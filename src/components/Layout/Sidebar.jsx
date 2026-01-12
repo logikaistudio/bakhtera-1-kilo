@@ -75,6 +75,7 @@ const Sidebar = () => {
             type: 'category', label: '📦 Operasional', items: [
                 { path: '/bridge/pengajuan', label: 'Pengajuan' },
                 { path: '/bridge/inventory', label: 'Inventaris Gudang' },
+                { path: '/bridge/outbound-inventory', label: 'Inventaris Barang Keluar' },
                 { path: '/bridge/goods-movement', label: 'Pergerakan Barang' },
             ]
         },
@@ -112,7 +113,6 @@ const Sidebar = () => {
 
     // Pabean submenu items
     const pabeanSubMenuItems = [
-        { path: '/pabean', label: 'Dashboard' },
         { path: '/pabean/barang-masuk', label: 'Barang Masuk' },
         { path: '/pabean/barang-keluar', label: 'Barang Keluar' },
         { path: '/pabean/pergerakan', label: 'Barang Mutasi' },

@@ -57,6 +57,7 @@ import PengajuanManagement from './pages/Bridge/PengajuanManagement';
 import BridgeFinance from './pages/Bridge/BridgeFinance';
 import GoodsMovement from './pages/Bridge/GoodsMovement';
 import WarehouseInventory from './pages/Bridge/WarehouseInventory';
+import OutboundInventory from './pages/Bridge/OutboundInventory';
 import ActivityLogger from './pages/Bridge/ActivityLogger';
 import ApprovalManager from './pages/Bridge/ApprovalManager';
 
@@ -155,6 +156,7 @@ function App() {
                   <Route path="/bridge/finance" element={<BridgeFinance />} />
                   <Route path="/bridge/goods-movement" element={<GoodsMovement />} />
                   <Route path="/bridge/inventory" element={<WarehouseInventory />} />
+                  <Route path="/bridge/outbound-inventory" element={<OutboundInventory />} />
                   <Route path="/bridge/logger" element={<ActivityLogger />} />
                   <Route path="/bridge/approvals" element={<ApprovalManager />} />
                   <Route path="/bridge/pergerakan" element={<PergerakanBarang />} />

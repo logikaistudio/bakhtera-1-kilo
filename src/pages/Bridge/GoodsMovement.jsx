@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Calendar, Package, User, ArrowRight, Eye, Download, Trash2 } from 'lucide-react'; // Added Trash2
+import { Search, Package, Download, Trash2, ArrowUpRight, ArrowLeftRight } from 'lucide-react';
 import { useData } from '../../context/DataContext';
-import { supabase } from '../../lib/supabase';
 import Button from '../../components/Common/Button';
 import { exportToCSV } from '../../utils/exportCSV';
+import { exportToXLS } from '../../utils/exportXLS';
 
 const GoodsMovement = () => {
     const navigate = useNavigate();
-    const { mutationLogs = [], addMutationLog, updateMutationLog, updateInventoryStock, deleteMutationLog } = useData(); // Added deleteMutationLog
+    const { mutationLogs = [], addMutationLog, updateMutationLog, updateInventoryStock, deleteMutationLog, companySettings } = useData();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedLog, setSelectedLog] = useState(null);
     const [isEditMode, setIsEditMode] = useState(false);
@@ -19,6 +19,18 @@ const GoodsMovement = () => {
         log.bcDocumentNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         log.itemName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         log.pic?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    // Split logs into Pameran and Outbound
+    const pameranLogs = filteredLogs.filter(log =>
+        (log.origin && log.origin.toLowerCase().includes('pameran')) ||
+        (log.destination && log.destination.toLowerCase().includes('pameran'))
+    );
+
+    // Outbound logs are those that are NOT Pameran
+    const outboundLogs = filteredLogs.filter(log =>
+        !((log.origin && log.origin.toLowerCase().includes('pameran')) ||
+            (log.destination && log.destination.toLowerCase().includes('pameran')))
     );
 
     // Format location display
@@ -34,12 +46,9 @@ const GoodsMovement = () => {
             log.destination.toLowerCase() !== 'gudang';
 
         if (!isOutbound) {
-            // This IS a remutation (return to warehouse)
-            // If user edits this directly, we treat it as updating THIS log
             return { totalRemutated: log.mutatedQty, sisaDiLokasi: 0, maxRemutation: 0, lastRemutationLog: log };
         }
 
-        // For outbound, find related returns
         const relatedRemutations = mutationLogs.filter(m =>
             m.pengajuanNumber === log.pengajuanNumber &&
             m.itemCode === log.itemCode &&
@@ -49,12 +58,10 @@ const GoodsMovement = () => {
         );
         const totalRemutated = relatedRemutations.reduce((sum, r) => sum + (r.mutatedQty || 0), 0);
 
-        // Find the most recent remutation log to update if needed
         const lastRemutationLog = relatedRemutations.length > 0
             ? relatedRemutations.sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date))[0]
             : null;
 
-        // Cap: remutasi tidak boleh lebih dari mutasi
         const cappedRemutated = Math.min(totalRemutated, log.mutatedQty);
         const sisaDiLokasi = Math.max(0, log.mutatedQty - cappedRemutated);
         return { totalRemutated: cappedRemutated, sisaDiLokasi, maxRemutation: sisaDiLokasi, lastRemutationLog };
@@ -63,23 +70,16 @@ const GoodsMovement = () => {
     // Handle Remutation (Return to Warehouse)
     const handleRemutation = async (log, targetQty, pic, remarks) => {
         const { totalRemutated, maxRemutation: currentMaxRemutation, lastRemutationLog } = getRemutationInfo(log);
-
-        // Calculate delta (Target - Current Total)
-        // If target is 3 and current is 5, delta is -2 (Correction/Reduction)
-        // If target is 5 and current is 2, delta is +3 (Addition)
         const delta = targetQty - totalRemutated;
 
         const remutationDate = document.getElementById('remutationDate')?.value || new Date().toISOString().split('T')[0];
         const remutationTime = document.getElementById('remutationTime')?.value || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
         if (delta === 0) {
-            // Case: Metadata Update Only (PIC, Date, etc.)
             if (!lastRemutationLog) {
                 alert('Tidak ada data remutasi yang bisa diedit (belum ada remutasi sebelumnya).');
                 return false;
             }
-
-            // Update the LAST remutation log with new metadata
             try {
                 const updates = {
                     pic: pic,
@@ -87,9 +87,7 @@ const GoodsMovement = () => {
                     time: remutationTime,
                     remarks: remarks
                 };
-
                 await updateMutationLog(lastRemutationLog.id, updates);
-
                 alert('Data remutasi berhasil diperbarui (Info PIC/Tanggal/Keterangan)');
                 setSelectedLog(null);
                 setIsEditMode(false);
@@ -101,8 +99,6 @@ const GoodsMovement = () => {
             }
         }
 
-        // Validation: Target cannot depend on current stock, but total remutation cannot exceed initial mutated qty
-        // And total remutation cannot be negative
         if (targetQty < 0 || targetQty > log.mutatedQty) {
             alert(`Total remutasi harus antara 0 dan ${log.mutatedQty}`);
             return false;
@@ -113,7 +109,6 @@ const GoodsMovement = () => {
             return false;
         }
 
-        // Confirm if it's a correction (negative delta)
         if (delta < 0) {
             const confirm = window.confirm(`Anda akan mengurangi jumlah remutasi sebanyak ${Math.abs(delta)} unit. Lanjutkan?`);
             if (!confirm) return false;
@@ -129,12 +124,12 @@ const GoodsMovement = () => {
                 itemName: log.itemName,
                 serialNumber: log.serialNumber,
                 totalStock: log.totalStock,
-                origin: log.destination, // From Project
-                destination: 'Warehouse', // To Warehouse
-                mutatedQty: delta, // Log the difference (can be negative)
-                remainingStock: (currentMaxRemutation - delta), // This field is less relevant for logs but good for tracking
-                date: document.getElementById('remutationDate')?.value || new Date().toISOString().split('T')[0],
-                time: document.getElementById('remutationTime')?.value || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+                origin: log.destination,
+                destination: 'Warehouse',
+                mutatedQty: delta,
+                remainingStock: (currentMaxRemutation - delta),
+                date: remutationDate,
+                time: remutationTime,
                 pic: pic,
                 remarks: remarks || (delta > 0 ? `Remutasi Tambahan: ${delta} unit` : `Koreksi Remutasi: ${delta} unit`),
                 condition: 'Baik',
@@ -143,7 +138,6 @@ const GoodsMovement = () => {
 
             await addMutationLog(newMutation);
 
-            // Update inventory stock (accepts negative for corrections)
             await updateInventoryStock(
                 log.itemCode,
                 log.itemName,
@@ -166,7 +160,7 @@ const GoodsMovement = () => {
 
     // Delete Handler
     const handleDeleteRow = async (e, id) => {
-        e.stopPropagation(); // Prevent row click
+        e.stopPropagation();
         if (!window.confirm('Yakin ingin menghapus data mutasi ini secara permanen?\nData yang dihapus tidak dapat dikembalikan.')) return;
 
         if (deleteMutationLog) {
@@ -179,8 +173,8 @@ const GoodsMovement = () => {
         }
     };
 
-    // Export to CSV handler
-    const handleExportCSV = () => {
+    // Generic Export CSV
+    const handleExportCSV = (data, filename) => {
         const columns = [
             { key: 'pengajuanNumber', header: 'No. Pendaftaran' },
             { key: 'itemCode', header: 'Kode Barang' },
@@ -197,9 +191,166 @@ const GoodsMovement = () => {
             { key: 'destination', header: 'Ke' },
             { key: 'remarks', header: 'Keterangan' }
         ];
-
-        exportToCSV(filteredLogs, 'Pergerakan_Barang', columns);
+        exportToCSV(data, filename, columns);
     };
+
+    // Generic Export XLS
+    const handleExportXLS = (data, filename, title) => {
+        if (data.length === 0) {
+            alert('Tidak ada data untuk diexport');
+            return;
+        }
+
+        // Calculate date range for header
+        const dates = data.map(t => new Date(t.date).getTime());
+        const minDate = new Date(Math.min(...dates));
+        const maxDate = new Date(Math.max(...dates));
+
+        const formatDate = (d) => d.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const period = `${formatDate(minDate)} - ${formatDate(maxDate)}`;
+
+        const headerRows = [
+            { value: companySettings?.company_name || 'PT. BAKHTERA FREIGHT WORLDWIDE', style: 'company' },
+            { value: companySettings?.address || 'Jl. Contoh No. 123, Jakarta', style: 'normal' },
+            { value: '' },
+            { value: title.toUpperCase(), style: 'title' },
+            { value: `Periode: ${period}`, style: 'normal' },
+            { value: '' },
+            { value: '' }
+        ];
+
+        const xlsColumns = [
+            { header: 'No', key: 'no', width: 5, align: 'center' },
+            { header: 'No. Pengajuan', key: 'pengajuanNumber', width: 20 },
+            { header: 'Kode Barang', key: 'itemCode', width: 15 },
+            { header: 'Nama Item', key: 'itemName', width: 30 },
+            { header: 'Serial Number', key: 'serialNumber', width: 15 },
+            { header: 'Tanggal', key: 'date', width: 12, align: 'center', render: (i) => new Date(i.date).toLocaleDateString('id-ID') },
+            { header: 'Jam', key: 'time', width: 10, align: 'center' },
+            { header: 'PIC', key: 'pic', width: 15 },
+            { header: 'Stok Awal', key: 'totalStock', width: 10, align: 'center' },
+            { header: 'Mutasi', key: 'mutatedQty', width: 10, align: 'center' },
+            { header: 'Sisa', key: 'remainingStock', width: 10, align: 'center' },
+            { header: 'Dari', key: 'origin', width: 15 },
+            { header: 'Ke', key: 'destination', width: 15 },
+            { header: 'Keterangan', key: 'remarks', width: 30 }
+        ];
+
+        exportToXLS(data, filename, headerRows, xlsColumns);
+    };
+
+    const renderTable = (data, title, icon, colorClass, emptyMessage) => (
+        <div className="glass-card rounded-lg overflow-hidden mb-6">
+            <div className="p-4 border-b border-dark-border">
+                <div className="flex items-center gap-2">
+                    {icon}
+                    <h2 className="text-lg font-semibold text-silver-light">
+                        {title}
+                    </h2>
+                    <span className="ml-auto text-sm text-silver-dark">
+                        {data.length} entri
+                    </span>
+                    <div className="flex gap-2 ml-2">
+                        <Button
+                            onClick={() => handleExportXLS(data, `Laporan_${title.replace(/\s+/g, '_')}`, title)}
+                            variant="success"
+                            icon={null} // Removed Icon to keep it button simple or add FileSpreadsheet
+                            className="!py-1.5 !px-3 !text-xs font-bold"
+                        >
+                            XLS
+                        </Button>
+                        <Button
+                            onClick={() => handleExportCSV(data, `Data_${title.replace(/\s+/g, '_')}`)}
+                            variant="secondary"
+                            icon={Download}
+                            className="!py-1.5 !px-3 !text-xs"
+                        >
+                            CSV
+                        </Button>
+                    </div>
+                </div>
+            </div>
+
+            {data.length === 0 ? (
+                <div className="p-12 text-center text-silver-dark">
+                    <Package className="w-16 h-16 mx-auto mb-4 opacity-30" />
+                    <p className="text-lg">{emptyMessage}</p>
+                </div>
+            ) : (
+                <div className="overflow-x-auto">
+                    <table className="w-full">
+                        <thead className={`${colorClass}/10`}>
+                            <tr>
+                                <th className="px-4 py-3 text-left text-xs text-silver">No. Pengajuan</th>
+                                <th className="px-4 py-3 text-left text-xs text-silver">Kode Barang</th>
+                                <th className="px-4 py-3 text-left text-xs text-silver">Nama Item</th>
+                                <th className="px-4 py-3 text-center text-xs text-silver">Tanggal</th>
+                                <th className="px-4 py-3 text-left text-xs text-silver">PIC</th>
+                                <th className="px-4 py-3 text-center text-xs text-accent-blue">Stok Awal</th>
+                                <th className="px-4 py-3 text-center text-xs text-accent-orange">Mutasi</th>
+                                <th className="px-4 py-3 text-center text-xs text-accent-green">Remutasi</th>
+                                <th className="px-4 py-3 text-center text-xs text-accent-purple">Sisa</th>
+                                <th className="px-4 py-3 text-left text-xs text-silver">Lokasi</th>
+                                <th className="px-4 py-3 text-left text-xs text-silver">Keterangan</th>
+                                <th className="px-4 py-3 text-center text-xs text-silver">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-dark-border">
+                            {data.map((log, idx) => {
+                                const { totalRemutated, sisaDiLokasi } = getRemutationInfo(log);
+                                return (
+                                    <tr
+                                        key={log.id}
+                                        className="hover:bg-dark-surface/50 cursor-pointer"
+                                        onClick={() => navigate(`/bridge/inventory?pengajuan=${encodeURIComponent(log.pengajuanNumber)}`)}
+                                        title="Klik untuk melihat detail inventaris di Gudang"
+                                    >
+                                        <td className="px-4 py-3 text-sm text-silver-light">{log.pengajuanNumber}</td>
+                                        <td className="px-4 py-3 text-sm text-silver-light">{log.itemCode || '-'}</td>
+                                        <td className="px-4 py-3 text-sm text-silver-light">
+                                            <div>{log.itemName}</div>
+                                            {log.serialNumber && <div className="text-xs text-silver-dark">SN: {log.serialNumber}</div>}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-silver text-center">
+                                            {new Date(log.date).toLocaleDateString('id-ID')}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-silver-light">{log.pic}</td>
+                                        <td className="px-4 py-3 text-center">
+                                            <span className="text-sm text-accent-blue">{log.totalStock}</span>
+                                        </td>
+                                        <td className="px-4 py-3 text-center">
+                                            <span className="text-sm text-accent-orange">{log.mutatedQty}</span>
+                                        </td>
+                                        <td className="px-4 py-3 text-center">
+                                            <span className="text-sm text-accent-green">{totalRemutated}</span>
+                                        </td>
+                                        <td className="px-4 py-3 text-center">
+                                            <span className="text-sm text-accent-purple">{sisaDiLokasi}</span>
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-silver">
+                                            {formatLocation(log.origin, log.destination)}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-silver-dark max-w-xs truncate">
+                                            {log.remarks || '-'}
+                                        </td>
+                                        <td className="px-4 py-3 text-center">
+                                            <button
+                                                onClick={(e) => handleDeleteRow(e, log.id)}
+                                                className="p-1.5 hover:bg-red-500/10 text-gray-500 hover:text-red-500 rounded-lg transition-colors"
+                                                title="Hapus Data"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </div>
+    );
 
     return (
         <div className="p-6 space-y-6">
@@ -209,137 +360,38 @@ const GoodsMovement = () => {
                 <p className="text-silver-dark mt-1">Riwayat Mutasi & Pergerakan Inventaris Gudang</p>
             </div>
 
-            {/* Search & Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                {/* Search */}
-                <div className="md:col-span-2 glass-card p-4 rounded-lg">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
-                        <input
-                            type="text"
-                            placeholder="Cari berdasarkan No. Pendaftaran, Item, atau PIC..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
-                        />
-                    </div>
-                </div>
-
-                {/* Stats */}
-                <div className="glass-card p-4 rounded-lg border border-accent-blue">
-                    <p className="text-xs text-silver-dark">Total Mutasi</p>
-                    <p className="text-2xl font-bold text-accent-blue">{mutationLogs.length}</p>
-                </div>
-                <div className="glass-card p-4 rounded-lg border border-accent-green">
-                    <p className="text-xs text-silver-dark">Hari Ini</p>
-                    <p className="text-2xl font-bold text-accent-green">
-                        {mutationLogs.filter(log => log.date === new Date().toISOString().split('T')[0]).length}
-                    </p>
+            {/* Search */}
+            <div className="glass-card p-4 rounded-lg">
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
+                    <input
+                        type="text"
+                        placeholder="Cari berdasarkan No. Pendaftaran, Item, atau PIC..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
+                    />
                 </div>
             </div>
 
-            {/* Mutation Logs Table */}
-            <div className="glass-card rounded-lg overflow-hidden">
-                <div className="p-4 border-b border-dark-border">
-                    <div className="flex items-center gap-2">
-                        <Package className="w-5 h-5 text-accent-purple" />
-                        <h2 className="text-lg font-semibold text-silver-light">
-                            Riwayat Mutasi Barang
-                        </h2>
-                        <span className="ml-auto text-sm text-silver-dark">
-                            {filteredLogs.length} entri
-                        </span>
-                        <Button
-                            onClick={handleExportCSV}
-                            variant="secondary"
-                            icon={Download}
-                            className="ml-2"
-                        >
-                            Export CSV
-                        </Button>
-                    </div>
-                </div>
+            {/* Table 1: Pameran */}
+            {renderTable(
+                pameranLogs,
+                "Aktivitas Pameran",
+                <ArrowLeftRight className="w-5 h-5 text-accent-purple" />,
+                "bg-accent-purple",
+                "Belum ada aktivitas pameran"
+            )}
 
-                {filteredLogs.length === 0 ? (
-                    <div className="p-12 text-center text-silver-dark">
-                        <Package className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                        <p className="text-lg">Belum ada riwayat mutasi</p>
-                        <p className="text-sm mt-2">Mutasi barang akan muncul di sini setelah submit dari Inventaris Gudang</p>
-                    </div>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="bg-accent-purple/10">
-                                <tr>
-                                    <th className="px-4 py-3 text-left text-xs text-silver">No. Pengajuan</th>
-                                    <th className="px-4 py-3 text-left text-xs text-silver">Kode Barang</th>
-                                    <th className="px-4 py-3 text-left text-xs text-silver">Nama Item</th>
-                                    <th className="px-4 py-3 text-center text-xs text-silver">Tanggal</th>
-                                    <th className="px-4 py-3 text-left text-xs text-silver">PIC</th>
-                                    <th className="px-4 py-3 text-center text-xs text-accent-blue">Stok Awal</th>
-                                    <th className="px-4 py-3 text-center text-xs text-accent-orange">Mutasi</th>
-                                    <th className="px-4 py-3 text-center text-xs text-accent-green">Remutasi</th>
-                                    <th className="px-4 py-3 text-center text-xs text-accent-purple">Sisa</th>
-                                    <th className="px-4 py-3 text-left text-xs text-silver">Lokasi</th>
-                                    <th className="px-4 py-3 text-left text-xs text-silver">Keterangan</th>
-                                    <th className="px-4 py-3 text-center text-xs text-silver">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-dark-border">
-                                {filteredLogs.map((log, idx) => {
-                                    const { totalRemutated, sisaDiLokasi } = getRemutationInfo(log);
-                                    return (
-                                        <tr
-                                            key={log.id}
-                                            className="hover:bg-dark-surface/50 cursor-pointer"
-                                            onClick={() => navigate(`/bridge/inventory?pengajuan=${encodeURIComponent(log.pengajuanNumber)}`)}
-                                            title="Klik untuk melihat detail inventaris di Gudang"
-                                        >
-                                            <td className="px-4 py-3 text-sm text-silver-light">{log.pengajuanNumber}</td>
-                                            <td className="px-4 py-3 text-sm text-silver-light">{log.itemCode || '-'}</td>
-                                            <td className="px-4 py-3 text-sm text-silver-light">
-                                                <div>{log.itemName}</div>
-                                                {log.serialNumber && <div className="text-xs text-silver-dark">SN: {log.serialNumber}</div>}
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-silver text-center">
-                                                {new Date(log.date).toLocaleDateString('id-ID')}
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-silver-light">{log.pic}</td>
-                                            <td className="px-4 py-3 text-center">
-                                                <span className="text-sm text-accent-blue">{log.totalStock}</span>
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
-                                                <span className="text-sm text-accent-orange">{log.mutatedQty}</span>
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
-                                                <span className="text-sm text-accent-green">{totalRemutated}</span>
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
-                                                <span className="text-sm text-accent-purple">{sisaDiLokasi}</span>
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-silver">
-                                                {formatLocation(log.origin, log.destination)}
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-silver-dark max-w-xs truncate">
-                                                {log.remarks || '-'}
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
-                                                <button
-                                                    onClick={(e) => handleDeleteRow(e, log.id)}
-                                                    className="p-1.5 hover:bg-red-500/10 text-gray-500 hover:text-red-500 rounded-lg transition-colors"
-                                                    title="Hapus Data"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </div>
+            {/* Table 2: Outbound */}
+            {renderTable(
+                outboundLogs,
+                "Aktivitas Outbound",
+                <ArrowUpRight className="w-5 h-5 text-accent-orange" />,
+                "bg-accent-orange",
+                "Belum ada aktivitas outbound lainnya"
+            )}
+
 
             {/* Detail Modal */}
             {selectedLog && (() => {
@@ -442,7 +494,6 @@ const GoodsMovement = () => {
                                     </table>
                                 </div>
 
-                                {/* Kode Packing Label */}
                                 <p className="text-sm text-gray-600 mb-2 mt-6">Kode Packing: {selectedLog.packageNumber || 'Box-1'}</p>
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-sm border border-gray-300">
@@ -520,13 +571,10 @@ const GoodsMovement = () => {
                                     </table>
                                 </div>
 
-                                {/* Scrollbar indicator */}
                                 <div className="w-full h-2 bg-gray-200 rounded-full mt-4 mb-4">
                                     <div className="h-full w-1/3 bg-sky-400 rounded-full"></div>
                                 </div>
 
-                                {/* Document Upload Section - Show when edit mode */}
-                                {/* Document Upload Section - Show when edit mode */}
                                 {isEditMode && (
                                     <div className="p-4 bg-green-50 border border-green-200 rounded-lg mt-4">
                                         <h4 className="text-sm font-semibold text-green-700 mb-3">Upload Dokumen Pendukung & Simpan</h4>
@@ -558,7 +606,6 @@ const GoodsMovement = () => {
                                     </div>
                                 )}
 
-                                {/* Status Info */}
                                 {!isEditMode && isOutbound && maxRemutation === 0 && (
                                     <p className="text-gray-600 text-sm">✓ Semua item sudah diremutasi ke Warehouse</p>
                                 )}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, FileText, CheckCircle, Edit2, Download, Trash2, X, Warehouse, Package } from 'lucide-react';
+import { Plus, FileText, CheckCircle, Edit2, Download, Trash2, X, Warehouse, Package, ArrowRight } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import Button from '../../components/Common/Button';
 import PackageManager from '../../components/Common/PackageManager';
@@ -31,6 +31,10 @@ const PengajuanManagement = () => {
     // Warehouse selector states for outbound
     const [showWarehouseSelector, setShowWarehouseSelector] = useState(false);
     const [sourcePengajuanId, setSourcePengajuanId] = useState(null);
+    const [showItemEditor, setShowItemEditor] = useState(false); // NEW: For editing selected items
+    const [editablePackages, setEditablePackages] = useState([]); // NEW: Temporary packages for editing
+    const [showDetailModal, setShowDetailModal] = useState(false); // NEW: Detail modal
+    const [selectedPengajuan, setSelectedPengajuan] = useState(null); // NEW: Selected pengajuan for detail
 
     const [editFormData, setEditFormData] = useState({
         bcDocumentNumber: '',
@@ -423,10 +427,11 @@ const PengajuanManagement = () => {
         const pengajuanId = pengajuan.id;
         const pengajuanNumber = pengajuan.quotationNumber || pengajuan.quotation_number;
 
-        // Get all outbound mutations for this pengajuan
+        // Get all mutations that moved items OUT of warehouse (to Pameran or Keluar TPB)
         const outboundMutations = mutationLogs.filter(log =>
             (log.pengajuanId === pengajuanId || log.pengajuanNumber === pengajuanNumber) &&
-            (log.origin === 'warehouse' && log.destination !== 'warehouse')
+            log.origin === 'Gudang' && // Must be from warehouse
+            (log.destination === 'Pameran' || log.destination === 'Keluar TPB') // Moved out
         );
 
         // Create map of mutated quantities per item
@@ -494,6 +499,113 @@ const PengajuanManagement = () => {
 
         console.log('📦 Selected source pengajuan:', pengajuan.quotationNumber || pengajuan.quotation_number);
         console.log('📦 Packages with available stock:', packagesWithAvailable);
+    };
+
+    // NEW: Handle editing item selection
+    const handleEditItemSelection = () => {
+        setEditablePackages(formData.packages || []);
+        setShowItemEditor(true);
+    };
+
+    // NEW: Handle confirm edited items
+    const handleConfirmEditedItems = () => {
+        // Filter out items with 0 quantity
+        const filteredPackages = editablePackages
+            .map(pkg => ({
+                ...pkg,
+                items: pkg.items.filter(item => (item.quantity || 0) > 0)
+            }))
+            .filter(pkg => pkg.items.length > 0);
+
+        if (filteredPackages.length === 0) {
+            alert('⚠️ Tidak ada item yang dipilih. Pilih setidaknya 1 item untuk dikeluarkan.');
+            return;
+        }
+
+        setFormData(prev => ({
+            ...prev,
+            packages: filteredPackages
+        }));
+
+        setShowItemEditor(false);
+        console.log('✅ Item selection updated:', filteredPackages);
+    };
+
+    // NEW: Handle quantity change in editor
+    const handleItemQuantityChange = (pkgIndex, itemIndex, newQty) => {
+        setEditablePackages(prev => {
+            const updated = JSON.parse(JSON.stringify(prev)); // Deep clone
+            const item = updated[pkgIndex].items[itemIndex];
+            const maxQty = item.availableQty || item.quantity || 0;
+
+            // Validate quantity
+            const validQty = Math.max(0, Math.min(parseInt(newQty) || 0, maxQty));
+            updated[pkgIndex].items[itemIndex].quantity = validQty;
+
+            return updated;
+        });
+    };
+
+    // NEW: Handle remove item (set quantity to 0)
+    const handleRemoveItem = (pkgIndex, itemIndex) => {
+        setEditablePackages(prev => {
+            const updated = JSON.parse(JSON.stringify(prev)); // Deep clone
+            updated[pkgIndex].items[itemIndex].quantity = 0;
+            return updated;
+        });
+    };
+
+    // NEW: Quick outbound submission from inbound pengajuan
+    const handleQuickOutbound = (inboundPengajuan, e) => {
+        e.stopPropagation(); // Prevent row click
+
+        // Calculate available stock for this pengajuan
+        const packagesWithStock = calculateAvailableStock(inboundPengajuan);
+
+        // Filter packages with available items
+        const packagesWithAvailable = packagesWithStock.filter(pkg =>
+            pkg.items.some(item => item.availableQty > 0)
+        ).map(pkg => ({
+            ...pkg,
+            items: pkg.items.filter(item => item.availableQty > 0).map(item => ({
+                ...item,
+                quantity: item.availableQty
+            }))
+        }));
+
+        if (packagesWithAvailable.length === 0) {
+            alert('❌ Tidak ada barang yang tersedia di gudang untuk pengajuan ini.\n\nSemua barang mungkin sudah dipindahkan ke Pameran atau sudah keluar dari TPB.');
+            return;
+        }
+
+        // Store in editable state
+        setEditablePackages(packagesWithAvailable);
+
+        // Auto-populate form for outbound
+        setFormData({
+            submissionDate: new Date().toISOString().split('T')[0],
+            customer: inboundPengajuan.customer || '',
+            type: 'outbound',
+            bcDocType: inboundPengajuan.bcDocType || inboundPengajuan.bc_document_type || '',
+            shipper: inboundPengajuan.shipper || '',
+            owner: inboundPengajuan.customer || '',
+            origin: 'Gudang TPPB',
+            destination: '',
+            packages: packagesWithAvailable,
+            documents: [],
+            notes: `Pengajuan keluar dari ${inboundPengajuan.quotationNumber || inboundPengajuan.quotation_number}`,
+            invoiceValue: '',
+            invoiceCurrency: 'IDR',
+            exchangeRate: '',
+            sourcePengajuanId: inboundPengajuan.id,
+            sourcePengajuanNumber: inboundPengajuan.quotationNumber || inboundPengajuan.quotation_number
+        });
+
+        setSourcePengajuanId(inboundPengajuan.id);
+        setShowForm(true);
+
+        console.log('🚀 Quick Outbound from:', inboundPengajuan.quotationNumber || inboundPengajuan.quotation_number);
+        console.log(`📦 ${packagesWithAvailable.length} package dengan ${packagesWithAvailable.reduce((sum, pkg) => sum + pkg.items.length, 0)} item siap diajukan keluar`);
     };
 
     // Removed getCustomsStatusBadge - Status Bea Cukai column removed per user request
@@ -587,76 +699,95 @@ const PengajuanManagement = () => {
                         </div>
                     </div>
 
-                    {/* Customer & Transaction Details */}
+                    {/* Tipe Pengajuan Section - NEW */}
+                    <div className="glass-card p-4 rounded-lg border-2 border-accent-purple bg-accent-purple/10">
+                        <h4 className="text-sm font-semibold text-silver-light mb-3">📦 Tipe Pengajuan</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-medium text-silver mb-2">Tipe *</label>
+                                <select
+                                    value={formData.type}
+                                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                                    className="w-full"
+                                >
+                                    <option value="inbound">Masuk (Inbound)</option>
+                                    <option value="outbound">Keluar (Outbound)</option>
+                                </select>
+                                <p className="text-xs text-silver-dark mt-1">
+                                    Pilih tipe pengajuan sesuai dengan alur barang (masuk atau keluar)
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* BC Document, Owner & Shipper Section - NEW */}
+                    <div className="glass-card p-4 rounded-lg border-2 border-accent-orange bg-accent-orange/10">
+                        <h4 className="text-sm font-semibold text-silver-light mb-3">📄 Dokumen BC & Pihak Terkait</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-silver mb-2">Jenis Dokumen BC *</label>
+                                <select
+                                    required
+                                    value={formData.bcDocType}
+                                    onChange={(e) => setFormData({ ...formData, bcDocType: e.target.value })}
+                                    className="w-full"
+                                >
+                                    <option value="">-- Pilih Jenis Dokumen BC --</option>
+                                    {getFilteredBCCodes().map(bc => (
+                                        <option key={bc.id} value={bc.code}>
+                                            {bc.code} - {bc.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-silver-dark mt-1">
+                                    Pilih jenis dokumen Bea Cukai sesuai tipe pengajuan
+                                </p>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-silver mb-2">Pemilik Barang *</label>
+                                <select
+                                    required
+                                    value={formData.customer}
+                                    onChange={(e) => setFormData({ ...formData, customer: e.target.value })}
+                                    className="w-full"
+                                >
+                                    <option value="">-- Pilih Pelanggan --</option>
+                                    {customers.map(cust => (
+                                        <option key={cust.id} value={cust.name}>
+                                            {cust.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-silver-dark mt-1">
+                                    Pilih dari daftar customer yang sudah terdaftar
+                                </p>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-silver mb-2">Shipper *</label>
+                                <select
+                                    required
+                                    value={formData.shipper}
+                                    onChange={(e) => setFormData({ ...formData, shipper: e.target.value })}
+                                    className="w-full"
+                                >
+                                    <option value="">-- Pilih Shipper --</option>
+                                    {vendors.map(vendor => (
+                                        <option key={vendor.id} value={vendor.name}>
+                                            {vendor.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-silver-dark mt-1">
+                                    Pengirim/vendor yang mengirimkan barang
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Origin & Destination */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-silver mb-2">Pemilik Barang *</label>
-                            <select
-                                required
-                                value={formData.customer}
-                                onChange={(e) => setFormData({ ...formData, customer: e.target.value })}
-                                className="w-full"
-                            >
-                                <option value="">-- Pilih Pelanggan --</option>
-                                {customers.map(cust => (
-                                    <option key={cust.id} value={cust.name}>
-                                        {cust.name}
-                                    </option>
-                                ))}
-                            </select>
-                            <p className="text-xs text-silver-dark mt-1">
-                                Pilih dari daftar customer yang sudah terdaftar
-                            </p>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-silver mb-2">Tipe *</label>
-                            <select
-                                value={formData.type}
-                                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                                className="w-full"
-                            >
-                                <option value="inbound">Masuk (Inbound)</option>
-                                <option value="outbound">Keluar (Outbound)</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-silver mb-2">Jenis Dokumen BC *</label>
-                            <select
-                                required
-                                value={formData.bcDocType}
-                                onChange={(e) => setFormData({ ...formData, bcDocType: e.target.value })}
-                                className="w-full"
-                            >
-                                <option value="">-- Pilih Jenis Dokumen BC --</option>
-                                {getFilteredBCCodes().map(bc => (
-                                    <option key={bc.id} value={bc.code}>
-                                        {bc.code} - {bc.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-
-
-                        <div>
-                            <label className="block text-sm font-medium text-silver mb-2">Shipper *</label>
-                            <select
-                                required
-                                value={formData.shipper}
-                                onChange={(e) => setFormData({ ...formData, shipper: e.target.value })}
-                                className="w-full"
-                            >
-                                <option value="">-- Pilih Shipper --</option>
-                                {vendors.map(vendor => (
-                                    <option key={vendor.id} value={vendor.name}>
-                                        {vendor.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
                         <div>
                             <label className="block text-sm font-medium text-silver mb-2">Asal</label>
                             <input
@@ -777,27 +908,43 @@ const PengajuanManagement = () => {
                             </p>
 
                             {sourcePengajuanId ? (
-                                <div className="flex items-center justify-between bg-dark-surface/50 p-3 rounded-lg">
-                                    <div className="flex items-center gap-2">
-                                        <Package className="w-5 h-5 text-accent-green" />
-                                        <span className="text-sm text-silver">
-                                            Sumber: <span className="font-medium text-accent-green">{formData.sourcePengajuanNumber}</span>
-                                        </span>
-                                        <span className="text-xs text-silver-dark">
-                                            ({formData.packages?.length || 0} package, {formData.packages?.reduce((sum, pkg) => sum + (pkg.items?.length || 0), 0) || 0} item)
-                                        </span>
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between bg-dark-surface/50 p-3 rounded-lg">
+                                        <div className="flex items-center gap-2">
+                                            <Package className="w-5 h-5 text-accent-green" />
+                                            <span className="text-sm text-silver">
+                                                Sumber: <span className="font-medium text-accent-green">{formData.sourcePengajuanNumber}</span>
+                                            </span>
+                                            <span className="text-xs text-silver-dark">
+                                                ({formData.packages?.length || 0} package, {formData.packages?.reduce((sum, pkg) => sum + (pkg.items?.length || 0), 0) || 0} item)
+                                            </span>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Button
+                                                type="button"
+                                                variant="primary"
+                                                size="sm"
+                                                icon={Edit2}
+                                                onClick={handleEditItemSelection}
+                                            >
+                                                Edit Pilihan
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant="secondary"
+                                                size="sm"
+                                                onClick={() => {
+                                                    setSourcePengajuanId(null);
+                                                    setFormData(prev => ({ ...prev, packages: [], sourcePengajuanId: null, sourcePengajuanNumber: null }));
+                                                }}
+                                            >
+                                                Ganti
+                                            </Button>
+                                        </div>
                                     </div>
-                                    <Button
-                                        type="button"
-                                        variant="secondary"
-                                        size="sm"
-                                        onClick={() => {
-                                            setSourcePengajuanId(null);
-                                            setFormData(prev => ({ ...prev, packages: [], sourcePengajuanId: null, sourcePengajuanNumber: null }));
-                                        }}
-                                    >
-                                        Ganti
-                                    </Button>
+                                    <p className="text-xs text-silver-dark italic">
+                                        💡 Klik "Edit Pilihan" untuk menyesuaikan item atau quantity yang akan dikeluarkan
+                                    </p>
                                 </div>
                             ) : (
                                 <Button
@@ -861,42 +1008,49 @@ const PengajuanManagement = () => {
                 </form>
             )}
 
-            {/* Daftar Pengajuan - TABLE FORMAT */}
-            <div className="glass-card p-6 rounded-lg">
+            {/* Daftar Pengajuan - SPLIT INTO TWO TABLES */}
+
+            {/* ==================== PENGAJUAN MASUK (INBOUND) ==================== */}
+            <div className="glass-card p-6 rounded-lg border-2 border-accent-blue">
                 <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xl font-semibold text-silver-light">Pengajuan</h3>
+                    <div>
+                        <h3 className="text-xl font-semibold text-accent-blue flex items-center gap-2">
+                            📥 Pengajuan Masuk (Inbound)
+                        </h3>
+                        <p className="text-xs text-silver-dark mt-1">Pengajuan barang masuk ke TPPB</p>
+                    </div>
                     <Button
                         onClick={handleExportCSV}
                         variant="secondary"
                         icon={Download}
+                        size="sm"
                     >
                         Export CSV
                     </Button>
                 </div>
 
-                {quotations.length === 0 ? (
+                {quotations.filter(q => q.type === 'inbound').length === 0 ? (
                     <div className="text-center py-8 text-silver-dark">
                         <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                        <p>Belum ada pengajuan</p>
+                        <p>Belum ada pengajuan masuk</p>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full">
                             <thead className="bg-accent-blue">
                                 <tr>
-                                    <th className="px-4 py-3 text-left text-sm font-semibold text-white">No. Pengajuan</th>
-                                    <th className="px-4 py-3 text-left text-sm font-semibold text-white">Tanggal</th>
-                                    <th className="px-4 py-3 text-left text-sm font-semibold text-white">Pemilik Barang</th>
-                                    <th className="px-4 py-3 text-left text-sm font-semibold text-white">Tipe</th>
-                                    <th className="px-4 py-3 text-left text-sm font-semibold text-white">Dokumen BC</th>
-                                    <th className="px-4 py-3 text-left text-sm font-semibold text-white">Jumlah Barang</th>
-                                    <th className="px-4 py-3 text-left text-sm font-semibold text-white">No. Dokumen Pabean</th>
-                                    <th className="px-4 py-3 text-left text-sm font-semibold text-white">Tgl Approval</th>
-                                    <th className="px-4 py-3 text-left text-sm font-semibold text-white">Status Dokumen</th>
+                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">No. Pengajuan</th>
+                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Tanggal</th>
+                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Pemilik Barang</th>
+                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Dokumen BC</th>
+                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Jumlah Barang</th>
+                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">No. Dokumen Pabean</th>
+                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Tgl Approval</th>
+                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Status Dokumen</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-dark-border">
-                                {quotations.map(quot => {
+                                {quotations.filter(q => q.type === 'inbound').map(quot => {
                                     const docStatus = quot.documentStatus || quot.document_status || 'pengajuan';
                                     const docStatusBadge = {
                                         pengajuan: { color: 'bg-yellow-500/20 text-yellow-400', label: 'Pengajuan' },
@@ -910,42 +1064,124 @@ const PengajuanManagement = () => {
                                             onClick={() => handleEditPengajuan(quot)}
                                             className="hover:bg-dark-surface smooth-transition cursor-pointer"
                                         >
-                                            <td className="px-4 py-3 text-sm text-silver-light font-medium">
+                                            <td className="px-4 py-2 text-sm text-silver-light font-medium whitespace-nowrap">
                                                 {quot.quotationNumber || quot.quotation_number || quot.id}
                                             </td>
-                                            <td className="px-4 py-3 text-sm text-silver-dark">
+                                            <td className="px-4 py-2 text-sm text-silver-dark whitespace-nowrap">
                                                 {new Date(quot.submissionDate || quot.submission_date || quot.date).toLocaleDateString('id-ID')}
                                             </td>
-                                            <td className="px-4 py-3 text-sm text-silver">
+                                            <td className="px-4 py-2 text-sm text-silver whitespace-nowrap">
                                                 {quot.customer}
                                             </td>
-                                            <td className="px-4 py-3 text-sm text-silver-dark">
-                                                {quot.type === 'inbound' ? 'Masuk (Inbound)' : 'Keluar (Outbound)'}
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-silver">
+                                            <td className="px-4 py-2 text-sm text-silver whitespace-nowrap">
                                                 {quot.bcDocType || quot.bc_document_type || '-'}
                                             </td>
-
-                                            {/* Jumlah Barang */}
-                                            <td className="px-4 py-3 text-sm text-silver">
+                                            <td className="px-4 py-2 text-sm text-silver whitespace-nowrap">
                                                 {quot.packages
                                                     ? `${quot.packages.length} package (${quot.packages.reduce((sum, pkg) => sum + (pkg.items?.length || 0), 0)} item)`
                                                     : (quot.packageItems?.length || quot.items?.length || 0)
                                                 }
                                             </td>
-
-                                            {/* No. Dokumen Pabean */}
-                                            <td className="px-4 py-3 text-sm text-accent-blue font-medium">
+                                            <td className="px-4 py-2 text-sm text-accent-blue font-medium whitespace-nowrap">
                                                 {quot.bcDocumentNumber || quot.bc_document_number || '-'}
                                             </td>
-
-                                            {/* Tanggal Approval */}
-                                            <td className="px-4 py-3 text-sm text-silver">
+                                            <td className="px-4 py-2 text-sm text-silver whitespace-nowrap">
                                                 {quot.approvedDate || quot.approved_date ? new Date(quot.approvedDate || quot.approved_date).toLocaleDateString('id-ID') : '-'}
                                             </td>
+                                            <td className="px-4 py-2 whitespace-nowrap">
+                                                <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${docStatusBadge.color}`}>
+                                                    {docStatusBadge.label}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                )
+                }
+            </div>
 
-                                            {/* Status Dokumen */}
-                                            <td className="px-4 py-3">
+            {/* ==================== PENGAJUAN KELUAR (OUTBOUND) ==================== */}
+            <div className="glass-card p-6 rounded-lg border-2 border-accent-purple mt-10">
+                <div className="flex items-center justify-between mb-4">
+                    <div>
+                        <h3 className="text-xl font-semibold text-accent-purple flex items-center gap-2">
+                            📤 Pengajuan Keluar (Outbound)
+                        </h3>
+                        <p className="text-xs text-silver-dark mt-1">Pengajuan barang keluar dari TPPB</p>
+                    </div>
+                    <Button
+                        onClick={handleExportCSV}
+                        variant="secondary"
+                        icon={Download}
+                        size="sm"
+                    >
+                        Export CSV
+                    </Button>
+                </div>
+
+                {quotations.filter(q => q.type === 'outbound').length === 0 ? (
+                    <div className="text-center py-8 text-silver-dark">
+                        <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                        <p>Belum ada pengajuan keluar</p>
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full">
+                            <thead className="bg-accent-purple">
+                                <tr>
+                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">No. Pengajuan</th>
+                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Tanggal</th>
+                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Pemilik Barang</th>
+                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Dokumen BC</th>
+                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Jumlah Barang</th>
+                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">No. Dokumen Pabean</th>
+                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Tgl Approval</th>
+                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Status Dokumen</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-dark-border">
+                                {quotations.filter(q => q.type === 'outbound').map(quot => {
+                                    const docStatus = quot.documentStatus || quot.document_status || 'pengajuan';
+                                    const docStatusBadge = {
+                                        pengajuan: { color: 'bg-yellow-500/20 text-yellow-400', label: 'Pengajuan' },
+                                        approved: { color: 'bg-green-500/20 text-green-400', label: 'Approved' },
+                                        rejected: { color: 'bg-red-500/20 text-red-400', label: 'Rejected' }
+                                    }[docStatus] || { color: 'bg-yellow-500/20 text-yellow-400', label: 'Pengajuan' };
+
+                                    return (
+                                        <tr
+                                            key={quot.id}
+                                            onClick={() => handleEditPengajuan(quot)}
+                                            className="hover:bg-dark-surface smooth-transition cursor-pointer"
+                                        >
+                                            <td className="px-4 py-2 text-sm text-silver-light font-medium whitespace-nowrap">
+                                                {quot.quotationNumber || quot.quotation_number || quot.id}
+                                            </td>
+                                            <td className="px-4 py-2 text-sm text-silver-dark whitespace-nowrap">
+                                                {new Date(quot.submissionDate || quot.submission_date || quot.date).toLocaleDateString('id-ID')}
+                                            </td>
+                                            <td className="px-4 py-2 text-sm text-silver whitespace-nowrap">
+                                                {quot.customer}
+                                            </td>
+                                            <td className="px-4 py-2 text-sm text-silver whitespace-nowrap">
+                                                {quot.bcDocType || quot.bc_document_type || '-'}
+                                            </td>
+                                            <td className="px-4 py-2 text-sm text-silver whitespace-nowrap">
+                                                {quot.packages
+                                                    ? `${quot.packages.length} package (${quot.packages.reduce((sum, pkg) => sum + (pkg.items?.length || 0), 0)} item)`
+                                                    : (quot.packageItems?.length || quot.items?.length || 0)
+                                                }
+                                            </td>
+                                            <td className="px-4 py-2 text-sm text-accent-purple font-medium whitespace-nowrap">
+                                                {quot.bcDocumentNumber || quot.bc_document_number || '-'}
+                                            </td>
+                                            <td className="px-4 py-2 text-sm text-silver whitespace-nowrap">
+                                                {quot.approvedDate || quot.approved_date ? new Date(quot.approvedDate || quot.approved_date).toLocaleDateString('id-ID') : '-'}
+                                            </td>
+                                            <td className="px-4 py-2 whitespace-nowrap">
                                                 <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${docStatusBadge.color}`}>
                                                     {docStatusBadge.label}
                                                 </span>
@@ -1164,6 +1400,22 @@ const PengajuanManagement = () => {
                                     >
                                         Hapus
                                     </Button>
+
+                                    {editModal.pengajuan.type === 'inbound' &&
+                                        (editModal.pengajuan.documentStatus || editModal.pengajuan.document_status) === 'approved' && (
+                                            <Button
+                                                variant="primary"
+                                                onClick={(e) => {
+                                                    handleQuickOutbound(editModal.pengajuan, e);
+                                                    setEditModal({ show: false, pengajuan: null });
+                                                }}
+                                                icon={ArrowRight}
+                                                className="bg-accent-purple hover:bg-accent-purple/80"
+                                            >
+                                                Ajukan Barang Keluar
+                                            </Button>
+                                        )}
+
                                     <div className="flex gap-3">
                                         <Button variant="secondary" onClick={handleCancelEdit}>
                                             Batal
@@ -1303,6 +1555,109 @@ const PengajuanManagement = () => {
                             <Button variant="secondary" onClick={() => setShowWarehouseSelector(false)}>
                                 Batal
                             </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Item Editor Modal */}
+            {showItemEditor && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+                    <div className="bg-white rounded-2xl max-w-6xl w-full max-h-[85vh] overflow-hidden shadow-2xl">
+                        <div className="flex justify-between items-center p-6 border-b border-gray-200">
+                            <div>
+                                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                                    <Edit2 className="w-5 h-5" />
+                                    Edit Pilihan Barang Keluar
+                                </h2>
+                                <p className="text-sm text-gray-500 mt-1">
+                                    Sesuaikan item dan quantity yang akan dikeluarkan dari gudang
+                                </p>
+                            </div>
+                            <button onClick={() => setShowItemEditor(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+                        <div className="p-6 overflow-y-auto max-h-[70vh] bg-gray-50 space-y-4">
+                            {editablePackages.map((pkg, pkgIndex) => {
+                                const activeItems = pkg.items.filter(item => (item.quantity || 0) > 0);
+                                if (activeItems.length === 0) return null;
+                                return (
+                                    <div key={pkgIndex} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                                        <div className="bg-gray-100 px-4 py-2">
+                                            <h4 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                                                <Package className="w-4 h-4 text-accent-purple" />
+                                                Kode Packing: {pkg.packageNumber}
+                                            </h4>
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-sm">
+                                                <thead className="bg-blue-600">
+                                                    <tr>
+                                                        <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">KODE BARANG</th>
+                                                        <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">NAMA ITEM</th>
+                                                        <th className="px-4 py-3 text-center text-xs font-bold text-white uppercase">TERSEDIA</th>
+                                                        <th className="px-4 py-3 text-center text-xs font-bold text-white uppercase">QTY KELUAR</th>
+                                                        <th className="px-4 py-3 text-center text-xs font-bold text-white uppercase">AKSI</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-200">
+                                                    {pkg.items.map((item, itemIndex) => {
+                                                        if ((item.quantity || 0) === 0) return null;
+                                                        const maxQty = item.availableQty || item.quantity || 0;
+                                                        return (
+                                                            <tr key={itemIndex} className="hover:bg-blue-50/50">
+                                                                <td className="px-4 py-3 text-sm font-mono text-gray-900">{item.itemCode}</td>
+                                                                <td className="px-4 py-3 text-sm text-gray-700">{item.name || item.itemName}</td>
+                                                                <td className="px-4 py-3 text-center">
+                                                                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                                                                        {maxQty}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="px-4 py-3 text-center">
+                                                                    <input type="number" min="0" max={maxQty} value={item.quantity || 0} onChange={(e) => handleItemQuantityChange(pkgIndex, itemIndex, e.target.value)} className="w-24 px-3 py-2 text-center border-2 border-gray-300 rounded-lg text-gray-900 font-semibold focus:border-accent-purple focus:ring-2 focus:ring-accent-purple/20 transition-all" />
+                                                                </td>
+                                                                <td className="px-4 py-3 text-center">
+                                                                    <button onClick={() => handleRemoveItem(pkgIndex, itemIndex)} className="inline-flex items-center justify-center p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors" title="Hapus item ini">
+                                                                        <Trash2 className="w-4 h-4" />
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            <div className="bg-gradient-to-br from-white to-gray-50 p-5 rounded-xl shadow-md">
+                                <h4 className="text-sm font-bold text-gray-700 mb-3">📊 Ringkasan</h4>
+                                <div className="grid grid-cols-3 gap-6 text-sm">
+                                    <div>
+                                        <p className="text-gray-500 font-medium mb-1">Total Package</p>
+                                        <p className="text-2xl font-bold text-accent-purple">
+                                            {editablePackages.filter(pkg => pkg.items.some(i => (i.quantity || 0) > 0)).length}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-gray-500 font-medium mb-1">Total Item</p>
+                                        <p className="text-2xl font-bold text-accent-purple">
+                                            {editablePackages.reduce((sum, pkg) => sum + pkg.items.filter(i => (i.quantity || 0) > 0).length, 0)}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-gray-500 font-medium mb-1">Total Quantity</p>
+                                        <p className="text-2xl font-bold text-accent-purple">
+                                            {editablePackages.reduce((sum, pkg) => sum + pkg.items.reduce((itemSum, i) => itemSum + (i.quantity || 0), 0), 0)}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-white">
+                            <Button variant="secondary" onClick={() => setShowItemEditor(false)}>Batal</Button>
+                            <Button variant="primary" icon={CheckCircle} onClick={handleConfirmEditedItems}>Konfirmasi Pilihan</Button>
                         </div>
                     </div>
                 </div>

@@ -276,6 +276,7 @@ const WarehouseInventory = () => {
             mutationDate: new Date().toISOString().split('T')[0],
             mutationTime: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
             mutationPic: '',
+            mutationLocation: 'Pameran', // Default location
             packages: (pengajuanToProcess.packages || []).map(pkg => ({
                 ...pkg,
                 items: (pkg.items || []).map(item => {
@@ -442,8 +443,9 @@ const WarehouseInventory = () => {
                     const bcNum = selectedPengajuan?.bcDocumentNumber || selectedPengajuan?.bc_document_number ||
                         mutationData?.bcDocumentNumber || mutationData?.bc_document_number;
 
-                    // 1. Process Outbound Mutation (Warehouse -> Pameran)
+                    // 1. Process Outbound Mutation (Warehouse -> Selected Location)
                     if (mutationQty > 0 && mutationQty <= item.inWarehouse) {
+                        const destinationLocation = mutationData.mutationLocation || 'Pameran';
                         mutations.push({
                             pengajuanId: qId,
                             pengajuanNumber: qNumber,
@@ -458,12 +460,12 @@ const WarehouseInventory = () => {
                             mutatedQty: mutationQty,
                             remainingStock: item.inWarehouse - mutationQty, // Logic sisa gudang
                             origin: 'warehouse',
-                            destination: 'Pameran',
+                            destination: destinationLocation,
                             condition: item.mutationCondition,
                             date: mutationData.mutationDate,
                             time: mutationData.mutationTime,
                             pic: mutationData.mutationPic,
-                            remarks: item.notes || `Mutasi ke Pameran`,
+                            remarks: item.notes || `Mutasi ke ${destinationLocation}`,
                             documents: mutationDocuments.map(d => ({ title: d.title, name: d.name, type: d.type })),
                             _pkgIndex: pkgIdx,
                             _itemIndex: itemIdx,
@@ -925,509 +927,474 @@ const WarehouseInventory = () => {
                 )}
             </div>
 
-            {/* ==================== DATA INVENTARIS KELUAR ==================== */}
-            <div className="mt-8">
-                <div className="flex justify-between items-center mb-4">
-                    <div>
-                        <h2 className="text-2xl font-bold gradient-text">📤 Data Inventaris Keluar</h2>
-                        <p className="text-silver-dark mt-1">Data Barang Keluar dari Pengajuan Outbound yang Disetujui</p>
-                    </div>
-                </div>
-
-                <div className="glass-card rounded-lg overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="bg-accent-purple">
-                                <tr>
-                                    <th className="px-2 py-1 text-left text-xs font-semibold text-white whitespace-nowrap">No. Pengajuan</th>
-                                    <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">No. Pabean</th>
-                                    <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">Tgl Keluar Gudang</th>
-                                    <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">Tujuan</th>
-                                    <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">Customer</th>
-                                    <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">Jml Package</th>
-                                    <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">Jml Item</th>
-                                    <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">Sumber</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-dark-border">
-                                {filteredOutboundPengajuan.map(pengajuan => {
-                                    const { packageCount, itemCount } = countPackagesAndItems(pengajuan);
-                                    return (
-                                        <tr key={pengajuan.id} className="hover:bg-dark-surface smooth-transition cursor-pointer" onClick={() => handleRowClick(pengajuan)}>
-                                            <td className="px-2 py-0.5 text-xs text-accent-purple font-semibold whitespace-nowrap">{pengajuan.quotationNumber || pengajuan.quotation_number || '-'}</td>
-                                            <td className="px-2 py-0.5 text-xs text-silver text-center whitespace-nowrap">{pengajuan.bcDocumentNumber || pengajuan.bc_document_number || '-'}</td>
-                                            <td className="px-2 py-0.5 text-xs text-silver text-center whitespace-nowrap">{formatDate(pengajuan.approvedDate || pengajuan.approved_date || pengajuan.date)}</td>
-                                            <td className="px-2 py-0.5 text-xs text-silver text-center whitespace-nowrap">{pengajuan.destination || '-'}</td>
-                                            <td className="px-2 py-0.5 text-xs text-silver text-center whitespace-nowrap">{pengajuan.customer || '-'}</td>
-                                            <td className="px-2 py-0.5 text-xs text-accent-purple font-bold text-center">{packageCount}</td>
-                                            <td className="px-2 py-0.5 text-xs text-accent-purple font-bold text-center">{itemCount}</td>
-                                            <td className="px-2 py-0.5 text-xs text-accent-green text-center whitespace-nowrap">{pengajuan.sourcePengajuanNumber || pengajuan.source_pengajuan_number || '-'}</td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                    {filteredOutboundPengajuan.length === 0 && (
-                        <div className="text-center py-12">
-                            <ExternalLink className="w-16 h-16 text-silver-dark mx-auto mb-4" />
-                            <p className="text-silver-dark">Belum ada pengajuan keluar yang disetujui</p>
-                        </div>
-                    )}
-                </div>
-            </div>
 
             {/* Detail Inventory Modal */}
-            {selectedPengajuan && displayData && !showMutationModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-dark-card rounded-xl w-full max-w-6xl max-h-[90vh] overflow-hidden shadow-xl">
-                        <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-dark-border">
-                            <div>
-                                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Detail Inventaris</h2>
-                                <p className="text-sm text-gray-500 dark:text-silver-dark">{selectedPengajuan.quotationNumber || selectedPengajuan.quotation_number}</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                {!isEditing ? (
-                                    <>
-                                        {/* Only show mutation buttons for inbound pengajuan */}
-                                        {selectedPengajuan.type !== 'outbound' && (
-                                            <>
-                                                <Button onClick={handleStartMutation} variant="danger" icon={ArrowRightLeft} className="text-sm">Mutasi</Button>
-                                                <Button onClick={handleDeleteAllMutations} variant="secondary" icon={Trash2} className="text-sm text-red-600 hover:text-red-800">Hapus Mutasi</Button>
-                                            </>
-                                        )}
-                                        <Button onClick={handleStartEdit} variant="secondary" icon={Edit2} className="text-sm">Edit</Button>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Button onClick={handleCancelEdit} variant="secondary" icon={XCircle} className="text-sm">Batal</Button>
-                                        <Button onClick={handleSaveEdit} variant="primary" icon={Save} className="text-sm">Simpan</Button>
-                                    </>
-                                )}
-                                <button onClick={handleCloseDetail} className="p-2 hover:bg-gray-100 dark:hover:bg-dark-surface rounded-lg"><X className="w-5 h-5 text-gray-500" /></button>
-                            </div>
-                        </div>
-
-                        {/* Data Inventaris Section Title */}
-                        <div className="px-4 pt-4 pb-2">
-                            <h3 className="text-base font-bold text-gray-800 dark:text-silver-light">📦 Data Inventaris</h3>
-                        </div>
-
-                        {/* Header Table */}
-                        <div className="px-4 pb-4 border-b border-gray-200 dark:border-dark-border">
-                            <div className="overflow-x-auto border border-gray-200 dark:border-dark-border rounded-lg">
-                                <table className="w-full">
-                                    <thead className={selectedPengajuan.type === 'outbound' ? 'bg-accent-purple' : 'bg-accent-blue'}>
-                                        <tr>
-                                            <th className="px-2 py-1 text-left text-xs font-semibold text-white">No. Pengajuan</th>
-                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white">No. Pabean</th>
-                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white">
-                                                {selectedPengajuan.type === 'outbound' ? 'Tgl Keluar Gudang' : 'Tgl Masuk Gudang'}
-                                            </th>
-                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white">
-                                                {selectedPengajuan.type === 'outbound' ? 'Jam Keluar' : 'Jam Masuk'}
-                                            </th>
-                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white">Jml Package</th>
-                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white">Jml Item</th>
-                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white">
-                                                {selectedPengajuan.type === 'outbound' ? 'PIC yang Mengeluarkan' : 'PIC Penerima'}
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr className="bg-white dark:bg-dark-card">
-                                            <td className="px-2 py-0.5 text-xs text-gray-900 dark:text-silver-light font-semibold">{displayData.quotationNumber || displayData.quotation_number || '-'}</td>
-                                            <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center">{displayData.bcDocumentNumber || displayData.bc_document_number || '-'}</td>
-                                            <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center">
-                                                {isEditing ? <input type="date" value={editData.submissionDate || editData.submission_date || ''} onChange={(e) => setEditData({ ...editData, submissionDate: e.target.value })} className="px-1 py-0.5 text-xs border rounded" /> : formatDate(displayData.submissionDate || displayData.submission_date)}
-                                            </td>
-                                            <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center">
-                                                {isEditing ? <input type="time" value={editData.entryTime || ''} onChange={(e) => setEditData({ ...editData, entryTime: e.target.value })} className="px-1 py-0.5 text-xs border rounded" /> : formatTime(displayData.approvedDate || displayData.approved_date)}
-                                            </td>
-                                            <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center font-bold">{countPackagesAndItems(displayData).packageCount}</td>
-                                            <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center font-bold">{countPackagesAndItems(displayData).itemCount}</td>
-                                            <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center">
-                                                {isEditing ? <input type="text" value={editData.pic || ''} onChange={(e) => setEditData({ ...editData, pic: e.target.value })} className="w-20 px-1 py-0.5 text-xs border rounded text-center" /> : (displayData.pic || '-')}
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        {/* Detail Item Section Title */}
-                        <div className="px-4 pt-8 pb-3">
-                            <h3 className="text-base font-bold text-gray-800 dark:text-silver-light">📝 Detail Item</h3>
-                        </div>
-
-                        {/* Detail Items */}
-                        <div className="p-4 overflow-y-auto max-h-[calc(90vh-280px)] space-y-4">
-                            {(displayData.packages || []).map((pkg, pkgIndex) => (
-                                <div key={pkgIndex} className="border border-gray-200 dark:border-dark-border rounded-lg overflow-hidden">
-                                    <div className="bg-gray-100 dark:bg-dark-surface px-3 py-2 border-b border-gray-200 dark:border-dark-border">
-                                        <span className="text-sm font-semibold text-gray-700 dark:text-silver-light">Kode Packing: {pkg.packageNumber || `PKG-${pkgIndex + 1}`}</span>
-                                    </div>
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full">
-                                            <thead className={selectedPengajuan.type === 'outbound' ? 'bg-accent-purple' : 'bg-accent-blue'}>
-                                                <tr>
-                                                    {selectedPengajuan.type !== 'outbound' && (
-                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white w-16">Checkout</th>
-                                                    )}
-                                                    <th className="px-2 py-1 text-left text-xs font-semibold text-white w-8">No. Urut</th>
-                                                    <th className="px-2 py-1 text-left text-xs font-semibold text-white w-20">Kode Barang</th>
-                                                    <th className="px-2 py-1 text-left text-xs font-semibold text-white w-16">HS Code</th>
-                                                    <th className="px-2 py-1 text-left text-xs font-semibold text-white">Item</th>
-                                                    <th className="px-2 py-1 text-center text-xs font-semibold text-white w-14">Jumlah</th>
-                                                    <th className="px-2 py-1 text-center text-xs font-semibold text-white w-14">Satuan</th>
-                                                    <th className="px-2 py-1 text-center text-xs font-semibold text-white w-32">Status</th>
-                                                    <th className="px-2 py-1 text-left text-xs font-semibold text-white w-20">Lokasi</th>
-                                                    <th className="px-2 py-1 text-left text-xs font-semibold text-white w-16">Kondisi</th>
-                                                    <th className="px-2 py-1 text-left text-xs font-semibold text-white w-full">Keterangan</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-gray-200 dark:divide-dark-border">
-                                                {(pkg.items || []).map((item, itemIdx) => {
-                                                    const itemName = item.name || item.itemName;
-                                                    const mutationInfo = getItemMutationInfo(item.itemCode, pkg.packageNumber, itemName);
-                                                    const itemStatus = getIndividualItemStatus(item.itemCode, pkg.packageNumber, itemName);
-                                                    const inWarehouse = (item.quantity || 0) - itemStatus.atPameran;
-                                                    const isCheckedOut = item.checkedOut || item.checked_out;
-                                                    const checkoutBcNumber = item.checkoutBcNumber || item.checkout_bc_number;
-
-                                                    // Determine row styling - brown for checked out items
-                                                    const rowClass = isCheckedOut
-                                                        ? 'bg-amber-100 dark:bg-amber-900/20 hover:bg-amber-200 dark:hover:bg-amber-900/30'
-                                                        : mutationInfo
-                                                            ? 'bg-orange-50 dark:bg-orange-900/10 hover:bg-gray-50 dark:hover:bg-dark-surface/50'
-                                                            : 'hover:bg-gray-50 dark:hover:bg-dark-surface/50';
-
-                                                    return (
-                                                        <tr key={itemIdx} className={rowClass}>
-                                                            {/* Checkout column - only for inbound */}
-                                                            {selectedPengajuan.type !== 'outbound' && (
-                                                                <td className="px-2 py-0.5 text-center">
-                                                                    {isEditing ? (
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            checked={item.checkedOut || false}
-                                                                            onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'checkedOut', e.target.checked)}
-                                                                            className="w-4 h-4 rounded border-gray-300 text-accent-blue focus:ring-accent-blue cursor-pointer"
-                                                                        />
-                                                                    ) : isCheckedOut ? (
-                                                                        <CheckCircle className="w-4 h-4 text-amber-600 mx-auto" />
-                                                                    ) : (
-                                                                        <span className="text-gray-300">○</span>
-                                                                    )}
-                                                                </td>
-                                                            )}
-                                                            <td className={`px-2 py-0.5 text-xs ${isCheckedOut ? 'text-amber-800 dark:text-amber-400' : 'text-gray-700 dark:text-silver'}`}>{itemIdx + 1}</td>
-                                                            <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{isEditing ? <input type="text" value={item.itemCode || ''} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'itemCode', e.target.value)} className="w-full px-1 py-0.5 text-xs border rounded" /> : (item.itemCode || '-')}</td>
-                                                            <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{isEditing ? <input type="text" value={item.hsCode || ''} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'hsCode', e.target.value)} className="w-full px-1 py-0.5 text-xs border rounded" /> : (item.hsCode || '-')}</td>
-                                                            <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{isEditing ? <input type="text" value={item.name || ''} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'name', e.target.value)} className="w-full px-1 py-0.5 text-xs border rounded" /> : (item.name || item.itemName || '-')}</td>
-                                                            <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center">{isEditing ? <input type="number" value={item.quantity || 0} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'quantity', parseInt(e.target.value) || 0)} className="w-14 px-1 py-0.5 text-xs border rounded text-center" /> : (item.quantity || 0)}</td>
-                                                            <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center">{isEditing ? <input type="text" value={item.uom || 'pcs'} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'uom', e.target.value)} className="w-12 px-1 py-0.5 text-xs border rounded text-center" /> : (item.uom || 'pcs')}</td>
-                                                            <td className="px-2 py-0.5 text-xs text-center">
-                                                                <div className="flex items-center justify-center gap-1">
-                                                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                                                                        🏢 {inWarehouse}
-                                                                    </span>
-                                                                    {itemStatus.atPameran > 0 && (
-                                                                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
-                                                                            📍 {itemStatus.atPameran}
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                            </td>
-                                                            <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{isEditing ? <select value={item.location?.room || 'warehouse'} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'location', e.target.value)} className="px-1 py-0.5 text-xs border rounded"><option value="warehouse">Warehouse</option><option value="pameran">Pameran</option></select> : (item.location?.room || 'warehouse')}</td>
-                                                            <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{isEditing ? <select value={item.condition || 'Baik'} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'condition', e.target.value)} className="px-1 py-0.5 text-xs border rounded"><option value="Baik">Baik</option><option value="Rusak">Rusak</option><option value="Cacat">Cacat</option></select> : (item.condition || 'Baik')}</td>
-                                                            <td className={`px-2 py-0.5 text-xs ${isCheckedOut ? 'text-amber-800 dark:text-amber-400' : 'text-gray-700 dark:text-silver'}`}>
-                                                                {isEditing ? (
-                                                                    <div className="flex flex-col gap-1">
-                                                                        <input type="text" value={item.notes || ''} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'notes', e.target.value)} className="w-full px-1 py-0.5 text-xs border rounded" placeholder="Catatan..." />
-                                                                        {item.checkedOut && (
-                                                                            <input
-                                                                                type="text"
-                                                                                value={item.checkoutBcNumber || ''}
-                                                                                onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'checkoutBcNumber', e.target.value)}
-                                                                                className="w-full px-1 py-0.5 text-xs border border-amber-400 rounded bg-amber-50"
-                                                                                placeholder="No. Dokumen Pabean Keluar"
-                                                                            />
-                                                                        )}
-                                                                    </div>
-                                                                ) : isCheckedOut ? (
-                                                                    <div className="flex flex-col gap-0.5">
-                                                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-200 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-                                                                            <CheckCircle className="w-3 h-3" />
-                                                                            SUDAH KELUAR
-                                                                        </span>
-                                                                        {checkoutBcNumber && (
-                                                                            <span className="text-[10px] text-amber-700 dark:text-amber-400">
-                                                                                BC: {checkoutBcNumber}
-                                                                            </span>
-                                                                        )}
-                                                                        {item.notes && <span className="text-[10px]">{item.notes}</span>}
-                                                                    </div>
-                                                                ) : mutationInfo ? (
-                                                                    <div className="flex flex-col gap-0.5">
-                                                                        <div className="flex items-center gap-1">
-                                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
-                                                                                <AlertCircle className="w-3 h-3" />
-                                                                                MUTASI
-                                                                            </span>
-                                                                        </div>
-                                                                        <span className="text-[10px] text-orange-600 dark:text-orange-400">
-                                                                            {mutationInfo.totalMutated} unit ke {mutationInfo.destination} ({formatDate(mutationInfo.date)})
-                                                                        </span>
-                                                                        <button
-                                                                            onClick={handleGoToPergerakan}
-                                                                            className="inline-flex items-center gap-1 text-[10px] text-blue-600 hover:text-blue-800 hover:underline"
-                                                                        >
-                                                                            <ExternalLink className="w-3 h-3" />
-                                                                            Lihat di Pergerakan Barang
-                                                                        </button>
-                                                                    </div>
-                                                                ) : (item.notes || '-')}
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
-                                    </div>
+            {
+                selectedPengajuan && displayData && !showMutationModal && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white dark:bg-dark-card rounded-xl w-full max-w-6xl max-h-[90vh] overflow-hidden shadow-xl">
+                            <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-dark-border">
+                                <div>
+                                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">Detail Inventaris</h2>
+                                    <p className="text-sm text-gray-500 dark:text-silver-dark">{selectedPengajuan.quotationNumber || selectedPengajuan.quotation_number}</p>
                                 </div>
-                            ))}
+                                <div className="flex items-center gap-2">
+                                    {!isEditing ? (
+                                        <>
+                                            {/* Only show mutation buttons for inbound pengajuan */}
+                                            {selectedPengajuan.type !== 'outbound' && (
+                                                <>
+                                                    <Button onClick={handleStartMutation} variant="danger" icon={ArrowRightLeft} className="text-sm">Mutasi</Button>
+                                                    <Button onClick={handleDeleteAllMutations} variant="secondary" icon={Trash2} className="text-sm text-red-600 hover:text-red-800">Hapus Mutasi</Button>
+                                                </>
+                                            )}
+                                            <Button onClick={handleStartEdit} variant="secondary" icon={Edit2} className="text-sm">Edit</Button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Button onClick={handleCancelEdit} variant="secondary" icon={XCircle} className="text-sm">Batal</Button>
+                                            <Button onClick={handleSaveEdit} variant="primary" icon={Save} className="text-sm">Simpan</Button>
+                                        </>
+                                    )}
+                                    <button onClick={handleCloseDetail} className="p-2 hover:bg-gray-100 dark:hover:bg-dark-surface rounded-lg"><X className="w-5 h-5 text-gray-500" /></button>
+                                </div>
+                            </div>
+
+                            {/* Data Inventaris Section Title */}
+                            <div className="px-4 pt-4 pb-2">
+                                <h3 className="text-base font-bold text-gray-800 dark:text-silver-light">📦 Data Inventaris</h3>
+                            </div>
+
+                            {/* Header Table */}
+                            <div className="px-4 pb-4 border-b border-gray-200 dark:border-dark-border">
+                                <div className="overflow-x-auto border border-gray-200 dark:border-dark-border rounded-lg">
+                                    <table className="w-full">
+                                        <thead className={selectedPengajuan.type === 'outbound' ? 'bg-accent-purple' : 'bg-accent-blue'}>
+                                            <tr>
+                                                <th className="px-2 py-1 text-left text-xs font-semibold text-white">No. Pengajuan</th>
+                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">No. Pabean</th>
+                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">
+                                                    {selectedPengajuan.type === 'outbound' ? 'Tgl Keluar Gudang' : 'Tgl Masuk Gudang'}
+                                                </th>
+                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">
+                                                    {selectedPengajuan.type === 'outbound' ? 'Jam Keluar' : 'Jam Masuk'}
+                                                </th>
+                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">Jml Package</th>
+                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">Jml Item</th>
+                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">
+                                                    {selectedPengajuan.type === 'outbound' ? 'PIC yang Mengeluarkan' : 'PIC Penerima'}
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr className="bg-white dark:bg-dark-card">
+                                                <td className="px-2 py-0.5 text-xs text-gray-900 dark:text-silver-light font-semibold">{displayData.quotationNumber || displayData.quotation_number || '-'}</td>
+                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center">{displayData.bcDocumentNumber || displayData.bc_document_number || '-'}</td>
+                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center">
+                                                    {isEditing ? <input type="date" value={editData.submissionDate || editData.submission_date || ''} onChange={(e) => setEditData({ ...editData, submissionDate: e.target.value })} className="px-1 py-0.5 text-xs border rounded" /> : formatDate(displayData.submissionDate || displayData.submission_date)}
+                                                </td>
+                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center">
+                                                    {isEditing ? <input type="time" value={editData.entryTime || ''} onChange={(e) => setEditData({ ...editData, entryTime: e.target.value })} className="px-1 py-0.5 text-xs border rounded" /> : formatTime(displayData.approvedDate || displayData.approved_date)}
+                                                </td>
+                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center font-bold">{countPackagesAndItems(displayData).packageCount}</td>
+                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center font-bold">{countPackagesAndItems(displayData).itemCount}</td>
+                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center">
+                                                    {isEditing ? <input type="text" value={editData.pic || ''} onChange={(e) => setEditData({ ...editData, pic: e.target.value })} className="w-20 px-1 py-0.5 text-xs border rounded text-center" /> : (displayData.pic || '-')}
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {/* Detail Item Section Title */}
+                            <div className="px-4 pt-8 pb-3">
+                                <h3 className="text-base font-bold text-gray-800 dark:text-silver-light">📝 Detail Item</h3>
+                            </div>
+
+                            {/* Detail Items */}
+                            <div className="p-4 overflow-y-auto max-h-[calc(90vh-280px)] space-y-4">
+                                {(displayData.packages || []).map((pkg, pkgIndex) => (
+                                    <div key={pkgIndex} className="border border-gray-200 dark:border-dark-border rounded-lg overflow-hidden">
+                                        <div className="bg-gray-100 dark:bg-dark-surface px-3 py-2 border-b border-gray-200 dark:border-dark-border">
+                                            <span className="text-sm font-semibold text-gray-700 dark:text-silver-light">Kode Packing: {pkg.packageNumber || `PKG-${pkgIndex + 1}`}</span>
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full">
+                                                <thead className={selectedPengajuan.type === 'outbound' ? 'bg-accent-purple' : 'bg-accent-blue'}>
+                                                    <tr>
+                                                        {selectedPengajuan.type !== 'outbound' && (
+                                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white w-16">Checkout</th>
+                                                        )}
+                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-8">No. Urut</th>
+                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-20">Kode Barang</th>
+                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-16">HS Code</th>
+                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white">Item</th>
+                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white w-14">Jumlah</th>
+                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white w-14">Satuan</th>
+                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white w-32">Status</th>
+                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-20">Lokasi</th>
+                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-16">Kondisi</th>
+                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-full">Keterangan</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-200 dark:divide-dark-border">
+                                                    {(pkg.items || []).map((item, itemIdx) => {
+                                                        const itemName = item.name || item.itemName;
+                                                        const mutationInfo = getItemMutationInfo(item.itemCode, pkg.packageNumber, itemName);
+                                                        const itemStatus = getIndividualItemStatus(item.itemCode, pkg.packageNumber, itemName);
+                                                        const inWarehouse = (item.quantity || 0) - itemStatus.atPameran;
+                                                        const isCheckedOut = item.checkedOut || item.checked_out;
+                                                        const checkoutBcNumber = item.checkoutBcNumber || item.checkout_bc_number;
+
+                                                        // Determine row styling - brown for checked out items
+                                                        const rowClass = isCheckedOut
+                                                            ? 'bg-amber-100 dark:bg-amber-900/20 hover:bg-amber-200 dark:hover:bg-amber-900/30'
+                                                            : mutationInfo
+                                                                ? 'bg-orange-50 dark:bg-orange-900/10 hover:bg-gray-50 dark:hover:bg-dark-surface/50'
+                                                                : 'hover:bg-gray-50 dark:hover:bg-dark-surface/50';
+
+                                                        return (
+                                                            <tr key={itemIdx} className={rowClass}>
+                                                                {/* Checkout column - only for inbound */}
+                                                                {selectedPengajuan.type !== 'outbound' && (
+                                                                    <td className="px-2 py-0.5 text-center">
+                                                                        {isEditing ? (
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={item.checkedOut || false}
+                                                                                onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'checkedOut', e.target.checked)}
+                                                                                className="w-4 h-4 rounded border-gray-300 text-accent-blue focus:ring-accent-blue cursor-pointer"
+                                                                            />
+                                                                        ) : isCheckedOut ? (
+                                                                            <CheckCircle className="w-4 h-4 text-amber-600 mx-auto" />
+                                                                        ) : (
+                                                                            <span className="text-gray-300">○</span>
+                                                                        )}
+                                                                    </td>
+                                                                )}
+                                                                <td className={`px-2 py-0.5 text-xs ${isCheckedOut ? 'text-amber-800 dark:text-amber-400' : 'text-gray-700 dark:text-silver'}`}>{itemIdx + 1}</td>
+                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{isEditing ? <input type="text" value={item.itemCode || ''} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'itemCode', e.target.value)} className="w-full px-1 py-0.5 text-xs border rounded" /> : (item.itemCode || '-')}</td>
+                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{isEditing ? <input type="text" value={item.hsCode || ''} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'hsCode', e.target.value)} className="w-full px-1 py-0.5 text-xs border rounded" /> : (item.hsCode || '-')}</td>
+                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{isEditing ? <input type="text" value={item.name || ''} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'name', e.target.value)} className="w-full px-1 py-0.5 text-xs border rounded" /> : (item.name || item.itemName || '-')}</td>
+                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center">{isEditing ? <input type="number" value={item.quantity || 0} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'quantity', parseInt(e.target.value) || 0)} className="w-14 px-1 py-0.5 text-xs border rounded text-center" /> : (item.quantity || 0)}</td>
+                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center">{isEditing ? <input type="text" value={item.uom || 'pcs'} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'uom', e.target.value)} className="w-12 px-1 py-0.5 text-xs border rounded text-center" /> : (item.uom || 'pcs')}</td>
+                                                                <td className="px-2 py-0.5 text-xs text-center">
+                                                                    <div className="flex items-center justify-center gap-1">
+                                                                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                                                            🏢 {inWarehouse}
+                                                                        </span>
+                                                                        {itemStatus.atPameran > 0 && (
+                                                                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                                                                                📍 {itemStatus.atPameran}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{isEditing ? <select value={item.location?.room || 'warehouse'} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'location', e.target.value)} className="px-1 py-0.5 text-xs border rounded"><option value="warehouse">Warehouse</option><option value="pameran">Pameran</option></select> : (item.location?.room || 'warehouse')}</td>
+                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{isEditing ? <select value={item.condition || 'Baik'} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'condition', e.target.value)} className="px-1 py-0.5 text-xs border rounded"><option value="Baik">Baik</option><option value="Rusak">Rusak</option><option value="Cacat">Cacat</option></select> : (item.condition || 'Baik')}</td>
+                                                                <td className={`px-2 py-0.5 text-xs ${isCheckedOut ? 'text-amber-800 dark:text-amber-400' : 'text-gray-700 dark:text-silver'}`}>
+                                                                    {isEditing ? (
+                                                                        <div className="flex flex-col gap-1">
+                                                                            <input type="text" value={item.notes || ''} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'notes', e.target.value)} className="w-full px-1 py-0.5 text-xs border rounded" placeholder="Catatan..." />
+                                                                            {item.checkedOut && (
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={item.checkoutBcNumber || ''}
+                                                                                    onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'checkoutBcNumber', e.target.value)}
+                                                                                    className="w-full px-1 py-0.5 text-xs border border-amber-400 rounded bg-amber-50"
+                                                                                    placeholder="No. Dokumen Pabean Keluar"
+                                                                                />
+                                                                            )}
+                                                                        </div>
+                                                                    ) : isCheckedOut ? (
+                                                                        <div className="flex flex-col gap-0.5">
+                                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-200 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                                                                                <CheckCircle className="w-3 h-3" />
+                                                                                SUDAH KELUAR
+                                                                            </span>
+                                                                            {checkoutBcNumber && (
+                                                                                <span className="text-[10px] text-amber-700 dark:text-amber-400">
+                                                                                    BC: {checkoutBcNumber}
+                                                                                </span>
+                                                                            )}
+                                                                            {item.notes && <span className="text-[10px]">{item.notes}</span>}
+                                                                        </div>
+                                                                    ) : mutationInfo ? (
+                                                                        <div className="flex flex-col gap-0.5">
+                                                                            <div className="flex items-center gap-1">
+                                                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                                                                                    <AlertCircle className="w-3 h-3" />
+                                                                                    MUTASI
+                                                                                </span>
+                                                                            </div>
+                                                                            <span className="text-[10px] text-orange-600 dark:text-orange-400">
+                                                                                {mutationInfo.totalMutated} unit ke {mutationInfo.destination} ({formatDate(mutationInfo.date)})
+                                                                            </span>
+                                                                            <button
+                                                                                onClick={handleGoToPergerakan}
+                                                                                className="inline-flex items-center gap-1 text-[10px] text-blue-600 hover:text-blue-800 hover:underline"
+                                                                            >
+                                                                                <ExternalLink className="w-3 h-3" />
+                                                                                Lihat di Pergerakan Barang
+                                                                            </button>
+                                                                        </div>
+                                                                    ) : (item.notes || '-')}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* ========== MUTATION MODAL ========== */}
-            {showMutationModal && mutationData && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-dark-card rounded-xl w-full max-w-7xl max-h-[90vh] overflow-hidden shadow-xl">
-                        {/* Modal Header */}
-                        <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-dark-border bg-red-50 dark:bg-red-900/20">
-                            <div>
-                                <h2 className="text-xl font-bold text-red-700 dark:text-red-400">Mutasi Barang</h2>
-                                <p className="text-sm text-red-600 dark:text-red-500">{selectedPengajuan.quotationNumber || selectedPengajuan.quotation_number}</p>
+            {
+                showMutationModal && mutationData && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white dark:bg-dark-card rounded-xl w-full max-w-7xl max-h-[90vh] overflow-hidden shadow-xl">
+                            {/* Modal Header */}
+                            <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-dark-border bg-red-50 dark:bg-red-900/20">
+                                <div>
+                                    <h2 className="text-xl font-bold text-red-700 dark:text-red-400">Mutasi Barang</h2>
+                                    <p className="text-sm text-red-600 dark:text-red-500">{selectedPengajuan.quotationNumber || selectedPengajuan.quotation_number}</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Button onClick={handleCloseMutation} variant="secondary" icon={XCircle} className="text-sm">Batal</Button>
+                                    <Button onClick={handleSaveMutation} variant="danger" icon={Save} className="text-sm">Simpan Mutasi</Button>
+                                    <button onClick={handleCloseMutation} className="p-2 hover:bg-red-100 rounded-lg"><X className="w-5 h-5 text-red-500" /></button>
+                                </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <Button onClick={handleCloseMutation} variant="secondary" icon={XCircle} className="text-sm">Batal</Button>
-                                <Button onClick={handleSaveMutation} variant="danger" icon={Save} className="text-sm">Simpan Mutasi</Button>
-                                <button onClick={handleCloseMutation} className="p-2 hover:bg-red-100 rounded-lg"><X className="w-5 h-5 text-red-500" /></button>
-                            </div>
-                        </div>
 
-                        {/* Mutation Header Table */}
-                        <div className="p-4 border-b border-gray-200 dark:border-dark-border">
-                            <div className="overflow-x-auto border border-gray-200 dark:border-dark-border rounded-lg">
-                                <table className="w-full">
-                                    <thead className="bg-red-600">
-                                        <tr>
-                                            <th className="px-2 py-1 text-left text-xs font-semibold text-white">No. Pengajuan</th>
-                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white">No. Pabean</th>
-                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white">Tgl Masuk</th>
-                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white">Jam Masuk</th>
-                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white">Jml Pkg</th>
-                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white">Jml Item</th>
-                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white">PIC</th>
-                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700">Tgl Mutasi</th>
-                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700">Jam Mutasi</th>
-                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700">PIC Mutasi</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr className="bg-white dark:bg-dark-card">
-                                            <td className="px-2 py-1 text-xs font-semibold">{mutationData.quotationNumber || mutationData.quotation_number || '-'}</td>
-                                            <td className="px-2 py-1 text-xs text-center">{mutationData.bcDocumentNumber || mutationData.bc_document_number || '-'}</td>
-                                            <td className="px-2 py-1 text-xs text-center">{formatDate(mutationData.submissionDate || mutationData.submission_date)}</td>
-                                            <td className="px-2 py-1 text-xs text-center">{formatTime(mutationData.approvedDate || mutationData.approved_date)}</td>
-                                            <td className="px-2 py-1 text-xs text-center font-bold">{countPackagesAndItems(mutationData).packageCount}</td>
-                                            <td className="px-2 py-1 text-xs text-center font-bold">{countPackagesAndItems(mutationData).itemCount}</td>
-                                            <td className="px-2 py-1 text-xs text-center">{mutationData.pic || '-'}</td>
-                                            <td className="px-2 py-1 text-xs text-center bg-red-50 dark:bg-red-900/10">
-                                                <input type="date" value={mutationData.mutationDate || ''} onChange={(e) => setMutationData({ ...mutationData, mutationDate: e.target.value })} className="px-1 py-0.5 text-xs border border-red-300 rounded" />
-                                            </td>
-                                            <td className="px-2 py-1 text-xs text-center bg-red-50 dark:bg-red-900/10">
-                                                <input type="time" value={mutationData.mutationTime || ''} onChange={(e) => setMutationData({ ...mutationData, mutationTime: e.target.value })} className="px-1 py-0.5 text-xs border border-red-300 rounded" />
-                                            </td>
-                                            <td className="px-2 py-1 text-xs text-center bg-red-50 dark:bg-red-900/10">
-                                                <input type="text" value={mutationData.mutationPic || ''} onChange={(e) => setMutationData({ ...mutationData, mutationPic: e.target.value })} placeholder="PIC" className="w-20 px-1 py-0.5 text-xs border border-red-300 rounded text-center" />
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
+                            {/* Mutation Header Table */}
+                            <div className="p-4 border-b border-gray-200 dark:border-dark-border">
+                                <div className="overflow-x-auto border border-gray-200 dark:border-dark-border rounded-lg">
+                                    <table className="w-full">
+                                        <thead className="bg-red-600">
+                                            <tr>
+                                                <th className="px-2 py-1 text-left text-xs font-semibold text-white">No. Pengajuan</th>
+                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">No. Pabean</th>
+                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">Tgl Masuk</th>
+                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">Jam Masuk</th>
+                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">Jml Pkg</th>
+                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">Jml Item</th>
+                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">PIC</th>
+                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700">Tgl Mutasi</th>
+                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700">Jam Mutasi</th>
+                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700">PIC Mutasi</th>
+                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700">Lokasi Mutasi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr className="bg-white dark:bg-dark-card">
+                                                <td className="px-2 py-1 text-xs font-semibold">{mutationData.quotationNumber || mutationData.quotation_number || '-'}</td>
+                                                <td className="px-2 py-1 text-xs text-center">{mutationData.bcDocumentNumber || mutationData.bc_document_number || '-'}</td>
+                                                <td className="px-2 py-1 text-xs text-center">{formatDate(mutationData.submissionDate || mutationData.submission_date)}</td>
+                                                <td className="px-2 py-1 text-xs text-center">{formatTime(mutationData.approvedDate || mutationData.approved_date)}</td>
+                                                <td className="px-2 py-1 text-xs text-center font-bold">{countPackagesAndItems(mutationData).packageCount}</td>
+                                                <td className="px-2 py-1 text-xs text-center font-bold">{countPackagesAndItems(mutationData).itemCount}</td>
+                                                <td className="px-2 py-1 text-xs text-center">{mutationData.pic || '-'}</td>
+                                                <td className="px-2 py-1 text-xs text-center bg-red-50 dark:bg-red-900/10">
+                                                    <input type="date" value={mutationData.mutationDate || ''} onChange={(e) => setMutationData({ ...mutationData, mutationDate: e.target.value })} className="px-1 py-0.5 text-xs border border-red-300 rounded" />
+                                                </td>
+                                                <td className="px-2 py-1 text-xs text-center bg-red-50 dark:bg-red-900/10">
+                                                    <input type="time" value={mutationData.mutationTime || ''} onChange={(e) => setMutationData({ ...mutationData, mutationTime: e.target.value })} className="px-1 py-0.5 text-xs border border-red-300 rounded" />
+                                                </td>
+                                                <td className="px-2 py-1 text-xs text-center bg-red-50 dark:bg-red-900/10">
+                                                    <input type="text" value={mutationData.mutationPic || ''} onChange={(e) => setMutationData({ ...mutationData, mutationPic: e.target.value })} placeholder="PIC" className="w-20 px-1 py-0.5 text-xs border border-red-300 rounded text-center" />
+                                                </td>
+                                                <td className="px-2 py-1 text-xs text-center bg-red-50 dark:bg-red-900/10">
+                                                    <select
+                                                        value={mutationData.mutationLocation || 'Pameran'}
+                                                        onChange={(e) => setMutationData({ ...mutationData, mutationLocation: e.target.value })}
+                                                        className="px-2 py-0.5 text-xs border border-red-300 rounded text-center bg-white dark:bg-dark-card"
+                                                    >
+                                                        <option value="Gudang">Gudang</option>
+                                                        <option value="Pameran">Pameran</option>
+                                                        <option value="Keluar TPB">Keluar TPB</option>
+                                                    </select>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
-                        </div>
 
-                        {/* Mutation Body */}
-                        <div className="p-4 overflow-y-auto max-h-[calc(90vh-400px)] space-y-4">
-                            {(mutationData.packages || []).map((pkg, pkgIndex) => (
-                                <div key={pkgIndex} className="border border-gray-200 dark:border-dark-border rounded-lg overflow-hidden">
-                                    <div className="bg-gray-100 dark:bg-dark-surface px-3 py-2 border-b border-gray-200 dark:border-dark-border">
-                                        <span className="text-sm font-semibold">Kode Packing: {pkg.packageNumber || `PKG-${pkgIndex + 1}`}</span>
+                            {/* Mutation Body */}
+                            <div className="p-4 overflow-y-auto max-h-[calc(90vh-400px)] space-y-4">
+                                {(mutationData.packages || []).map((pkg, pkgIndex) => (
+                                    <div key={pkgIndex} className="border border-gray-200 dark:border-dark-border rounded-lg overflow-hidden">
+                                        <div className="bg-gray-100 dark:bg-dark-surface px-3 py-2 border-b border-gray-200 dark:border-dark-border">
+                                            <span className="text-sm font-semibold">Kode Packing: {pkg.packageNumber || `PKG-${pkgIndex + 1}`}</span>
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full">
+                                                <thead className="bg-accent-blue">
+                                                    <tr>
+                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-8">No. Urut</th>
+                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-20">Kode Barang</th>
+                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-16">HS Code</th>
+                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white">Item</th>
+                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white w-14">Jumlah</th>
+                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white w-14">Satuan</th>
+                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-20">Lokasi</th>
+                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-16">Kondisi</th>
+                                                        {/* Mutation columns */}
+                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-24">Jml Mutasi</th>
+                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-24">Jml Remutasi</th>
+                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-20">Total Saat Ini</th>
+                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-20">Kondisi</th>
+                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-full">Keterangan</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-200 dark:divide-dark-border">
+                                                    {(pkg.items || []).map((item, itemIdx) => {
+                                                        // Logic baru menggunakan inWarehouse & atPameran
+                                                        const isFullyMutated = item.inWarehouse === 0 && item.atPameran === 0;
+
+                                                        return (
+                                                            <tr key={itemIdx} className={`hover:bg-gray-50 dark:hover:bg-dark-surface/50 ${isFullyMutated ? 'opacity-75 bg-gray-50' : ''}`}>
+                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{itemIdx + 1}</td>
+                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{item.itemCode || '-'}</td>
+                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{item.hsCode || '-'}</td>
+                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{item.name || item.itemName || '-'}</td>
+                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center">{item.quantity || 0}</td>
+                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center">{item.uom || 'pcs'}</td>
+                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{item.location?.room || 'warehouse'}</td>
+                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{item.condition || 'Baik'}</td>
+
+                                                                {/* Mutation input (Gudang -> Pameran) */}
+                                                                <td className="px-2 py-0.5 text-xs text-center bg-red-50 dark:bg-red-900/10 border-r border-red-100 dark:border-red-900/20">
+                                                                    <div className="flex flex-col items-center">
+                                                                        <input
+                                                                            type="number"
+                                                                            min="0"
+                                                                            max={item.inWarehouse}
+                                                                            value={item.mutationQty || ''}
+                                                                            onChange={(e) => handleMutationItemChange(pkgIndex, itemIdx, 'mutationQty', parseInt(e.target.value) || 0)}
+                                                                            className="w-16 px-1 py-0.5 text-xs text-center border border-red-300 rounded focus:ring-1 focus:ring-red-500"
+                                                                            placeholder="0"
+                                                                            disabled={item.inWarehouse === 0}
+                                                                        />
+                                                                        <span className="text-[9px] text-gray-400 mt-0.5">Max: {item.inWarehouse}</span>
+                                                                    </div>
+                                                                </td>
+
+                                                                {/* Remutation input (Pameran -> Gudang) */}
+                                                                <td className="px-2 py-0.5 text-xs text-center bg-red-50 dark:bg-red-900/10">
+                                                                    <div className="flex flex-col items-center">
+                                                                        <input
+                                                                            type="number"
+                                                                            min="0"
+                                                                            max={item.atPameran}
+                                                                            value={item.remutationQty || ''}
+                                                                            onChange={(e) => handleMutationItemChange(pkgIndex, itemIdx, 'remutationQty', parseInt(e.target.value) || 0)}
+                                                                            className="w-16 px-1 py-0.5 text-xs text-center border border-blue-300 rounded focus:ring-1 focus:ring-blue-500"
+                                                                            placeholder="0"
+                                                                            disabled={item.atPameran === 0}
+                                                                        />
+                                                                        <span className="text-[9px] text-gray-400 mt-0.5">Max: {item.atPameran}</span>
+                                                                    </div>
+                                                                </td>
+
+                                                                {/* Total Saat Ini (Projected Warehouse Stock) */}
+                                                                <td className="px-2 py-0.5 text-xs text-center bg-red-50 dark:bg-red-900/10 font-bold text-gray-800 dark:text-gray-200">
+                                                                    {(item.inWarehouse || 0) - (item.mutationQty || 0) + (item.remutationQty || 0)}
+                                                                </td>
+
+                                                                {/* Condition */}
+                                                                <td className="px-2 py-0.5 text-xs text-center bg-red-50 dark:bg-red-900/10">
+                                                                    <select
+                                                                        value={item.mutationCondition || 'Baik'}
+                                                                        onChange={(e) => handleMutationItemChange(pkgIndex, itemIdx, 'mutationCondition', e.target.value)}
+                                                                        className="w-full px-1 py-0.5 text-xs border border-red-300 rounded bg-white text-center"
+                                                                    >
+                                                                        <option value="Baik">Baik</option>
+                                                                        <option value="Rusak">Rusak</option>
+                                                                        <option value="Cacat">Cacat</option>
+                                                                    </select>
+                                                                </td>
+
+                                                                {/* Notes */}
+                                                                <td className="px-2 py-0.5 text-xs bg-red-50 dark:bg-red-900/10">
+                                                                    <input
+                                                                        type="text"
+                                                                        value={item.notes || ''}
+                                                                        onChange={(e) => handleMutationItemChange(pkgIndex, itemIdx, 'notes', e.target.value)}
+                                                                        className="w-full px-1 py-0.5 text-xs border border-red-300 rounded"
+                                                                        placeholder="Keterangan..."
+                                                                    />
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full">
-                                            <thead className="bg-accent-blue">
-                                                <tr>
-                                                    <th className="px-2 py-1 text-left text-xs font-semibold text-white w-8">No. Urut</th>
-                                                    <th className="px-2 py-1 text-left text-xs font-semibold text-white w-20">Kode Barang</th>
-                                                    <th className="px-2 py-1 text-left text-xs font-semibold text-white w-16">HS Code</th>
-                                                    <th className="px-2 py-1 text-left text-xs font-semibold text-white">Item</th>
-                                                    <th className="px-2 py-1 text-center text-xs font-semibold text-white w-14">Jumlah</th>
-                                                    <th className="px-2 py-1 text-center text-xs font-semibold text-white w-14">Satuan</th>
-                                                    <th className="px-2 py-1 text-left text-xs font-semibold text-white w-20">Lokasi</th>
-                                                    <th className="px-2 py-1 text-left text-xs font-semibold text-white w-16">Kondisi</th>
-                                                    {/* Mutation columns */}
-                                                    <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-24">Jml Mutasi</th>
-                                                    <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-24">Jml Remutasi</th>
-                                                    <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-20">Total Saat Ini</th>
-                                                    <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-20">Kondisi</th>
-                                                    <th className="px-2 py-1 text-left text-xs font-semibold text-white w-full">Keterangan</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-gray-200 dark:divide-dark-border">
-                                                {(pkg.items || []).map((item, itemIdx) => {
-                                                    // Logic baru menggunakan inWarehouse & atPameran
-                                                    const isFullyMutated = item.inWarehouse === 0 && item.atPameran === 0;
+                                ))}
 
-                                                    return (
-                                                        <tr key={itemIdx} className={`hover:bg-gray-50 dark:hover:bg-dark-surface/50 ${isFullyMutated ? 'opacity-75 bg-gray-50' : ''}`}>
-                                                            <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{itemIdx + 1}</td>
-                                                            <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{item.itemCode || '-'}</td>
-                                                            <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{item.hsCode || '-'}</td>
-                                                            <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{item.name || item.itemName || '-'}</td>
-                                                            <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center">{item.quantity || 0}</td>
-                                                            <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center">{item.uom || 'pcs'}</td>
-                                                            <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{item.location?.room || 'warehouse'}</td>
-                                                            <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{item.condition || 'Baik'}</td>
-
-                                                            {/* Mutation input (Gudang -> Pameran) */}
-                                                            <td className="px-2 py-0.5 text-xs text-center bg-red-50 dark:bg-red-900/10 border-r border-red-100 dark:border-red-900/20">
-                                                                <div className="flex flex-col items-center">
-                                                                    <input
-                                                                        type="number"
-                                                                        min="0"
-                                                                        max={item.inWarehouse}
-                                                                        value={item.mutationQty || ''}
-                                                                        onChange={(e) => handleMutationItemChange(pkgIndex, itemIdx, 'mutationQty', parseInt(e.target.value) || 0)}
-                                                                        className="w-16 px-1 py-0.5 text-xs text-center border border-red-300 rounded focus:ring-1 focus:ring-red-500"
-                                                                        placeholder="0"
-                                                                        disabled={item.inWarehouse === 0}
-                                                                    />
-                                                                    <span className="text-[9px] text-gray-400 mt-0.5">Max: {item.inWarehouse}</span>
-                                                                </div>
+                                {/* Document Upload Section */}
+                                <div className="border border-gray-200 dark:border-dark-border rounded-lg overflow-hidden mt-4">
+                                    <div className="bg-gray-100 dark:bg-dark-surface px-3 py-2 border-b border-gray-200 dark:border-dark-border flex justify-between items-center">
+                                        <span className="text-sm font-semibold text-gray-700 dark:text-silver-light">Dokumen Pendukung ({mutationDocuments.length}/8)</span>
+                                        <div>
+                                            <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".jpg,.jpeg,.png,.pdf" multiple className="hidden" />
+                                            <Button onClick={() => fileInputRef.current?.click()} variant="secondary" icon={Upload} className="text-xs" disabled={mutationDocuments.length >= 8}>
+                                                Upload Dokumen
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    <div className="p-3">
+                                        {mutationDocuments.length === 0 ? (
+                                            <p className="text-xs text-gray-500 text-center py-4">Belum ada dokumen pendukung. Klik Upload untuk menambahkan (JPG, PNG, PDF - Max 3MB).</p>
+                                        ) : (
+                                            <table className="w-full">
+                                                <thead className="bg-gray-50 dark:bg-dark-surface">
+                                                    <tr>
+                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-gray-600 w-8">No</th>
+                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-gray-600">Judul Dokumen</th>
+                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-gray-600">Nama File</th>
+                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-gray-600">Tipe</th>
+                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-gray-600">Ukuran</th>
+                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-gray-600 w-12">Aksi</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-200 dark:divide-dark-border">
+                                                    {mutationDocuments.map((doc, idx) => (
+                                                        <tr key={doc.id}>
+                                                            <td className="px-2 py-1 text-xs text-gray-700">{idx + 1}</td>
+                                                            <td className="px-2 py-1 text-xs">
+                                                                <input type="text" value={doc.title} onChange={(e) => handleDocumentTitleChange(doc.id, e.target.value)} placeholder="Masukkan judul..." className="w-full px-2 py-1 text-xs border border-gray-300 rounded" />
                                                             </td>
-
-                                                            {/* Remutation input (Pameran -> Gudang) */}
-                                                            <td className="px-2 py-0.5 text-xs text-center bg-red-50 dark:bg-red-900/10">
-                                                                <div className="flex flex-col items-center">
-                                                                    <input
-                                                                        type="number"
-                                                                        min="0"
-                                                                        max={item.atPameran}
-                                                                        value={item.remutationQty || ''}
-                                                                        onChange={(e) => handleMutationItemChange(pkgIndex, itemIdx, 'remutationQty', parseInt(e.target.value) || 0)}
-                                                                        className="w-16 px-1 py-0.5 text-xs text-center border border-blue-300 rounded focus:ring-1 focus:ring-blue-500"
-                                                                        placeholder="0"
-                                                                        disabled={item.atPameran === 0}
-                                                                    />
-                                                                    <span className="text-[9px] text-gray-400 mt-0.5">Max: {item.atPameran}</span>
-                                                                </div>
+                                                            <td className="px-2 py-1 text-xs text-gray-700 flex items-center gap-1">
+                                                                <FileText className="w-3 h-3" /> {doc.name}
                                                             </td>
-
-                                                            {/* Total Saat Ini (Projected Warehouse Stock) */}
-                                                            <td className="px-2 py-0.5 text-xs text-center bg-red-50 dark:bg-red-900/10 font-bold text-gray-800 dark:text-gray-200">
-                                                                {(item.inWarehouse || 0) - (item.mutationQty || 0) + (item.remutationQty || 0)}
-                                                            </td>
-
-                                                            {/* Condition */}
-                                                            <td className="px-2 py-0.5 text-xs text-center bg-red-50 dark:bg-red-900/10">
-                                                                <select
-                                                                    value={item.mutationCondition || 'Baik'}
-                                                                    onChange={(e) => handleMutationItemChange(pkgIndex, itemIdx, 'mutationCondition', e.target.value)}
-                                                                    className="w-full px-1 py-0.5 text-xs border border-red-300 rounded bg-white text-center"
-                                                                >
-                                                                    <option value="Baik">Baik</option>
-                                                                    <option value="Rusak">Rusak</option>
-                                                                    <option value="Cacat">Cacat</option>
-                                                                </select>
-                                                            </td>
-
-                                                            {/* Notes */}
-                                                            <td className="px-2 py-0.5 text-xs bg-red-50 dark:bg-red-900/10">
-                                                                <input
-                                                                    type="text"
-                                                                    value={item.notes || ''}
-                                                                    onChange={(e) => handleMutationItemChange(pkgIndex, itemIdx, 'notes', e.target.value)}
-                                                                    className="w-full px-1 py-0.5 text-xs border border-red-300 rounded"
-                                                                    placeholder="Keterangan..."
-                                                                />
+                                                            <td className="px-2 py-1 text-xs text-gray-500 text-center uppercase">{doc.type.split('/')[1]}</td>
+                                                            <td className="px-2 py-1 text-xs text-gray-500 text-center">{(doc.size / 1024).toFixed(1)} KB</td>
+                                                            <td className="px-2 py-1 text-center">
+                                                                <button onClick={() => handleRemoveDocument(doc.id)} className="p-1 hover:bg-red-100 rounded text-red-500"><Trash2 className="w-3 h-3" /></button>
                                                             </td>
                                                         </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        )}
                                     </div>
-                                </div>
-                            ))}
-
-                            {/* Document Upload Section */}
-                            <div className="border border-gray-200 dark:border-dark-border rounded-lg overflow-hidden mt-4">
-                                <div className="bg-gray-100 dark:bg-dark-surface px-3 py-2 border-b border-gray-200 dark:border-dark-border flex justify-between items-center">
-                                    <span className="text-sm font-semibold text-gray-700 dark:text-silver-light">Dokumen Pendukung ({mutationDocuments.length}/8)</span>
-                                    <div>
-                                        <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".jpg,.jpeg,.png,.pdf" multiple className="hidden" />
-                                        <Button onClick={() => fileInputRef.current?.click()} variant="secondary" icon={Upload} className="text-xs" disabled={mutationDocuments.length >= 8}>
-                                            Upload Dokumen
-                                        </Button>
-                                    </div>
-                                </div>
-                                <div className="p-3">
-                                    {mutationDocuments.length === 0 ? (
-                                        <p className="text-xs text-gray-500 text-center py-4">Belum ada dokumen pendukung. Klik Upload untuk menambahkan (JPG, PNG, PDF - Max 3MB).</p>
-                                    ) : (
-                                        <table className="w-full">
-                                            <thead className="bg-gray-50 dark:bg-dark-surface">
-                                                <tr>
-                                                    <th className="px-2 py-1 text-left text-xs font-semibold text-gray-600 w-8">No</th>
-                                                    <th className="px-2 py-1 text-left text-xs font-semibold text-gray-600">Judul Dokumen</th>
-                                                    <th className="px-2 py-1 text-left text-xs font-semibold text-gray-600">Nama File</th>
-                                                    <th className="px-2 py-1 text-center text-xs font-semibold text-gray-600">Tipe</th>
-                                                    <th className="px-2 py-1 text-center text-xs font-semibold text-gray-600">Ukuran</th>
-                                                    <th className="px-2 py-1 text-center text-xs font-semibold text-gray-600 w-12">Aksi</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-gray-200 dark:divide-dark-border">
-                                                {mutationDocuments.map((doc, idx) => (
-                                                    <tr key={doc.id}>
-                                                        <td className="px-2 py-1 text-xs text-gray-700">{idx + 1}</td>
-                                                        <td className="px-2 py-1 text-xs">
-                                                            <input type="text" value={doc.title} onChange={(e) => handleDocumentTitleChange(doc.id, e.target.value)} placeholder="Masukkan judul..." className="w-full px-2 py-1 text-xs border border-gray-300 rounded" />
-                                                        </td>
-                                                        <td className="px-2 py-1 text-xs text-gray-700 flex items-center gap-1">
-                                                            <FileText className="w-3 h-3" /> {doc.name}
-                                                        </td>
-                                                        <td className="px-2 py-1 text-xs text-gray-500 text-center uppercase">{doc.type.split('/')[1]}</td>
-                                                        <td className="px-2 py-1 text-xs text-gray-500 text-center">{(doc.size / 1024).toFixed(1)} KB</td>
-                                                        <td className="px-2 py-1 text-center">
-                                                            <button onClick={() => handleRemoveDocument(doc.id)} className="p-1 hover:bg-red-100 rounded text-red-500"><Trash2 className="w-3 h-3" /></button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    )}
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 };
 

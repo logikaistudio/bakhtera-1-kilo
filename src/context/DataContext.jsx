@@ -105,6 +105,95 @@ export const DataProvider = ({ children }) => {
         itemCode: q.item_code,
     });
 
+    // Shared Helper: Map Inbound DB -> State (freight_inbound schema)
+    const mapInboundToState = (i) => {
+        // Parse documents JSONB
+        let parsedDocs = {};
+        if (typeof i.documents === 'string') {
+            try { parsedDocs = JSON.parse(i.documents); } catch (e) { parsedDocs = {}; }
+        } else {
+            parsedDocs = i.documents || {};
+        }
+
+        const items = parsedDocs.items || [];
+        // Extract supporting documents to prevent UI crash when mapping
+        const supportingDocs = parsedDocs.bcSupportingDocuments || [];
+
+        return {
+            ...i,
+            // CamelCase aliases for UI
+            pengajuanId: i.pengajuan_id,
+            pengajuanNumber: i.pengajuan_number,
+            customsDocNumber: i.customs_doc_number,
+            customsDocDate: i.customs_doc_date,
+            customsDocType: i.customs_doc_type,
+            receiptNumber: i.receipt_number,
+            itemCode: i.item_code,
+            hsCode: i.hs_code,
+            serialNumber: i.serial_number,
+            currency: i.currency,
+            quantity: i.quantity,
+            unit: i.unit,
+            value: i.value,
+            sender: i.sender,
+            assetName: i.asset_name,
+            assetId: i.item_code,
+            createdAt: i.created_at,
+            date: i.date,
+            // Items array for BarangMasuk.jsx flatMap
+            items: items,
+            // Use the extracted array for UI mapping
+            documents: supportingDocs,
+            // Keep original data just in case
+            originalDocuments: i.documents
+        };
+    };
+
+    // Shared Helper: Map Outbound DB -> State (freight_outbound schema)
+    const mapOutboundToState = (o) => {
+        // Parse documents JSONB
+        let parsedDocs = {};
+        if (typeof o.documents === 'string') {
+            try { parsedDocs = JSON.parse(o.documents); } catch (e) { parsedDocs = {}; }
+        } else {
+            parsedDocs = o.documents || {};
+        }
+
+        const items = parsedDocs.items || [];
+        // Extract supporting documents to prevent UI crash when mapping
+        const supportingDocs = parsedDocs.bcSupportingDocuments || [];
+
+        return {
+            ...o,
+            // CamelCase aliases for UI
+            pengajuanId: o.pengajuan_id,
+            pengajuanNumber: o.pengajuan_number,
+            customsDocNumber: o.customs_doc_number,
+            customsDocDate: o.customs_doc_date,
+            customsDocType: o.customs_doc_type,
+            receiptNumber: o.receipt_number,
+            itemCode: o.item_code,
+            hsCode: o.hs_code,
+            serialNumber: o.serial_number,
+            currency: o.currency,
+            quantity: o.quantity,
+            unit: o.unit,
+            value: o.value,
+            receiver: o.receiver,
+            destination: o.destination,
+            assetName: o.asset_name,
+            assetId: o.item_code,
+            createdAt: o.created_at,
+            date: o.date,
+            // Items array for BarangKeluar.jsx flatMap
+            items: items,
+            // Use the extracted array for UI mapping to prevent crash (.map on string)
+            documents: supportingDocs,
+            // Keep original data just in case
+            originalDocuments: o.documents
+        };
+    };
+
     // Load data from localStorage on mount
     useEffect(() => {
         const loadData = async () => {
@@ -220,49 +309,12 @@ export const DataProvider = ({ children }) => {
                 if (vendorError) console.error('Error fetching vendors:', vendorError);
                 else if (vendorData) setVendors(vendorData);
 
-                // Helper: Map Inbound DB -> State (freight_inbound schema)
-                const mapInboundToState = (i) => {
-                    // Parse documents JSONB to get items array
-                    let documents = i.documents;
-                    let items = [];
-                    if (typeof documents === 'string') {
-                        try { documents = JSON.parse(documents); } catch (e) { documents = {}; }
-                    }
-                    if (documents && documents.items) {
-                        items = documents.items;
-                    }
-                    return {
-                        ...i,
-                        // CamelCase aliases for UI
-                        pengajuanId: i.pengajuan_id,
-                        pengajuanNumber: i.pengajuan_number,
-                        customsDocNumber: i.customs_doc_number,
-                        customsDocDate: i.customs_doc_date,
-                        customsDocType: i.customs_doc_type,
-                        receiptNumber: i.receipt_number,
-                        itemCode: i.item_code,
-                        hsCode: i.hs_code,
-                        serialNumber: i.serial_number,
-                        currency: i.currency,
-                        quantity: i.quantity,
-                        unit: i.unit,
-                        value: i.value,
-                        sender: i.sender,
-                        assetName: i.asset_name,
-                        assetId: i.item_code,
-                        createdAt: i.created_at,
-                        date: i.date,
-                        // Items array for BarangMasuk.jsx flatMap
-                        items: items
-                    };
-                };
-
                 // Load Transactions (Inbound, Outbound, Reject)
                 const { data: inData, error: inError } = await supabase.from('freight_inbound').select('*');
                 if (!inError) setInboundTransactions((inData || []).map(mapInboundToState));
 
                 const { data: outData, error: outError } = await supabase.from('freight_outbound').select('*');
-                if (!outError) setOutboundTransactions(outData || []);
+                if (!outError) setOutboundTransactions((outData || []).map(mapOutboundToState));
 
                 const { data: rejData, error: rejError } = await supabase.from('freight_reject').select('*');
                 if (!rejError) setRejectTransactions(rejData || []);
@@ -389,8 +441,8 @@ export const DataProvider = ({ children }) => {
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'freight_outbound' }, (payload) => {
                 console.log('⚡ Realtime Outbound Update:', payload);
-                if (payload.eventType === 'INSERT') setOutboundTransactions(prev => [payload.new, ...prev]);
-                else if (payload.eventType === 'UPDATE') setOutboundTransactions(prev => prev.map(item => item.id === payload.new.id ? payload.new : item));
+                if (payload.eventType === 'INSERT') setOutboundTransactions(prev => [mapOutboundToState(payload.new), ...prev]);
+                else if (payload.eventType === 'UPDATE') setOutboundTransactions(prev => prev.map(item => item.id === payload.new.id ? mapOutboundToState(payload.new) : item));
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'freight_reject' }, (payload) => {
                 console.log('⚡ Realtime Reject Update:', payload);

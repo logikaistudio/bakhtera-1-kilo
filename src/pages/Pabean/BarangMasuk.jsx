@@ -7,33 +7,48 @@ import { exportToCSV } from '../../utils/exportCSV';
 import { exportToXLS } from '../../utils/exportXLS';
 
 const BarangMasuk = () => {
-    const { inboundTransactions = [] } = useData();
+    const { inboundTransactions = [], companySettings } = useData();
     const [searchTerm, setSearchTerm] = useState('');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
     const [selectedItem, setSelectedItem] = useState(null);
 
     // Flatten transactions into items
     const allItems = inboundTransactions.flatMap(t => {
         if (t.items && t.items.length > 0) {
-            return t.items.map(item => ({
+            return t.items.map((item, itemIdx) => ({
                 ...t,
                 ...item,
                 assetName: item.goodsType || item.assetName, // Map goodsType to assetName
-                originalTransaction: t
+                originalTransaction: t,
+                // Ensure sequence number is captured
+                noUrut: item.sequenceNumber || item.noUrut || (itemIdx + 1)
             }));
         }
         return [t];
     });
 
     // Filter transactions
-    const filteredTransactions = allItems.filter(item =>
-        (item.assetName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (item.customsDocNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (item.customsDocType || '').toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredTransactions = allItems.filter(item => {
+        const matchesSearch = (item.assetName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (item.customsDocNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (item.customsDocType || '').toLowerCase().includes(searchTerm.toLowerCase());
+
+        const itemDate = new Date(item.date);
+        const start = startDate ? new Date(startDate) : null;
+        const end = endDate ? new Date(endDate) : null;
+
+        if (end) end.setHours(23, 59, 59, 999); // Include the entire end day
+
+        const matchesDate = (!start || itemDate >= start) && (!end || itemDate <= end);
+
+        return matchesSearch && matchesDate;
+    });
 
     // Export to CSV handler
     const handleExportCSV = () => {
         const columns = [
+            { key: 'pengajuanNumber', header: 'No. Pengajuan' },
             { key: 'customsDocType', header: 'Jenis Dokumen' },
             { key: 'customsDocNumber', header: 'No. Dokumen (Pabean)' },
             { key: 'customsDocDate', header: 'Tanggal Dokumen' },
@@ -43,7 +58,7 @@ const BarangMasuk = () => {
             { key: 'packageNumber', header: 'Kode Box' },
             { key: 'itemCode', header: 'Kode Barang' },
             { key: 'hsCode', header: 'Kode HS' },
-            { key: 'serialNumber', header: 'Nomor Urut' },
+            { key: 'noUrut', header: 'Nomor Urut' },
             { key: 'assetName', header: 'Nama Barang' },
             { key: 'quantity', header: 'Quantity' },
             { key: 'unit', header: 'Satuan' },
@@ -51,7 +66,14 @@ const BarangMasuk = () => {
             { key: 'currency', header: 'Currency' }
         ];
 
-        exportToCSV(filteredTransactions, 'Barang_Masuk', columns);
+        // Format data for CSV
+        const dataToExport = filteredTransactions.map(item => ({
+            ...item,
+            date: item.date ? new Date(item.date).toLocaleDateString('id-ID') : '-',
+            customsDocDate: item.customsDocDate ? new Date(item.customsDocDate).toLocaleDateString('id-ID') : '-'
+        }));
+
+        exportToCSV(dataToExport, 'Barang_Masuk', columns);
     };
 
     // Export to XLS handler
@@ -70,32 +92,29 @@ const BarangMasuk = () => {
         const period = `${formatDate(minDate)} - ${formatDate(maxDate)}`;
 
         const headerRows = [
-            { value: 'PT. FREIGHT ONE INDONESIA', style: 'company' },
-            { value: '', style: 'normal' },
+            { value: companySettings?.company_name || 'PT. BAKHTERA FREIGHT WORLDWIDE', style: 'company' },
+            { value: companySettings?.address || 'Jl. Contoh No. 123, Jakarta', style: 'normal' },
             { value: '' },
-            { value: 'DATA BARANG MASUK', style: 'title' },
+            { value: 'DATA BARANG MASUK (INBOUND)', style: 'title' },
             { value: `Periode: ${period}`, style: 'normal' },
-            { value: '' },
-            { value: '' }
+            { value: '' }, // Spacer
+            { value: '' }  // Spacer
         ];
 
         const xlsColumns = [
             { header: 'No', key: 'no', width: 5, align: 'center' },
-            { header: 'Jenis Dok', key: 'customsDocType', width: 10, render: (i) => i.customsDocType || 'BC 2.3' },
-            { header: 'No. Dok Pabean', key: 'customsDocNumber', width: 20 },
-            { header: 'Tgl Dok', key: 'customsDocDate', width: 12, render: (i) => i.customsDocDate ? new Date(i.customsDocDate).toLocaleDateString('id-ID') : '-' },
-            { header: 'No. Bukti', key: 'receiptNumber', width: 15 },
-            { header: 'Tgl Terima', key: 'date', width: 12, render: (i) => i.date ? new Date(i.date).toLocaleDateString('id-ID') : '-' },
+            { header: 'No. Pengajuan', key: 'pengajuanNumber', width: 20 }, // Mapped correctly to pengajuanNumber
+            { header: 'Jenis Dokumen', key: 'customsDocType', width: 15, render: (i) => i.customsDocType || 'BC 2.3' },
+            { header: 'Tgl. Terima', key: 'date', width: 12, align: 'center', render: (i) => i.date ? new Date(i.date).toLocaleDateString('id-ID') : '-' },
             { header: 'Pengirim', key: 'sender', width: 20, render: (i) => i.sender || i.supplier || '-' },
-            { header: 'Kode Box', key: 'packageNumber', width: 15, align: 'center' },
+            { header: 'Kode Package/Box', key: 'packageNumber', width: 15, align: 'center' },
             { header: 'Kode Barang', key: 'itemCode', width: 15 },
             { header: 'Kode HS', key: 'hsCode', width: 12 },
-            { header: 'No. Urut', key: 'serialNumber', width: 10, align: 'center' },
+            { header: 'No. Urut', key: 'noUrut', width: 8, align: 'center' },
             { header: 'Nama Barang', key: 'assetName', width: 30 },
-            { header: 'Qty', key: 'quantity', width: 8, align: 'center', render: (i) => Number(i.quantity) || 0 },
+            { header: 'Jumlah Barang', key: 'quantity', width: 12, align: 'center', render: (i) => Number(i.quantity) || 0 },
             { header: 'Satuan', key: 'unit', width: 8, align: 'center', render: (i) => i.unit || 'pcs' },
-            { header: 'Nilai', key: 'value', width: 15, align: 'right', render: (i) => Number(i.value) || 0 },
-            { header: 'Currency', key: 'currency', width: 8, align: 'center', render: (i) => i.currency || 'IDR' }
+            { header: 'Nilai', key: 'value', width: 15, align: 'right', render: (i) => i.value ? formatCurrency(i.value) : '-' }
         ];
 
         exportToXLS(filteredTransactions, 'Laporan_Barang_Masuk', headerRows, xlsColumns);
@@ -111,7 +130,7 @@ const BarangMasuk = () => {
 
             {/* Search & Stats */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="md:col-span-2 glass-card p-4 rounded-lg">
+                <div className="md:col-span-2 glass-card p-4 rounded-lg flex flex-col gap-3">
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                         <input
@@ -122,15 +141,35 @@ const BarangMasuk = () => {
                             className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
                         />
                     </div>
+                    <div className="flex gap-2">
+                        <div className="flex-1">
+                            <input
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none text-sm"
+                                placeholder="Dari Tanggal"
+                            />
+                        </div>
+                        <div className="flex-1">
+                            <input
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none text-sm"
+                                placeholder="Sampai Tanggal"
+                            />
+                        </div>
+                    </div>
                 </div>
                 <div className="glass-card p-4 rounded-lg border border-accent-blue">
                     <p className="text-xs text-silver-dark">Total Transaksi</p>
                     <p className="text-2xl font-bold text-accent-blue">{inboundTransactions.length}</p>
                 </div>
                 <div className="glass-card p-4 rounded-lg border border-accent-green">
-                    <p className="text-xs text-silver-dark">Hari Ini</p>
+                    <p className="text-xs text-silver-dark">Total Item</p>
                     <p className="text-2xl font-bold text-accent-green">
-                        {inboundTransactions.filter(t => t.date === new Date().toISOString().split('T')[0]).length}
+                        {allItems.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)}
                     </p>
                 </div>
             </div>
@@ -142,22 +181,24 @@ const BarangMasuk = () => {
                         <ArrowDownCircle className="w-5 h-5 text-accent-blue" />
                         <h2 className="text-lg font-semibold text-silver-light">Daftar Barang Masuk</h2>
                         <span className="ml-auto text-sm text-silver-dark">{filteredTransactions.length} entri</span>
-                        <Button
-                            onClick={handleExportCSV}
-                            variant="secondary"
-                            icon={Download}
-                            className="ml-2"
-                        >
-                            Export CSV
-                        </Button>
-                        <Button
-                            onClick={handleExportXLS}
-                            variant="success"
-                            icon={FileSpreadsheet}
-                            className="ml-2"
-                        >
-                            Export XLS
-                        </Button>
+                        <div className="flex gap-2 ml-2">
+                            <Button
+                                onClick={handleExportXLS}
+                                variant="success"
+                                icon={FileSpreadsheet}
+                                className="!py-1.5 !px-3 !text-xs"
+                            >
+                                XLS
+                            </Button>
+                            <Button
+                                onClick={handleExportCSV}
+                                variant="secondary"
+                                icon={Download}
+                                className="!py-1.5 !px-3 !text-xs"
+                            >
+                                CSV
+                            </Button>
+                        </div>
                     </div>
                 </div>
 
@@ -168,20 +209,19 @@ const BarangMasuk = () => {
                             <tr>
                                 <th className="px-2 py-2 text-center text-[10px] font-semibold text-silver whitespace-nowrap">No</th>
                                 <th className="px-2 py-2 text-left text-[10px] font-semibold text-silver whitespace-nowrap">Jenis Dok</th>
+                                <th className="px-2 py-2 text-left text-[10px] font-semibold text-silver whitespace-nowrap">No. Pengajuan</th>
                                 <th className="px-2 py-2 text-left text-[10px] font-semibold text-silver whitespace-nowrap">No. Dok Pabean</th>
                                 <th className="px-2 py-2 text-center text-[10px] font-semibold text-silver whitespace-nowrap">Tgl Dok</th>
-                                <th className="px-2 py-2 text-left text-[10px] font-semibold text-silver whitespace-nowrap">No. Bukti</th>
                                 <th className="px-2 py-2 text-center text-[10px] font-semibold text-silver whitespace-nowrap">Tgl Terima</th>
                                 <th className="px-2 py-2 text-left text-[10px] font-semibold text-silver whitespace-nowrap">Pengirim</th>
                                 <th className="px-2 py-2 text-left text-[10px] font-semibold text-silver whitespace-nowrap">Kode Box</th>
                                 <th className="px-2 py-2 text-left text-[10px] font-semibold text-silver whitespace-nowrap">Kode Barang</th>
                                 <th className="px-2 py-2 text-left text-[10px] font-semibold text-silver whitespace-nowrap">Kode HS</th>
-                                <th className="px-2 py-2 text-left text-[10px] font-semibold text-silver whitespace-nowrap">No. Urut</th>
+                                <th className="px-2 py-2 text-center text-[10px] font-semibold text-silver whitespace-nowrap">No. Urut</th>
                                 <th className="px-2 py-2 text-left text-[10px] font-semibold text-silver whitespace-nowrap">Nama Barang</th>
                                 <th className="px-2 py-2 text-center text-[10px] font-semibold text-silver whitespace-nowrap">Qty</th>
                                 <th className="px-2 py-2 text-center text-[10px] font-semibold text-silver whitespace-nowrap">Satuan</th>
                                 <th className="px-2 py-2 text-right text-[10px] font-semibold text-silver whitespace-nowrap">Nilai</th>
-                                <th className="px-2 py-2 text-center text-[10px] font-semibold text-silver whitespace-nowrap">Curr</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -202,11 +242,11 @@ const BarangMasuk = () => {
                                     >
                                         <td className="px-2 py-2 text-[11px] text-center text-silver">{idx + 1}</td>
                                         <td className="px-2 py-2 text-[11px] text-silver">{item.customsDocType || 'BC 2.3'}</td>
+                                        <td className="px-2 py-2 text-[11px] text-silver">{item.pengajuanNumber || '-'}</td>
                                         <td className="px-2 py-2 text-[11px] text-accent-blue">{item.customsDocNumber}</td>
                                         <td className="px-2 py-2 text-[11px] text-center text-silver">
                                             {item.customsDocDate ? new Date(item.customsDocDate).toLocaleDateString('id-ID') : '-'}
                                         </td>
-                                        <td className="px-2 py-2 text-[11px] text-silver">{item.receiptNumber || '-'}</td>
                                         <td className="px-2 py-2 text-[11px] text-center text-silver">
                                             {new Date(item.date).toLocaleDateString('id-ID')}
                                         </td>
@@ -214,14 +254,13 @@ const BarangMasuk = () => {
                                         <td className="px-2 py-2 text-[11px] text-accent-purple">{item.packageNumber || '-'}</td>
                                         <td className="px-2 py-2 text-[11px] text-silver font-mono">{item.itemCode || '-'}</td>
                                         <td className="px-2 py-2 text-[11px] text-silver font-mono">{item.hsCode || '-'}</td>
-                                        <td className="px-2 py-2 text-[11px] text-silver font-mono">{item.serialNumber || '-'}</td>
+                                        <td className="px-2 py-2 text-[11px] text-center text-silver font-mono">{item.noUrut || item.serialNumber || '-'}</td>
                                         <td className="px-2 py-2 text-[11px] text-silver">{item.assetName}</td>
                                         <td className="px-2 py-2 text-[11px] text-center text-accent-blue">{item.quantity}</td>
                                         <td className="px-2 py-2 text-[11px] text-center text-silver">{item.unit}</td>
                                         <td className="px-2 py-2 text-[11px] text-right text-silver">
                                             {formatCurrency(item.value)}
                                         </td>
-                                        <td className="px-2 py-2 text-[11px] text-center text-silver">{item.currency || 'IDR'}</td>
                                     </tr>
                                 ))
                             )}
@@ -267,8 +306,8 @@ const BarangMasuk = () => {
                                     <p className="text-sm text-silver-light font-medium">{selectedItem.assetName}</p>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-silver-dark">Nomor Urut / Serial</label>
-                                    <p className="text-sm text-silver-light font-mono">{selectedItem.serialNumber || '-'}</p>
+                                    <label className="text-xs text-silver-dark">Nomor Urut</label>
+                                    <p className="text-sm text-silver-light font-mono">{selectedItem.noUrut || selectedItem.serialNumber || '-'}</p>
                                 </div>
                                 <div>
                                     <label className="text-xs text-silver-dark">Tanggal Masuk</label>
@@ -283,7 +322,7 @@ const BarangMasuk = () => {
                                     <p className="text-sm text-silver-light">{selectedItem.customsDocType}</p>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-silver-dark">No. Dokumen</label>
+                                    <label className="text-xs text-silver-dark">No. Dokumen Pabean</label>
                                     <p className="text-sm text-accent-blue">{selectedItem.customsDocNumber}</p>
                                 </div>
                                 <div>
