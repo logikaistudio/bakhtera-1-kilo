@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Package as PackageIcon, X, Edit2, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Package as PackageIcon, Trash2, Edit2, ChevronDown, ChevronRight } from 'lucide-react';
 import Button from './Button';
 import PackageItemManager from './PackageItemManager';
 
@@ -201,7 +201,7 @@ const PackageManager = ({ packages = [], onChange, itemMaster = [] }) => {
                                 <div className="flex items-center gap-2">
                                     <button
                                         type="button"
-                                        onClick={() => handleEditPackage(pkg)}
+                                        onClick={(e) => { e.stopPropagation(); handleEditPackage(pkg); }}
                                         className="p-2 hover:bg-blue-500/20 rounded smooth-transition"
                                         title="Edit Package"
                                     >
@@ -209,11 +209,11 @@ const PackageManager = ({ packages = [], onChange, itemMaster = [] }) => {
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => handleRemovePackage(pkg.id)}
+                                        onClick={(e) => { e.stopPropagation(); handleRemovePackage(pkg.id); }}
                                         className="p-2 hover:bg-red-500/20 rounded smooth-transition"
                                         title="Hapus Package"
                                     >
-                                        <X className="w-4 h-4 text-red-400" />
+                                        <Trash2 className="w-4 h-4 text-red-400" />
                                     </button>
                                 </div>
                             </div>
@@ -221,7 +221,7 @@ const PackageManager = ({ packages = [], onChange, itemMaster = [] }) => {
 
                         {/* Package Items (Expandable) */}
                         {isExpanded && (
-                            <div className="p-4 bg-dark-surface/30">
+                            <div className="p-4 bg-white border-t border-gray-200">
                                 <PackageItemManager
                                     items={pkg.items || []}
                                     onChange={(items) => handleItemsChange(pkg.id, items)}

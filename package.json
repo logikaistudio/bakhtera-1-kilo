@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.89.0",
+    "bcryptjs": "^3.0.3",
     "framer-motion": "^12.23.26",
     "jspdf": "^3.0.4",
     "jspdf-autotable": "^5.0.2",
@@ -20,7 +21,8 @@
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.11.0",
     "recharts": "^3.6.0",
-    "xlsx": "^0.18.5"
+    "uuid": "^13.0.0",
+    "xlsx-js-style": "^1.2.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

@@ -382,8 +382,6 @@ const InvoiceManagement = () => {
             tax_rate: 11.00,
             discount_amount: 0,
             customer_notes: '',
-            discount_amount: 0,
-            customer_notes: '',
             notes: ''
         });
         setSelectedQuotation(null);

@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
-import { read, utils } from 'xlsx';
+import XLSX from 'xlsx-js-style';
+const { read, utils } = XLSX;
 import {
     Plus, Search, Edit, Trash2, FileText, CheckCircle, XCircle, Grid, List, Upload, Clock
 } from 'lucide-react';

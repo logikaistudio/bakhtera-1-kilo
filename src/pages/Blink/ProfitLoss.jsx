@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import * as XLSX from 'xlsx';
+import XLSX from 'xlsx-js-style';
 import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import {

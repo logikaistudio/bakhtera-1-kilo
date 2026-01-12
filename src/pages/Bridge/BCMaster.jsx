@@ -44,7 +44,7 @@ const BCMaster = () => {
             name: bcCode.name,
             category: bcCode.category,
             description: bcCode.description,
-            isActive: bcCode.isActive
+            isActive: bcCode.is_active ?? bcCode.isActive  // Map from snake_case
         });
         setShowForm(true);
     };
@@ -227,9 +227,9 @@ const BCMaster = () => {
                                     </td>
                                     <td className="px-4 py-3 text-sm text-silver-dark">{bc.description}</td>
                                     <td className="px-4 py-3 text-center">
-                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${bc.isActive ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'
+                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${(bc.is_active ?? bc.isActive) ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'
                                             }`}>
-                                            {bc.isActive ? 'Aktif' : 'Tidak Aktif'}
+                                            {(bc.is_active ?? bc.isActive) ? 'Aktif' : 'Tidak Aktif'}
                                         </span>
                                     </td>
                                 </tr>

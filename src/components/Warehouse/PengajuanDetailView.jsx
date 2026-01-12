@@ -139,14 +139,14 @@ const PengajuanDetailView = ({ pengajuan, onClose, onSubmitMutations, onUpdatePe
                 <div className="sticky top-0 bg-dark-surface p-6 border-b border-dark-border z-10">
                     <div className="flex justify-between items-start">
                         <div className="flex-1">
-                            <h2 className="text-2xl font-bold gradient-text mb-2">Detail Pendaftaran</h2>
+                            <h2 className="text-2xl font-bold gradient-text mb-2">Detail Pengajuan</h2>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
                                 <div>
-                                    <p className="text-xs text-silver-dark">No. Pendaftaran</p>
+                                    <p className="text-xs text-silver-dark">No. Pengajuan</p>
                                     <p className="text-sm font-semibold text-silver-light">{pengajuan.quotationNumber}</p>
                                 </div>
                                 <div>
-                                    <p className="text-xs text-silver-dark">Tanggal Pendaftaran</p>
+                                    <p className="text-xs text-silver-dark">Tanggal Pengajuan</p>
                                     <p className="text-sm font-semibold text-silver-light">
                                         {new Date(pengajuan.submissionDate || pengajuan.date).toLocaleDateString('id-ID')}
                                     </p>

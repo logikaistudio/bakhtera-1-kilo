@@ -125,7 +125,7 @@ const POFormModal = ({ onClose, onSubmit, vendors }) => {
                             {/* No. Pendaftaran (Quotation) - Optional */}
                             <div>
                                 <label className="block text-sm font-medium text-silver mb-2">
-                                    No. Pendaftaran (Opsional)
+                                    No. Pengajuan (Opsional)
                                 </label>
                                 <select
                                     value={formData.quotationId}
@@ -140,7 +140,7 @@ const POFormModal = ({ onClose, onSubmit, vendors }) => {
                                     ))}
                                 </select>
                                 {formData.quotationId && (
-                                    <p className="text-xs text-accent-purple mt-1">✓ PO akan terhubung dengan pendaftaran ini</p>
+                                    <p className="text-xs text-accent-purple mt-1">✓ PO akan terhubung dengan pengajuan ini</p>
                                 )}
                             </div>
 

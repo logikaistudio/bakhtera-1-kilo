@@ -1,0 +1,4 @@
+
+ALTER TABLE freight_quotations 
+ADD COLUMN IF NOT EXISTS approved_date TIMESTAMP WITH TIME ZONE,
+ADD COLUMN IF NOT EXISTS approved_by TEXT;

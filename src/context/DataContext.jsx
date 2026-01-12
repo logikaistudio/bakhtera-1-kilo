@@ -25,317 +25,17 @@ export const DataProvider = ({ children }) => {
     const [events, setEvents] = useState([]);
 
     // Bridge TPPB specific data
-    const [quotations, setQuotations] = useState([
-        // Sample Quotation 1 - Approved
-        {
-            id: 'QUOT-SAMPLE-001',
-            quotationNumber: 'QT-2025-001',
-            customer: 'PT Maju Jaya Indonesia',
-            customerId: 'CUST-001',
-            bcDocumentNumber: 'BC23-2025-001234',
-            title: 'Jasa Pengurusan TPPB - Elektronik Impor',
-            date: '2025-01-15',
-            validUntil: '2025-02-15',
-            status: 'approved',
-            packages: [
-                {
-                    id: 'pkg-001',
-                    packageNumber: 'PKG-001',
-                    description: 'Electronics Package',
-                    items: [
-                        {
-                            id: 'item-1',
-                            packageNumber: 'PKG-001',
-                            itemName: 'Laptop Dell XPS 15',
-                            goodsType: 'Laptop Dell XPS 15',
-                            serialNumber: 'DXPS-2025-001-010',
-                            quantity: 10,
-                            unit: 'pcs',
-                            condition: 'good',
-                            value: 250000000,
-                            notes: 'Laptop untuk kantor, kondisi baru'
-                        }
-                    ]
-                },
-                {
-                    id: 'pkg-002',
-                    packageNumber: 'PKG-002',
-                    description: 'Display Package',
-                    items: [
-                        {
-                            id: 'item-2',
-                            packageNumber: 'PKG-002',
-                            itemName: 'Monitor LG 27" 4K',
-                            goodsType: 'Monitor LG 27" 4K',
-                            serialNumber: 'LG27-2025-002-015',
-                            quantity: 15,
-                            unit: 'pcs',
-                            condition: 'good',
-                            value: 75000000,
-                            notes: 'Monitor 4K untuk workstation'
-                        }
-                    ]
-                }
-            ],
-            services: {
-                tppbFee: { amount: 15000000, total: 15000000 },
-                customsClearance: { amount: 10000000, total: 10000000 },
-                transportCost: { amount: 5000000, total: 5000000 },
-                handling: { amount: 3000000, total: 3000000 }
-            },
-            customCosts: [],
-            discountType: 'percentage',
-            discountValue: 5,
-            taxRate: 11,
-            subtotalBeforeDiscount: 358000000,
-            discountAmount: 17900000,
-            subtotalAfterDiscount: 340100000,
-            taxAmount: 37411000,
-            grandTotal: 377511000,
-            notes: 'Pengajuan untuk impor elektronik dari Singapore',
-            createdAt: '2025-01-15T10:00:00Z'
-        },
-        // Sample Quotation 2 - Approved
-        {
-            id: 'QUOT-SAMPLE-002',
-            quotationNumber: 'QT-2025-002',
-            customer: 'CV Sumber Rezeki',
-            customerId: 'CUST-002',
-            bcDocumentNumber: 'BC23-2025-005678',
-            title: 'Jasa Pengurusan TPPB - Spare Parts Mesin',
-            date: '2025-01-20',
-            validUntil: '2025-02-20',
-            status: 'approved',
-            items: [
-                {
-                    id: 'item-1',
-                    packageNumber: 'PKG-SR-001',
-                    goodsType: 'Bearing SKF 6205',
-                    quantity: 100,
-                    unit: 'pcs',
-                    condition: 'good',
-                    serialNumber: 'SKF6205-BATCH-A',
-                    value: 15000000,
-                    notes: 'Bearing import dari Jerman'
-                },
-                {
-                    id: 'item-2',
-                    packageNumber: 'PKG-SR-002',
-                    goodsType: 'V-Belt Type A',
-                    quantity: 50,
-                    unit: 'pcs',
-                    condition: 'good',
-                    serialNumber: 'VBELT-A-BATCH-B',
-                    value: 10000000,
-                    notes: 'V-Belt untuk mesin produksi'
-                },
-                {
-                    id: 'item-3',
-                    packageNumber: 'PKG-SR-003',
-                    goodsType: 'Oil Seal 25x40x7',
-                    quantity: 200,
-                    unit: 'pcs',
-                    condition: 'good',
-                    serialNumber: 'OILSEAL-BATCH-C',
-                    value: 10000000,
-                    notes: 'Oil seal standar industri'
-                }
-            ],
-            services: {
-                tppbFee: { amount: 8000000, total: 8000000 },
-                customsClearance: { amount: 6000000, total: 6000000 },
-                transportCost: { amount: 3000000, total: 3000000 },
-                insurance: { amount: 1000000, total: 1000000 }
-            },
-            customCosts: [
-                {
-                    id: 'custom-1',
-                    description: 'Biaya Fumigasi',
-                    amount: 2000000,
-                    total: 2000000
-                }
-            ],
-            discountType: 'percentage',
-            discountValue: 0,
-            taxRate: 11,
-            subtotalBeforeDiscount: 55000000,
-            discountAmount: 0,
-            subtotalAfterDiscount: 55000000,
-            taxAmount: 6050000,
-            grandTotal: 61050000,
-            notes: 'Spare parts untuk mesin produksi, butuh handling khusus',
-            createdAt: '2025-01-20T14:30:00Z'
-        }
-    ]);
+    const [quotations, setQuotations] = useState([]);
     const [customsDocuments, setCustomsDocuments] = useState([]);
     const [goodsMovements, setGoodsMovements] = useState([]);
     const [inspections, setInspections] = useState([]);
-    const [itemMaster, setItemMaster] = useState([
-        { id: 'item-001', itemCode: '8471.30.00', itemType: 'Laptop / Computer' },
-        { id: 'item-002', itemCode: '8528.52.00', itemType: 'Monitor' },
-        { id: 'item-003', itemCode: '8471.60.40', itemType: 'Keyboard' },
-        { id: 'item-004', itemCode: '8471.60.70', itemType: 'Mouse' },
-        { id: 'item-005', itemCode: '8517.62.00', itemType: 'Networking Equipment' }
-    ]);
-    const [inboundTransactions, setInboundTransactions] = useState([
-        // From QT-2025-001 - Laptop Dell XPS 15
-        {
-            id: 'inbound-001',
-            date: '2025-01-16',
-            customsDocType: 'BC 2.3',
-            customsDocNumber: 'BC23-2025-001234',
-            customsDocDate: '2025-01-16',
-            receiptNumber: 'QT-2025-001',
-            sender: 'PT Maju Jaya Indonesia',
-            supplier: 'PT Maju Jaya Indonesia',
-            itemCode: '8471.30.00',
-            hsCode: '8471.30.00',
-            assetName: 'Laptop Dell XPS 15',
-            quantity: 10,
-            unit: 'pcs',
-            value: 250000000,
-            currency: 'IDR',
-            status: 'completed'
-        },
-        // From QT-2025-001 - Monitor LG 27" 4K
-        {
-            id: 'inbound-002',
-            date: '2025-01-16',
-            customsDocType: 'BC 2.3',
-            customsDocNumber: 'BC23-2025-001234',
-            customsDocDate: '2025-01-16',
-            receiptNumber: 'QT-2025-001',
-            sender: 'PT Maju Jaya Indonesia',
-            supplier: 'PT Maju Jaya Indonesia',
-            itemCode: '8528.52.00',
-            hsCode: '8528.52.00',
-            assetName: 'Monitor LG 27" 4K',
-            quantity: 15,
-            unit: 'pcs',
-            value: 75000000,
-            currency: 'IDR',
-            status: 'completed'
-        },
-        // From QT-2025-002 - Bearing SKF 6205
-        {
-            id: 'inbound-003',
-            date: '2025-01-20',
-            customsDocType: 'BC 2.3',
-            customsDocNumber: 'BC23-2025-005678',
-            customsDocDate: '2025-01-20',
-            receiptNumber: 'QT-2025-002',
-            sender: 'CV Sumber Rezeki',
-            supplier: 'CV Sumber Rezeki',
-            itemCode: '8471.60.40',
-            hsCode: '8471.60.40',
-            assetName: 'Bearing SKF 6205',
-            quantity: 100,
-            unit: 'pcs',
-            value: 15000000,
-            currency: 'IDR',
-            status: 'completed'
-        }
-    ]);
-    const [outboundTransactions, setOutboundTransactions] = useState([
-        // Outbound from warehouse inventory - Laptop Dell XPS 15
-        {
-            id: 'outbound-001',
-            date: '2025-01-22',
-            customsDocType: 'BC 3.0',
-            customsDocNumber: 'BC30-2025-000123',
-            customsDocDate: '2025-01-22',
-            receiptNumber: 'QT-2025-001',
-            destination: 'PT Customer Export Jakarta',
-            receiver: 'PT Customer Export Jakarta',
-            itemCode: '8471.30.00',
-            hsCode: '8471.30.00',
-            assetName: 'Laptop Dell XPS 15',
-            quantity: 3,
-            unit: 'pcs',
-            value: 75000000,
-            currency: 'IDR',
-            status: 'completed'
-        }
-    ]);
-    const [rejectTransactions, setRejectTransactions] = useState([
-        {
-            id: 'reject-001',
-            date: '2025-01-19',
-            customsDocType: 'BC 2.5',
-            customsDocNumber: 'BC25-2025-000123',
-            customsDocDate: '2025-01-19',
-            receiptNumber: 'RCP-REJ-001',
-            rejectReason: 'Rusak saat pengiriman',
-            itemCode: '8528.52.00',
-            hsCode: '8528.52.00',
-            assetName: 'Monitor LED 27" 4K',
-            quantity: 2,
-            unit: 'pcs',
-            value: 10000000,
-            currency: 'IDR',
-            notes: 'LCD pecah, kemasan rusak parah',
-            status: 'rejected'
-        }
-    ]);
+    const [itemMaster, setItemMaster] = useState([]);
+    const [inboundTransactions, setInboundTransactions] = useState([]);
+    const [outboundTransactions, setOutboundTransactions] = useState([]);
+    const [rejectTransactions, setRejectTransactions] = useState([]);
 
     // Activity Logs for audit tracking
-    const [activityLogs, setActivityLogs] = useState([
-        {
-            id: 'log-001',
-            timestamp: '2025-01-16T10:30:00',
-            module: 'Pendaftaran',
-            action: 'add',
-            entityType: 'Quotation',
-            entityId: 'QT-2025-001',
-            entityName: 'Jasa Pengurusan TPPB - Elektronik Impor',
-            user: 'Admin User',
-            details: 'Created new quotation for PT Maju Jaya Indonesia'
-        },
-        {
-            id: 'log-002',
-            timestamp: '2025-01-16T14:15:00',
-            module: 'Pendaftaran',
-            action: 'edit',
-            entityType: 'Quotation',
-            entityId: 'QT-2025-001',
-            entityName: 'Jasa Pengurusan TPPB - Elektronik Impor',
-            user: 'Admin User',
-            details: 'Updated status to approved'
-        },
-        {
-            id: 'log-003',
-            timestamp: '2025-01-17T09:20:00',
-            module: 'Warehouse',
-            action: 'add',
-            entityType: 'Inventory',
-            entityId: 'inv-sample-001',
-            entityName: 'Laptop Dell XPS 15',
-            user: 'Warehouse Staff',
-            details: 'Added 10 units to warehouse inventory'
-        },
-        {
-            id: 'log-004',
-            timestamp: '2025-01-18T11:45:00',
-            module: 'Finance',
-            action: 'add',
-            entityType: 'Invoice',
-            entityId: 'INV-2025-001',
-            entityName: 'Invoice for QT-2025-001',
-            user: 'Finance Admin',
-            details: 'Generated invoice from quotation'
-        },
-        {
-            id: 'log-005',
-            timestamp: '2025-01-19T15:30:00',
-            module: 'Goods Movement',
-            action: 'add',
-            entityType: 'Mutation Log',
-            entityId: 'mut-001',
-            entityName: 'Transfer to Ruang Pameran',
-            user: 'Warehouse Staff',
-            details: 'Moved 5 units of Laptop Dell XPS 15'
-        }
-    ]);
+    const [activityLogs, setActivityLogs] = useState([]);
 
     // Helper function to log activity
     const logActivity = (module, action, entityType, entityId, entityName, details, user = 'System User') => {
@@ -354,10 +54,7 @@ export const DataProvider = ({ children }) => {
     };
 
     // Pending Approvals
-    const [pendingApprovals, setPendingApprovals] = useState([
-        { id: 'approval-001', requestDate: '2025-01-20T09:30:00', type: 'edit', module: 'Pendaftaran', entityType: 'Quotation', entityId: 'QT-2025-001', entityName: 'Jasa Pengurusan TPPB - Elektronik Impor', requestedBy: 'Staff User', changes: { field: 'status', oldValue: 'pending', newValue: 'approved' }, details: 'Update status pendaftaran', status: 'pending' },
-        { id: 'approval-002', requestDate: '2025-01-21T14:20:00', type: 'delete', module: 'Finance', entityType: 'Invoice', entityId: 'INV-2025-099', entityName: 'Invoice Duplicate', requestedBy: 'Finance Staff', changes: {}, details: 'Delete duplicate invoice', status: 'pending' }
-    ]);
+    const [pendingApprovals, setPendingApprovals] = useState([]);
 
     const requestApproval = (type, module, entityType, entityId, entityName, changes, details, requestedBy = 'User') => {
         const newRequest = { id: `approval-${Date.now()}`, requestDate: new Date().toISOString(), type, module, entityType, entityId, entityName, requestedBy, changes, details, status: 'pending' };
@@ -378,165 +75,10 @@ export const DataProvider = ({ children }) => {
         if (request) logActivity(request.module, 'rejected', request.entityType, request.entityId, request.entityName, `Rejected: ${reason}`, rejectedBy);
     };
 
-    const [warehouseInventory, setWarehouseInventory] = useState([
-        // Sample inventory for QT-2025-001 - ready for mutation testing
-        {
-            id: 'inv-sample-001',
-            pengajuanId: 'QUOT-SAMPLE-001',
-            pengajuanNumber: 'QT-2025-001',
-            submissionDate: '2025-01-15',
-            bcDocumentNumber: 'BC23-2025-001234',
-            bcDocumentDate: '2025-01-16',
-            packageNumber: 'PKG-001',
-            itemCode: '8471.30.00',
-            itemName: 'Laptop Dell XPS 15',
-            assetName: 'Laptop Dell XPS 15',
-            serialNumber: 'DXPS-2025-001-010',
-            quantity: 10,
-            currentStock: 10,
-            unit: 'pcs',
-            value: 250000000,
-            condition: 'good',
-            hsCode: '8471.30.00',
-            entryDate: '2025-01-16',
-            location: {
-                room: 'Ruang Server',
-                rack: 'Rak A1',
-                slot: 'Slot 01-05'
-            },
-            receivedBy: 'Warehouse Staff',
-            remarks: 'Laptop untuk keperluan pameran elektronik',
-            notes: 'Laptop untuk kantor, kondisi baru',
-            movements: [
-                {
-                    id: 'mov-initial-001',
-                    date: '2025-01-16',
-                    time: '10:00',
-                    quantity: 10,
-                    movementType: 'in',
-                    origin: 'supplier',
-                    destination: 'gudang',
-                    position: 'gudang',
-                    condition: 'good',
-                    remainingStock: 10,
-                    pic: 'Warehouse Manager',
-                    notes: 'Initial stock entry from approved pengajuan QT-2025-001',
-                    documents: []
-                }
-            ]
-        },
-        {
-            id: 'inv-sample-002',
-            pengajuanId: 'QUOT-SAMPLE-001',
-            pengajuanNumber: 'QT-2025-001',
-            submissionDate: '2025-01-15',
-            bcDocumentNumber: 'BC23-2025-001234',
-            bcDocumentDate: '2025-01-16',
-            packageNumber: 'PKG-002',
-            itemName: 'Monitor LG 27" 4K',
-            assetName: 'Monitor LG 27" 4K',
-            serialNumber: 'LG27-2025-002-015',
-            quantity: 15,
-            currentStock: 15,
-            unit: 'pcs',
-            value: 75000000,
-            condition: 'good',
-            hsCode: '8528.52.00',
-            entryDate: '2025-01-16',
-            location: {
-                room: 'Ruang Server',
-                rack: 'Rak A2',
-                slot: 'Slot 06-20'
-            },
-            receivedBy: 'Warehouse Staff',
-            remarks: 'Monitor 4K untuk workstation pameran',
-            notes: 'Monitor 4K untuk workstation',
-            movements: [
-                {
-                    id: 'mov-initial-002',
-                    date: '2025-01-16',
-                    time: '10:15',
-                    quantity: 15,
-                    movementType: 'in',
-                    origin: 'supplier',
-                    destination: 'gudang',
-                    position: 'gudang',
-                    condition: 'good',
-                    remainingStock: 15,
-                    pic: 'Warehouse Manager',
-                    notes: 'Initial stock entry from approved pengajuan QT-2025-001',
-                    documents: []
-                }
-            ]
-        }
-    ]);
+    const [warehouseInventory, setWarehouseInventory] = useState([]);
     const [mutationLogs, setMutationLogs] = useState([]);
-    const [bcCodes, setBcCodes] = useState([
-        {
-            id: 'bc-2.3',
-            code: 'BC 2.3',
-            name: 'Pemasukan Barang Impor ke TPPB',
-            category: 'inbound',
-            description: 'Digunakan untuk pemasukan barang dari luar negeri ke Tempat Penyelenggaraan Pameran Berikat (TPPB).',
-            isActive: true
-        },
-        {
-            id: 'bc-2.7',
-            code: 'BC 2.7',
-            name: 'Pemindahan Antar TPB',
-            category: 'inbound',
-            description: 'Digunakan untuk pemindahan barang antar Tempat Penimbunan Berikat, termasuk dari atau ke TPPB. (Bisa Inbound/Outbound)',
-            isActive: true
-        },
-        {
-            id: 'bc-2.5',
-            code: 'BC 2.5',
-            name: 'Pengeluaran ke Dalam Negeri',
-            category: 'outbound',
-            description: 'Digunakan jika barang pameran dijual atau dipakai di dalam negeri (TLDDP).',
-            isActive: true
-        },
-        {
-            id: 'bc-4.0',
-            code: 'BC 4.0',
-            name: 'Pemasukan Barang Lokal ke TPPB',
-            category: 'inbound',
-            description: 'Digunakan untuk memasukkan barang asal dalam negeri ke TPPB untuk keperluan pameran.',
-            isActive: true
-        },
-        {
-            id: 'bc-4.1',
-            code: 'BC 4.1',
-            name: 'Pengeluaran Barang Lokal dari TPPB',
-            category: 'outbound',
-            description: 'Digunakan untuk mengeluarkan kembali barang lokal dari TPPB ke pemilik di dalam negeri.',
-            isActive: true
-        },
-        {
-            id: 'bc-2.6.1',
-            code: 'BC 2.6.1',
-            name: 'Pengeluaran Sementara',
-            category: 'outbound',
-            description: 'Digunakan saat barang TPPB dikeluarkan sementara (misalnya untuk demo atau uji coba).',
-            isActive: true
-        },
-        {
-            id: 'bc-2.6.2',
-            code: 'BC 2.6.2',
-            name: 'Pemasukan Kembali',
-            category: 'inbound',
-            description: 'Digunakan untuk memasukkan kembali barang yang sebelumnya keluar sementara.',
-            isActive: true
-        },
-        {
-            id: 'bc-2.8',
-            code: 'BC 2.8',
-            name: 'Re-ekspor ke Luar Negeri',
-            category: 'outbound',
-            description: 'Digunakan untuk mengeluarkan barang dari TPPB ke luar negeri (re-ekspor).',
-            isActive: true
-        }
-    ]);
+    const [bcCodes, setBcCodes] = useState([]);
+    const [hsCodes, setHSCodes] = useState([]); // HS Master State
 
     // Finance module data
     const [invoices, setInvoices] = useState([]);
@@ -544,6 +86,24 @@ export const DataProvider = ({ children }) => {
     const [purchaseOrders, setPurchaseOrders] = useState([]);
     const [payroll, setPayroll] = useState([]);
     const [leads, setLeads] = useState([]);
+
+    // Shared Helper: Map Quotation DB -> State
+    const normalizeQuotation = (q) => ({
+        ...q,
+        quotationNumber: q.quotation_number,
+        submissionDate: q.submission_date || q.date,
+        documentStatus: q.document_status,
+        customsStatus: q.customs_status,
+        bcDocumentNumber: q.bc_document_number,
+        bcDocumentDate: q.bc_document_date,
+        bcDocType: q.bc_document_type,
+        bcSupportingDocuments: q.bc_supporting_documents || [],
+        approvedDate: q.approved_date,
+        approvedBy: q.approved_by,
+        rejectionReason: q.rejection_reason,
+        rejectionDate: q.rejection_date,
+        itemCode: q.item_code,
+    });
 
     // Load data from localStorage on mount
     useEffect(() => {
@@ -557,24 +117,87 @@ export const DataProvider = ({ children }) => {
                 };
                 window.addEventListener('updateWarehouseInventory', handleWarehouseUpdate);
 
+                // Helper: Map Quotation DB -> State
+                const mapQuotationToState = (q) => ({
+                    ...q,
+                    quotationNumber: q.quotation_number,
+                    submissionDate: q.submission_date || q.date,
+                    documentStatus: q.document_status,
+                    customsStatus: q.customs_status,
+                    bcDocumentNumber: q.bc_document_number,
+                    bcDocumentDate: q.bc_document_date,
+                    bcDocType: q.bc_document_type,
+                    bcSupportingDocuments: q.bc_supporting_documents || [],
+                    approvedDate: q.approved_date,
+                    approvedBy: q.approved_by,
+                    rejectionReason: q.rejection_reason,
+                    rejectionDate: q.rejection_date,
+                    itemCode: q.item_code,
+                    // Keep original snake_case too just in case? Or rely on camelCase
+                });
+
+                // Helper: Map Warehouse DB -> State (freight_warehouse schema)
+                const mapWarehouseToState = (w) => {
+                    // Parse location if stored as string
+                    let location = w.location;
+                    if (typeof location === 'string') {
+                        try { location = JSON.parse(location); } catch (e) { location = {}; }
+                    }
+                    return {
+                        ...w,
+                        // CamelCase aliases for UI
+                        pengajuanId: w.pengajuan_id,
+                        pengajuanNumber: w.pengajuan_number,
+                        bcDocumentNumber: w.bc_document_number,
+                        packageNumber: w.package_number,
+                        itemCode: w.item_code,
+                        itemName: w.item_name,
+                        assetName: w.asset_name || w.item_name,
+                        serialNumber: w.serial_number,
+                        entryDate: w.entry_date,
+                        submissionDate: w.submission_date,
+                        location: location,
+                        // Legacy compatibility
+                        assetId: w.item_code,
+                        currentStock: w.quantity,
+                    };
+                };
+
                 // Load TPPB Workflow Data (Quotations, etc.)
                 const { data: quotData, error: quotError } = await supabase.from('freight_quotations').select('*');
                 if (quotError) console.error('Error fetching quotations:', quotError);
-                else setQuotations(quotData || []);
+                else setQuotations((quotData || []).map(normalizeQuotation));
 
                 // Load Warehouse Inventory
                 const { data: whData, error: whError } = await supabase.from('freight_warehouse').select('*');
                 if (whError) console.error('Error fetching inventory:', whError);
-                else setWarehouseInventory(whData || []);
+                else setWarehouseInventory((whData || []).map(mapWarehouseToState));
 
                 // Load Master Data
                 const { data: bcData, error: bcError } = await supabase.from('freight_bc_codes').select('*');
                 if (bcError) console.error('Error fetching BC codes:', bcError);
                 else setBcCodes(bcData || []);
 
-                const { data: itemData, error: itemError } = await supabase.from('freight_inventory').select('*'); // Using freight_inventory table for item master
+                const { data: hsData, error: hsError } = await supabase.from('freight_hs_codes').select('*');
+                if (hsError) console.error('Error fetching HS codes:', hsError);
+                else setHSCodes(hsData.map(h => ({
+                    id: h.id,
+                    hsCode: h.hs_code,
+                    description: h.description
+                })) || []);
+
+                const { data: itemData, error: itemError } = await supabase.from('freight_inventory').select('*');
                 if (itemError) console.error('Error fetching Item master:', itemError);
-                else setItemMaster(itemData || []);
+                else {
+                    // Map snake_case from DB to camelCase for UI
+                    const mappedItems = (itemData || []).map(item => ({
+                        id: item.id,
+                        itemCode: item.item_code,
+                        itemType: item.item_type,
+                        description: item.description
+                    }));
+                    setItemMaster(mappedItems);
+                }
 
                 // Load Customers from Supabase (with Debug Logging)
                 console.log('🔄 Fetching customers from Supabase...');
@@ -597,9 +220,46 @@ export const DataProvider = ({ children }) => {
                 if (vendorError) console.error('Error fetching vendors:', vendorError);
                 else if (vendorData) setVendors(vendorData);
 
+                // Helper: Map Inbound DB -> State (freight_inbound schema)
+                const mapInboundToState = (i) => {
+                    // Parse documents JSONB to get items array
+                    let documents = i.documents;
+                    let items = [];
+                    if (typeof documents === 'string') {
+                        try { documents = JSON.parse(documents); } catch (e) { documents = {}; }
+                    }
+                    if (documents && documents.items) {
+                        items = documents.items;
+                    }
+                    return {
+                        ...i,
+                        // CamelCase aliases for UI
+                        pengajuanId: i.pengajuan_id,
+                        pengajuanNumber: i.pengajuan_number,
+                        customsDocNumber: i.customs_doc_number,
+                        customsDocDate: i.customs_doc_date,
+                        customsDocType: i.customs_doc_type,
+                        receiptNumber: i.receipt_number,
+                        itemCode: i.item_code,
+                        hsCode: i.hs_code,
+                        serialNumber: i.serial_number,
+                        currency: i.currency,
+                        quantity: i.quantity,
+                        unit: i.unit,
+                        value: i.value,
+                        sender: i.sender,
+                        assetName: i.asset_name,
+                        assetId: i.item_code,
+                        createdAt: i.created_at,
+                        date: i.date,
+                        // Items array for BarangMasuk.jsx flatMap
+                        items: items
+                    };
+                };
+
                 // Load Transactions (Inbound, Outbound, Reject)
                 const { data: inData, error: inError } = await supabase.from('freight_inbound').select('*');
-                if (!inError) setInboundTransactions(inData || []);
+                if (!inError) setInboundTransactions((inData || []).map(mapInboundToState));
 
                 const { data: outData, error: outError } = await supabase.from('freight_outbound').select('*');
                 if (!outError) setOutboundTransactions(outData || []);
@@ -614,8 +274,40 @@ export const DataProvider = ({ children }) => {
                 const { data: custDocData, error: custDocError } = await supabase.from('freight_customs').select('*');
                 if (!custDocError) setCustomsDocuments(custDocData || []);
 
+                // Load Mutation Logs from freight_mutation_logs table
                 const { data: mLogData, error: mLogError } = await supabase.from('freight_mutation_logs').select('*');
-                if (!mLogError) setMutationLogs(mLogData || []);
+                if (!mLogError) {
+                    // Map snake_case to camelCase for UI
+                    const mappedLogs = (mLogData || []).map(log => ({
+                        id: log.id?.toString(),
+                        pengajuanId: log.pengajuan_id,
+                        pengajuanNumber: log.pengajuan_number,
+                        bcDocumentNumber: log.bc_document_number,
+                        packageNumber: log.package_number,
+                        itemCode: log.item_code,
+                        itemName: log.item_name,
+                        assetName: log.item_name,
+                        hsCode: log.hs_code,
+                        serialNumber: log.serial_number,
+                        totalStock: log.total_stock,
+                        mutatedQty: log.mutated_qty,
+                        remainingStock: log.remaining_stock,
+                        origin: log.origin,
+                        destination: log.destination,
+                        condition: log.condition || 'Baik',
+                        date: log.date,
+                        time: log.time,
+                        pic: log.pic,
+                        remarks: log.remarks,
+                        documents: log.documents || [],
+                        uom: log.uom || 'pcs',
+                        createdAt: log.created_at,
+                        submissionDate: log.date,
+                        approvedDate: log.date
+                    }));
+                    setMutationLogs(mappedLogs);
+                    console.log(`✅ Loaded ${mappedLogs.length} mutation logs from Supabase`);
+                }
 
                 // Load Finance Data
                 const { data: invData, error: invError } = await supabase.from('freight_invoices').select('*');
@@ -680,20 +372,20 @@ export const DataProvider = ({ children }) => {
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'freight_quotations' }, (payload) => {
                 console.log('⚡ Realtime Quotation Update:', payload);
-                if (payload.eventType === 'INSERT') setQuotations(prev => [...prev, payload.new]);
-                else if (payload.eventType === 'UPDATE') setQuotations(prev => prev.map(item => item.id === payload.new.id ? payload.new : item));
+                if (payload.eventType === 'INSERT') setQuotations(prev => [...prev, normalizeQuotation(payload.new)]);
+                else if (payload.eventType === 'UPDATE') setQuotations(prev => prev.map(item => item.id === payload.new.id ? normalizeQuotation(payload.new) : item));
                 // Delete typically not used for quotations, but handled if needed
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'freight_warehouse' }, (payload) => {
                 console.log('⚡ Realtime Warehouse Update:', payload);
-                if (payload.eventType === 'INSERT') setWarehouseInventory(prev => [...prev, payload.new]);
-                else if (payload.eventType === 'UPDATE') setWarehouseInventory(prev => prev.map(item => item.id === payload.new.id ? payload.new : item));
+                if (payload.eventType === 'INSERT') setWarehouseInventory(prev => [...prev, mapWarehouseToState(payload.new)]);
+                else if (payload.eventType === 'UPDATE') setWarehouseInventory(prev => prev.map(item => item.id === payload.new.id ? mapWarehouseToState(payload.new) : item));
                 else if (payload.eventType === 'DELETE') setWarehouseInventory(prev => prev.filter(item => item.id !== payload.old.id));
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'freight_inbound' }, (payload) => {
                 console.log('⚡ Realtime Inbound Update:', payload);
-                if (payload.eventType === 'INSERT') setInboundTransactions(prev => [payload.new, ...prev]);
-                else if (payload.eventType === 'UPDATE') setInboundTransactions(prev => prev.map(item => item.id === payload.new.id ? payload.new : item));
+                if (payload.eventType === 'INSERT') setInboundTransactions(prev => [mapInboundToState(payload.new), ...prev]);
+                else if (payload.eventType === 'UPDATE') setInboundTransactions(prev => prev.map(item => item.id === payload.new.id ? mapInboundToState(payload.new) : item));
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'freight_outbound' }, (payload) => {
                 console.log('⚡ Realtime Outbound Update:', payload);
@@ -741,6 +433,47 @@ export const DataProvider = ({ children }) => {
                 else if (payload.eventType === 'UPDATE') setGoodsMovements(prev => prev.map(item => item.id === payload.new.id ? payload.new : item));
                 else if (payload.eventType === 'DELETE') setGoodsMovements(prev => prev.filter(item => item.id !== payload.old.id));
             })
+            // Add subscription for Mutation Logs (for Bridge UI)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'freight_mutation_logs' }, (payload) => {
+                console.log('⚡ Realtime Mutation Log Update:', payload);
+                const mapRealtimeLog = (log) => ({
+                    id: log.id?.toString(),
+                    pengajuanId: log.pengajuan_id,
+                    pengajuanNumber: log.pengajuan_number,
+                    bcDocumentNumber: log.bc_document_number,
+                    packageNumber: log.package_number,
+                    itemCode: log.item_code,
+                    itemName: log.item_name,
+                    assetName: log.item_name, // fallback or same
+                    hsCode: log.hs_code,
+                    serialNumber: log.serial_number,
+                    totalStock: log.total_stock,
+                    mutatedQty: log.mutated_qty,
+                    remainingStock: log.remaining_stock,
+                    origin: log.origin,
+                    destination: log.destination,
+                    condition: log.condition || 'Baik',
+                    date: log.date,
+                    time: log.time,
+                    pic: log.pic,
+                    remarks: log.remarks,
+                    documents: log.documents || [],
+                    uom: log.uom || 'pcs',
+                    createdAt: log.created_at,
+                    submissionDate: log.date,
+                    approvedDate: log.date
+                });
+
+                if (payload.eventType === 'INSERT') {
+                    setMutationLogs(prev => [...prev, mapRealtimeLog(payload.new)]);
+                }
+                else if (payload.eventType === 'UPDATE') {
+                    setMutationLogs(prev => prev.map(item => item.id === payload.new.id.toString() ? mapRealtimeLog(payload.new) : item));
+                }
+                else if (payload.eventType === 'DELETE') {
+                    setMutationLogs(prev => prev.filter(item => item.id !== payload.old.id.toString()));
+                }
+            })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'freight_inspections' }, (payload) => {
                 console.log('⚡ Realtime Inspection Update:', payload);
                 if (payload.eventType === 'INSERT') setInspections(prev => [...prev, payload.new]);
@@ -758,6 +491,36 @@ export const DataProvider = ({ children }) => {
                 if (payload.eventType === 'INSERT') setPurchases(prev => [...prev, payload.new]);
                 else if (payload.eventType === 'UPDATE') setPurchases(prev => prev.map(item => item.id === payload.new.id ? payload.new : item));
                 else if (payload.eventType === 'DELETE') setPurchases(prev => prev.filter(item => item.id !== payload.old.id));
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'freight_inventory' }, (payload) => {
+                console.log('⚡ Realtime Item Master Update:', payload);
+                if (payload.eventType === 'INSERT') {
+                    const newItem = {
+                        id: payload.new.id,
+                        itemCode: payload.new.item_code,
+                        itemType: payload.new.item_type,
+                        description: payload.new.description
+                    };
+                    setItemMaster(prev => [...prev, newItem]);
+                }
+                else if (payload.eventType === 'UPDATE') {
+                    const updatedItem = {
+                        id: payload.new.id,
+                        itemCode: payload.new.item_code,
+                        itemType: payload.new.item_type,
+                        description: payload.new.description
+                    };
+                    setItemMaster(prev => prev.map(item => item.id === payload.new.id ? updatedItem : item));
+                }
+                else if (payload.eventType === 'DELETE') {
+                    setItemMaster(prev => prev.filter(item => item.id !== payload.old.id));
+                }
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'freight_bc_codes' }, (payload) => {
+                console.log('⚡ Realtime BC Code Update:', payload);
+                if (payload.eventType === 'INSERT') setBcCodes(prev => [...prev, payload.new]);
+                else if (payload.eventType === 'UPDATE') setBcCodes(prev => prev.map(item => item.id === payload.new.id ? payload.new : item));
+                else if (payload.eventType === 'DELETE') setBcCodes(prev => prev.filter(item => item.id !== payload.old.id));
             })
             .subscribe();
 
@@ -1034,7 +797,7 @@ export const DataProvider = ({ children }) => {
     };
 
     // Inbound Transaction operations (Bridge TPPB)
-    const addInboundTransaction = (transaction) => {
+    const addInboundTransaction = async (transaction) => {
         // Calculate total operational cost
         const opCosts = transaction.operationalCosts || {};
         const totalOperationalCost = Object.keys(opCosts)
@@ -1064,10 +827,79 @@ export const DataProvider = ({ children }) => {
             status: 'approved',
             createdAt: new Date().toISOString(),
         };
-        setCustomsDocuments([...customsDocuments, customsDoc]);
 
-        // Auto-update warehouse inventory
-        updateInventoryStock(transaction.assetId, transaction.assetName, transaction.quantity, transaction.unit, 'inbound', newTransaction.id, transaction.value);
+        // Map to snake_case for DB (Strictly match freight_customs schema)
+        // Table columns: id, quotation_id, document_type, document_number, document_date, status, notes, documents (jsonb)
+        const customsDocPayload = {
+            id: customsDoc.id,
+            // mapping keys to match schema
+            document_type: customsDoc.docType,
+            document_number: customsDoc.docNumber,
+            document_date: customsDoc.docDate,
+            status: customsDoc.status,
+            created_at: customsDoc.createdAt,
+            // Missing columns in schema: transaction_type, transaction_id, asset_name, quantity, value
+            // Solution: Store extra metadata in 'documents' JSONB column or 'notes', or just omit if not needed there.
+            // Storing in 'notes' for visibility or 'documents' JSONB
+            notes: `Auto-generated for ${customsDoc.transactionType}. Asset: ${customsDoc.assetName}, Qty: ${customsDoc.quantity}`,
+            documents: {
+                transactionType: customsDoc.transactionType,
+                transactionId: customsDoc.transactionId,
+                assetName: customsDoc.assetName,
+                quantity: customsDoc.quantity,
+                value: customsDoc.value
+            }
+        };
+
+        // Persist Customs Document
+        const { error: customsError } = await supabase.from('freight_customs').insert([customsDocPayload]);
+        if (!customsError) {
+            setCustomsDocuments(prev => [...prev, customsDoc]);
+        }
+
+        // Map transaction to snake_case for DB (Strictly match freight_inbound schema)
+        const inboundPayload = {
+            id: newTransaction.id,
+            // pengajuan_id? newTransaction.quotationId ?
+            // Schema has: pengajuan_id, pengajuan_number, customs_doc_type, customs_doc_number, customs_doc_date...
+            asset_name: newTransaction.assetName,
+            // item_code? asset_id? Schema has 'item_code'
+            item_code: newTransaction.assetId,
+            quantity: newTransaction.quantity,
+            unit: newTransaction.unit,
+            value: newTransaction.value,
+            customs_doc_number: newTransaction.customsDocNumber,
+            customs_doc_date: newTransaction.customsDocDate,
+            customs_doc_type: newTransaction.customsDocType, // Not doc_type
+            sender: newTransaction.sender,
+            notes: newTransaction.notes,
+            created_at: newTransaction.createdAt,
+            date: newTransaction.date, // Add date column mapping (NOT NULL)
+
+            // Map new fields to DB columns
+            hs_code: newTransaction.hsCode,
+            serial_number: newTransaction.serialNumber,
+            currency: newTransaction.currency,
+            receipt_number: newTransaction.receiptNumber,
+
+            documents: {
+                totalOperationalCost: newTransaction.totalOperationalCost,
+                totalCost: newTransaction.totalCost,
+                status: newTransaction.status
+            }
+        };
+
+        // Persist Inbound Transaction
+        const { error: inboundError } = await supabase.from('freight_inbound').insert([inboundPayload]);
+
+        if (inboundError) {
+            console.error('Error adding inbound transaction:', inboundError);
+            return;
+        }
+
+        // NOTE: Inventory creation is now handled by updateQuotation when status changes to 'approved'
+        // This prevents duplicate inventory creation and 406 errors from conflicting queries
+        // await updateInventoryStock(transaction.assetId, transaction.assetName, transaction.quantity, transaction.unit, 'inbound', newTransaction.id, transaction.value);
 
         // Auto-generate finance invoice for goods value
         const goodsInvoice = {
@@ -1099,7 +931,7 @@ export const DataProvider = ({ children }) => {
 
         newTransaction.invoiceId = goodsInvoice.id;
 
-        setInboundTransactions([...inboundTransactions, newTransaction]);
+        setInboundTransactions(prev => [newTransaction, ...prev]);
         return newTransaction;
     };
 
@@ -1112,11 +944,14 @@ export const DataProvider = ({ children }) => {
     };
 
     // Outbound Transaction operations (Bridge TPPB)
-    const addOutboundTransaction = (transaction) => {
+    const addOutboundTransaction = async (transaction) => {
         // Check stock availability
         const inventory = warehouseInventory.find(i => i.assetId === transaction.assetId);
-        if (!inventory || inventory.currentStock < transaction.quantity) {
-            throw new Error('Insufficient stock for outbound transaction');
+        if (!inventory || (inventory.currentStock || 0) < transaction.quantity) {
+            console.error('Insufficient stock:', inventory);
+            alert('Insufficient stock for outbound transaction');
+            // Just return or throw but better to alert
+            return;
         }
 
         // Calculate total operational cost
@@ -1148,10 +983,68 @@ export const DataProvider = ({ children }) => {
             status: 'approved',
             createdAt: new Date().toISOString(),
         };
-        setCustomsDocuments([...customsDocuments, customsDoc]);
+
+        // Map to snake_case (Strictly match freight_customs schema)
+        const customsDocPayload = {
+            id: customsDoc.id,
+            document_type: customsDoc.docType,
+            document_number: customsDoc.docNumber,
+            document_date: customsDoc.docDate,
+            status: customsDoc.status,
+            created_at: customsDoc.createdAt,
+            // Store extra metadata in 'documents' JSONB
+            documents: {
+                transactionType: customsDoc.transactionType,
+                transactionId: customsDoc.transactionId,
+                assetName: customsDoc.assetName,
+                quantity: customsDoc.quantity,
+                value: customsDoc.value
+            }
+        };
+
+        // Persist Customs Document
+        const { error: customsError } = await supabase.from('freight_customs').insert([customsDocPayload]);
+        if (!customsError) {
+            setCustomsDocuments(prev => [...prev, customsDoc]);
+        } else {
+            console.error("Error adding outbound customs doc:", customsError);
+        }
+
+        // Map to snake_case (Strictly match freight_outbound schema)
+        // Schema: id, pengajuan_id, pengajuan_number, customs_doc_type, customs_doc_number, customs_doc_date, receipt_number, date, destination, receiver, item_code, asset_name, quantity, unit, value, currency, records(jsonb?)
+        const outboundPayload = {
+            id: newTransaction.id,
+            // pengajuan_id?
+            item_code: newTransaction.assetId,
+            asset_name: newTransaction.assetName,
+            quantity: newTransaction.quantity,
+            unit: newTransaction.unit,
+            value: newTransaction.value,
+            customs_doc_number: newTransaction.customsDocNumber,
+            customs_doc_date: newTransaction.customsDocDate,
+            customs_doc_type: newTransaction.customsDocType,
+            destination: newTransaction.destination,
+            receiver: newTransaction.receiver, // or customer?
+            notes: newTransaction.notes,
+            created_at: newTransaction.createdAt,
+            date: newTransaction.date || new Date().toISOString().split('T')[0], // Add date column mapping (NOT NULL)
+            documents: {
+                totalOperationalCost: newTransaction.totalOperationalCost,
+                netRevenue: newTransaction.netRevenue,
+                status: newTransaction.status
+            }
+        };
+
+        // Persist Outbound Transaction
+        const { error: outboundError } = await supabase.from('freight_outbound').insert([outboundPayload]);
+
+        if (outboundError) {
+            console.error("Error adding outbound transaction:", outboundError);
+            return;
+        }
 
         // Auto-update warehouse inventory (reduce stock)
-        updateInventoryStock(transaction.assetId, transaction.assetName, -transaction.quantity, transaction.unit, 'outbound', newTransaction.id, transaction.value);
+        await updateInventoryStock(transaction.assetId, transaction.assetName, -transaction.quantity, transaction.unit, 'outbound', newTransaction.id, transaction.value);
 
         // Auto-generate finance invoice for sales income
         const salesInvoice = {
@@ -1196,11 +1089,25 @@ export const DataProvider = ({ children }) => {
     };
 
     // Warehouse Inventory helper function
-    const updateInventoryStock = (assetId, assetName, quantity, unit, type, transactionId, value) => {
-        const existingInventory = warehouseInventory.find(i => i.assetId === assetId);
+    const updateInventoryStock = async (assetId, assetName, quantity, unit, type, transactionId, value) => {
+        // Query DB directly first for source of truth
+        let { data: existingInventory, error } = await supabase
+            .from('freight_warehouse')
+            .select('*')
+            .eq('item_code', assetId)
+            .single();
 
-        if (existingInventory) {
-            const newStock = existingInventory.currentStock + quantity;
+        // Fallback to local state if DB query fails or returns nothing
+        if (!existingInventory && !error) {
+            existingInventory = warehouseInventory.find(i => i.assetId === assetId);
+        }
+
+        const existingStock = existingInventory ? (existingInventory.current_stock ?? existingInventory.currentStock ?? 0) : 0;
+        const existsId = existingInventory ? existingInventory.id : null;
+        const existingMovements = existingInventory ? (existingInventory.movements || []) : [];
+
+        if (existsId) {
+            const newStock = Number(existingStock) + Number(quantity);
             const movement = {
                 type,
                 transactionId,
@@ -1208,39 +1115,279 @@ export const DataProvider = ({ children }) => {
                 date: new Date().toISOString(),
             };
 
-            setWarehouseInventory(warehouseInventory.map(i =>
-                i.assetId === assetId
-                    ? {
-                        ...i,
-                        currentStock: newStock,
-                        value: value,
-                        movements: [...(i.movements || []), movement],
-                        lastUpdated: new Date().toISOString(),
-                    }
-                    : i
-            ));
+            const updatedDataPayload = {
+                quantity: newStock,
+                value: value || existingInventory.value,
+                updated_at: new Date().toISOString()
+            };
+
+            const { error: updateError } = await supabase.from('freight_warehouse').update(updatedDataPayload).eq('id', existsId);
+
+            if (!updateError) {
+                setWarehouseInventory(prev => prev.map(i => i.id === existsId ? { ...i, currentStock: newStock, lastUpdated: new Date().toISOString(), movements: [...(i.movements || []), movement] } : i));
+            } else {
+                console.error("Error updating warehouse stock:", updateError);
+            }
         } else if (quantity > 0) {
-            // Create new inventory item for inbound
-            const newInventory = {
+            // Create new inventory item
+            const newInventoryState = {
                 id: Date.now().toString(),
-                assetId,
-                assetName,
-                category: 'TPPB Goods',
+                assetId: assetId,
+                assetName: assetName,
                 currentStock: quantity,
-                unit,
-                minStock: 0,
+                unit: unit,
+                minStock: 10,
                 maxStock: 1000,
-                value,
-                location: 'Warehouse',
+                value: value,
+                category: unit === 'kg' || unit === 'ton' ? 'Raw Material' : 'Finished Goods',
+                location: 'Zone A',
                 lastUpdated: new Date().toISOString(),
                 movements: [{
                     type,
                     transactionId,
-                    quantity: Math.abs(quantity),
-                    date: new Date().toISOString(),
-                }],
+                    quantity: quantity,
+                    date: new Date().toISOString()
+                }]
             };
-            setWarehouseInventory([...warehouseInventory, newInventory]);
+
+            const newInventoryPayload = {
+                id: newInventoryState.id,
+                item_code: newInventoryState.assetId,
+                asset_name: newInventoryState.assetName,
+                quantity: newInventoryState.currentStock,
+                unit: newInventoryState.unit,
+                value: newInventoryState.value,
+                location: JSON.stringify({ zone: newInventoryState.location }),
+                updated_at: newInventoryState.lastUpdated,
+                notes: `Auto-created from ${type} transaction ${transactionId}`
+            };
+
+            const { error: insertError } = await supabase.from('freight_warehouse').insert([newInventoryPayload]);
+
+            if (!insertError) {
+                setWarehouseInventory(prev => [...prev, newInventoryState]);
+            } else {
+                console.error("Error creating warehouse inventory:", insertError);
+            }
+        }
+    };
+
+    // ========== ITEM CHECKOUT (Mark items as checked out from warehouse) ==========
+    const updateItemCheckout = async (itemId, checkedOut, bcNumber = null) => {
+        try {
+            const checkoutDate = checkedOut ? new Date().toISOString().split('T')[0] : null;
+
+            const updatePayload = {
+                checked_out: checkedOut,
+                checkout_date: checkoutDate,
+                checkout_bc_number: bcNumber,
+                updated_at: new Date().toISOString()
+            };
+
+            const { error } = await supabase
+                .from('freight_warehouse')
+                .update(updatePayload)
+                .eq('id', itemId);
+
+            if (error) {
+                console.error('Error updating item checkout status:', error);
+                throw error;
+            }
+
+            // Update local state
+            setWarehouseInventory(prev => prev.map(item =>
+                item.id === itemId
+                    ? {
+                        ...item,
+                        checkedOut: checkedOut,
+                        checkoutDate: checkoutDate,
+                        checkoutBcNumber: bcNumber
+                    }
+                    : item
+            ));
+
+            console.log(`✅ Item ${itemId} checkout status updated: ${checkedOut}`);
+            return { success: true };
+        } catch (error) {
+            console.error('Failed to update item checkout:', error);
+            return { success: false, error };
+        }
+    };
+
+    // ========== MUTATION LOGS ==========
+    const addMutationLog = async (mutationData) => {
+        try {
+            const newLog = {
+                ...mutationData,
+                createdAt: new Date().toISOString()
+            };
+
+            // Save to Supabase freight_mutation_logs table
+            // Generate unique ID
+            const mutationId = `MUT-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+            const { data, error } = await supabase
+                .from('freight_mutation_logs')
+                .insert([{
+                    id: mutationId,
+                    pengajuan_id: mutationData.pengajuanId || null,
+                    pengajuan_number: mutationData.pengajuanNumber || mutationData.pengajuan_number || null,
+                    bc_document_number: mutationData.bcDocumentNumber || null,
+                    package_number: mutationData.packageNumber || null,
+                    item_code: mutationData.itemCode || null,
+                    item_name: mutationData.itemName || mutationData.assetName || null,
+                    hs_code: mutationData.hsCode || null,
+                    serial_number: mutationData.serialNumber || null,
+                    sender: mutationData.sender || null, // Added for Pabean Barang Mutasi
+                    date: mutationData.date || new Date().toISOString().split('T')[0],
+                    time: mutationData.time || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+                    pic: mutationData.pic || null,
+                    total_stock: mutationData.totalStock || 0,
+                    mutated_qty: mutationData.mutatedQty || 0,
+                    remaining_stock: mutationData.remainingStock || 0,
+                    origin: mutationData.origin || 'warehouse',
+                    destination: mutationData.destination || 'warehouse',
+                    condition: mutationData.condition || null,
+                    remarks: mutationData.remarks || null,
+                    documents: mutationData.documents || [],
+                    uom: mutationData.uom || 'pcs'
+                }])
+                .select();
+
+            if (error) {
+                console.error('❌ Error saving mutation to Supabase:', error);
+                console.error('❌ Error details:', JSON.stringify(error, null, 2));
+                throw error;
+            }
+
+            console.log('✅ Mutation log saved to Supabase:', data);
+
+            // Manual state update to ensure immediate UI refresh
+            // Format the saved data to match state structure
+            const savedLog = data[0];
+            const formattedLog = {
+                id: savedLog.id?.toString(),
+                pengajuanId: savedLog.pengajuan_id,
+                pengajuanNumber: savedLog.pengajuan_number,
+                bcDocumentNumber: savedLog.bc_document_number,
+                packageNumber: savedLog.package_number,
+                itemCode: savedLog.item_code,
+                itemName: savedLog.item_name,
+                assetName: savedLog.item_name,
+                hsCode: savedLog.hs_code,
+                serialNumber: savedLog.serial_number,
+                sender: savedLog.sender, // Added for Pabean Barang Mutasi
+                totalStock: savedLog.total_stock,
+                mutatedQty: savedLog.mutated_qty,
+                remainingStock: savedLog.remaining_stock,
+                origin: savedLog.origin,
+                destination: savedLog.destination,
+                condition: savedLog.condition,
+                date: savedLog.date,
+                time: savedLog.time,
+                pic: savedLog.pic,
+                remarks: savedLog.remarks,
+                documents: savedLog.documents,
+                uom: savedLog.uom,
+                createdAt: savedLog.created_at
+            };
+
+            // Add to state immediately
+            setMutationLogs(prev => [...prev, formattedLog]);
+            console.log('📦 Mutation log added to state:', formattedLog);
+
+            return data[0];
+        } catch (error) {
+            console.error('❌ Failed to add mutation log:', error);
+            throw error;
+        }
+    };
+
+    const updateMutationLog = async (id, updates) => {
+        try {
+            // Update in Supabase
+            const { data, error } = await supabase
+                .from('freight_mutation_logs')
+                .update({
+                    destination: updates.destination,
+                    condition: updates.condition,
+                    pic: updates.pic,
+                    date: updates.date,
+                    time: updates.time,
+                    remarks: updates.remarks,
+                    documents: updates.documents,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', id)
+                .select();
+
+            if (error) {
+                console.error('❌ Error updating mutation in Supabase:', error);
+                throw error;
+            }
+
+            console.log('✅ Mutation log updated in Supabase:', data);
+
+            // Update local state
+            const savedLog = data[0];
+            const formattedLog = {
+                id: savedLog.id?.toString(),
+                pengajuanId: savedLog.pengajuan_id,
+                pengajuanNumber: savedLog.pengajuan_number,
+                bcDocumentNumber: savedLog.bc_document_number,
+                packageNumber: savedLog.package_number,
+                itemCode: savedLog.item_code,
+                itemName: savedLog.item_name,
+                assetName: savedLog.item_name,
+                hsCode: savedLog.hs_code,
+                totalStock: savedLog.total_stock,
+                mutatedQty: savedLog.mutated_qty,
+                remainingStock: savedLog.remaining_stock,
+                origin: savedLog.origin,
+                destination: savedLog.destination,
+                condition: savedLog.condition,
+                date: savedLog.date,
+                time: savedLog.time,
+                pic: savedLog.pic,
+                remarks: savedLog.remarks,
+                documents: savedLog.documents,
+                uom: savedLog.uom,
+                createdAt: savedLog.created_at
+            };
+
+            setMutationLogs(prev => prev.map(log => log.id === id ? formattedLog : log));
+
+            console.log('📦 Mutation log updated in state:', formattedLog);
+            return formattedLog;
+        } catch (error) {
+            console.error('❌ Failed to update mutation log:', error);
+            throw error;
+        }
+    };
+
+    const deleteMutationLog = async (id) => {
+        try {
+            // Delete from Supabase
+            const { error } = await supabase
+                .from('freight_mutation_logs')
+                .delete()
+                .eq('id', id);
+
+            if (error) {
+                console.error('❌ Error deleting mutation from Supabase:', error);
+                throw error;
+            }
+
+            console.log('✅ Mutation log deleted from Supabase:', id);
+
+            // Update local state
+            setMutationLogs(prev => prev.filter(log => log.id !== id.toString()));
+
+            console.log('📦 Mutation log removed from state:', id);
+            return true;
+        } catch (error) {
+            console.error('❌ Failed to delete mutation log:', error);
+            throw error;
         }
     };
 
@@ -1296,7 +1443,25 @@ export const DataProvider = ({ children }) => {
             created_at: new Date().toISOString(),
         };
 
-        const { error } = await supabase.from('freight_customs').insert([newDocument]);
+        // Map to snake_case (Strictly match freight_customs schema)
+        const payload = {
+            id: newDocument.id,
+            document_type: newDocument.docType,
+            document_number: newDocument.docNumber,
+            document_date: newDocument.docDate,
+            status: newDocument.status,
+            created_at: newDocument.created_at,
+            notes: newDocument.notes,
+            documents: {
+                transactionType: newDocument.transactionType,
+                transactionId: newDocument.transactionId,
+                assetName: newDocument.assetName,
+                quantity: newDocument.quantity,
+                value: newDocument.value
+            }
+        };
+
+        const { error } = await supabase.from('freight_customs').insert([payload]);
         if (error) {
             console.error('Error adding customs document:', error);
             return;
@@ -1332,22 +1497,286 @@ export const DataProvider = ({ children }) => {
 
     const addQuotation = async (quotation) => {
         console.log('🔵 addQuotation called with:', quotation);
+
+        // Generate quotation number based on submission date (Strictly)
+        const submissionDate = quotation.submissionDate || new Date().toISOString().split('T')[0];
+        // Format: BRGYYMM-XXXXXX
+        // Ensure we parse year/month from submissionDate string correctly (YYYY-MM-DD expected)
+        const year = submissionDate.substring(2, 4); // YY (from YYYY)
+        const month = submissionDate.substring(5, 7); // MM
+
+        // Count existing quotations for the same month/year to determine Sequence?
+        // Current logic uses total length. Better might be to count filtered list, but stick to length + 1 for now to avoid complexity change unless requested.
+        const quotationNumber = `BRG${year}${month}-${String(quotations.length + 1).padStart(6, '0')}`;
+
         const newQuotation = {
-            ...quotation,
+            // ID and basic info
             id: `QT-${Date.now()}`,
-            created_at: new Date().toISOString()
+            quotation_number: quotationNumber,
+
+            // Map camelCase to snake_case for database columns
+            customer: quotation.customer,
+            customer_id: quotation.customerId || null,
+            bc_document_number: quotation.bcDocumentNumber || null,
+            bc_document_date: quotation.bcDocumentDate || null,
+            bc_document_type: quotation.bcDocType || quotation.bcDocumentType || null,
+
+            // Dates
+            date: quotation.date || new Date().toISOString().split('T')[0],
+            submission_date: quotation.submissionDate || new Date().toISOString().split('T')[0],
+
+            // Status fields
+            status: quotation.status || 'draft',
+            document_status: quotation.documentStatus || 'pengajuan',
+            customs_status: quotation.customsStatus || 'pending',
+
+            // Type and details
+            type: quotation.type,
+            item_code: quotation.itemCode || null,
+            shipper: quotation.shipper || null,
+            origin: quotation.origin || null,
+            destination: quotation.destination || null,
+
+            // JSONB fields
+            packages: quotation.packages || [],
+            documents: quotation.documents || [],
+            bc_supporting_documents: quotation.bcSupportingDocuments || [],
+
+            // Additional fields
+            notes: quotation.notes || null,
+            rejection_reason: quotation.rejectionReason || null,
+            rejection_date: quotation.rejectionDate || null,
+            pic: quotation.pic || null,
+
+            // Timestamps
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
         };
 
-        const { error } = await supabase.from('freight_quotations').insert([newQuotation]);
+        console.log('🔵 Inserting quotation with data:', newQuotation);
+
+        const { data, error } = await supabase
+            .from('freight_quotations')
+            .insert([newQuotation])
+            .select();
+
         if (error) {
-            console.error('Error adding quotation:', error);
-            alert('Failed to add quotation to database');
+            console.error('❌ Error adding quotation:', error);
+            alert(`Failed to add quotation: ${error.message}`);
             return;
         }
 
-        console.log('🔵 Creating new quotation:', newQuotation);
-        setQuotations(prev => [...prev, newQuotation]);
-        return newQuotation;
+        console.log('✅ Quotation created successfully:', quotationNumber);
+
+        // Fix: Use the actual data returned from DB (with correct ID) but merge with input to keep UI helpers if any
+        const savedData = data[0];
+        // Use normalized data to ensure consistent camelCase properties
+        const finalQuotation = normalizeQuotation(savedData);
+
+        setQuotations(prev => [...prev, finalQuotation]);
+        return finalQuotation;
+    };
+
+    const deleteQuotation = async (id) => {
+        try {
+            console.log('🗑️ [DELETE START] Deleting quotation:', id);
+
+            // 0. Fetch quotation details for numbers
+            console.log('📋 [STEP 0] Fetching quotation details...');
+            const { data: quotation, error: fetchError } = await supabase
+                .from('freight_quotations')
+                .select('quotation_number')
+                .eq('id', id)
+                .single();
+
+            if (fetchError) {
+                console.error('❌ [STEP 0] Fetch error:', fetchError);
+            } else {
+                console.log('✅ [STEP 0] Fetched quotation:', quotation);
+            }
+
+            // 1. Delete dependent customs documents (Cascade Delete)
+            console.log('📋 [STEP 1] Deleting customs documents...');
+            const { error: customsError } = await supabase
+                .from('freight_customs')
+                .delete()
+                .eq('quotation_id', id);
+
+            if (customsError) {
+                console.error('❌ [STEP 1] Customs delete error:', customsError);
+            } else {
+                console.log('✅ [STEP 1] Customs documents deleted');
+            }
+
+            // 2. Unlink (set null) or Delete related Invoices
+            console.log('📋 [STEP 2] Unlinking invoices...');
+            const { error: invoiceError } = await supabase
+                .from('freight_invoices')
+                .update({ quotation_id: null })
+                .eq('quotation_id', id);
+
+            if (invoiceError) {
+                console.error('❌ [STEP 2] Invoice unlink error:', invoiceError);
+            } else {
+                console.log('✅ [STEP 2] Invoices unlinked');
+            }
+
+            // 3. Unlink related Purchases
+            console.log('📋 [STEP 3] Unlinking purchases...');
+            const { error: purchaseError } = await supabase
+                .from('freight_purchases')
+                .update({ quotation_id: null })
+                .eq('quotation_id', id);
+
+            if (purchaseError) {
+                console.error('❌ [STEP 3] Purchase unlink error:', purchaseError);
+            } else {
+                console.log('✅ [STEP 3] Purchases unlinked');
+            }
+
+            // 4. Delete Warehouse Inventory
+            console.log('📋 [STEP 4] Deleting warehouse inventory...');
+            const { error: inventoryError } = await supabase
+                .from('warehouse_inventory')
+                .delete()
+                .eq('pengajuan_id', id);
+
+            if (inventoryError) {
+                console.error('❌ [STEP 4] Inventory delete error:', inventoryError);
+            } else {
+                console.log('✅ [STEP 4] Warehouse inventory deleted');
+            }
+
+            // 5. Unlink Freight Shipments (if any)
+            console.log('📋 [STEP 5] Unlinking shipments...');
+            const { error: shipmentError } = await supabase
+                .from('freight_shipments')
+                .update({ quotation_id: null })
+                .eq('quotation_id', id);
+
+            if (shipmentError) {
+                console.error('❌ [STEP 5] Shipment unlink error:', shipmentError);
+            } else {
+                console.log('✅ [STEP 5] Shipments unlinked');
+            }
+
+            // 6. Delete Mutation Logs
+            if (quotation?.quotation_number) {
+                console.log('📋 [STEP 6a] Deleting mutation logs by number:', quotation.quotation_number);
+                const { error: gmError } = await supabase
+                    .from('freight_mutation_logs')
+                    .delete()
+                    .eq('pengajuan_number', quotation.quotation_number);
+
+                if (gmError) {
+                    console.error('❌ [STEP 6a] Mutation logs delete error (by number):', gmError);
+                } else {
+                    console.log('✅ [STEP 6a] Mutation logs deleted (by number)');
+                }
+            }
+
+            // Also try by ID just in case
+            console.log('📋 [STEP 6b] Deleting mutation logs by ID...');
+            const { error: gmIdError } = await supabase
+                .from('freight_mutation_logs')
+                .delete()
+                .eq('pengajuan_id', id);
+
+            if (gmIdError) {
+                console.error('❌ [STEP 6b] Mutation logs delete error (by ID):', gmIdError);
+            } else {
+                console.log('✅ [STEP 6b] Mutation logs deleted (by ID)');
+            }
+
+
+            // 7. Delete Pabean Module Data (Inbound/Outbound/Reject)
+            console.log('📋 [STEP 7a] Deleting Pabean inbound transactions...');
+            const { error: inboundError } = await supabase
+                .from('freight_inbound')
+                .delete()
+                .eq('pengajuan_id', id);
+
+            if (inboundError) {
+                console.error('❌ [STEP 7a] Inbound delete error:', inboundError);
+            } else {
+                console.log('✅ [STEP 7a] Inbound transactions deleted');
+            }
+
+            console.log('📋 [STEP 7b] Deleting Pabean outbound transactions...');
+            const { error: outboundError } = await supabase
+                .from('freight_outbound')
+                .delete()
+                .eq('pengajuan_id', id);
+
+            if (outboundError) {
+                console.error('❌ [STEP 7b] Outbound delete error:', outboundError);
+            } else {
+                console.log('✅ [STEP 7b] Outbound transactions deleted');
+            }
+
+            console.log('📋 [STEP 7c] Deleting Pabean reject transactions...');
+            const { error: rejectError } = await supabase
+                .from('freight_reject')
+                .delete()
+                .eq('pengajuan_id', id);
+
+            if (rejectError) {
+                console.error('❌ [STEP 7c] Reject delete error:', rejectError);
+            } else {
+                console.log('✅ [STEP 7c] Reject transactions deleted');
+            }
+
+            console.log('📋 [STEP 7d] Deleting Warehouse inventory logs...');
+            const { error: whError } = await supabase
+                .from('freight_warehouse')
+                .delete()
+                .eq('pengajuan_id', id);
+
+            if (whError) {
+                console.error('❌ [STEP 7d] Warehouse delete error:', whError);
+            } else {
+                console.log('✅ [STEP 7d] Warehouse inventory logs deleted');
+            }
+
+            // 8. Finally, Delete the quotation
+            console.log('📋 [STEP 8] FINAL STEP: Deleting the quotation itself...');
+            const { error, data: deleteResult } = await supabase
+                .from('freight_quotations')
+                .delete()
+                .eq('id', id);
+
+            if (error) {
+                console.error('❌❌❌ [STEP 8] CRITICAL: Quotation delete FAILED:', error);
+                console.error('Error details:', JSON.stringify(error, null, 2));
+                throw error;
+            } else {
+                console.log('✅✅✅ [STEP 8] Quotation successfully deleted from database!');
+            }
+
+            // 9. Update LOCAL STATE to reflect deletion in UI
+            console.log('📋 [STEP 9] Updating local state...');
+
+            // Remove from quotations list
+            setQuotations(prev => prev.filter(q => q.id !== id));
+
+            // Remove from Pabean module states
+            setInboundTransactions(prev => prev.filter(t => t.pengajuanId !== id && t.pengajuan_id !== id));
+            setOutboundTransactions(prev => prev.filter(t => t.pengajuanId !== id && t.pengajuan_id !== id));
+            setRejectTransactions(prev => prev.filter(t => t.pengajuanId !== id && t.pengajuan_id !== id));
+
+            // Remove from warehouse inventory
+            setWarehouseInventory(prev => prev.filter(inv => inv.pengajuanId !== id && inv.pengajuan_id !== id));
+
+            // Remove from customs documents
+            setCustomsDocuments(prev => prev.filter(doc => doc.quotationId !== id && doc.quotation_id !== id));
+
+            console.log('✅ [STEP 9] Local state updated - all related data removed from UI');
+            console.log('✅ Quotation deleted successfully');
+            return { success: true };
+        } catch (error) {
+            console.error('❌ Error deleting quotation:', error);
+            return { success: false, error };
+        }
     };
 
     const confirmQuotation = async (quotationId) => {
@@ -1395,9 +1824,30 @@ export const DataProvider = ({ children }) => {
         }
 
         // Create BC Document in Supabase
+        // Create BC Document in Supabase with correct snake_case mapping
+        const bcDocPayload = {
+            doc_type: quotation.type === 'inbound' ? 'BC 2.3' : 'BC 2.7', // Assumed snake_case key based on standard
+            doc_number: `${quotation.type === 'inbound' ? 'BC23' : 'BC27'}-${Date.now().toString().slice(-6)}`,
+            // Use submission date from quotation, not current date
+            doc_date: quotation.submissionDate || quotation.submission_date || quotation.date || new Date().toISOString().split('T')[0],
+            quotation_id: quotation.id,
+            transaction_type: quotation.type, // 'inbound' or 'outbound'
+            customer_id: quotation.customerId || null,
+            supplier: quotation.shipper || '', // Mapping shipper to supplier for inbound
+
+            // JSONB or Text fields
+            asset_name: JSON.stringify(quotation.items || []), // Store items summary or raw
+            quantity: quotation.items ? quotation.items.reduce((s, i) => s + (Number(i.quantity) || 0), 0) : 0,
+            value: quotation.items ? quotation.items.reduce((s, i) => s + (Number(i.value) || 0), 0) : 0,
+
+            status: 'pending',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+
         const { error: bcError } = await supabase
-            .from('freight_customs') // Assuming BC docs are stored in freight_customs or similar table, adjusting based on logic
-            .insert([bcDoc]);
+            .from('freight_customs')
+            .insert([bcDocPayload]);
 
         // Note: Check if freight_customs structure matches bcDoc, if not, might need adjustment or dedicated table. 
         // For now trusting schema matches or flexible JSONB columns.
@@ -1417,138 +1867,199 @@ export const DataProvider = ({ children }) => {
             return;
         }
 
-        const previousStatus = quotation.documentStatus;
+        const previousStatus = quotation.document_status || quotation.documentStatus;
         console.log('🔄 Previous document status:', previousStatus, '→ New:', updatedData.documentStatus);
+
+        // Map camelCase to snake_case for database update
+        const dbUpdateData = {};
+
+        // Map all possible fields
+        if (updatedData.documentStatus !== undefined) dbUpdateData.document_status = updatedData.documentStatus;
+        if (updatedData.customsStatus !== undefined) dbUpdateData.customs_status = updatedData.customsStatus;
+        if (updatedData.bcDocumentNumber !== undefined) dbUpdateData.bc_document_number = updatedData.bcDocumentNumber;
+        if (updatedData.bcDocumentDate !== undefined) dbUpdateData.bc_document_date = updatedData.bcDocumentDate || null;
+        if (updatedData.bcDocType !== undefined) dbUpdateData.bc_document_type = updatedData.bcDocType;
+        if (updatedData.approvedDate !== undefined) dbUpdateData.approved_date = updatedData.approvedDate || null;
+        if (updatedData.approvedBy !== undefined) dbUpdateData.approved_by = updatedData.approvedBy;
+        if (updatedData.rejectionReason !== undefined) dbUpdateData.rejection_reason = updatedData.rejectionReason;
+        if (updatedData.rejectionDate !== undefined) dbUpdateData.rejection_date = updatedData.rejectionDate || null;
+        if (updatedData.packages !== undefined) dbUpdateData.packages = updatedData.packages;
+        if (updatedData.documents !== undefined) dbUpdateData.documents = updatedData.documents;
+        if (updatedData.bcSupportingDocuments !== undefined) dbUpdateData.bc_supporting_documents = updatedData.bcSupportingDocuments;
+        if (updatedData.notes !== undefined) dbUpdateData.notes = updatedData.notes;
+        if (updatedData.pic !== undefined) dbUpdateData.pic = updatedData.pic;
+        if (updatedData.status !== undefined) dbUpdateData.status = updatedData.status;
+
+        // Always update timestamp
+        dbUpdateData.updated_at = new Date().toISOString();
+
+        console.log('📝 Mapped update data:', dbUpdateData);
 
         // Update Quotation in Supabase
         const { error: updateError } = await supabase
             .from('freight_quotations')
-            .update(updatedData)
+            .update(dbUpdateData)
             .eq('id', quotationId);
 
         if (updateError) {
-            console.error('Error updating quotation:', updateError);
-            alert('Failed to update quotation');
+            console.error('❌ Error updating quotation:', updateError);
+            alert(`Failed to update quotation: ${updateError.message}`);
             return;
         }
+
+        console.log('✅ Quotation updated successfully');
 
         // Check if status changed to approved
         if (updatedData.documentStatus === 'approved' && previousStatus !== 'approved') {
             console.log('✅ Status changed to APPROVED - Creating warehouse inventory...');
 
-            // Extract all items from all packages with enhanced data
+            // Extract all items from all packages with enhanced data - mapped to freight_warehouse schema
             const allItems = (updatedData.packages || []).flatMap((pkg, pkgIdx) =>
                 (pkg.items || []).map((item, itemIdx) => ({
+                    // Primary key
                     id: `INV-${quotationId}-P${pkgIdx}-I${itemIdx}-${Date.now()}`,
-                    pengajuan_id: quotationId, // Supabase column name often snake_case, check schema if needed
-                    // Mapping to match expected DB schema or JSONB
-                    // Assuming flexible schema or matching names. 
-                    // Note: Ideally schema keys should match exactly. 
-                    // Let's stick to camelCase if UI uses it, but DB likely expects snake_case for columns if not JSONB
-                    // For safety, let's use the object structure we defined in schema or rely on JS->JSON mapping
 
-                    // Actually, let's use the exact keys from the previous local object, 
-                    // but we must ensure column names in Supabase match or are JSONB.
-                    // Given 001_initial_schema.sql used JSONB for most complex data or TEXT, 
-                    // let's assume we map standard fields.
-
-                    pengajuanId: quotationId,
-                    pengajuanNumber: updatedData.quotationNumber || updatedData.id,
-                    submissionDate: updatedData.submissionDate || updatedData.date,
-                    bcDocumentNumber: updatedData.bcDocumentNumber,
-                    bcDocumentDate: updatedData.approvedDate || new Date().toISOString().split('T')[0],
-                    packageNumber: pkg.packageNumber,
+                    // Foreign key and references - snake_case for Supabase
+                    pengajuan_id: quotationId,
+                    pengajuan_number: updatedData.quotationNumber || quotation.quotation_number || quotationId,
+                    bc_document_number: updatedData.bcDocumentNumber,
+                    package_number: pkg.packageNumber,
 
                     // Item details
-                    itemName: item.name,
-                    serialNumber: item.serialNumber || '-',
+                    item_code: item.itemCode || null,
+                    item_name: item.name || item.itemName,
+                    asset_name: item.name || item.itemName,
+                    serial_number: (itemIdx + 1).toString(),
                     quantity: item.quantity || 1,
+                    unit: item.uom || 'pcs',
                     condition: item.condition || 'new',
-                    value: item.value || 0,
-                    weight: item.weight || '-',
-                    dimensions: item.dimensions || '-',
-                    notes: item.notes || '',
+                    value: item.value || (item.price * (item.quantity || 1)) || 0,
 
-                    // Warehouse specific
-                    entryDate: new Date().toISOString().split('T')[0],
-                    location: {
+                    // Location as JSONB
+                    location: JSON.stringify({
                         room: 'Ruang Utama',
                         rack: 'To be assigned',
                         slot: 'To be assigned'
-                    },
-                    receivedBy: updatedData.approvedBy || 'Admin',
-                    remarks: `Auto - created from pengajuan ${updatedData.quotationNumber || updatedData.id} `,
+                    }),
 
-                    customer: updatedData.customer,
-                    status: 'in_warehouse',
-                    currentStock: item.quantity || 1,
+                    // Dates - Use submission date from Pengajuan, not current date
+                    entry_date: updatedData.submissionDate || quotation.submission_date || quotation.date || new Date().toISOString().split('T')[0],
+                    submission_date: updatedData.submissionDate || quotation.submission_date || quotation.date,
 
-                    // Movement history - initial entry
-                    movements: [{
-                        id: `MOV-${Date.now()}-0`,
-                        date: new Date().toISOString(),
-                        time: new Date().toLocaleTimeString('id-ID'),
-                        quantity: item.quantity || 1,
-                        movementType: 'in',
-                        position: 'gudang',
-                        condition: item.condition || 'new',
-                        remainingStock: item.quantity || 1,
-                        pic: updatedData.approvedBy || 'Admin',
-                        notes: 'Initial entry from pengajuan approval',
-                        documents: []
-                    }],
+                    // Additional info
+                    remarks: `Auto-created from pengajuan ${updatedData.quotationNumber || quotation.quotation_number || quotationId}`,
+                    notes: item.notes || '',
 
-                    created_at: new Date().toISOString()
+                    // Timestamps
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
                 }))
             );
 
             console.log(`📦 Creating ${allItems.length} inventory items in Supabase...`);
 
-            // Insert into Supabase
+            // Insert into Supabase - CORRECT table: freight_warehouse
             const { error: invError } = await supabase.from('freight_warehouse').insert(allItems);
             if (invError) console.error('Error creating inventory in Supabase:', invError);
             else {
                 // Determine if we need to add to Inbound/Outbound Transaction Logs
                 const updatedQuotation = { ...quotation, ...updatedData };
+
+                // Flatten all items from packages for Pabean display
+                const flatItems = (updatedQuotation.packages || []).flatMap((pkg, pkgIdx) =>
+                    (pkg.items || []).map((item, itemIdx) => ({
+                        itemCode: item.itemCode || null,
+                        hsCode: item.hsCode || null,
+                        serialNumber: (itemIdx + 1).toString(),
+                        goodsType: item.name || item.itemName, // For BarangMasuk.jsx display
+                        assetName: item.name || item.itemName,
+                        quantity: item.quantity || 1,
+                        unit: item.uom || 'pcs',
+                        value: item.value || (item.price * (item.quantity || 1)) || 0,
+                        packageNumber: pkg.packageNumber
+                    }))
+                );
+
+                // Transaction data for freight_inbound - use snake_case for DB columns
                 const transactionData = {
                     id: `TRX-${quotationId}-${Date.now()}`,
-                    pengajuanId: quotationId,
-                    date: updatedQuotation.bcDocumentDate || new Date().toISOString().split('T')[0],
-                    customsDocType: updatedQuotation.bcDocType,
-                    customsDocNumber: updatedQuotation.bcDocumentNumber,
-                    customsDocDate: updatedQuotation.bcDocumentDate,
-                    receiptNumber: updatedQuotation.quotationNumber,
+                    pengajuan_id: quotationId,
+                    pengajuan_number: updatedQuotation.quotationNumber || updatedQuotation.quotation_number,
+                    // FIX: Use submission date from Pengajuan first to maintain consistency with Bridge module
+                    date: updatedQuotation.submissionDate || updatedQuotation.submission_date || quotation.submission_date || quotation.date,
+                    customs_doc_type: updatedQuotation.bcDocType || updatedQuotation.bc_document_type,
+                    customs_doc_number: updatedQuotation.bcDocumentNumber || updatedQuotation.bc_document_number,
+                    customs_doc_date: updatedQuotation.bcDocumentDate || updatedQuotation.bc_document_date,
+                    receipt_number: updatedQuotation.quotationNumber || updatedQuotation.quotation_number,
                     sender: updatedQuotation.shipper || updatedQuotation.customer,
+
+                    item_code: updatedQuotation.itemCode || flatItems[0]?.itemCode || null,
+                    asset_name: flatItems[0]?.assetName || 'Bulk Items',
+                    quantity: flatItems.reduce((sum, i) => sum + (i.quantity || 0), 0),
+                    unit: 'pcs',
+                    value: flatItems.reduce((sum, i) => sum + (i.value || 0), 0),
+                    currency: 'IDR',
+
+                    pic: updatedQuotation.pic || updatedQuotation.approvedBy,
+                    documents: JSON.stringify({
+                        bcSupportingDocuments: updatedQuotation.bcSupportingDocuments || [],
+                        // Include items array in JSONB for Pabean display
+                        items: flatItems
+                    }),
+
+                    notes: updatedQuotation.notes || '',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                };
+
+                // For local state - add camelCase aliases and items array for BarangMasuk.jsx
+                const transactionForState = {
+                    ...transactionData,
+                    // CamelCase aliases for local state/UI
+                    pengajuanId: quotationId,
+                    pengajuanNumber: transactionData.pengajuan_number,
+                    customsDocType: transactionData.customs_doc_type,
+                    customsDocNumber: transactionData.customs_doc_number,
+                    customsDocDate: transactionData.customs_doc_date,
+                    receiptNumber: transactionData.receipt_number,
+                    itemCode: transactionData.item_code,
+                    assetName: transactionData.asset_name,
                     receiver: updatedQuotation.customer,
                     supplier: updatedQuotation.shipper,
                     destination: updatedQuotation.destination,
-
-                    itemCode: updatedQuotation.itemCode,
-                    assetName: updatedQuotation.packages?.[0]?.items?.[0]?.name || 'Bulk Items',
-                    quantity: updatedQuotation.packages?.reduce((sum, pkg) => sum + (pkg.items?.length || 0), 0) || 0,
-                    unit: 'pcs',
-                    value: updatedQuotation.packages?.reduce((sum, pkg) => sum + (pkg.items?.reduce((s, i) => s + (i.value || 0), 0) || 0), 0) || 0,
-                    currency: 'IDR',
-
-                    itemPhoto: null,
-                    pic: updatedQuotation.pic || updatedQuotation.approvedBy,
-                    documents: updatedQuotation.bcSupportingDocuments || [],
-
-                    status: 'completed',
-                    created_at: new Date().toISOString()
+                    // Items array for BarangMasuk.jsx flatMap
+                    items: flatItems,
+                    status: 'completed'
                 };
 
                 if (updatedQuotation.type === 'inbound') {
                     console.log('✅ Approved Inbound - Inserting to Supabase Inbound Log');
                     await supabase.from('freight_inbound').insert([transactionData]);
-                    setInboundTransactions(prev => [transactionData, ...prev]);
+                    // Use transactionForState with items array for local state (Pabean display)
+                    setInboundTransactions(prev => [transactionForState, ...prev]);
                 } else if (updatedQuotation.type === 'outbound') {
                     console.log('✅ Approved Outbound - Inserting to Supabase Outbound Log');
                     await supabase.from('freight_outbound').insert([transactionData]);
-                    setOutboundTransactions(prev => [transactionData, ...prev]);
+                    // Use transactionForState with items array for local state
+                    setOutboundTransactions(prev => [transactionForState, ...prev]);
                 }
 
-                setWarehouseInventory(prev => [...prev, ...allItems]);
+                // Update local warehouse inventory state with allItems for UI
+                const allItemsForState = allItems.map(item => ({
+                    ...item,
+                    // Add camelCase aliases for WarehouseInventory.jsx
+                    pengajuanId: item.pengajuan_id,
+                    pengajuanNumber: item.pengajuan_number,
+                    bcDocumentNumber: item.bc_document_number,
+                    packageNumber: item.package_number,
+                    itemName: item.item_name,
+                    assetName: item.asset_name,
+                    serialNumber: item.serial_number,
+                    entryDate: item.entry_date,
+                    submissionDate: item.submission_date,
+                    location: typeof item.location === 'string' ? JSON.parse(item.location) : item.location
+                }));
+                setWarehouseInventory(prev => [...prev, ...allItemsForState]);
             }
 
         } else if (updatedData.documentStatus === 'rejected' && previousStatus !== 'rejected') {
@@ -1557,7 +2068,8 @@ export const DataProvider = ({ children }) => {
             const rejectData = {
                 id: `REJ-${quotationId}-${Date.now()}`,
                 pengajuanId: quotationId,
-                date: updatedQuotation.rejectionDate || new Date().toISOString().split('T')[0],
+                // Use rejection date if provided, otherwise use submission date from quotation
+                date: updatedQuotation.rejectionDate || updatedQuotation.rejection_date || updatedQuotation.submissionDate || updatedQuotation.submission_date || quotation.date,
                 customsDocType: updatedQuotation.bcDocType,
                 customsDocNumber: updatedQuotation.bcDocumentNumber || '-',
                 receiptNumber: updatedQuotation.quotationNumber || '-',
@@ -1582,7 +2094,23 @@ export const DataProvider = ({ children }) => {
             setRejectTransactions(prev => [rejectData, ...prev]);
         }
 
-        setQuotations(prev => prev.map(q => (q.id === quotationId ? { ...q, ...updatedData } : q)));
+        // IMPORTANT: Refetch the updated quotation from database to ensure consistency
+        // This solves snake_case/camelCase mapping issues
+        const { data: updatedQuotation, error: fetchError } = await supabase
+            .from('freight_quotations')
+            .select('*')
+            .eq('id', quotationId)
+            .single();
+
+        if (fetchError) {
+            console.error('❌ Error refetching updated quotation:', fetchError);
+            // Fallback to local update if refetch fails
+            setQuotations(prev => prev.map(q => (q.id === quotationId ? { ...q, ...updatedData } : q)));
+        } else {
+            console.log('✅ Refetched updated quotation from database:', updatedQuotation);
+            // Update with fresh database data
+            setQuotations(prev => prev.map(q => (q.id === quotationId ? updatedQuotation : q)));
+        }
 
         // IMPORTANT: Sync inventory data when BC document details are updated (Post-approval edits)
         if (updatedData.bcDocumentNumber || updatedData.bcDocumentDate) {
@@ -1968,35 +2496,189 @@ export const DataProvider = ({ children }) => {
 
 
     // BC Code CRUD operations
-    const addBCCode = (bcCode) => {
+    const addBCCode = async (bcCodeData) => {
         const newBCCode = {
-            ...bcCode,
-            id: `bc - ${Date.now()} `,
+            id: `bc-${Date.now()}`,
+            code: bcCodeData.code,
+            name: bcCodeData.name,
+            category: bcCodeData.category,
+            description: bcCodeData.description || null,
+            is_active: bcCodeData.isActive !== undefined ? bcCodeData.isActive : true,
+            created_at: new Date().toISOString(),
         };
-        setBcCodes([...bcCodes, newBCCode]);
+
+        const { error } = await supabase.from('freight_bc_codes').insert([newBCCode]);
+        if (error) {
+            console.error('Error adding BC code:', error);
+            alert('Gagal menambahkan BC code ke database');
+            return;
+        }
+
+        setBcCodes(prev => [...prev, newBCCode]);
         return newBCCode;
     };
 
-    const updateBCCode = (id, updatedBCCode) => {
-        setBcCodes(bcCodes.map(bc => bc.id === id ? { ...bc, ...updatedBCCode } : bc));
+    const updateBCCode = async (id, updatedData) => {
+        const dbUpdate = {
+            code: updatedData.code,
+            name: updatedData.name,
+            category: updatedData.category,
+            description: updatedData.description || null,
+            is_active: updatedData.isActive,
+            updated_at: new Date().toISOString(),
+        };
+
+        const { error } = await supabase
+            .from('freight_bc_codes')
+            .update(dbUpdate)
+            .eq('id', id);
+
+        if (error) {
+            console.error('Error updating BC code:', error);
+            alert('Gagal mengupdate BC code');
+            return;
+        }
+
+        setBcCodes(prev => prev.map(bc => bc.id === id ? { ...bc, ...dbUpdate } : bc));
     };
 
-    const deleteBCCode = (id) => {
+    const deleteBCCode = async (id) => {
+        const { error } = await supabase
+            .from('freight_bc_codes')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            console.error('Error deleting BC code:', error);
+            alert('Gagal menghapus BC code');
+            return;
+        }
+
         setBcCodes(prev => prev.filter(bc => bc.id !== id));
     };
 
+    // HS Code CRUD operations
+    const addHSCode = async (hsData) => {
+        const { data, error } = await supabase
+            .from('freight_hs_codes')
+            .insert([{
+                hs_code: hsData.hsCode,
+                description: hsData.description
+            }])
+            .select();
+
+        if (error) {
+            console.error('Error adding HS code:', error);
+            alert('Failed to add HS code');
+            return;
+        }
+
+        if (data) {
+            const newHS = {
+                id: data[0].id,
+                hsCode: data[0].hs_code,
+                description: data[0].description
+            };
+            setHSCodes(prev => [...prev, newHS]);
+            return newHS;
+        }
+    };
+
+    const updateHSCode = async (id, hsData) => {
+        const { error } = await supabase
+            .from('freight_hs_codes')
+            .update({
+                hs_code: hsData.hsCode,
+                description: hsData.description
+            })
+            .eq('id', id);
+
+        if (error) {
+            console.error('Error updating HS code:', error);
+            alert('Failed to update HS code');
+            return;
+        }
+
+        setHSCodes(prev => prev.map(item =>
+            item.id === id ? { ...item, ...hsData } : item
+        ));
+    };
+
+    const deleteHSCode = async (id) => {
+        const { error } = await supabase.from('freight_hs_codes').delete().eq('id', id);
+        if (error) {
+            console.error('Error deleting HS code:', error);
+            alert('Failed to delete HS code');
+            return;
+        }
+        setHSCodes(prev => prev.filter(item => item.id !== id));
+    };
+
     // Item Master CRUD operations
-    const addItemCode = (itemData) => {
-        const newItem = { id: `item-${Date.now()}`, ...itemData };
-        setItemMaster([...itemMaster, newItem]);
+    const addItemCode = async (itemData) => {
+        const newItem = {
+            id: Date.now().toString(),
+            item_code: itemData.itemCode,
+            item_type: itemData.itemType,
+            description: itemData.description || null,
+            created_at: new Date().toISOString(),
+        };
+
+        const { error } = await supabase.from('freight_inventory').insert([newItem]);
+        if (error) {
+            console.error('Error adding item code:', error);
+            alert('Failed to add item code to database');
+            return;
+        }
+
+        // Update local state with camelCase for UI compatibility
+        const uiItem = {
+            id: newItem.id,
+            itemCode: newItem.item_code,
+            itemType: newItem.item_type,
+            description: newItem.description
+        };
+        setItemMaster(prev => [...prev, uiItem]);
+        return uiItem;
     };
 
-    const updateItemCode = (id, updatedData) => {
-        setItemMaster(itemMaster.map(item => item.id === id ? { ...item, ...updatedData } : item));
+    const updateItemCode = async (id, updatedData) => {
+        const dbUpdate = {
+            item_code: updatedData.itemCode,
+            item_type: updatedData.itemType,
+            description: updatedData.description || null,
+            updated_at: new Date().toISOString(),
+        };
+
+        const { error } = await supabase
+            .from('freight_inventory')
+            .update(dbUpdate)
+            .eq('id', id);
+
+        if (error) {
+            console.error('Error updating item code:', error);
+            alert('Failed to update item code');
+            return;
+        }
+
+        setItemMaster(prev => prev.map(item =>
+            item.id === id ? { ...item, ...updatedData } : item
+        ));
     };
 
-    const deleteItemCode = (id) => {
-        setItemMaster(itemMaster.filter(item => item.id !== id));
+    const deleteItemCode = async (id) => {
+        const { error } = await supabase
+            .from('freight_inventory')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            console.error('Error deleting item code:', error);
+            alert('Failed to delete item code');
+            return;
+        }
+
+        setItemMaster(prev => prev.filter(item => item.id !== id));
     };
 
     // Invoice CRUD operations
@@ -2133,6 +2815,9 @@ export const DataProvider = ({ children }) => {
         setWarehouseInventory,
         mutationLogs,
         setMutationLogs,
+        addMutationLog,
+        updateMutationLog,
+        deleteMutationLog,
         bcCodes,
         invoices,
         purchases,
@@ -2189,6 +2874,8 @@ export const DataProvider = ({ children }) => {
         addWarehouseInventory,
         updateWarehouseInventory,
         deleteWarehouseInventory,
+        updateInventoryStock,
+        updateItemCheckout,
 
         // Customs Document operations
         addCustomsDocument,
@@ -2196,6 +2883,7 @@ export const DataProvider = ({ children }) => {
         deleteCustomsDocument,
         addQuotation,
         updateQuotation,
+        deleteQuotation,
         confirmQuotation,
         approveBC,
         rejectBC,
@@ -2207,6 +2895,12 @@ export const DataProvider = ({ children }) => {
         addBCCode,
         updateBCCode,
         deleteBCCode,
+
+        // HS Code operations
+        hsCodes,
+        addHSCode,
+        updateHSCode,
+        deleteHSCode,
 
         // Invoice operations
         addInvoice,

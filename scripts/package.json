@@ -1,0 +1,13 @@
+{
+    "name": "cleanup-script",
+    "version": "1.0.0",
+    "type": "module",
+    "description": "Cleanup orphaned Pabean data",
+    "scripts": {
+        "cleanup": "node cleanup_orphaned_data.js"
+    },
+    "dependencies": {
+        "@supabase/supabase-js": "^2.39.0",
+        "dotenv": "^16.3.1"
+    }
+}

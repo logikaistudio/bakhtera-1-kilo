@@ -6,7 +6,7 @@ import {
     CheckCircle, AlertCircle, RefreshCw, FileSpreadsheet, FileText
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import * as XLSX from 'xlsx';
+import XLSX from 'xlsx-js-style';
 
 const TrialBalance = () => {
     const navigate = useNavigate();

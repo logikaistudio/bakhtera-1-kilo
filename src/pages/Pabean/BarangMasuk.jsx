@@ -1,20 +1,34 @@
 import React, { useState } from 'react';
-import { ArrowDownCircle, Search, Eye, Package, Download } from 'lucide-react';
+import { ArrowDownCircle, Search, Eye, Package, Download, FileSpreadsheet } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import Button from '../../components/Common/Button';
 import { formatCurrency } from '../../utils/currencyFormatter';
 import { exportToCSV } from '../../utils/exportCSV';
+import { exportToXLS } from '../../utils/exportXLS';
 
 const BarangMasuk = () => {
     const { inboundTransactions = [] } = useData();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedItem, setSelectedItem] = useState(null);
 
+    // Flatten transactions into items
+    const allItems = inboundTransactions.flatMap(t => {
+        if (t.items && t.items.length > 0) {
+            return t.items.map(item => ({
+                ...t,
+                ...item,
+                assetName: item.goodsType || item.assetName, // Map goodsType to assetName
+                originalTransaction: t
+            }));
+        }
+        return [t];
+    });
+
     // Filter transactions
-    const filteredTransactions = inboundTransactions.filter(item =>
-        item.assetName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.customsDocNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.customsDocType?.toLowerCase().includes(searchTerm.toLowerCase())
+    const filteredTransactions = allItems.filter(item =>
+        (item.assetName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (item.customsDocNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (item.customsDocType || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     // Export to CSV handler
@@ -26,7 +40,10 @@ const BarangMasuk = () => {
             { key: 'receiptNumber', header: 'No. Bukti' },
             { key: 'date', header: 'Tanggal Terima' },
             { key: 'sender', header: 'Pengirim' },
-            { key: 'itemCode', header: 'Kode' },
+            { key: 'packageNumber', header: 'Kode Box' },
+            { key: 'itemCode', header: 'Kode Barang' },
+            { key: 'hsCode', header: 'Kode HS' },
+            { key: 'serialNumber', header: 'Nomor Urut' },
             { key: 'assetName', header: 'Nama Barang' },
             { key: 'quantity', header: 'Quantity' },
             { key: 'unit', header: 'Satuan' },
@@ -35,6 +52,53 @@ const BarangMasuk = () => {
         ];
 
         exportToCSV(filteredTransactions, 'Barang_Masuk', columns);
+    };
+
+    // Export to XLS handler
+    const handleExportXLS = () => {
+        if (filteredTransactions.length === 0) {
+            alert('Tidak ada data untuk diexport');
+            return;
+        }
+
+        // Calculate date range for header
+        const dates = filteredTransactions.map(t => new Date(t.date).getTime());
+        const minDate = new Date(Math.min(...dates));
+        const maxDate = new Date(Math.max(...dates));
+
+        const formatDate = (d) => d.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const period = `${formatDate(minDate)} - ${formatDate(maxDate)}`;
+
+        const headerRows = [
+            { value: 'PT. FREIGHT ONE INDONESIA', style: 'company' },
+            { value: '', style: 'normal' },
+            { value: '' },
+            { value: 'DATA BARANG MASUK', style: 'title' },
+            { value: `Periode: ${period}`, style: 'normal' },
+            { value: '' },
+            { value: '' }
+        ];
+
+        const xlsColumns = [
+            { header: 'No', key: 'no', width: 5, align: 'center' },
+            { header: 'Jenis Dok', key: 'customsDocType', width: 10, render: (i) => i.customsDocType || 'BC 2.3' },
+            { header: 'No. Dok Pabean', key: 'customsDocNumber', width: 20 },
+            { header: 'Tgl Dok', key: 'customsDocDate', width: 12, render: (i) => i.customsDocDate ? new Date(i.customsDocDate).toLocaleDateString('id-ID') : '-' },
+            { header: 'No. Bukti', key: 'receiptNumber', width: 15 },
+            { header: 'Tgl Terima', key: 'date', width: 12, render: (i) => i.date ? new Date(i.date).toLocaleDateString('id-ID') : '-' },
+            { header: 'Pengirim', key: 'sender', width: 20, render: (i) => i.sender || i.supplier || '-' },
+            { header: 'Kode Box', key: 'packageNumber', width: 15, align: 'center' },
+            { header: 'Kode Barang', key: 'itemCode', width: 15 },
+            { header: 'Kode HS', key: 'hsCode', width: 12 },
+            { header: 'No. Urut', key: 'serialNumber', width: 10, align: 'center' },
+            { header: 'Nama Barang', key: 'assetName', width: 30 },
+            { header: 'Qty', key: 'quantity', width: 8, align: 'center', render: (i) => Number(i.quantity) || 0 },
+            { header: 'Satuan', key: 'unit', width: 8, align: 'center', render: (i) => i.unit || 'pcs' },
+            { header: 'Nilai', key: 'value', width: 15, align: 'right', render: (i) => Number(i.value) || 0 },
+            { header: 'Currency', key: 'currency', width: 8, align: 'center', render: (i) => i.currency || 'IDR' }
+        ];
+
+        exportToXLS(filteredTransactions, 'Laporan_Barang_Masuk', headerRows, xlsColumns);
     };
 
     return (
@@ -86,6 +150,14 @@ const BarangMasuk = () => {
                         >
                             Export CSV
                         </Button>
+                        <Button
+                            onClick={handleExportXLS}
+                            variant="success"
+                            icon={FileSpreadsheet}
+                            className="ml-2"
+                        >
+                            Export XLS
+                        </Button>
                     </div>
                 </div>
 
@@ -94,25 +166,28 @@ const BarangMasuk = () => {
                     <table className="w-full">
                         <thead className="bg-accent-blue/10">
                             <tr>
-                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver">No</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">Jenis Dokumen</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">No. Dokumen (Pabean)</th>
-                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver">Tanggal Dokumen</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">No. Bukti</th>
-                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver">Tanggal Terima</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">Pengirim</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">Kode</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">Nama Barang</th>
-                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver">Quantity</th>
-                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver">Satuan</th>
-                                <th className="px-4 py-3 text-right text-xs font-semibold text-silver">Nilai</th>
-                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver">Currency</th>
+                                <th className="px-2 py-2 text-center text-[10px] font-semibold text-silver whitespace-nowrap">No</th>
+                                <th className="px-2 py-2 text-left text-[10px] font-semibold text-silver whitespace-nowrap">Jenis Dok</th>
+                                <th className="px-2 py-2 text-left text-[10px] font-semibold text-silver whitespace-nowrap">No. Dok Pabean</th>
+                                <th className="px-2 py-2 text-center text-[10px] font-semibold text-silver whitespace-nowrap">Tgl Dok</th>
+                                <th className="px-2 py-2 text-left text-[10px] font-semibold text-silver whitespace-nowrap">No. Bukti</th>
+                                <th className="px-2 py-2 text-center text-[10px] font-semibold text-silver whitespace-nowrap">Tgl Terima</th>
+                                <th className="px-2 py-2 text-left text-[10px] font-semibold text-silver whitespace-nowrap">Pengirim</th>
+                                <th className="px-2 py-2 text-left text-[10px] font-semibold text-silver whitespace-nowrap">Kode Box</th>
+                                <th className="px-2 py-2 text-left text-[10px] font-semibold text-silver whitespace-nowrap">Kode Barang</th>
+                                <th className="px-2 py-2 text-left text-[10px] font-semibold text-silver whitespace-nowrap">Kode HS</th>
+                                <th className="px-2 py-2 text-left text-[10px] font-semibold text-silver whitespace-nowrap">No. Urut</th>
+                                <th className="px-2 py-2 text-left text-[10px] font-semibold text-silver whitespace-nowrap">Nama Barang</th>
+                                <th className="px-2 py-2 text-center text-[10px] font-semibold text-silver whitespace-nowrap">Qty</th>
+                                <th className="px-2 py-2 text-center text-[10px] font-semibold text-silver whitespace-nowrap">Satuan</th>
+                                <th className="px-2 py-2 text-right text-[10px] font-semibold text-silver whitespace-nowrap">Nilai</th>
+                                <th className="px-2 py-2 text-center text-[10px] font-semibold text-silver whitespace-nowrap">Curr</th>
                             </tr>
                         </thead>
                         <tbody>
                             {filteredTransactions.length === 0 ? (
                                 <tr>
-                                    <td colSpan="13" className="px-4 py-12 text-center">
+                                    <td colSpan="15" className="px-4 py-12 text-center">
                                         <Package className="w-16 h-16 mx-auto mb-4 opacity-30 text-silver-dark" />
                                         <p className="text-lg text-silver-dark">Belum ada data barang masuk</p>
                                         <p className="text-sm text-silver-dark mt-2">Transaksi inbound akan muncul di sini</p>
@@ -125,25 +200,28 @@ const BarangMasuk = () => {
                                         onClick={() => setSelectedItem(item)}
                                         className="border-t border-dark-border hover:bg-dark-surface/50 cursor-pointer"
                                     >
-                                        <td className="px-4 py-3 text-sm text-center text-silver-light">{idx + 1}</td>
-                                        <td className="px-4 py-3 text-sm text-silver-light">{item.customsDocType || 'BC 2.3'}</td>
-                                        <td className="px-4 py-3 text-sm text-accent-blue">{item.customsDocNumber}</td>
-                                        <td className="px-4 py-3 text-sm text-center text-silver-light">
+                                        <td className="px-2 py-2 text-[11px] text-center text-silver">{idx + 1}</td>
+                                        <td className="px-2 py-2 text-[11px] text-silver">{item.customsDocType || 'BC 2.3'}</td>
+                                        <td className="px-2 py-2 text-[11px] text-accent-blue">{item.customsDocNumber}</td>
+                                        <td className="px-2 py-2 text-[11px] text-center text-silver">
                                             {item.customsDocDate ? new Date(item.customsDocDate).toLocaleDateString('id-ID') : '-'}
                                         </td>
-                                        <td className="px-4 py-3 text-sm text-silver-light">{item.receiptNumber || '-'}</td>
-                                        <td className="px-4 py-3 text-sm text-center text-silver-light">
+                                        <td className="px-2 py-2 text-[11px] text-silver">{item.receiptNumber || '-'}</td>
+                                        <td className="px-2 py-2 text-[11px] text-center text-silver">
                                             {new Date(item.date).toLocaleDateString('id-ID')}
                                         </td>
-                                        <td className="px-4 py-3 text-sm text-silver-light">{item.sender || item.supplier || '-'}</td>
-                                        <td className="px-4 py-3 text-sm text-silver-light font-mono text-xs">{item.itemCode || item.hsCode || '-'}</td>
-                                        <td className="px-4 py-3 text-sm text-silver-light font-medium">{item.assetName}</td>
-                                        <td className="px-4 py-3 text-sm text-center text-accent-blue font-semibold">{item.quantity}</td>
-                                        <td className="px-4 py-3 text-sm text-center text-silver-light">{item.unit}</td>
-                                        <td className="px-4 py-3 text-sm text-right text-silver-light">
+                                        <td className="px-2 py-2 text-[11px] text-silver">{item.sender || item.supplier || '-'}</td>
+                                        <td className="px-2 py-2 text-[11px] text-accent-purple">{item.packageNumber || '-'}</td>
+                                        <td className="px-2 py-2 text-[11px] text-silver font-mono">{item.itemCode || '-'}</td>
+                                        <td className="px-2 py-2 text-[11px] text-silver font-mono">{item.hsCode || '-'}</td>
+                                        <td className="px-2 py-2 text-[11px] text-silver font-mono">{item.serialNumber || '-'}</td>
+                                        <td className="px-2 py-2 text-[11px] text-silver">{item.assetName}</td>
+                                        <td className="px-2 py-2 text-[11px] text-center text-accent-blue">{item.quantity}</td>
+                                        <td className="px-2 py-2 text-[11px] text-center text-silver">{item.unit}</td>
+                                        <td className="px-2 py-2 text-[11px] text-right text-silver">
                                             {formatCurrency(item.value)}
                                         </td>
-                                        <td className="px-4 py-3 text-sm text-center text-silver-light">{item.currency || 'IDR'}</td>
+                                        <td className="px-2 py-2 text-[11px] text-center text-silver">{item.currency || 'IDR'}</td>
                                     </tr>
                                 ))
                             )}
@@ -178,11 +256,19 @@ const BarangMasuk = () => {
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="text-xs text-silver-dark">Kode Barang</label>
-                                    <p className="text-sm text-silver-light font-mono">{selectedItem.itemCode || selectedItem.hsCode || '-'}</p>
+                                    <p className="text-sm text-silver-light font-mono">{selectedItem.itemCode || '-'}</p>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-silver-dark">Kode HS</label>
+                                    <p className="text-sm text-silver-light font-mono">{selectedItem.hsCode || '-'}</p>
                                 </div>
                                 <div>
                                     <label className="text-xs text-silver-dark">Nama Barang</label>
                                     <p className="text-sm text-silver-light font-medium">{selectedItem.assetName}</p>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-silver-dark">Nomor Urut / Serial</label>
+                                    <p className="text-sm text-silver-light font-mono">{selectedItem.serialNumber || '-'}</p>
                                 </div>
                                 <div>
                                     <label className="text-xs text-silver-dark">Tanggal Masuk</label>

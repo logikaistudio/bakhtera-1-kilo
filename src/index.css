@@ -33,7 +33,7 @@
 
 /* Light Theme */
 [data-theme='light'] {
-  --dark-bg: #F7F7F7;
+  --dark-bg: #FFFFFF;
   --dark-surface: #F2F3F4;
   --dark-card: #F2F3F4;
   --dark-border: #D1D5DB;
@@ -48,7 +48,7 @@
   --accent-orange: #EA580C;
 
   /* Theme-specific */
-  --bg-primary: #F7F7F7;
+  --bg-primary: #FFFFFF;
   --bg-secondary: #F2F3F4;
   --bg-tertiary: #F2F3F4;
   --border-color: #D1D5DB;
@@ -278,15 +278,15 @@ textarea::placeholder {
 
 /* Main Content Light Theme - White Snow Background */
 [data-theme="light"] main {
-  background-color: #FFFAFA !important;
+  background-color: #FFFFFF !important;
 }
 
 [data-theme="light"] main>div {
-  background-color: #FFFAFA !important;
+  background-color: #FFFFFF !important;
 }
 
 [data-theme="light"] .bg-dark-bg {
-  background-color: #FFFAFA !important;
+  background-color: #FFFFFF !important;
 }
 
 /* Light Theme Text Colors for Better Contrast */
@@ -711,4 +711,31 @@ textarea::placeholder {
 [data-theme="light"] button.bg-dark-card svg,
 [data-theme="light"] .bg-dark-card svg {
   color: #FFFFFF !important;
+}
+
+/* Force Uniform Non-Bold Font in Tables */
+table thead th {
+  font-weight: 400 !important;
+}
+
+table tbody td {
+  font-weight: 400 !important;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+}
+
+[data-theme="light"] thead th {
+  font-weight: 400 !important;
+}
+
+[data-theme="light"] tbody td {
+  font-weight: 400 !important;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+}
+
+/* Remove any bold from table content */
+table td strong,
+table td b,
+table th strong,
+table th b {
+  font-weight: 400 !important;
 }

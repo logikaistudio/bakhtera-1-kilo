@@ -9,7 +9,7 @@ import {
     FileText, DollarSign, CreditCard, Wallet, Eye, Trash2,
     RefreshCw, Database, FileSpreadsheet, ExternalLink
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import XLSX from 'xlsx-js-style';
 
 const GeneralJournal = () => {
     const navigate = useNavigate();

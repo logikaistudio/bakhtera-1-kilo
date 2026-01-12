@@ -45,8 +45,19 @@ const OutboundManagement = () => {
         const grossProfit = serviceGrandTotal - totalDirectCosts;
         const profitMargin = serviceGrandTotal > 0 ? (grossProfit / serviceGrandTotal) * 100 : 0;
 
+        // Derive header info from items for consistency
+        const primaryItem = formData.items[0];
+        const derivedAssetName = primaryItem ? (formData.items.length > 1 ? `${primaryItem.goodsType} (+${formData.items.length - 1} items)` : primaryItem.goodsType) : 'Unknown';
+
         const transactionData = {
             ...formData,
+            // Header-level fields derived from items
+            assetName: derivedAssetName,
+            itemCode: primaryItem?.itemCode || '',
+            hsCode: primaryItem?.hsCode || '',
+            quantity: totalItems,
+            unit: primaryItem?.unit || 'mixed',
+
             date: formData.bcDocDate,
             type: 'outbound',
             value: totalValue,
@@ -185,18 +196,26 @@ const OutboundManagement = () => {
                     onChange={(items) => setFormData({ ...formData, items })}
                 />
 
-                {/* Service Breakdown (Invoice to Customer) */}
-                <ServiceBreakdown
-                    services={formData.serviceBreakdown}
-                    onChange={(services) => setFormData({ ...formData, serviceBreakdown: services })}
-                    totalItems={totalItems}
-                />
+                {/* Financial Details Section */}
+                <div className="glass-card p-6 rounded-lg border border-dark-border">
+                    <h3 className="text-lg font-semibold text-silver-light mb-4">Financial Details</h3>
+                    <div className="space-y-6">
+                        {/* Service Breakdown (Invoice to Customer) */}
+                        <ServiceBreakdown
+                            services={formData.serviceBreakdown}
+                            onChange={(services) => setFormData({ ...formData, serviceBreakdown: services })}
+                            totalItems={totalItems}
+                        />
 
-                {/* Direct Costs (COGS) */}
-                <DirectCosts
-                    costs={formData.directCosts}
-                    onChange={(costs) => setFormData({ ...formData, directCosts: costs })}
-                />
+                        <div className="border-t border-dark-border my-4"></div>
+
+                        {/* Direct Costs (COGS) */}
+                        <DirectCosts
+                            costs={formData.directCosts}
+                            onChange={(costs) => setFormData({ ...formData, directCosts: costs })}
+                        />
+                    </div>
+                </div>
 
                 {/* Profit Summary */}
                 {serviceGrandTotal > 0 && (

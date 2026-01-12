@@ -1,8 +1,18 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { DataProvider } from './context/DataContext';
+import { AuthProvider } from './context/AuthContext';
 import MainLayout from './components/Layout/MainLayout';
 import { testSupabaseConnection, getSupabaseStatus } from './lib/supabase';
+
+// Auth Components
+import Login from './pages/Auth/Login';
+import ProtectedRoute from './components/Auth/ProtectedRoute';
+
+// Admin Module  
+import UserManagement from './pages/Admin/UserManagement';
+import RolePermissions from './pages/Admin/RolePermissions';
+import UserPermissionAssignment from './pages/Admin/UserPermissionAssignment';
 
 // Main Dashboard
 import FreightDashboard from './pages/FreightDashboard';
@@ -39,9 +49,10 @@ import GeneralLedger from './pages/Blink/GeneralLedger';
 import TrialBalance from './pages/Blink/TrialBalance';
 
 // Bridge Module
-import BridgeDashboard from './pages/Bridge/BridgeDashboard';
+import BridgeOverview from './pages/Bridge/BridgeOverview';
 import BCMaster from './pages/Bridge/BCMaster';
 import ItemMaster from './pages/Bridge/ItemMaster';
+import HSMaster from './pages/Bridge/HSMaster';
 import PengajuanManagement from './pages/Bridge/PengajuanManagement';
 import BridgeFinance from './pages/Bridge/BridgeFinance';
 import GoodsMovement from './pages/Bridge/GoodsMovement';
@@ -87,87 +98,116 @@ function App() {
     initSupabase();
   }, []);
   return (
-    <DataProvider>
-      <Router>
-        <MainLayout>
+    <AuthProvider>
+      <DataProvider>
+        <Router>
           <Routes>
-            {/* Main Dashboard */}
-            <Route path="/" element={<FreightDashboard />} />
+            {/* Auth Route - No Layout */}
+            <Route path="/login" element={<Login />} />
 
-            {/* Centralized Modules */}
-            <Route path="/vendors" element={<VendorManagement />} />
-            <Route path="/customers" element={<CustomerManagement />} />
-            <Route path="/finance" element={<Finance />} />
-            <Route path="/finance/coa" element={<COAMaster />} />
-            <Route path="/settings" element={<CompanySettings />} />
+            {/* App Routes - With Layout */}
+            <Route path="/*" element={
+              <MainLayout>
+                <Routes>
+                  {/* Main Dashboard */}
+                  <Route path="/" element={<FreightDashboard />} />
 
-            {/* Blink Module - Sales & Operations */}
-            <Route path="/blink" element={<BlinkDashboard />} />
-            <Route path="/blink/quotations" element={<QuotationManagement />} />
-            <Route path="/blink/flow-monitor" element={<FlowMonitor />} />
-            <Route path="/blink/sales-achievement" element={<SalesAchievement />} />
-            <Route path="/blink/shipments" element={<ShipmentManagement />} />
-            <Route path="/blink/operations/tracking" element={<TrackingMonitoring />} />
-            <Route path="/blink/operations/awb" element={<AWBManagement />} />
-            <Route path="/blink/operations/bl" element={<BLManagement />} />
-            <Route path="/blink/master/routes" element={<MasterRoutes />} />
+                  {/* Centralized Modules */}
+                  <Route path="/vendors" element={<VendorManagement />} />
+                  <Route path="/customers" element={<CustomerManagement />} />
+                  <Route path="/finance" element={<Finance />} />
+                  <Route path="/finance/coa" element={<COAMaster />} />
+                  <Route path="/settings" element={<CompanySettings />} />
 
-            {/* Blink Finance Module */}
-            <Route path="/blink/finance/invoices" element={<InvoiceManagement />} />
-            <Route path="/blink/finance/purchase-orders" element={<PurchaseOrder />} />
-            <Route path="/blink/finance/general-journal" element={<GeneralJournal />} />
-            <Route path="/blink/finance/general-ledger" element={<GeneralLedger />} />
-            <Route path="/blink/finance/trial-balance" element={<TrialBalance />} />
-            <Route path="/blink/finance/ar" element={<AccountsReceivable />} />
-            <Route path="/blink/finance/ap" element={<AccountsPayable />} />
-            <Route path="/blink/finance/profit-loss" element={<ProfitLoss />} />
-            <Route path="/blink/finance/balance-sheet" element={<BalanceSheet />} />
-            <Route path="/blink/sales-revenue" element={<SalesRevenue />} />
+                  {/* Blink Module - Sales & Operations */}
+                  <Route path="/blink" element={<BlinkDashboard />} />
+                  <Route path="/blink/quotations" element={<QuotationManagement />} />
+                  <Route path="/blink/flow-monitor" element={<FlowMonitor />} />
+                  <Route path="/blink/sales-achievement" element={<SalesAchievement />} />
+                  <Route path="/blink/shipments" element={<ShipmentManagement />} />
+                  <Route path="/blink/operations/tracking" element={<TrackingMonitoring />} />
+                  <Route path="/blink/operations/awb" element={<AWBManagement />} />
+                  <Route path="/blink/operations/bl" element={<BLManagement />} />
+                  <Route path="/blink/master/routes" element={<MasterRoutes />} />
 
-            {/* Legacy Blink Routes - Redirects */}
-            <Route path="/blink/invoices" element={<InvoiceManagement />} />
-            <Route path="/blink/finance/profit" element={<ProfitAnalysis />} />
+                  {/* Blink Finance Module */}
+                  <Route path="/blink/finance/invoices" element={<InvoiceManagement />} />
+                  <Route path="/blink/finance/purchase-orders" element={<PurchaseOrder />} />
+                  <Route path="/blink/finance/general-journal" element={<GeneralJournal />} />
+                  <Route path="/blink/finance/general-ledger" element={<GeneralLedger />} />
+                  <Route path="/blink/finance/trial-balance" element={<TrialBalance />} />
+                  <Route path="/blink/finance/ar" element={<AccountsReceivable />} />
+                  <Route path="/blink/finance/ap" element={<AccountsPayable />} />
+                  <Route path="/blink/finance/profit-loss" element={<ProfitLoss />} />
+                  <Route path="/blink/finance/balance-sheet" element={<BalanceSheet />} />
+                  <Route path="/blink/sales-revenue" element={<SalesRevenue />} />
 
-            {/* Bridge Module */}
-            <Route path="/bridge" element={<BridgeDashboard />} />
-            <Route path="/bridge/bc-master" element={<BCMaster />} />
-            <Route path="/bridge/item-master" element={<ItemMaster />} />
-            <Route path="/bridge/pengajuan" element={<PengajuanManagement />} />
-            <Route path="/bridge/finance" element={<BridgeFinance />} />
-            <Route path="/bridge/goods-movement" element={<GoodsMovement />} />
-            <Route path="/bridge/inventory" element={<WarehouseInventory />} />
-            <Route path="/bridge/logger" element={<ActivityLogger />} />
-            <Route path="/bridge/approvals" element={<ApprovalManager />} />
+                  {/* Legacy Blink Routes - Redirects */}
+                  <Route path="/blink/invoices" element={<InvoiceManagement />} />
+                  <Route path="/blink/finance/profit" element={<ProfitAnalysis />} />
 
-            {/* Big Module */}
-            <Route path="/big" element={<BigDashboard />} />
+                  {/* Bridge Module */}
+                  <Route path="/bridge" element={<BridgeOverview />} />
+                  <Route path="/bridge/bc-master" element={<BCMaster />} />
+                  <Route path="/bridge/item-master" element={<ItemMaster />} />
+                  <Route path="/bridge/hs-master" element={<HSMaster />} />
+                  <Route path="/bridge/pengajuan" element={<PengajuanManagement />} />
+                  <Route path="/bridge/finance" element={<BridgeFinance />} />
+                  <Route path="/bridge/goods-movement" element={<GoodsMovement />} />
+                  <Route path="/bridge/inventory" element={<WarehouseInventory />} />
+                  <Route path="/bridge/logger" element={<ActivityLogger />} />
+                  <Route path="/bridge/approvals" element={<ApprovalManager />} />
+                  <Route path="/bridge/pergerakan" element={<PergerakanBarang />} />
 
-            {/* Sales */}
-            <Route path="/big/quotations" element={<BigQuotations />} />
-            <Route path="/big/sales/quotations" element={<BigQuotations />} />
+                  {/* Big Module */}
+                  <Route path="/big" element={<BigDashboard />} />
 
-            {/* Operations */}
-            <Route path="/big/events" element={<EventManagement />} />
-            <Route path="/big/operations/events" element={<EventManagement />} />
-            <Route path="/big/costs" element={<BigCosts />} />
-            <Route path="/big/operations/costs" element={<BigCosts />} />
+                  {/* Sales */}
+                  <Route path="/big/quotations" element={<BigQuotations />} />
+                  <Route path="/big/sales/quotations" element={<BigQuotations />} />
 
-            {/* Finance */}
-            <Route path="/big/invoices" element={<BigInvoices />} />
-            <Route path="/big/finance/invoices" element={<BigInvoices />} />
-            <Route path="/big/ar" element={<BigAR />} />
-            <Route path="/big/finance/ar" element={<BigAR />} />
+                  {/* Operations */}
+                  <Route path="/big/events" element={<EventManagement />} />
+                  <Route path="/big/operations/events" element={<EventManagement />} />
+                  <Route path="/big/costs" element={<BigCosts />} />
+                  <Route path="/big/operations/costs" element={<BigCosts />} />
 
-            {/* Pabean Module */}
-            <Route path="/pabean" element={<PabeanDashboard />} />
-            <Route path="/pabean/barang-masuk" element={<BarangMasuk />} />
-            <Route path="/pabean/barang-keluar" element={<BarangKeluar />} />
-            <Route path="/pabean/barang-reject" element={<BarangReject />} />
-            <Route path="/pabean/pergerakan" element={<PergerakanBarang />} />
+                  {/* Finance */}
+                  <Route path="/big/invoices" element={<BigInvoices />} />
+                  <Route path="/big/finance/invoices" element={<BigInvoices />} />
+                  <Route path="/big/ar" element={<BigAR />} />
+                  <Route path="/big/finance/ar" element={<BigAR />} />
+
+                  {/* Pabean Module */}
+                  <Route path="/pabean" element={<PabeanDashboard />} />
+                  <Route path="/pabean/barang-masuk" element={<BarangMasuk />} />
+                  <Route path="/pabean/barang-keluar" element={<BarangKeluar />} />
+                  <Route path="/pabean/barang-reject" element={<BarangReject />} />
+                  <Route path="/pabean/pergerakan" element={<PergerakanBarang />} />
+
+                  {/* Admin Module - Super Admin Only */}
+                  <Route path="/admin/users" element={
+                    <ProtectedRoute requireSuperAdmin={true}>
+                      <UserManagement />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/admin/permissions" element={
+                    <ProtectedRoute requireSuperAdmin={true}>
+                      <RolePermissions />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/admin/user-permissions" element={
+                    <ProtectedRoute requireSuperAdmin={true}>
+                      <UserPermissionAssignment />
+                    </ProtectedRoute>
+                  } />
+                </Routes>
+              </MainLayout>
+            } />
           </Routes>
-        </MainLayout>
-      </Router>
-    </DataProvider>
+        </Router>
+      </DataProvider>
+    </AuthProvider>
   );
 }
 

@@ -18,6 +18,7 @@ const Button = ({
         secondary: 'bg-dark-card text-silver border border-dark-border hover:border-accent-blue',
         danger: 'bg-red-600 text-white hover:bg-red-700',
         ghost: 'bg-transparent text-silver hover:bg-dark-surface',
+        success: 'bg-green-600 text-white hover:bg-green-700',
     };
 
     const sizes = {

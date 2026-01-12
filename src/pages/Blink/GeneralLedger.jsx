@@ -6,7 +6,7 @@ import {
     ArrowUpRight, ArrowDownLeft, CheckCircle, AlertCircle,
     FileText, FileSpreadsheet, ExternalLink, RefreshCw
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import XLSX from 'xlsx-js-style';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const GeneralLedger = () => {

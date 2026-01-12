@@ -1,395 +1,290 @@
-import React, { useState } from 'react';
-import { Plus, Package, X, Edit2, Save } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Package, X, Edit2, Save, Trash2, Check } from 'lucide-react';
 import Button from './Button';
+import { useData } from '../../context/DataContext';
 import { formatCurrency, parseCurrency } from '../../utils/currencyFormatter';
 
-const PackageItemManager = ({ items = [], onChange, itemMaster = [] }) => {
+const PackageItemManager = ({ items = [], onChange }) => {
+    const { itemMaster = [], hsCodes = [] } = useData();
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [formData, setFormData] = useState({
-        name: '',
         itemCode: '',
-        serialNumber: '',
-        quantity: '1',
-        condition: 'new',
+        hsCode: '',
+        name: '',
+        quantity: '',
+        unit: 'pcs',
+        price: '', // Nominal
         currency: 'IDR',
-        value: '',
-        weight: '',
-        dimensions: '',
+        exchangeRate: '1',
+        totalPrice: '', // Calculated
         notes: ''
     });
 
-    const conditionOptions = [
-        { value: 'new', label: 'Baru' },
-        { value: 'used', label: 'Bekas' },
-        { value: 'refurbished', label: 'Rekondisi' },
-        { value: 'damaged', label: 'Rusak' }
-    ];
+    const unitOptions = ['pcs', 'kg', 'ton', 'm', 'm2', 'm3', 'set', 'box', 'roll', 'btl'];
+    const currencyOptions = ['IDR', 'USD', 'EUR', 'SGD', 'CNY', 'JPY'];
+
+    // Auto-fill Logic
+    useEffect(() => {
+        if (formData.itemCode) {
+            const selected = itemMaster.find(i => i.itemCode === formData.itemCode);
+            if (selected) {
+                setFormData(prev => ({
+                    ...prev,
+                    name: selected.itemName || selected.itemType || prev.name,
+                    unit: selected.unit || prev.unit
+                }));
+            }
+        }
+    }, [formData.itemCode, itemMaster]);
+
+    const calculateTotal = (qty, price) => {
+        return (Number(qty) || 0) * (parseCurrency(price) || 0);
+    };
 
     const handleAdd = () => {
-        if (!formData.name.trim()) {
-            alert('Nama barang wajib diisi');
+        if (!formData.name || !formData.quantity) {
+            alert('Nama Item dan Jumlah wajib diisi');
             return;
         }
 
+        const qty = Number(formData.quantity) || 0;
+        const price = parseCurrency(formData.price) || 0;
+        const rate = Number(formData.exchangeRate) || 1;
+        const total = qty * price;
+        const valueIDR = total * rate;
+
+        const newItem = {
+            id: editingId || `item-${Date.now()}`,
+            ...formData,
+            quantity: qty,
+            price: price, // Store as number
+            exchangeRate: rate,
+            totalPrice: total,
+            value: valueIDR
+        };
+
         if (editingId) {
-            // Update existing item
-            const updated = items.map(item =>
-                item.id === editingId
-                    ? { ...formData, id: editingId, value: parseCurrency(formData.value) }
-                    : item
-            );
-            onChange(updated);
+            onChange(items.map(item => item.id === editingId ? newItem : item));
             setEditingId(null);
         } else {
-            // Add new item
-            const newItem = {
-                id: `item-${Date.now()}`,
-                name: formData.name.trim(),
-                serialNumber: formData.serialNumber.trim(),
-                quantity: parseInt(formData.quantity) || 1,
-                condition: formData.condition,
-                value: parseCurrency(formData.value),
-                weight: formData.weight.trim(),
-                dimensions: formData.dimensions.trim(),
-                notes: formData.notes.trim()
-            };
             onChange([...items, newItem]);
         }
 
-        // Reset form
-        setFormData({
-            name: '',
+        // Reset but keep context
+        setFormData(prev => ({
+            ...prev,
             itemCode: '',
-            serialNumber: '',
-            quantity: '1',
-            condition: 'new',
-            currency: 'IDR',
-            value: '',
-            weight: '',
-            dimensions: '',
-            notes: ''
-        });
-        setShowForm(false);
+            name: '',
+            quantity: '',
+            price: '', // Reset to empty string
+            totalPrice: '',
+            // Keep HS Code, Unit, Currency, Rate
+        }));
+        // Don't close form automatically to allow rapid entry if adding new
+        if (editingId) setShowForm(false);
     };
 
     const handleEdit = (item) => {
         setFormData({
-            name: item.name,
             itemCode: item.itemCode || '',
-            serialNumber: item.serialNumber || '',
-            quantity: item.quantity?.toString() || '1',
-            condition: item.condition || 'new',
+            hsCode: item.hsCode || '',
+            name: item.name,
+            quantity: item.quantity,
+            unit: item.unit || 'pcs',
+            price: formatCurrency(item.price || (item.value / item.quantity) || 0), // Format for input
             currency: item.currency || 'IDR',
-            value: formatCurrency(item.value || 0),
-            weight: item.weight || '',
-            dimensions: item.dimensions || '',
+            exchangeRate: item.exchangeRate || '1',
+            totalPrice: item.totalPrice || (item.quantity * item.price) || '',
             notes: item.notes || ''
         });
         setEditingId(item.id);
         setShowForm(true);
     };
 
-    const handleRemove = (itemId) => {
-        if (window.confirm('Hapus barang ini?')) {
-            onChange(items.filter(item => item.id !== itemId));
+    const handleRemove = (id) => {
+        if (window.confirm('Hapus item ini?')) {
+            onChange(items.filter(i => i.id !== id));
         }
     };
 
     const handleCancel = () => {
-        setFormData({
-            name: '',
-            serialNumber: '',
-            quantity: '1',
-            condition: 'new',
-            value: '',
-            weight: '',
-            dimensions: '',
-            notes: ''
-        });
         setEditingId(null);
+        setFormData({
+            itemCode: '', hscode: '', name: '', quantity: '', unit: 'pcs', price: '', currency: 'IDR', exchangeRate: '1', totalPrice: '', notes: ''
+        });
         setShowForm(false);
     };
 
-    const totalValue = items.reduce((sum, item) => sum + (item.value || 0), 0);
-    const totalItems = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+    // Calculate Grand Total for Display
+    const totalQty = items.reduce((sum, i) => sum + Number(i.quantity), 0);
+    const totalVal = items.reduce((sum, i) => sum + Number(i.value), 0);
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <Package className="w-5 h-5 text-accent-green" />
-                    <h3 className="text-lg font-semibold text-silver-light">Daftar Barang dalam Package</h3>
-                    <span className="text-xs text-silver-dark">
-                        ({items.length} jenis barang, {totalItems} total item, nilai: Rp {formatCurrency(totalValue)})
-                    </span>
-                </div>
-                {!showForm && (
-                    <Button size="sm" onClick={() => setShowForm(true)} icon={Plus}>
-                        Tambah Barang
-                    </Button>
-                )}
+            {/* Header / Summary */}
+            <div className="flex items-center justify-between text-sm text-silver-dark px-2">
+                <span>Total: {items.length} item ({totalQty} unit)</span>
+                <span className="text-emerald-600 dark:text-accent-green font-bold">Total Nilai: Rp {formatCurrency(totalVal)}</span>
             </div>
 
-            {/* Add/Edit Form */}
-            {showForm && (
-                <div className="glass-card p-4 rounded-lg border-2 border-accent-green bg-accent-green/10">
-                    <h4 className="text-sm font-semibold text-silver-light mb-4">
-                        {editingId ? 'Edit Barang' : 'Tambah Barang Baru'}
-                    </h4>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        {/* Kode Barang */}
-                        <div>
-                            <label className="block text-sm font-medium text-silver mb-2">
-                                Kode Barang *
-                            </label>
-                            <select
-                                value={formData.itemCode}
-                                onChange={(e) => setFormData({ ...formData, itemCode: e.target.value })}
-                                className="w-full"
+            {/* Main Table Layout */}
+            <div className="bg-white rounded overflow-hidden border border-gray-200">
+                <table className="w-full text-xs">
+                    <thead>
+                        <tr className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200 text-gray-600 h-6">
+                            <th className="px-1 py-0.5 text-left w-6">No Urut</th>
+                            <th className="px-1 py-0.5 text-left w-24">Kode</th>
+                            <th className="px-1 py-0.5 text-left w-16">HS</th>
+                            <th className="px-1 py-0.5 text-left">Item</th>
+                            <th className="px-1 py-0.5 text-right w-12">Jml</th>
+                            <th className="px-1 py-0.5 text-left w-12">Sat</th>
+                            <th className="px-1 py-0.5 text-right w-24">Nominal</th>
+                            <th className="px-1 py-0.5 text-right w-24 hidden md:table-cell">Total</th>
+                            <th className="px-1 py-0.5 text-left w-12 hidden md:table-cell">Kurs</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y-2 divide-gray-100">
+                        {items.map((item, idx) => (
+                            <tr
+                                key={item.id}
+                                onClick={() => handleEdit(item)}
+                                className="hover:bg-blue-50 smooth-transition group cursor-pointer text-gray-800 h-6"
                             >
-                                <option value="">-- Pilih Kode Barang --</option>
-                                {itemMaster.map(item => (
-                                    <option key={item.id} value={item.itemCode}>
-                                        {item.itemCode} - {item.itemType}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        {/* Nama Barang */}
-                        <div className="md:col-span-1">
-                            <label className="block text-sm font-medium text-silver mb-2">
-                                Nama Barang *
-                            </label>
-                            <input
-                                type="text"
-                                value={formData.name}
-                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                placeholder="contoh: Mesin CNC Model X200"
-                                className="w-full"
-                            />
-                        </div>
-
-                        {/* Serial Number */}
-                        <div>
-                            <label className="block text-sm font-medium text-silver mb-2">
-                                Serial Number (SN)
-                            </label>
-                            <input
-                                type="text"
-                                value={formData.serialNumber}
-                                onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value })}
-                                placeholder="SN1234567890"
-                                className="w-full"
-                            />
-                        </div>
-
-                        {/* Quantity */}
-                        <div>
-                            <label className="block text-sm font-medium text-silver mb-2">
-                                Jumlah *
-                            </label>
-                            <input
-                                type="number"
-                                min="1"
-                                value={formData.quantity}
-                                onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                                className="w-full"
-                            />
-                        </div>
-
-                        {/* Condition */}
-                        <div>
-                            <label className="block text-sm font-medium text-silver mb-2">
-                                Kondisi *
-                            </label>
-                            <select
-                                value={formData.condition}
-                                onChange={(e) => setFormData({ ...formData, condition: e.target.value })}
-                                className="w-full"
-                            >
-                                {conditionOptions.map(opt => (
-                                    <option key={opt.value} value={opt.value}>
-                                        {opt.label}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        {/* Currency */}
-                        <div>
-                            <label className="block text-sm font-medium text-silver mb-2">
-                                Currency *
-                            </label>
-                            <select
-                                value={formData.currency}
-                                onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                                className="w-full"
-                            >
-                                <option value="IDR">IDR</option>
-                                <option value="USD">USD</option>
-                            </select>
-                        </div>
-
-                        {/* Value */}
-                        <div>
-                            <label className="block text-sm font-medium text-silver mb-2">
-                                Nilai (Rp)
-                            </label>
-                            <input
-                                type="text"
-                                value={formData.value}
-                                onChange={(e) => setFormData({ ...formData, value: formatCurrency(e.target.value) })}
-                                placeholder="0"
-                                className="w-full"
-                            />
-                        </div>
-
-                        {/* Weight */}
-                        <div>
-                            <label className="block text-sm font-medium text-silver mb-2">
-                                Berat
-                            </label>
-                            <input
-                                type="text"
-                                value={formData.weight}
-                                onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
-                                placeholder="contoh: 100 kg"
-                                className="w-full"
-                            />
-                        </div>
-
-                        {/* Dimensions */}
-                        <div>
-                            <label className="block text-sm font-medium text-silver mb-2">
-                                Ukuran
-                            </label>
-                            <input
-                                type="text"
-                                value={formData.dimensions}
-                                onChange={(e) => setFormData({ ...formData, dimensions: e.target.value })}
-                                placeholder="contoh: 100x50x30 cm"
-                                className="w-full"
-                            />
-                        </div>
-
-                        {/* Notes */}
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-silver mb-2">
-                                Keterangan
-                            </label>
-                            <textarea
-                                value={formData.notes}
-                                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                                placeholder="Catatan tambahan tentang barang ini..."
-                                rows={2}
-                                className="w-full"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="flex justify-end gap-2">
-                        <Button type="button" variant="secondary" size="sm" onClick={handleCancel}>
-                            Batal
-                        </Button>
-                        <Button type="button" size="sm" onClick={handleAdd} icon={editingId ? Save : Plus}>
-                            {editingId ? 'Simpan Perubahan' : 'Tambah Barang'}
-                        </Button>
-                    </div>
-                </div>
-            )}
-
-            {/* Items List */}
-            {items.length > 0 && (
-                <div className="glass-card rounded-lg overflow-hidden">
-                    <table className="w-full">
-                        <thead className="bg-accent-green">
-                            <tr>
-                                <th className="px-4 py-3 text-left text-sm font-semibold text-white">No</th>
-                                <th className="px-4 py-3 text-left text-sm font-semibold text-white">Nama Barang</th>
-                                <th className="px-4 py-3 text-left text-sm font-semibold text-white">SN</th>
-                                <th className="px-4 py-3 text-left text-sm font-semibold text-white">Jml</th>
-                                <th className="px-4 py-3 text-left text-sm font-semibold text-white">Kondisi</th>
-                                <th className="px-4 py-3 text-left text-sm font-semibold text-white">Nilai</th>
-                                <th className="px-4 py-3 text-left text-sm font-semibold text-white">Berat</th>
-                                <th className="px-4 py-3 text-left text-sm font-semibold text-white">Ukuran</th>
-                                <th className="px-4 py-3 text-center text-sm font-semibold text-white">Aksi</th>
+                                <td className="px-1 py-0.5">{idx + 1}</td>
+                                <td className="px-1 py-0.5 truncate">{item.itemCode || '-'}</td>
+                                <td className="px-1 py-0.5 truncate">{item.hsCode || '-'}</td>
+                                <td className="px-1 py-0.5 font-medium truncate max-w-[150px]">{item.name}</td>
+                                <td className="px-1 py-0.5 text-right font-bold">{item.quantity}</td>
+                                <td className="px-1 py-0.5">{item.unit}</td>
+                                <td className="px-1 py-0.5 text-right font-medium">
+                                    {formatCurrency(item.price)}
+                                </td>
+                                <td className="px-1 py-0.5 text-right font-medium text-emerald-600">
+                                    {formatCurrency(item.totalPrice || (item.quantity * item.price))}
+                                </td>
+                                <td className="px-1 py-0.5 text-xs text-gray-500 hidden md:table-cell">
+                                    {item.currency}
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody className="divide-y divide-dark-border">
-                            {items.map((item, index) => (
-                                <tr key={item.id} className="hover:bg-dark-surface smooth-transition">
-                                    <td className="px-4 py-3 text-sm text-silver-dark font-medium">
-                                        {index + 1}
-                                    </td>
-                                    <td className="px-4 py-3 text-sm text-silver-light">
-                                        <div>
-                                            <p className="font-medium">{item.name}</p>
-                                            {item.notes && (
-                                                <p className="text-xs text-silver-dark mt-1">{item.notes}</p>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-3 text-sm text-silver-dark">
-                                        {item.serialNumber || '-'}
-                                    </td>
-                                    <td className="px-4 py-3 text-sm text-silver">
-                                        {item.quantity}
-                                    </td>
-                                    <td className="px-4 py-3 text-sm">
-                                        <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${item.condition === 'new' ? 'bg-green-500/20 text-green-400' :
-                                            item.condition === 'used' ? 'bg-blue-500/20 text-blue-400' :
-                                                item.condition === 'refurbished' ? 'bg-purple-500/20 text-purple-400' :
-                                                    'bg-red-500/20 text-red-400'
-                                            }`}>
-                                            {conditionOptions.find(c => c.value === item.condition)?.label || item.condition}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3 text-sm text-accent-green font-semibold">
-                                        {item.value ? `Rp ${formatCurrency(item.value)}` : '-'}
-                                    </td>
-                                    <td className="px-4 py-3 text-sm text-silver-dark">
-                                        {item.weight || '-'}
-                                    </td>
-                                    <td className="px-4 py-3 text-sm text-silver-dark">
-                                        {item.dimensions || '-'}
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <div className="flex items-center justify-center gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => handleEdit(item)}
-                                                className="p-1 hover:bg-blue-500 hover:bg-opacity-20 rounded smooth-transition"
-                                                title="Edit"
-                                            >
-                                                <Edit2 className="w-4 h-4 text-blue-400" />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleRemove(item.id)}
-                                                className="p-1 hover:bg-red-500 hover:bg-opacity-20 rounded smooth-transition"
-                                                title="Hapus"
-                                            >
-                                                <X className="w-4 h-4 text-red-400" />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            )}
+                        ))}
 
-            {items.length === 0 && !showForm && (
-                <div className="glass-card p-8 rounded-lg text-center text-silver-dark">
-                    <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                    <p>Belum ada barang ditambahkan</p>
-                    <p className="text-xs mt-1">Klik "Tambah Barang" untuk mulai</p>
-                </div>
-            )}
+                        {/* Input Row (Always visible or toggled?) - User asked for "Tambah Item" button. 
+                            Let's make the Input Row appear when requested or always at bottom for quick entry?
+                            Better: Have a dedicated "Add Row" button that reveals the row.
+                        */}
+                    </tbody>
+                </table>
+
+                {/* Form Section - Designed as a sleek panel below table */}
+                {showForm ? (
+                    <div className="p-4 bg-accent-blue/5 border-t border-accent-blue/30 animate-fade-in-up">
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                            {/* Line 1: Identification */}
+                            <div className="md:col-span-2">
+                                <label className="text-xs text-silver-dark block mb-1">Kode Barang</label>
+                                <select
+                                    className="w-full text-sm p-2 bg-dark-bg border border-dark-border rounded focus:border-accent-blue"
+                                    value={formData.itemCode}
+                                    onChange={e => setFormData({ ...formData, itemCode: e.target.value })}
+                                >
+                                    <option value="">Pilih...</option>
+                                    {itemMaster.map(i => <option key={i.id} value={i.itemCode}>{i.itemCode}</option>)}
+                                </select>
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="text-xs text-silver-dark block mb-1">HS Code</label>
+                                <select
+                                    className="w-full text-sm p-2 bg-dark-bg border border-dark-border rounded focus:border-accent-blue"
+                                    value={formData.hsCode}
+                                    onChange={e => setFormData({ ...formData, hsCode: e.target.value })}
+                                >
+                                    <option value="">Optional...</option>
+                                    {hsCodes.map(h => <option key={h.id} value={h.hsCode}>{h.hsCode}</option>)}
+                                </select>
+                            </div>
+                            <div className="md:col-span-3">
+                                <label className="text-xs text-silver-dark block mb-1">Nama Item</label>
+                                <input
+                                    className="w-full text-sm p-2 bg-dark-bg border border-dark-border rounded focus:border-accent-blue"
+                                    value={formData.name}
+                                    onChange={e => setFormData({ ...formData, name: e.target.value })}
+                                    placeholder="Nama barang..."
+                                />
+                            </div>
+
+                            {/* Line 2: Quantities */}
+                            <div className="md:col-span-1">
+                                <label className="text-xs text-silver-dark block mb-1">Jml</label>
+                                <input
+                                    type="number"
+                                    className="w-full text-sm p-2 bg-dark-bg border border-dark-border rounded focus:border-accent-blue"
+                                    value={formData.quantity}
+                                    onChange={e => setFormData({ ...formData, quantity: e.target.value })}
+                                />
+                            </div>
+                            <div className="md:col-span-1">
+                                <label className="text-xs text-silver-dark block mb-1">Satuan</label>
+                                <select
+                                    className="w-full text-sm p-2 bg-dark-bg border border-dark-border rounded focus:border-accent-blue"
+                                    value={formData.unit}
+                                    onChange={e => setFormData({ ...formData, unit: e.target.value })}
+                                >
+                                    {unitOptions.map(u => <option key={u} value={u}>{u}</option>)}
+                                </select>
+                            </div>
+
+                            {/* Line 3: Pricing */}
+                            <div className="md:col-span-1">
+                                <label className="text-xs text-silver-dark block mb-1">Mata Uang</label>
+                                <select
+                                    className="w-full text-sm p-2 bg-dark-bg border border-dark-border rounded focus:border-accent-blue"
+                                    value={formData.currency}
+                                    onChange={e => setFormData({ ...formData, currency: e.target.value })}
+                                >
+                                    {currencyOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="text-xs text-silver-dark block mb-1">Nominal (@)</label>
+                                <input
+                                    type="text"
+                                    className="w-full text-sm p-2 bg-dark-bg border border-dark-border rounded focus:border-accent-blue"
+                                    value={formData.price}
+                                    onChange={e => setFormData({ ...formData, price: formatCurrency(e.target.value) })}
+                                    placeholder="0.00"
+                                />
+                            </div>
+
+                            {/* Actions */}
+                            <div className="md:col-span-12 flex justify-between gap-2 mt-2">
+                                <div>
+                                    {editingId && (
+                                        <Button size="sm" variant="danger" onClick={() => handleRemove(editingId)} icon={Trash2}>
+                                            Hapus
+                                        </Button>
+                                    )}
+                                </div>
+                                <div className="flex gap-2">
+                                    <Button size="sm" variant="secondary" onClick={handleCancel}>Batal</Button>
+                                    <Button size="sm" onClick={handleAdd} icon={editingId ? Check : Plus}>
+                                        {editingId ? 'Update' : 'Tambah'}
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="p-3 bg-white border-t border-gray-200 flex justify-center">
+                        <button
+                            onClick={() => setShowForm(true)}
+                            className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 transition-colors py-2 px-4 rounded hover:bg-blue-50"
+                        >
+                            <Plus className="w-4 h-4" /> Tambah Item
+                        </button>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

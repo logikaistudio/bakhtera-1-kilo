@@ -5,7 +5,7 @@ import {
     Scale, TrendingUp, Shield, Download, Calendar,
     RefreshCw, FileSpreadsheet, FileText, CheckCircle, AlertCircle
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import XLSX from 'xlsx-js-style';
 import Button from '../../components/Common/Button';
 
 const BalanceSheet = () => {

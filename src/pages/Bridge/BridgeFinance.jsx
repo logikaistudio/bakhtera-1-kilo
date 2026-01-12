@@ -122,7 +122,7 @@ const BridgeFinance = () => {
         <div class="info-row"><span class="label">Tanggal:</span><span class="value">${new Date(document.date).toLocaleDateString('id-ID')}</span></div>
         <div class="info-row"><span class="label">${isInvoice ? 'Customer' : 'Vendor'}:</span><span class="value">${document.customerName || document.customer || document.vendor || '-'}</span></div>
         <div class="info-row"><span class="label">Judul:</span><span class="value">${document.title}</span></div>
-        ${document.pengajuanNumber ? `<div class="info-row"><span class="label">Ref. Pendaftaran:</span><span class="value">${document.pengajuanNumber}</span></div>` : ''}
+        ${document.pengajuanNumber ? `<div class="info-row"><span class="label">Ref. Pengajuan:</span><span class="value">${document.pengajuanNumber}</span></div>` : ''}
     </div>
     
     ${document.items && document.items.length > 0 ? `
@@ -284,7 +284,7 @@ const BridgeFinance = () => {
                                 <thead className="bg-accent-blue">
                                     <tr>
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-white">No. Invoice</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-white">Ref. Pendaftaran</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-white">Ref. Pengajuan</th>
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-white">Customer</th>
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-white">Tanggal</th>
                                         <th className="px-4 py-3 text-left text-sm font-semibold text-white">Judul</th>
@@ -557,7 +557,7 @@ const BridgeFinance = () => {
                             </div>
                             <div><span className="font-semibold">Judul:</span> {selectedInvoice.title}</div>
                             {selectedInvoice.pengajuanNumber && (
-                                <div><span className="font-semibold">Ref. Pendaftaran:</span> <span className="text-accent-blue">{selectedInvoice.pengajuanNumber}</span></div>
+                                <div><span className="font-semibold">Ref. Pengajuan:</span> <span className="text-accent-blue">{selectedInvoice.pengajuanNumber}</span></div>
                             )}
                             <div className="border-t border-dark-border pt-4">
                                 <p className="font-semibold text-xl">Total: <span className="text-accent-green">Rp {formatCurrency(selectedInvoice.grandTotal)}</span></p>

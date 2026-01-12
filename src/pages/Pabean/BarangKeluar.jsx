@@ -10,11 +10,24 @@ const BarangKeluar = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedItem, setSelectedItem] = useState(null);
 
+    // Flatten transactions into items
+    const allItems = outboundTransactions.flatMap(t => {
+        if (t.items && t.items.length > 0) {
+            return t.items.map(item => ({
+                ...t,
+                ...item,
+                assetName: item.goodsType || item.assetName,
+                originalTransaction: t
+            }));
+        }
+        return [t];
+    });
+
     // Filter transactions
-    const filteredTransactions = outboundTransactions.filter(item =>
-        item.assetName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.customsDocNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.customsDocType?.toLowerCase().includes(searchTerm.toLowerCase())
+    const filteredTransactions = allItems.filter(item =>
+        (item.assetName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (item.customsDocNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (item.customsDocType || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     // Export to CSV handler
@@ -27,7 +40,10 @@ const BarangKeluar = () => {
             { key: 'date', header: 'Tanggal Keluar' },
             { key: 'destination', header: 'Tujuan' },
             { key: 'receiver', header: 'Penerima' },
-            { key: 'itemCode', header: 'Kode' },
+            { key: 'packageNumber', header: 'Kode Box' },
+            { key: 'itemCode', header: 'Kode Barang' },
+            { key: 'hsCode', header: 'Kode HS' },
+            { key: 'serialNumber', header: 'Nomor Urut' },
             { key: 'assetName', header: 'Nama Barang' },
             { key: 'quantity', header: 'Quantity' },
             { key: 'unit', header: 'Satuan' },
@@ -102,7 +118,10 @@ const BarangKeluar = () => {
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-silver">No. Bukti</th>
                                 <th className="px-4 py-3 text-center text-xs font-semibold text-silver">Tanggal Keluar</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-silver">Penerima</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">Kode</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">Kode Box</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">Kode Barang</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">Kode HS</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">No. Urut</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-silver">Nama Barang</th>
                                 <th className="px-4 py-3 text-center text-xs font-semibold text-silver">Quantity</th>
                                 <th className="px-4 py-3 text-center text-xs font-semibold text-silver">Satuan</th>
@@ -113,7 +132,7 @@ const BarangKeluar = () => {
                         <tbody>
                             {filteredTransactions.length === 0 ? (
                                 <tr>
-                                    <td colSpan="13" className="px-4 py-12 text-center">
+                                    <td colSpan="15" className="px-4 py-12 text-center">
                                         <Package className="w-16 h-16 mx-auto mb-4 opacity-30 text-silver-dark" />
                                         <p className="text-lg text-silver-dark">Belum ada data barang keluar</p>
                                         <p className="text-sm text-silver-dark mt-2">Transaksi outbound akan muncul di sini</p>
@@ -137,7 +156,10 @@ const BarangKeluar = () => {
                                             {new Date(item.date).toLocaleDateString('id-ID')}
                                         </td>
                                         <td className="px-4 py-3 text-sm text-silver-light">{item.destination || item.receiver || '-'}</td>
-                                        <td className="px-4 py-3 text-sm text-silver-light font-mono text-xs">{item.itemCode || item.hsCode || '-'}</td>
+                                        <td className="px-4 py-3 text-sm text-accent-purple font-medium">{item.packageNumber || '-'}</td>
+                                        <td className="px-4 py-3 text-sm text-silver-light font-mono text-xs">{item.itemCode || '-'}</td>
+                                        <td className="px-4 py-3 text-sm text-silver-light font-mono text-xs">{item.hsCode || '-'}</td>
+                                        <td className="px-4 py-3 text-sm text-silver-light font-mono text-xs">{item.serialNumber || '-'}</td>
                                         <td className="px-4 py-3 text-sm text-silver-light font-medium">{item.assetName}</td>
                                         <td className="px-4 py-3 text-sm text-center text-accent-orange font-semibold">{item.quantity}</td>
                                         <td className="px-4 py-3 text-sm text-center text-silver-light">{item.unit}</td>
@@ -179,11 +201,19 @@ const BarangKeluar = () => {
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="text-xs text-silver-dark">Kode Barang</label>
-                                    <p className="text-sm text-silver-light font-mono">{selectedItem.itemCode || selectedItem.hsCode || '-'}</p>
+                                    <p className="text-sm text-silver-light font-mono">{selectedItem.itemCode || '-'}</p>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-silver-dark">Kode HS</label>
+                                    <p className="text-sm text-silver-light font-mono">{selectedItem.hsCode || '-'}</p>
                                 </div>
                                 <div>
                                     <label className="text-xs text-silver-dark">Nama Barang</label>
                                     <p className="text-sm text-silver-light font-medium">{selectedItem.assetName}</p>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-silver-dark">Nomor Urut / Serial</label>
+                                    <p className="text-sm text-silver-light font-mono">{selectedItem.serialNumber || '-'}</p>
                                 </div>
                                 <div>
                                     <label className="text-xs text-silver-dark">Tanggal Keluar</label>
