@@ -289,7 +289,7 @@ const GoodsMovement = () => {
                                 <th className="px-4 py-3 text-center text-xs text-accent-blue">Stok Awal</th>
                                 <th className="px-4 py-3 text-center text-xs text-accent-orange">Mutasi</th>
                                 <th className="px-4 py-3 text-center text-xs text-accent-green">Remutasi</th>
-                                <th className="px-4 py-3 text-center text-xs text-accent-purple">Sisa</th>
+                                <th className="px-4 py-3 text-center text-xs text-accent-purple">Sisa Gudang</th>
                                 <th className="px-4 py-3 text-left text-xs text-silver">Lokasi</th>
                                 <th className="px-4 py-3 text-left text-xs text-silver">Keterangan</th>
                                 <th className="px-4 py-3 text-center text-xs text-silver">Aksi</th>
@@ -297,7 +297,7 @@ const GoodsMovement = () => {
                         </thead>
                         <tbody className="divide-y divide-dark-border">
                             {data.map((log, idx) => {
-                                const { totalRemutated, sisaDiLokasi } = getRemutationInfo(log);
+                                const { totalRemutated } = getRemutationInfo(log);
                                 return (
                                     <tr
                                         key={log.id}
@@ -324,8 +324,23 @@ const GoodsMovement = () => {
                                         <td className="px-4 py-3 text-center">
                                             <span className="text-sm text-accent-green">{totalRemutated}</span>
                                         </td>
+
                                         <td className="px-4 py-3 text-center">
-                                            <span className="text-sm text-accent-purple">{sisaDiLokasi}</span>
+                                            <span className="text-sm text-accent-purple" title="Sisa stok di gudang saat transaksi">
+                                                {(() => {
+                                                    const isOutbound = log.destination &&
+                                                        log.destination.toLowerCase() !== 'warehouse' &&
+                                                        log.destination.toLowerCase() !== 'gudang';
+
+                                                    if (isOutbound) {
+                                                        return Number(log.totalStock) - Number(log.mutatedQty);
+                                                    } else {
+                                                        return (log.remainingStock !== undefined && log.remainingStock !== null)
+                                                            ? log.remainingStock
+                                                            : '-';
+                                                    }
+                                                })()}
+                                            </span>
                                         </td>
                                         <td className="px-4 py-3 text-sm text-silver">
                                             {formatLocation(log.origin, log.destination)}
