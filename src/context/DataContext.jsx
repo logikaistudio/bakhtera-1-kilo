@@ -30,6 +30,7 @@ export const DataProvider = ({ children }) => {
     const [goodsMovements, setGoodsMovements] = useState([]);
     const [inspections, setInspections] = useState([]);
     const [itemMaster, setItemMaster] = useState([]);
+    const [picMaster, setPicMaster] = useState([]);
     const [inboundTransactions, setInboundTransactions] = useState([]);
     const [outboundTransactions, setOutboundTransactions] = useState([]);
     const [rejectTransactions, setRejectTransactions] = useState([]);
@@ -997,12 +998,43 @@ export const DataProvider = ({ children }) => {
 
     // Outbound Transaction operations (Bridge TPPB)
     const addOutboundTransaction = async (transaction) => {
-        // Check stock availability
-        const inventory = warehouseInventory.find(i => i.assetId === transaction.assetId);
-        if (!inventory || (inventory.currentStock || 0) < transaction.quantity) {
-            console.error('Insufficient stock:', inventory);
-            alert('Insufficient stock for outbound transaction');
-            // Just return or throw but better to alert
+        // Check stock availability from Database (Real-time)
+        let query = supabase
+            .from('freight_warehouse')
+            .select('quantity, asset_name, package_number')
+            .eq('item_code', transaction.assetId);
+
+        if (transaction.sourcePengajuanId) {
+            query = query.eq('pengajuan_id', transaction.sourcePengajuanId);
+        }
+
+        // Add package_number filter if provided for more specific stock check
+        if (transaction.packageNumber) {
+            query = query.eq('package_number', transaction.packageNumber);
+        }
+
+        const { data: dbInventory, error: inventoryError } = await query;
+
+        if (inventoryError) {
+            console.error('Error fetching inventory for stock check:', inventoryError);
+            alert(`Create Transaction Error: Gagal memeriksa stok untuk item ${transaction.assetName}`);
+            return;
+        }
+
+        // Sum available quantity across all matching records
+        const currentQty = dbInventory ? dbInventory.reduce((sum, item) => sum + (item.quantity || 0), 0) : 0;
+
+        console.log(`📊 Stock check for ${transaction.assetName} (${transaction.assetId}):`, {
+            found: dbInventory?.length || 0,
+            currentQty,
+            requested: transaction.quantity,
+            packageNumber: transaction.packageNumber,
+            sourcePengajuanId: transaction.sourcePengajuanId
+        });
+
+        if (currentQty < transaction.quantity) {
+            console.error('Insufficient stock:', dbInventory);
+            alert(`Stok tidak mencukupi untuk item: ${transaction.assetName}.\n\nStok Tersedia (DB): ${currentQty}\nDiminta: ${transaction.quantity}`);
             return;
         }
 
@@ -1604,6 +1636,19 @@ export const DataProvider = ({ children }) => {
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
         };
+
+        // Handle documents JSONB - ensuring we save separate fields or wrap in object if needed
+        // Current logic mostly sends array of files. We'll upgrade this to object if source info exists.
+        if (quotation.sourcePengajuanId) {
+            newQuotation.documents = {
+                files: Array.isArray(quotation.documents) ? quotation.documents : [],
+                sourcePengajuanId: quotation.sourcePengajuanId,
+                sourcePengajuanNumber: quotation.sourcePengajuanNumber,
+                // Keep backward compatibility if other fields exist
+                ...(typeof quotation.documents === 'object' && !Array.isArray(quotation.documents) ? quotation.documents : {})
+            };
+            console.log('🔗 Linking Outbound to Inbound:', quotation.sourcePengajuanNumber);
+        }
 
         console.log('🔵 Inserting quotation with data:', newQuotation);
 
@@ -2733,6 +2778,75 @@ export const DataProvider = ({ children }) => {
         setItemMaster(prev => prev.filter(item => item.id !== id));
     };
 
+    // ========== PIC MASTER CRUD OPERATIONS ==========
+    const addPIC = async (picData) => {
+        const newPIC = {
+            id: Date.now().toString(),
+            nik: picData.nik,
+            nama: picData.nama,
+            jabatan: picData.jabatan,
+            is_active: picData.isActive ?? true,
+            created_at: new Date().toISOString(),
+        };
+
+        const { error } = await supabase.from('freight_pic').insert([newPIC]);
+        if (error) {
+            console.error('Error adding PIC:', error);
+            alert('Failed to add PIC to database');
+            return;
+        }
+
+        const uiPIC = {
+            id: newPIC.id,
+            nik: newPIC.nik,
+            nama: newPIC.nama,
+            jabatan: newPIC.jabatan,
+            isActive: newPIC.is_active
+        };
+        setPicMaster(prev => [...prev, uiPIC]);
+        return uiPIC;
+    };
+
+    const updatePIC = async (id, updatedData) => {
+        const dbUpdate = {
+            nama: updatedData.nama,
+            jabatan: updatedData.jabatan,
+            is_active: updatedData.isActive ?? updatedData.is_active ?? true,
+            updated_at: new Date().toISOString(),
+        };
+
+        const { error } = await supabase
+            .from('freight_pic')
+            .update(dbUpdate)
+            .eq('id', id);
+
+        if (error) {
+            console.error('Error updating PIC:', error);
+            alert('Failed to update PIC');
+            return;
+        }
+
+        setPicMaster(prev => prev.map(pic =>
+            pic.id === id ? { ...pic, ...updatedData } : pic
+        ));
+    };
+
+    const deletePIC = async (id) => {
+        const { error } = await supabase
+            .from('freight_pic')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            console.error('Error deleting PIC:', error);
+            alert('Failed to delete PIC');
+            return;
+        }
+
+        setPicMaster(prev => prev.filter(pic => pic.id !== id));
+    };
+
+
     // Invoice CRUD operations
     const addInvoice = (invoiceData) => {
         console.log('💾 addInvoice called with data:', invoiceData);
@@ -2974,6 +3088,12 @@ export const DataProvider = ({ children }) => {
         addItemCode,
         updateItemCode,
         deleteItemCode,
+
+        // PIC Master operations
+        picMaster,
+        addPIC,
+        updatePIC,
+        deletePIC,
 
         // Helper functions
         getApprovedPengajuan,

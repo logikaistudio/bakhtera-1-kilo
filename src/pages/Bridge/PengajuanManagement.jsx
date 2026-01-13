@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, FileText, CheckCircle, Edit2, Download, Trash2, X, Warehouse, Package, ArrowRight } from 'lucide-react';
+import { Plus, FileText, CheckCircle, Edit2, Download, Trash2, X, Warehouse, Package, ArrowRight, Save } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import Button from '../../components/Common/Button';
 import PackageManager from '../../components/Common/PackageManager';
@@ -20,7 +20,8 @@ const PengajuanManagement = () => {
         addInboundTransaction,
         addOutboundTransaction, // Added for outbound approval
         vendors = [],
-        mutationLogs = [] // Added for calculating available stock
+        mutationLogs = [], // Added for calculating available stock
+        warehouseInventory = [] // Added for accurate stock checking
     } = useData();
     const navigate = useNavigate();
     const [showForm, setShowForm] = useState(false);
@@ -269,65 +270,89 @@ const PengajuanManagement = () => {
                 const isOutbound = pengajuanType === 'outbound';
 
                 console.log(`🔄 Triggering Automated ${isOutbound ? 'Outbound' : 'Inbound'} & Inventory Update (Sync Mode)...`);
-                const allItems = editModal.pengajuan.packages?.flatMap(pkg => pkg.items || []) || [];
 
-                if (allItems.length > 0) {
+                // Loop through packages to preserve package context
+                const packages = editModal.pengajuan.packages || [];
+
+                if (packages.length > 0) {
                     let processedCount = 0;
-                    for (const item of allItems) {
-                        if (isOutbound) {
-                            // OUTBOUND TRANSACTION
-                            const transaction = {
-                                assetId: item.itemCode || `ITEM-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-                                assetName: item.itemName,
-                                quantity: Number(item.quantity) || 0,
-                                unit: item.uom || 'pcs',
-                                value: (Number(item.price) || 0) * (Number(item.quantity) || 0),
 
-                                customsDocType: editModal.pengajuan.bcDocType,
-                                customsDocNumber: editFormData.bcDocumentNumber,
-                                customsDocDate: editFormData.bcDocumentDate,
+                    for (const pkg of packages) {
+                        const items = pkg.items || [];
 
-                                hsCode: item.hsCode || item.hs_code || '',
-                                currency: editModal.pengajuan.invoiceCurrency || 'IDR',
+                        for (const item of items) {
+                            if (isOutbound) {
+                                // OUTBOUND TRANSACTION
+                                const itemCode = item.itemCode || item.item_code;
+                                const itemName = item.itemName || item.item_name || item.name || 'Unknown Item';
 
-                                // Outbound specific fields
-                                destination: editModal.pengajuan.destination || 'Ekspor',
-                                receiver: editModal.pengajuan.customer || '',
-                                sourcePengajuanId: editModal.pengajuan.sourcePengajuanId,
-                                sourcePengajuanNumber: editModal.pengajuan.sourcePengajuanNumber,
+                                if (!itemCode) {
+                                    console.error('❌ Missing item code for item:', item);
+                                    alert(`Error: Kode barang tidak ditemukan untuk item "${itemName}". Transaksi dibatalkan.`);
+                                    return;
+                                }
 
-                                date: editFormData.manualDate || editFormData.bcDocumentDate || editModal.pengajuan.submissionDate || editModal.pengajuan.submission_date || editModal.pengajuan.date,
-                                notes: `Auto-generated from Outbound Quotation ${editModal.pengajuan.quotationNumber || editModal.pengajuan.quotation_number || editModal.pengajuan.id}`
-                            };
+                                const transaction = {
+                                    assetId: itemCode,
+                                    assetName: itemName,
+                                    quantity: Number(item.quantity) || 0,
+                                    unit: item.uom || 'pcs',
+                                    value: (Number(item.price) || 0) * (Number(item.quantity) || 0),
 
-                            await addOutboundTransaction(transaction);
-                        } else {
-                            // INBOUND TRANSACTION (existing logic)
-                            const transaction = {
-                                assetId: item.itemCode || `ITEM-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-                                assetName: item.itemName,
-                                quantity: Number(item.quantity) || 0,
-                                unit: item.uom || 'pcs',
-                                value: (Number(item.price) || 0) * (Number(item.quantity) || 0),
+                                    customsDocType: editModal.pengajuan.bcDocType,
+                                    customsDocNumber: editFormData.bcDocumentNumber,
+                                    customsDocDate: editFormData.bcDocumentDate,
 
-                                customsDocType: editModal.pengajuan.bcDocType,
-                                customsDocNumber: editFormData.bcDocumentNumber,
-                                customsDocDate: editFormData.bcDocumentDate,
+                                    hsCode: item.hsCode || item.hs_code || '',
+                                    currency: editModal.pengajuan.invoiceCurrency || 'IDR',
 
-                                hsCode: item.hsCode || item.hs_code || '',
-                                serialNumber: (processedCount + 1).toString(),
-                                currency: editModal.pengajuan.invoiceCurrency || 'IDR',
-                                receiptNumber: editModal.pengajuan.quotationNumber || editModal.pengajuan.quotation_number || editModal.pengajuan.id,
+                                    // Outbound specific fields
+                                    destination: editModal.pengajuan.destination || 'Ekspor',
+                                    receiver: editModal.pengajuan.customer || '',
+                                    sourcePengajuanId: editModal.pengajuan.sourcePengajuanId,
+                                    sourcePengajuanNumber: editModal.pengajuan.sourcePengajuanNumber,
 
-                                date: editFormData.manualDate || editFormData.bcDocumentDate || editModal.pengajuan.submissionDate || editModal.pengajuan.submission_date || editModal.pengajuan.date,
-                                sender: editModal.pengajuan.shipper,
-                                notes: `Auto-generated from Quotation ${editModal.pengajuan.quotationNumber || editModal.pengajuan.quotation_number || editModal.pengajuan.id}`
-                            };
+                                    // IMPORTANT: Include package number for proper stock validation
+                                    packageNumber: pkg.packageNumber || pkg.package_number,
 
-                            await addInboundTransaction(transaction);
+                                    date: editFormData.manualDate || editFormData.bcDocumentDate || editModal.pengajuan.submissionDate || editModal.pengajuan.submission_date || editModal.pengajuan.date,
+                                    notes: `Auto-generated from Outbound Quotation ${editModal.pengajuan.quotationNumber || editModal.pengajuan.quotation_number || editModal.pengajuan.id}`
+                                };
+
+                                await addOutboundTransaction(transaction);
+                            } else {
+                                // INBOUND TRANSACTION (existing logic)
+                                // Consistency fix: Use same robust property access
+                                const itemCodeIn = item.itemCode || item.item_code || `ITEM-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+                                const itemNameIn = item.itemName || item.item_name || item.name || 'Unknown Item';
+
+                                const transaction = {
+                                    assetId: itemCodeIn,
+                                    assetName: itemNameIn,
+                                    quantity: Number(item.quantity) || 0,
+                                    unit: item.uom || 'pcs',
+                                    value: (Number(item.price) || 0) * (Number(item.quantity) || 0),
+
+                                    customsDocType: editModal.pengajuan.bcDocType,
+                                    customsDocNumber: editFormData.bcDocumentNumber,
+                                    customsDocDate: editFormData.bcDocumentDate,
+
+                                    hsCode: item.hsCode || item.hs_code || '',
+                                    serialNumber: (processedCount + 1).toString(),
+                                    currency: editModal.pengajuan.invoiceCurrency || 'IDR',
+                                    receiptNumber: editModal.pengajuan.quotationNumber || editModal.pengajuan.quotation_number || editModal.pengajuan.id,
+
+                                    date: editFormData.manualDate || editFormData.bcDocumentDate || editModal.pengajuan.submissionDate || editModal.pengajuan.submission_date || editModal.pengajuan.date,
+                                    sender: editModal.pengajuan.shipper,
+                                    notes: `Auto-generated from Quotation ${editModal.pengajuan.quotationNumber || editModal.pengajuan.quotation_number || editModal.pengajuan.id}`
+                                };
+
+                                await addInboundTransaction(transaction);
+                            }
+                            processedCount++;
                         }
-                        processedCount++;
                     }
+
                     if (processedCount > 0) {
                         const targetModule = isOutbound ? 'Barang Keluar & Inventory' : 'Barang Masuk & Inventory';
                         alert(`✨ Otomatisasi: ${processedCount} Item berhasil disinkronkan ke ${targetModule}!`);
@@ -425,36 +450,31 @@ const PengajuanManagement = () => {
     // Calculate available stock for each item in a pengajuan
     const calculateAvailableStock = (pengajuan) => {
         const pengajuanId = pengajuan.id;
-        const pengajuanNumber = pengajuan.quotationNumber || pengajuan.quotation_number;
+        // Use warehouseInventory as the source of truth for current stock
+        // This handles cases where items were moved/shipped via Outbound or Mutation
 
-        // Get all mutations that moved items OUT of warehouse (to Pameran or Keluar TPB)
-        const outboundMutations = mutationLogs.filter(log =>
-            (log.pengajuanId === pengajuanId || log.pengajuanNumber === pengajuanNumber) &&
-            log.origin === 'Gudang' && // Must be from warehouse
-            (log.destination === 'Pameran' || log.destination === 'Keluar TPB') // Moved out
-        );
-
-        // Create map of mutated quantities per item
-        const mutatedQtyMap = {};
-        outboundMutations.forEach(log => {
-            const key = `${log.packageNumber}-${log.itemCode}`;
-            mutatedQtyMap[key] = (mutatedQtyMap[key] || 0) + (log.mutatedQty || 0);
-        });
-
-        // Calculate available stock for each package/item
         const packagesWithStock = (pengajuan.packages || []).map(pkg => ({
             ...pkg,
             items: (pkg.items || []).map(item => {
-                const key = `${pkg.packageNumber}-${item.itemCode}`;
-                const mutated = mutatedQtyMap[key] || 0;
-                const originalQty = item.quantity || 0;
-                const availableQty = Math.max(0, originalQty - mutated);
+                const itemCode = item.itemCode || item.item_code;
+
+                // Find matching inventory record
+                // Matches based on Pengajuan ID (FIFO/Specific Ident) and Package/Item Code
+                // Note: freight_warehouse should have these fields populated from inbound
+                const inventoryItem = warehouseInventory.find(inv =>
+                    (inv.pengajuanId === pengajuanId || inv.pengajuan_id === pengajuanId) &&
+                    (inv.itemCode === itemCode || inv.item_code === itemCode) &&
+                    (inv.packageNumber === pkg.packageNumber || inv.package_number === pkg.packageNumber)
+                );
+
+                const currentStock = inventoryItem ? (inventoryItem.currentStock ?? inventoryItem.quantity ?? 0) : 0;
+
                 return {
                     ...item,
-                    originalQty,
-                    mutatedQty: mutated,
-                    availableQty,
-                    outboundQty: availableQty // Default to max available
+                    originalQty: item.quantity || 0,
+                    mutatedQty: 0, // Not strictly needed for logic, but kept for structure
+                    availableQty: currentStock,
+                    outboundQty: currentStock // Default to max available
                 };
             })
         }));
@@ -591,12 +611,25 @@ const PengajuanManagement = () => {
             owner: inboundPengajuan.customer || '',
             origin: 'Gudang TPPB',
             destination: '',
+            itemDate: '',
             packages: packagesWithAvailable,
             documents: [],
             notes: `Pengajuan keluar dari ${inboundPengajuan.quotationNumber || inboundPengajuan.quotation_number}`,
+            blNumber: '',
+            blDate: '',
+            invoiceNumber: '',
             invoiceValue: '',
             invoiceCurrency: 'IDR',
             exchangeRate: '',
+            exchangeRateDate: '',
+            documentStatus: 'pengajuan',
+            bcDocumentNumber: '',
+            bcDocumentDate: '',
+            bcSupportingDocuments: [],
+            rejectionReason: '',
+            rejectionDate: '',
+            pic: '',
+            customsStatus: 'pending',
             sourcePengajuanId: inboundPengajuan.id,
             sourcePengajuanNumber: inboundPengajuan.quotationNumber || inboundPengajuan.quotation_number
         });
@@ -1563,7 +1596,7 @@ const PengajuanManagement = () => {
             {/* Item Editor Modal */}
             {showItemEditor && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-                    <div className="bg-white rounded-2xl max-w-6xl w-full max-h-[85vh] overflow-hidden shadow-2xl">
+                    <div className="bg-white rounded-2xl max-w-6xl w-full max-h-[85vh] overflow-hidden shadow-2xl flex flex-col">
                         <div className="flex justify-between items-center p-6 border-b border-gray-200">
                             <div>
                                 <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
@@ -1578,7 +1611,7 @@ const PengajuanManagement = () => {
                                 <X className="w-6 h-6" />
                             </button>
                         </div>
-                        <div className="p-6 overflow-y-auto max-h-[70vh] bg-gray-50 space-y-4">
+                        <div className="p-6 overflow-y-auto flex-1 bg-gray-50 space-y-4">
                             {editablePackages.map((pkg, pkgIndex) => {
                                 const activeItems = pkg.items.filter(item => (item.quantity || 0) > 0);
                                 if (activeItems.length === 0) return null;
@@ -1657,7 +1690,7 @@ const PengajuanManagement = () => {
                         </div>
                         <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-white">
                             <Button variant="secondary" onClick={() => setShowItemEditor(false)}>Batal</Button>
-                            <Button variant="primary" icon={CheckCircle} onClick={handleConfirmEditedItems}>Konfirmasi Pilihan</Button>
+                            <Button variant="primary" icon={Save} onClick={handleConfirmEditedItems}>Simpan</Button>
                         </div>
                     </div>
                 </div>
