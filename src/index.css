@@ -277,7 +277,10 @@ textarea::placeholder {
 }
 
 /* Main Content Light Theme - White Snow Background */
+[data-theme="light"] body,
+[data-theme="light"] #root,
 [data-theme="light"] main {
+  background: #FFFFFF !important;
   background-color: #FFFFFF !important;
 }
 
@@ -444,7 +447,7 @@ textarea::placeholder {
 
 [data-theme="light"] .glass-card.border-accent-green {
   border-left: 4px solid #059669 !important;
-  background: linear-gradient(135deg, #FFFFFF 0%, #ECFDF5 100%) !important;
+  background: linear-gradient(135deg, #FFFFFF 0%, #F5F3FF 100%) !important;
 }
 
 [data-theme="light"] .glass-card.border-accent-purple {

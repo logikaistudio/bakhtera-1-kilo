@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Warehouse, Search, Download, X, Edit2, Save, XCircle, ArrowRightLeft, Upload, FileText, Trash2, ExternalLink, AlertCircle, CheckCircle } from 'lucide-react';
+import { Warehouse, Search, Download, X, Edit2, Save, XCircle, ArrowRightLeft, Upload, FileText, Trash2, ExternalLink, AlertCircle, CheckCircle, Box, MapPin } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useData } from '../../context/DataContext';
 import Button from '../../components/Common/Button';
@@ -116,12 +116,132 @@ const WarehouseInventory = () => {
 
     const handleSaveEdit = async () => {
         try {
-            await updateQuotation(selectedPengajuan.id, editData);
+            // Sanitize: Remove temporary mutation fields before saving
+            const cleanedData = {
+                ...editData,
+                packages: (editData.packages || []).map(pkg => ({
+                    ...pkg,
+                    items: (pkg.items || []).map(item => {
+                        const { mutationInQty, mutationOutQty, mutationDate, ...cleanItem } = item;
+                        return cleanItem;
+                    })
+                }))
+            };
+
+            // 1. Save quotation data (without mutation fields)
+            await updateQuotation(selectedPengajuan.id, cleanedData);
+            console.log('✅ Data inventaris berhasil disimpan');
+
+            // 2. Process mutations if any
+            const mutations = [];
+            const qNumber = editData.quotationNumber || editData.quotation_number;
+            const qId = selectedPengajuan.id;
+            const bcNum = editData.bcDocumentNumber || editData.bc_document_number;
+            const senderName = (typeof editData?.shipper === 'string' ? editData.shipper : null) ||
+                editData?.shipper?.name || editData?.shipper_name ||
+                (typeof editData?.customer === 'string' ? editData.customer : null) ||
+                editData?.customer?.name || editData?.customer_name ||
+                editData?.companyName || editData?.company_name || '-';
+
+            (editData.packages || []).forEach((pkg, pkgIdx) => {
+                (pkg.items || []).forEach((item, itemIdx) => {
+                    const outQty = item.mutationOutQty || 0;
+                    const inQty = item.mutationInQty || 0;
+
+                    // Get item status for validation
+                    const itemName = item.name || item.itemName;
+                    const itemStatus = getIndividualItemStatus(item.itemCode, pkg.packageNumber, itemName);
+                    const inWarehouse = (item.quantity || 0) - itemStatus.atPameran;
+
+                    // Process outbound mutation (Gudang -> Pameran/Outbound)
+                    if (outQty > 0 && outQty <= inWarehouse) {
+                        const destinationLocation = editData.mutationDestination || 'Pameran';
+                        mutations.push({
+                            pengajuanId: qId,
+                            pengajuanNumber: qNumber,
+                            bcDocumentNumber: bcNum,
+                            packageNumber: pkg.packageNumber,
+                            itemCode: item.itemCode,
+                            itemName: itemName,
+                            hsCode: item.hsCode,
+                            sender: senderName,
+                            totalStock: item.quantity,
+                            mutatedQty: outQty,
+                            remainingStock: inWarehouse - outQty,
+                            origin: 'warehouse',
+                            destination: destinationLocation,
+                            condition: item.condition || 'Baik',
+                            date: editData.mutationDate || new Date().toISOString().split('T')[0],
+                            time: editData.mutationTime || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+                            pic: editData.mutationPic || '',
+                            remarks: item.notes || `Mutasi ke ${destinationLocation}`,
+                            _type: 'outbound'
+                        });
+                    }
+
+                    // Process inbound mutation (Pameran -> Gudang)
+                    if (inQty > 0 && inQty <= itemStatus.atPameran) {
+                        mutations.push({
+                            pengajuanId: qId,
+                            pengajuanNumber: qNumber,
+                            bcDocumentNumber: bcNum,
+                            packageNumber: pkg.packageNumber,
+                            itemCode: item.itemCode,
+                            itemName: itemName,
+                            hsCode: item.hsCode,
+                            sender: senderName,
+                            totalStock: item.quantity,
+                            mutatedQty: inQty,
+                            remainingStock: inWarehouse + inQty,
+                            origin: 'Pameran',
+                            destination: 'warehouse',
+                            condition: item.condition || 'Baik',
+                            date: editData.mutationDate || new Date().toISOString().split('T')[0],
+                            time: editData.mutationTime || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+                            pic: editData.mutationPic || '',
+                            remarks: item.notes || 'Kembali ke Gudang',
+                            _type: 'inbound'
+                        });
+                    }
+
+                    // Reset mutation fields after processing
+                    item.mutationOutQty = 0;
+                    item.mutationInQty = 0;
+                });
+            });
+
+            // Save mutations
+            if (addMutationLog && mutations.length > 0) {
+                console.log('📊 Processing', mutations.length, 'mutation(s)...');
+                for (const mutation of mutations) {
+                    console.log('💾 Saving mutation:', mutation.itemName, mutation._type, 'qty:', mutation.mutatedQty);
+                    await addMutationLog(mutation);
+
+                    // Update inventory stock
+                    const qtyChange = mutation._type === 'outbound' ? -Math.abs(mutation.mutatedQty) : Math.abs(mutation.mutatedQty);
+                    if (updateInventoryStock) {
+                        await updateInventoryStock(
+                            mutation.itemCode,
+                            mutation.itemName,
+                            qtyChange,
+                            'pcs',
+                            mutation._type === 'outbound' ? 'Mutation Out' : 'Mutation In',
+                            mutation.pengajuanNumber,
+                            0
+                        );
+                        console.log('📉 Inventory updated:', mutation.itemCode, qtyChange);
+                    }
+                }
+                alert(`Data berhasil disimpan! ${mutations.length} mutasi diproses.`);
+            } else {
+                alert('Data berhasil disimpan!');
+            }
+
             setSelectedPengajuan(editData);
             setIsEditing(false);
-            console.log('✅ Data inventaris berhasil disimpan');
         } catch (error) {
             console.error('❌ Gagal menyimpan data:', error);
+            alert('Gagal menyimpan data: ' + error.message);
         }
     };
 
@@ -702,12 +822,13 @@ const WarehouseInventory = () => {
         const pengajuanNumber = selectedPengajuan.quotationNumber || selectedPengajuan.quotation_number;
         const pengajuanId = selectedPengajuan.id;
 
+
+
         // Find all outbound mutations for this specific item
         const outboundMutations = mutationLogs.filter(m =>
             (m.pengajuanId === pengajuanId || normalize(m.pengajuanNumber) === normalize(pengajuanNumber)) &&
             normalize(m.itemCode) === normalize(itemCode) &&
-            normalize(m.packageNumber) === normalize(packageNumber) &&
-            (itemName ? (normalize(m.itemName) === normalize(itemName) || normalize(m.assetName) === normalize(itemName)) : true) &&
+            (packageNumber ? normalize(m.packageNumber) === normalize(packageNumber) : true) &&
             (m.destination || '').toLowerCase() !== 'warehouse' &&
             (m.destination || '').toLowerCase() !== 'gudang'
         );
@@ -716,8 +837,7 @@ const WarehouseInventory = () => {
         const returnMutations = mutationLogs.filter(m =>
             (m.pengajuanId === pengajuanId || normalize(m.pengajuanNumber) === normalize(pengajuanNumber)) &&
             normalize(m.itemCode) === normalize(itemCode) &&
-            normalize(m.packageNumber) === normalize(packageNumber) &&
-            (itemName ? (normalize(m.itemName) === normalize(itemName) || normalize(m.assetName) === normalize(itemName)) : true) &&
+            (packageNumber ? normalize(m.packageNumber) === normalize(packageNumber) : true) &&
             ((m.destination || '').toLowerCase() === 'warehouse' || (m.destination || '').toLowerCase() === 'gudang')
         );
 
@@ -944,11 +1064,10 @@ const WarehouseInventory = () => {
                                             {/* Only show mutation buttons for inbound pengajuan */}
                                             {selectedPengajuan.type !== 'outbound' && (
                                                 <>
-                                                    <Button onClick={handleStartMutation} variant="danger" icon={ArrowRightLeft} className="text-sm">Mutasi</Button>
                                                     <Button onClick={handleDeleteAllMutations} variant="secondary" icon={Trash2} className="text-sm text-red-600 hover:text-red-800">Hapus Mutasi</Button>
                                                 </>
                                             )}
-                                            <Button onClick={handleStartEdit} variant="secondary" icon={Edit2} className="text-sm">Edit</Button>
+                                            <Button onClick={handleStartEdit} variant="secondary" icon={Edit2} className="text-sm">Kelola</Button>
                                         </>
                                     ) : (
                                         <>
@@ -1007,13 +1126,50 @@ const WarehouseInventory = () => {
                                 </div>
                             </div>
 
+                            {/* Mutation Info Section - Only in edit mode for inbound */}
+                            {isEditing && selectedPengajuan.type !== 'outbound' && (
+                                <div className="px-4 py-3 bg-orange-50 border-b border-orange-200">
+                                    <h3 className="text-sm font-bold text-orange-700 mb-2">🔄 Info Mutasi</h3>
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <div>
+                                            <label className="text-xs text-gray-600">Tgl Mutasi</label>
+                                            <input
+                                                type="date"
+                                                value={editData.mutationDate || new Date().toISOString().split('T')[0]}
+                                                onChange={(e) => setEditData({ ...editData, mutationDate: e.target.value })}
+                                                className="w-full px-2 py-1 text-xs border border-orange-300 rounded"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs text-gray-600">Jam Mutasi</label>
+                                            <input
+                                                type="time"
+                                                value={editData.mutationTime || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                                                onChange={(e) => setEditData({ ...editData, mutationTime: e.target.value })}
+                                                className="w-full px-2 py-1 text-xs border border-orange-300 rounded"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs text-gray-600">PIC Mutasi</label>
+                                            <input
+                                                type="text"
+                                                value={editData.mutationPic || ''}
+                                                onChange={(e) => setEditData({ ...editData, mutationPic: e.target.value })}
+                                                placeholder="Nama PIC"
+                                                className="w-full px-2 py-1 text-xs border border-orange-300 rounded"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Detail Item Section Title */}
-                            <div className="px-4 pt-8 pb-3">
+                            <div className="px-4 pt-4 pb-3">
                                 <h3 className="text-base font-bold text-gray-800 dark:text-silver-light">📝 Detail Item</h3>
                             </div>
 
                             {/* Detail Items */}
-                            <div className="p-4 overflow-y-auto max-h-[calc(90vh-280px)] space-y-4">
+                            <div className={`p-4 overflow-y-auto space-y-4 ${isEditing && selectedPengajuan.type !== 'outbound' ? 'max-h-[calc(90vh-360px)]' : 'max-h-[calc(90vh-280px)]'}`}>
                                 {(displayData.packages || []).map((pkg, pkgIndex) => (
                                     <div key={pkgIndex} className="border border-gray-200 dark:border-dark-border rounded-lg overflow-hidden">
                                         <div className="bg-gray-100 dark:bg-dark-surface px-3 py-2 border-b border-gray-200 dark:border-dark-border">
@@ -1023,19 +1179,26 @@ const WarehouseInventory = () => {
                                             <table className="w-full">
                                                 <thead className={selectedPengajuan.type === 'outbound' ? 'bg-accent-purple' : 'bg-accent-blue'}>
                                                     <tr>
-                                                        {selectedPengajuan.type !== 'outbound' && (
-                                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white w-16">Checkout</th>
+                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-8" style={{ fontWeight: 'bold' }}>No.</th>
+                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-20" style={{ fontWeight: 'bold' }}>Kode Brg</th>
+                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-16" style={{ fontWeight: 'bold' }}>HS</th>
+                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white" style={{ fontWeight: 'bold' }}>Item</th>
+                                                        <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white w-12" style={{ fontWeight: 'bold' }}>Awal</th>
+                                                        <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white w-12" style={{ fontWeight: 'bold' }}>Sat</th>
+                                                        {isEditing && selectedPengajuan.type !== 'outbound' && (
+                                                            <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white bg-green-700 w-16" style={{ fontWeight: 'bold' }}>Stok</th>
                                                         )}
-                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-8">No. Urut</th>
-                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-20">Kode Barang</th>
-                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-16">HS Code</th>
-                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white">Item</th>
-                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white w-14">Jumlah</th>
-                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white w-14">Satuan</th>
-                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white w-32">Status</th>
-                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-20">Lokasi</th>
-                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-16">Kondisi</th>
-                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-full">Keterangan</th>
+                                                        <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white w-24" style={{ fontWeight: 'bold' }}>Status</th>
+                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-16" style={{ fontWeight: 'bold' }}>Lokasi</th>
+                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-14" style={{ fontWeight: 'bold' }}>Kondisi</th>
+                                                        {/* Mutation columns - only in edit mode for inbound */}
+                                                        {isEditing && selectedPengajuan.type !== 'outbound' && (
+                                                            <>
+                                                                <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white bg-red-700 w-16" style={{ fontWeight: 'bold' }}>Keluar</th>
+                                                                <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white bg-blue-700 w-16" style={{ fontWeight: 'bold' }}>Kembali</th>
+                                                            </>
+                                                        )}
+                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-full" style={{ fontWeight: 'bold' }}>Keterangan</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-gray-200 dark:divide-dark-border">
@@ -1047,6 +1210,14 @@ const WarehouseInventory = () => {
                                                         const isCheckedOut = item.checkedOut || item.checked_out;
                                                         const checkoutBcNumber = item.checkoutBcNumber || item.checkout_bc_number;
 
+                                                        // Logic values for mutations
+                                                        const maxKeluar = inWarehouse || 0;
+                                                        const maxKembali = itemStatus.atPameran || 0;
+                                                        // Sanitize: Cap mutation values by max allowed to prevent ghost values
+                                                        const keluarQty = Math.min(item.mutationOutQty || 0, maxKeluar);
+                                                        const kembaliQty = Math.min(item.mutationInQty || 0, maxKembali);
+                                                        const projectedSisa = inWarehouse - keluarQty + kembaliQty;
+
                                                         // Determine row styling - brown for checked out items
                                                         const rowClass = isCheckedOut
                                                             ? 'bg-amber-100 dark:bg-amber-900/20 hover:bg-amber-200 dark:hover:bg-amber-900/30'
@@ -1056,87 +1227,108 @@ const WarehouseInventory = () => {
 
                                                         return (
                                                             <tr key={itemIdx} className={rowClass}>
-                                                                {/* Checkout column - only for inbound */}
-                                                                {selectedPengajuan.type !== 'outbound' && (
-                                                                    <td className="px-2 py-0.5 text-center">
-                                                                        {isEditing ? (
-                                                                            <input
-                                                                                type="checkbox"
-                                                                                checked={item.checkedOut || false}
-                                                                                onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'checkedOut', e.target.checked)}
-                                                                                className="w-4 h-4 rounded border-gray-300 text-accent-blue focus:ring-accent-blue cursor-pointer"
-                                                                            />
-                                                                        ) : isCheckedOut ? (
-                                                                            <CheckCircle className="w-4 h-4 text-amber-600 mx-auto" />
-                                                                        ) : (
-                                                                            <span className="text-gray-300">○</span>
-                                                                        )}
+                                                                <td className={`px-1 py-0 text-xs ${isCheckedOut ? 'text-amber-800 dark:text-amber-400' : 'text-gray-700 dark:text-silver'}`}>{itemIdx + 1}</td>
+                                                                <td className="px-1 py-0 text-xs text-gray-700 dark:text-silver">{(item.itemCode || '-')}</td>
+                                                                <td className="px-1 py-0 text-xs text-gray-700 dark:text-silver">{(item.hsCode || '-')}</td>
+                                                                <td className="px-1 py-0 text-xs text-gray-700 dark:text-silver max-w-[250px] break-words">{(item.name || item.itemName || '-')}</td>
+                                                                <td className="px-1 py-0 text-xs text-gray-700 dark:text-silver text-center">
+                                                                    <span className="font-semibold">{item.quantity || 0}</span>
+                                                                </td>
+                                                                <td className="px-1 py-0 text-xs text-gray-700 dark:text-silver text-center">{(item.uom || 'pcs')}</td>
+                                                                {isEditing && selectedPengajuan.type !== 'outbound' && (
+                                                                    <td className="px-1 py-0 text-xs text-center bg-green-50 font-bold text-green-700">
+                                                                        {projectedSisa}
                                                                     </td>
                                                                 )}
-                                                                <td className={`px-2 py-0.5 text-xs ${isCheckedOut ? 'text-amber-800 dark:text-amber-400' : 'text-gray-700 dark:text-silver'}`}>{itemIdx + 1}</td>
-                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{isEditing ? <input type="text" value={item.itemCode || ''} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'itemCode', e.target.value)} className="w-full px-1 py-0.5 text-xs border rounded" /> : (item.itemCode || '-')}</td>
-                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{isEditing ? <input type="text" value={item.hsCode || ''} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'hsCode', e.target.value)} className="w-full px-1 py-0.5 text-xs border rounded" /> : (item.hsCode || '-')}</td>
-                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{isEditing ? <input type="text" value={item.name || ''} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'name', e.target.value)} className="w-full px-1 py-0.5 text-xs border rounded" /> : (item.name || item.itemName || '-')}</td>
-                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center">{isEditing ? <input type="number" value={item.quantity || 0} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'quantity', parseInt(e.target.value) || 0)} className="w-14 px-1 py-0.5 text-xs border rounded text-center" /> : (item.quantity || 0)}</td>
-                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center">{isEditing ? <input type="text" value={item.uom || 'pcs'} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'uom', e.target.value)} className="w-12 px-1 py-0.5 text-xs border rounded text-center" /> : (item.uom || 'pcs')}</td>
-                                                                <td className="px-2 py-0.5 text-xs text-center">
+                                                                <td className="px-1 py-0 text-xs text-center">
                                                                     <div className="flex items-center justify-center gap-1">
-                                                                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                                                                            🏢 {inWarehouse}
-                                                                        </span>
+                                                                        <div className="flex items-center gap-0.5 bg-green-100 dark:bg-green-900/30 px-1 py-0 rounded border border-green-200 dark:border-green-800">
+                                                                            <Box className="w-2.5 h-2.5 text-green-600 dark:text-green-400" />
+                                                                            <span className="text-[9px] font-bold text-green-700 dark:text-green-400">{inWarehouse}</span>
+                                                                        </div>
                                                                         {itemStatus.atPameran > 0 && (
-                                                                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
-                                                                                📍 {itemStatus.atPameran}
-                                                                            </span>
+                                                                            <div className="flex items-center gap-0.5 bg-orange-100 dark:bg-orange-900/30 px-1 py-0 rounded border border-orange-200 dark:border-orange-800">
+                                                                                <MapPin className="w-2.5 h-2.5 text-orange-600 dark:text-orange-400" />
+                                                                                <span className="text-[9px] font-bold text-orange-700 dark:text-orange-400">{itemStatus.atPameran}</span>
+                                                                            </div>
                                                                         )}
                                                                     </div>
                                                                 </td>
-                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{isEditing ? <select value={item.location?.room || 'warehouse'} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'location', e.target.value)} className="px-1 py-0.5 text-xs border rounded"><option value="warehouse">Warehouse</option><option value="pameran">Pameran</option></select> : (item.location?.room || 'warehouse')}</td>
-                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{isEditing ? <select value={item.condition || 'Baik'} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'condition', e.target.value)} className="px-1 py-0.5 text-xs border rounded"><option value="Baik">Baik</option><option value="Rusak">Rusak</option><option value="Cacat">Cacat</option></select> : (item.condition || 'Baik')}</td>
-                                                                <td className={`px-2 py-0.5 text-xs ${isCheckedOut ? 'text-amber-800 dark:text-amber-400' : 'text-gray-700 dark:text-silver'}`}>
+                                                                <td className="px-1 py-0 text-xs text-gray-700 dark:text-silver">{isEditing ? <select value={item.location?.room || 'warehouse'} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'location', e.target.value)} className="px-1 py-0 text-xs border rounded"><option value="warehouse">Warehouse</option><option value="pameran">Pameran</option><option value="outbound">Outbound</option></select> : (item.location?.room || 'warehouse')}</td>
+                                                                <td className="px-1 py-0 text-xs text-gray-700 dark:text-silver">{isEditing ? <select value={item.condition || 'Baik'} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'condition', e.target.value)} className="px-1 py-0 text-xs border rounded"><option value="Baik">Baik</option><option value="Rusak">Rusak</option><option value="Cacat">Cacat</option></select> : (item.condition || 'Baik')}</td>
+                                                                {/* Mutation columns - only in edit mode for inbound */}
+                                                                {isEditing && selectedPengajuan.type !== 'outbound' && (
+                                                                    <>
+                                                                        {/* Keluar Gudang */}
+                                                                        <td className="px-1 py-0 text-xs text-center bg-red-50">
+                                                                            <select
+                                                                                value={keluarQty}
+                                                                                onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'mutationOutQty', parseInt(e.target.value) || 0)}
+                                                                                className={`w-12 px-1 py-0 text-xs border rounded text-center ${maxKeluar > 0 ? 'border-red-300 bg-white' : 'border-gray-300 bg-gray-200'}`}
+                                                                                disabled={maxKeluar === 0}
+                                                                            >
+                                                                                {[...Array(maxKeluar + 1).keys()].map(n => (
+                                                                                    <option key={n} value={n}>{n}</option>
+                                                                                ))}
+                                                                            </select>
+                                                                        </td>
+                                                                        {/* Kembali Gudang */}
+                                                                        <td className="px-1 py-0 text-xs text-center bg-blue-50">
+                                                                            <select
+                                                                                value={kembaliQty}
+                                                                                onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'mutationInQty', parseInt(e.target.value) || 0)}
+                                                                                className={`w-12 px-1 py-0 text-xs border rounded text-center ${maxKembali > 0 ? 'border-blue-300 bg-white' : 'border-gray-300 bg-gray-200'}`}
+                                                                                disabled={maxKembali === 0}
+                                                                            >
+                                                                                {[...Array(maxKembali + 1).keys()].map(n => (
+                                                                                    <option key={n} value={n}>{n}</option>
+                                                                                ))}
+                                                                            </select>
+                                                                        </td>
+                                                                    </>
+                                                                )}
+                                                                <td className={`px-1 py-0 text-xs ${isCheckedOut ? 'text-amber-800 dark:text-amber-400' : 'text-gray-700 dark:text-silver'}`}>
                                                                     {isEditing ? (
-                                                                        <div className="flex flex-col gap-1">
-                                                                            <input type="text" value={item.notes || ''} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'notes', e.target.value)} className="w-full px-1 py-0.5 text-xs border rounded" placeholder="Catatan..." />
+                                                                        <div className="flex items-center gap-1">
+                                                                            <input type="text" value={item.notes || ''} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'notes', e.target.value)} className="w-24 px-1 py-0 text-xs border rounded" placeholder="Catatan..." />
                                                                             {item.checkedOut && (
                                                                                 <input
                                                                                     type="text"
                                                                                     value={item.checkoutBcNumber || ''}
                                                                                     onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'checkoutBcNumber', e.target.value)}
-                                                                                    className="w-full px-1 py-0.5 text-xs border border-amber-400 rounded bg-amber-50"
-                                                                                    placeholder="No. Dokumen Pabean Keluar"
+                                                                                    className="w-20 px-1 py-0 text-xs border border-amber-400 rounded bg-amber-50"
+                                                                                    placeholder="No. BC"
                                                                                 />
                                                                             )}
                                                                         </div>
                                                                     ) : isCheckedOut ? (
-                                                                        <div className="flex flex-col gap-0.5">
-                                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-200 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-                                                                                <CheckCircle className="w-3 h-3" />
-                                                                                SUDAH KELUAR
+                                                                        <div className="flex items-center gap-1 flex-wrap">
+                                                                            <span className="inline-flex items-center gap-0.5 px-1 py-0 rounded text-[9px] font-medium bg-amber-200 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 whitespace-nowrap">
+                                                                                <CheckCircle className="w-2.5 h-2.5" />
+                                                                                KELUAR
                                                                             </span>
                                                                             {checkoutBcNumber && (
-                                                                                <span className="text-[10px] text-amber-700 dark:text-amber-400">
+                                                                                <span className="text-[9px] text-amber-700 dark:text-amber-400 whitespace-nowrap">
                                                                                     BC: {checkoutBcNumber}
                                                                                 </span>
                                                                             )}
-                                                                            {item.notes && <span className="text-[10px]">{item.notes}</span>}
+                                                                            {item.notes && <span className="text-[9px]">{item.notes}</span>}
                                                                         </div>
                                                                     ) : mutationInfo ? (
-                                                                        <div className="flex flex-col gap-0.5">
-                                                                            <div className="flex items-center gap-1">
-                                                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
-                                                                                    <AlertCircle className="w-3 h-3" />
-                                                                                    MUTASI
-                                                                                </span>
-                                                                            </div>
-                                                                            <span className="text-[10px] text-orange-600 dark:text-orange-400">
-                                                                                {mutationInfo.totalMutated} unit ke {mutationInfo.destination} ({formatDate(mutationInfo.date)})
+                                                                        <div className="flex items-center gap-1 flex-wrap">
+                                                                            <span className="inline-flex items-center gap-0.5 px-1 py-0 rounded text-[9px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 whitespace-nowrap">
+                                                                                <AlertCircle className="w-2.5 h-2.5" />
+                                                                                MUTASI
+                                                                            </span>
+                                                                            <span className="text-[9px] text-orange-600 dark:text-orange-400 whitespace-nowrap">
+                                                                                {mutationInfo.totalMutated}u → {mutationInfo.destination}
                                                                             </span>
                                                                             <button
                                                                                 onClick={handleGoToPergerakan}
-                                                                                className="inline-flex items-center gap-1 text-[10px] text-blue-600 hover:text-blue-800 hover:underline"
+                                                                                className="inline-flex items-center gap-0.5 text-[9px] text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap"
                                                                             >
-                                                                                <ExternalLink className="w-3 h-3" />
-                                                                                Lihat di Pergerakan Barang
+                                                                                <ExternalLink className="w-2.5 h-2.5" />
+                                                                                Detail
                                                                             </button>
                                                                         </div>
                                                                     ) : (item.notes || '-')}
@@ -1151,7 +1343,7 @@ const WarehouseInventory = () => {
                                 ))}
                             </div>
                         </div>
-                    </div>
+                    </div >
                 )
             }
 
@@ -1218,7 +1410,7 @@ const WarehouseInventory = () => {
                                                     >
                                                         <option value="Gudang">Gudang</option>
                                                         <option value="Pameran">Pameran</option>
-                                                        <option value="Keluar TPB">Keluar TPB</option>
+                                                        <option value="Outbound">Outbound</option>
                                                     </select>
                                                 </td>
                                             </tr>
@@ -1247,17 +1439,31 @@ const WarehouseInventory = () => {
                                                         <th className="px-2 py-1 text-left text-xs font-semibold text-white w-20">Lokasi</th>
                                                         <th className="px-2 py-1 text-left text-xs font-semibold text-white w-16">Kondisi</th>
                                                         {/* Mutation columns */}
-                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-24">Jml Mutasi</th>
-                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-24">Jml Remutasi</th>
-                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-20">Total Saat Ini</th>
+                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-24">Keluar Gudang</th>
+                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-blue-700 w-24">Kembali Gudang</th>
+                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-20">Sisa Gudang</th>
                                                         <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-20">Kondisi</th>
                                                         <th className="px-2 py-1 text-left text-xs font-semibold text-white w-full">Keterangan</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-gray-200 dark:divide-dark-border">
                                                     {(pkg.items || []).map((item, itemIdx) => {
-                                                        // Logic baru menggunakan inWarehouse & atPameran
+                                                        // Logic berdasarkan lokasi mutasi yang dipilih
                                                         const isFullyMutated = item.inWarehouse === 0 && item.atPameran === 0;
+                                                        const mutationLocation = mutationData?.mutationLocation || 'Pameran';
+
+                                                        // Determine which direction is active based on selected location
+                                                        const isToGudang = mutationLocation === 'Gudang'; // Remutasi: Pameran -> Gudang
+                                                        const isToPameranOrOutbound = mutationLocation === 'Pameran' || mutationLocation === 'Outbound'; // Mutasi: Gudang -> Pameran/Outbound
+
+                                                        // Calculate max values
+                                                        const maxMutasi = item.inWarehouse || 0; // Max bisa keluar dari gudang
+                                                        const maxRemutasi = item.atPameran || 0; // Max bisa balik dari pameran
+
+                                                        // Outbound only available if stock in warehouse
+                                                        const canMutateToOutbound = mutationLocation === 'Outbound' && maxMutasi > 0;
+                                                        const canMutateToPameran = mutationLocation === 'Pameran' && maxMutasi > 0;
+                                                        const canRemutate = mutationLocation === 'Gudang' && maxRemutasi > 0;
 
                                                         return (
                                                             <tr key={itemIdx} className={`hover:bg-gray-50 dark:hover:bg-dark-surface/50 ${isFullyMutated ? 'opacity-75 bg-gray-50' : ''}`}>
@@ -1270,37 +1476,41 @@ const WarehouseInventory = () => {
                                                                 <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{item.location?.room || 'warehouse'}</td>
                                                                 <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{item.condition || 'Baik'}</td>
 
-                                                                {/* Mutation input (Gudang -> Pameran) */}
-                                                                <td className="px-2 py-0.5 text-xs text-center bg-red-50 dark:bg-red-900/10 border-r border-red-100 dark:border-red-900/20">
+                                                                {/* Mutation input (Gudang -> Pameran/Outbound) - Active when going TO Pameran/Outbound */}
+                                                                <td className={`px-2 py-0.5 text-xs text-center border-r border-red-100 dark:border-red-900/20 ${isToPameranOrOutbound ? 'bg-red-50 dark:bg-red-900/10' : 'bg-gray-100 dark:bg-gray-800'}`}>
                                                                     <div className="flex flex-col items-center">
-                                                                        <input
-                                                                            type="number"
-                                                                            min="0"
-                                                                            max={item.inWarehouse}
-                                                                            value={item.mutationQty || ''}
+                                                                        <select
+                                                                            value={item.mutationQty || 0}
                                                                             onChange={(e) => handleMutationItemChange(pkgIndex, itemIdx, 'mutationQty', parseInt(e.target.value) || 0)}
-                                                                            className="w-16 px-1 py-0.5 text-xs text-center border border-red-300 rounded focus:ring-1 focus:ring-red-500"
-                                                                            placeholder="0"
-                                                                            disabled={item.inWarehouse === 0}
-                                                                        />
-                                                                        <span className="text-[9px] text-gray-400 mt-0.5">Max: {item.inWarehouse}</span>
+                                                                            className={`w-16 px-1 py-0.5 text-xs text-center border rounded focus:ring-1 ${isToPameranOrOutbound && maxMutasi > 0 ? 'border-red-300 focus:ring-red-500 bg-white' : 'border-gray-300 bg-gray-200 cursor-not-allowed'}`}
+                                                                            disabled={!isToPameranOrOutbound || maxMutasi === 0}
+                                                                        >
+                                                                            {[...Array(maxMutasi + 1).keys()].map(n => (
+                                                                                <option key={n} value={n}>{n}</option>
+                                                                            ))}
+                                                                        </select>
+                                                                        <span className={`text-[9px] mt-0.5 ${isToPameranOrOutbound ? 'text-red-500' : 'text-gray-400'}`}>
+                                                                            Stok: {maxMutasi}
+                                                                        </span>
                                                                     </div>
                                                                 </td>
 
-                                                                {/* Remutation input (Pameran -> Gudang) */}
-                                                                <td className="px-2 py-0.5 text-xs text-center bg-red-50 dark:bg-red-900/10">
+                                                                {/* Remutation input (Pameran -> Gudang) - Active when going TO Gudang */}
+                                                                <td className={`px-2 py-0.5 text-xs text-center ${isToGudang ? 'bg-blue-50 dark:bg-blue-900/10' : 'bg-gray-100 dark:bg-gray-800'}`}>
                                                                     <div className="flex flex-col items-center">
-                                                                        <input
-                                                                            type="number"
-                                                                            min="0"
-                                                                            max={item.atPameran}
-                                                                            value={item.remutationQty || ''}
+                                                                        <select
+                                                                            value={item.remutationQty || 0}
                                                                             onChange={(e) => handleMutationItemChange(pkgIndex, itemIdx, 'remutationQty', parseInt(e.target.value) || 0)}
-                                                                            className="w-16 px-1 py-0.5 text-xs text-center border border-blue-300 rounded focus:ring-1 focus:ring-blue-500"
-                                                                            placeholder="0"
-                                                                            disabled={item.atPameran === 0}
-                                                                        />
-                                                                        <span className="text-[9px] text-gray-400 mt-0.5">Max: {item.atPameran}</span>
+                                                                            className={`w-16 px-1 py-0.5 text-xs text-center border rounded focus:ring-1 ${isToGudang && maxRemutasi > 0 ? 'border-blue-300 focus:ring-blue-500 bg-white' : 'border-gray-300 bg-gray-200 cursor-not-allowed'}`}
+                                                                            disabled={!isToGudang || maxRemutasi === 0}
+                                                                        >
+                                                                            {[...Array(maxRemutasi + 1).keys()].map(n => (
+                                                                                <option key={n} value={n}>{n}</option>
+                                                                            ))}
+                                                                        </select>
+                                                                        <span className={`text-[9px] mt-0.5 ${isToGudang ? 'text-blue-500' : 'text-gray-400'}`}>
+                                                                            Di Pameran: {maxRemutasi}
+                                                                        </span>
                                                                     </div>
                                                                 </td>
 

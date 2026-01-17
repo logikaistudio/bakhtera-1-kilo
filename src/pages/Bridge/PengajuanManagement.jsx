@@ -984,9 +984,13 @@ const PengajuanManagement = () => {
                                     type="button"
                                     variant="primary"
                                     icon={Warehouse}
-                                    onClick={() => setShowWarehouseSelector(true)}
+                                    onClick={() => {
+                                        if (window.confirm('Anda akan diarahkan ke halaman Stok Gudang untuk memilih barang keluar. Lanjutkan?')) {
+                                            navigate('/bridge/inventory');
+                                        }
+                                    }}
                                 >
-                                    Pilih dari Gudang
+                                    Pilih dari Gudang / Input Stok
                                 </Button>
                             )}
                         </div>
@@ -1596,15 +1600,15 @@ const PengajuanManagement = () => {
             {/* Item Editor Modal */}
             {showItemEditor && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-                    <div className="bg-white rounded-2xl max-w-6xl w-full max-h-[85vh] overflow-hidden shadow-2xl flex flex-col">
+                    <div className="bg-white rounded-2xl max-w-7xl w-full max-h-[85vh] overflow-hidden shadow-2xl flex flex-col">
                         <div className="flex justify-between items-center p-6 border-b border-gray-200">
                             <div>
                                 <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                                     <Edit2 className="w-5 h-5" />
-                                    Edit Pilihan Barang Keluar
+                                    Detail Inventaris
                                 </h2>
                                 <p className="text-sm text-gray-500 mt-1">
-                                    Sesuaikan item dan quantity yang akan dikeluarkan dari gudang
+                                    Pilih item dan quantity yang akan dikeluarkan dari gudang
                                 </p>
                             </div>
                             <button onClick={() => setShowItemEditor(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
@@ -1612,12 +1616,17 @@ const PengajuanManagement = () => {
                             </button>
                         </div>
                         <div className="p-6 overflow-y-auto flex-1 bg-gray-50 space-y-4">
+                            {/* Detail Item Section Title */}
+                            <div className="pb-2">
+                                <h3 className="text-base font-bold text-gray-800">📝 Detail Item</h3>
+                            </div>
+
                             {editablePackages.map((pkg, pkgIndex) => {
                                 const activeItems = pkg.items.filter(item => (item.quantity || 0) > 0);
                                 if (activeItems.length === 0) return null;
                                 return (
                                     <div key={pkgIndex} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                                        <div className="bg-gray-100 px-4 py-2">
+                                        <div className="bg-gray-100 px-4 py-2 border-b border-gray-200">
                                             <h4 className="text-sm font-bold text-gray-700 flex items-center gap-2">
                                                 <Package className="w-4 h-4 text-accent-purple" />
                                                 Kode Packing: {pkg.packageNumber}
@@ -1625,33 +1634,59 @@ const PengajuanManagement = () => {
                                         </div>
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-sm">
-                                                <thead className="bg-blue-600">
+                                                <thead className="bg-accent-purple">
                                                     <tr>
-                                                        <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">KODE BARANG</th>
-                                                        <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">NAMA ITEM</th>
-                                                        <th className="px-4 py-3 text-center text-xs font-bold text-white uppercase">TERSEDIA</th>
-                                                        <th className="px-4 py-3 text-center text-xs font-bold text-white uppercase">QTY KELUAR</th>
-                                                        <th className="px-4 py-3 text-center text-xs font-bold text-white uppercase">AKSI</th>
+                                                        <th className="px-2 py-2 text-left text-xs font-bold whitespace-nowrap text-white w-12">NO. URUT</th>
+                                                        <th className="px-2 py-2 text-left text-xs font-bold whitespace-nowrap text-white w-24">KODE BARANG</th>
+                                                        <th className="px-2 py-2 text-left text-xs font-bold whitespace-nowrap text-white w-20">HS CODE</th>
+                                                        <th className="px-2 py-2 text-left text-xs font-bold whitespace-nowrap text-white">ITEM</th>
+                                                        <th className="px-2 py-2 text-center text-xs font-bold whitespace-nowrap text-white w-16">JML AWAL</th>
+                                                        <th className="px-2 py-2 text-center text-xs font-bold whitespace-nowrap text-white w-14">SATUAN</th>
+                                                        <th className="px-2 py-2 text-center text-xs font-bold whitespace-nowrap text-white w-24">STATUS</th>
+                                                        <th className="px-2 py-2 text-center text-xs font-bold whitespace-nowrap text-white w-20">LOKASI</th>
+                                                        <th className="px-2 py-2 text-center text-xs font-bold whitespace-nowrap text-white w-16">KONDISI</th>
+                                                        <th className="px-2 py-2 text-center text-xs font-bold whitespace-nowrap text-white bg-green-700 w-24">QTY KELUAR</th>
+                                                        <th className="px-2 py-2 text-center text-xs font-bold whitespace-nowrap text-white w-12">AKSI</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-gray-200">
                                                     {pkg.items.map((item, itemIndex) => {
                                                         if ((item.quantity || 0) === 0) return null;
                                                         const maxQty = item.availableQty || item.quantity || 0;
+                                                        const currentQty = item.quantity || 0;
                                                         return (
-                                                            <tr key={itemIndex} className="hover:bg-blue-50/50">
-                                                                <td className="px-4 py-3 text-sm font-mono text-gray-900">{item.itemCode}</td>
-                                                                <td className="px-4 py-3 text-sm text-gray-700">{item.name || item.itemName}</td>
-                                                                <td className="px-4 py-3 text-center">
-                                                                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
-                                                                        {maxQty}
-                                                                    </span>
+                                                            <tr key={itemIndex} className="hover:bg-purple-50/50">
+                                                                <td className="px-2 py-2 text-xs text-gray-700">{itemIndex + 1}</td>
+                                                                <td className="px-2 py-2 text-xs font-mono text-gray-900">{item.itemCode || '-'}</td>
+                                                                <td className="px-2 py-2 text-xs text-gray-700">{item.hsCode || '-'}</td>
+                                                                <td className="px-2 py-2 text-xs text-gray-700">{item.name || item.itemName || '-'}</td>
+                                                                <td className="px-2 py-2 text-xs text-center font-semibold text-gray-900">{item.originalQty || maxQty}</td>
+                                                                <td className="px-2 py-2 text-xs text-center text-gray-700">{item.uom || 'pcs'}</td>
+                                                                <td className="px-2 py-2 text-xs text-center">
+                                                                    <div className="flex items-center justify-center gap-1">
+                                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-100 text-green-800 border border-green-200">
+                                                                            📦 {maxQty}
+                                                                        </span>
+                                                                    </div>
                                                                 </td>
-                                                                <td className="px-4 py-3 text-center">
-                                                                    <input type="number" min="0" max={maxQty} value={item.quantity || 0} onChange={(e) => handleItemQuantityChange(pkgIndex, itemIndex, e.target.value)} className="w-24 px-3 py-2 text-center border-2 border-gray-300 rounded-lg text-gray-900 font-semibold focus:border-accent-purple focus:ring-2 focus:ring-accent-purple/20 transition-all" />
+                                                                <td className="px-2 py-2 text-xs text-center text-gray-700">warehouse</td>
+                                                                <td className="px-2 py-2 text-xs text-center text-gray-700">{item.condition || 'Baik'}</td>
+                                                                <td className="px-2 py-2 text-center bg-green-50">
+                                                                    <input
+                                                                        type="number"
+                                                                        min="0"
+                                                                        max={maxQty}
+                                                                        value={currentQty}
+                                                                        onChange={(e) => handleItemQuantityChange(pkgIndex, itemIndex, e.target.value)}
+                                                                        className="w-20 px-2 py-1 text-center border-2 border-green-300 rounded-lg text-gray-900 font-semibold focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
+                                                                    />
                                                                 </td>
-                                                                <td className="px-4 py-3 text-center">
-                                                                    <button onClick={() => handleRemoveItem(pkgIndex, itemIndex)} className="inline-flex items-center justify-center p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors" title="Hapus item ini">
+                                                                <td className="px-2 py-2 text-center">
+                                                                    <button
+                                                                        onClick={() => handleRemoveItem(pkgIndex, itemIndex)}
+                                                                        className="inline-flex items-center justify-center p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                                                                        title="Hapus item ini"
+                                                                    >
                                                                         <Trash2 className="w-4 h-4" />
                                                                     </button>
                                                                 </td>

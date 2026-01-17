@@ -11,7 +11,6 @@ const GoodsMovement = () => {
     const { mutationLogs = [], addMutationLog, updateMutationLog, updateInventoryStock, deleteMutationLog, companySettings } = useData();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedLog, setSelectedLog] = useState(null);
-    const [isEditMode, setIsEditMode] = useState(false);
 
     // Filter mutation logs based on search
     const filteredLogs = mutationLogs.filter(log =>
@@ -72,6 +71,10 @@ const GoodsMovement = () => {
         const { totalRemutated, maxRemutation: currentMaxRemutation, lastRemutationLog } = getRemutationInfo(log);
         const delta = targetQty - totalRemutated;
 
+        const isOutbound = log.destination &&
+            log.destination.toLowerCase() !== 'warehouse' &&
+            log.destination.toLowerCase() !== 'gudang';
+
         const remutationDate = document.getElementById('remutationDate')?.value || new Date().toISOString().split('T')[0];
         const remutationTime = document.getElementById('remutationTime')?.value || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
@@ -90,7 +93,6 @@ const GoodsMovement = () => {
                 await updateMutationLog(lastRemutationLog.id, updates);
                 alert('Data remutasi berhasil diperbarui (Info PIC/Tanggal/Keterangan)');
                 setSelectedLog(null);
-                setIsEditMode(false);
                 return true;
             } catch (error) {
                 console.error('Error updating remutation metadata:', error);
@@ -115,6 +117,9 @@ const GoodsMovement = () => {
         }
 
         try {
+            const mutationLocation = document.getElementById('mutationLocationSelect')?.value || (isOutbound ? 'outbound' : 'warehouse');
+            const storageLocation = document.getElementById('storageLocationInput')?.value || '';
+
             const newMutation = {
                 pengajuanId: log.pengajuanId,
                 pengajuanNumber: log.pengajuanNumber,
@@ -133,7 +138,9 @@ const GoodsMovement = () => {
                 pic: pic,
                 remarks: remarks || (delta > 0 ? `Remutasi Tambahan: ${delta} unit` : `Koreksi Remutasi: ${delta} unit`),
                 condition: 'Baik',
-                uom: log.uom || 'pcs'
+                uom: log.uom || 'pcs',
+                mutationLocation: mutationLocation,
+                storageLocation: storageLocation
             };
 
             await addMutationLog(newMutation);
@@ -149,7 +156,6 @@ const GoodsMovement = () => {
 
             alert('Data remutasi berhasil diperbarui!');
             setSelectedLog(null);
-            setIsEditMode(false);
             return true;
         } catch (error) {
             console.error('Error processing remutation:', error);
@@ -230,13 +236,72 @@ const GoodsMovement = () => {
             { header: 'PIC', key: 'pic', width: 15 },
             { header: 'Stok Awal', key: 'totalStock', width: 10, align: 'center' },
             { header: 'Mutasi', key: 'mutatedQty', width: 10, align: 'center' },
-            { header: 'Sisa', key: 'remainingStock', width: 10, align: 'center' },
+            { header: 'Sisa', key: 'calculatedRemaining', width: 10, align: 'center' },
             { header: 'Dari', key: 'origin', width: 15 },
             { header: 'Ke', key: 'destination', width: 15 },
             { header: 'Keterangan', key: 'remarks', width: 30 }
         ];
 
         exportToXLS(data, filename, headerRows, xlsColumns);
+    };
+
+    // Helper: Calculate Running Stock Balance
+    const calculateRunningStock = (logs) => {
+        // Deep copy to avoid mutating state directly
+        const sortedLogs = [...logs].sort((a, b) => {
+            const dateA = new Date(a.createdAt || a.date);
+            const dateB = new Date(b.createdAt || b.date);
+            return dateA - dateB;
+        });
+
+        const itemBalances = {}; // { itemCode: currentBalance }
+        const itemTotalRef = {}; // { itemCode: lastTotalStock }
+
+        const processedLogs = sortedLogs.map(log => {
+            const itemCode = log.itemCode || 'unknown';
+            const totalStock = Number(log.totalStock) || 0;
+            const mutationQty = Number(log.mutatedQty) || 0;
+
+            const isOutbound = log.destination &&
+                log.destination.toLowerCase() !== 'warehouse' &&
+                log.destination.toLowerCase() !== 'gudang';
+
+            // Initialize if first time seeing this item
+            if (itemBalances[itemCode] === undefined) {
+                itemBalances[itemCode] = totalStock;
+                itemTotalRef[itemCode] = totalStock;
+            } else {
+                // Check if Total Stock changed (e.g. Purchase) and adjust balance
+                const diff = totalStock - itemTotalRef[itemCode];
+                if (diff !== 0) {
+                    itemBalances[itemCode] += diff;
+                    itemTotalRef[itemCode] = totalStock;
+                }
+            }
+
+            // Apply mutation
+            if (isOutbound) {
+                itemBalances[itemCode] -= mutationQty;
+            } else {
+                // Inbound / Remutation
+                itemBalances[itemCode] += mutationQty;
+            }
+
+            // Ensure non-negative (safety net)
+            // itemBalances[itemCode] = Math.max(0, itemBalances[itemCode]);
+
+            return {
+                ...log,
+                calculatedRemaining: itemBalances[itemCode]
+            };
+        });
+
+        // Return re-sorted by descending date for display (Newest First)
+        return processedLogs.sort((a, b) => {
+            const dateA = new Date(a.createdAt || a.date);
+            const dateB = new Date(b.createdAt || b.date);
+            return dateB - dateA;
+        });
     };
 
     const renderTable = (data, title, icon, colorClass, emptyMessage) => (
@@ -408,7 +473,7 @@ const GoodsMovement = () => {
             )}
 
 
-            {/* Detail Modal */}
+            {/* Detail Modal - Combined Edit & Mutation */}
             {selectedLog && (() => {
                 const { totalRemutated, sisaDiLokasi, maxRemutation, lastRemutationLog } = getRemutationInfo(selectedLog);
                 const isOutbound = selectedLog.destination &&
@@ -417,7 +482,7 @@ const GoodsMovement = () => {
 
                 return (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                        <div className="bg-white rounded-lg shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden">
+                        <div className="bg-white rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
                             {/* Header */}
                             <div className="bg-sky-500 px-6 py-4 flex justify-between items-center rounded-t-lg">
                                 <div>
@@ -425,26 +490,31 @@ const GoodsMovement = () => {
                                     <p className="text-sm text-white/90">{selectedLog.pengajuanNumber}</p>
                                 </div>
                                 <div className="flex gap-2">
+                                    <button
+                                        onClick={() => setSelectedLog(null)}
+                                        className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm font-medium flex items-center gap-1"
+                                    >
+                                        ✕ Batal
+                                    </button>
                                     {isOutbound && (
                                         <button
-                                            onClick={() => setIsEditMode(!isEditMode)}
-                                            className={`px-4 py-2 rounded text-sm font-medium ${isEditMode ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-500 hover:bg-green-600'} text-white`}
+                                            onClick={() => {
+                                                const qty = parseInt(document.getElementById('remutationQty')?.value) || totalRemutated;
+                                                const pic = document.getElementById('remutationPIC')?.value || '';
+                                                const remarks = document.getElementById('remutationRemarks')?.value || '';
+                                                handleRemutation(selectedLog, qty, pic, remarks);
+                                            }}
+                                            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded text-sm font-medium flex items-center gap-1"
                                         >
-                                            {isEditMode ? '✓ Selesai Edit' : '✎ Edit'}
+                                            💾 Simpan Mutasi
                                         </button>
                                     )}
-                                    <button
-                                        onClick={() => { setSelectedLog(null); setIsEditMode(false); }}
-                                        className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm font-medium"
-                                    >
-                                        × Batal
-                                    </button>
                                 </div>
                             </div>
 
                             {/* Content */}
                             <div className="p-4 overflow-y-auto max-h-[calc(90vh-80px)] bg-gray-50">
-                                <div className="overflow-x-auto">
+                                <div className="overflow-x-auto mb-4">
                                     <table className="w-full text-sm border border-gray-300">
                                         <thead>
                                             <tr className="bg-sky-400 text-white">
@@ -454,9 +524,10 @@ const GoodsMovement = () => {
                                                 <th className="px-3 py-2 text-center border-r border-sky-300 font-medium">JAM MASUK</th>
                                                 <th className="px-3 py-2 text-center border-r border-sky-300 font-medium">JML ITEM</th>
                                                 <th className="px-3 py-2 text-left border-r border-sky-300 font-medium">PIC</th>
-                                                <th className="px-3 py-2 text-center border-r border-sky-300 font-medium">TGL REMUTASI</th>
-                                                <th className="px-3 py-2 text-center border-r border-sky-300 font-medium">JAM</th>
-                                                <th className="px-3 py-2 text-left font-medium">PIC REMUTASI</th>
+                                                <th className="px-3 py-2 text-center border-r border-sky-300 font-medium">TGL MUTASI</th>
+                                                <th className="px-3 py-2 text-center border-r border-sky-300 font-medium">JAM MUTASI</th>
+                                                <th className="px-3 py-2 text-left border-r border-sky-300 font-medium">PIC MUTASI</th>
+                                                <th className="px-3 py-2 text-left font-medium">LOKASI MUTASI</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -468,68 +539,71 @@ const GoodsMovement = () => {
                                                 <td className="px-3 py-2 border border-gray-200 text-gray-600 text-center">{selectedLog.mutatedQty}</td>
                                                 <td className="px-3 py-2 border border-gray-200 text-gray-800">{selectedLog.pic}</td>
                                                 <td className="px-3 py-2 border border-gray-200 text-center">
-                                                    {isEditMode ? (
-                                                        <input
-                                                            type="date"
-                                                            id="remutationDate"
-                                                            defaultValue={lastRemutationLog?.date || new Date().toISOString().split('T')[0]}
-                                                            className="w-full px-2 py-1 border border-green-400 rounded text-sm bg-green-50"
-                                                        />
-                                                    ) : (
-                                                        <span className="text-gray-500">{lastRemutationLog?.date ? new Date(lastRemutationLog.date).toLocaleDateString('id-ID') : '-'}</span>
-                                                    )}
+                                                    <input
+                                                        type="date"
+                                                        id="remutationDate"
+                                                        defaultValue={lastRemutationLog?.date || new Date().toISOString().split('T')[0]}
+                                                        className="w-full px-2 py-1 border border-sky-300 rounded text-sm bg-white"
+                                                    />
                                                 </td>
                                                 <td className="px-3 py-2 border border-gray-200 text-center">
-                                                    {isEditMode ? (
-                                                        <input
-                                                            type="time"
-                                                            id="remutationTime"
-                                                            defaultValue={lastRemutationLog?.time || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false })}
-                                                            className="w-full px-2 py-1 border border-green-400 rounded text-sm bg-green-50"
-                                                        />
-                                                    ) : (
-                                                        <span className="text-gray-500">{lastRemutationLog?.time || '-'}</span>
-                                                    )}
+                                                    <input
+                                                        type="time"
+                                                        id="remutationTime"
+                                                        defaultValue={lastRemutationLog?.time || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                                                        className="w-full px-2 py-1 border border-sky-300 rounded text-sm bg-white"
+                                                    />
                                                 </td>
                                                 <td className="px-3 py-2 border border-gray-200">
-                                                    {isEditMode ? (
-                                                        <input
-                                                            type="text"
-                                                            id="remutationPIC"
-                                                            defaultValue={lastRemutationLog?.pic || ''}
-                                                            placeholder="Nama PIC"
-                                                            className="w-full px-2 py-1 border border-green-400 rounded text-sm bg-green-50"
-                                                        />
-                                                    ) : (
-                                                        <span className="text-gray-500">{lastRemutationLog?.pic || '-'}</span>
-                                                    )}
+                                                    <input
+                                                        type="text"
+                                                        id="remutationPIC"
+                                                        defaultValue={lastRemutationLog?.pic || ''}
+                                                        placeholder="Nama PIC"
+                                                        className="w-full px-2 py-1 border border-sky-300 rounded text-sm bg-white"
+                                                    />
+                                                </td>
+                                                <td className="px-3 py-2 border border-gray-200">
+                                                    <select
+                                                        id="mutationLocationSelect"
+                                                        defaultValue={selectedLog.mutationLocation || (isOutbound ? 'outbound' : 'warehouse')}
+                                                        className="w-full px-2 py-1 border border-sky-300 rounded text-sm bg-white capitalize"
+                                                    >
+                                                        <option value="warehouse">Warehouse</option>
+                                                        <option value="pameran">Pameran</option>
+                                                        <option value="outbound">Outbound</option>
+                                                    </select>
                                                 </td>
                                             </tr>
                                         </tbody>
                                     </table>
                                 </div>
 
-                                <p className="text-sm text-gray-600 mb-2 mt-6">Kode Packing: {selectedLog.packageNumber || 'Box-1'}</p>
+                                <p className="text-sm text-gray-600 mb-2">Kode Packing: <span className="font-semibold">{selectedLog.packageNumber || 'Box-1'}</span></p>
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-sm border border-gray-300">
                                         <thead>
                                             <tr className="bg-sky-400 text-white">
+                                                <th className="px-2 py-2 text-center border-r border-sky-300 font-medium w-12">NO.</th>
                                                 <th className="px-2 py-2 text-left border-r border-sky-300 font-medium">KODE BARANG</th>
+                                                <th className="px-2 py-2 text-left border-r border-sky-300 font-medium">HS CODE</th>
                                                 <th className="px-2 py-2 text-left border-r border-sky-300 font-medium">ITEM</th>
                                                 <th className="px-2 py-2 text-center border-r border-sky-300 font-medium">JUMLAH</th>
                                                 <th className="px-2 py-2 text-left border-r border-sky-300 font-medium">SATUAN</th>
-                                                <th className="px-2 py-2 text-left border-r border-sky-300 font-medium">LOKASI</th>
+                                                <th className="px-2 py-2 text-left border-r border-sky-300 font-medium">LOKASI ASAL</th>
                                                 <th className="px-2 py-2 text-left border-r border-sky-300 font-medium">KONDISI</th>
                                                 <th className="px-2 py-2 text-center border-r border-sky-300 font-medium text-orange-200">JML MUTASI</th>
-                                                <th className="px-2 py-2 text-center border-r border-sky-300 font-medium text-green-200">REMUTASI</th>
+                                                <th className="px-2 py-2 text-center border-r border-sky-300 font-medium text-green-200">JML REMUTASI</th>
                                                 <th className="px-2 py-2 text-center border-r border-sky-300 font-medium text-purple-200">SISA</th>
-                                                <th className="px-2 py-2 text-left border-r border-sky-300 font-medium">LOKASI REMUTASI</th>
+                                                <th className="px-2 py-2 text-left border-r border-sky-300 font-medium text-cyan-200">LOKASI PENYIMPANAN</th>
                                                 <th className="px-2 py-2 text-left font-medium">KETERANGAN</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <tr className="bg-sky-50">
+                                                <td className="px-2 py-2 border border-gray-200 text-center text-gray-800">1</td>
                                                 <td className="px-2 py-2 border border-gray-200 text-gray-800">{selectedLog.itemCode || '-'}</td>
+                                                <td className="px-2 py-2 border border-gray-200 text-gray-600">{selectedLog.hsCode || '-'}</td>
                                                 <td className="px-2 py-2 border border-gray-200 text-gray-800">{selectedLog.itemName}</td>
                                                 <td className="px-2 py-2 border border-gray-200 text-center text-gray-600">{selectedLog.totalStock}</td>
                                                 <td className="px-2 py-2 border border-gray-200 text-gray-600">{selectedLog.uom || 'pcs'}</td>
@@ -539,94 +613,57 @@ const GoodsMovement = () => {
                                                     <span className="text-orange-500 font-medium">{selectedLog.mutatedQty}</span>
                                                 </td>
                                                 <td className="px-2 py-2 border border-gray-200 text-center">
-                                                    {isEditMode ? (
+                                                    {isOutbound ? (
                                                         <input
                                                             type="number"
                                                             id="remutationQty"
-                                                            defaultValue={maxRemutation > 0 ? maxRemutation : totalRemutated}
+                                                            defaultValue={totalRemutated}
                                                             min={0}
                                                             max={selectedLog.mutatedQty}
-                                                            className="w-16 px-2 py-1 border border-green-400 rounded text-sm text-center bg-green-50"
+                                                            className="w-16 px-2 py-1 border border-sky-300 rounded text-sm text-center bg-white"
                                                         />
                                                     ) : (
                                                         <span className="text-green-500 font-medium">{totalRemutated}</span>
                                                     )}
                                                 </td>
                                                 <td className="px-2 py-2 border border-gray-200 text-center">
-                                                    <span className="text-purple-500 font-medium">{isEditMode ? '-' : sisaDiLokasi}</span>
+                                                    <span className="text-purple-500 font-medium">{sisaDiLokasi}</span>
                                                 </td>
                                                 <td className="px-2 py-2 border border-gray-200">
-                                                    {isEditMode ? (
-                                                        <select
-                                                            id="remutationLocation"
-                                                            className="w-full px-2 py-1 border border-green-400 rounded text-sm bg-green-50"
-                                                        >
-                                                            <option value="Warehouse">Warehouse</option>
-                                                            <option value="Gudang">Gudang</option>
-                                                        </select>
-                                                    ) : (
-                                                        <span className="text-gray-600 capitalize">{isOutbound ? selectedLog.destination : 'Warehouse'}</span>
-                                                    )}
+                                                    <input
+                                                        type="text"
+                                                        id="storageLocationInput"
+                                                        defaultValue={selectedLog.storageLocation || ''}
+                                                        placeholder="Contoh: Rak A-1"
+                                                        className="w-full px-2 py-1 border border-sky-300 rounded text-sm bg-white"
+                                                    />
                                                 </td>
                                                 <td className="px-2 py-2 border border-gray-200">
-                                                    {isEditMode ? (
-                                                        <input
-                                                            type="text"
-                                                            id="remutationRemarks"
-                                                            defaultValue={lastRemutationLog?.remarks || selectedLog.remarks || ''}
-                                                            placeholder="Keterangan"
-                                                            className="w-full px-2 py-1 border border-green-400 rounded text-sm bg-green-50"
-                                                        />
-                                                    ) : (
-                                                        <span className="text-gray-500">{lastRemutationLog?.remarks || selectedLog.remarks || '-'}</span>
-                                                    )}
+                                                    <input
+                                                        type="text"
+                                                        id="remutationRemarks"
+                                                        defaultValue={lastRemutationLog?.remarks || selectedLog.remarks || ''}
+                                                        placeholder="Keterangan"
+                                                        className="w-full px-2 py-1 border border-sky-300 rounded text-sm bg-white"
+                                                    />
                                                 </td>
                                             </tr>
                                         </tbody>
                                     </table>
                                 </div>
 
-                                <div className="w-full h-2 bg-gray-200 rounded-full mt-4 mb-4">
-                                    <div className="h-full w-1/3 bg-sky-400 rounded-full"></div>
+                                {/* Status Info */}
+                                <div className="mt-4 p-3 rounded-lg border bg-white">
+                                    {isOutbound && maxRemutation > 0 && (
+                                        <p className="text-blue-600 text-sm">ℹ️ Tersisa <strong>{maxRemutation}</strong> unit yang dapat diremutasi ke Warehouse</p>
+                                    )}
+                                    {isOutbound && maxRemutation === 0 && (
+                                        <p className="text-green-600 text-sm">✓ Semua item sudah diremutasi ke Warehouse</p>
+                                    )}
+                                    {!isOutbound && (
+                                        <p className="text-gray-600 text-sm">✓ Item ini adalah remutasi (sudah kembali ke Warehouse)</p>
+                                    )}
                                 </div>
-
-                                {isEditMode && (
-                                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg mt-4">
-                                        <h4 className="text-sm font-semibold text-green-700 mb-3">Upload Dokumen Pendukung & Simpan</h4>
-                                        <div className="flex gap-4 items-end">
-                                            <div className="flex-1">
-                                                <label className="text-xs text-gray-600">Dokumen Pendukung</label>
-                                                <input
-                                                    type="file"
-                                                    id="remutationDoc"
-                                                    multiple
-                                                    accept=".pdf,.jpg,.jpeg,.png"
-                                                    className="w-full mt-1 px-3 py-2 border border-gray-300 rounded text-sm bg-white"
-                                                />
-                                            </div>
-                                            <div>
-                                                <button
-                                                    onClick={() => {
-                                                        const qty = parseInt(document.getElementById('remutationQty')?.value) || maxRemutation;
-                                                        const pic = document.getElementById('remutationPIC')?.value || '';
-                                                        const remarks = document.getElementById('remutationRemarks')?.value || '';
-                                                        handleRemutation(selectedLog, qty, pic, remarks);
-                                                    }}
-                                                    className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded text-sm font-medium"
-                                                >
-                                                    💾 Simpan Remutasi
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {!isEditMode && isOutbound && maxRemutation === 0 && (
-                                    <p className="text-gray-600 text-sm">✓ Semua item sudah diremutasi ke Warehouse</p>
-                                )}
-                                {!isEditMode && !isOutbound && (
-                                    <p className="text-gray-600 text-sm">✓ Item ini adalah remutasi (sudah kembali ke Warehouse)</p>
-                                )}
                             </div>
                         </div>
                     </div>

@@ -331,33 +331,46 @@ export const DataProvider = ({ children }) => {
                 const { data: mLogData, error: mLogError } = await supabase.from('freight_mutation_logs').select('*');
                 if (!mLogError) {
                     // Map snake_case to camelCase for UI
-                    const mappedLogs = (mLogData || []).map(log => ({
-                        id: log.id?.toString(),
-                        pengajuanId: log.pengajuan_id,
-                        pengajuanNumber: log.pengajuan_number,
-                        bcDocumentNumber: log.bc_document_number,
-                        packageNumber: log.package_number,
-                        itemCode: log.item_code,
-                        itemName: log.item_name,
-                        assetName: log.item_name,
-                        hsCode: log.hs_code,
-                        serialNumber: log.serial_number,
-                        totalStock: log.total_stock,
-                        mutatedQty: log.mutated_qty,
-                        remainingStock: log.remaining_stock,
-                        origin: log.origin,
-                        destination: log.destination,
-                        condition: log.condition || 'Baik',
-                        date: log.date,
-                        time: log.time,
-                        pic: log.pic,
-                        remarks: log.remarks,
-                        documents: log.documents || [],
-                        uom: log.uom || 'pcs',
-                        createdAt: log.created_at,
-                        submissionDate: log.date,
-                        approvedDate: log.date
-                    }));
+                    const mappedLogs = (mLogData || []).map(log => {
+                        // Extract metadata from documents if valid object (and not array of files)
+                        // Note: older logs might have array of files in documents. 
+                        // Newer logs (post-fix) have object { files: [], ...meta }
+                        const docs = log.documents || {};
+                        const isMeta = docs && !Array.isArray(docs);
+                        const meta = isMeta ? docs : {};
+                        const files = isMeta ? (docs.files || []) : (Array.isArray(docs) ? docs : []);
+
+                        return {
+                            id: log.id?.toString(),
+                            pengajuanId: log.pengajuan_id,
+                            pengajuanNumber: log.pengajuan_number,
+                            bcDocumentNumber: log.bc_document_number,
+                            packageNumber: log.package_number || meta.packageNumber,
+                            itemCode: log.item_code,
+                            itemName: log.item_name,
+                            assetName: log.item_name,
+                            hsCode: log.hs_code || meta.hsCode,
+                            serialNumber: log.serial_number,
+                            totalStock: log.total_stock,
+                            mutatedQty: log.mutated_qty,
+                            remainingStock: log.remaining_stock,
+                            origin: log.origin,
+                            destination: log.destination,
+                            condition: log.condition || meta.condition || 'Baik',
+                            date: log.date,
+                            time: log.time,
+                            pic: log.pic,
+                            remarks: log.remarks,
+                            documents: files, // Return array of files to UI for compatibility
+                            uom: log.uom || meta.uom || 'pcs',
+                            mutationLocation: log.mutation_location || meta.mutationLocation,
+                            storageLocation: log.storage_location || meta.storageLocation,
+                            sender: log.sender || meta.sender,
+                            createdAt: log.created_at,
+                            submissionDate: log.date,
+                            approvedDate: log.date
+                        };
+                    });
                     setMutationLogs(mappedLogs);
                     console.log(`✅ Loaded ${mappedLogs.length} mutation logs from Supabase`);
                 }
@@ -388,25 +401,12 @@ export const DataProvider = ({ children }) => {
                 // Load Company Settings
                 await fetchCompanySettings();
 
-
             } catch (error) {
                 console.error("Failed to load data from Supabase:", error);
             }
         };
         loadData();
     }, []);
-
-    // Save to localStorage whenever data changes
-    // Vendors and Customers now managed by Supabase - removed localStorage sync
-    /*
-    useEffect(() => {
-        localStorage.setItem('freight_vendors', JSON.stringify(vendors));
-    }, [vendors]);
-
-    useEffect(() => {
-        localStorage.setItem('freight_customers', JSON.stringify(customers));
-    }, [customers]);
-    */
 
     // Realtime Subscriptions
     useEffect(() => {
@@ -427,7 +427,6 @@ export const DataProvider = ({ children }) => {
                 console.log('⚡ Realtime Quotation Update:', payload);
                 if (payload.eventType === 'INSERT') setQuotations(prev => [...prev, normalizeQuotation(payload.new)]);
                 else if (payload.eventType === 'UPDATE') setQuotations(prev => prev.map(item => item.id === payload.new.id ? normalizeQuotation(payload.new) : item));
-                // Delete typically not used for quotations, but handled if needed
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'freight_warehouse' }, (payload) => {
                 console.log('⚡ Realtime Warehouse Update:', payload);
@@ -489,33 +488,43 @@ export const DataProvider = ({ children }) => {
             // Add subscription for Mutation Logs (for Bridge UI)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'freight_mutation_logs' }, (payload) => {
                 console.log('⚡ Realtime Mutation Log Update:', payload);
-                const mapRealtimeLog = (log) => ({
-                    id: log.id?.toString(),
-                    pengajuanId: log.pengajuan_id,
-                    pengajuanNumber: log.pengajuan_number,
-                    bcDocumentNumber: log.bc_document_number,
-                    packageNumber: log.package_number,
-                    itemCode: log.item_code,
-                    itemName: log.item_name,
-                    assetName: log.item_name, // fallback or same
-                    hsCode: log.hs_code,
-                    serialNumber: log.serial_number,
-                    totalStock: log.total_stock,
-                    mutatedQty: log.mutated_qty,
-                    remainingStock: log.remaining_stock,
-                    origin: log.origin,
-                    destination: log.destination,
-                    condition: log.condition || 'Baik',
-                    date: log.date,
-                    time: log.time,
-                    pic: log.pic,
-                    remarks: log.remarks,
-                    documents: log.documents || [],
-                    uom: log.uom || 'pcs',
-                    createdAt: log.created_at,
-                    submissionDate: log.date,
-                    approvedDate: log.date
-                });
+                const mapRealtimeLog = (log) => {
+                    const docs = log.documents || {};
+                    const isMeta = docs && !Array.isArray(docs);
+                    const meta = isMeta ? docs : {};
+                    const files = isMeta ? (docs.files || []) : (Array.isArray(docs) ? docs : []);
+
+                    return {
+                        id: log.id?.toString(),
+                        pengajuanId: log.pengajuan_id,
+                        pengajuanNumber: log.pengajuan_number,
+                        bcDocumentNumber: log.bc_document_number,
+                        packageNumber: log.package_number || meta.packageNumber,
+                        itemCode: log.item_code,
+                        itemName: log.item_name,
+                        assetName: log.item_name, // fallback or same
+                        hsCode: log.hs_code || meta.hsCode,
+                        serialNumber: log.serial_number,
+                        totalStock: log.total_stock,
+                        mutatedQty: log.mutated_qty,
+                        remainingStock: log.remaining_stock,
+                        origin: log.origin,
+                        destination: log.destination,
+                        condition: log.condition || meta.condition || 'Baik',
+                        date: log.date,
+                        time: log.time,
+                        pic: log.pic,
+                        remarks: log.remarks,
+                        documents: files,
+                        uom: log.uom || meta.uom || 'pcs',
+                        mutationLocation: log.mutation_location || meta.mutationLocation,
+                        storageLocation: log.storage_location || meta.storageLocation,
+                        sender: log.sender || meta.sender,
+                        createdAt: log.created_at,
+                        submissionDate: log.date,
+                        approvedDate: log.date
+                    };
+                };
 
                 if (payload.eventType === 'INSERT') {
                     setMutationLogs(prev => [...prev, mapRealtimeLog(payload.new)]);
@@ -586,7 +595,7 @@ export const DataProvider = ({ children }) => {
     useEffect(() => {
         localStorage.setItem('freight_vendors', JSON.stringify(vendors));
     }, [vendors]);
-
+    
     useEffect(() => {
         localStorage.setItem('freight_customers', JSON.stringify(customers));
     }, [customers]);
@@ -597,7 +606,7 @@ export const DataProvider = ({ children }) => {
     useEffect(() => {
         localStorage.setItem('freight_vendors', JSON.stringify(vendors));
     }, [vendors]);
-
+    
     useEffect(() => {
         localStorage.setItem('freight_customers', JSON.stringify(customers));
     }, [customers]);
@@ -1317,12 +1326,12 @@ export const DataProvider = ({ children }) => {
                     pengajuan_id: mutationData.pengajuanId || null,
                     pengajuan_number: mutationData.pengajuanNumber || mutationData.pengajuan_number || null,
                     bc_document_number: mutationData.bcDocumentNumber || null,
-                    package_number: mutationData.packageNumber || null,
+                    // package_number, item_code, etc. are NOT in schema? 
+                    // Verify schema: id, pengajuan_id, pengajuan_number, bc_document_number, item_code, item_name, serial_number, date, time, pic, total_stock, mutated_qty, remaining_stock, origin, destination, remarks, documents, created_at, updated_at
+
                     item_code: mutationData.itemCode || null,
                     item_name: mutationData.itemName || mutationData.assetName || null,
-                    hs_code: mutationData.hsCode || null,
                     serial_number: mutationData.serialNumber || null,
-                    sender: mutationData.sender || null, // Added for Pabean Barang Mutasi
                     date: mutationData.date || new Date().toISOString().split('T')[0],
                     time: mutationData.time || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
                     pic: mutationData.pic || null,
@@ -1331,10 +1340,24 @@ export const DataProvider = ({ children }) => {
                     remaining_stock: mutationData.remainingStock || 0,
                     origin: mutationData.origin || 'warehouse',
                     destination: mutationData.destination || 'warehouse',
-                    condition: mutationData.condition || null,
+                    // condition is NOT in schema based on my read? Wait.
+                    // Line 284: CREATE TABLE freight_mutation_logs
+                    // Cols: id, pengajuan_id, ..., remarks, documents, created_at, updated_at
+                    // missing: condition, uom, sender, package_number, hs_code, mutation_location, storage_location
+
                     remarks: mutationData.remarks || null,
-                    documents: mutationData.documents || [],
-                    uom: mutationData.uom || 'pcs'
+
+                    // Store ALL extra fields in documents JSONB
+                    documents: {
+                        files: Array.isArray(mutationData.documents) ? mutationData.documents : [],
+                        sender: mutationData.sender,
+                        uom: mutationData.uom || 'pcs',
+                        mutationLocation: mutationData.mutationLocation,
+                        storageLocation: mutationData.storageLocation,
+                        packageNumber: mutationData.packageNumber,
+                        hsCode: mutationData.hsCode,
+                        condition: mutationData.condition // saving condition here too since it might be missing
+                    }
                 }])
                 .select();
 
@@ -1349,30 +1372,37 @@ export const DataProvider = ({ children }) => {
             // Manual state update to ensure immediate UI refresh
             // Format the saved data to match state structure
             const savedLog = data[0];
+            const docs = savedLog.documents || {};
+            const isMeta = docs && !Array.isArray(docs);
+            const meta = isMeta ? docs : {};
+            const files = isMeta ? (docs.files || []) : (Array.isArray(docs) ? docs : []);
+
             const formattedLog = {
                 id: savedLog.id?.toString(),
                 pengajuanId: savedLog.pengajuan_id,
                 pengajuanNumber: savedLog.pengajuan_number,
                 bcDocumentNumber: savedLog.bc_document_number,
-                packageNumber: savedLog.package_number,
+                packageNumber: savedLog.package_number || meta.packageNumber,
                 itemCode: savedLog.item_code,
                 itemName: savedLog.item_name,
                 assetName: savedLog.item_name,
-                hsCode: savedLog.hs_code,
+                hsCode: savedLog.hs_code || meta.hsCode,
                 serialNumber: savedLog.serial_number,
-                sender: savedLog.sender, // Added for Pabean Barang Mutasi
+                sender: savedLog.sender || meta.sender, // Added for Pabean Barang Mutasi
                 totalStock: savedLog.total_stock,
                 mutatedQty: savedLog.mutated_qty,
                 remainingStock: savedLog.remaining_stock,
                 origin: savedLog.origin,
                 destination: savedLog.destination,
-                condition: savedLog.condition,
+                condition: savedLog.condition || meta.condition || 'Baik',
                 date: savedLog.date,
                 time: savedLog.time,
                 pic: savedLog.pic,
                 remarks: savedLog.remarks,
-                documents: savedLog.documents,
-                uom: savedLog.uom,
+                documents: files,
+                uom: savedLog.uom || meta.uom || 'pcs',
+                mutationLocation: savedLog.mutation_location || meta.mutationLocation,
+                storageLocation: savedLog.storage_location || meta.storageLocation,
                 createdAt: savedLog.created_at
             };
 
@@ -1414,28 +1444,36 @@ export const DataProvider = ({ children }) => {
 
             // Update local state
             const savedLog = data[0];
+            const docs = savedLog.documents || {};
+            const isMeta = docs && !Array.isArray(docs);
+            const meta = isMeta ? docs : {};
+            const files = isMeta ? (docs.files || []) : (Array.isArray(docs) ? docs : []);
+
             const formattedLog = {
                 id: savedLog.id?.toString(),
                 pengajuanId: savedLog.pengajuan_id,
                 pengajuanNumber: savedLog.pengajuan_number,
                 bcDocumentNumber: savedLog.bc_document_number,
-                packageNumber: savedLog.package_number,
+                packageNumber: savedLog.package_number || meta.packageNumber,
                 itemCode: savedLog.item_code,
                 itemName: savedLog.item_name,
                 assetName: savedLog.item_name,
-                hsCode: savedLog.hs_code,
+                hsCode: savedLog.hs_code || meta.hsCode,
                 totalStock: savedLog.total_stock,
                 mutatedQty: savedLog.mutated_qty,
                 remainingStock: savedLog.remaining_stock,
                 origin: savedLog.origin,
                 destination: savedLog.destination,
-                condition: savedLog.condition,
+                condition: savedLog.condition || meta.condition || 'Baik',
                 date: savedLog.date,
                 time: savedLog.time,
                 pic: savedLog.pic,
                 remarks: savedLog.remarks,
-                documents: savedLog.documents,
-                uom: savedLog.uom,
+                documents: files,
+                uom: savedLog.uom || meta.uom || 'pcs',
+                mutationLocation: savedLog.mutation_location || meta.mutationLocation,
+                storageLocation: savedLog.storage_location || meta.storageLocation,
+                sender: savedLog.sender || meta.sender,
                 createdAt: savedLog.created_at
             };
 

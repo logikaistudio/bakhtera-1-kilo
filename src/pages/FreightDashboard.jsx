@@ -65,7 +65,7 @@ const FreightDashboard = () => {
                 { label: 'Acara Mendatang', value: upcomingEvents },
                 { label: 'Total Acara', value: events.length },
             ],
-            color: 'from-green-500/20 to-green-600/20',
+            color: 'from-orange-500/20 to-orange-600/20',
         },
     ];
 
@@ -115,7 +115,7 @@ const FreightDashboard = () => {
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: index * 0.1 }}
-                            className="glass-card glass-card-hover p-6 rounded-lg cursor-pointer group"
+                            className="relative glass-card glass-card-hover p-6 rounded-lg cursor-pointer group"
                             onClick={() => navigate(module.path)}
                         >
                             <div className={`absolute inset-0 bg-gradient-to-br ${module.color} rounded-lg opacity-0 group-hover:opacity-100 smooth-transition`} />
