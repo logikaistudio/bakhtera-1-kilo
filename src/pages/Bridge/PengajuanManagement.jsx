@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Plus, FileText, CheckCircle, Edit2, Download, Trash2, X, Warehouse, Package, ArrowRight, Save } from 'lucide-react';
+import { Plus, FileText, CheckCircle, Edit2, Download, Trash2, X, Warehouse, Package, ArrowRight, Save, Box, MapPin, ExternalLink, AlertCircle } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import Button from '../../components/Common/Button';
 import PackageManager from '../../components/Common/PackageManager';
 import DocumentUploadManager from '../../components/Common/DocumentUploadManager';
+import WarehouseItemSelectorModal from '../../components/Bridge/WarehouseItemSelectorModal';
 import { useNavigate } from 'react-router-dom';
 import { exportToCSV } from '../../utils/exportCSV';
 
@@ -18,10 +19,11 @@ const PengajuanManagement = () => {
         bcCodes = [],
         itemMaster = [],
         addInboundTransaction,
-        addOutboundTransaction, // Added for outbound approval
+        addOutboundTransaction,
         vendors = [],
-        mutationLogs = [], // Added for calculating available stock
-        warehouseInventory = [] // Added for accurate stock checking
+        mutationLogs = [],
+        warehouseInventory = [],
+        outboundTransactions = [] // Added for calculating already outbound stock
     } = useData();
     const navigate = useNavigate();
     const [showForm, setShowForm] = useState(false);
@@ -36,6 +38,8 @@ const PengajuanManagement = () => {
     const [editablePackages, setEditablePackages] = useState([]); // NEW: Temporary packages for editing
     const [showDetailModal, setShowDetailModal] = useState(false); // NEW: Detail modal
     const [selectedPengajuan, setSelectedPengajuan] = useState(null); // NEW: Selected pengajuan for detail
+    const [showSplitViewModal, setShowSplitViewModal] = useState(false); // NEW: Split View Modal for item selection
+    const [sourcePackagesForSplitView, setSourcePackagesForSplitView] = useState([]); // Source packages for split view
 
     const [editFormData, setEditFormData] = useState({
         bcDocumentNumber: '',
@@ -232,10 +236,24 @@ const PengajuanManagement = () => {
     };
 
     const handleSaveEdit = async () => {
+        const isOutbound = editModal.pengajuan.type === 'outbound';
+
         // Validation
         if (editFormData.documentStatus === 'approved' && !editFormData.bcDocumentNumber.trim()) {
             alert('❌ No. Dokumen Pabean wajib diisi untuk approval');
             return;
+        }
+
+        // Outbound specific validation: require PIC (approver)
+        if (isOutbound && editFormData.documentStatus === 'approved') {
+            if (!editFormData.pic || !editFormData.pic.trim()) {
+                alert('❌ PIC/Approver wajib diisi untuk approval barang keluar');
+                return;
+            }
+            if (!editFormData.bcDocumentDate) {
+                alert('❌ Tanggal Dokumen Pabean wajib diisi untuk approval barang keluar');
+                return;
+            }
         }
 
         if (editFormData.documentStatus === 'rejected') {
@@ -282,44 +300,11 @@ const PengajuanManagement = () => {
 
                         for (const item of items) {
                             if (isOutbound) {
-                                // OUTBOUND TRANSACTION
-                                const itemCode = item.itemCode || item.item_code;
-                                const itemName = item.itemName || item.item_name || item.name || 'Unknown Item';
-
-                                if (!itemCode) {
-                                    console.error('❌ Missing item code for item:', item);
-                                    alert(`Error: Kode barang tidak ditemukan untuk item "${itemName}". Transaksi dibatalkan.`);
-                                    return;
-                                }
-
-                                const transaction = {
-                                    assetId: itemCode,
-                                    assetName: itemName,
-                                    quantity: Number(item.quantity) || 0,
-                                    unit: item.uom || 'pcs',
-                                    value: (Number(item.price) || 0) * (Number(item.quantity) || 0),
-
-                                    customsDocType: editModal.pengajuan.bcDocType,
-                                    customsDocNumber: editFormData.bcDocumentNumber,
-                                    customsDocDate: editFormData.bcDocumentDate,
-
-                                    hsCode: item.hsCode || item.hs_code || '',
-                                    currency: editModal.pengajuan.invoiceCurrency || 'IDR',
-
-                                    // Outbound specific fields
-                                    destination: editModal.pengajuan.destination || 'Ekspor',
-                                    receiver: editModal.pengajuan.customer || '',
-                                    sourcePengajuanId: editModal.pengajuan.sourcePengajuanId,
-                                    sourcePengajuanNumber: editModal.pengajuan.sourcePengajuanNumber,
-
-                                    // IMPORTANT: Include package number for proper stock validation
-                                    packageNumber: pkg.packageNumber || pkg.package_number,
-
-                                    date: editFormData.manualDate || editFormData.bcDocumentDate || editModal.pengajuan.submissionDate || editModal.pengajuan.submission_date || editModal.pengajuan.date,
-                                    notes: `Auto-generated from Outbound Quotation ${editModal.pengajuan.quotationNumber || editModal.pengajuan.quotation_number || editModal.pengajuan.id}`
-                                };
-
-                                await addOutboundTransaction(transaction);
+                                // OUTBOUND: Saat approval, HANYA update status
+                                // Insert ke freight_outbound dilakukan di step terpisah (Proses Barang Keluar)
+                                // Ini sesuai flow: Approval → Konfirmasi Item Keluar → Insert freight_outbound
+                                console.log('📋 Outbound item approved, waiting for item exit confirmation');
+                                processedCount++;
                             } else {
                                 // INBOUND TRANSACTION (existing logic)
                                 // Consistency fix: Use same robust property access
@@ -354,8 +339,11 @@ const PengajuanManagement = () => {
                     }
 
                     if (processedCount > 0) {
-                        const targetModule = isOutbound ? 'Barang Keluar & Inventory' : 'Barang Masuk & Inventory';
-                        alert(`✨ Otomatisasi: ${processedCount} Item berhasil disinkronkan ke ${targetModule}!`);
+                        if (!isOutbound) {
+                            alert(`✨ Otomatisasi: ${processedCount} Item berhasil disinkronkan ke Barang Masuk & Inventory!`);
+                        } else {
+                            alert(`✅ Pengajuan barang keluar berhasil di-approve!\n\n📌 Langkah selanjutnya:\nKlik "Proses Barang Keluar" untuk konfirmasi item yang akan dikeluarkan dari gudang.`);
+                        }
                     }
                 }
             }
@@ -448,38 +436,190 @@ const PengajuanManagement = () => {
     };
 
     // Calculate available stock for each item in a pengajuan
+    // COMPLETE LOGIC:
+    // - Stok Awal: dari pengajuan inbound (quantity original)
+    // - Stok Pameran: dari mutationLogs (item yang sedang di pameran, belum dikembalikan)
+    // - Stok Keluar: dari outboundTransactions (item yang sudah di-outbound/terjual)
+    // - Stok Tersedia = Stok Awal - Stok Pameran - Stok Keluar
+    // 
+    // RULES:
+    // - Item di gudang bisa: mutasi ke pameran ATAU outbound
+    // - Item di pameran TIDAK bisa outbound langsung, harus dikembalikan ke gudang dulu
     const calculateAvailableStock = (pengajuan) => {
-        const pengajuanId = pengajuan.id;
-        // Use warehouseInventory as the source of truth for current stock
-        // This handles cases where items were moved/shipped via Outbound or Mutation
+        const pengajuanNumber = pengajuan.quotationNumber || pengajuan.quotation_number;
 
-        const packagesWithStock = (pengajuan.packages || []).map(pkg => ({
-            ...pkg,
-            items: (pkg.items || []).map(item => {
-                const itemCode = item.itemCode || item.item_code;
+        console.log('🔍 calculateAvailableStock for:', pengajuanNumber);
 
-                // Find matching inventory record
-                // Matches based on Pengajuan ID (FIFO/Specific Ident) and Package/Item Code
-                // Note: freight_warehouse should have these fields populated from inbound
-                const inventoryItem = warehouseInventory.find(inv =>
-                    (inv.pengajuanId === pengajuanId || inv.pengajuan_id === pengajuanId) &&
-                    (inv.itemCode === itemCode || inv.item_code === itemCode) &&
-                    (inv.packageNumber === pkg.packageNumber || inv.package_number === pkg.packageNumber)
-                );
+        const normalize = (str) => (str || '').toLowerCase().trim();
 
-                const currentStock = inventoryItem ? (inventoryItem.currentStock ?? inventoryItem.quantity ?? 0) : 0;
+        // Helper: Get stok di pameran for an item
+        const getPameranStock = (itemCode, packageNumber) => {
+            // Mutations TO pameran (from warehouse to pameran/other)
+            const toMutations = mutationLogs.filter(m =>
+                normalize(m.pengajuanNumber) === normalize(pengajuanNumber) &&
+                normalize(m.itemCode) === normalize(itemCode) &&
+                (packageNumber ? normalize(m.packageNumber) === normalize(packageNumber) : true) &&
+                normalize(m.destination) !== 'warehouse' &&
+                normalize(m.destination) !== 'gudang'
+            );
 
-                return {
-                    ...item,
-                    originalQty: item.quantity || 0,
-                    mutatedQty: 0, // Not strictly needed for logic, but kept for structure
-                    availableQty: currentStock,
-                    outboundQty: currentStock // Default to max available
-                };
-            })
-        }));
+            // Mutations BACK to warehouse (return from pameran)
+            const backMutations = mutationLogs.filter(m =>
+                normalize(m.pengajuanNumber) === normalize(pengajuanNumber) &&
+                normalize(m.itemCode) === normalize(itemCode) &&
+                (packageNumber ? normalize(m.packageNumber) === normalize(packageNumber) : true) &&
+                (normalize(m.destination) === 'warehouse' || normalize(m.destination) === 'gudang')
+            );
+
+            const totalTo = toMutations.reduce((sum, m) => sum + (parseInt(m.mutatedQty) || 0), 0);
+            const totalBack = backMutations.reduce((sum, m) => sum + (parseInt(m.mutatedQty) || 0), 0);
+
+            return Math.max(0, totalTo - totalBack);
+        };
+
+        // Helper: Get stok sudah keluar (outbound) for an item
+        const getOutboundStock = (itemCode, packageNumber) => {
+            // Find outbound transactions from this pengajuan with matching item
+            let totalOutbound = 0;
+
+            outboundTransactions.forEach(t => {
+                const sourcePengajuan = t.sourcePengajuanNumber || t.source_pengajuan_number;
+
+                // Only count if source matches this pengajuan
+                if (normalize(sourcePengajuan) !== normalize(pengajuanNumber)) return;
+
+                // Check items array
+                if (t.items && Array.isArray(t.items)) {
+                    t.items.forEach(item => {
+                        const outItemCode = normalize(item.itemCode || item.item_code);
+                        const outPkgNumber = normalize(item.packageNumber || item.package_number);
+
+                        if (outItemCode === normalize(itemCode)) {
+                            if (!packageNumber || outPkgNumber === normalize(packageNumber)) {
+                                totalOutbound += parseInt(item.quantity) || 0;
+                            }
+                        }
+                    });
+                } else {
+                    // Single item transaction
+                    const outItemCode = normalize(t.itemCode || t.item_code);
+                    if (outItemCode === normalize(itemCode)) {
+                        totalOutbound += parseInt(t.quantity) || 0;
+                    }
+                }
+            });
+
+            return totalOutbound;
+        };
+
+        // Process each package and item
+        const packagesWithStock = (pengajuan.packages || []).map(pkg => {
+            const pkgNumber = pkg.packageNumber || pkg.package_number;
+
+            return {
+                ...pkg,
+                items: (pkg.items || []).map(item => {
+                    const itemCode = item.itemCode || item.item_code;
+                    const itemName = item.name || item.itemName || item.item_name;
+
+                    // Stok Awal (from pengajuan)
+                    const originalQty = item.quantity || 0;
+
+                    // Stok di Pameran
+                    const pameranStock = getPameranStock(itemCode, pkgNumber);
+
+                    // Stok sudah Keluar
+                    const outboundStock = getOutboundStock(itemCode, pkgNumber);
+
+                    // Stok Tersedia = Awal - Pameran - Keluar
+                    const availableQty = Math.max(0, originalQty - pameranStock - outboundStock);
+
+                    console.log(`  📦 ${itemName} (${itemCode}): Awal=${originalQty}, Pameran=${pameranStock}, Keluar=${outboundStock}, Tersedia=${availableQty}`);
+
+                    return {
+                        ...item,
+                        originalQty: originalQty,        // Stok Awal
+                        pameranQty: pameranStock,        // Stok di Pameran
+                        outboundedQty: outboundStock,    // Stok sudah Keluar
+                        availableQty: availableQty,      // Stok Tersedia
+                        outboundQty: availableQty        // Default = semua tersedia
+                    };
+                })
+            };
+        });
+
+        console.log('📋 Result:', packagesWithStock.map(p => ({
+            pkg: p.packageNumber,
+            items: p.items.map(i => ({
+                name: i.name || i.itemName,
+                awal: i.originalQty,
+                pameran: i.pameranQty,
+                keluar: i.outboundedQty,
+                tersedia: i.availableQty
+            }))
+        })));
 
         return packagesWithStock;
+    };
+
+    // Helper to normalize strings for robust comparison
+    const normalize = (str) => (str || '').toLowerCase().trim();
+
+    // Helper to find mutation info for an item - used for Detail Inventaris modal
+    const getItemMutationInfo = (itemCode, packageNumber, itemName, pengajuanId, pengajuanNumber) => {
+        const mutations = mutationLogs.filter(m =>
+            (m.pengajuanId === pengajuanId || normalize(m.pengajuanNumber) === normalize(pengajuanNumber)) &&
+            normalize(m.itemCode) === normalize(itemCode) &&
+            (packageNumber ? normalize(m.packageNumber) === normalize(packageNumber) : true) &&
+            (itemName ? (normalize(m.itemName) === normalize(itemName) || normalize(m.assetName) === normalize(itemName)) : true)
+        );
+
+        if (mutations.length === 0) return null;
+
+        // Sum all mutations for this item
+        const totalMutated = mutations.reduce((sum, m) => sum + (m.mutatedQty || 0), 0);
+        const latestMutation = mutations.sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+
+        return {
+            totalMutated,
+            date: latestMutation.date,
+            time: latestMutation.time,
+            destination: latestMutation.destination,
+            mutationCount: mutations.length
+        };
+    };
+
+    // Helper to calculate item location status (per individual item) - used for Detail Inventaris modal
+    const getIndividualItemStatus = (itemCode, packageNumber, itemName, pengajuanId, pengajuanNumber, originalQty) => {
+        // Find all outbound mutations for this specific item
+        const outboundMutations = mutationLogs.filter(m =>
+            (m.pengajuanId === pengajuanId || normalize(m.pengajuanNumber) === normalize(pengajuanNumber)) &&
+            normalize(m.itemCode) === normalize(itemCode) &&
+            (packageNumber ? normalize(m.packageNumber) === normalize(packageNumber) : true) &&
+            (m.destination || '').toLowerCase() !== 'warehouse' &&
+            (m.destination || '').toLowerCase() !== 'gudang'
+        );
+
+        // Find all return mutations for this specific item
+        const returnMutations = mutationLogs.filter(m =>
+            (m.pengajuanId === pengajuanId || normalize(m.pengajuanNumber) === normalize(pengajuanNumber)) &&
+            normalize(m.itemCode) === normalize(itemCode) &&
+            (packageNumber ? normalize(m.packageNumber) === normalize(packageNumber) : true) &&
+            ((m.destination || '').toLowerCase() === 'warehouse' || (m.destination || '').toLowerCase() === 'gudang')
+        );
+
+        // Calculate net outbound
+        const totalOutbound = outboundMutations.reduce((sum, m) => sum + (parseInt(m.mutatedQty) || 0), 0);
+        const totalReturned = returnMutations.reduce((sum, m) => sum + (parseInt(m.mutatedQty) || 0), 0);
+        const netAtPameran = Math.max(0, totalOutbound - totalReturned);
+        const inWarehouse = Math.max(0, (originalQty || 0) - netAtPameran);
+
+        return {
+            atPameran: netAtPameran,
+            inWarehouse,
+            totalOutbound,
+            totalReturned
+        };
     };
 
     // Handle selection of source pengajuan for outbound
@@ -493,7 +633,10 @@ const PengajuanManagement = () => {
             ...pkg,
             items: pkg.items.filter(item => item.availableQty > 0).map(item => ({
                 ...item,
-                quantity: item.outboundQty // Set quantity to outbound qty
+                // Keep original quantity for reference
+                quantity: item.originalQty || item.quantity,
+                // Add outboundQuantity field which processOutbound.js expects
+                outboundQuantity: item.outboundQty || item.availableQty
             }))
         }));
 
@@ -511,7 +654,9 @@ const PengajuanManagement = () => {
             packages: packagesWithAvailable,
             // Reference to source
             sourcePengajuanId: pengajuan.id,
-            sourcePengajuanNumber: pengajuan.quotationNumber || pengajuan.quotation_number
+            sourcePengajuanNumber: pengajuan.quotationNumber || pengajuan.quotation_number,
+            sourceBcDocumentNumber: pengajuan.bcDocumentNumber || pengajuan.bc_document_number,
+            sourceBcDocumentDate: pengajuan.bcDocumentDate || pengajuan.bc_document_date
         }));
 
         setSourcePengajuanId(pengajuan.id);
@@ -521,10 +666,31 @@ const PengajuanManagement = () => {
         console.log('📦 Packages with available stock:', packagesWithAvailable);
     };
 
-    // NEW: Handle editing item selection
+    // NEW: Handle editing item selection - now uses Split View Modal
     const handleEditItemSelection = () => {
-        setEditablePackages(formData.packages || []);
-        setShowItemEditor(true);
+        // Find source pengajuan to get original packages
+        const sourcePengajuan = quotations.find(q =>
+            (q.id === sourcePengajuanId) ||
+            (q.quotationNumber === formData.sourcePengajuanNumber) ||
+            (q.quotation_number === formData.sourcePengajuanNumber)
+        );
+
+        if (sourcePengajuan) {
+            // Use calculateAvailableStock to get consistent warehouse data
+            // This ensures modal shows the same items as "Data Package (Referensi)"
+            const packagesWithStock = calculateAvailableStock(sourcePengajuan);
+            setSourcePackagesForSplitView(packagesWithStock);
+        }
+        setShowSplitViewModal(true);
+    };
+
+    // Handle apply from Split View Modal
+    const handleApplySplitViewSelection = (selectedPackages) => {
+        setFormData(prev => ({
+            ...prev,
+            packages: selectedPackages
+        }));
+        setShowSplitViewModal(false);
     };
 
     // NEW: Handle confirm edited items
@@ -579,66 +745,51 @@ const PengajuanManagement = () => {
     const handleQuickOutbound = (inboundPengajuan, e) => {
         e.stopPropagation(); // Prevent row click
 
-        // Calculate available stock for this pengajuan
-        const packagesWithStock = calculateAvailableStock(inboundPengajuan);
+        console.log('🚀 Quick Outbound for:', inboundPengajuan.quotationNumber);
 
-        // Filter packages with available items
-        const packagesWithAvailable = packagesWithStock.filter(pkg =>
-            pkg.items.some(item => item.availableQty > 0)
-        ).map(pkg => ({
-            ...pkg,
-            items: pkg.items.filter(item => item.availableQty > 0).map(item => ({
-                ...item,
-                quantity: item.availableQty
-            }))
-        }));
-
-        if (packagesWithAvailable.length === 0) {
-            alert('❌ Tidak ada barang yang tersedia di gudang untuk pengajuan ini.\n\nSemua barang mungkin sudah dipindahkan ke Pameran atau sudah keluar dari TPB.');
-            return;
-        }
-
-        // Store in editable state
-        setEditablePackages(packagesWithAvailable);
-
-        // Auto-populate form for outbound
-        setFormData({
+        // Prepare outbound form data based on inbound source
+        const outboundData = {
+            id: null, // New record
             submissionDate: new Date().toISOString().split('T')[0],
-            customer: inboundPengajuan.customer || '',
-            type: 'outbound',
-            bcDocType: inboundPengajuan.bcDocType || inboundPengajuan.bc_document_type || '',
-            shipper: inboundPengajuan.shipper || '',
-            owner: inboundPengajuan.customer || '',
-            origin: 'Gudang TPPB',
-            destination: '',
-            itemDate: '',
-            packages: packagesWithAvailable,
-            documents: [],
-            notes: `Pengajuan keluar dari ${inboundPengajuan.quotationNumber || inboundPengajuan.quotation_number}`,
-            blNumber: '',
-            blDate: '',
-            invoiceNumber: '',
-            invoiceValue: '',
-            invoiceCurrency: 'IDR',
-            exchangeRate: '',
-            exchangeRateDate: '',
-            documentStatus: 'pengajuan',
-            bcDocumentNumber: '',
-            bcDocumentDate: '',
-            bcSupportingDocuments: [],
-            rejectionReason: '',
-            rejectionDate: '',
-            pic: '',
-            customsStatus: 'pending',
-            sourcePengajuanId: inboundPengajuan.id,
-            sourcePengajuanNumber: inboundPengajuan.quotationNumber || inboundPengajuan.quotation_number
-        });
+            customer: inboundPengajuan.customer,
+            type: 'outbound', // Force outbound
+            // Inherit BC Type from Source implies same treatment usually, 
+            // BUT outbound usually has different BC type (e.g. BC 2.3 -> BC 2.7). 
+            // So we might leave bcDocType empty or set a default if known. 
+            // For now, let user select to be safe, OR match source category if possible.
+            bcDocType: '',
 
-        setSourcePengajuanId(inboundPengajuan.id);
+            shipper: inboundPengajuan.shipper,
+            origin: inboundPengajuan.origin,
+            destination: '', // To be filled
+            itemDate: inboundPengajuan.itemDate,
+            packages: [], // Will be filled by handleSelectSourcePengajuan logic
+            documents: [],
+            notes: `Pengajuan keluar untuk ${inboundPengajuan.quotationNumber}`,
+
+            // Source Reference
+            sourcePengajuanId: inboundPengajuan.id,
+            sourcePengajuanNumber: inboundPengajuan.quotationNumber || inboundPengajuan.quotation_number,
+            sourceBcDocumentNumber: inboundPengajuan.bcDocumentNumber || inboundPengajuan.bc_document_number,
+            sourceBcDocumentDate: inboundPengajuan.bcDocumentDate || inboundPengajuan.bc_document_date,
+
+            // Defaults
+            documentStatus: 'pengajuan',
+            customsStatus: 'pending'
+        };
+
+        // Open Form
+        setFormData(outboundData);
         setShowForm(true);
 
-        console.log('🚀 Quick Outbound from:', inboundPengajuan.quotationNumber || inboundPengajuan.quotation_number);
-        console.log(`📦 ${packagesWithAvailable.length} package dengan ${packagesWithAvailable.reduce((sum, pkg) => sum + pkg.items.length, 0)} item siap diajukan keluar`);
+        // Trigger logic to fetch items for this source
+        // We can reuse the logic from handleSelectSourcePengajuan by calling it directly 
+        // or letting the useEffect/form logic handle it. 
+        // Since handleSelectSourcePengajuan is available, let's use it to populate packages.
+        handleSelectSourcePengajuan(inboundPengajuan);
+
+        // Scroll to top
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     // Removed getCustomsStatusBadge - Status Bea Cukai column removed per user request
@@ -776,6 +927,88 @@ const PengajuanManagement = () => {
                                     Pilih jenis dokumen Bea Cukai sesuai tipe pengajuan
                                 </p>
                             </div>
+
+                            {/* Outbound Specific: Source Pengajuan Selector */}
+                            {formData.type === 'outbound' && (
+                                <>
+                                    {/* Source Pengajuan Dropdown */}
+                                    <div className="md:col-span-2">
+                                        <label className="block text-sm font-medium text-silver mb-2">
+                                            Pilih Pengajuan Masuk (Source) *
+                                        </label>
+                                        <select
+                                            required
+                                            value={formData.sourcePengajuanId || ''}
+                                            onChange={(e) => {
+                                                const selectedPengajuan = getApprovedInboundPengajuan().find(p => p.id === e.target.value);
+                                                if (selectedPengajuan) {
+                                                    handleSelectSourcePengajuan(selectedPengajuan);
+                                                } else {
+                                                    // Reset if empty selected
+                                                    setFormData(prev => ({
+                                                        ...prev,
+                                                        sourcePengajuanId: '',
+                                                        sourcePengajuanNumber: '',
+                                                        sourceBcDocumentNumber: '',
+                                                        sourceBcDocumentDate: '',
+                                                        packages: []
+                                                    }));
+                                                }
+                                            }}
+                                            className="w-full"
+                                        >
+                                            <option value="">-- Pilih Pengajuan Masuk yang Approved --</option>
+                                            {getApprovedInboundPengajuan().map(p => (
+                                                <option key={p.id} value={p.id}>
+                                                    {p.quotationNumber || p.quotation_number} - {p.customer} ({p.bcDocumentNumber || p.bc_document_number || 'No BC'})
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <p className="text-xs text-silver-dark mt-1">
+                                            Hanya pengajuan masuk yang sudah approved yang dapat dipilih
+                                        </p>
+                                    </div>
+
+                                    {/* Read-Only Reference Fields */}
+                                    {formData.sourcePengajuanId && (
+                                        <>
+                                            <div>
+                                                <label className="block text-sm font-medium text-silver mb-2">
+                                                    No. Pengajuan Asal (Referensi)
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.sourcePengajuanNumber || ''}
+                                                    disabled
+                                                    className="w-full bg-dark-surface/50 cursor-not-allowed"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-silver mb-2">
+                                                    No. Pabean Asal (Referensi)
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.sourceBcDocumentNumber || '-'}
+                                                    disabled
+                                                    className="w-full bg-dark-surface/50 cursor-not-allowed"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-silver mb-2">
+                                                    Tanggal Pabean Asal
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.sourceBcDocumentDate || '-'}
+                                                    disabled
+                                                    className="w-full bg-dark-surface/50 cursor-not-allowed"
+                                                />
+                                            </div>
+                                        </>
+                                    )}
+                                </>
+                            )}
 
                             <div>
                                 <label className="block text-sm font-medium text-silver mb-2">Pemilik Barang *</label>
@@ -943,12 +1176,19 @@ const PengajuanManagement = () => {
                             {sourcePengajuanId ? (
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-between bg-dark-surface/50 p-3 rounded-lg">
-                                        <div className="flex items-center gap-2">
-                                            <Package className="w-5 h-5 text-accent-green" />
-                                            <span className="text-sm text-silver">
-                                                Sumber: <span className="font-medium text-accent-green">{formData.sourcePengajuanNumber}</span>
-                                            </span>
-                                            <span className="text-xs text-silver-dark">
+                                        <div className="flex flex-col gap-1">
+                                            <div className="flex items-center gap-2">
+                                                <Package className="w-5 h-5 text-accent-green" />
+                                                <span className="text-sm text-silver">
+                                                    Sumber: <span className="font-medium text-accent-green">{formData.sourcePengajuanNumber}</span>
+                                                </span>
+                                            </div>
+                                            {formData.sourceBcDocumentNumber && (
+                                                <span className="text-xs text-silver ml-7">
+                                                    Ref BC Masuk: <span className="text-accent-blue">{formData.sourceBcDocumentNumber}</span> ({formData.sourceBcDocumentDate ? new Date(formData.sourceBcDocumentDate).toLocaleDateString('id-ID') : '-'})
+                                                </span>
+                                            )}
+                                            <span className="text-xs text-silver-dark ml-7">
                                                 ({formData.packages?.length || 0} package, {formData.packages?.reduce((sum, pkg) => sum + (pkg.items?.length || 0), 0) || 0} item)
                                             </span>
                                         </div>
@@ -984,11 +1224,7 @@ const PengajuanManagement = () => {
                                     type="button"
                                     variant="primary"
                                     icon={Warehouse}
-                                    onClick={() => {
-                                        if (window.confirm('Anda akan diarahkan ke halaman Stok Gudang untuk memilih barang keluar. Lanjutkan?')) {
-                                            navigate('/bridge/inventory');
-                                        }
-                                    }}
+                                    onClick={() => setShowWarehouseSelector(true)}
                                 >
                                     Pilih dari Gudang / Input Stok
                                 </Button>
@@ -1045,193 +1281,196 @@ const PengajuanManagement = () => {
                 </form>
             )}
 
-            {/* Daftar Pengajuan - SPLIT INTO TWO TABLES */}
+            {/* Daftar Pengajuan - SPLIT INTO TWO TABLES - Only show when NOT editing/creating */}
+            {!showForm && (
+                <>
+                    {/* ==================== PENGAJUAN MASUK (INBOUND) ==================== */}
+                    <div className="glass-card p-6 rounded-lg border-2 border-accent-blue">
+                        <div className="flex items-center justify-between mb-4">
+                            <div>
+                                <h3 className="text-xl font-semibold text-accent-blue flex items-center gap-2">
+                                    📥 Pengajuan Masuk (Inbound)
+                                </h3>
+                                <p className="text-xs text-silver-dark mt-1">Pengajuan barang masuk ke TPPB</p>
+                            </div>
+                            <Button
+                                onClick={handleExportCSV}
+                                variant="secondary"
+                                icon={Download}
+                                size="sm"
+                            >
+                                Export CSV
+                            </Button>
+                        </div>
 
-            {/* ==================== PENGAJUAN MASUK (INBOUND) ==================== */}
-            <div className="glass-card p-6 rounded-lg border-2 border-accent-blue">
-                <div className="flex items-center justify-between mb-4">
-                    <div>
-                        <h3 className="text-xl font-semibold text-accent-blue flex items-center gap-2">
-                            📥 Pengajuan Masuk (Inbound)
-                        </h3>
-                        <p className="text-xs text-silver-dark mt-1">Pengajuan barang masuk ke TPPB</p>
-                    </div>
-                    <Button
-                        onClick={handleExportCSV}
-                        variant="secondary"
-                        icon={Download}
-                        size="sm"
-                    >
-                        Export CSV
-                    </Button>
-                </div>
-
-                {quotations.filter(q => q.type === 'inbound').length === 0 ? (
-                    <div className="text-center py-8 text-silver-dark">
-                        <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                        <p>Belum ada pengajuan masuk</p>
-                    </div>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="bg-accent-blue">
-                                <tr>
-                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">No. Pengajuan</th>
-                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Tanggal</th>
-                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Pemilik Barang</th>
-                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Dokumen BC</th>
-                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Jumlah Barang</th>
-                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">No. Dokumen Pabean</th>
-                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Tgl Approval</th>
-                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Status Dokumen</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-dark-border">
-                                {quotations.filter(q => q.type === 'inbound').map(quot => {
-                                    const docStatus = quot.documentStatus || quot.document_status || 'pengajuan';
-                                    const docStatusBadge = {
-                                        pengajuan: { color: 'bg-yellow-500/20 text-yellow-400', label: 'Pengajuan' },
-                                        approved: { color: 'bg-green-500/20 text-green-400', label: 'Approved' },
-                                        rejected: { color: 'bg-red-500/20 text-red-400', label: 'Rejected' }
-                                    }[docStatus] || { color: 'bg-yellow-500/20 text-yellow-400', label: 'Pengajuan' };
-
-                                    return (
-                                        <tr
-                                            key={quot.id}
-                                            onClick={() => handleEditPengajuan(quot)}
-                                            className="hover:bg-dark-surface smooth-transition cursor-pointer"
-                                        >
-                                            <td className="px-4 py-2 text-sm text-silver-light font-medium whitespace-nowrap">
-                                                {quot.quotationNumber || quot.quotation_number || quot.id}
-                                            </td>
-                                            <td className="px-4 py-2 text-sm text-silver-dark whitespace-nowrap">
-                                                {new Date(quot.submissionDate || quot.submission_date || quot.date).toLocaleDateString('id-ID')}
-                                            </td>
-                                            <td className="px-4 py-2 text-sm text-silver whitespace-nowrap">
-                                                {quot.customer}
-                                            </td>
-                                            <td className="px-4 py-2 text-sm text-silver whitespace-nowrap">
-                                                {quot.bcDocType || quot.bc_document_type || '-'}
-                                            </td>
-                                            <td className="px-4 py-2 text-sm text-silver whitespace-nowrap">
-                                                {quot.packages
-                                                    ? `${quot.packages.length} package (${quot.packages.reduce((sum, pkg) => sum + (pkg.items?.length || 0), 0)} item)`
-                                                    : (quot.packageItems?.length || quot.items?.length || 0)
-                                                }
-                                            </td>
-                                            <td className="px-4 py-2 text-sm text-accent-blue font-medium whitespace-nowrap">
-                                                {quot.bcDocumentNumber || quot.bc_document_number || '-'}
-                                            </td>
-                                            <td className="px-4 py-2 text-sm text-silver whitespace-nowrap">
-                                                {quot.approvedDate || quot.approved_date ? new Date(quot.approvedDate || quot.approved_date).toLocaleDateString('id-ID') : '-'}
-                                            </td>
-                                            <td className="px-4 py-2 whitespace-nowrap">
-                                                <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${docStatusBadge.color}`}>
-                                                    {docStatusBadge.label}
-                                                </span>
-                                            </td>
+                        {quotations.filter(q => q.type === 'inbound').length === 0 ? (
+                            <div className="text-center py-8 text-silver-dark">
+                                <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                                <p>Belum ada pengajuan masuk</p>
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead className="bg-accent-blue">
+                                        <tr>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">No. Pengajuan</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Tanggal</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Pemilik Barang</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Dokumen BC</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Jumlah Barang</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">No. Dokumen Pabean</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Tgl Approval</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Status Dokumen</th>
                                         </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                )
-                }
-            </div>
+                                    </thead>
+                                    <tbody className="divide-y divide-dark-border">
+                                        {quotations.filter(q => q.type === 'inbound').map(quot => {
+                                            const docStatus = quot.documentStatus || quot.document_status || 'pengajuan';
+                                            const docStatusBadge = {
+                                                pengajuan: { color: 'bg-yellow-500/20 text-yellow-400', label: 'Pengajuan' },
+                                                approved: { color: 'bg-green-500/20 text-green-400', label: 'Approved' },
+                                                rejected: { color: 'bg-red-500/20 text-red-400', label: 'Rejected' }
+                                            }[docStatus] || { color: 'bg-yellow-500/20 text-yellow-400', label: 'Pengajuan' };
 
-            {/* ==================== PENGAJUAN KELUAR (OUTBOUND) ==================== */}
-            <div className="glass-card p-6 rounded-lg border-2 border-accent-purple mt-10">
-                <div className="flex items-center justify-between mb-4">
-                    <div>
-                        <h3 className="text-xl font-semibold text-accent-purple flex items-center gap-2">
-                            📤 Pengajuan Keluar (Outbound)
-                        </h3>
-                        <p className="text-xs text-silver-dark mt-1">Pengajuan barang keluar dari TPPB</p>
+                                            return (
+                                                <tr
+                                                    key={quot.id}
+                                                    onClick={() => handleEditPengajuan(quot)}
+                                                    className="hover:bg-dark-surface smooth-transition cursor-pointer"
+                                                >
+                                                    <td className="px-4 py-2 text-sm text-silver-light font-medium whitespace-nowrap">
+                                                        {quot.quotationNumber || quot.quotation_number || quot.id}
+                                                    </td>
+                                                    <td className="px-4 py-2 text-sm text-silver-dark whitespace-nowrap">
+                                                        {new Date(quot.submissionDate || quot.submission_date || quot.date).toLocaleDateString('id-ID')}
+                                                    </td>
+                                                    <td className="px-4 py-2 text-sm text-silver whitespace-nowrap">
+                                                        {quot.customer}
+                                                    </td>
+                                                    <td className="px-4 py-2 text-sm text-silver whitespace-nowrap">
+                                                        {quot.bcDocType || quot.bc_document_type || '-'}
+                                                    </td>
+                                                    <td className="px-4 py-2 text-sm text-silver whitespace-nowrap">
+                                                        {quot.packages
+                                                            ? `${quot.packages.length} package (${quot.packages.reduce((sum, pkg) => sum + (pkg.items?.length || 0), 0)} item)`
+                                                            : (quot.packageItems?.length || quot.items?.length || 0)
+                                                        }
+                                                    </td>
+                                                    <td className="px-4 py-2 text-sm text-accent-blue font-medium whitespace-nowrap">
+                                                        {quot.bcDocumentNumber || quot.bc_document_number || '-'}
+                                                    </td>
+                                                    <td className="px-4 py-2 text-sm text-silver whitespace-nowrap">
+                                                        {quot.approvedDate || quot.approved_date ? new Date(quot.approvedDate || quot.approved_date).toLocaleDateString('id-ID') : '-'}
+                                                    </td>
+                                                    <td className="px-4 py-2 whitespace-nowrap">
+                                                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${docStatusBadge.color}`}>
+                                                            {docStatusBadge.label}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )
+                        }
                     </div>
-                    <Button
-                        onClick={handleExportCSV}
-                        variant="secondary"
-                        icon={Download}
-                        size="sm"
-                    >
-                        Export CSV
-                    </Button>
-                </div>
 
-                {quotations.filter(q => q.type === 'outbound').length === 0 ? (
-                    <div className="text-center py-8 text-silver-dark">
-                        <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                        <p>Belum ada pengajuan keluar</p>
-                    </div>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="bg-accent-purple">
-                                <tr>
-                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">No. Pengajuan</th>
-                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Tanggal</th>
-                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Pemilik Barang</th>
-                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Dokumen BC</th>
-                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Jumlah Barang</th>
-                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">No. Dokumen Pabean</th>
-                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Tgl Approval</th>
-                                    <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Status Dokumen</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-dark-border">
-                                {quotations.filter(q => q.type === 'outbound').map(quot => {
-                                    const docStatus = quot.documentStatus || quot.document_status || 'pengajuan';
-                                    const docStatusBadge = {
-                                        pengajuan: { color: 'bg-yellow-500/20 text-yellow-400', label: 'Pengajuan' },
-                                        approved: { color: 'bg-green-500/20 text-green-400', label: 'Approved' },
-                                        rejected: { color: 'bg-red-500/20 text-red-400', label: 'Rejected' }
-                                    }[docStatus] || { color: 'bg-yellow-500/20 text-yellow-400', label: 'Pengajuan' };
+                    {/* ==================== PENGAJUAN KELUAR (OUTBOUND) ==================== */}
+                    <div className="glass-card p-6 rounded-lg border-2 border-accent-purple mt-10">
+                        <div className="flex items-center justify-between mb-4">
+                            <div>
+                                <h3 className="text-xl font-semibold text-accent-purple flex items-center gap-2">
+                                    📤 Pengajuan Keluar (Outbound)
+                                </h3>
+                                <p className="text-xs text-silver-dark mt-1">Pengajuan barang keluar dari TPPB</p>
+                            </div>
+                            <Button
+                                onClick={handleExportCSV}
+                                variant="secondary"
+                                icon={Download}
+                                size="sm"
+                            >
+                                Export CSV
+                            </Button>
+                        </div>
 
-                                    return (
-                                        <tr
-                                            key={quot.id}
-                                            onClick={() => handleEditPengajuan(quot)}
-                                            className="hover:bg-dark-surface smooth-transition cursor-pointer"
-                                        >
-                                            <td className="px-4 py-2 text-sm text-silver-light font-medium whitespace-nowrap">
-                                                {quot.quotationNumber || quot.quotation_number || quot.id}
-                                            </td>
-                                            <td className="px-4 py-2 text-sm text-silver-dark whitespace-nowrap">
-                                                {new Date(quot.submissionDate || quot.submission_date || quot.date).toLocaleDateString('id-ID')}
-                                            </td>
-                                            <td className="px-4 py-2 text-sm text-silver whitespace-nowrap">
-                                                {quot.customer}
-                                            </td>
-                                            <td className="px-4 py-2 text-sm text-silver whitespace-nowrap">
-                                                {quot.bcDocType || quot.bc_document_type || '-'}
-                                            </td>
-                                            <td className="px-4 py-2 text-sm text-silver whitespace-nowrap">
-                                                {quot.packages
-                                                    ? `${quot.packages.length} package (${quot.packages.reduce((sum, pkg) => sum + (pkg.items?.length || 0), 0)} item)`
-                                                    : (quot.packageItems?.length || quot.items?.length || 0)
-                                                }
-                                            </td>
-                                            <td className="px-4 py-2 text-sm text-accent-purple font-medium whitespace-nowrap">
-                                                {quot.bcDocumentNumber || quot.bc_document_number || '-'}
-                                            </td>
-                                            <td className="px-4 py-2 text-sm text-silver whitespace-nowrap">
-                                                {quot.approvedDate || quot.approved_date ? new Date(quot.approvedDate || quot.approved_date).toLocaleDateString('id-ID') : '-'}
-                                            </td>
-                                            <td className="px-4 py-2 whitespace-nowrap">
-                                                <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${docStatusBadge.color}`}>
-                                                    {docStatusBadge.label}
-                                                </span>
-                                            </td>
+                        {quotations.filter(q => q.type === 'outbound').length === 0 ? (
+                            <div className="text-center py-8 text-silver-dark">
+                                <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                                <p>Belum ada pengajuan keluar</p>
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead className="bg-accent-purple">
+                                        <tr>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">No. Pengajuan</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Tanggal</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Pemilik Barang</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Dokumen BC</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Jumlah Barang</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">No. Dokumen Pabean</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Tgl Approval</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Status Dokumen</th>
                                         </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
+                                    </thead>
+                                    <tbody className="divide-y divide-dark-border">
+                                        {quotations.filter(q => q.type === 'outbound').map(quot => {
+                                            const docStatus = quot.documentStatus || quot.document_status || 'pengajuan';
+                                            const docStatusBadge = {
+                                                pengajuan: { color: 'bg-yellow-500/20 text-yellow-400', label: 'Pengajuan' },
+                                                approved: { color: 'bg-green-500/20 text-green-400', label: 'Approved' },
+                                                rejected: { color: 'bg-red-500/20 text-red-400', label: 'Rejected' }
+                                            }[docStatus] || { color: 'bg-yellow-500/20 text-yellow-400', label: 'Pengajuan' };
+
+                                            return (
+                                                <tr
+                                                    key={quot.id}
+                                                    onClick={() => handleEditPengajuan(quot)}
+                                                    className="hover:bg-dark-surface smooth-transition cursor-pointer"
+                                                >
+                                                    <td className="px-4 py-2 text-sm text-silver-light font-medium whitespace-nowrap">
+                                                        {quot.quotationNumber || quot.quotation_number || quot.id}
+                                                    </td>
+                                                    <td className="px-4 py-2 text-sm text-silver-dark whitespace-nowrap">
+                                                        {new Date(quot.submissionDate || quot.submission_date || quot.date).toLocaleDateString('id-ID')}
+                                                    </td>
+                                                    <td className="px-4 py-2 text-sm text-silver whitespace-nowrap">
+                                                        {quot.customer}
+                                                    </td>
+                                                    <td className="px-4 py-2 text-sm text-silver whitespace-nowrap">
+                                                        {quot.bcDocType || quot.bc_document_type || '-'}
+                                                    </td>
+                                                    <td className="px-4 py-2 text-sm text-silver whitespace-nowrap">
+                                                        {quot.packages
+                                                            ? `${quot.packages.length} package (${quot.packages.reduce((sum, pkg) => sum + (pkg.items?.length || 0), 0)} item)`
+                                                            : (quot.packageItems?.length || quot.items?.length || 0)
+                                                        }
+                                                    </td>
+                                                    <td className="px-4 py-2 text-sm text-accent-purple font-medium whitespace-nowrap">
+                                                        {quot.bcDocumentNumber || quot.bc_document_number || '-'}
+                                                    </td>
+                                                    <td className="px-4 py-2 text-sm text-silver whitespace-nowrap">
+                                                        {quot.approvedDate || quot.approved_date ? new Date(quot.approvedDate || quot.approved_date).toLocaleDateString('id-ID') : '-'}
+                                                    </td>
+                                                    <td className="px-4 py-2 whitespace-nowrap">
+                                                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${docStatusBadge.color}`}>
+                                                            {docStatusBadge.label}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )
+                        }
                     </div>
-                )
-                }
-            </div>
+                </>
+            )}
 
             {/* Confirmation Dialog */}
             {
@@ -1301,6 +1540,24 @@ const PengajuanManagement = () => {
                                             </p>
                                         </div>
                                     </div>
+
+                                    {/* Source Reference for Outbound */}
+                                    {editModal.pengajuan.type === 'outbound' && editModal.pengajuan.sourcePengajuanNumber && (
+                                        <div className="mt-3 pt-3 border-t border-dark-border">
+                                            <p className="text-xs text-accent-purple font-semibold mb-2">📥 Referensi Pengajuan Masuk:</p>
+                                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                                <div>
+                                                    <p className="text-silver-dark">No. Pengajuan Asal</p>
+                                                    <p className="text-silver-light">{editModal.pengajuan.sourcePengajuanNumber || '-'}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-silver-dark">No. Pabean Asal</p>
+                                                    <p className="text-silver-light">{editModal.pengajuan.sourceBcDocumentNumber || '-'}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <div className="mt-3 pt-3 border-t border-dark-border text-right">
                                         {(editModal.pengajuan.documentStatus || editModal.pengajuan.document_status) === 'approved' ? (
                                             <p className="text-xs text-amber-400 italic">
@@ -1317,15 +1574,20 @@ const PengajuanManagement = () => {
                                 {/* BC Document Number */}
                                 <div>
                                     <label className="block text-sm font-medium text-silver mb-2">
-                                        No. Dokumen Pabean {editFormData.documentStatus === 'approved' && <span className="text-red-400">*</span>}
+                                        {editModal.pengajuan.type === 'outbound' ? 'No. Dokumen BC Keluar' : 'No. Dokumen Pabean'} {editFormData.documentStatus === 'approved' && <span className="text-red-400">*</span>}
                                     </label>
                                     <input
                                         type="text"
                                         value={editFormData.bcDocumentNumber}
                                         onChange={(e) => setEditFormData({ ...editFormData, bcDocumentNumber: e.target.value })}
-                                        placeholder="contoh: BC2.3-2025-001"
+                                        placeholder={editModal.pengajuan.type === 'outbound' ? 'Nomor BC Keluar baru (wajib)' : 'contoh: BC2.3-2025-001'}
                                         className="w-full"
                                     />
+                                    {editModal.pengajuan.type === 'outbound' && (
+                                        <p className="text-xs text-accent-purple mt-1">
+                                            ⚠️ Ini adalah nomor BC baru untuk barang keluar, berbeda dari BC masuk
+                                        </p>
+                                    )}
                                 </div>
 
                                 {/* BC Document Date */}
@@ -1377,7 +1639,8 @@ const PengajuanManagement = () => {
                                             required
                                             value={editFormData.manualDate}
                                             onChange={(e) => setEditFormData({ ...editFormData, manualDate: e.target.value })}
-                                            className="w-full border-accent-green focus:ring-accent-green"
+                                            className={`w-full border-accent-green focus:ring-accent-green ${(editModal.pengajuan.documentStatus || editModal.pengajuan.document_status) === 'approved' ? 'bg-dark-surface/50 cursor-not-allowed opacity-70' : ''}`}
+                                            disabled={(editModal.pengajuan.documentStatus || editModal.pengajuan.document_status) === 'approved'}
                                         />
                                         <p className="text-xs text-silver-dark mt-1">Tanggal ini akan digunakan sebagai tanggal masuk barang di sistem.</p>
                                     </div>
@@ -1450,6 +1713,24 @@ const PengajuanManagement = () => {
                                                 className="bg-accent-purple hover:bg-accent-purple/80"
                                             >
                                                 Ajukan Barang Keluar
+                                            </Button>
+                                        )}
+
+                                    {/* Button untuk proses barang keluar setelah outbound approved */}
+                                    {editModal.pengajuan.type === 'outbound' &&
+                                        (editModal.pengajuan.documentStatus || editModal.pengajuan.document_status) === 'approved' &&
+                                        (editModal.pengajuan.outboundStatus !== 'processed') && (
+                                            <Button
+                                                variant="primary"
+                                                onClick={() => {
+                                                    // Navigate to OutboundInventory to confirm item exit
+                                                    navigate('/bridge/outbound-inventory');
+                                                    setEditModal({ show: false, pengajuan: null });
+                                                }}
+                                                icon={Package}
+                                                className="bg-accent-orange hover:bg-accent-orange/80"
+                                            >
+                                                Proses Barang Keluar
                                             </Button>
                                         )}
 
@@ -1597,98 +1878,209 @@ const PengajuanManagement = () => {
                 </div>
             )}
 
-            {/* Item Editor Modal */}
+            {/* Item Editor Modal - Detail Inventaris Style (konsisten dengan WarehouseInventory) */}
             {showItemEditor && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-                    <div className="bg-white rounded-2xl max-w-7xl w-full max-h-[85vh] overflow-hidden shadow-2xl flex flex-col">
-                        <div className="flex justify-between items-center p-6 border-b border-gray-200">
+                    <div className="bg-white rounded-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
+                        {/* Modal Header */}
+                        <div className="flex justify-between items-center p-4 border-b border-gray-200">
                             <div>
-                                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                                    <Edit2 className="w-5 h-5" />
-                                    Detail Inventaris
-                                </h2>
-                                <p className="text-sm text-gray-500 mt-1">
-                                    Pilih item dan quantity yang akan dikeluarkan dari gudang
-                                </p>
+                                <h2 className="text-xl font-bold text-gray-900">Detail Inventaris</h2>
+                                <p className="text-sm text-gray-500">{formData.sourcePengajuanNumber || '-'}</p>
                             </div>
-                            <button onClick={() => setShowItemEditor(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                                <X className="w-6 h-6" />
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <Button onClick={handleConfirmEditedItems} variant="primary" icon={Edit2} className="text-sm">Kelola</Button>
+                                <button onClick={() => setShowItemEditor(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                                    <X className="w-5 h-5 text-gray-500" />
+                                </button>
+                            </div>
                         </div>
-                        <div className="p-6 overflow-y-auto flex-1 bg-gray-50 space-y-4">
-                            {/* Detail Item Section Title */}
-                            <div className="pb-2">
-                                <h3 className="text-base font-bold text-gray-800">📝 Detail Item</h3>
-                            </div>
 
+                        {/* Data Inventaris Section */}
+                        <div className="px-4 pt-4 pb-2">
+                            <h3 className="text-base font-bold text-gray-800">📦 Data Inventaris</h3>
+                        </div>
+
+                        {/* Header Info Table */}
+                        <div className="px-4 pb-4 border-b border-gray-200">
+                            <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                                <table className="w-full">
+                                    <thead className="bg-blue-600">
+                                        <tr>
+                                            <th className="px-2 py-1 text-left text-xs font-semibold text-white">NO. PENGAJUAN</th>
+                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white">NO. PABEAN</th>
+                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white">TGL MASUK GUDANG</th>
+                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white">JAM MASUK</th>
+                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white">JML PACKAGE</th>
+                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white">JML ITEM</th>
+                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white">PIC PENERIMA</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {(() => {
+                                            // Find source pengajuan data
+                                            const sourcePengajuan = quotations.find(q =>
+                                                (q.quotationNumber || q.quotation_number) === formData.sourcePengajuanNumber ||
+                                                q.id === formData.sourcePengajuanId
+                                            );
+                                            const totalPackages = editablePackages.length;
+                                            const totalItems = editablePackages.reduce((sum, pkg) => sum + (pkg.items?.length || 0), 0);
+
+                                            return (
+                                                <tr className="bg-white">
+                                                    <td className="px-2 py-0.5 text-xs text-gray-900 font-semibold">{formData.sourcePengajuanNumber || '-'}</td>
+                                                    <td className="px-2 py-0.5 text-xs text-gray-700 text-center">{sourcePengajuan?.bcDocumentNumber || sourcePengajuan?.bc_document_number || '-'}</td>
+                                                    <td className="px-2 py-0.5 text-xs text-gray-700 text-center">
+                                                        {sourcePengajuan?.approvedDate || sourcePengajuan?.approved_date
+                                                            ? new Date(sourcePengajuan.approvedDate || sourcePengajuan.approved_date).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                                                            : '-'
+                                                        }
+                                                    </td>
+                                                    <td className="px-2 py-0.5 text-xs text-gray-700 text-center">
+                                                        {sourcePengajuan?.approvedDate || sourcePengajuan?.approved_date
+                                                            ? new Date(sourcePengajuan.approvedDate || sourcePengajuan.approved_date).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+                                                            : '-'
+                                                        }
+                                                    </td>
+                                                    <td className="px-2 py-0.5 text-xs text-gray-700 text-center font-bold">{totalPackages}</td>
+                                                    <td className="px-2 py-0.5 text-xs text-gray-700 text-center font-bold">{totalItems}</td>
+                                                    <td className="px-2 py-0.5 text-xs text-gray-700 text-center">{sourcePengajuan?.pic || '-'}</td>
+                                                </tr>
+                                            );
+                                        })()}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        {/* Detail Item Section Title */}
+                        <div className="px-4 pt-4 pb-3">
+                            <h3 className="text-base font-bold text-gray-800">📝 Detail Item</h3>
+                        </div>
+
+                        {/* Detail Items - Scrollable */}
+                        <div className="p-4 overflow-y-auto flex-1 space-y-4 max-h-[calc(90vh-320px)]">
                             {editablePackages.map((pkg, pkgIndex) => {
                                 const activeItems = pkg.items.filter(item => (item.quantity || 0) > 0);
                                 if (activeItems.length === 0) return null;
+
+                                // Get source pengajuan info for mutation lookup
+                                const sourcePengajuan = quotations.find(q =>
+                                    (q.quotationNumber || q.quotation_number) === formData.sourcePengajuanNumber ||
+                                    q.id === formData.sourcePengajuanId
+                                );
+                                const pengajuanId = sourcePengajuan?.id;
+                                const pengajuanNumber = formData.sourcePengajuanNumber;
+
                                 return (
-                                    <div key={pkgIndex} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                                        <div className="bg-gray-100 px-4 py-2 border-b border-gray-200">
-                                            <h4 className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                                                <Package className="w-4 h-4 text-accent-purple" />
-                                                Kode Packing: {pkg.packageNumber}
-                                            </h4>
+                                    <div key={pkgIndex} className="border border-gray-200 rounded-lg overflow-hidden">
+                                        <div className="bg-gray-100 px-3 py-2 border-b border-gray-200">
+                                            <span className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                                                <Package className="w-4 h-4 text-blue-600" />
+                                                Kode Packing: {pkg.packageNumber || `PKG-${pkgIndex + 1}`}
+                                            </span>
                                         </div>
                                         <div className="overflow-x-auto">
-                                            <table className="w-full text-sm">
-                                                <thead className="bg-accent-purple">
+                                            <table className="w-full">
+                                                <thead className="bg-blue-600">
                                                     <tr>
-                                                        <th className="px-2 py-2 text-left text-xs font-bold whitespace-nowrap text-white w-12">NO. URUT</th>
-                                                        <th className="px-2 py-2 text-left text-xs font-bold whitespace-nowrap text-white w-24">KODE BARANG</th>
-                                                        <th className="px-2 py-2 text-left text-xs font-bold whitespace-nowrap text-white w-20">HS CODE</th>
-                                                        <th className="px-2 py-2 text-left text-xs font-bold whitespace-nowrap text-white">ITEM</th>
-                                                        <th className="px-2 py-2 text-center text-xs font-bold whitespace-nowrap text-white w-16">JML AWAL</th>
-                                                        <th className="px-2 py-2 text-center text-xs font-bold whitespace-nowrap text-white w-14">SATUAN</th>
-                                                        <th className="px-2 py-2 text-center text-xs font-bold whitespace-nowrap text-white w-24">STATUS</th>
-                                                        <th className="px-2 py-2 text-center text-xs font-bold whitespace-nowrap text-white w-20">LOKASI</th>
-                                                        <th className="px-2 py-2 text-center text-xs font-bold whitespace-nowrap text-white w-16">KONDISI</th>
-                                                        <th className="px-2 py-2 text-center text-xs font-bold whitespace-nowrap text-white bg-green-700 w-24">QTY KELUAR</th>
-                                                        <th className="px-2 py-2 text-center text-xs font-bold whitespace-nowrap text-white w-12">AKSI</th>
+                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-8">NO.</th>
+                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-20">KODE BRG</th>
+                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-16">HS</th>
+                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white">ITEM</th>
+                                                        <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white w-12">AWAL</th>
+                                                        <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white w-12">SAT</th>
+                                                        <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white w-24">STATUS</th>
+                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-16">LOKASI</th>
+                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-14">KONDISI</th>
+                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-full">KETERANGAN</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-gray-200">
-                                                    {pkg.items.map((item, itemIndex) => {
+                                                    {pkg.items.map((item, itemIdx) => {
                                                         if ((item.quantity || 0) === 0) return null;
-                                                        const maxQty = item.availableQty || item.quantity || 0;
-                                                        const currentQty = item.quantity || 0;
+
+                                                        const itemName = item.name || item.itemName;
+                                                        const originalQty = item.originalQty || item.availableQty || item.quantity || 0;
+
+                                                        // Get mutation info for this item
+                                                        const mutationInfo = getItemMutationInfo(
+                                                            item.itemCode,
+                                                            pkg.packageNumber,
+                                                            itemName,
+                                                            pengajuanId,
+                                                            pengajuanNumber
+                                                        );
+
+                                                        // Get item status (warehouse vs pameran)
+                                                        const itemStatus = getIndividualItemStatus(
+                                                            item.itemCode,
+                                                            pkg.packageNumber,
+                                                            itemName,
+                                                            pengajuanId,
+                                                            pengajuanNumber,
+                                                            originalQty
+                                                        );
+
+                                                        const inWarehouse = itemStatus.inWarehouse;
+                                                        const atPameran = itemStatus.atPameran;
+
+                                                        // Determine row styling based on mutation status
+                                                        const rowClass = mutationInfo
+                                                            ? 'bg-orange-50 hover:bg-orange-100/50'
+                                                            : 'hover:bg-gray-50';
+
                                                         return (
-                                                            <tr key={itemIndex} className="hover:bg-purple-50/50">
-                                                                <td className="px-2 py-2 text-xs text-gray-700">{itemIndex + 1}</td>
-                                                                <td className="px-2 py-2 text-xs font-mono text-gray-900">{item.itemCode || '-'}</td>
-                                                                <td className="px-2 py-2 text-xs text-gray-700">{item.hsCode || '-'}</td>
-                                                                <td className="px-2 py-2 text-xs text-gray-700">{item.name || item.itemName || '-'}</td>
-                                                                <td className="px-2 py-2 text-xs text-center font-semibold text-gray-900">{item.originalQty || maxQty}</td>
-                                                                <td className="px-2 py-2 text-xs text-center text-gray-700">{item.uom || 'pcs'}</td>
-                                                                <td className="px-2 py-2 text-xs text-center">
+                                                            <tr key={itemIdx} className={rowClass}>
+                                                                <td className="px-1 py-0 text-xs text-gray-700">{itemIdx + 1}</td>
+                                                                <td className="px-1 py-0 text-xs text-gray-700">{item.itemCode || '-'}</td>
+                                                                <td className="px-1 py-0 text-xs text-gray-700">{item.hsCode || '-'}</td>
+                                                                <td className="px-1 py-0 text-xs text-gray-700 max-w-[250px] break-words">{itemName || '-'}</td>
+                                                                <td className="px-1 py-0 text-xs text-gray-700 text-center">
+                                                                    <span className="font-semibold">{originalQty}</span>
+                                                                </td>
+                                                                <td className="px-1 py-0 text-xs text-gray-700 text-center">{item.uom || 'pcs'}</td>
+                                                                <td className="px-1 py-0 text-xs text-center">
                                                                     <div className="flex items-center justify-center gap-1">
-                                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-100 text-green-800 border border-green-200">
-                                                                            📦 {maxQty}
-                                                                        </span>
+                                                                        <div className="flex items-center gap-0.5 bg-green-100 px-1 py-0 rounded border border-green-200">
+                                                                            <Box className="w-2.5 h-2.5 text-green-600" />
+                                                                            <span className="text-[9px] font-bold text-green-700">{inWarehouse}</span>
+                                                                        </div>
+                                                                        {atPameran > 0 && (
+                                                                            <div className="flex items-center gap-0.5 bg-orange-100 px-1 py-0 rounded border border-orange-200">
+                                                                                <MapPin className="w-2.5 h-2.5 text-orange-600" />
+                                                                                <span className="text-[9px] font-bold text-orange-700">{atPameran}</span>
+                                                                            </div>
+                                                                        )}
                                                                     </div>
                                                                 </td>
-                                                                <td className="px-2 py-2 text-xs text-center text-gray-700">warehouse</td>
-                                                                <td className="px-2 py-2 text-xs text-center text-gray-700">{item.condition || 'Baik'}</td>
-                                                                <td className="px-2 py-2 text-center bg-green-50">
-                                                                    <input
-                                                                        type="number"
-                                                                        min="0"
-                                                                        max={maxQty}
-                                                                        value={currentQty}
-                                                                        onChange={(e) => handleItemQuantityChange(pkgIndex, itemIndex, e.target.value)}
-                                                                        className="w-20 px-2 py-1 text-center border-2 border-green-300 rounded-lg text-gray-900 font-semibold focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
-                                                                    />
+                                                                <td className="px-1 py-0 text-xs text-gray-700">
+                                                                    {typeof item.location === 'string'
+                                                                        ? item.location
+                                                                        : (item.location?.room && typeof item.location.room === 'string'
+                                                                            ? item.location.room
+                                                                            : (item.location?.room?.room || 'warehouse'))}
                                                                 </td>
-                                                                <td className="px-2 py-2 text-center">
-                                                                    <button
-                                                                        onClick={() => handleRemoveItem(pkgIndex, itemIndex)}
-                                                                        className="inline-flex items-center justify-center p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
-                                                                        title="Hapus item ini"
-                                                                    >
-                                                                        <Trash2 className="w-4 h-4" />
-                                                                    </button>
+                                                                <td className="px-1 py-0 text-xs text-gray-700">{item.condition || 'Baik'}</td>
+                                                                <td className="px-1 py-0 text-xs text-gray-700">
+                                                                    {mutationInfo ? (
+                                                                        <div className="flex items-center gap-1 flex-wrap">
+                                                                            <span className="inline-flex items-center gap-0.5 px-1 py-0 rounded text-[9px] font-medium bg-orange-100 text-orange-700 whitespace-nowrap">
+                                                                                <AlertCircle className="w-2.5 h-2.5" />
+                                                                                MUTASI
+                                                                            </span>
+                                                                            <span className="text-[9px] text-orange-600 whitespace-nowrap">
+                                                                                {mutationInfo.totalMutated}u → {mutationInfo.destination}
+                                                                            </span>
+                                                                            <button
+                                                                                onClick={() => navigate(`/bridge/goods-movement?pengajuan=${encodeURIComponent(pengajuanNumber)}`)}
+                                                                                className="inline-flex items-center gap-0.5 text-[9px] text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap"
+                                                                            >
+                                                                                <ExternalLink className="w-2.5 h-2.5" />
+                                                                                Detail
+                                                                            </button>
+                                                                        </div>
+                                                                    ) : (item.notes || '-')}
                                                                 </td>
                                                             </tr>
                                                         );
@@ -1699,30 +2091,9 @@ const PengajuanManagement = () => {
                                     </div>
                                 );
                             })}
-                            <div className="bg-gradient-to-br from-white to-gray-50 p-5 rounded-xl shadow-md">
-                                <h4 className="text-sm font-bold text-gray-700 mb-3">📊 Ringkasan</h4>
-                                <div className="grid grid-cols-3 gap-6 text-sm">
-                                    <div>
-                                        <p className="text-gray-500 font-medium mb-1">Total Package</p>
-                                        <p className="text-2xl font-bold text-accent-purple">
-                                            {editablePackages.filter(pkg => pkg.items.some(i => (i.quantity || 0) > 0)).length}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <p className="text-gray-500 font-medium mb-1">Total Item</p>
-                                        <p className="text-2xl font-bold text-accent-purple">
-                                            {editablePackages.reduce((sum, pkg) => sum + pkg.items.filter(i => (i.quantity || 0) > 0).length, 0)}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <p className="text-gray-500 font-medium mb-1">Total Quantity</p>
-                                        <p className="text-2xl font-bold text-accent-purple">
-                                            {editablePackages.reduce((sum, pkg) => sum + pkg.items.reduce((itemSum, i) => itemSum + (i.quantity || 0), 0), 0)}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
+
+                        {/* Footer with Batal dan Simpan */}
                         <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-white">
                             <Button variant="secondary" onClick={() => setShowItemEditor(false)}>Batal</Button>
                             <Button variant="primary" icon={Save} onClick={handleConfirmEditedItems}>Simpan</Button>
@@ -1730,6 +2101,16 @@ const PengajuanManagement = () => {
                     </div>
                 </div>
             )}
+
+            {/* Split View Modal for Item Selection */}
+            <WarehouseItemSelectorModal
+                isOpen={showSplitViewModal}
+                onClose={() => setShowSplitViewModal(false)}
+                sourceItems={sourcePackagesForSplitView}
+                selectedItems={formData.packages}
+                onApply={handleApplySplitViewSelection}
+                sourcePengajuanNumber={formData.sourcePengajuanNumber}
+            />
         </div >
     );
 };

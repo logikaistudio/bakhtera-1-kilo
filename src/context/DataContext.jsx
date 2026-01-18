@@ -104,6 +104,14 @@ export const DataProvider = ({ children }) => {
         rejectionReason: q.rejection_reason,
         rejectionDate: q.rejection_date,
         itemCode: q.item_code,
+        // Outbound processing status
+        outboundStatus: q.outbound_status || null,
+        outboundDate: q.outbound_date || null,
+        // Source Reference Fields (For Outbound History)
+        sourcePengajuanId: q.source_pengajuan_id || null,
+        sourcePengajuanNumber: q.source_pengajuan_number || null,
+        sourceBcDocumentNumber: q.source_bc_document_number || null,
+        sourceBcDocumentDate: q.source_bc_document_date || null,
     });
 
     // Shared Helper: Map Inbound DB -> State (freight_inbound schema)
@@ -186,6 +194,8 @@ export const DataProvider = ({ children }) => {
             assetId: o.item_code,
             createdAt: o.created_at,
             date: o.date,
+            // Extracted Source Reference for Reconciliation
+            sourcePengajuanNumber: parsedDocs.source_pengajuan_number,
             // Items array for BarangKeluar.jsx flatMap
             items: items,
             // Use the extracted array for UI mapping to prevent crash (.map on string)
@@ -223,6 +233,13 @@ export const DataProvider = ({ children }) => {
                     rejectionReason: q.rejection_reason,
                     rejectionDate: q.rejection_date,
                     itemCode: q.item_code,
+                    // Outbound processing status
+                    outboundStatus: q.outbound_status,
+                    outboundDate: q.outbound_date,
+                    // Source Reference Fields
+                    sourcePengajuanNumber: q.source_pengajuan_number || null,
+                    sourceBcDocumentNumber: q.source_bc_document_number || null,
+                    sourceBcDocumentDate: q.source_bc_document_date || null,
                     // Keep original snake_case too just in case? Or rely on camelCase
                 });
 
@@ -350,6 +367,7 @@ export const DataProvider = ({ children }) => {
                             itemName: log.item_name,
                             assetName: log.item_name,
                             hsCode: log.hs_code || meta.hsCode,
+                            bcDocType: meta.bcDocType, // Extracted for Pabean Mutation Report
                             serialNumber: log.serial_number,
                             totalStock: log.total_stock,
                             mutatedQty: log.mutated_qty,
@@ -1658,6 +1676,11 @@ export const DataProvider = ({ children }) => {
             shipper: quotation.shipper || null,
             origin: quotation.origin || null,
             destination: quotation.destination || null,
+            // Source References (Outbound History)
+            source_pengajuan_id: quotation.sourcePengajuanId || null,
+            source_pengajuan_number: quotation.sourcePengajuanNumber || null,
+            source_bc_document_number: quotation.sourceBcDocumentNumber || null,
+            source_bc_document_date: quotation.sourceBcDocumentDate || null,
 
             // JSONB fields
             packages: quotation.packages || [],
@@ -1728,6 +1751,30 @@ export const DataProvider = ({ children }) => {
                 console.error('❌ [STEP 0] Fetch error:', fetchError);
             } else {
                 console.log('✅ [STEP 0] Fetched quotation:', quotation);
+            }
+
+            // 0.5. CRITICAL: Delete linked outbound quotations that reference this inbound (Cascade Delete)
+            // This handles the case where outbound submissions reference this inbound via source_pengajuan_id
+            console.log('📋 [STEP 0.5] Checking for linked outbound quotations...');
+            const { data: linkedOutbound, error: linkedFetchError } = await supabase
+                .from('freight_quotations')
+                .select('id, quotation_number')
+                .eq('source_pengajuan_id', id);
+
+            if (linkedFetchError) {
+                console.error('❌ [STEP 0.5] Error fetching linked outbound:', linkedFetchError);
+            } else if (linkedOutbound && linkedOutbound.length > 0) {
+                console.log(`📋 [STEP 0.5] Found ${linkedOutbound.length} linked outbound quotations to delete:`,
+                    linkedOutbound.map(q => q.quotation_number).join(', '));
+
+                // Recursively delete each linked outbound first
+                for (const linked of linkedOutbound) {
+                    console.log(`🔄 [STEP 0.5] Recursively deleting linked outbound: ${linked.quotation_number}`);
+                    await deleteQuotation(linked.id);
+                }
+                console.log('✅ [STEP 0.5] All linked outbound quotations deleted');
+            } else {
+                console.log('✅ [STEP 0.5] No linked outbound quotations found');
             }
 
             // 1. Delete dependent customs documents (Cascade Delete)
@@ -2024,6 +2071,11 @@ export const DataProvider = ({ children }) => {
         if (updatedData.notes !== undefined) dbUpdateData.notes = updatedData.notes;
         if (updatedData.pic !== undefined) dbUpdateData.pic = updatedData.pic;
         if (updatedData.status !== undefined) dbUpdateData.status = updatedData.status;
+        // Source References
+        if (updatedData.sourcePengajuanId !== undefined) dbUpdateData.source_pengajuan_id = updatedData.sourcePengajuanId;
+        if (updatedData.sourcePengajuanNumber !== undefined) dbUpdateData.source_pengajuan_number = updatedData.sourcePengajuanNumber;
+        if (updatedData.sourceBcDocumentNumber !== undefined) dbUpdateData.source_bc_document_number = updatedData.sourceBcDocumentNumber;
+        if (updatedData.sourceBcDocumentDate !== undefined) dbUpdateData.source_bc_document_date = updatedData.sourceBcDocumentDate || null;
 
         // Always update timestamp
         dbUpdateData.updated_at = new Date().toISOString();

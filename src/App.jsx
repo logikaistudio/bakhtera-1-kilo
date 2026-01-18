@@ -153,7 +153,7 @@ function App() {
                   <Route path="/bridge/item-master" element={<ItemMaster />} />
                   <Route path="/bridge/hs-master" element={<HSMaster />} />
                   <Route path="/bridge/pengajuan" element={<PengajuanManagement />} />
-                  <Route path="/bridge/finance" element={<BridgeFinance />} />
+                  <Route path="/bridge/finance/*" element={<BridgeFinance />} />
                   <Route path="/bridge/goods-movement" element={<GoodsMovement />} />
                   <Route path="/bridge/inventory" element={<WarehouseInventory />} />
                   <Route path="/bridge/outbound-inventory" element={<OutboundInventory />} />

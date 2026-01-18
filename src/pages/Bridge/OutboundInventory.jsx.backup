@@ -3,10 +3,9 @@ import { Search, Download, Package, TrendingUp, Calendar, FileText, Eye, X, Edit
 import { useData } from '../../context/DataContext';
 import Button from '../../components/Common/Button';
 import { exportToCSV } from '../../utils/exportCSV';
-import { createProcessOutboundHandler } from './handlers/processOutbound';
 
 const OutboundInventory = () => {
-    const { quotations = [], addMutationLog, mutationLogs = [], updateQuotation } = useData();
+    const { quotations = [], addMutationLog } = useData();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedItem, setSelectedItem] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
@@ -16,12 +15,12 @@ const OutboundInventory = () => {
     const [editedItem, setEditedItem] = useState(null);
     const [isSaving, setIsSaving] = useState(false);
 
-    // Filter only approved OUTBOUND pengajuan
-    // Termasuk yang sudah diproses (processed) untuk ditampilkan dengan read-only mode
+    // Filter only approved OUTBOUND pengajuan yang BELUM diproses ke Pabean
+    // Halaman ini untuk memproses pengajuan approved ke freight_outbound & warehouse
     const approvedOutboundPengajuan = quotations.filter(q =>
         (q.documentStatus === 'approved' || q.document_status === 'approved') &&
-        q.type === 'outbound'
-        // Removed: !q.outbound_status - now shows ALL approved outbound including processed
+        q.type === 'outbound' &&
+        !q.outbound_status // Belum diproses (NULL)
     );
 
     // Helper function to count packages and items
@@ -54,35 +53,6 @@ const OutboundInventory = () => {
         } catch (e) {
             return '-';
         }
-    };
-
-    // Helper to calculate pameran stock for an item based on source pengajuan mutations
-    const getPameranStock = (sourcePengajuanNumber, itemCode, packageNumber) => {
-        if (!sourcePengajuanNumber || !mutationLogs.length) return 0;
-
-        const normalize = (str) => (str || '').toLowerCase().trim();
-
-        // Find all outbound mutations (to pameran) for this item from source pengajuan
-        const outboundMutations = mutationLogs.filter(m =>
-            normalize(m.pengajuanNumber) === normalize(sourcePengajuanNumber) &&
-            normalize(m.itemCode) === normalize(itemCode) &&
-            (packageNumber ? normalize(m.packageNumber) === normalize(packageNumber) : true) &&
-            (m.destination || '').toLowerCase() !== 'warehouse' &&
-            (m.destination || '').toLowerCase() !== 'gudang'
-        );
-
-        // Find all return mutations (back to warehouse) for this item
-        const returnMutations = mutationLogs.filter(m =>
-            normalize(m.pengajuanNumber) === normalize(sourcePengajuanNumber) &&
-            normalize(m.itemCode) === normalize(itemCode) &&
-            (packageNumber ? normalize(m.packageNumber) === normalize(packageNumber) : true) &&
-            ((m.destination || '').toLowerCase() === 'warehouse' || (m.destination || '').toLowerCase() === 'gudang')
-        );
-
-        const totalOut = outboundMutations.reduce((sum, m) => sum + (parseInt(m.mutatedQty) || 0), 0);
-        const totalReturn = returnMutations.reduce((sum, m) => sum + (parseInt(m.mutatedQty) || 0), 0);
-
-        return Math.max(0, totalOut - totalReturn);
     };
 
     // Filter outbound data based on search
@@ -124,6 +94,7 @@ const OutboundInventory = () => {
                 tanggalKeluar: formatDate(item.approvedDate || item.approved_date || item.date),
                 tujuan: item.destination || '-',
                 customer: item.customer || '-',
+                jumlahPackage: packageCount,
                 jumlahPackage: packageCount,
                 jumlahItem: itemCount,
                 status: (item.outbound_status === 'submitted' && item.outbound_date)
@@ -339,34 +310,11 @@ const OutboundInventory = () => {
         setIsEditing(false);
     };
 
-    // Callback for refreshing data after successful processing
-    const handleRefreshAfterProcess = async () => {
-        // Update the local quotation state to reflect new status
-        if (selectedItem) {
-            const updatedData = {
-                outbound_status: 'processed',
-                outbound_date: new Date().toISOString()
-            };
-            try {
-                await updateQuotation(selectedItem.id, updatedData);
-                // Also update selectedItem locally
-                setSelectedItem(prev => prev ? { ...prev, ...updatedData } : null);
-            } catch (err) {
-                console.error('Failed to refresh quotation:', err);
-            }
-        }
-    };
-
-    // PROCESS OUTBOUND TO PABEAN - Pass editedItem, isEditing, and refresh callback
-    const handleProcessOutbound = createProcessOutboundHandler(selectedItem, setIsSaving, setShowDetailModal, editedItem, isEditing, handleRefreshAfterProcess);
-
     // SUBMIT TO PABEAN HANDLER
     const handleSubmitToPabean = async () => {
-        // Use editedItem if in edit mode, otherwise selectedItem
-        const itemToSubmit = isEditing && editedItem ? editedItem : selectedItem;
-        if (!itemToSubmit) return;
+        if (!selectedItem) return;
 
-        const confirmMsg = `Anda akan mengirimkan data ${itemToSubmit.quotationNumber || itemToSubmit.quotation_number} ke Pabean - Barang Keluar.\n\nPastikan data sudah benar. Lanjutkan?`;
+        const confirmMsg = `Anda akan mengirimkan data ${selectedItem.quotationNumber || selectedItem.quotation_number} ke Pabean - Barang Keluar.\n\nPastikan data sudah benar. Lanjutkan?`;
         if (!window.confirm(confirmMsg)) return;
 
         setIsSaving(true);
@@ -374,51 +322,26 @@ const OutboundInventory = () => {
             let successCount = 0;
             const errors = [];
 
-            // First, save the edited data to database if there are changes
-            if (isEditing && editedItem) {
-                const { supabase } = await import('../../lib/supabase');
-                const updatePayload = {
-                    packages: editedItem.packages,
-                    pic: editedItem.pic,
-                    approved_date: editedItem.approvedDate || editedItem.approved_date,
-                    date: (editedItem.approvedDate || editedItem.approved_date || '').split('T')[0],
-                };
-
-                const { error: saveError } = await supabase
-                    .from('freight_quotations')
-                    .update(updatePayload)
-                    .eq('id', editedItem.id);
-
-                if (saveError) {
-                    throw new Error('Gagal menyimpan perubahan sebelum submit: ' + saveError.message);
-                }
-            }
-
             // Iterate through all packages and items to create mutation logs
-            const promises = (itemToSubmit.packages || []).flatMap((pkg) =>
+            const promises = (selectedItem.packages || []).flatMap((pkg) =>
                 (pkg.items || []).map(async (item) => {
                     try {
-                        // Use outboundQuantity if available, fallback to quantity
-                        const qtyToMutate = item.outboundQuantity !== undefined ? item.outboundQuantity : item.quantity;
-                        const initialStock = item.initialQuantity || item.quantity || 0;
-                        const remainingAfterOutbound = Math.max(0, initialStock - qtyToMutate);
-
                         const newMutation = {
-                            pengajuanId: itemToSubmit.id,
-                            pengajuanNumber: itemToSubmit.quotationNumber || itemToSubmit.quotation_number,
-                            bcDocumentNumber: itemToSubmit.bcDocumentNumber || itemToSubmit.bc_document_number,
+                            pengajuanId: selectedItem.id,
+                            pengajuanNumber: selectedItem.quotationNumber || selectedItem.quotation_number,
+                            bcDocumentNumber: selectedItem.bcDocumentNumber || selectedItem.bc_document_number,
                             packageNumber: pkg.packageNumber,
                             itemCode: item.itemCode,
                             itemName: item.name || item.itemName,
-                            serialNumber: item.serialNumber || '-',
-                            totalStock: initialStock, // Original stock
-                            origin: 'Warehouse',
-                            destination: 'Outbound', // Fixed destination for outbound
-                            mutatedQty: qtyToMutate, // Use outboundQuantity
-                            remainingStock: remainingAfterOutbound, // Calculate remaining
-                            date: (itemToSubmit.approvedDate || itemToSubmit.approved_date || new Date().toISOString()).split('T')[0],
-                            time: new Date(itemToSubmit.approvedDate || itemToSubmit.approved_date || new Date()).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
-                            pic: itemToSubmit.pic || 'Admin',
+                            serialNumber: item.serialNumber || '-', // Assuming serial number might be there or not
+                            totalStock: item.quantity, // For outbound, stock is what is being moved
+                            origin: 'Warehouse', // Usually outbound comes FROM warehouse
+                            destination: item.location || 'Keluar', // Destination set in item or default 'Keluar'
+                            mutatedQty: item.quantity,
+                            remainingStock: 0, // Outbound leaves 0 usually if full move
+                            date: (selectedItem.approvedDate || selectedItem.approved_date || new Date().toISOString()).split('T')[0],
+                            time: new Date(selectedItem.approvedDate || selectedItem.approved_date || new Date()).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+                            pic: selectedItem.pic || 'Admin',
                             remarks: item.notes || 'Outbound Submission',
                             condition: item.condition || 'Baik',
                             uom: item.uom || 'pcs'
@@ -448,7 +371,7 @@ const OutboundInventory = () => {
                         outbound_status: 'submitted',
                         outbound_date: now
                     })
-                    .eq('id', itemToSubmit.id);
+                    .eq('id', selectedItem.id);
 
                 if (statusError) {
                     console.error("Failed to update status:", statusError);
@@ -476,10 +399,10 @@ const OutboundInventory = () => {
                 <div>
                     <h1 className="text-3xl font-bold gradient-text flex items-center gap-3">
                         <Package className="w-8 h-8" />
-                        Laporan Barang Keluar
+                        Inventaris Barang Keluar
                     </h1>
                     <p className="text-silver-dark mt-1">
-                        Proses Pengajuan Barang Keluar ke Pabean & Update Inventory
+                        Data Barang Keluar dari Pengajuan Outbound yang Disetujui
                     </p>
                 </div>
                 <Button onClick={handleExportCSV} variant="primary" icon={Download}>
@@ -586,27 +509,13 @@ const OutboundInventory = () => {
                                             <td className="px-3 py-1.5 text-[11px] text-accent-purple font-bold text-center whitespace-nowrap">{packageCount}</td>
                                             <td className="px-3 py-1.5 text-[11px] text-accent-purple font-bold text-center whitespace-nowrap">{itemCount}</td>
                                             <td className="px-3 py-1.5 text-[11px] text-center whitespace-nowrap">
-                                                {pengajuan.outbound_status === 'processed' ? (
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 border border-green-500/30 text-[10px]">
-                                                            ✓ Barang Keluar dari Gudang
-                                                        </span>
-                                                        <span className="text-[9px] text-gray-400">
-                                                            {formatDate(pengajuan.outbound_date)} {formatTime(pengajuan.outbound_date)}
-                                                        </span>
-                                                    </div>
-                                                ) : pengajuan.outbound_status === 'submitted' ? (
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <span className="px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 text-[10px]">
-                                                            ⏳ Menunggu Proses Pabean
-                                                        </span>
-                                                        <span className="text-[9px] text-gray-400">
-                                                            {formatDate(pengajuan.outbound_date)}
-                                                        </span>
-                                                    </div>
+                                                {pengajuan.outbound_status === 'submitted' ? (
+                                                    <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 border border-green-500/30 text-[10px]">
+                                                        Barang Keluar ({formatDate(pengajuan.outbound_date)} {formatTime(pengajuan.outbound_date)})
+                                                    </span>
                                                 ) : (
                                                     <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 text-[10px]">
-                                                        📋 Document Approved
+                                                        Document Approved
                                                     </span>
                                                 )}
                                             </td>
@@ -648,67 +557,46 @@ const OutboundInventory = () => {
                                     XLS
                                 </button>
 
-                                {/* SUBMIT/KIRIM BUTTON - Show only when NOT editing and NOT already processed */}
-                                {!isEditing && (!selectedItem?.outbound_status || selectedItem?.outbound_status === 'approved') && (
+                                {/* SUBMIT/KIRIM BUTTON - Show only when NOT editing, next to Edit */}
+                                {!isEditing && (
                                     <button
-                                        onClick={handleProcessOutbound}
+                                        onClick={handleSubmitToPabean}
                                         disabled={isSaving}
-                                        className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-colors mr-2 disabled:opacity-50"
-                                        title="Proses ke Pabean - Barang Keluar"
+                                        className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-colors mr-2"
+                                        title="Kirim ke Pabean - Barang Keluar"
                                     >
                                         <Send className="w-4 h-4" />
-                                        {isSaving ? 'Memproses...' : 'Proses ke Pabean - Barang Keluar'}
+                                        Kirim
                                     </button>
                                 )}
 
-                                {/* Show status indicator when already processed */}
-                                {selectedItem?.outbound_status === 'processed' && (
-                                    <div className="flex items-center gap-2 px-4 py-2 bg-green-600/20 text-green-400 rounded-lg text-sm font-medium border border-green-500/30">
-                                        ✓ Barang Sudah Keluar dari Gudang
-                                    </div>
-                                )}
-                                {selectedItem?.outbound_status === 'submitted' && (
-                                    <div className="flex items-center gap-2 px-4 py-2 bg-yellow-600/20 text-yellow-400 rounded-lg text-sm font-medium border border-yellow-500/30">
-                                        ⏳ Menunggu Proses Pabean
-                                    </div>
-                                )}
-
-                                {/* Hide Edit buttons if already processed */}
-                                {selectedItem?.outbound_status !== 'processed' ? (
-                                    isEditing ? (
-                                        <>
-                                            <button
-                                                onClick={handleSaveChanges}
-                                                disabled={isSaving}
-                                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-colors disabled:opacity-50"
-                                            >
-                                                {isSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Edit className="w-4 h-4" />}
-                                                Simpan
-                                            </button>
-                                            <button
-                                                onClick={handleCancelEdit}
-                                                disabled={isSaving}
-                                                className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
-                                            >
-                                                <X className="w-4 h-4" />
-                                                Batal
-                                            </button>
-                                        </>
-                                    ) : (
+                                {isEditing ? (
+                                    <>
                                         <button
-                                            onClick={() => setIsEditing(true)}
-                                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+                                            onClick={handleSaveChanges}
+                                            disabled={isSaving}
+                                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-colors disabled:opacity-50"
                                         >
-                                            <Edit className="w-4 h-4" />
-                                            Edit
+                                            {isSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Edit className="w-4 h-4" />}
+                                            Simpan
                                         </button>
-                                    )
+                                        <button
+                                            onClick={handleCancelEdit}
+                                            disabled={isSaving}
+                                            className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+                                        >
+                                            <X className="w-4 h-4" />
+                                            Batal
+                                        </button>
+                                    </>
                                 ) : (
-                                    /* Read-only indicator when processed */
-                                    <div className="px-3 py-1.5 bg-gray-200 text-gray-600 rounded-lg text-xs font-medium flex items-center gap-1">
-                                        <Eye className="w-3 h-3" />
-                                        Read Only
-                                    </div>
+                                    <button
+                                        onClick={() => setIsEditing(true)}
+                                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+                                    >
+                                        <Edit className="w-4 h-4" />
+                                        Edit
+                                    </button>
                                 )}
 
                                 <button onClick={() => setShowDetailModal(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors ml-2">
@@ -801,137 +689,128 @@ const OutboundInventory = () => {
                                                             <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase">KODE BARANG</th>
                                                             <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase w-20">HS CODE</th>
                                                             <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase">ITEM</th>
-                                                            <th className="px-3 py-3 text-center text-xs font-bold text-white uppercase w-20">STOK AWAL</th>
-                                                            <th className="px-3 py-3 text-center text-xs font-bold text-white uppercase w-20 bg-orange-500">STOK PAMERAN</th>
+                                                            <th className="px-3 py-3 text-center text-xs font-bold text-white uppercase w-20">JUMLAH</th>
                                                             <th className="px-3 py-3 text-center text-xs font-bold text-white uppercase w-20">SATUAN</th>
-                                                            <th className="px-3 py-3 text-center text-xs font-bold text-white uppercase w-24 bg-red-600">JML KELUAR</th>
-                                                            <th className="px-3 py-3 text-center text-xs font-bold text-white uppercase w-24 bg-green-600">SISA STOK</th>
+                                                            <th className="px-3 py-3 text-center text-xs font-bold text-white uppercase w-24">STATUS</th>
+                                                            <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase w-24">LOKASI</th>
                                                             <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase w-20">KONDISI</th>
                                                             <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase">KETERANGAN</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-gray-200">
-                                                        {(pkg.items || []).map((item, itemIdx) => {
-                                                            // Get source pengajuan number for mutation lookup
-                                                            const sourcePengajuanNumber = (isEditing ? editedItem : selectedItem)?.sourcePengajuanNumber ||
-                                                                (isEditing ? editedItem : selectedItem)?.source_pengajuan_number;
+                                                        {(pkg.items || []).map((item, itemIdx) => (
+                                                            <tr key={itemIdx} className="hover:bg-blue-50/50">
+                                                                <td className="px-3 py-2 text-sm text-gray-900 font-medium">{itemIdx + 1}</td>
 
-                                                            // Calculate stock values
-                                                            const totalStock = item.initialQuantity || item.quantity || 0;
-                                                            const pameranStock = getPameranStock(sourcePengajuanNumber, item.itemCode, pkg.packageNumber);
-                                                            const availableWarehouseStock = Math.max(0, totalStock - pameranStock);
-                                                            const outboundQty = Math.min(item.outboundQuantity || item.quantity || 0, availableWarehouseStock);
-                                                            const remainingStock = Math.max(0, availableWarehouseStock - outboundQty);
+                                                                {/* KODE BARANG */}
+                                                                <td className="px-3 py-2 text-sm font-mono text-gray-900">
+                                                                    {isEditing ? (
+                                                                        <input
+                                                                            type="text"
+                                                                            value={item.itemCode || ''}
+                                                                            onChange={(e) => handleUpdateItem(pkgIndex, itemIdx, 'itemCode', e.target.value)}
+                                                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
+                                                                        />
+                                                                    ) : (item.itemCode || '-')}
+                                                                </td>
 
-                                                            return (
-                                                                <tr key={itemIdx} className="hover:bg-blue-50/50">
-                                                                    <td className="px-3 py-2 text-sm text-gray-900 font-medium">{itemIdx + 1}</td>
+                                                                {/* HS CODE */}
+                                                                <td className="px-3 py-2 text-sm text-gray-700">
+                                                                    {isEditing ? (
+                                                                        <input
+                                                                            type="text"
+                                                                            value={item.hsCode || ''}
+                                                                            onChange={(e) => handleUpdateItem(pkgIndex, itemIdx, 'hsCode', e.target.value)}
+                                                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
+                                                                        />
+                                                                    ) : (item.hsCode || '-')}
+                                                                </td>
 
-                                                                    {/* KODE BARANG */}
-                                                                    <td className="px-3 py-2 text-sm font-mono text-gray-900">
-                                                                        {isEditing ? (
-                                                                            <input
-                                                                                type="text"
-                                                                                value={item.itemCode || ''}
-                                                                                onChange={(e) => handleUpdateItem(pkgIndex, itemIdx, 'itemCode', e.target.value)}
-                                                                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
-                                                                            />
-                                                                        ) : (item.itemCode || '-')}
-                                                                    </td>
+                                                                {/* ITEM NAME */}
+                                                                <td className="px-3 py-2 text-sm text-gray-700">
+                                                                    {isEditing ? (
+                                                                        <input
+                                                                            type="text"
+                                                                            value={item.name || item.itemName || ''}
+                                                                            onChange={(e) => handleUpdateItem(pkgIndex, itemIdx, 'name', e.target.value)}
+                                                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
+                                                                        />
+                                                                    ) : (item.name || item.itemName || '-')}
+                                                                </td>
 
-                                                                    {/* HS CODE */}
-                                                                    <td className="px-3 py-2 text-sm text-gray-700">
-                                                                        {isEditing ? (
-                                                                            <input
-                                                                                type="text"
-                                                                                value={item.hsCode || ''}
-                                                                                onChange={(e) => handleUpdateItem(pkgIndex, itemIdx, 'hsCode', e.target.value)}
-                                                                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
-                                                                            />
-                                                                        ) : (item.hsCode || '-')}
-                                                                    </td>
+                                                                {/* JUMLAH (Number) */}
+                                                                <td className="px-3 py-2 text-sm text-center text-gray-900 font-semibold">
+                                                                    {isEditing ? (
+                                                                        <input
+                                                                            type="number"
+                                                                            value={item.quantity || 0}
+                                                                            onChange={(e) => handleUpdateItem(pkgIndex, itemIdx, 'quantity', parseFloat(e.target.value))}
+                                                                            className="w-20 px-2 py-1 text-sm text-center border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
+                                                                        />
+                                                                    ) : (item.quantity || 0)}
+                                                                </td>
 
-                                                                    {/* ITEM NAME */}
-                                                                    <td className="px-3 py-2 text-sm text-gray-700">
-                                                                        {isEditing ? (
-                                                                            <input
-                                                                                type="text"
-                                                                                value={item.name || item.itemName || ''}
-                                                                                onChange={(e) => handleUpdateItem(pkgIndex, itemIdx, 'name', e.target.value)}
-                                                                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
-                                                                            />
-                                                                        ) : (item.name || item.itemName || '-')}
-                                                                    </td>
+                                                                {/* SATUAN */}
+                                                                <td className="px-3 py-2 text-sm text-center text-gray-700">
+                                                                    {isEditing ? (
+                                                                        <input
+                                                                            type="text"
+                                                                            value={item.uom || ''}
+                                                                            onChange={(e) => handleUpdateItem(pkgIndex, itemIdx, 'uom', e.target.value)}
+                                                                            className="w-20 px-2 py-1 text-sm text-center border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
+                                                                        />
+                                                                    ) : (item.uom || 'pcs')}
+                                                                </td>
 
-                                                                    {/* STOK AWAL (Total Stock - Read Only) */}
-                                                                    <td className="px-3 py-2 text-sm text-center text-gray-900 font-semibold">
-                                                                        {totalStock}
-                                                                    </td>
+                                                                {/* STATUS (Badge) - Not editable (derived) */}
+                                                                <td className="px-3 py-2 text-center">
+                                                                    <span className="inline-flex items-center px-2 py-1 rounded text-xs font-semibold bg-green-100 text-green-800">
+                                                                        {item.quantity || 0}
+                                                                    </span>
+                                                                </td>
 
-                                                                    {/* STOK PAMERAN (Exhibition Stock - Read Only) */}
-                                                                    <td className="px-3 py-2 text-center bg-orange-50">
-                                                                        <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-bold ${pameranStock > 0 ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-500'}`}>
-                                                                            {pameranStock}
-                                                                        </span>
-                                                                    </td>
+                                                                {/* LOKASI */}
+                                                                <td className="px-3 py-2 text-sm text-gray-700">
+                                                                    {isEditing ? (
+                                                                        <select
+                                                                            value={item.location || 'Keluar'}
+                                                                            onChange={(e) => handleUpdateItem(pkgIndex, itemIdx, 'location', e.target.value)}
+                                                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
+                                                                        >
+                                                                            <option value="Keluar">Keluar</option>
+                                                                            <option value="Warehouse">Warehouse</option>
+                                                                        </select>
+                                                                    ) : (item.location || 'Keluar')}
+                                                                </td>
 
-                                                                    {/* SATUAN (Fixed - Read Only) */}
-                                                                    <td className="px-3 py-2 text-sm text-center text-gray-700">
-                                                                        {item.uom || 'pcs'}
-                                                                    </td>
+                                                                {/* KONDISI */}
+                                                                <td className="px-3 py-2 text-sm text-gray-700">
+                                                                    {isEditing ? (
+                                                                        <select
+                                                                            value={item.condition || 'Baik'}
+                                                                            onChange={(e) => handleUpdateItem(pkgIndex, itemIdx, 'condition', e.target.value)}
+                                                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
+                                                                        >
+                                                                            <option value="Baik">Baik</option>
+                                                                            <option value="Rusak">Rusak</option>
+                                                                            <option value="Perbaikan">Perbaikan</option>
+                                                                        </select>
+                                                                    ) : (item.condition || 'Baik')}
+                                                                </td>
 
-                                                                    {/* JML KELUAR (Outbound Quantity - Editable, max = availableWarehouseStock) */}
-                                                                    <td className="px-3 py-2 text-center bg-red-50">
-                                                                        {isEditing ? (
-                                                                            <input
-                                                                                type="number"
-                                                                                min="0"
-                                                                                max={availableWarehouseStock}
-                                                                                value={item.outboundQuantity || item.quantity || 0}
-                                                                                onChange={(e) => handleUpdateItem(pkgIndex, itemIdx, 'outboundQuantity', Math.min(parseInt(e.target.value) || 0, availableWarehouseStock))}
-                                                                                className="w-16 px-2 py-1 text-sm text-center border border-red-300 rounded focus:border-red-500 focus:outline-none font-semibold"
-                                                                            />
-                                                                        ) : (
-                                                                            <span className="font-semibold text-red-700">{outboundQty}</span>
-                                                                        )}
-                                                                    </td>
-
-                                                                    {/* SISA STOK (Remaining Stock - Calculated) */}
-                                                                    <td className="px-3 py-2 text-center bg-green-50">
-                                                                        <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-bold ${remainingStock > 0 ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                                                                            {remainingStock}
-                                                                        </span>
-                                                                    </td>
-
-                                                                    {/* KONDISI */}
-                                                                    <td className="px-3 py-2 text-sm text-gray-700">
-                                                                        {isEditing ? (
-                                                                            <select
-                                                                                value={item.condition || 'Baik'}
-                                                                                onChange={(e) => handleUpdateItem(pkgIndex, itemIdx, 'condition', e.target.value)}
-                                                                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
-                                                                            >
-                                                                                <option value="Baik">Baik</option>
-                                                                                <option value="Rusak">Rusak</option>
-                                                                                <option value="Perbaikan">Perbaikan</option>
-                                                                            </select>
-                                                                        ) : (item.condition || 'Baik')}
-                                                                    </td>
-
-                                                                    {/* KETERANGAN */}
-                                                                    <td className="px-3 py-2 text-sm text-gray-500">
-                                                                        {isEditing ? (
-                                                                            <input
-                                                                                type="text"
-                                                                                value={item.notes || ''}
-                                                                                onChange={(e) => handleUpdateItem(pkgIndex, itemIdx, 'notes', e.target.value)}
-                                                                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
-                                                                            />
-                                                                        ) : (item.notes || '-')}
-                                                                    </td>
-                                                                </tr>
-                                                            );
-                                                        })}
+                                                                {/* KETERANGAN */}
+                                                                <td className="px-3 py-2 text-sm text-gray-500">
+                                                                    {isEditing ? (
+                                                                        <input
+                                                                            type="text"
+                                                                            value={item.notes || ''}
+                                                                            onChange={(e) => handleUpdateItem(pkgIndex, itemIdx, 'notes', e.target.value)}
+                                                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
+                                                                        />
+                                                                    ) : (item.notes || '-')}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
                                                     </tbody>
                                                 </table>
                                             </div>

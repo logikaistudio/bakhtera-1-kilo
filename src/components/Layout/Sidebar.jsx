@@ -75,7 +75,7 @@ const Sidebar = () => {
             type: 'category', label: '📦 Operasional', items: [
                 { path: '/bridge/pengajuan', label: 'Pengajuan' },
                 { path: '/bridge/inventory', label: 'Inventaris Gudang' },
-                { path: '/bridge/outbound-inventory', label: 'Inventaris Barang Keluar' },
+                { path: '/bridge/outbound-inventory', label: 'Laporan Barang Keluar' },
                 { path: '/bridge/goods-movement', label: 'Pergerakan Barang' },
             ]
         },

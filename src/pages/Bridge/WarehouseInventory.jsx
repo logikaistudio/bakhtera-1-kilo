@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Warehouse, Search, Download, X, Edit2, Save, XCircle, ArrowRightLeft, Upload, FileText, Trash2, ExternalLink, AlertCircle, CheckCircle, Box, MapPin } from 'lucide-react';
+import { Warehouse, Search, Download, X, Edit2, Save, XCircle, ArrowRightLeft, Upload, FileText, Trash2, ExternalLink, AlertCircle, CheckCircle, Box, MapPin, LogOut } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useData } from '../../context/DataContext';
 import Button from '../../components/Common/Button';
@@ -151,11 +151,13 @@ const WarehouseInventory = () => {
                     // Get item status for validation
                     const itemName = item.name || item.itemName;
                     const itemStatus = getIndividualItemStatus(item.itemCode, pkg.packageNumber, itemName);
-                    const inWarehouse = (item.quantity || 0) - itemStatus.atPameran;
+                    // Use totalDeducted to account for official outbound as well
+                    const inWarehouse = (item.quantity || 0) - (itemStatus.totalDeducted || itemStatus.atPameran);
 
-                    // Process outbound mutation (Gudang -> Pameran/Outbound)
+                    // Process outbound mutation (Gudang -> Pameran)
                     if (outQty > 0 && outQty <= inWarehouse) {
-                        const destinationLocation = editData.mutationDestination || 'Pameran';
+                        // Strict data flow: Manual Out = Pameran
+                        const destinationLocation = 'Pameran';
                         mutations.push({
                             pengajuanId: qId,
                             pengajuanNumber: qNumber,
@@ -171,9 +173,10 @@ const WarehouseInventory = () => {
                             origin: 'warehouse',
                             destination: destinationLocation,
                             condition: item.condition || 'Baik',
-                            date: editData.mutationDate || new Date().toISOString().split('T')[0],
-                            time: editData.mutationTime || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
-                            pic: editData.mutationPic || '',
+                            // Use per-item Out details, fallback to global or current
+                            date: item.mutationDateOut || editData.mutationDate || new Date().toISOString().split('T')[0],
+                            time: item.mutationTimeOut || editData.mutationTime || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+                            pic: item.mutationPicOut || editData.mutationPic || '',
                             remarks: item.notes || `Mutasi ke ${destinationLocation}`,
                             _type: 'outbound'
                         });
@@ -196,10 +199,11 @@ const WarehouseInventory = () => {
                             origin: 'Pameran',
                             destination: 'warehouse',
                             condition: item.condition || 'Baik',
-                            date: editData.mutationDate || new Date().toISOString().split('T')[0],
-                            time: editData.mutationTime || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
-                            pic: editData.mutationPic || '',
-                            remarks: item.notes || 'Kembali ke Gudang',
+                            // Use per-item In details
+                            date: item.mutationDateIn || editData.mutationDate || new Date().toISOString().split('T')[0],
+                            time: item.mutationTimeIn || editData.mutationTime || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+                            pic: item.mutationPicIn || editData.mutationPic || '',
+                            remarks: item.notes || 'Pengembalian ke Gudang',
                             _type: 'inbound'
                         });
                     }
@@ -401,8 +405,8 @@ const WarehouseInventory = () => {
                 ...pkg,
                 items: (pkg.items || []).map(item => {
                     const status = getIndividualItemStatus(item.itemCode, pkg.packageNumber);
-                    // inWarehouse = max allowed for OUTBOUND (Mutasi)
-                    const inWarehouse = (item.quantity || 0) - status.atPameran;
+                    // inWarehouse = max allowed for OUTBOUND (Mutasi) - includes official outbound deduction
+                    const inWarehouse = (item.quantity || 0) - (status.totalDeducted || status.atPameran);
 
                     return {
                         ...item,
@@ -441,23 +445,34 @@ const WarehouseInventory = () => {
             modalOpen: showMutationModal
         });
 
-        if (pengajuanParam && actionParam === 'openMutation' && quotations.length > 0) {
+        if (pengajuanParam && quotations.length > 0) {
             const paramClean = pengajuanParam.trim();
             const found = quotations.find(q =>
                 (q.quotationNumber || q.quotation_number || '').trim() === paramClean
             );
 
             if (found) {
-                // Ensure we haven't already opened it or are currently editing something else
-                if (!showMutationModal && !isEditing) {
-                    console.log('✅ [AutoOpen] Match found. Opening modal shortly for:', found.quotationNumber);
+                if (actionParam === 'openMutation') {
+                    // Ensure we haven't already opened it or are currently editing something else
+                    if (!showMutationModal && !isEditing) {
+                        console.log('✅ [AutoOpen] Match found. Opening mutation modal shortly for:', found.quotationNumber);
 
-                    // Add slight delay to ensure UI/State is ready
-                    const timer = setTimeout(() => {
-                        handleStartMutation(found);
-                    }, 300);
+                        // Add slight delay to ensure UI/State is ready
+                        const timer = setTimeout(() => {
+                            handleStartMutation(found);
+                        }, 300);
 
-                    return () => clearTimeout(timer);
+                        return () => clearTimeout(timer);
+                    }
+                } else if (actionParam === 'viewDetail') {
+                    // Ensure we haven't already opened it
+                    if (!selectedPengajuan) {
+                        console.log('✅ [AutoOpen] Match found. Opening detail modal shortly for:', found.quotationNumber);
+                        const timer = setTimeout(() => {
+                            handleRowClick(found);
+                        }, 300);
+                        return () => clearTimeout(timer);
+                    }
                 }
             } else {
                 console.warn('⚠️ [AutoOpen] Quotation not found for:', paramClean);
@@ -760,7 +775,7 @@ const WarehouseInventory = () => {
         };
     };
 
-    // Helper to calculate items by location for a pengajuan (real-time from mutation logs)
+    // Helper to calculate items by location for a pengajuan (real-time from mutation logs AND outbound transactions)
     const getItemsByLocation = (pengajuan) => {
         const pengajuanNumber = pengajuan.quotationNumber || pengajuan.quotation_number;
         const pengajuanId = pengajuan.id;
@@ -776,8 +791,8 @@ const WarehouseInventory = () => {
                 totalItems += itemQty;
                 const itemName = item.name || item.itemName;
 
-                // Find all outbound mutations for this item
-                const outboundMutations = mutationLogs.filter(m =>
+                // 1. Find outbound MUTATIONS (e.g. Pameran)
+                const mutationsOut = mutationLogs.filter(m =>
                     (m.pengajuanId === pengajuanId || normalize(m.pengajuanNumber) === normalize(pengajuanNumber)) &&
                     normalize(m.itemCode) === normalize(item.itemCode) &&
                     normalize(m.packageNumber) === normalize(pkg.packageNumber) &&
@@ -786,7 +801,21 @@ const WarehouseInventory = () => {
                     (m.destination || '').toLowerCase() !== 'gudang'
                 );
 
-                // Find all inbound/return mutations for this item
+                // 2. Find official OUTBOUND TRANSACTIONS (freight_outbound)
+                // Filter strictly by source reference or loosely by code if no source ref
+                const officialOutbound = outboundTransactions.filter(o => {
+                    const matchSource = (o.documents?.source_pengajuan_number === pengajuanNumber) ||
+                        (o.pengajuan_id === pengajuanId); // Ideal match
+
+                    const matchItem = normalize(o.item_code) === normalize(item.itemCode) &&
+                        (pkg.packageNumber ? normalize(o.documents?.packageNumber) === normalize(pkg.packageNumber) : true);
+
+                    // If source ref exists, use it. Else fallback to item match (risky but needed)
+                    if (o.documents?.source_pengajuan_number) return matchSource && matchItem;
+                    return matchItem;
+                });
+
+                // 3. Find RETURN mutations (Pameran -> Warehouse)
                 const returnMutations = mutationLogs.filter(m =>
                     (m.pengajuanId === pengajuanId || normalize(m.pengajuanNumber) === normalize(pengajuanNumber)) &&
                     normalize(m.itemCode) === normalize(item.itemCode) &&
@@ -795,13 +824,16 @@ const WarehouseInventory = () => {
                     ((m.destination || '').toLowerCase() === 'warehouse' || (m.destination || '').toLowerCase() === 'gudang')
                 );
 
-                // Calculate net outbound to pameran
-                const totalOutbound = outboundMutations.reduce((sum, m) => sum + (m.mutatedQty || 0), 0);
+                // Calculate totals
+                const totalMutationOut = mutationsOut.reduce((sum, m) => sum + (m.mutatedQty || 0), 0);
+                const totalOfficialOut = officialOutbound.reduce((sum, o) => sum + (o.quantity || 0), 0);
                 const totalReturned = returnMutations.reduce((sum, m) => sum + (m.mutatedQty || 0), 0);
-                const netAtPameran = Math.max(0, totalOutbound - totalReturned);
 
-                // Calculate remaining in warehouse
-                const remainingInWarehouse = Math.max(0, itemQty - netAtPameran);
+                // Net Pameran = Mutasi Keluar - Mutasi Balik
+                const netAtPameran = Math.max(0, totalMutationOut - totalReturned);
+
+                // Remaining in Warehouse = Initial - (Net Pameran + Official Outbound)
+                const remainingInWarehouse = Math.max(0, itemQty - netAtPameran - totalOfficialOut);
 
                 itemsInWarehouse += remainingInWarehouse;
                 itemsAtPameran += netAtPameran;
@@ -817,14 +849,12 @@ const WarehouseInventory = () => {
 
     // Helper to calculate item location status (per individual item)
     const getIndividualItemStatus = (itemCode, packageNumber, itemName) => {
-        if (!selectedPengajuan) return { atPameran: 0, totalOutbound: 0, totalReturned: 0 };
+        if (!selectedPengajuan) return { atPameran: 0, totalOutbound: 0, totalReturned: 0, officialOutbound: 0 };
 
         const pengajuanNumber = selectedPengajuan.quotationNumber || selectedPengajuan.quotation_number;
         const pengajuanId = selectedPengajuan.id;
 
-
-
-        // Find all outbound mutations for this specific item
+        // 1. MUTATIONS (Pameran etc)
         const outboundMutations = mutationLogs.filter(m =>
             (m.pengajuanId === pengajuanId || normalize(m.pengajuanNumber) === normalize(pengajuanNumber)) &&
             normalize(m.itemCode) === normalize(itemCode) &&
@@ -833,7 +863,39 @@ const WarehouseInventory = () => {
             (m.destination || '').toLowerCase() !== 'gudang'
         );
 
-        // Find all return mutations for this specific item
+        // 2. OFFICIAL OUTBOUND (freight_outbound)
+        const officialOutbound = outboundTransactions.filter(o => {
+            const hasSourceRef = !!o.documents?.source_pengajuan_number;
+            const sourceRef = o.documents?.source_pengajuan_number || '';
+            const docPackage = o.documents?.packageNumber;
+
+            // Debug matching
+            const isItemMatch = normalize(o.item_code) === normalize(itemCode);
+
+            // Relaxed Source Match: 
+            const matchSource = (normalize(sourceRef) === normalize(pengajuanNumber)) ||
+                (normalize(sourceRef).includes(normalize(pengajuanNumber)) && pengajuanNumber.length > 5) || // Ensure not matching empty/short strings
+                (normalize(pengajuanNumber).includes(normalize(sourceRef)) && sourceRef.length > 5) ||
+                (o.pengajuan_id === pengajuanId);
+
+            // Relaxed Item Match
+            // If Source Matches -> We trust it significantly. Ignore package number mismatch if highly likely.
+            if (matchSource && isItemMatch) return true;
+
+            // Manual/Legacy Match (No Source Ref)
+            // Match Item Code AND (Package Match OR Outbound has no package info)
+            const matchPackage = packageNumber
+                ? (docPackage ? normalize(docPackage) === normalize(packageNumber) : true) // If doc has no pkg, assume valid
+                : true;
+
+            if (isItemMatch && !matchSource && !hasSourceRef) {
+                return matchPackage;
+            }
+
+            return false;
+        });
+
+        // 3. RETURN MUTATIONS
         const returnMutations = mutationLogs.filter(m =>
             (m.pengajuanId === pengajuanId || normalize(m.pengajuanNumber) === normalize(pengajuanNumber)) &&
             normalize(m.itemCode) === normalize(itemCode) &&
@@ -841,15 +903,25 @@ const WarehouseInventory = () => {
             ((m.destination || '').toLowerCase() === 'warehouse' || (m.destination || '').toLowerCase() === 'gudang')
         );
 
-        // Calculate net outbound
-        const totalOutbound = outboundMutations.reduce((sum, m) => sum + (parseInt(m.mutatedQty) || 0), 0);
+        // Calc totals
+        const totalMutationOut = outboundMutations.reduce((sum, m) => sum + (parseInt(m.mutatedQty) || 0), 0);
+        const totalOfficialOut = officialOutbound.reduce((sum, o) => sum + (parseInt(o.quantity) || 0), 0);
         const totalReturned = returnMutations.reduce((sum, m) => sum + (parseInt(m.mutatedQty) || 0), 0);
-        const netAtPameran = Math.max(0, totalOutbound - totalReturned);
+
+        const netAtPameran = Math.max(0, totalMutationOut - totalReturned);
+
+        // Debug Log
+        if (totalOfficialOut > 0) {
+            console.log(`✅ [${itemCode}] STOCK ADJUSTED: -${totalOfficialOut} from Outbound`);
+        }
 
         return {
             atPameran: netAtPameran,
-            totalOutbound,
-            totalReturned
+            totalOutbound: totalMutationOut,
+            totalOfficialOut: totalOfficialOut,
+            totalReturned,
+            // Convenience total for deduction
+            totalDeducted: netAtPameran + totalOfficialOut
         };
     };
 
@@ -1051,9 +1123,9 @@ const WarehouseInventory = () => {
             {/* Detail Inventory Modal */}
             {
                 selectedPengajuan && displayData && !showMutationModal && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                        <div className="bg-white dark:bg-dark-card rounded-xl w-full max-w-6xl max-h-[90vh] overflow-hidden shadow-xl">
-                            <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-dark-border">
+                    <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+                        <div className="bg-white dark:bg-dark-card rounded-xl w-full max-w-6xl max-h-[90vh] overflow-hidden shadow-xl flex flex-col">
+                            <div className="flex-shrink-0 flex justify-between items-center p-4 border-b border-gray-200 dark:border-dark-border">
                                 <div>
                                     <h2 className="text-xl font-bold text-gray-900 dark:text-white">Detail Inventaris</h2>
                                     <p className="text-sm text-gray-500 dark:text-silver-dark">{selectedPengajuan.quotationNumber || selectedPengajuan.quotation_number}</p>
@@ -1080,12 +1152,12 @@ const WarehouseInventory = () => {
                             </div>
 
                             {/* Data Inventaris Section Title */}
-                            <div className="px-4 pt-4 pb-2">
+                            <div className="flex-shrink-0 px-4 pt-4 pb-2">
                                 <h3 className="text-base font-bold text-gray-800 dark:text-silver-light">📦 Data Inventaris</h3>
                             </div>
 
                             {/* Header Table */}
-                            <div className="px-4 pb-4 border-b border-gray-200 dark:border-dark-border">
+                            <div className="flex-shrink-0 px-4 pb-4 border-b border-gray-200 dark:border-dark-border">
                                 <div className="overflow-x-auto border border-gray-200 dark:border-dark-border rounded-lg">
                                     <table className="w-full">
                                         <thead className={selectedPengajuan.type === 'outbound' ? 'bg-accent-purple' : 'bg-accent-blue'}>
@@ -1126,50 +1198,15 @@ const WarehouseInventory = () => {
                                 </div>
                             </div>
 
-                            {/* Mutation Info Section - Only in edit mode for inbound */}
-                            {isEditing && selectedPengajuan.type !== 'outbound' && (
-                                <div className="px-4 py-3 bg-orange-50 border-b border-orange-200">
-                                    <h3 className="text-sm font-bold text-orange-700 mb-2">🔄 Info Mutasi</h3>
-                                    <div className="grid grid-cols-3 gap-4">
-                                        <div>
-                                            <label className="text-xs text-gray-600">Tgl Mutasi</label>
-                                            <input
-                                                type="date"
-                                                value={editData.mutationDate || new Date().toISOString().split('T')[0]}
-                                                onChange={(e) => setEditData({ ...editData, mutationDate: e.target.value })}
-                                                className="w-full px-2 py-1 text-xs border border-orange-300 rounded"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-xs text-gray-600">Jam Mutasi</label>
-                                            <input
-                                                type="time"
-                                                value={editData.mutationTime || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
-                                                onChange={(e) => setEditData({ ...editData, mutationTime: e.target.value })}
-                                                className="w-full px-2 py-1 text-xs border border-orange-300 rounded"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-xs text-gray-600">PIC Mutasi</label>
-                                            <input
-                                                type="text"
-                                                value={editData.mutationPic || ''}
-                                                onChange={(e) => setEditData({ ...editData, mutationPic: e.target.value })}
-                                                placeholder="Nama PIC"
-                                                className="w-full px-2 py-1 text-xs border border-orange-300 rounded"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
+                            {/* Mutation Info Section REMOVED - Using per-row columns */}
 
                             {/* Detail Item Section Title */}
-                            <div className="px-4 pt-4 pb-3">
+                            <div className="flex-shrink-0 px-4 pt-4 pb-3">
                                 <h3 className="text-base font-bold text-gray-800 dark:text-silver-light">📝 Detail Item</h3>
                             </div>
 
                             {/* Detail Items */}
-                            <div className={`p-4 overflow-y-auto space-y-4 ${isEditing && selectedPengajuan.type !== 'outbound' ? 'max-h-[calc(90vh-360px)]' : 'max-h-[calc(90vh-280px)]'}`}>
+                            <div className="flex-1 min-h-0 p-4 overflow-y-auto space-y-4">
                                 {(displayData.packages || []).map((pkg, pkgIndex) => (
                                     <div key={pkgIndex} className="border border-gray-200 dark:border-dark-border rounded-lg overflow-hidden">
                                         <div className="bg-gray-100 dark:bg-dark-surface px-3 py-2 border-b border-gray-200 dark:border-dark-border">
@@ -1188,14 +1225,23 @@ const WarehouseInventory = () => {
                                                         {isEditing && selectedPengajuan.type !== 'outbound' && (
                                                             <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white bg-green-700 w-16" style={{ fontWeight: 'bold' }}>Stok</th>
                                                         )}
-                                                        <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white w-24" style={{ fontWeight: 'bold' }}>Status</th>
-                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-16" style={{ fontWeight: 'bold' }}>Lokasi</th>
+                                                        <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white w-28" style={{ fontWeight: 'bold' }}>Status</th>
+                                                        { /* Lokasi removed from here */}
                                                         <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-14" style={{ fontWeight: 'bold' }}>Kondisi</th>
                                                         {/* Mutation columns - only in edit mode for inbound */}
                                                         {isEditing && selectedPengajuan.type !== 'outbound' && (
                                                             <>
                                                                 <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white bg-red-700 w-16" style={{ fontWeight: 'bold' }}>Keluar</th>
+                                                                {/* New Outbound Details */}
+                                                                <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white bg-red-800 w-24">Tgl Keluar</th>
+                                                                <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white bg-red-800 w-16">Jam</th>
+                                                                <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white bg-red-800 w-20">PIC</th>
+
                                                                 <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white bg-blue-700 w-16" style={{ fontWeight: 'bold' }}>Kembali</th>
+                                                                {/* New Inbound Details */}
+                                                                <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white bg-blue-800 w-24">Tgl Kembali</th>
+                                                                <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white bg-blue-800 w-16">Jam</th>
+                                                                <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white bg-blue-800 w-20">PIC</th>
                                                             </>
                                                         )}
                                                         <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-full" style={{ fontWeight: 'bold' }}>Keterangan</th>
@@ -1206,7 +1252,8 @@ const WarehouseInventory = () => {
                                                         const itemName = item.name || item.itemName;
                                                         const mutationInfo = getItemMutationInfo(item.itemCode, pkg.packageNumber, itemName);
                                                         const itemStatus = getIndividualItemStatus(item.itemCode, pkg.packageNumber, itemName);
-                                                        const inWarehouse = (item.quantity || 0) - itemStatus.atPameran;
+                                                        // Use totalDeducted to account for official outbound
+                                                        const inWarehouse = (item.quantity || 0) - (itemStatus.totalDeducted || itemStatus.atPameran);
                                                         const isCheckedOut = item.checkedOut || item.checked_out;
                                                         const checkoutBcNumber = item.checkoutBcNumber || item.checkout_bc_number;
 
@@ -1240,26 +1287,37 @@ const WarehouseInventory = () => {
                                                                         {projectedSisa}
                                                                     </td>
                                                                 )}
-                                                                <td className="px-1 py-0 text-xs text-center">
-                                                                    <div className="flex items-center justify-center gap-1">
-                                                                        <div className="flex items-center gap-0.5 bg-green-100 dark:bg-green-900/30 px-1 py-0 rounded border border-green-200 dark:border-green-800">
-                                                                            <Box className="w-2.5 h-2.5 text-green-600 dark:text-green-400" />
-                                                                            <span className="text-[9px] font-bold text-green-700 dark:text-green-400">{inWarehouse}</span>
+                                                                <td className="px-1 py-1 text-xs text-left align-top">
+                                                                    <div className="flex flex-col gap-1 items-start">
+                                                                        {/* Warehouse */}
+                                                                        <div className="flex items-center justify-between w-full min-w-[70px] bg-green-50 dark:bg-green-900/20 px-1.5 py-0.5 rounded border border-green-100 dark:border-green-800/50">
+                                                                            <span className="text-[10px] text-green-700 dark:text-green-400 font-medium">Gudang</span>
+                                                                            <span className="text-[10px] font-bold text-green-800 dark:text-green-300">{inWarehouse}</span>
                                                                         </div>
+
+                                                                        {/* Pameran */}
                                                                         {itemStatus.atPameran > 0 && (
-                                                                            <div className="flex items-center gap-0.5 bg-orange-100 dark:bg-orange-900/30 px-1 py-0 rounded border border-orange-200 dark:border-orange-800">
-                                                                                <MapPin className="w-2.5 h-2.5 text-orange-600 dark:text-orange-400" />
-                                                                                <span className="text-[9px] font-bold text-orange-700 dark:text-orange-400">{itemStatus.atPameran}</span>
+                                                                            <div className="flex items-center justify-between w-full min-w-[70px] bg-orange-50 dark:bg-orange-900/20 px-1.5 py-0.5 rounded border border-orange-100 dark:border-orange-800/50">
+                                                                                <span className="text-[10px] text-orange-700 dark:text-orange-400 font-medium">Pameran</span>
+                                                                                <span className="text-[10px] font-bold text-orange-800 dark:text-orange-300">{itemStatus.atPameran}</span>
+                                                                            </div>
+                                                                        )}
+
+                                                                        {/* Keluar */}
+                                                                        {itemStatus.totalOfficialOut > 0 && (
+                                                                            <div className="flex items-center justify-between w-full min-w-[70px] bg-purple-50 dark:bg-purple-900/20 px-1.5 py-0.5 rounded border border-purple-100 dark:border-purple-800/50">
+                                                                                <span className="text-[10px] text-purple-700 dark:text-purple-400 font-medium">Keluar</span>
+                                                                                <span className="text-[10px] font-bold text-purple-800 dark:text-purple-300">{itemStatus.totalOfficialOut}</span>
                                                                             </div>
                                                                         )}
                                                                     </div>
                                                                 </td>
-                                                                <td className="px-1 py-0 text-xs text-gray-700 dark:text-silver">{isEditing ? <select value={item.location?.room || 'warehouse'} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'location', e.target.value)} className="px-1 py-0 text-xs border rounded"><option value="warehouse">Warehouse</option><option value="pameran">Pameran</option><option value="outbound">Outbound</option></select> : (item.location?.room || 'warehouse')}</td>
+                                                                {/* <td ... Lokasi removed from here ... ></td> */}
                                                                 <td className="px-1 py-0 text-xs text-gray-700 dark:text-silver">{isEditing ? <select value={item.condition || 'Baik'} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'condition', e.target.value)} className="px-1 py-0 text-xs border rounded"><option value="Baik">Baik</option><option value="Rusak">Rusak</option><option value="Cacat">Cacat</option></select> : (item.condition || 'Baik')}</td>
                                                                 {/* Mutation columns - only in edit mode for inbound */}
                                                                 {isEditing && selectedPengajuan.type !== 'outbound' && (
                                                                     <>
-                                                                        {/* Keluar Gudang */}
+                                                                        {/* Keluar Cols */}
                                                                         <td className="px-1 py-0 text-xs text-center bg-red-50">
                                                                             <select
                                                                                 value={keluarQty}
@@ -1272,7 +1330,29 @@ const WarehouseInventory = () => {
                                                                                 ))}
                                                                             </select>
                                                                         </td>
-                                                                        {/* Kembali Gudang */}
+                                                                        <td className="px-1 py-0 text-xs text-center bg-red-50">
+                                                                            <input type="date" className="w-[85px] px-0.5 py-0 text-[10px] border border-red-200 rounded"
+                                                                                value={item.mutationDateOut || ''}
+                                                                                onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'mutationDateOut', e.target.value)}
+                                                                                disabled={keluarQty === 0}
+                                                                            />
+                                                                        </td>
+                                                                        <td className="px-1 py-0 text-xs text-center bg-red-50">
+                                                                            <input type="time" className="w-[60px] px-0.5 py-0 text-[10px] border border-red-200 rounded"
+                                                                                value={item.mutationTimeOut || ''}
+                                                                                onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'mutationTimeOut', e.target.value)}
+                                                                                disabled={keluarQty === 0}
+                                                                            />
+                                                                        </td>
+                                                                        <td className="px-1 py-0 text-xs text-center bg-red-50">
+                                                                            <input type="text" className="w-[70px] px-0.5 py-0 text-[10px] border border-red-200 rounded" placeholder="PIC"
+                                                                                value={item.mutationPicOut || ''}
+                                                                                onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'mutationPicOut', e.target.value)}
+                                                                                disabled={keluarQty === 0}
+                                                                            />
+                                                                        </td>
+
+                                                                        {/* Kembali Cols */}
                                                                         <td className="px-1 py-0 text-xs text-center bg-blue-50">
                                                                             <select
                                                                                 value={kembaliQty}
@@ -1285,6 +1365,28 @@ const WarehouseInventory = () => {
                                                                                 ))}
                                                                             </select>
                                                                         </td>
+                                                                        <td className="px-1 py-0 text-xs text-center bg-blue-50">
+                                                                            <input type="date" className="w-[85px] px-0.5 py-0 text-[10px] border border-blue-200 rounded"
+                                                                                value={item.mutationDateIn || ''}
+                                                                                onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'mutationDateIn', e.target.value)}
+                                                                                disabled={kembaliQty === 0}
+                                                                            />
+                                                                        </td>
+                                                                        <td className="px-1 py-0 text-xs text-center bg-blue-50">
+                                                                            <input type="time" className="w-[60px] px-0.5 py-0 text-[10px] border border-blue-200 rounded"
+                                                                                value={item.mutationTimeIn || ''}
+                                                                                onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'mutationTimeIn', e.target.value)}
+                                                                                disabled={kembaliQty === 0}
+                                                                            />
+                                                                        </td>
+                                                                        <td className="px-1 py-0 text-xs text-center bg-blue-50">
+                                                                            <input type="text" className="w-[70px] px-0.5 py-0 text-[10px] border border-blue-200 rounded" placeholder="PIC"
+                                                                                value={item.mutationPicIn || ''}
+                                                                                onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'mutationPicIn', e.target.value)}
+                                                                                disabled={kembaliQty === 0}
+                                                                            />
+                                                                        </td>
+
                                                                     </>
                                                                 )}
                                                                 <td className={`px-1 py-0 text-xs ${isCheckedOut ? 'text-amber-800 dark:text-amber-400' : 'text-gray-700 dark:text-silver'}`}>
@@ -1350,7 +1452,7 @@ const WarehouseInventory = () => {
             {/* ========== MUTATION MODAL ========== */}
             {
                 showMutationModal && mutationData && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
                         <div className="bg-white dark:bg-dark-card rounded-xl w-full max-w-7xl max-h-[90vh] overflow-hidden shadow-xl">
                             {/* Modal Header */}
                             <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-dark-border bg-red-50 dark:bg-red-900/20">
@@ -1473,7 +1575,7 @@ const WarehouseInventory = () => {
                                                                 <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{item.name || item.itemName || '-'}</td>
                                                                 <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center">{item.quantity || 0}</td>
                                                                 <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center">{item.uom || 'pcs'}</td>
-                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{item.location?.room || 'warehouse'}</td>
+                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{typeof item.location === 'string' ? item.location : (typeof item.location?.room === 'string' ? item.location.room : 'warehouse')}</td>
                                                                 <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{item.condition || 'Baik'}</td>
 
                                                                 {/* Mutation input (Gudang -> Pameran/Outbound) - Active when going TO Pameran/Outbound */}

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { DollarSign, FileText, TrendingUp, TrendingDown, Plus, Edit, Check, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { DollarSign, FileText, TrendingUp, TrendingDown, Plus, Edit, Check, X, Trash2 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import Button from '../../components/Common/Button';
 import LineItemManager from '../../components/Common/LineItemManager';
@@ -10,6 +11,8 @@ import POFormModal from '../../components/Finance/POFormModal';
 import { formatCurrency } from '../../utils/currencyFormatter';
 
 const BridgeFinance = () => {
+    const location = useLocation();
+    const navigate = useNavigate();
     const {
         invoices = [],
         purchases = [],
@@ -31,6 +34,27 @@ const BridgeFinance = () => {
     } = useData();
 
     const [activeTab, setActiveTab] = useState('invoices');
+
+    // Sync URL with Tab
+    useEffect(() => {
+        const path = location.pathname;
+        if (path.includes('/bridge/finance/invoices') || path.includes('/bridge/finance/ar')) {
+            setActiveTab('invoices');
+        } else if (path.includes('/bridge/finance/po')) {
+            setActiveTab('pos');
+        } else if (path.includes('/bridge/finance/ap')) { // Assuming AP maps to purchases
+            setActiveTab('purchases');
+        }
+    }, [location.pathname]);
+
+    const handleTabChange = (tab) => {
+        setActiveTab(tab);
+        let path = '/bridge/finance';
+        if (tab === 'invoices') path += '/invoices';
+        else if (tab === 'pos') path += '/po';
+        else if (tab === 'purchases') path += '/ap'; // Using AP route for purchases tab logic
+        navigate(path);
+    };
     const [showInvoiceForm, setShowInvoiceForm] = useState(false);
     const [showPurchaseForm, setShowPurchaseForm] = useState(false);
     const [showPOForm, setShowPOForm] = useState(false);
@@ -229,7 +253,7 @@ const BridgeFinance = () => {
             {/* Tabs */}
             <div className="flex gap-2 items-center">
                 <button
-                    onClick={() => setActiveTab('invoices')}
+                    onClick={() => handleTabChange('invoices')}
                     className={`px-4 py-2 rounded-lg font-medium smooth-transition ${activeTab === 'invoices'
                         ? 'bg-accent-blue text-white'
                         : 'bg-dark-surface text-silver-dark hover:text-silver'
@@ -238,7 +262,7 @@ const BridgeFinance = () => {
                     Invoices ({invoices.length})
                 </button>
                 <button
-                    onClick={() => setActiveTab('purchases')}
+                    onClick={() => handleTabChange('purchases')}
                     className={`px-4 py-2 rounded-lg font-medium smooth-transition ${activeTab === 'purchases'
                         ? 'bg-accent-blue text-white'
                         : 'bg-dark-surface text-silver-dark hover:text-silver'
@@ -247,7 +271,7 @@ const BridgeFinance = () => {
                     Purchases ({purchases.length})
                 </button>
                 <button
-                    onClick={() => setActiveTab('pos')}
+                    onClick={() => handleTabChange('pos')}
                     className={`px-4 py-2 rounded-lg font-medium smooth-transition ${activeTab === 'pos'
                         ? 'bg-accent-purple text-white'
                         : 'bg-dark-surface text-silver-dark hover:text-silver'
@@ -647,7 +671,7 @@ const SummaryCard = ({ title, value, icon: Icon, color }) => {
 
 // Invoice Form Modal Component
 const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) => {
-    const { quotations = [] } = useData();
+    const { quotations = [], invoices = [] } = useData();
 
     // Filter only approved quotations
     const approvedQuotations = quotations.filter(q => q.status === 'approved');
@@ -659,17 +683,45 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
         bcDocument: '',
         title: '',
         items: [],
-        services: {},
-        customCosts: [],
+        services: {}, // Kept for compatibility but hidden if not needed
+        customCosts: [], // Kept for compatibility but hidden if not needed
         discountType: 'percentage',
         discountValue: 0,
         taxRate: 11,
         notes: '',
-        status: 'unpaid'
+        status: 'unpaid',
+        cogsItems: [] // COGS Items state
     });
 
     const [manualInvoiceNumber, setManualInvoiceNumber] = useState(false);
     const [customInvoiceNumber, setCustomInvoiceNumber] = useState('');
+
+    // Item Form State
+    const [itemForm, setItemForm] = useState({
+        item: '',
+        description: '',
+        unitPrice: '',
+        quantity: '',
+        unit: 'pcs'
+    });
+
+    const unitOptions = ['pcs', 'kg', 'ton', 'm', 'm2', 'm3', 'set', 'box', 'pallet', 'ctn', 'unit'];
+
+    // Generate Auto Invoice Number
+    const generateInvoiceNumber = () => {
+        const today = new Date();
+        const y = today.getFullYear().toString().slice(-2);
+        const m = String(today.getMonth() + 1).padStart(2, '0');
+        const d = String(today.getDate()).padStart(2, '0');
+
+        // Simple sequence generation based on existing invoices count
+        // In a real app, this should come from backend
+        const sequence = String(invoices.length + 1).padStart(8, '0');
+
+        return `BRG-INV-${y}${m}${d}-${sequence}`;
+    };
+
+    const autoInvoiceNumber = generateInvoiceNumber();
 
     // Handle quotation selection - auto populate all fields
     const handleQuotationSelect = (quotationId) => {
@@ -683,52 +735,149 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
                 customer: selectedQuotation.customer || '',
                 bcDocument: selectedQuotation.bcDocumentNumber || '',
                 title: `Invoice untuk Quotation ${selectedQuotation.quotationNumber || ''}`,
-                // Map items properly - ensure they have the right structure
+                // Map items properly
                 items: (selectedQuotation.items || []).map(item => ({
                     id: item.id || `item-${Date.now()}-${Math.random()}`,
+                    item: item.itemName || item.item || '',
                     description: item.description || '',
-                    quantity: item.quantity || 0,
+                    quantity: Number(item.quantity) || 0,
                     unit: item.unit || 'Unit',
-                    unitPrice: item.unitPrice || 0,
-                    value: item.value || (item.quantity * item.unitPrice)
+                    unitPrice: Number(item.unitPrice) || Number(item.price) || 0,
+                    total: (Number(item.quantity) || 0) * (Number(item.unitPrice) || Number(item.price) || 0)
                 })),
-                services: selectedQuotation.services || {},
-                customCosts: selectedQuotation.customCosts || [],
                 discountType: selectedQuotation.discountType || 'percentage',
                 discountValue: selectedQuotation.discountValue || 0,
                 taxRate: selectedQuotation.taxRate || 11,
+                // Initialize COGS with same items but 0 price
+                cogsItems: (selectedQuotation.items || []).map(item => ({
+                    id: `cogs-${item.id || Date.now()}-${Math.random()}`,
+                    item: item.itemName || item.item || '',
+                    description: item.description || '',
+                    quantity: Number(item.quantity) || 0,
+                    unit: item.unit || 'Unit',
+                    unitPrice: 0, // Default cost to 0
+                    total: 0
+                }))
             });
-            console.log('✅ Items auto-filled:', selectedQuotation.items);
         } else {
             // Reset if no quotation selected
             setFormData({
+                ...formData,
                 quotationId: '',
                 customer: '',
-                date: new Date().toISOString().split('T')[0],
+                bcDocument: '',
+                title: '',
                 bcDocument: '',
                 title: '',
                 items: [],
-                services: {},
-                customCosts: [],
-                discountType: 'percentage',
-                discountValue: 0,
-                taxRate: 11,
-                notes: '',
-                status: 'unpaid'
+                cogsItems: []
             });
         }
     };
 
+    const handleAddItem = () => {
+        if (!itemForm.item || !itemForm.quantity || !itemForm.unitPrice) {
+            alert('Item, Jumlah, dan Harga Satuan wajib diisi');
+            return;
+        }
+
+        const newItem = {
+            id: `item-${Date.now()}`,
+            item: itemForm.item,
+            description: itemForm.description,
+            quantity: Number(itemForm.quantity),
+            unit: itemForm.unit,
+            unitPrice: Number(itemForm.unitPrice),
+            total: Number(itemForm.quantity) * Number(itemForm.unitPrice)
+        };
+
+        setFormData({
+            ...formData,
+            items: [...formData.items, newItem]
+        });
+
+        // Reset form
+        setItemForm({
+            item: '',
+            description: '',
+            unitPrice: '',
+            quantity: '',
+            unit: 'pcs'
+        });
+    };
+
+    const handleRemoveItem = (id) => {
+        setFormData({
+            ...formData,
+            items: formData.items.filter(i => i.id !== id)
+        });
+    };
+
+    // COGS Management
+    const handleSyncCogs = () => {
+        const newCogs = formData.items.map(item => ({
+            id: `cogs-${Date.now()}-${Math.random()}`,
+            item: item.item,
+            description: item.description,
+            quantity: item.quantity,
+            unit: item.unit,
+            unitPrice: 0,
+            total: 0
+        }));
+        setFormData(prev => ({ ...prev, cogsItems: newCogs }));
+    };
+
+    const handleAddCogsItem = () => {
+        const newItem = {
+            id: `cogs-${Date.now()}`,
+            item: '',
+            description: '',
+            quantity: 0,
+            unit: 'pcs',
+            unitPrice: 0,
+            total: 0
+        };
+        setFormData(prev => ({ ...prev, cogsItems: [...prev.cogsItems, newItem] }));
+    };
+
+    const handleUpdateCogsItem = (id, field, value) => {
+        setFormData(prev => ({
+            ...prev,
+            cogsItems: prev.cogsItems.map(item => {
+                if (item.id === id) {
+                    const updates = { [field]: value };
+                    // Recalculate total if qty or price changes
+                    if (field === 'quantity' || field === 'unitPrice') {
+                        const qty = field === 'quantity' ? Number(value) : item.quantity;
+                        const price = field === 'unitPrice' ? Number(value) : item.unitPrice;
+                        updates.total = qty * price;
+                    }
+                    return { ...item, ...updates };
+                }
+                return item;
+            })
+        }));
+    };
+
+    const handleRemoveCogsItem = (id) => {
+        setFormData(prev => ({
+            ...prev,
+            cogsItems: prev.cogsItems.filter(i => i.id !== id)
+        }));
+    };
+
     const handleSubmit = (e) => {
         e.preventDefault();
-        console.log('📝 Invoice form submitted, formData:', formData);
+
+        if (formData.items.length === 0) {
+            alert('Harap tambahkan minimal satu item');
+            return;
+        }
 
         try {
             // Calculate
-            const itemsSubtotal = formData.items.reduce((sum, item) => sum + (item.value || 0), 0);
-            const serviceSubtotal = Object.values(formData.services).reduce((sum, s) => sum + (s.total || 0), 0);
-            const customCostsSubtotal = formData.customCosts.reduce((sum, cost) => sum + (cost.total || 0), 0);
-            const subtotalBeforeDiscount = itemsSubtotal + serviceSubtotal + customCostsSubtotal;
+            const itemsSubtotal = formData.items.reduce((sum, item) => sum + item.total, 0);
+            const subtotalBeforeDiscount = itemsSubtotal; // Ignoring services/customCosts for this simplified view
 
             let discountAmount = 0;
             if (formData.discountType === 'percentage') {
@@ -744,21 +893,17 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
             const invoiceData = {
                 ...formData,
                 itemsSubtotal,
-                serviceSubtotal,
-                customCostsSubtotal,
                 subtotalBeforeDiscount,
                 discountAmount,
                 subtotalAfterDiscount,
                 taxAmount,
                 grandTotal,
-                // Add custom invoice number if manual mode
-                customInvoiceNumber: manualInvoiceNumber ? customInvoiceNumber : null
+                invoiceNumber: manualInvoiceNumber ? customInvoiceNumber : autoInvoiceNumber,
+                cogsItems: formData.cogsItems,
+                totalCogs: formData.cogsItems.reduce((sum, item) => sum + (item.total || 0), 0)
             };
 
-            console.log('📝 Calling onSubmit with invoice data:', invoiceData);
             onSubmit(invoiceData);
-            console.log('📝 Invoice submitted successfully, closing modal');
-            alert('Invoice berhasil disimpan!');
             onClose();
         } catch (error) {
             console.error('❌ Error submitting invoice:', error);
@@ -766,24 +911,43 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
         }
     };
 
+    // Calculations for Summary
+    const itemsSubtotal = formData.items.reduce((sum, item) => sum + item.total, 0);
+    const discountAmt = formData.discountType === 'percentage'
+        ? (itemsSubtotal * formData.discountValue) / 100
+        : Number(formData.discountValue);
+    const subtotalAfterDisc = itemsSubtotal - discountAmt;
+    const taxAmt = (subtotalAfterDisc * formData.taxRate) / 100;
+    const finalTotal = subtotalAfterDisc + taxAmt;
+
+    // COGS Calculation
+    const totalCogs = formData.cogsItems.reduce((sum, item) => sum + (item.total || 0), 0);
+    const grossProfit = itemsSubtotal - totalCogs;
+    const profitMargin = itemsSubtotal > 0 ? (grossProfit / itemsSubtotal) * 100 : 0;
+
     return (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
             <div className="glass-card rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-                <div className="sticky top-0 bg-dark-card border-b border-dark-border p-6 z-10">
-                    <h2 className="text-2xl font-bold gradient-text">Buat Invoice Baru</h2>
-                    <p className="text-silver-dark text-sm mt-1">Lengkapi informasi invoice dan breakdown biaya</p>
+                <div className="sticky top-0 bg-dark-card border-b border-dark-border p-6 z-10 flex justify-between items-center">
+                    <div>
+                        <h2 className="text-2xl font-bold gradient-text">Buat Invoice Baru</h2>
+                        <p className="text-silver-dark text-sm mt-1">Lengkapi form invoice di bawah ini</p>
+                    </div>
+                    <button onClick={onClose} className="p-2 hover:bg-dark-surface rounded-full">
+                        <X className="w-6 h-6 text-silver" />
+                    </button>
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-6 space-y-6">
-                    {/* INVOICE HEADER - PROMINENT SECTION */}
+                    {/* INVOICE HEADER */}
                     <div className="glass-card p-6 rounded-lg border border-accent-blue/30 bg-gradient-to-br from-accent-blue/5 to-transparent">
                         <h3 className="text-lg font-semibold text-silver-light mb-4 flex items-center gap-2">
                             <FileText className="w-5 h-5 text-accent-blue" />
-                            Informasi Invoice
+                            Header Invoice
                         </h3>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* No. Invoice - Manual or Auto */}
+                            {/* No. Invoice */}
                             <div>
                                 <div className="flex items-center justify-between mb-2">
                                     <label className="block text-sm font-medium text-silver">
@@ -799,7 +963,7 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
                                             }}
                                             className="w-4 h-4"
                                         />
-                                        <span className="text-xs text-silver-dark">Manual</span>
+                                        <span className="text-xs text-silver-dark">Manual Input</span>
                                     </label>
                                 </div>
 
@@ -809,61 +973,47 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
                                         required
                                         value={customInvoiceNumber}
                                         onChange={(e) => setCustomInvoiceNumber(e.target.value)}
-                                        placeholder="Contoh: INV-2025-001"
+                                        placeholder="BRG-INV-YYMMDD-XXXXXXXX"
                                         className="w-full px-4 py-3 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
                                     />
                                 ) : (
                                     <div className="px-4 py-3 bg-dark-surface/50 border border-dark-border rounded-lg">
-                                        <p className="text-silver-light font-mono">
-                                            Auto: INV-{new Date().getFullYear()}-XXX
+                                        <p className="text-silver-light font-mono font-bold tracking-wide">
+                                            {autoInvoiceNumber}
                                         </p>
-                                        <p className="text-xs text-silver-dark mt-1">Dibuat otomatis saat submit</p>
+                                        <p className="text-xs text-silver-dark mt-1">Digenerate otomatis sistem</p>
                                     </div>
                                 )}
                             </div>
 
-                            {/* No. Pengajuan Dropdown */}
+                            {/* Data Customer */}
                             <div>
                                 <label className="block text-sm font-medium text-silver mb-2">
-                                    No. Pendaftaran
+                                    Data Customer *
                                 </label>
-                                <select
-                                    value={formData.quotationId}
-                                    onChange={(e) => handleQuotationSelect(e.target.value)}
-                                    className="w-full px-4 py-3 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
-                                >
-                                    <option value="">-- Pilih No. Pendaftaran --</option>
-                                    {approvedQuotations.map(q => (
-                                        <option key={q.id} value={q.id}>
-                                            {q.quotationNumber} - {q.customer}
-                                        </option>
-                                    ))}
-                                </select>
-                                {formData.quotationId && (
-                                    <p className="text-xs text-accent-blue mt-2">✓ Data customer, items, dan biaya sudah auto-filled</p>
-                                )}
+                                <div className="flex gap-2">
+                                    <select
+                                        value={formData.quotationId}
+                                        onChange={(e) => handleQuotationSelect(e.target.value)}
+                                        className="w-1/3 px-3 py-3 bg-dark-surface border border-dark-border rounded-l-lg text-silver-light text-sm focus:border-accent-blue focus:outline-none"
+                                    >
+                                        <option value="">Ref. Quotation</option>
+                                        {approvedQuotations.map(q => (
+                                            <option key={q.id} value={q.id}>{q.quotationNumber}</option>
+                                        ))}
+                                    </select>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={formData.customer}
+                                        onChange={(e) => setFormData({ ...formData, customer: e.target.value })}
+                                        className="flex-1 px-4 py-3 bg-dark-surface border border-dark-border rounded-r-lg text-silver-light focus:border-accent-blue focus:outline-none"
+                                        placeholder="Nama Customer"
+                                    />
+                                </div>
                             </div>
 
-                            {/* Customer */}
-                            <div>
-                                <label className="block text-sm font-medium text-silver mb-2">
-                                    Customer *
-                                </label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={formData.customer}
-                                    onChange={(e) => setFormData({ ...formData, customer: e.target.value })}
-                                    className="w-full px-4 py-3 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
-                                    placeholder="Nama Customer"
-                                    disabled={!!formData.quotationId}
-                                />
-                                {formData.quotationId && (
-                                    <p className="text-xs text-silver-dark mt-1">Dari pengajuan terpilih</p>
-                                )}
-                            </div>
-
-                            {/* Tanggal Invoice */}
+                            {/* Tanggal Inv */}
                             <div>
                                 <label className="block text-sm font-medium text-silver mb-2">
                                     Tanggal Invoice *
@@ -877,69 +1027,313 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
                                 />
                             </div>
 
-                            {/* Judul Invoice */}
-                            <div className="md:col-span-2">
+                            {/* Judul */}
+                            <div>
                                 <label className="block text-sm font-medium text-silver mb-2">
-                                    Judul Invoice *
+                                    Judul / Keterangan
                                 </label>
                                 <input
                                     type="text"
-                                    required
                                     value={formData.title}
                                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                                     className="w-full px-4 py-3 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
-                                    placeholder="Contoh: Invoice untuk Pengiriman Barang Impor"
+                                    placeholder="Keterangan Invoice..."
                                 />
                             </div>
                         </div>
                     </div>
 
-                    {/* BREAKDOWN SECTION */}
+                    {/* ITEMS TABLE SECTION */}
                     <div className="border-t border-dark-border pt-6">
-                        <h3 className="text-lg font-semibold text-silver-light mb-4">Detail Breakdown Biaya</h3>
+                        <h3 className="text-lg font-semibold text-silver-light mb-4">Detail Item Invoice</h3>
 
-                        <LineItemManager
-                            key={formData.quotationId || 'no-quotation'}
-                            items={formData.items}
-                            onChange={(items) => setFormData({ ...formData, items })}
-                        />
-
-                        <ServiceBreakdown
-                            key={formData.quotationId || 'no-quotation-service'}
-                            services={formData.services}
-                            onChange={(services) => setFormData({ ...formData, services })}
-                            totalItems={formData.items.reduce((sum, item) => sum + item.quantity, 0)}
-                        />
-
-                        <CustomCostsManager
-                            key={formData.quotationId || 'no-quotation-costs'}
-                            costs={formData.customCosts}
-                            onChange={(costs) => setFormData({ ...formData, customCosts: costs })}
-                        />
-
-                        <QuotationSummary
-                            itemsSubtotal={formData.items.reduce((sum, item) => sum + (item.value || 0), 0)}
-                            serviceSubtotal={Object.values(formData.services).reduce((sum, s) => sum + (s.total || 0), 0)}
-                            customCostsSubtotal={formData.customCosts.reduce((sum, cost) => sum + (cost.total || 0), 0)}
-                            discountType={formData.discountType}
-                            discountValue={formData.discountValue}
-                            taxRate={formData.taxRate}
-                            onDiscountChange={({ type, value }) => setFormData({ ...formData, discountType: type, discountValue: value })}
-                            onTaxRateChange={(rate) => setFormData({ ...formData, taxRate: rate })}
-                        />
-
-                        <div>
-                            <label className="block text-sm font-medium text-silver mb-2">Catatan</label>
-                            <textarea
-                                value={formData.notes}
-                                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                                rows={3}
-                                className="w-full"
-                                placeholder="Catatan tambahan..."
-                            />
+                        {/* Item Input Form */}
+                        <div className="glass-card p-4 rounded-lg border border-dark-border mb-4">
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                                <div className="md:col-span-3">
+                                    <label className="block text-xs font-medium text-silver mb-1">Item</label>
+                                    <input
+                                        type="text"
+                                        value={itemForm.item}
+                                        onChange={(e) => setItemForm({ ...itemForm, item: e.target.value })}
+                                        placeholder="Nama Item"
+                                        className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-sm"
+                                    />
+                                </div>
+                                <div className="md:col-span-3">
+                                    <label className="block text-xs font-medium text-silver mb-1">Deskripsi</label>
+                                    <input
+                                        type="text"
+                                        value={itemForm.description}
+                                        onChange={(e) => setItemForm({ ...itemForm, description: e.target.value })}
+                                        placeholder="Deskripsi..."
+                                        className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-sm"
+                                    />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-xs font-medium text-silver mb-1">Harga Satuan</label>
+                                    <input
+                                        type="number"
+                                        value={itemForm.unitPrice}
+                                        onChange={(e) => setItemForm({ ...itemForm, unitPrice: e.target.value })}
+                                        placeholder="Rp 0"
+                                        className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-sm"
+                                    />
+                                </div>
+                                <div className="md:col-span-1">
+                                    <label className="block text-xs font-medium text-silver mb-1">Jml</label>
+                                    <input
+                                        type="number"
+                                        value={itemForm.quantity}
+                                        onChange={(e) => setItemForm({ ...itemForm, quantity: e.target.value })}
+                                        placeholder="0"
+                                        className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-sm"
+                                    />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-xs font-medium text-silver mb-1">Satuan</label>
+                                    <select
+                                        value={itemForm.unit}
+                                        onChange={(e) => setItemForm({ ...itemForm, unit: e.target.value })}
+                                        className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-sm"
+                                    >
+                                        {unitOptions.map(u => <option key={u} value={u}>{u}</option>)}
+                                    </select>
+                                </div>
+                                <div className="md:col-span-1">
+                                    <button
+                                        type="button"
+                                        onClick={handleAddItem}
+                                        className="w-full py-2 bg-accent-blue hover:bg-blue-600 text-white rounded-lg flex items-center justify-center transition-colors"
+                                    >
+                                        <Plus className="w-5 h-5" />
+                                    </button>
+                                </div>
+                            </div>
                         </div>
 
-                        <div className="flex gap-3 justify-end">
+                        {/* Table */}
+                        <div className="glass-card rounded-lg overflow-hidden overflow-x-auto mb-4">
+                            <table className="w-full text-sm">
+                                <thead className="bg-accent-blue/10">
+                                    <tr>
+                                        <th className="px-4 py-3 text-center text-silver-light w-16">No</th>
+                                        <th className="px-4 py-3 text-left text-silver-light">Item</th>
+                                        <th className="px-4 py-3 text-left text-silver-light">Deskripsi</th>
+                                        <th className="px-4 py-3 text-right text-silver-light">Harga Satuan</th>
+                                        <th className="px-4 py-3 text-center text-silver-light">Jumlah</th>
+                                        <th className="px-4 py-3 text-center text-silver-light">Satuan</th>
+                                        <th className="px-4 py-3 text-right text-silver-light">Subtotal</th>
+                                        <th className="px-4 py-3 text-center text-silver-light w-16">Acc</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-dark-border">
+                                    {formData.items.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="8" className="px-4 py-8 text-center text-silver-dark opacity-50">
+                                                Belum ada item ditambahkan
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        formData.items.map((item, idx) => (
+                                            <tr key={item.id} className="hover:bg-dark-surface/50">
+                                                <td className="px-4 py-2 text-center text-silver">{idx + 1}</td>
+                                                <td className="px-4 py-2 text-silver font-medium">{item.item}</td>
+                                                <td className="px-4 py-2 text-silver">{item.description || '-'}</td>
+                                                <td className="px-4 py-2 text-right text-silver font-mono">
+                                                    {formatCurrency(item.unitPrice)}
+                                                </td>
+                                                <td className="px-4 py-2 text-center text-silver">{item.quantity}</td>
+                                                <td className="px-4 py-2 text-center text-silver">{item.unit}</td>
+                                                <td className="px-4 py-2 text-right text-accent-green font-mono font-medium">
+                                                    {formatCurrency(item.total)}
+                                                </td>
+                                                <td className="px-4 py-2 text-center">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRemoveItem(item.id)}
+                                                        className="text-red-400 hover:text-red-300 transition-colors"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* COGS SECTION */}
+                        <div className="border-t border-dark-border pt-6 mt-6">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-lg font-semibold text-silver-light">COGS / Biaya Modal</h3>
+                                <div className="flex gap-2">
+                                    <Button
+                                        type="button"
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={handleSyncCogs}
+                                        icon={FileText}
+                                    >
+                                        Salin dari Invoice
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        onClick={handleAddCogsItem}
+                                        icon={Plus}
+                                    >
+                                        Tambah Item
+                                    </Button>
+                                </div>
+                            </div>
+
+                            <div className="glass-card rounded-lg overflow-hidden overflow-x-auto mb-4 border border-dark-border">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-accent-orange/10">
+                                        <tr>
+                                            <th className="px-4 py-3 text-left text-silver-light">Item</th>
+                                            <th className="px-4 py-3 text-left text-silver-light">Deskripsi</th>
+                                            <th className="px-4 py-3 text-right text-silver-light">Harga Beli</th>
+                                            <th className="px-4 py-3 text-center text-silver-light">Jml</th>
+                                            <th className="px-4 py-3 text-right text-silver-light">Total</th>
+                                            <th className="px-4 py-3 text-center text-silver-light w-10"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-dark-border">
+                                        {formData.cogsItems.length === 0 ? (
+                                            <tr>
+                                                <td colSpan="6" className="px-4 py-6 text-center text-silver-dark opacity-50">
+                                                    Belum ada item COGS. Klik "Salin dari Invoice" atau "Tambah Item".
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            formData.cogsItems.map((item, idx) => (
+                                                <tr key={item.id} className="hover:bg-dark-surface/50">
+                                                    <td className="p-2">
+                                                        <input
+                                                            type="text"
+                                                            value={item.item}
+                                                            onChange={(e) => handleUpdateCogsItem(item.id, 'item', e.target.value)}
+                                                            className="w-full bg-transparent border border-dark-border rounded px-2 py-1 text-silver-light"
+                                                            placeholder="Nama Item"
+                                                        />
+                                                    </td>
+                                                    <td className="p-2">
+                                                        <input
+                                                            type="text"
+                                                            value={item.description}
+                                                            onChange={(e) => handleUpdateCogsItem(item.id, 'description', e.target.value)}
+                                                            className="w-full bg-transparent border border-dark-border rounded px-2 py-1 text-silver"
+                                                            placeholder="Deskripsi"
+                                                        />
+                                                    </td>
+                                                    <td className="p-2">
+                                                        <input
+                                                            type="number"
+                                                            value={item.unitPrice}
+                                                            onChange={(e) => handleUpdateCogsItem(item.id, 'unitPrice', e.target.value)}
+                                                            className="w-full bg-transparent border border-dark-border rounded px-2 py-1 text-right text-silver font-mono"
+                                                            placeholder="0"
+                                                        />
+                                                    </td>
+                                                    <td className="p-2 w-20">
+                                                        <input
+                                                            type="number"
+                                                            value={item.quantity}
+                                                            onChange={(e) => handleUpdateCogsItem(item.id, 'quantity', e.target.value)}
+                                                            className="w-full bg-transparent border border-dark-border rounded px-2 py-1 text-center text-silver"
+                                                            placeholder="0"
+                                                        />
+                                                    </td>
+                                                    <td className="p-2 text-right font-mono text-accent-orange">
+                                                        {formatCurrency(item.total)}
+                                                    </td>
+                                                    <td className="p-2 text-center">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveCogsItem(item.id)}
+                                                            className="text-red-400 hover:text-red-300 transition-colors"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                    {formData.cogsItems.length > 0 && (
+                                        <tfoot className="bg-dark-surface/30 font-semibold border-t border-dark-border">
+                                            <tr>
+                                                <td colSpan="4" className="px-4 py-2 text-right text-silver">Total COGS:</td>
+                                                <td className="px-4 py-2 text-right text-accent-orange">Rp {formatCurrency(totalCogs)}</td>
+                                                <td></td>
+                                            </tr>
+                                            <tr>
+                                                <td colSpan="4" className="px-4 py-2 text-right text-silver">Estimasi Laba Kotor:</td>
+                                                <td className={`px-4 py-2 text-right ${grossProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                    Rp {formatCurrency(grossProfit)}
+                                                </td>
+                                                <td></td>
+                                            </tr>
+                                        </tfoot>
+                                    )}
+                                </table>
+                            </div>
+                        </div>
+
+                        {/* SUMMARY & TOTALS */}
+                        <div className="flex flex-col items-end space-y-3 pt-2 text-sm max-w-xs ml-auto">
+                            <div className="flex justify-between w-full text-silver">
+                                <span>Subtotal</span>
+                                <span>Rp {formatCurrency(itemsSubtotal)}</span>
+                            </div>
+
+                            {/* Discount */}
+                            <div className="flex justify-between items-center w-full text-silver">
+                                <span>Diskon</span>
+                                <div className="flex gap-1">
+                                    <input
+                                        type="number"
+                                        value={formData.discountValue}
+                                        onChange={(e) => setFormData({ ...formData, discountValue: Number(e.target.value) })}
+                                        className="w-16 bg-dark-bg border border-dark-border rounded px-1 text-right text-xs"
+                                    />
+                                    <select
+                                        value={formData.discountType}
+                                        onChange={(e) => setFormData({ ...formData, discountType: e.target.value })}
+                                        className="bg-dark-bg border border-dark-border rounded px-1 text-xs"
+                                    >
+                                        <option value="percentage">%</option>
+                                        <option value="fixed">Rp</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Tax */}
+                            <div className="flex justify-between items-center w-full text-silver">
+                                <span>Tax (PPN)</span>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="number"
+                                        value={formData.taxRate}
+                                        onChange={(e) => setFormData({ ...formData, taxRate: Number(e.target.value) })}
+                                        className="w-12 bg-dark-bg border border-dark-border rounded px-1 text-right text-xs"
+                                    />
+                                    <span>%</span>
+                                    <span className="w-24 text-right">Rp {formatCurrency(taxAmt)}</span>
+                                </div>
+                            </div>
+
+                            <div className="w-full border-t border-dark-border pt-2 flex justify-between items-center text-lg font-bold">
+                                <span className="text-silver-light">Grand Total</span>
+                                <span className="text-accent-green">Rp {formatCurrency(finalTotal)}</span>
+                            </div>
+                        </div>
+
+                        {/* ACTIONS */}
+                        <div className="flex gap-3 justify-end mt-8 border-t border-dark-border pt-6">
                             <Button type="button" variant="secondary" onClick={onClose}>
                                 Batal
                             </Button>

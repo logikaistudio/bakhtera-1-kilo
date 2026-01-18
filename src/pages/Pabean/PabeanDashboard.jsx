@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useData } from '../../context/DataContext';
 
 const PabeanDashboard = () => {
-    const { inboundTransactions = [], outboundTransactions = [], goodsMovements = [], mutationLogs = [], quotations = [] } = useData();
+    const { inboundTransactions = [], outboundTransactions = [], quotations = [] } = useData();
 
     // 1. Calculate Totals (Detail Quantity)
     const totalInbound = inboundTransactions.reduce((sum, t) => {
@@ -13,14 +13,19 @@ const PabeanDashboard = () => {
         return sum + (Number(t.quantity) || 0);
     }, 0);
 
-    // FIX: Match Barang Keluar Logic
-    // Prefer mutationLogs if available as it's the raw source, otherwise fall back to goodsMovements
-    const outboundLogs = (mutationLogs.length > 0 ? mutationLogs : goodsMovements).filter(log =>
-        (log.destination && log.destination.toLowerCase() !== 'warehouse') ||
-        (log.origin && log.origin.toLowerCase() === 'warehouse' && log.destination)
-    );
-
-    const totalOutbound = outboundLogs.reduce((sum, item) => sum + (Number(item.mutatedQty || item.quantity || item.totalStock) || 0), 0);
+    // FIX: Calculate totalOutbound from outboundTransactions (same logic as inbound)
+    // FIX: Calculate totalOutbound from OUTBOUND QUOTATIONS (Bridge Source of Truth)
+    // Simple logic: Mutasi = Barang Masuk - Barang Keluar
+    const totalOutbound = quotations
+        .filter(q => q.type === 'outbound' && ['submitted', 'approved', 'processed'].includes(q.outbound_status || q.documentStatus || q.document_status))
+        .reduce((sum, q) => {
+            return sum + (q.packages || []).reduce((pkgSum, pkg) => {
+                return pkgSum + (pkg.items || []).reduce((itemSum, item) => {
+                    const qty = item.outboundQuantity !== undefined ? Number(item.outboundQuantity) : (Number(item.quantity) || 0);
+                    return itemSum + qty;
+                }, 0);
+            }, 0);
+        }, 0);
 
     const stock = totalInbound - totalOutbound;
 
@@ -105,7 +110,7 @@ const PabeanDashboard = () => {
                                             {item.bcDocumentNumber || item.bc_document_number || '-'}
                                         </td>
                                         <td className="px-3 py-1.5 text-[11px] text-center text-silver-light whitespace-nowrap">
-                                            {item.date ? new Date(item.date).toLocaleDateString('id-ID', {
+                                            {(item.date || item.submissionDate || item.submission_date) ? new Date(item.date || item.submissionDate || item.submission_date).toLocaleDateString('id-ID', {
                                                 day: '2-digit', month: 'short', year: 'numeric'
                                             }) : '-'}
                                         </td>

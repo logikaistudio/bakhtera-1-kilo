@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Package, X, Edit2, Save, Trash2, Check } from 'lucide-react';
+import { Plus, Package, X, Edit2, Save, Trash2, Check, Eye } from 'lucide-react';
 import Button from './Button';
 import { useData } from '../../context/DataContext';
 import { formatCurrency, parseCurrency } from '../../utils/currencyFormatter';
 
-const PackageItemManager = ({ items = [], onChange }) => {
+const PackageItemManager = ({ items = [], onChange, readOnly = false }) => {
     const { itemMaster = [], hsCodes = [] } = useData();
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
@@ -43,6 +43,7 @@ const PackageItemManager = ({ items = [], onChange }) => {
     };
 
     const handleAdd = () => {
+        if (readOnly) return;
         if (!formData.name || !formData.quantity) {
             alert('Nama Item dan Jumlah wajib diisi');
             return;
@@ -86,6 +87,7 @@ const PackageItemManager = ({ items = [], onChange }) => {
     };
 
     const handleEdit = (item) => {
+        if (readOnly) return;
         setFormData({
             itemCode: item.itemCode || '',
             hsCode: item.hsCode || '',
@@ -103,6 +105,7 @@ const PackageItemManager = ({ items = [], onChange }) => {
     };
 
     const handleRemove = (id) => {
+        if (readOnly) return;
         if (window.confirm('Hapus item ini?')) {
             onChange(items.filter(i => i.id !== id));
         }
@@ -124,15 +127,23 @@ const PackageItemManager = ({ items = [], onChange }) => {
         <div className="space-y-4">
             {/* Header / Summary */}
             <div className="flex items-center justify-between text-sm text-silver-dark px-2">
-                <span>Total: {items.length} item ({totalQty} unit)</span>
+                <div className="flex items-center gap-2">
+                    <span>Total: {items.length} item ({totalQty} unit)</span>
+                    {readOnly && (
+                        <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs rounded-full border border-yellow-300">
+                            <Eye className="w-3 h-3 inline mr-1" />
+                            Read Only
+                        </span>
+                    )}
+                </div>
                 <span className="text-emerald-600 dark:text-accent-green font-bold">Total Nilai: Rp {formatCurrency(totalVal)}</span>
             </div>
 
             {/* Main Table Layout */}
-            <div className="bg-white rounded overflow-hidden border border-gray-200">
+            <div className={`rounded overflow-hidden border ${readOnly ? 'border-yellow-300 bg-yellow-50' : 'border-gray-200 bg-white'}`}>
                 <table className="w-full text-xs">
                     <thead>
-                        <tr className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200 text-gray-600 h-6">
+                        <tr className={`border-b-2 h-6 ${readOnly ? 'bg-yellow-100 border-yellow-200 text-yellow-700' : 'bg-gradient-to-r from-gray-50 to-gray-100 border-gray-200 text-gray-600'}`}>
                             <th className="px-1 py-0.5 text-left w-6">No Urut</th>
                             <th className="px-1 py-0.5 text-left w-24">Kode</th>
                             <th className="px-1 py-0.5 text-left w-16">HS</th>
@@ -148,8 +159,8 @@ const PackageItemManager = ({ items = [], onChange }) => {
                         {items.map((item, idx) => (
                             <tr
                                 key={item.id}
-                                onClick={() => handleEdit(item)}
-                                className="hover:bg-blue-50 smooth-transition group cursor-pointer text-gray-800 h-6"
+                                onClick={() => !readOnly && handleEdit(item)}
+                                className={`smooth-transition group h-6 ${readOnly ? 'text-gray-700' : 'hover:bg-blue-50 cursor-pointer text-gray-800'}`}
                             >
                                 <td className="px-1 py-0.5">{idx + 1}</td>
                                 <td className="px-1 py-0.5 truncate">{item.itemCode || '-'}</td>
@@ -176,8 +187,8 @@ const PackageItemManager = ({ items = [], onChange }) => {
                     </tbody>
                 </table>
 
-                {/* Form Section - Designed as a sleek panel below table */}
-                {showForm ? (
+                {/* Form Section - Hidden in Read Only mode */}
+                {!readOnly && showForm ? (
                     <div className="p-4 bg-accent-blue/5 border-t border-accent-blue/30 animate-fade-in-up">
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
                             {/* Line 1: Identification */}
@@ -274,7 +285,7 @@ const PackageItemManager = ({ items = [], onChange }) => {
                             </div>
                         </div>
                     </div>
-                ) : (
+                ) : !readOnly ? (
                     <div className="p-3 bg-white border-t border-gray-200 flex justify-center">
                         <button
                             onClick={() => setShowForm(true)}
@@ -283,10 +294,11 @@ const PackageItemManager = ({ items = [], onChange }) => {
                             <Plus className="w-4 h-4" /> Tambah Item
                         </button>
                     </div>
-                )}
+                ) : null}
             </div>
         </div>
     );
 };
 
 export default PackageItemManager;
+
