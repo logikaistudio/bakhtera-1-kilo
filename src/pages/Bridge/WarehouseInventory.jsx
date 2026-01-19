@@ -802,17 +802,18 @@ const WarehouseInventory = () => {
                 );
 
                 // 2. Find official OUTBOUND TRANSACTIONS (freight_outbound)
-                // Filter strictly by source reference or loosely by code if no source ref
+                // STRICT ISOLATION: Only match if source reference explicitly matches this pengajuan
                 const officialOutbound = outboundTransactions.filter(o => {
-                    const matchSource = (o.documents?.source_pengajuan_number === pengajuanNumber) ||
-                        (o.pengajuan_id === pengajuanId); // Ideal match
+                    // Must have explicit source reference to this pengajuan
+                    const matchSource = (normalize(o.documents?.source_pengajuan_number) === normalize(pengajuanNumber)) ||
+                        (o.pengajuan_id === pengajuanId);
 
+                    // Must match the item
                     const matchItem = normalize(o.item_code) === normalize(item.itemCode) &&
                         (pkg.packageNumber ? normalize(o.documents?.packageNumber) === normalize(pkg.packageNumber) : true);
 
-                    // If source ref exists, use it. Else fallback to item match (risky but needed)
-                    if (o.documents?.source_pengajuan_number) return matchSource && matchItem;
-                    return matchItem;
+                    // STRICT: Must match BOTH source reference AND item - no fallback to prevent cross-contamination
+                    return matchSource && matchItem;
                 });
 
                 // 3. Find RETURN mutations (Pameran -> Warehouse)
@@ -864,35 +865,26 @@ const WarehouseInventory = () => {
         );
 
         // 2. OFFICIAL OUTBOUND (freight_outbound)
+        // STRICT ISOLATION: Only match outbound if source reference explicitly points to THIS pengajuan
         const officialOutbound = outboundTransactions.filter(o => {
-            const hasSourceRef = !!o.documents?.source_pengajuan_number;
             const sourceRef = o.documents?.source_pengajuan_number || '';
             const docPackage = o.documents?.packageNumber;
 
-            // Debug matching
+            // Item must match
             const isItemMatch = normalize(o.item_code) === normalize(itemCode);
+            if (!isItemMatch) return false;
 
-            // Relaxed Source Match: 
+            // STRICT Source Match: Must explicitly reference this pengajuan
             const matchSource = (normalize(sourceRef) === normalize(pengajuanNumber)) ||
-                (normalize(sourceRef).includes(normalize(pengajuanNumber)) && pengajuanNumber.length > 5) || // Ensure not matching empty/short strings
-                (normalize(pengajuanNumber).includes(normalize(sourceRef)) && sourceRef.length > 5) ||
                 (o.pengajuan_id === pengajuanId);
 
-            // Relaxed Item Match
-            // If Source Matches -> We trust it significantly. Ignore package number mismatch if highly likely.
-            if (matchSource && isItemMatch) return true;
-
-            // Manual/Legacy Match (No Source Ref)
-            // Match Item Code AND (Package Match OR Outbound has no package info)
-            const matchPackage = packageNumber
-                ? (docPackage ? normalize(docPackage) === normalize(packageNumber) : true) // If doc has no pkg, assume valid
+            // Package match (optional, only if both have package info)
+            const matchPackage = packageNumber && docPackage
+                ? normalize(docPackage) === normalize(packageNumber)
                 : true;
 
-            if (isItemMatch && !matchSource && !hasSourceRef) {
-                return matchPackage;
-            }
-
-            return false;
+            // STRICT: Must match source reference - no fallback to prevent data leakage between submissions
+            return matchSource && matchPackage;
         });
 
         // 3. RETURN MUTATIONS
