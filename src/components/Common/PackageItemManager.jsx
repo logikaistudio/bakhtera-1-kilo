@@ -5,9 +5,10 @@ import { useData } from '../../context/DataContext';
 import { formatCurrency, parseCurrency } from '../../utils/currencyFormatter';
 
 const PackageItemManager = ({ items = [], onChange, readOnly = false }) => {
-    const { itemMaster = [], hsCodes = [] } = useData();
+    const { itemMaster = [], hsCodes = [], addItemCode } = useData();
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
+    const [manualItemCode, setManualItemCode] = useState(false); // Toggle for manual input mode
     const [formData, setFormData] = useState({
         itemCode: '',
         hsCode: '',
@@ -42,7 +43,7 @@ const PackageItemManager = ({ items = [], onChange, readOnly = false }) => {
         return (Number(qty) || 0) * (parseCurrency(price) || 0);
     };
 
-    const handleAdd = () => {
+    const handleAdd = async () => {
         if (readOnly) return;
         if (!formData.name || !formData.quantity) {
             alert('Nama Item dan Jumlah wajib diisi');
@@ -55,9 +56,31 @@ const PackageItemManager = ({ items = [], onChange, readOnly = false }) => {
         const total = qty * price;
         const valueIDR = total * rate;
 
+        // Auto-save new item code to database if manual and doesn't exist in master
+        if (manualItemCode && formData.itemCode && formData.itemCode.trim()) {
+            const codeExists = itemMaster.some(i =>
+                i.itemCode?.toLowerCase() === formData.itemCode.toLowerCase()
+            );
+
+            if (!codeExists && addItemCode) {
+                try {
+                    await addItemCode({
+                        itemCode: formData.itemCode.trim().toUpperCase(),
+                        itemType: formData.name || 'Barang', // Use item name as type
+                        description: `Auto-added from pengajuan`
+                    });
+                    console.log('✅ New item code saved to master:', formData.itemCode);
+                } catch (err) {
+                    console.error('⚠️ Failed to save new item code:', err);
+                    // Continue anyway - don't block the item addition
+                }
+            }
+        }
+
         const newItem = {
             id: editingId || `item-${Date.now()}`,
             ...formData,
+            itemCode: formData.itemCode?.trim()?.toUpperCase() || '', // Normalize
             quantity: qty,
             price: price, // Store as number
             exchangeRate: rate,
@@ -113,6 +136,7 @@ const PackageItemManager = ({ items = [], onChange, readOnly = false }) => {
 
     const handleCancel = () => {
         setEditingId(null);
+        setManualItemCode(false); // Reset manual input mode
         setFormData({
             itemCode: '', hscode: '', name: '', quantity: '', unit: 'pcs', price: '', currency: 'IDR', exchangeRate: '1', totalPrice: '', notes: ''
         });
@@ -193,15 +217,38 @@ const PackageItemManager = ({ items = [], onChange, readOnly = false }) => {
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
                             {/* Line 1: Identification */}
                             <div className="md:col-span-2">
-                                <label className="text-xs text-silver-dark block mb-1">Kode Barang</label>
-                                <select
-                                    className="w-full text-sm p-2 bg-dark-bg border border-dark-border rounded focus:border-accent-blue"
-                                    value={formData.itemCode}
-                                    onChange={e => setFormData({ ...formData, itemCode: e.target.value })}
-                                >
-                                    <option value="">Pilih...</option>
-                                    {itemMaster.map(i => <option key={i.id} value={i.itemCode}>{i.itemCode}</option>)}
-                                </select>
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="text-xs text-silver-dark">Kode Barang</label>
+                                    <button
+                                        type="button"
+                                        onClick={() => setManualItemCode(!manualItemCode)}
+                                        className="text-[10px] text-accent-blue hover:text-blue-400 transition-colors"
+                                    >
+                                        {manualItemCode ? '📋 Pilih dari Master' : '✏️ Input Manual'}
+                                    </button>
+                                </div>
+                                {manualItemCode ? (
+                                    <input
+                                        type="text"
+                                        className="w-full text-sm p-2 bg-dark-bg border border-dark-border rounded focus:border-accent-blue"
+                                        value={formData.itemCode}
+                                        onChange={e => setFormData({ ...formData, itemCode: e.target.value })}
+                                        placeholder="Ketik kode barang..."
+                                    />
+                                ) : (
+                                    <select
+                                        className="w-full text-sm p-2 bg-dark-bg border border-dark-border rounded focus:border-accent-blue"
+                                        value={formData.itemCode}
+                                        onChange={e => setFormData({ ...formData, itemCode: e.target.value })}
+                                    >
+                                        <option value="">Pilih...</option>
+                                        {itemMaster.map(i => (
+                                            <option key={i.id} value={i.itemCode}>
+                                                {i.itemCode} {i.itemType ? `- ${i.itemType}` : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                )}
                             </div>
                             <div className="md:col-span-2">
                                 <label className="text-xs text-silver-dark block mb-1">HS Code</label>
