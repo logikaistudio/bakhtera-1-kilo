@@ -13,8 +13,9 @@ export const useData = () => {
 
 export const DataProvider = ({ children }) => {
     // Centralized data state
-    const [vendors, setVendors] = useState([]);
-    const [customers, setCustomers] = useState([]);
+    const [vendors, setVendors] = useState([]); // Deprecated: use businessPartners filtered by is_vendor
+    const [customers, setCustomers] = useState([]); // Deprecated: use businessPartners filtered by is_customer
+    const [businessPartners, setBusinessPartners] = useState([]); // NEW: Unified partner management
     const [finance, setFinance] = useState([]);
     const [companySettings, setCompanySettings] = useState(null);
     const [bankAccounts, setBankAccounts] = useState([]);
@@ -306,26 +307,31 @@ export const DataProvider = ({ children }) => {
                     setItemMaster(mappedItems);
                 }
 
-                // Load Customers from Supabase (with Debug Logging)
-                console.log('🔄 Fetching customers from Supabase...');
-                const { data: customerData, error: customerError } = await supabase
-                    .from('freight_customers')
+
+                // ========================================
+                // CENTRALIZED BUSINESS PARTNERS
+                // Load from unified blink_business_partners table
+                // ========================================
+                console.log('🔄 Fetching business partners from Supabase...');
+                const { data: partnerData, error: partnerError } = await supabase
+                    .from('blink_business_partners')
                     .select('*');
 
-                if (customerError) {
-                    console.error('❌ Error fetching customers:', customerError);
-                } else if (customerData) {
-                    console.log(`✅ Loaded ${customerData.length} customers from Supabase:`, customerData);
-                    setCustomers(customerData);
+                if (partnerError) {
+                    console.error('❌ Error fetching business partners:', partnerError);
+                } else if (partnerData) {
+                    console.log(`✅ Loaded ${partnerData.length} business partners from Supabase`);
+                    setBusinessPartners(partnerData);
+
+                    // Backward compatibility: Populate old state
+                    const customerRecords = partnerData.filter(p => p.is_customer);
+                    const vendorRecords = partnerData.filter(p => p.is_vendor);
+
+                    console.log(`📊 Customers: ${customerRecords.length}, Vendors: ${vendorRecords.length}`);
+                    setCustomers(customerRecords);
+                    setVendors(vendorRecords);
                 }
 
-                // Load Vendors from Supabase
-                const { data: vendorData, error: vendorError } = await supabase
-                    .from('freight_vendors')
-                    .select('*');
-
-                if (vendorError) console.error('Error fetching vendors:', vendorError);
-                else if (vendorData) setVendors(vendorData);
 
                 // Load Transactions (Inbound, Outbound, Reject)
                 const { data: inData, error: inError } = await supabase.from('freight_inbound').select('*');
@@ -429,17 +435,47 @@ export const DataProvider = ({ children }) => {
     // Realtime Subscriptions
     useEffect(() => {
         const channel = supabase.channel('postgres_changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'freight_customers' }, (payload) => {
-                console.log('⚡ Realtime Customer Update:', payload);
-                if (payload.eventType === 'INSERT') setCustomers(prev => [...prev, payload.new]);
-                else if (payload.eventType === 'UPDATE') setCustomers(prev => prev.map(item => item.id === payload.new.id ? payload.new : item));
-                else if (payload.eventType === 'DELETE') setCustomers(prev => prev.filter(item => item.id !== payload.old.id));
-            })
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'freight_vendors' }, (payload) => {
-                console.log('⚡ Realtime Vendor Update:', payload);
-                if (payload.eventType === 'INSERT') setVendors(prev => [...prev, payload.new]);
-                else if (payload.eventType === 'UPDATE') setVendors(prev => prev.map(item => item.id === payload.new.id ? payload.new : item));
-                else if (payload.eventType === 'DELETE') setVendors(prev => prev.filter(item => item.id !== payload.old.id));
+            // ========================================
+            // CENTRALIZED BUSINESS PARTNERS REALTIME
+            // Subscribe to blink_business_partners changes
+            // ========================================
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'blink_business_partners' }, (payload) => {
+                console.log('⚡ Realtime Business Partner Update:', payload);
+
+                if (payload.eventType === 'INSERT') {
+                    setBusinessPartners(prev => [...prev, payload.new]);
+                    // Update old state for backward compatibility
+                    if (payload.new.is_customer) setCustomers(prev => [...prev, payload.new]);
+                    if (payload.new.is_vendor) setVendors(prev => [...prev, payload.new]);
+                }
+                else if (payload.eventType === 'UPDATE') {
+                    setBusinessPartners(prev => prev.map(item => item.id === payload.new.id ? payload.new : item));
+                    // Update old state
+                    if (payload.new.is_customer) {
+                        setCustomers(prev => {
+                            const exists = prev.find(c => c.id === payload.new.id);
+                            if (exists) return prev.map(item => item.id === payload.new.id ? payload.new : item);
+                            else return [...prev, payload.new]; // Add if newly marked as customer
+                        });
+                    } else {
+                        setCustomers(prev => prev.filter(item => item.id !== payload.new.id)); // Remove if no longer customer
+                    }
+
+                    if (payload.new.is_vendor) {
+                        setVendors(prev => {
+                            const exists = prev.find(v => v.id === payload.new.id);
+                            if (exists) return prev.map(item => item.id === payload.new.id ? payload.new : item);
+                            else return [...prev, payload.new];
+                        });
+                    } else {
+                        setVendors(prev => prev.filter(item => item.id !== payload.new.id));
+                    }
+                }
+                else if (payload.eventType === 'DELETE') {
+                    setBusinessPartners(prev => prev.filter(item => item.id !== payload.old.id));
+                    setCustomers(prev => prev.filter(item => item.id !== payload.old.id));
+                    setVendors(prev => prev.filter(item => item.id !== payload.old.id));
+                }
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'freight_quotations' }, (payload) => {
                 console.log('⚡ Realtime Quotation Update:', payload);
@@ -634,6 +670,101 @@ export const DataProvider = ({ children }) => {
     // localStorage removed - all data now persisted to Supabase only
     // ========================================
 
+    // ========================================
+    // BUSINESS PARTNER CRUD OPERATIONS (NEW - CENTRALIZED)
+    // ========================================
+    const addBusinessPartner = async (partner) => {
+        const newPartner = {
+            ...partner,
+            id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+        };
+
+        const { data, error } = await supabase.from('blink_business_partners').insert([newPartner]).select();
+        if (error) {
+            console.error('Error adding business partner:', error);
+            alert('Failed to add business partner to database');
+            return null;
+        }
+
+        // Realtime will handle state update, but we update optimistically
+        const inserted = data?.[0] || newPartner;
+        setBusinessPartners(prev => [...prev, inserted]);
+
+        // Update old state for backward compatibility
+        if (inserted.is_customer) setCustomers(prev => [...prev, inserted]);
+        if (inserted.is_vendor) setVendors(prev => [...prev, inserted]);
+
+        return inserted;
+    };
+
+    const updateBusinessPartner = async (id, updates) => {
+        const updatedData = {
+            ...updates,
+            updated_at: new Date().toISOString(),
+        };
+
+        const { error } = await supabase
+            .from('blink_business_partners')
+            .update(updatedData)
+            .eq('id', id);
+
+        if (error) {
+            console.error('Error updating business partner:', error);
+            alert('Failed to update business partner');
+            return false;
+        }
+
+        // Optimistically update state (realtime will sync)
+        setBusinessPartners(prev => prev.map(p => p.id === id ? { ...p, ...updatedData } : p));
+
+        // Update old state
+        const updatedPartner = businessPartners.find(p => p.id === id);
+        if (updatedPartner) {
+            const merged = { ...updatedPartner, ...updatedData };
+            if (merged.is_customer) {
+                setCustomers(prev => {
+                    const exists = prev.find(c => c.id === id);
+                    if (exists) return prev.map(c => c.id === id ? merged : c);
+                    else return [...prev, merged];
+                });
+            } else {
+                setCustomers(prev => prev.filter(c => c.id !== id));
+            }
+
+            if (merged.is_vendor) {
+                setVendors(prev => {
+                    const exists = prev.find(v => v.id === id);
+                    if (exists) return prev.map(v => v.id === id ? merged : v);
+                    else return [...prev, merged];
+                });
+            } else {
+                setVendors(prev => prev.filter(v => v.id !== id));
+            }
+        }
+
+        return true;
+    };
+
+    const deleteBusinessPartner = async (id) => {
+        const { error } = await supabase.from('blink_business_partners').delete().eq('id', id);
+        if (error) {
+            console.error('Error deleting business partner:', error);
+            alert('Failed to delete business partner');
+            return false;
+        }
+
+        setBusinessPartners(prev => prev.filter(p => p.id !== id));
+        setCustomers(prev => prev.filter(c => c.id !== id));
+        setVendors(prev => prev.filter(v => v.id !== id));
+        return true;
+    };
+
+    // ========================================
+    // OLD VENDOR CRUD OPERATIONS (DEPRECATED - WRAPPER AROUND BUSINESS PARTNERS)
+    // For backward compatibility only. New code should use addBusinessPartner()
+    // ========================================
     // Vendor CRUD operations
     const addVendor = async (vendor) => {
         const newVendor = {
@@ -3051,8 +3182,9 @@ export const DataProvider = ({ children }) => {
 
     const value = {
         // Centralized data
-        vendors,
-        customers,
+        vendors, // Deprecated: use businessPartners.filter(p => p.is_vendor)
+        customers, // Deprecated: use businessPartners.filter(p => p.is_customer)
+        businessPartners, // NEW: Unified partner management
         finance,
 
         // Module-specific data
@@ -3086,15 +3218,20 @@ export const DataProvider = ({ children }) => {
         approveRequest,
         rejectRequest,
 
-        // Vendor operations
+        // Vendor operations (Deprecated)
         addVendor,
         updateVendor,
         deleteVendor,
 
-        // Customer operations
+        // Customer operations (Deprecated)
         addCustomer,
         updateCustomer,
         deleteCustomer,
+
+        // Business Partner operations (NEW - Use these for new code)
+        addBusinessPartner,
+        updateBusinessPartner,
+        deleteBusinessPartner,
 
         // Finance operations
         addFinanceTransaction,

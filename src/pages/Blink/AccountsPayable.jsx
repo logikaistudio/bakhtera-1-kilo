@@ -445,8 +445,10 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment }) => {
             const { data, error } = await supabase
                 .from('finance_coa')
                 .select('*')
-                .in('type', ['EXPENSE', 'ASSET', 'Cost of Goods Sold']) // Expanded types for AP
+                .eq('type', 'EXPENSE')  // Expense accounts for AP
                 .eq('is_active', true)
+                .gte('level', 3)        // Only detail accounts (level >= 3)
+                .order('group_name', { ascending: true })
                 .order('code', { ascending: true });
 
             if (error) throw error;
@@ -601,7 +603,7 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment }) => {
                                                     <option value="">-- Pilih Akun --</option>
                                                     {accounts.map(acc => (
                                                         <option key={acc.id} value={acc.id}>
-                                                            {acc.code} - {acc.name}
+                                                            {acc.code} - {acc.name} {acc.group_name ? `(${acc.group_name})` : ''}
                                                         </option>
                                                     ))}
                                                 </select>

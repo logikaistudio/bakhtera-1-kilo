@@ -88,15 +88,62 @@ export const generateSONumber = (quotationNumber) => {
  * @param {string} quotationNumber - The base quotation number
  * @returns {string} Invoice number
  */
-export const generateInvoiceNumber = (quotationNumber) => {
+/**
+ * Generate Invoice Number from Quotation Number (Async & Unique)
+ * Format: INV-BLKYYMM-XXXX[-N]
+ * Checks DB for existing invoice numbers to avoid duplicates
+ * @param {string} quotationNumber - The base quotation number
+ * @returns {Promise<string>} Invoice number
+ */
+export const generateInvoiceNumber = async (quotationNumber) => {
+    let baseNumber;
     if (!quotationNumber) {
         const yymm = getYYMM();
-        return `INV-BLK${yymm}-0001`;
+        baseNumber = `INV-BLK${yymm}-0001`;
+    } else {
+        baseNumber = `INV-${quotationNumber}`;
     }
 
-    // Prepend INV- to the quotation number
-    // BLK2601-0001 -> INV-BLK2601-0001
-    return `INV-${quotationNumber}`;
+    try {
+        // Check if this invoice number already exists
+        const { data, error } = await supabase
+            .from('blink_invoices')
+            .select('invoice_number')
+            .like('invoice_number', `${baseNumber}%`)
+            .order('invoice_number', { ascending: false });
+
+        if (error) throw error;
+
+        // If no matches, return base number
+        if (!data || data.length === 0) {
+            return baseNumber;
+        }
+
+        // Check specifically for exact match
+        const exactMatch = data.find(d => d.invoice_number === baseNumber);
+        if (!exactMatch) return baseNumber; // Base number available
+
+        // If exact match exists, find the next available suffix
+        // Patterns: BASE, BASE-1, BASE-2...
+        let maxSuffix = 0;
+        data.forEach(row => {
+            const num = row.invoice_number;
+            if (num === baseNumber) return;
+
+            const suffixPart = num.replace(baseNumber + '-', '');
+            const suffixInt = parseInt(suffixPart);
+            if (!isNaN(suffixInt) && suffixInt > maxSuffix) {
+                maxSuffix = suffixInt;
+            }
+        });
+
+        return `${baseNumber}-${maxSuffix + 1}`;
+
+    } catch (error) {
+        console.error('Error generating unique invoice number:', error);
+        // Fallback: append timestamp to ensure uniqueness in case of DB error
+        return `${baseNumber}-${String(Date.now()).slice(-4)}`;
+    }
 };
 
 /**

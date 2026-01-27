@@ -346,8 +346,10 @@ const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency }) => {
             const { data, error } = await supabase
                 .from('finance_coa')
                 .select('*')
-                .in('type', ['REVENUE', 'OTHER_INCOME']) // Revenue only for AR
+                .eq('type', 'REVENUE')  // Revenue accounts for AR
                 .eq('is_active', true)
+                .gte('level', 3)        // Only detail accounts (level >= 3)
+                .order('group_name', { ascending: true })
                 .order('code', { ascending: true });
 
             if (error) throw error;
@@ -509,7 +511,7 @@ const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency }) => {
                                                     <option value="">-- Pilih Akun --</option>
                                                     {accounts.map(acc => (
                                                         <option key={acc.id} value={acc.id}>
-                                                            {acc.code} - {acc.name}
+                                                            {acc.code} - {acc.name} {acc.group_name ? `(${acc.group_name})` : ''}
                                                         </option>
                                                     ))}
                                                 </select>

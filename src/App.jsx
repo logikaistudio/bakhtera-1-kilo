@@ -36,6 +36,7 @@ import BLManagement from './pages/Blink/BLManagement';
 import SalesRevenue from './pages/Blink/SalesRevenue';
 import ProfitAnalysis from './pages/Blink/ProfitAnalysis';
 import MasterRoutes from './pages/Blink/MasterRoutes';
+import PartnerManagement from './pages/Blink/PartnerManagement';
 
 // Blink Finance Module
 import InvoiceManagement from './pages/Blink/InvoiceManagement';
@@ -47,6 +48,7 @@ import ProfitLoss from './pages/Blink/ProfitLoss';
 import BalanceSheet from './pages/Blink/BalanceSheet';
 import GeneralLedger from './pages/Blink/GeneralLedger';
 import TrialBalance from './pages/Blink/TrialBalance';
+import SellingVsBuying from './pages/Blink/SellingVsBuying';
 
 // Bridge Module
 import BridgeOverview from './pages/Bridge/BridgeOverview';
@@ -60,6 +62,7 @@ import WarehouseInventory from './pages/Bridge/WarehouseInventory';
 import OutboundInventory from './pages/Bridge/OutboundInventory';
 import ActivityLogger from './pages/Bridge/ActivityLogger';
 import ApprovalManager from './pages/Bridge/ApprovalManager';
+import CodeOfAccount from './pages/Bridge/CodeOfAccount';
 
 // Big Module
 import BigDashboard from './pages/Big/BigDashboard';
@@ -130,6 +133,7 @@ function App() {
                   <Route path="/blink/operations/awb" element={<AWBManagement />} />
                   <Route path="/blink/operations/bl" element={<BLManagement />} />
                   <Route path="/blink/master/routes" element={<MasterRoutes />} />
+                  <Route path="/blink/master/partners" element={<PartnerManagement />} />
 
                   {/* Blink Finance Module */}
                   <Route path="/blink/finance/invoices" element={<InvoiceManagement />} />
@@ -141,6 +145,7 @@ function App() {
                   <Route path="/blink/finance/ap" element={<AccountsPayable />} />
                   <Route path="/blink/finance/profit-loss" element={<ProfitLoss />} />
                   <Route path="/blink/finance/balance-sheet" element={<BalanceSheet />} />
+                  <Route path="/blink/finance/selling-buying" element={<SellingVsBuying />} />
                   <Route path="/blink/sales-revenue" element={<SalesRevenue />} />
 
                   {/* Legacy Blink Routes - Redirects */}
@@ -160,6 +165,7 @@ function App() {
                   <Route path="/bridge/logger" element={<ActivityLogger />} />
                   <Route path="/bridge/approvals" element={<ApprovalManager />} />
                   <Route path="/bridge/pergerakan" element={<PergerakanBarang />} />
+                  <Route path="/bridge/code-of-account" element={<CodeOfAccount />} />
 
                   {/* Big Module */}
                   <Route path="/big" element={<BigDashboard />} />

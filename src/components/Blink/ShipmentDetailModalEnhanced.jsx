@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate }) => {
+const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onViewAnalysis }) => {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('details');
     const [isEditing, setIsEditing] = useState(false);
@@ -115,8 +115,16 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate }) =>
         insurance: '',
         demurrage: '',
         other: '',
-        otherDescription: ''
+        otherDescription: '',
+        // New: Array of additional other costs
+        additionalCosts: []
     });
+
+    // Selling items from quotation (read-only reference)
+    const [sellingItems, setSellingItems] = useState(shipment?.sellingItems || []);
+
+    // Buying items (editable and can add more)
+    const [buyingItems, setBuyingItems] = useState(shipment?.buyingItems || []);
 
     // Currency management for COGS
     const [cogsCurrency, setCogsCurrency] = useState(shipment?.cogsCurrency || 'USD');
@@ -236,7 +244,8 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate }) =>
                 insurance: '',
                 demurrage: '',
                 other: '',
-                otherDescription: ''
+                otherDescription: '',
+                additionalCosts: []
             });
             setCogsCurrency(shipment.cogsCurrency || 'USD');
             setExchangeRate(shipment.exchangeRate || '');
@@ -250,6 +259,9 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate }) =>
                 eta: ''
             });
             setDocuments(shipment.documents || []);
+            // Sync selling and buying items
+            setSellingItems(shipment.sellingItems || []);
+            setBuyingItems(shipment.buyingItems || []);
         }
     }, [shipment]);
 
@@ -387,11 +399,25 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate }) =>
                 return isNaN(parsed) ? null : parsed;
             };
 
-            // Parse COGS items
-            const parsedCOGS = Object.entries(cogsData).reduce((acc, [key, value]) => {
-                acc[key] = parseNumber(value);
-                return acc;
-            }, {});
+            // Parse COGS items - handle both simple values and arrays
+            const parsedCOGS = {};
+            Object.entries(cogsData).forEach(([key, value]) => {
+                if (key === 'additionalCosts' && Array.isArray(value)) {
+                    // Keep additionalCosts as array with parsed amounts
+                    parsedCOGS[key] = value.map(item => ({
+                        description: item.description || '',
+                        amount: parseNumber(item.amount)
+                    }));
+                } else {
+                    parsedCOGS[key] = parseNumber(value);
+                }
+            });
+
+            // Parse buying items
+            const parsedBuyingItems = buyingItems.map(item => ({
+                description: item.description || '',
+                amount: parseNumber(item.amount)
+            }));
 
             // Update shipment with COGS data
             const updateData = {
@@ -399,7 +425,9 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate }) =>
                 cogs_currency: cogsCurrency,
                 exchange_rate: parseNumber(exchangeRate),
                 rate_date: rateDate || null,
-                quoted_amount: parseNumber(shipment.quotedAmount)
+                quoted_amount: parseNumber(shipment.quotedAmount),
+                selling_items: sellingItems, // Save selling items (read-only reference)
+                buying_items: parsedBuyingItems // Save buying items (editable)
             };
 
             // Remove null/undefined values
@@ -423,7 +451,9 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate }) =>
                 cogsCurrency: cogsCurrency,
                 exchangeRate: parseNumber(exchangeRate),
                 rateDate: rateDate,
-                quotedAmount: parseNumber(shipment.quotedAmount) || shipment.quotedAmount
+                quotedAmount: parseNumber(shipment.quotedAmount) || shipment.quotedAmount,
+                sellingItems: sellingItems,
+                buyingItems: parsedBuyingItems
             };
 
             onUpdate(updatedShipment);
@@ -443,7 +473,8 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate }) =>
     };
 
     const calculateTotalCOGS = () => {
-        return (
+        // Base COGS items
+        const baseCOGS =
             parseFloat(cogsData.oceanFreight || 0) +
             parseFloat(cogsData.airFreight || 0) +
             parseFloat(cogsData.trucking || 0) +
@@ -452,8 +483,19 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate }) =>
             parseFloat(cogsData.customs || 0) +
             parseFloat(cogsData.insurance || 0) +
             parseFloat(cogsData.demurrage || 0) +
-            parseFloat(cogsData.other || 0)
-        );
+            parseFloat(cogsData.other || 0);
+
+        // Additional costs from array
+        const additionalTotal = (cogsData.additionalCosts || []).reduce((sum, item) => {
+            return sum + parseFloat(item.amount || 0);
+        }, 0);
+
+        // Buying items total
+        const buyingTotal = (buyingItems || []).reduce((sum, item) => {
+            return sum + parseFloat(item.amount || 0);
+        }, 0);
+
+        return baseCOGS + additionalTotal + buyingTotal;
     };
 
     // Convert COGS to USD if in IDR
@@ -1970,6 +2012,95 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate }) =>
                                                     )}
                                                 </div>
                                             </div>
+
+                                            {/* Additional Other Costs - Dynamic List */}
+                                            {isEditingCOGS && (
+                                                <div className="mt-6 p-4 border border-dashed border-dark-border rounded-lg">
+                                                    <div className="flex items-center justify-between mb-3">
+                                                        <h5 className="text-sm font-semibold text-silver-light">Biaya Lain-lain Tambahan</h5>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const newCosts = [...(cogsData.additionalCosts || []), { description: '', amount: '' }];
+                                                                setCogsData({ ...cogsData, additionalCosts: newCosts });
+                                                            }}
+                                                            className="text-accent-orange hover:text-accent-orange/80 text-xs flex items-center gap-1"
+                                                        >
+                                                            <Plus className="w-4 h-4" /> Tambah Biaya
+                                                        </button>
+                                                    </div>
+
+                                                    {(cogsData.additionalCosts || []).length === 0 && (
+                                                        <p className="text-xs text-silver-dark text-center py-3">
+                                                            Belum ada biaya tambahan. Klik "Tambah Biaya" untuk menambahkan.
+                                                        </p>
+                                                    )}
+
+                                                    <div className="space-y-2">
+                                                        {(cogsData.additionalCosts || []).map((cost, index) => (
+                                                            <div key={index} className="grid grid-cols-12 gap-2 items-center">
+                                                                <div className="col-span-6">
+                                                                    <input
+                                                                        type="text"
+                                                                        value={cost.description}
+                                                                        onChange={(e) => {
+                                                                            const updated = [...cogsData.additionalCosts];
+                                                                            updated[index].description = e.target.value;
+                                                                            setCogsData({ ...cogsData, additionalCosts: updated });
+                                                                        }}
+                                                                        placeholder="Deskripsi biaya"
+                                                                        className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light text-sm"
+                                                                    />
+                                                                </div>
+                                                                <div className="col-span-4">
+                                                                    <input
+                                                                        type="text"
+                                                                        value={cost.amount ? parseFloat(cost.amount.toString().replace(/\./g, '')).toLocaleString('id-ID') : ''}
+                                                                        onChange={(e) => {
+                                                                            const value = e.target.value.replace(/\./g, '');
+                                                                            const updated = [...cogsData.additionalCosts];
+                                                                            updated[index].amount = value;
+                                                                            setCogsData({ ...cogsData, additionalCosts: updated });
+                                                                        }}
+                                                                        placeholder="Jumlah"
+                                                                        className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light text-sm"
+                                                                    />
+                                                                </div>
+                                                                <div className="col-span-2 flex justify-center">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            const updated = cogsData.additionalCosts.filter((_, i) => i !== index);
+                                                                            setCogsData({ ...cogsData, additionalCosts: updated });
+                                                                        }}
+                                                                        className="p-2 hover:bg-red-500/20 text-red-400 rounded"
+                                                                    >
+                                                                        <Trash2 className="w-4 h-4" />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Display Additional Costs in View Mode */}
+                                            {!isEditingCOGS && (cogsData.additionalCosts || []).length > 0 && (
+                                                <div className="mt-4 p-3 bg-dark-card rounded-lg">
+                                                    <h5 className="text-xs font-semibold text-silver-dark mb-2">Biaya Lain-lain Tambahan:</h5>
+                                                    <div className="space-y-1">
+                                                        {(cogsData.additionalCosts || []).map((cost, index) => (
+                                                            <div key={index} className="flex justify-between text-sm">
+                                                                <span className="text-silver-light">{cost.description || `Biaya #${index + 1}`}</span>
+                                                                <span className="text-silver-light font-medium">
+                                                                    {cost.amount ? parseFloat(cost.amount).toLocaleString('id-ID') : '-'}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
                                             <div className="mt-6">
                                                 {calculateProfit() < 0 && (
                                                     <div className="flex items-center gap-2 text-red-400">
@@ -1986,6 +2117,36 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate }) =>
                                                         <span className="text-sm">✓ Healthy margin</span>
                                                     </div>
                                                 )}
+                                            </div>
+                                        </div>
+
+                                        {/* Link to Selling vs Buying Page */}
+                                        <div className="glass-card p-4 rounded-lg border border-blue-500/30 bg-blue-500/5">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <DollarSign className="w-6 h-6 text-blue-400" />
+                                                    <div>
+                                                        <h4 className="font-semibold text-silver-light">Selling vs Buying Analysis</h4>
+                                                        <p className="text-xs text-silver-dark">
+                                                            Untuk analisis perbandingan lengkap, gunakan halaman khusus Selling vs Buying
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => {
+                                                        onClose();
+                                                        if (onViewAnalysis) {
+                                                            onViewAnalysis(shipment);
+                                                        } else {
+                                                            // Fallback if prop not provided
+                                                            window.location.href = `/blink/finance/selling-buying?id=${shipment.id}`;
+                                                        }
+                                                    }}
+                                                    className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                                                >
+                                                    Lihat Analisis
+                                                    <span>→</span>
+                                                </button>
                                             </div>
                                         </div>
                                     </>

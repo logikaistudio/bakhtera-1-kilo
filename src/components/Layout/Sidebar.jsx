@@ -48,7 +48,7 @@ const Sidebar = () => {
     const { user } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
     const [expandedSection, setExpandedSection] = useState('');
-    const [expandedCategories, setExpandedCategories] = useState(['marketing', 'operations', 'finance', 'data', 'bridge-operasional', 'bridge-finance', 'bridge-data']); // All expanded by default
+    const [expandedCategories, setExpandedCategories] = useState(['marketing', 'operations', 'finance', 'costing', 'profit', 'data', 'bridge-operasional', 'bridge-finance', 'bridge-data']); // All expanded by default
 
     const isActive = (path) => location.pathname === path;
 
@@ -97,6 +97,7 @@ const Sidebar = () => {
                 { path: '/bridge/hs-master', label: 'Master Kode HS' },
                 { path: '/bridge/item-master', label: 'Master Kode Barang' },
                 { path: '/bridge/pic-master', label: 'Master PIC' },
+                { path: '/bridge/code-of-account', label: 'Code of Account' },
             ]
         },
     ];
@@ -168,6 +169,13 @@ const Sidebar = () => {
             ]
         },
 
+        // Profit & Costing Category (New - Promoted for Visibility)
+        {
+            type: 'category', label: '📈 Profit & Costing', items: [
+                { path: '/blink/finance/selling-buying', label: 'Selling vs Buying Analysis' },
+            ]
+        },
+
         // Finance Category with Subcategories
         {
             type: 'category', label: '💰 Finance', items: [
@@ -192,6 +200,7 @@ const Sidebar = () => {
         // Master Data Category
         {
             type: 'category', label: '⚙️ Master Data', items: [
+                { path: '/blink/master/partners', label: 'Mitra Bisnis' },
                 { path: '/blink/master/routes', label: 'Master Routes' },
             ]
         },

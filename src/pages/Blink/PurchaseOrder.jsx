@@ -4,6 +4,7 @@ import { useData } from '../../context/DataContext';
 import { generatePONumber } from '../../utils/documentNumbers';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
+import COAPicker from '../../components/Common/COAPicker';
 import {
     FileText, Plus, Search, Filter, Eye, Download, CheckCircle,
     XCircle, Clock, Package, DollarSign, TrendingUp, AlertCircle, X, Edit, Save, History, AlertTriangle, Trash2
@@ -30,14 +31,21 @@ const PurchaseOrder = () => {
         po_date: new Date().toISOString().split('T')[0],
         delivery_date: '',
         payment_terms: 'NET 30',
-        po_items: [{ description: '', qty: 1, unit: 'Unit', unit_price: 0, amount: 0 }],
+        po_items: [{ description: '', qty: 1, unit: 'Unit', unit_price: 0, amount: 0, coa_id: null }],
         tax_rate: 11.00,
         discount_amount: 0,
         notes: '',
         currency: 'IDR',
         shipment_id: null,
         quotation_id: null,
-        job_number: ''
+        job_number: '',
+        // NEW: Shipper & Consignee details
+        shipper_id: '',
+        shipper_name: '',
+        shipper_address: '',
+        consignee_id: '',
+        consignee_name: '',
+        consignee_address: ''
     });
 
     // Edit state
@@ -135,7 +143,7 @@ const PurchaseOrder = () => {
     const addPOItem = () => {
         setFormData(prev => ({
             ...prev,
-            po_items: [...prev.po_items, { description: '', qty: 1, unit: 'Unit', unit_price: 0, amount: 0 }]
+            po_items: [...prev.po_items, { description: '', qty: 1, unit: 'Unit', unit_price: 0, amount: 0, coa_id: null }]
         }));
     };
 
@@ -171,7 +179,6 @@ const PurchaseOrder = () => {
     };
 
     const handleCreatePO = async (e) => {
-        e.preventDefault();
         e.preventDefault();
         console.log('Starting PO Creation... (Form Data):', formData);
         console.log('Vendor ID present?:', formData.vendor_id);
@@ -215,7 +222,14 @@ const PurchaseOrder = () => {
                     shipment_id: formData.shipment_id || null, // Allocation
                     quotation_id: formData.quotation_id || null,
                     job_number: formData.job_number || null,
-                    coa_id: formData.coa_id || null // Link to COA
+                    coa_id: formData.coa_id || null, // Link to COA
+                    // NEW: Shipper & Consignee details
+                    shipper_id: formData.shipper_id || null,
+                    shipper_name: formData.shipper_name || '',
+                    shipper_address: formData.shipper_address || '',
+                    consignee_id: formData.consignee_id || null,
+                    consignee_name: formData.consignee_name || '',
+                    consignee_address: formData.consignee_address || ''
                 }])
                 .select();
 
@@ -635,7 +649,7 @@ const PurchaseOrder = () => {
                         <p><strong>${po.po_number}</strong></p>
                     </div>
 
-                    <!-- Info section with aligned colons -->
+                    <!--Info section with aligned colons -->
                     <table class="info-table">
                         <tr>
                             <td class="label">Vendor</td>
@@ -663,6 +677,31 @@ const PurchaseOrder = () => {
                             <td class="value">${po.currency || 'IDR'}</td>
                         </tr>
                     </table>
+
+                    <!-- Shipper & Consignee Section -->
+                    ${po.shipper_name || po.consignee_name ? `
+                        <h3>Shipping Details</h3>
+                        <div style="display: table; width: 100%; margin-bottom: 15px;">
+                            ${po.shipper_name ? `
+                                <div style="display: table-cell; width: 50%; padding-right: 20px; vertical-align: top;">
+                                    <div style="padding: 10px; background: #f9f9f9; border-left: 3px solid #0070BB;">
+                                        <strong style="display: block; margin-bottom: 5px; color: #0070BB;">Shipper</strong>
+                                        <div style="font-size: 11px;">${po.shipper_name}</div>
+                                        ${po.shipper_address ? `<div style="font-size: 10px; color: #666; margin-top: 3px;">${po.shipper_address.replace(/\n/g, '<br>')}</div>` : ''}
+                                    </div>
+                                </div>
+                            ` : ''}
+                            ${po.consignee_name ? `
+                                <div style="display: table-cell; width: 50%; padding-left: ${po.shipper_name ? '0' : '0'}; vertical-align: top;">
+                                    <div style="padding: 10px; background: #f9f9f9; border-left: 3px solid #0070BB;">
+                                        <strong style="display: block; margin-bottom: 5px; color: #0070BB;">Consignee</strong>
+                                        <div style="font-size: 11px;">${po.consignee_name}</div>
+                                        ${po.consignee_address ? `<div style="font-size: 10px; color: #666; margin-top: 3px;">${po.consignee_address.replace(/\n/g, '<br>')}</div>` : ''}
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    ` : ''}
 
                     <h3>Order Items</h3>
                     <table class="items-table">
@@ -730,6 +769,48 @@ const PurchaseOrder = () => {
                         </div>
                     </div>
 
+                    <!-- Approval Signature Section -->
+                    <div style="margin-top: 40px; page-break-inside: avoid;">
+                        <h3>Approval Signature</h3>
+                        <div style="display: table; width: 100%;">
+                            <!-- Prepared By -->
+                            <div style="display: table-cell; width: 33%; text-align: center; padding: 10px; vertical-align: top;">
+                                <div style="border: 1px solid #ddd; padding: 15px; min-height: 100px; background: #f9f9f9;">
+                                    <div style="font-weight: bold; margin-bottom: 60px; color: #555;">Prepared By</div>
+                                    <div style="border-top: 1px solid #999; padding-top: 5px; font-size: 10px;">
+                                        (__________________)
+                                    </div>
+                                    <div style="font-size: 9px; color: #666; margin-top: 3px;">Date: __________</div>
+                                </div>
+                            </div>
+                            <!-- Approved By -->
+                            <div style="display: table-cell; width: 33%; text-align: center; padding: 10px; vertical-align: top;">
+                                <div style="border: 2px solid #0070BB; padding: 15px; min-height: 100px; background: #f7fcff;">
+                                    <div style="font-weight: bold; margin-bottom: 10px; color: #0070BB;">Approved By</div>
+                                    ${po.approval_signature ? `
+                                        <img src="${po.approval_signature}" alt="Signature" style="max-width: 100px; max-height: 40px; margin: 5px auto; display: block;" />
+                                    ` : `
+                                        <div style="margin: 20px 0;"></div>
+                                    `}
+                                    <div style="border-top: 1px solid #0070BB; padding-top: 5px; font-size: 10px; margin-top: 10px;">
+                                        <strong>${approvedBy}</strong>
+                                    </div>
+                                    <div style="font-size: 9px; color: #666; margin-top: 3px;">Date: ${approvalDate}</div>
+                                </div>
+                            </div>
+                            <!-- Received By -->
+                            <div style="display: table-cell; width: 33%; text-align: center; padding: 10px; vertical-align: top;">
+                                <div style="border: 1px solid #ddd; padding: 15px; min-height: 100px; background: #f9f9f9;">
+                                    <div style="font-weight: bold; margin-bottom: 60px; color: #555;">Received By</div>
+                                    <div style="border-top: 1px solid #999; padding-top: 5px; font-size: 10px;">
+                                        (__________________)
+                                    </div>
+                                    <div style="font-size: 9px; color: #666; margin-top: 3px;">Date: __________</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="button-container">
                         <button onclick="window.print()" class="btn-print">🖨️ Print</button>
                         <button onclick="window.close()" class="btn-close">✖ Close</button>
@@ -752,7 +833,7 @@ const PurchaseOrder = () => {
             po_date: po.po_date,
             delivery_date: po.delivery_date || '',
             payment_terms: po.payment_terms || 'NET 30',
-            po_items: po.po_items && po.po_items.length > 0 ? po.po_items : [{ description: '', qty: 1, unit: 'Unit', unit_price: 0, amount: 0 }],
+            po_items: po.po_items && po.po_items.length > 0 ? po.po_items : [{ description: '', qty: 1, unit: 'Unit', unit_price: 0, amount: 0, coa_id: null }],
             tax_rate: po.tax_rate || 11.00,
             discount_amount: po.discount_amount || 0,
             notes: po.notes || '',
@@ -760,7 +841,14 @@ const PurchaseOrder = () => {
             shipment_id: po.shipment_id || null,
             quotation_id: po.quotation_id || null,
             job_number: po.job_number || '',
-            coa_id: po.coa_id || '' // Load existing COA
+            coa_id: po.coa_id || '', // Load existing COA
+            // NEW: Shipper & Consignee details
+            shipper_id: po.shipper_id || '',
+            shipper_name: po.shipper_name || '',
+            shipper_address: po.shipper_address || '',
+            consignee_id: po.consignee_id || '',
+            consignee_name: po.consignee_name || '',
+            consignee_address: po.consignee_address || ''
         });
         setIsEditing(true);
         setEditId(po.id);
@@ -822,7 +910,14 @@ const PurchaseOrder = () => {
                 shipment_id: formData.shipment_id || null, // Allow updating allocation
                 quotation_id: formData.quotation_id || null,
                 job_number: formData.job_number || null,
-                coa_id: formData.coa_id || null
+                coa_id: formData.coa_id || null,
+                // NEW: Shipper & Consignee details
+                shipper_id: formData.shipper_id || null,
+                shipper_name: formData.shipper_name || '',
+                shipper_address: formData.shipper_address || '',
+                consignee_id: formData.consignee_id || null,
+                consignee_name: formData.consignee_name || '',
+                consignee_address: formData.consignee_address || ''
             };
 
             // If PO was approved, require re-approval and add revision info
@@ -885,7 +980,14 @@ const PurchaseOrder = () => {
             discount_amount: 0,
             notes: '',
             currency: 'IDR',
-            coa_id: ''
+            coa_id: '',
+            // NEW: Reset shipper & consignee
+            shipper_id: '',
+            shipper_name: '',
+            shipper_address: '',
+            consignee_id: '',
+            consignee_name: '',
+            consignee_address: ''
         });
         setIsEditing(false);
         setEditId(null);
@@ -1257,17 +1359,20 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, accounts, fo
 
                         {/* Header Row */}
                         <div className="grid grid-cols-12 gap-2 mb-2 px-3">
-                            <div className="col-span-5">
+                            <div className="col-span-4">
                                 <label className="text-xs font-semibold text-silver-dark uppercase">Deskripsi</label>
                             </div>
-                            <div className="col-span-2">
-                                <label className="text-xs font-semibold text-silver-dark uppercase">Jumlah</label>
+                            <div className="col-span-1">
+                                <label className="text-xs font-semibold text-silver-dark uppercase">Qty</label>
                             </div>
                             <div className="col-span-2">
-                                <label className="text-xs font-semibold text-silver-dark uppercase">Harga Satuan</label>
+                                <label className="text-xs font-semibold text-silver-dark uppercase">Harga</label>
                             </div>
                             <div className="col-span-2">
-                                <label className="text-xs font-semibold text-silver-dark uppercase">Nilai</label>
+                                <label className="text-xs font-semibold text-silver-dark uppercase">Total</label>
+                            </div>
+                            <div className="col-span-2">
+                                <label className="text-xs font-semibold text-silver-dark uppercase">Akun Biaya</label>
                             </div>
                             <div className="col-span-1"></div>
                         </div>
@@ -1275,7 +1380,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, accounts, fo
                         <div className="space-y-3">
                             {formData.po_items.map((item, index) => (
                                 <div key={index} className="grid grid-cols-12 gap-2 items-start glass-card p-3 rounded-lg">
-                                    <div className="col-span-5">
+                                    <div className="col-span-4">
                                         <input
                                             type="text"
                                             placeholder="Deskripsi item"
@@ -1285,13 +1390,13 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, accounts, fo
                                             required
                                         />
                                     </div>
-                                    <div className="col-span-2">
+                                    <div className="col-span-1">
                                         <input
                                             type="number"
                                             placeholder="0"
                                             value={item.qty}
                                             onChange={(e) => updatePOItem(index, 'qty', parseFloat(e.target.value) || 0)}
-                                            className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm"
+                                            className="w-full px-2 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm text-center"
                                             min="0"
                                             required
                                         />
@@ -1302,7 +1407,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, accounts, fo
                                             placeholder="0"
                                             value={item.unit_price}
                                             onChange={(e) => updatePOItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
-                                            className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm"
+                                            className="w-full px-2 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm"
                                             min="0"
                                             required
                                         />
@@ -1311,6 +1416,16 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, accounts, fo
                                         <div className="px-3 py-2 bg-dark-card border border-dark-border rounded-lg text-silver-light text-sm font-semibold">
                                             {formatCurrency(item.amount, formData.currency)}
                                         </div>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <COAPicker
+                                            value={item.coa_id}
+                                            onChange={(coaId) => updatePOItem(index, 'coa_id', coaId)}
+                                            context="AP"
+                                            minLevel={3}
+                                            placeholder="Pilih Akun"
+                                            size="sm"
+                                        />
                                     </div>
                                     <div className="col-span-1 flex items-center justify-center">
                                         {formData.po_items.length > 1 && (
@@ -1334,8 +1449,20 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, accounts, fo
                             <span>Subtotal:</span>
                             <span className="font-semibold">{formatCurrency(subtotal, formData.currency)}</span>
                         </div>
-                        <div className="flex justify-between text-silver-dark">
-                            <span>Tax ({formData.tax_rate}%):</span>
+                        <div className="flex justify-between items-center text-silver-dark">
+                            <div className="flex items-center gap-2">
+                                <span>VAT/Tax:</span>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    step="0.01"
+                                    value={formData.tax_rate}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, tax_rate: parseFloat(e.target.value) || 0 }))}
+                                    className="w-16 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm text-center"
+                                />
+                                <span className="text-xs">%</span>
+                            </div>
                             <span className="font-semibold">{formatCurrency(taxAmount, formData.currency)}</span>
                         </div>
                         <div className="flex justify-between text-xl font-bold text-silver-light">

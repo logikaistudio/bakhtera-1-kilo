@@ -5,6 +5,7 @@ import { useData } from '../../context/DataContext';
 import { generateInvoiceNumber } from '../../utils/documentNumbers';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
+import COAPicker from '../../components/Common/COAPicker';
 import {
     FileText, DollarSign, Calendar, User, Clock, CheckCircle, XCircle,
     Plus, Send, AlertCircle, Download, Eye, Edit, Trash, Receipt,
@@ -42,7 +43,7 @@ const InvoiceManagement = () => {
         billing_currency: 'IDR',
         exchange_rate: 1,
         invoice_items: [
-            { description: 'Ocean Freight', qty: 1, unit: 'Job', rate: 0, amount: 0 }
+            { description: 'Ocean Freight', qty: 1, unit: 'Job', rate: 0, amount: 0, coa_id: null }
         ],
         tax_rate: 11.00,
         discount_amount: 0,
@@ -259,7 +260,7 @@ const InvoiceManagement = () => {
             ...prev,
             invoice_items: [
                 ...prev.invoice_items,
-                { description: '', qty: 1, unit: 'Job', rate: 0, amount: 0 }
+                { description: '', qty: 1, unit: 'Job', rate: 0, amount: 0, coa_id: null }
             ]
         }));
     };
@@ -309,12 +310,30 @@ const InvoiceManagement = () => {
         }
 
         try {
+            // 1. Check if active invoice already exists for this reference
+            const referenceId = formData.quotation_id || formData.shipment_id;
+            const referenceField = formData.quotation_id ? 'quotation_id' : 'shipment_id';
+
+            const { data: existingInvoices, error: checkError } = await supabase
+                .from('blink_invoices')
+                .select('id, invoice_number, status')
+                .eq(referenceField, referenceId)
+                .neq('status', 'cancelled'); // Check for NON-cancelled invoices
+
+            if (checkError) throw checkError;
+
+            if (existingInvoices && existingInvoices.length > 0) {
+                const activeInv = existingInvoices[0];
+                alert(`Cannot create invoice: An active invoice (${activeInv.invoice_number}) already exists for this reference. Please cancel it first if you need to create a replacement.`);
+                return;
+            }
+
             const { subtotal, taxAmount, total } = calculateTotals();
 
-            // Generate invoice number based on quotation number
-            // Format: INV-BLKYYMM-XXXX (follows quotation number)
+            // 2. Generate unique invoice number (async)
+            // If previous invocies were cancelled, this will auto-generate suffix (e.g. -1)
             const quotationNum = selectedQuotation?.quotation_number || selectedQuotation?.quotationNumber || formData.job_number;
-            const invoiceNumber = generateInvoiceNumber(quotationNum);
+            const invoiceNumber = await generateInvoiceNumber(quotationNum);
 
             const newInvoice = {
                 invoice_number: invoiceNumber,
@@ -377,7 +396,7 @@ const InvoiceManagement = () => {
             billing_currency: 'IDR',
             exchange_rate: 1,
             invoice_items: [
-                { description: 'Ocean Freight', qty: 1, unit: 'Job', rate: 0, amount: 0 }
+                { description: 'Ocean Freight', qty: 1, unit: 'Job', rate: 0, amount: 0, coa_id: null }
             ],
             tax_rate: 11.00,
             discount_amount: 0,
@@ -1265,19 +1284,20 @@ const InvoiceCreateModal = ({ quotations, shipments, formData, setFormData, sele
                             <table className="w-full">
                                 <thead className="bg-accent-orange">
                                     <tr>
-                                        <th className="px-2 py-2 text-center text-xs font-semibold text-white w-12">No</th>
-                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white min-w-[300px]">Deskripsi</th>
-                                        <th className="px-3 py-2 text-center text-xs font-semibold text-white w-16">Jumlah</th>
-                                        <th className="px-3 py-2 text-center text-xs font-semibold text-white w-20">Satuan</th>
-                                        <th className="px-3 py-2 text-right text-xs font-semibold text-white w-28">Harga Satuan</th>
-                                        <th className="px-3 py-2 text-right text-xs font-semibold text-white w-28">Harga Total</th>
-                                        <th className="px-3 py-2 text-center text-xs font-semibold text-white w-12">Aksi</th>
+                                        <th className="px-2 py-2 text-center text-xs text-white w-10 font-normal">No</th>
+                                        <th className="px-2 py-2 text-left text-xs text-white min-w-[200px] font-normal">Description</th>
+                                        <th className="px-2 py-2 text-center text-xs text-white w-24 font-normal">Qty</th>
+                                        <th className="px-2 py-2 text-center text-xs text-white w-24 font-normal">Unit</th>
+                                        <th className="px-2 py-2 text-right text-xs text-white min-w-[140px] font-normal">Price</th>
+                                        <th className="px-2 py-2 text-right text-xs text-white min-w-[100px] font-normal">Total</th>
+                                        <th className="px-2 py-2 text-left text-xs text-white min-w-[180px] font-normal">Revenue Account</th>
+                                        <th className="px-2 py-2 text-center text-xs text-white w-10 font-normal">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-dark-border">
                                     {formData.invoice_items.map((item, index) => (
                                         <tr key={index} className="hover:bg-dark-surface/50 smooth-transition">
-                                            <td className="px-2 py-2 text-center text-silver-light text-xs font-medium">{index + 1}</td>
+                                            <td className="px-2 py-2 text-center text-silver-light text-xs">{index + 1}</td>
                                             <td className="px-3 py-2">
                                                 <input
                                                     type="text"
@@ -1320,17 +1340,27 @@ const InvoiceCreateModal = ({ quotations, shipments, formData, setFormData, sele
                                                     required
                                                 />
                                             </td>
-                                            <td className="px-3 py-2 text-right">
-                                                <span className="text-silver-light font-medium text-sm">{formatCurrency(item.amount, formData.billing_currency)}</span>
+                                            <td className="px-2 py-2 text-right">
+                                                <span className="text-silver-light text-sm">{formatCurrency(item.amount, formData.billing_currency)}</span>
                                             </td>
-                                            <td className="px-3 py-2 text-center">
+                                            <td className="px-2 py-2">
+                                                <COAPicker
+                                                    value={item.coa_id}
+                                                    onChange={(coaId) => updateInvoiceItem(index, 'coa_id', coaId)}
+                                                    context="AR"
+                                                    minLevel={3}
+                                                    placeholder="Pilih Akun"
+                                                    size="sm"
+                                                />
+                                            </td>
+                                            <td className="px-2 py-2 text-center">
                                                 <button
                                                     type="button"
                                                     onClick={() => removeInvoiceItem(index)}
-                                                    className="p-1.5 hover:bg-red-500/20 text-red-400 rounded smooth-transition"
+                                                    className="p-1 hover:bg-red-500/20 text-red-400 rounded smooth-transition"
                                                     disabled={formData.invoice_items.length === 1}
                                                 >
-                                                    <Trash className="w-4 h-4" />
+                                                    <Trash className="w-3.5 h-3.5" />
                                                 </button>
                                             </td>
                                         </tr>
@@ -2210,12 +2240,12 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                     <table className="w-full mb-8">
                         <thead>
                             <tr className="bg-gray-800 text-white">
-                                <th className="p-3 text-left text-xs font-bold">NO</th>
-                                <th className="p-3 text-left text-xs font-bold">DESKRIPSI</th>
-                                <th className="p-3 text-center text-xs font-bold">JUMLAH</th>
-                                <th className="p-3 text-center text-xs font-bold">SATUAN</th>
-                                <th className="p-3 text-right text-xs font-bold">HARGA SATUAN</th>
-                                <th className="p-3 text-right text-xs font-bold">TOTAL</th>
+                                <th className="p-3 text-left text-xs">NO</th>
+                                <th className="p-3 text-left text-xs">DESCRIPTION</th>
+                                <th className="p-3 text-center text-xs w-16">QTY</th>
+                                <th className="p-3 text-center text-xs w-14">UNIT</th>
+                                <th className="p-3 text-right text-xs w-28">PRICE</th>
+                                <th className="p-3 text-right text-xs w-24">TOTAL</th>
                             </tr>
                         </thead>
                         <tbody>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useData } from '../../context/DataContext';
 import DataTable from '../../components/Common/DataTable';
 import Modal from '../../components/Common/Modal';
@@ -7,17 +7,28 @@ import { Plus, Users, Download } from 'lucide-react';
 import { exportToCSV } from '../../utils/exportCSV';
 
 const VendorManagement = () => {
-    const { vendors, addVendor, updateVendor, deleteVendor } = useData();
+    const { businessPartners, addBusinessPartner, updateBusinessPartner, deleteBusinessPartner } = useData();
+
+    // Filter vendors from business partners
+    const vendors = useMemo(() =>
+        businessPartners.filter(p => p.is_vendor),
+        [businessPartners]
+    );
+
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingVendor, setEditingVendor] = useState(null);
     const [formData, setFormData] = useState({
-        name: '',
-        contact: '',
+        partner_name: '',
+        contact_person: '',
         email: '',
         phone: '',
         category: '',
-        npwp: '',
+        tax_id: '',
         status: 'active',
+        is_customer: false,
+        is_vendor: true,
+        is_agent: false,
+        is_transporter: false,
     });
 
     const categories = ['Shipping', 'Warehouse', 'Equipment', 'Event Supplies', 'General'];
@@ -26,44 +37,73 @@ const VendorManagement = () => {
     const handleOpenModal = (vendor = null) => {
         if (vendor) {
             setEditingVendor(vendor);
-            setFormData(vendor);
+            setFormData({
+                partner_name: vendor.partner_name,
+                contact_person: vendor.contact_person || '',
+                email: vendor.email || '',
+                phone: vendor.phone || '',
+                category: vendor.category || '',
+                tax_id: vendor.tax_id || '',
+                status: vendor.status || 'active',
+                is_customer: vendor.is_customer || false,
+                is_vendor: vendor.is_vendor || true,
+                is_agent: vendor.is_agent || false,
+                is_transporter: vendor.is_transporter || false,
+            });
         } else {
             setEditingVendor(null);
             setFormData({
-                name: '',
-                contact: '',
+                partner_name: '',
+                contact_person: '',
                 email: '',
                 phone: '',
                 category: '',
-                npwp: '',
+                tax_id: '',
                 status: 'active',
+                is_customer: false,
+                is_vendor: true,
+                is_agent: false,
+                is_transporter: false,
             });
         }
         setIsModalOpen(true);
     };
 
+
     const handleSubmit = (e) => {
         e.preventDefault();
         if (editingVendor) {
-            updateVendor(editingVendor.id, formData);
+            updateBusinessPartner(editingVendor.id, formData);
         } else {
-            addVendor(formData);
+            addBusinessPartner(formData);
         }
         setIsModalOpen(false);
     };
 
     const handleRemove = (vendor) => {
-        if (window.confirm(`Are you sure you want to delete ${vendor.name}?`)) {
-            deleteVendor(vendor.id);
+        if (window.confirm(`Are you sure you want to delete ${vendor.partner_name}?`)) {
+            deleteBusinessPartner(vendor.id);
         }
     };
 
     const columns = [
-        { header: 'Name', key: 'name' },
-        { header: 'Contact', key: 'contact' },
+        { header: 'Name', key: 'partner_name' },
+        { header: 'Contact', key: 'contact_person' },
         { header: 'Email', key: 'email' },
         { header: 'Phone', key: 'phone' },
         { header: 'Category', key: 'category' },
+        {
+            header: 'Roles',
+            key: 'roles',
+            render: (row) => (
+                <div className="flex gap-1 flex-wrap">
+                    {row.is_vendor && <span className="px-2 py-0.5 rounded text-xs bg-blue-500/20 text-blue-400">Vendor</span>}
+                    {row.is_customer && <span className="px-2 py-0.5 rounded text-xs bg-green-500/20 text-green-400">Customer</span>}
+                    {row.is_agent && <span className="px-2 py-0.5 rounded text-xs bg-purple-500/20 text-purple-400">Agent</span>}
+                    {row.is_transporter && <span className="px-2 py-0.5 rounded text-xs bg-orange-500/20 text-orange-400">Transporter</span>}
+                </div>
+            ),
+        },
         {
             header: 'Status',
             key: 'status',
@@ -83,12 +123,12 @@ const VendorManagement = () => {
     // Export to CSV handler
     const handleExportCSV = () => {
         const columns = [
-            { key: 'name', header: 'Vendor Name' },
-            { key: 'contact', header: 'Contact Person' },
+            { key: 'partner_name', header: 'Vendor Name' },
+            { key: 'contact_person', header: 'Contact Person' },
             { key: 'email', header: 'Email' },
             { key: 'phone', header: 'Phone' },
             { key: 'category', header: 'Category' },
-            { key: 'npwp', header: 'NPWP' },
+            { key: 'tax_id', header: 'NPWP' },
             { key: 'status', header: 'Status' }
         ];
 
@@ -166,16 +206,61 @@ const VendorManagement = () => {
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-silver-dark mb-2">
-                            Vendor Name *
+                            Partner Name *
                         </label>
                         <input
                             type="text"
                             required
-                            value={formData.name}
-                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                            placeholder="Enter vendor name"
+                            value={formData.partner_name}
+                            onChange={(e) => setFormData({ ...formData, partner_name: e.target.value })}
+                            placeholder="Enter partner name"
                             className="w-full"
                         />
+                    </div>
+
+                    {/* Partner Roles */}
+                    <div>
+                        <label className="block text-sm font-medium text-silver-dark mb-2">
+                            Partner Roles *
+                        </label>
+                        <div className="grid grid-cols-2 gap-3">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={formData.is_customer}
+                                    onChange={(e) => setFormData({ ...formData, is_customer: e.target.checked })}
+                                    className="w-4 h-4"
+                                />
+                                <span className="text-sm text-silver-light">Customer</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={formData.is_vendor}
+                                    onChange={(e) => setFormData({ ...formData, is_vendor: e.target.checked })}
+                                    className="w-4 h-4"
+                                />
+                                <span className="text-sm text-silver-light">Vendor</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={formData.is_agent}
+                                    onChange={(e) => setFormData({ ...formData, is_agent: e.target.checked })}
+                                    className="w-4 h-4"
+                                />
+                                <span className="text-sm text-silver-light">Agent</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={formData.is_transporter}
+                                    onChange={(e) => setFormData({ ...formData, is_transporter: e.target.checked })}
+                                    className="w-4 h-4"
+                                />
+                                <span className="text-sm text-silver-light">Transporter</span>
+                            </label>
+                        </div>
                     </div>
 
                     <div>
@@ -184,8 +269,8 @@ const VendorManagement = () => {
                         </label>
                         <input
                             type="text"
-                            value={formData.contact}
-                            onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
+                            value={formData.contact_person}
+                            onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
                             placeholder="Enter contact person name"
                             className="w-full"
                         />
@@ -200,7 +285,7 @@ const VendorManagement = () => {
                                 type="email"
                                 value={formData.email}
                                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                placeholder="vendor@example.com"
+                                placeholder="partner@example.com"
                                 className="w-full"
                             />
                         </div>
@@ -225,8 +310,8 @@ const VendorManagement = () => {
                         </label>
                         <input
                             type="text"
-                            value={formData.npwp}
-                            onChange={(e) => setFormData({ ...formData, npwp: e.target.value })}
+                            value={formData.tax_id}
+                            onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
                             placeholder="00.000.000.0-000.000"
                             className="w-full"
                             maxLength="20"

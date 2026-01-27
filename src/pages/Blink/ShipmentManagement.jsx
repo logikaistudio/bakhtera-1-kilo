@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Button from '../../components/Common/Button';
 import ShipmentDetailModal from '../../components/Blink/ShipmentDetailModalEnhanced';
+import SellingBuyingDetailModal from '../../components/Blink/SellingBuyingDetailModal';
 import { Ship, Plus, MapPin, Filter, Search, Download, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
@@ -9,6 +10,8 @@ const ShipmentManagement = () => {
     const [shipments, setShipments] = useState([]);
     const [selectedShipment, setSelectedShipment] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
+    const [showAnalysisModal, setShowAnalysisModal] = useState(false);
+    const [analysisShipment, setAnalysisShipment] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [serviceFilter, setServiceFilter] = useState('all');
@@ -161,6 +164,11 @@ const ShipmentManagement = () => {
     const handleViewShipment = (shipment) => {
         setSelectedShipment(shipment);
         setShowDetailModal(true);
+    };
+
+    const handleViewAnalysis = (shipment) => {
+        setAnalysisShipment(shipment);
+        setShowAnalysisModal(true);
     };
 
     // Handle update shipment
@@ -467,7 +475,16 @@ const ShipmentManagement = () => {
                     fetchShipments();
                 }}
                 shipment={selectedShipment}
+                shipment={selectedShipment}
                 onUpdate={handleUpdateShipment}
+                onViewAnalysis={handleViewAnalysis}
+            />
+
+            {/* Selling Buying Analysis Modal (Compact & Instant) */}
+            <SellingBuyingDetailModal
+                isOpen={showAnalysisModal}
+                onClose={() => setShowAnalysisModal(false)}
+                shipment={analysisShipment}
             />
         </div>
     );

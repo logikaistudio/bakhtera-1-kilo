@@ -143,14 +143,15 @@ const TrialBalance = () => {
         }
     };
 
-    // Grouping Logic
+    // Grouping Logic - Scontro Style (Debit Side vs Credit Side)
+    // Left: Assets, Expenses
+    // Right: Liabilities, Equity, Revenue
     const groupedBalances = {
         ASSET: balances.filter(b => b.type === 'ASSET'),
         LIABILITY: balances.filter(b => b.type === 'LIABILITY'),
         EQUITY: balances.filter(b => b.type === 'EQUITY'),
-        REVENUE: balances.filter(b => b.type === 'REVENUE'),
-        EXPENSE: balances.filter(b => ['EXPENSE', 'COGS', 'DIRECT_COST'].includes(b.type)),
-        OTHER: balances.filter(b => ['OTHER_INCOME', 'OTHER_EXPENSE'].includes(b.type))
+        REVENUE: balances.filter(b => ['REVENUE', 'OTHER_INCOME'].includes(b.type)),
+        EXPENSE: balances.filter(b => ['EXPENSE', 'COGS', 'DIRECT_COST', 'OTHER_EXPENSE'].includes(b.type)),
     };
 
     const handleAccountClick = (accountId) => {
@@ -162,6 +163,7 @@ const TrialBalance = () => {
         return val.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     };
 
+    // Compact Account Table for Scontro View
     const AccountGroupTable = ({ title, data, colorClass = "text-silver-light" }) => {
         if (data.length === 0) return null;
 
@@ -173,51 +175,42 @@ const TrialBalance = () => {
         }), { opening: 0, debit: 0, credit: 0, closing: 0 });
 
         return (
-            <div className="mb-8">
-                <h3 className={`font-bold text-lg mb-2 pl-2 border-l-4 ${colorClass.replace('text-', 'border-')} ${colorClass}`}>
-                    {title}
-                </h3>
-                <div className="glass-card rounded-lg overflow-hidden">
-                    <table className="w-full text-sm">
-                        <thead className="bg-[#0070BB] text-white opacity-90">
+            <div className="mb-6">
+                <div className={`flex items-center justify-between mb-2 pl-3 border-l-4 ${colorClass.replace('text-', 'border-')}`}>
+                    <h3 className={`font-bold text-base ${colorClass}`}>{title}</h3>
+                    <span className="text-xs font-mono font-bold text-silver-dark opacity-70">
+                        Total: {formatCurrency(groupTotal.closing)}
+                    </span>
+                </div>
+
+                <div className="glass-card rounded-lg overflow-hidden border border-white/5">
+                    <table className="w-full text-xs">
+                        <thead className="bg-dark-surface border-b border-dark-border/50">
                             <tr>
-                                <th className="px-4 py-2 text-left font-semibold w-24">Kode</th>
-                                <th className="px-4 py-2 text-left font-semibold">Nama Akun</th>
-                                <th className="px-4 py-2 text-right font-semibold">Saldo Awal</th>
-                                <th className="px-4 py-2 text-right font-semibold bg-white/10">Mutasi Debit</th>
-                                <th className="px-4 py-2 text-right font-semibold bg-white/10">Mutasi Kredit</th>
-                                <th className="px-4 py-2 text-right font-semibold">Saldo Akhir</th>
+                                <th className="px-3 py-2 text-left font-semibold w-16 text-silver-dark uppercase tracking-wider">Kode</th>
+                                <th className="px-3 py-2 text-left font-semibold text-silver-dark uppercase tracking-wider">Akun</th>
+                                <th className="px-3 py-2 text-right font-semibold text-silver-dark uppercase tracking-wider">Saldo</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-dark-border">
+                        <tbody className="divide-y divide-dark-border/30">
                             {data.map(acc => (
                                 <tr
                                     key={acc.id}
                                     onClick={() => handleAccountClick(acc.id)}
-                                    className="hover:bg-dark-surface smooth-transition cursor-pointer group"
+                                    className="hover:bg-white/5 smooth-transition cursor-pointer group"
                                 >
-                                    <td className="px-4 py-2 font-mono text-accent-orange group-hover:underline">{acc.code}</td>
-                                    <td className="px-4 py-2 text-silver-light font-medium">{acc.name}</td>
-                                    <td className="px-4 py-2 text-right font-mono text-silver-dark">{formatCurrency(acc.opening)}</td>
-                                    <td className="px-4 py-2 text-right font-mono text-green-400 bg-green-400/5">
-                                        {acc.debitPeriod !== 0 ? formatCurrency(acc.debitPeriod) : '-'}
-                                    </td>
-                                    <td className="px-4 py-2 text-right font-mono text-cyan-400 bg-cyan-400/5">
-                                        {acc.creditPeriod !== 0 ? formatCurrency(acc.creditPeriod) : '-'}
-                                    </td>
-                                    <td className="px-4 py-2 text-right font-mono font-bold text-silver-light">
+                                    <td className="px-3 py-1.5 font-mono text-accent-orange/80 group-hover:text-accent-orange">{acc.code}</td>
+                                    <td className="px-3 py-1.5 text-silver-light truncate max-w-[150px]">{acc.name}</td>
+                                    <td className={`px-3 py-1.5 text-right font-mono font-medium ${acc.closing < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
                                         {formatCurrency(acc.closing)}
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
-                        <tfoot className="bg-dark-surface/50 font-bold">
+                        <tfoot className="bg-dark-surface/30 font-bold border-t border-dark-border/50">
                             <tr>
-                                <td colSpan="2" className="px-4 py-2 text-right text-xs uppercase tracking-wider text-silver-dark">Subtotal {title}</td>
-                                <td className="px-4 py-2 text-right font-mono text-silver-dark text-xs">{formatCurrency(groupTotal.opening)}</td>
-                                <td className="px-4 py-2 text-right font-mono text-green-400 text-xs">{formatCurrency(groupTotal.debit)}</td>
-                                <td className="px-4 py-2 text-right font-mono text-cyan-400 text-xs">{formatCurrency(groupTotal.credit)}</td>
-                                <td className="px-4 py-2 text-right font-mono text-silver-light text-xs">{formatCurrency(groupTotal.closing)}</td>
+                                <td colSpan="2" className="px-3 py-2 text-right text-[10px] uppercase tracking-wider text-silver-dark">Total {title}</td>
+                                <td className="px-3 py-2 text-right font-mono text-silver-light">{formatCurrency(groupTotal.closing)}</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -232,9 +225,19 @@ const TrialBalance = () => {
     };
 
     const getExportData = () => {
-        const rows = balances.map(acc => ({
+        // Flatten list for export
+        const allBalances = [
+            ...groupedBalances.ASSET,
+            ...groupedBalances.LIABILITY,
+            ...groupedBalances.EQUITY,
+            ...groupedBalances.REVENUE,
+            ...groupedBalances.EXPENSE
+        ];
+
+        const rows = allBalances.map(acc => ({
             'Kode Akun': acc.code,
             'Nama Akun': acc.name,
+            'Tipe': acc.type,
             'Saldo Awal': formatExportCurrency(acc.opening),
             'Mutasi Debit': formatExportCurrency(acc.debitPeriod),
             'Mutasi Kredit': formatExportCurrency(acc.creditPeriod),
@@ -244,6 +247,7 @@ const TrialBalance = () => {
         const totalRow = {
             'Kode Akun': 'TOTAL',
             'Nama Akun': '',
+            'Tipe': '',
             'Saldo Awal': formatExportCurrency(totals.opening),
             'Mutasi Debit': formatExportCurrency(totals.debit),
             'Mutasi Kredit': formatExportCurrency(totals.credit),
@@ -261,6 +265,7 @@ const TrialBalance = () => {
         ws['!cols'] = [
             { wch: 15 }, // Kode Akun
             { wch: 40 }, // Nama Akun
+            { wch: 15 }, // Tipe
             { wch: 18 }, // Saldo Awal
             { wch: 18 }, // Mutasi Debit
             { wch: 18 }, // Mutasi Kredit
@@ -291,7 +296,7 @@ const TrialBalance = () => {
                         <Scale className="w-8 h-8" />
                         Neraca Saldo
                     </h1>
-                    <p className="text-silver-dark mt-1">Trial Balance - Ringkasan saldo semua akun</p>
+                    <p className="text-silver-dark mt-1">Trial Balance Scontro View - Ringkasan Saldo Akun</p>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -363,28 +368,34 @@ const TrialBalance = () => {
                 </div>
             </div>
 
-            {/* Grand Total Row Fixed Top or Bottom */}
-            <div className={`glass-card p-3 rounded-lg flex gap-4 text-sm font-bold border ${isBalanced ? 'border-dark-border' : 'border-red-500/50'} bg-dark-surface/50`}>
-                <div className="flex-1 text-right text-silver-dark">GRAND TOTAL</div>
-                <div className="w-32 text-right text-green-400">{formatCurrency(totals.debit)}</div>
-                <div className="w-32 text-right text-cyan-400">{formatCurrency(totals.credit)}</div>
-            </div>
-
             {loading ? (
                 <div className="p-12 text-center text-silver-dark">Loading financial data...</div>
             ) : (
-                <div className="space-y-2">
-                    <AccountGroupTable title="HARTA (ASSETS)" data={groupedBalances.ASSET} colorClass="text-green-400" />
-                    <AccountGroupTable title="KEWAJIBAN (LIABILITIES)" data={groupedBalances.LIABILITY} colorClass="text-red-400" />
-                    <AccountGroupTable title="MODAL (EQUITY)" data={groupedBalances.EQUITY} colorClass="text-blue-400" />
-                    <AccountGroupTable title="PENDAPATAN (REVENUE)" data={groupedBalances.REVENUE} colorClass="text-cyan-400" />
-                    <AccountGroupTable title="BEBAN (EXPENSES)" data={groupedBalances.EXPENSE} colorClass="text-orange-400" />
-                    <AccountGroupTable title="LAIN-LAIN (OTHERS)" data={groupedBalances.OTHER} colorClass="text-purple-400" />
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                    {/* Left Column: Aktiva & Beban */}
+                    <div className="space-y-6">
+                        <div className="flex items-center gap-2 text-green-400 mb-2 border-b border-dark-border pb-2">
+                            <div className="w-3 h-3 rounded-full bg-green-500/50"></div>
+                            <h2 className="font-bold uppercase tracking-wider text-sm">Debit Side (Harta & Beban)</h2>
+                        </div>
+                        <AccountGroupTable title="HARTA (ASSETS)" data={groupedBalances.ASSET} colorClass="text-green-400" />
+                        <AccountGroupTable title="BEBAN (EXPENSES)" data={groupedBalances.EXPENSE} colorClass="text-orange-400" />
+                    </div>
+
+                    {/* Right Column: Pasiva & Pendapatan */}
+                    <div className="space-y-6">
+                        <div className="flex items-center gap-2 text-blue-400 mb-2 border-b border-dark-border pb-2">
+                            <div className="w-3 h-3 rounded-full bg-blue-500/50"></div>
+                            <h2 className="font-bold uppercase tracking-wider text-sm">Credit Side (Kewajiban, Modal & Pendapatan)</h2>
+                        </div>
+                        <AccountGroupTable title="KEWAJIBAN (LIABILITIES)" data={groupedBalances.LIABILITY} colorClass="text-red-400" />
+                        <AccountGroupTable title="MODAL (EQUITY)" data={groupedBalances.EQUITY} colorClass="text-blue-400" />
+                        <AccountGroupTable title="PENDAPATAN (REVENUE)" data={groupedBalances.REVENUE} colorClass="text-cyan-400" />
+                    </div>
                 </div>
             )}
-            <div className="text-center text-xs text-silver-dark mt-6 italic">
-                * Saldo minus (-) atau dalam kurung menunjukkan saldo normal Kredit (Utang/Modal/Pendapatan).
-                Sedangkan positif menunjukkan saldo normal Debit (Aset/Beban).
+            <div className="text-center text-xs text-silver-dark mt-6 italic bg-dark-surface/30 p-4 rounded border border-white/5">
+                Note: Dalam tampilan Scontro ini, akun dikelompokkan berdasarkan sisi normalnya. Harta dan Beban di sisi Kiri (Debit), sedangkan Kewajiban, Modal, dan Pendapatan di sisi Kanan (Kredit).
             </div>
         </div>
     );

@@ -94,6 +94,13 @@ const BlinkDashboard = () => {
             description: 'Laporan Laba Rugi Realtime',
             icon: DollarSign,
             color: 'amber'
+        },
+        {
+            path: '/blink/finance/selling-buying',
+            label: 'Selling vs Buying',
+            description: 'Analisis margin per shipment (Manajer)',
+            icon: TrendingUp,
+            color: 'emerald'
         }
     ];
 

@@ -6,6 +6,7 @@ import { generateQuotationNumber } from '../../utils/documentNumbers';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
 import ServiceItemManager from '../../components/Common/ServiceItemManager';
+import PartnerPicker from '../../components/Common/PartnerPicker';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import {
@@ -29,7 +30,7 @@ const QuotationManagement = () => {
 
     // Form state
     const [formData, setFormData] = useState({
-        customerId: '',
+        partnerId: '', // Changed from customerId
         customerName: '',
         customerCompany: '',
         customerAddress: '',
@@ -42,6 +43,9 @@ const QuotationManagement = () => {
         cargoType: '',
         weight: '',
         volume: '',
+        grossWeight: '',
+        netWeight: '',
+        measure: '',
         commodity: '',
         currency: 'USD',
         totalAmount: '',
@@ -102,7 +106,10 @@ const QuotationManagement = () => {
                 createdAt: q.created_at || q.createdAt,
                 updatedAt: q.updated_at || q.updatedAt,
                 currency: q.currency || 'USD',
-                status: q.status || 'draft'
+                status: q.status || 'draft',
+                grossWeight: q.gross_weight || q.grossWeight,
+                netWeight: q.net_weight || q.netWeight,
+                measure: q.measure || q.measure
             }));
 
             console.log('✅ Mapped', mapped.length, 'quotations');
@@ -115,26 +122,22 @@ const QuotationManagement = () => {
         }
     };
 
-    // Auto-populate customer data when customer selected
-    const handleCustomerChange = (e) => {
-        const customerId = e.target.value;
-        const selectedCustomer = customers.find(c => c.id === customerId);
+    // Auto-populate customer data when partner selected
+    const handlePartnerChange = (partnerId) => {
+        setFormData(prev => ({
+            ...prev,
+            partnerId: partnerId
+        }));
+    };
 
-        if (selectedCustomer) {
+    // Callback when partner data is loaded from picker
+    const handlePartnerLoad = (partner) => {
+        if (partner) {
             setFormData(prev => ({
                 ...prev,
-                customerId: customerId,
-                customerName: selectedCustomer.name,
-                customerCompany: selectedCustomer.company || '',
-                customerAddress: selectedCustomer.address || ''
-            }));
-        } else {
-            setFormData(prev => ({
-                ...prev,
-                customerId: '',
-                customerName: '',
-                customerCompany: '',
-                customerAddress: ''
+                customerName: partner.partner_name,
+                customerCompany: partner.partner_name, // Or separate field if exists
+                customerAddress: `${partner.address_line1 || ''} ${partner.address_line2 || ''} ${partner.city || ''} ${partner.country || ''}`.trim()
             }));
         }
     };
@@ -154,7 +157,8 @@ const QuotationManagement = () => {
             quotation_number: jobNumber,
             customer_name: formData.customerName,
             customer_company: formData.customerCompany,
-            customer_id: (formData.customerId && formData.customerId.includes('-')) ? formData.customerId : null,  // Only valid UUIDs
+            partner_id: formData.partnerId || null, // Link to business partner
+            customer_id: null, // Legacy column (deprecated)
             customer_address: formData.customerAddress,
             sales_person: formData.salesPerson,
             quotation_type: formData.quotationType,
@@ -164,8 +168,12 @@ const QuotationManagement = () => {
             destination: formData.destination,
             service_type: formData.serviceType,
             cargo_type: formData.cargoType,
-            weight: formData.weight ? parseFloat(formData.weight) : null,
+            // Automatically set legacy weight to grossWeight if provided
+            weight: formData.grossWeight ? parseFloat(formData.grossWeight) : (formData.weight ? parseFloat(formData.weight) : null),
             volume: formData.volume ? parseFloat(formData.volume) : null,
+            gross_weight: formData.grossWeight ? parseFloat(formData.grossWeight) : null,
+            net_weight: formData.netWeight ? parseFloat(formData.netWeight) : null,
+            measure: formData.measure ? parseFloat(formData.measure) : null,
             commodity: formData.commodity,
             currency: formData.currency,
             total_amount: formData.totalAmount ? parseInt(formData.totalAmount.toString().replace(/\./g, '')) : 0,
@@ -262,7 +270,7 @@ const QuotationManagement = () => {
 
     const resetForm = () => {
         setFormData({
-            customerId: '',
+            partnerId: '',
             customerName: '',
             customerCompany: '',
             customerAddress: '',
@@ -275,6 +283,9 @@ const QuotationManagement = () => {
             cargoType: '',
             weight: '',
             volume: '',
+            grossWeight: '',
+            netWeight: '',
+            measure: '',
             commodity: '',
             currency: 'USD',
             totalAmount: '',
@@ -715,7 +726,13 @@ const QuotationManagement = () => {
                     // Fix: Carry over missing data fields
                     customer_id: quotation.customerId,
                     service_items: quotation.serviceItems || [],
-                    notes: quotation.notes || ''
+                    notes: quotation.notes || '',
+                    // New fields propagation
+                    gross_weight: quotation.grossWeight || null,
+                    net_weight: quotation.netWeight || null,
+                    measure: quotation.measure || null,
+                    // Map service items to selling items for COGS comparison
+                    selling_items: quotation.serviceItems || [] // Using serviceItems as initial selling items
                 }]);
 
             if (error) throw error;
@@ -949,27 +966,22 @@ const QuotationManagement = () => {
                 <form onSubmit={(e) => handleSubmit(e, 'draft')} className="space-y-6">
 
 
-                    {/* Customer Selection */}
+                    {/* Customer Selection - using PartnerPicker */}
                     <div>
                         <label className="block text-sm font-medium text-silver mb-2">
                             Customer <span className="text-red-400">*</span>
                         </label>
-                        <select
-                            required
-                            value={formData.customerId}
-                            onChange={handleCustomerChange}
-                            className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
-                        >
-                            <option value="">Pilih Customer...</option>
-                            {activeCustomers.map(customer => (
-                                <option key={customer.id} value={customer.id}>
-                                    {customer.name} {customer.company && `- ${customer.company} `}
-                                </option>
-                            ))}
-                        </select>
+                        <PartnerPicker
+                            value={formData.partnerId}
+                            onChange={handlePartnerChange}
+                            onPartnerLoad={handlePartnerLoad}
+                            roleFilter="customer"
+                            placeholder="Pilih Customer..."
+                            required={true}
+                        />
                         {formData.customerAddress && (
                             <p className="text-xs text-silver-dark mt-1">
-                                Address: {formData.customerAddress}
+                                📍 {formData.customerAddress}
                             </p>
                         )}
                     </div>
@@ -1007,7 +1019,7 @@ const QuotationManagement = () => {
                             >
                                 <option value="RG">Regular (RG)</option>
                                 <option value="PJ">Project (PJ)</option>
-                                <option value="CM">Common (CM)</option>
+                                <option value="EV">Event (EV)</option>
                             </select>
                         </div>
                         <div>
@@ -1101,33 +1113,63 @@ const QuotationManagement = () => {
                         </div>
                     </div>
 
-                    {/* Weight & Volume */}
-                    <div className="grid grid-cols-2 gap-4">
+                    {/* Volume (Standalone) */}
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium text-silver mb-2">
+                            Volume (CBM)
+                        </label>
+                        <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={formData.volume}
+                            onChange={(e) => setFormData({ ...formData, volume: e.target.value })}
+                            placeholder="5.5"
+                            className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
+                        />
+                    </div>
+
+                    {/* Gross Weight, Net Weight & Measure */}
+                    <div className="grid grid-cols-3 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-silver mb-2">
-                                Weight (kg)
+                                Gross Weight (kgs)
                             </label>
                             <input
                                 type="number"
                                 min="0"
                                 step="0.01"
-                                value={formData.weight}
-                                onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
+                                value={formData.grossWeight}
+                                onChange={(e) => setFormData({ ...formData, grossWeight: e.target.value })}
+                                placeholder="1200"
+                                className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-silver mb-2">
+                                Net Weight (kgs)
+                            </label>
+                            <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={formData.netWeight}
+                                onChange={(e) => setFormData({ ...formData, netWeight: e.target.value })}
                                 placeholder="1000"
                                 className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
                             />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-silver mb-2">
-                                Volume (CBM)
+                                Measure (M³)
                             </label>
                             <input
                                 type="number"
                                 min="0"
-                                step="0.01"
-                                value={formData.volume}
-                                onChange={(e) => setFormData({ ...formData, volume: e.target.value })}
-                                placeholder="5.5"
+                                step="0.001"
+                                value={formData.measure}
+                                onChange={(e) => setFormData({ ...formData, measure: e.target.value })}
+                                placeholder="5.500"
                                 className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
                             />
                         </div>
@@ -1330,7 +1372,8 @@ const QuotationManagement = () => {
                                 <p className="text-silver-light font-medium">
                                     {viewingQuotation.quotationType === 'RG' && 'Regular'}
                                     {viewingQuotation.quotationType === 'PJ' && 'Project'}
-                                    {viewingQuotation.quotationType === 'CM' && 'Common'}
+                                    {viewingQuotation.quotationType === 'EV' && 'Event'}
+                                    {viewingQuotation.quotationType === 'CM' && 'Event'}
                                     {!viewingQuotation.quotationType && 'Regular'}
                                 </p>
                             </div>
@@ -1374,6 +1417,58 @@ const QuotationManagement = () => {
                                 <option value="air">Air Freight</option>
                                 <option value="land">Land Transport</option>
                             </select>
+                        </div>
+
+                        {/* Cargo Details */}
+                        <div className="p-3 bg-dark-card rounded-lg border border-dark-border">
+                            <h5 className="text-xs font-semibold text-silver-dark mb-3 uppercase tracking-wider">Cargo Details</h5>
+
+                            <div className="mb-3">
+                                <p className="text-xs text-silver-dark mb-1">Volume (CBM)</p>
+                                <input
+                                    type="number"
+                                    value={isEditingQuotation ? (editedQuotation?.volume || '') : (viewingQuotation.volume || '')}
+                                    onChange={(e) => setEditedQuotation({ ...editedQuotation, volume: e.target.value })}
+                                    disabled={!isEditingQuotation}
+                                    className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm disabled:opacity-70"
+                                    placeholder="-"
+                                />
+                            </div>
+                            <div className="grid grid-cols-3 gap-3">
+                                <div>
+                                    <p className="text-xs text-silver-dark mb-1">Gross (kg)</p>
+                                    <input
+                                        type="number"
+                                        value={isEditingQuotation ? (editedQuotation?.grossWeight || '') : (viewingQuotation.grossWeight || '')}
+                                        onChange={(e) => setEditedQuotation({ ...editedQuotation, grossWeight: e.target.value })}
+                                        disabled={!isEditingQuotation}
+                                        className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm disabled:opacity-70"
+                                        placeholder="-"
+                                    />
+                                </div>
+                                <div>
+                                    <p className="text-xs text-silver-dark mb-1">Net (kg)</p>
+                                    <input
+                                        type="number"
+                                        value={isEditingQuotation ? (editedQuotation?.netWeight || '') : (viewingQuotation.netWeight || '')}
+                                        onChange={(e) => setEditedQuotation({ ...editedQuotation, netWeight: e.target.value })}
+                                        disabled={!isEditingQuotation}
+                                        className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm disabled:opacity-70"
+                                        placeholder="-"
+                                    />
+                                </div>
+                                <div>
+                                    <p className="text-xs text-silver-dark mb-1">Measure (M³)</p>
+                                    <input
+                                        type="number"
+                                        value={isEditingQuotation ? (editedQuotation?.measure || '') : (viewingQuotation.measure || '')}
+                                        onChange={(e) => setEditedQuotation({ ...editedQuotation, measure: e.target.value })}
+                                        disabled={!isEditingQuotation}
+                                        className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm disabled:opacity-70"
+                                        placeholder="-"
+                                    />
+                                </div>
+                            </div>
                         </div>
 
                         <div className="p-4 bg-gradient-to-r from-accent-orange/10 to-transparent rounded-lg border border-accent-orange/20">
