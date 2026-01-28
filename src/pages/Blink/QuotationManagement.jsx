@@ -51,7 +51,13 @@ const QuotationManagement = () => {
         totalAmount: '',
         validityDays: 30,
         notes: '',
-        serviceItems: []
+        validityDays: 30,
+        notes: '',
+        serviceItems: [],
+        termsConditions: `1. All rates are subject to change without prior notice.
+2. Payment terms: Net 30 Days.
+3. Subject to space and equipment availability.
+4. Standard Trading Conditions apply.`
     });
 
     const statusConfig = {
@@ -109,7 +115,12 @@ const QuotationManagement = () => {
                 status: q.status || 'draft',
                 grossWeight: q.gross_weight || q.grossWeight,
                 netWeight: q.net_weight || q.netWeight,
-                measure: q.measure || q.measure
+                netWeight: q.net_weight || q.netWeight,
+                measure: q.measure || q.measure,
+                termsConditions: q.terms_and_conditions || `1. All rates are subject to change without prior notice.
+2. Payment terms: Net 30 Days.
+3. Subject to space and equipment availability.
+4. Standard Trading Conditions apply.`
             }));
 
             console.log('✅ Mapped', mapped.length, 'quotations');
@@ -179,7 +190,10 @@ const QuotationManagement = () => {
             total_amount: formData.totalAmount ? parseInt(formData.totalAmount.toString().replace(/\./g, '')) : 0,
             status: status,
             notes: formData.notes,
-            service_items: formData.serviceItems
+            status: status,
+            notes: formData.notes,
+            service_items: formData.serviceItems,
+            terms_and_conditions: formData.termsConditions
         };
 
         try {
@@ -246,7 +260,8 @@ const QuotationManagement = () => {
                     total_amount: editedQuotation.totalAmount,
                     origin: editedQuotation.origin,
                     destination: editedQuotation.destination,
-                    notes: editedQuotation.notes
+                    notes: editedQuotation.notes,
+                    terms_and_conditions: editedQuotation.termsConditions
                 })
                 .eq('id', editedQuotation.id);
 
@@ -291,7 +306,11 @@ const QuotationManagement = () => {
             totalAmount: '',
             validityDays: 30,
             notes: '',
-            serviceItems: []
+            serviceItems: [],
+            termsConditions: `1. All rates are subject to change without prior notice.
+2. Payment terms: Net 30 Days.
+3. Subject to space and equipment availability.
+4. Standard Trading Conditions apply.`
         });
     };
 
@@ -546,6 +565,11 @@ const QuotationManagement = () => {
                 </tr>
             `).join('');
 
+            const termsLines = (quotation.termsConditions || `1. All rates are subject to change without prior notice.
+2. Payment terms: Net 30 Days.
+3. Subject to space and equipment availability.
+4. Standard Trading Conditions apply.`).split('\n').map(line => `<li>${line.replace(/^\d+\.\s*/, '')}</li>`).join('');
+
             const content = `
                 <!DOCTYPE html>
                 <html>
@@ -630,10 +654,7 @@ const QuotationManagement = () => {
                     <div style="margin-top: 40px; border-top: 1px solid #ddd; padding-top: 20px;">
                         <h4 style="font-size: 12px; font-weight: bold; margin-bottom: 10px;">TERMS & CONDITIONS:</h4>
                         <ol style="padding-left: 20px; margin: 0; line-height: 1.5;">
-                            <li>All rates are subject to change without prior notice.</li>
-                            <li>Payment terms: ${quotation.paymentTerms || 'Net 30 Days'}.</li>
-                            <li>Subject to space and equipment availability.</li>
-                            <li>Standard Trading Conditions apply.</li>
+                            ${termsLines}
                         </ol>
                     </div>
 
@@ -1247,6 +1268,20 @@ const QuotationManagement = () => {
                         />
                     </div>
 
+                    {/* Terms & Conditions */}
+                    <div>
+                        <label className="block text-sm font-medium text-silver mb-2">
+                            Terms & Conditions
+                        </label>
+                        <textarea
+                            rows={5}
+                            value={formData.termsConditions}
+                            onChange={(e) => setFormData({ ...formData, termsConditions: e.target.value })}
+                            placeholder="Enter terms and conditions..."
+                            className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light font-mono text-xs"
+                        />
+                    </div>
+
                     {/* Actions */}
                     <div className="flex justify-end gap-3 pt-4 border-t border-dark-border">
                         <Button
@@ -1527,6 +1562,23 @@ const QuotationManagement = () => {
                             </div>
                         )}
 
+                        {/* Terms & Conditions (View/Edit) */}
+                        <div className="p-4 bg-dark-card rounded-lg border border-dark-border">
+                            <h5 className="text-xs font-semibold text-silver-dark mb-2 uppercase tracking-wider">Terms & Conditions</h5>
+                            {isEditingQuotation ? (
+                                <textarea
+                                    rows={5}
+                                    value={editedQuotation?.termsConditions || ''}
+                                    onChange={(e) => setEditedQuotation({ ...editedQuotation, termsConditions: e.target.value })}
+                                    className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light font-mono text-xs"
+                                />
+                            ) : (
+                                <div className="text-sm text-silver-light whitespace-pre-line pl-4 border-l-2 border-accent-orange/30">
+                                    {viewingQuotation.termsConditions}
+                                </div>
+                            )}
+                        </div>
+
                         {/* Department-Specific Actions */}
                         <div className="flex justify-between gap-3 pt-4 border-t border-dark-border">
                             <div className="flex gap-2">
@@ -1742,12 +1794,17 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                     {/* Terms */}
                     <div className="mt-12 pt-6 border-t border-gray-300">
                         <h4 className="text-xs font-bold text-gray-700 mb-2">TERMS & CONDITIONS:</h4>
-                        <ol className="list-decimal pl-4 text-xs text-gray-600 space-y-1">
-                            <li>All rates are subject to change without prior notice.</li>
-                            <li>Payment terms: {quotation.paymentTerms || 'Net 30 Days'}.</li>
-                            <li>Subject to space and equipment availability.</li>
-                            <li>Standard Trading Conditions apply.</li>
-                        </ol>
+                        <div className="mt-12 pt-6 border-t border-gray-300">
+                            <h4 className="text-xs font-bold text-gray-700 mb-2">TERMS & CONDITIONS:</h4>
+                            <ol className="list-decimal pl-4 text-xs text-gray-600 space-y-1">
+                                {(quotation.termsConditions || `1. All rates are subject to change without prior notice.
+2. Payment terms: Net 30 Days.
+3. Subject to space and equipment availability.
+4. Standard Trading Conditions apply.`).split('\n').map((line, idx) => (
+                                    <li key={idx}>{line.replace(/^\d+\.\s*/, '')}</li>
+                                ))}
+                            </ol>
+                        </div>
                     </div>
 
                     {/* Footer */}
