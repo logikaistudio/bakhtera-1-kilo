@@ -1339,23 +1339,47 @@ const QuotationManagement = () => {
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 p-4 bg-dark-surface rounded-lg">
                             <div>
                                 <p className="text-xs text-silver-dark mb-1">Customer</p>
-                                <select
-                                    value={editedQuotation?.customerId || viewingQuotation.customerId}
-                                    onChange={(e) => {
-                                        const customer = customers.find(c => c.id === e.target.value);
-                                        setEditedQuotation({
-                                            ...editedQuotation,
-                                            customerId: e.target.value,
-                                            customer: customer?.name || ''
-                                        });
-                                    }}
-                                    disabled={!isEditingQuotation}
-                                    className="w-full px-2 py-1 bg-dark-card border border-dark-border rounded text-silver-light text-sm disabled:opacity-70 disabled:cursor-not-allowed"
-                                >
-                                    {customers.filter(c => c.status === 'active').map(customer => (
-                                        <option key={customer.id} value={customer.id}>{customer.name}</option>
-                                    ))}
-                                </select>
+                                {isEditingQuotation ? (
+                                    <PartnerPicker
+                                        value={editedQuotation?.partnerId || editedQuotation?.customerId}
+                                        onChange={(partnerId) => {
+                                            setEditedQuotation(prev => ({
+                                                ...prev,
+                                                partnerId: partnerId,
+                                                customerId: partnerId // for backward compatibility
+                                            }));
+                                        }}
+                                        onPartnerLoad={(partner) => {
+                                            if (partner) {
+                                                setEditedQuotation(prev => ({
+                                                    ...prev,
+                                                    customerName: partner.partner_name,
+                                                    customerCompany: partner.partner_name,
+                                                    customerAddress: `${partner.address_line1 || ''} ${partner.address_line2 || ''} ${partner.city || ''} ${partner.country || ''}`.trim()
+                                                }));
+                                            }
+                                        }}
+                                        roleFilter="customer"
+                                        placeholder="Select Customer..."
+                                    />
+                                ) : (
+                                    <input
+                                        type="text"
+                                        value={viewingQuotation.customerName || viewingQuotation.customer_name || ''}
+                                        readOnly
+                                        className="w-full px-2 py-1 bg-dark-card border border-dark-border rounded text-silver-light text-sm"
+                                    />
+                                )}
+                            </div>
+                            <div>
+                                <p className="text-xs text-silver-dark mb-1">Customer Address</p>
+                                <input
+                                    type="text"
+                                    value={isEditingQuotation ? (editedQuotation?.customerAddress || '') : (viewingQuotation.customerAddress || viewingQuotation.customer_address || '')}
+                                    readOnly={!isEditingQuotation}
+                                    onChange={(e) => setEditedQuotation({ ...editedQuotation, customerAddress: e.target.value })}
+                                    className={`w-full px-2 py-1 bg-dark-card border border-dark-border rounded text-silver-light text-sm ${isEditingQuotation ? '' : 'disabled:opacity-70'}`}
+                                />
                             </div>
                             <div>
                                 <p className="text-xs text-silver-dark mb-1">Sales Person</p>
