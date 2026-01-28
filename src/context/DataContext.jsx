@@ -44,6 +44,8 @@ export const DataProvider = ({ children }) => {
     const [inboundTransactions, setInboundTransactions] = useState([]);
     const [outboundTransactions, setOutboundTransactions] = useState([]);
     const [rejectTransactions, setRejectTransactions] = useState([]);
+    const [warehouseInventory, setWarehouseInventory] = useState([]);
+    const [mutationLogs, setMutationLogs] = useState([]);
 
     // Activity Logs for audit tracking
     const [activityLogs, setActivityLogs] = useState([]);
