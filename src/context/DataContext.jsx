@@ -46,13 +46,48 @@ export const DataProvider = ({ children }) => {
     const [rejectTransactions, setRejectTransactions] = useState([]);
     const [warehouseInventory, setWarehouseInventory] = useState([]);
     const [mutationLogs, setMutationLogs] = useState([]);
+    const [bcCodes, setBcCodes] = useState([]);
+    const [invoices, setInvoices] = useState([]);
+    const [purchases, setPurchases] = useState([]);
+    const [pendingApprovals, setPendingApprovals] = useState([]);
 
     // Activity Logs for audit tracking
     const [activityLogs, setActivityLogs] = useState([]);
 
-    // ... (rest of logging functions)
+    // Activity logging function
+    const logActivity = (activity) => {
+        const newLog = {
+            id: Date.now().toString(),
+            ...activity,
+            timestamp: new Date().toISOString()
+        };
+        setActivityLogs(prev => [newLog, ...prev]);
+        return newLog;
+    };
 
-    // ...
+    // Approval workflow functions
+    const requestApproval = (request) => {
+        const newRequest = {
+            id: Date.now().toString(),
+            ...request,
+            status: 'pending',
+            createdAt: new Date().toISOString()
+        };
+        setPendingApprovals(prev => [...prev, newRequest]);
+        return newRequest;
+    };
+
+    const approveRequest = (id) => {
+        setPendingApprovals(prev => prev.map(req =>
+            req.id === id ? { ...req, status: 'approved', approvedAt: new Date().toISOString() } : req
+        ));
+    };
+
+    const rejectRequest = (id, reason = '') => {
+        setPendingApprovals(prev => prev.map(req =>
+            req.id === id ? { ...req, status: 'rejected', rejectedAt: new Date().toISOString(), rejectReason: reason } : req
+        ));
+    };
 
     // Load data from localStorage on mount
     useEffect(() => {
