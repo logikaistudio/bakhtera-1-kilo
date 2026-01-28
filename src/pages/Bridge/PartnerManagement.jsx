@@ -311,6 +311,9 @@ const BridgePartnerManagement = () => {
 
             {/* Partners Table */}
             <div className="glass-card rounded-lg overflow-hidden">
+                <p className="text-xs text-silver-dark px-4 py-2 bg-dark-surface/50 border-b border-dark-border">
+                    💡 Klik baris untuk edit • Klik kanan untuk hapus
+                </p>
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead className="bg-accent-orange">
@@ -319,19 +322,26 @@ const BridgePartnerManagement = () => {
                                 <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">Nama Mitra</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">Kontak</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">Role</th>
-                                <th className="px-4 py-3 text-center text-xs font-bold text-white uppercase">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
                             {filteredPartners.length === 0 ? (
                                 <tr>
-                                    <td colSpan="5" className="px-4 py-8 text-center text-silver-dark">
+                                    <td colSpan="4" className="px-4 py-8 text-center text-silver-dark">
                                         {searchTerm || roleFilter !== 'all' ? 'Tidak ada mitra yang cocok' : 'Belum ada mitra. Klik "Tambah Mitra Baru"'}
                                     </td>
                                 </tr>
                             ) : (
                                 filteredPartners.map((partner) => (
-                                    <tr key={partner.id} className="hover:bg-dark-surface/50 transition-colors">
+                                    <tr
+                                        key={partner.id}
+                                        className="hover:bg-dark-surface/50 transition-colors cursor-pointer"
+                                        onClick={() => handleEdit(partner)}
+                                        onContextMenu={(e) => {
+                                            e.preventDefault();
+                                            handleDelete(partner.id);
+                                        }}
+                                    >
                                         <td className="px-4 py-3 text-xs font-mono text-blue-400">{partner.partner_code || '-'}</td>
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-2">
@@ -359,22 +369,6 @@ const BridgePartnerManagement = () => {
                                                         {role.label}
                                                     </span>
                                                 ))}
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <div className="flex items-center justify-center gap-2">
-                                                <button
-                                                    onClick={() => handleEdit(partner)}
-                                                    className="p-1.5 hover:bg-blue-500/20 text-blue-400 rounded transition-colors"
-                                                >
-                                                    <Edit className="w-4 h-4" />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(partner.id)}
-                                                    className="p-1.5 hover:bg-red-500/20 text-red-400 rounded transition-colors"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
                                             </div>
                                         </td>
                                     </tr>
