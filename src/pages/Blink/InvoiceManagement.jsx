@@ -48,7 +48,22 @@ const InvoiceManagement = () => {
         tax_rate: 11.00,
         discount_amount: 0,
         customer_notes: '',
-        notes: ''
+        notes: '',
+        // Print-specific fields
+        consignor: '',
+        consignee: '',
+        order_reference: '',
+        goods_description: '',
+        import_broker: '',
+        chargeable_weight: '',
+        packages: '',
+        vessel_name: '',
+        voyage_number: '',
+        ocean_bl: '',
+        house_bl: '',
+        etd: '',
+        eta: '',
+        containers: ''
     });
 
     const statusConfig = {
@@ -190,7 +205,13 @@ const InvoiceManagement = () => {
                         unit: 'Job',
                         rate: quotation.totalAmount || quotation.total_amount || 0,
                         amount: quotation.totalAmount || quotation.total_amount || 0
-                    }]
+                    }],
+                // Pre-fill fields from quotation where possible
+                consignor: quotation.shipper_name || '', // Assuming shipper map to consignor often
+                consignee: quotation.customerName || '',
+                goods_description: quotation.commodity || '',
+                chargeable_weight: parseFloat(quotation.chargeableWeight || quotation.weight || 0),
+                packages: quotation.packageType ? `${quotation.quantity || ''} ${quotation.packageType}` : ''
             }));
         }
     };
@@ -235,7 +256,20 @@ const InvoiceManagement = () => {
                     unit: 'Shipment',
                     rate: shipment.quoted_amount || 0,
                     amount: shipment.quoted_amount || 0
-                }]
+                }],
+                // Pre-fill fields from shipment
+                consignor: shipment.shipper_name || '',
+                consignee: shipment.consignee_name || shipment.customer || '',
+                vessel_name: shipment.vessel_name || '',
+                voyage_number: shipment.voyage_number || '',
+                ocean_bl: shipment.mbl_number || '',
+                house_bl: shipment.hbl_number || '',
+                etd: shipment.etd || '',
+                eta: shipment.eta || '',
+                containers: shipment.container_number || '',
+                goods_description: shipment.commodity || '',
+                chargeable_weight: shipment.chargeable_weight || shipment.weight || '',
+                packages: shipment.packages || ''
             }));
         }
     };
@@ -365,7 +399,22 @@ const InvoiceManagement = () => {
                 outstanding_amount: total,
                 status: 'draft',
                 customer_notes: formData.customer_notes || null,
-                notes: formData.notes || null
+                notes: formData.notes || null,
+                // Print fields
+                consignor: formData.consignor,
+                consignee: formData.consignee,
+                order_reference: formData.order_reference,
+                goods_description: formData.goods_description,
+                import_broker: formData.import_broker,
+                chargeable_weight: parseFloat(formData.chargeable_weight) || 0,
+                packages: formData.packages,
+                vessel_name: formData.vessel_name,
+                voyage_number: formData.voyage_number,
+                ocean_bl: formData.ocean_bl,
+                house_bl: formData.house_bl,
+                etd: formData.etd || null,
+                eta: formData.eta || null,
+                containers: formData.containers
             };
 
             const { data, error } = await supabase
@@ -401,7 +450,21 @@ const InvoiceManagement = () => {
             tax_rate: 11.00,
             discount_amount: 0,
             customer_notes: '',
-            notes: ''
+            notes: '',
+            consignor: '',
+            consignee: '',
+            order_reference: '',
+            goods_description: '',
+            import_broker: '',
+            chargeable_weight: '',
+            packages: '',
+            vessel_name: '',
+            voyage_number: '',
+            ocean_bl: '',
+            house_bl: '',
+            etd: '',
+            eta: '',
+            containers: ''
         });
         setSelectedQuotation(null);
         setSelectedShipment(null);
@@ -423,375 +486,301 @@ const InvoiceManagement = () => {
                 return;
             }
 
+            // Helper for empty fields default
+            const safeStr = (str) => str || '-';
+            const safeDate = (date) => date ? new Date(date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
+
             // Generate items rows
             const itemsRows = invoice.invoice_items?.map((item, index) => `
                 <tr>
-                    <td style="text-align: center;">${index + 1}</td>
-                    <td>${String(item.description || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
-                    <td style="text-align: center;">${item.qty || 0}</td>
-                    <td style="text-align: center;">${item.unit || '-'}</td>
-                    <td style="text-align: right;">${formatCurrency(item.rate || 0, invoice.currency)}</td>
-                    <td style="text-align: right;">${formatCurrency(item.amount || 0, invoice.currency)}</td>
+                    <td style="vertical-align: top; text-transform: capitalize;">${String(item.description || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
+                    <td style="text-align: center; vertical-align: top;">${invoice.currency}</td>
+                    <td style="text-align: right; vertical-align: top;">${formatCurrency(item.amount || 0, invoice.currency).replace('Rp ', '').replace('$', '')}</td>
+                    <td style="text-align: right; vertical-align: top;">${formatCurrency((item.amount || 0) * (invoice.tax_rate || 0) / 100, invoice.currency).replace('Rp ', '').replace('$', '')}</td>
                 </tr>
-            `).join('') || '<tr><td colspan="6" style="text-align: center;">No items</td></tr>';
-
-            // Generate shipment details HTML
-            const shipmentDetailsHtml = (invoice.service_type || invoice.bl_awb_number || invoice.voyage) ? `
-                <div style="flex: 1;">
-                    <strong style="display: block; margin-bottom: 8px; font-size: 10px;">Shipment Details</strong>
-                    ${invoice.service_type ? `<div style="margin-bottom: 4px; font-size: 9px;"><span style="color: #666;">Service:</span> ${invoice.service_type.toUpperCase()}</div>` : ''}
-                    ${invoice.bl_awb_number ? `<div style="margin-bottom: 4px; font-size: 9px;"><span style="color: #666;">BL/AWB:</span> ${invoice.bl_awb_number}</div>` : ''}
-                    ${invoice.voyage ? `<div style="margin-bottom: 4px; font-size: 9px;"><span style="color: #666;">Voyage:</span> ${invoice.voyage}</div>` : ''}
-                    ${invoice.shipper_name ? `<div style="margin-bottom: 4px; font-size: 9px;"><span style="color: #666;">Shipper:</span> ${invoice.shipper_name}</div>` : ''}
-                    ${invoice.delivery_date ? `<div style="margin-bottom: 4px; font-size: 9px;"><span style="color: #666;">Delivery:</span> ${invoice.delivery_date}</div>` : ''}
-                </div>
-            ` : '';
-
-            const cargoDetailsHtml = (invoice.container_type || invoice.weight || invoice.cbm) ? `
-                <div style="flex: 1;">
-                    <strong style="display: block; margin-bottom: 8px; font-size: 10px;">Cargo Details</strong>
-                    ${invoice.container_type ? `<div style="margin-bottom: 4px; font-size: 9px;"><span style="color: #666;">Container:</span> ${invoice.container_type}</div>` : ''}
-                    ${invoice.weight && invoice.weight > 0 ? `<div style="margin-bottom: 4px; font-size: 9px;"><span style="color: #666;">Weight:</span> ${invoice.weight} kg</div>` : ''}
-                    ${invoice.dimensions ? `<div style="margin-bottom: 4px; font-size: 9px;"><span style="color: #666;">Dimensions:</span> ${invoice.dimensions}</div>` : ''}
-                    ${invoice.cbm && invoice.cbm > 0 ? `<div style="margin-bottom: 4px; font-size: 9px;"><span style="color: #666;">CBM:</span> ${invoice.cbm} m³</div>` : ''}
-                </div>
-            ` : '';
+            `).join('') || '<tr><td colspan="4" style="text-align: center; padding: 10px;">No items</td></tr>';
 
             const printContent = `
                 <!DOCTYPE html>
                 <html>
                 <head>
                     <meta charset="UTF-8">
-                    <title>Invoice - ${invoice.invoice_number}</title>
                     <style>
-                        * { margin: 0; padding: 0; box-sizing: border-box; }
-                        body {
-                            font-family: Arial, Helvetica, sans-serif;
-                            margin: 10mm;
-                            color: #333;
-                            font-size: 10px;
-                            line-height: 1.3;
+                        @import url('https://fonts.googleapis.com/css2?family=Arimo:wght@400;700&display=swap');
+                        * { box-sizing: border-box; }
+                        body { 
+                            font-family: 'Arimo', Arial, sans-serif; 
+                            font-size: 11px; 
+                            margin: 0; 
+                            padding: 20px; 
+                            color: #000; 
+                            background-color: #f0f0f0; 
+                            -webkit-print-color-adjust: exact; 
                         }
-                        .header {
-                            border-bottom: 2px solid #0070BB;
-                            padding-bottom: 10px;
-                            margin-bottom: 15px;
-                        }
-                        .header h1 {
-                            font-size: 18px;
-                            color: #0070BB;
-                            margin-bottom: 4px;
-                        }
-                        .header p {
-                            font-size: 12px;
-                            color: #666;
+                        .container { 
+                            width: 210mm; 
+                            min-height: 297mm; 
+                            margin: 0 auto; 
+                            background-color: #fff;
+                            padding: 15mm; 
+                            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                            position: relative;
                         }
                         
-                        /* Company & Customer */
-                        .company-info {
-                            display: flex;
-                            justify-content: space-between;
-                            margin-bottom: 15px;
+                        /* Header */
+                        .header-row { display: flex; justify-content: space-between; margin-bottom: 20px; align-items: flex-start; }
+                        .company-logo h1 { margin: 0; font-size: 24px; font-weight: bold; font-style: italic; color: #000; }
+                        .company-logo p { margin: 0; font-size: 9px; letter-spacing: 3px; color: #555; text-transform: uppercase; }
+                        .company-address { text-align: right; font-size: 10px; line-height: 1.4; color: #333; }
+
+                        /* Invoice Title Bar */
+                        .invoice-title-bar { 
+                            border-top: 2px solid #000; border-bottom: 2px solid #000; 
+                            background-color: #ededed;
+                            padding: 6px 10px; margin-bottom: 20px; font-weight: bold; font-size: 16px; 
+                            display: flex; justify-content: space-between; align-items: center;
                         }
-                        .company-info > div {
-                            flex: 1;
-                        }
-                        .company-info h3 {
-                            font-size: 9px;
-                            font-weight: bold;
-                            color: #666;
-                            margin-bottom: 6px;
-                        }
-                        .company-info .company-name {
-                            font-size: 11px;
-                            font-weight: bold;
-                            margin-bottom: 4px;
-                        }
-                        .company-info p {
-                            font-size: 9px;
-                            margin-bottom: 2px;
-                        }
+
+                        /* Client & Invoice Info */
+                        .info-section { display: flex; margin-bottom: 20px; }
+                        .info-left { width: 55%; padding-right: 20px; }
+                        .info-right { width: 45%; }
                         
-                        /* Invoice details grid */
-                        .invoice-details {
-                            display: grid;
-                            grid-template-columns: repeat(4, 1fr);
-                            gap: 10px;
-                            background: #f9f9f9;
-                            padding: 10px;
-                            margin-bottom: 12px;
-                            border-radius: 4px;
-                        }
-                        .invoice-details .detail-item {
-                            font-size: 9px;
-                        }
-                        .invoice-details .detail-label {
-                            color: #666;
-                            margin-bottom: 2px;
-                        }
-                        .invoice-details .detail-value {
-                            font-weight: bold;
-                        }
+                        .info-table { width: 100%; border-collapse: collapse; }
+                        .info-table td { padding: 2px 0; vertical-align: top; font-size: 11px; }
+                        .info-table .label { width: 110px; font-weight: bold; color: #444; }
+                        .info-table .val { font-weight: bold; }
+
+                        /* Shipment Details Box */
+                        .shipment-box { border: 1px solid #000; margin-bottom: 20px; }
+                        .shipment-header { background: #333; color: #fff; font-weight: bold; padding: 4px 8px; text-transform: uppercase; font-size: 11px; border-bottom: 1px solid #000; }
                         
-                        /* Shipment & Cargo */
-                        .shipment-cargo {
-                            display: flex;
-                            gap: 15px;
-                            padding: 10px;
-                            border: 1px solid #ddd;
-                            margin-bottom: 12px;
-                            border-radius: 4px;
-                        }
+                        .shipment-grid { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid #ccc; }
+                        .shipment-cell { padding: 3px 6px; border-right: 1px solid #ccc; font-size: 11px; }
+                        .shipment-cell:last-child { border-right: none; }
+                        .shipment-cell label { display: block; font-size: 9px; color: #666; font-weight: bold; text-transform: uppercase; margin-bottom: 2px; }
+                        .shipment-cell span { display: block; font-weight: bold; color: #000; min-height: 12px;}
                         
-                        /* Table */
-                        table {
-                            width: 100%;
-                            border-collapse: collapse;
-                            margin-bottom: 15px;
-                        }
-                        th, td {
-                            border: 1px solid #ddd;
-                            padding: 6px;
-                            font-size: 9px;
-                        }
-                        th {
-                            background-color: #0070BB;
-                            color: white;
-                            font-weight: bold;
-                            text-align: left;
-                        }
+                        .grid-4 { display: grid; grid-template-columns: 2fr 1fr 1fr 1.5fr; border-bottom: 1px solid #ccc; }
+                        .shipment-row-border { border-bottom: 1px solid #ccc; }
+                        
+                        /* Charges Table */
+                        .charges-table { width: 100%; border-collapse: collapse; margin-bottom: 5px; border: 1px solid #000; }
+                        .charges-table th { background: #e0e0e0; border-bottom: 1px solid #000; padding: 6px 8px; text-align: left; font-weight: bold; font-size: 11px; text-transform: uppercase; }
+                        .charges-table td { border-bottom: 1px solid #ccc; border-right: 1px solid #ccc; padding: 4px 8px; font-size: 11px; vertical-align: top; }
+                        .charges-table td:last-child { border-right: none; }
+                        .charges-table tr:last-child td { border-bottom: none; }
                         
                         /* Totals */
-                        .totals-section {
-                            display: flex;
-                            justify-content: flex-end;
-                            margin-top: 15px;
-                        }
-                        .totals-table {
-                            width: 250px;
-                            border-collapse: collapse;
-                        }
-                        .totals-table td {
-                            padding: 4px 0;
-                            font-size: 9px;
-                            border: none;
-                        }
-                        .totals-table .label {
-                            width: 100px;
-                            text-align: right;
-                            font-weight: bold;
-                            padding-right: 10px;
-                        }
-                        .totals-table .colon {
-                            width: 10px;
-                        }
-                        .totals-table .value {
-                            text-align: right;
-                        }
-                        .totals-table .grand-total {
-                            font-size: 11px;
-                            font-weight: bold;
-                            border-top: 2px solid #0070BB;
-                            padding-top: 6px !important;
-                        }
-                        .totals-table .grand-total .value {
-                            color: #0070BB;
-                        }
-                        
-                        /* Notes */
-                        .notes {
-                            padding: 10px;
-                            background: #f9f9f9;
-                            border-left: 3px solid #0070BB;
-                            font-size: 9px;
-                            height: fit-content;
-                        }
-                        
+                        .totals-wrapper { display: flex; justify-content: flex-end; margin-bottom: 20px; }
+                        .totals-box { width: 320px; border: 1px solid #000; border-top: none; }
+                        .totals-row { display: flex; justify-content: space-between; padding: 6px 10px; font-weight: bold; font-size: 11px; }
+                        .border-bottom { border-bottom: 1px solid #ccc; }
+                        .grand-total { background: #333; color: white; padding: 10px; font-size: 13px; text-transform: uppercase; }
+
                         /* Footer */
-                        .footer {
-                            margin-top: 20px;
-                            padding-top: 10px;
-                            border-top: 1px solid #ddd;
-                            text-align: center;
-                            font-size: 8px;
-                            color: #666;
-                        }
+                        .footer-section { display: flex; margin-top: auto; border-top: 2px solid #000; padding-top: 20px; page-break-inside: avoid; }
+                        .footer-left { flex: 1; padding-right: 40px; font-size: 10px; }
+                        .footer-right { width: 220px; text-align: center; }
+                        .signature-line { margin-top: 70px; border-top: 1px solid #000; padding-top: 5px; font-weight: bold; font-size: 11px;}
                         
-                        /* Print buttons */
-                        .print-actions {
-                            text-align: center;
-                            margin: 20px 0;
-                        }
-                        .print-actions button {
-                            padding: 10px 20px;
-                            margin: 0 8px;
-                            border: none;
-                            border-radius: 4px;
-                            cursor: pointer;
-                            font-size: 12px;
-                            font-weight: bold;
-                        }
-                        .btn-print {
-                            background: #0070BB;
-                            color: white;
-                        }
-                        .btn-print:hover {
-                            background: #005a99;
-                        }
-                        .btn-close {
-                            background: #666;
-                            color: white;
-                        }
-                        .btn-close:hover {
-                            background: #555;
-                        }
+                        .bank-box { border: 1px solid #999; background: #fcfcfc; padding: 10px; margin-top: 8px; border-radius: 4px; font-size: 11px; line-height: 1.4; }
                         
-                        @media print {
-                            body { margin: 5mm; }
-                            .print-actions { display: none; }
+                        /* Print Actions Button in New Window */
+                        .print-actions { 
+                            position: fixed; top: 20px; right: 20px; 
+                            background: white; padding: 15px; border-radius: 8px; 
+                            box-shadow: 0 4px 12px rgba(0,0,0,0.15); 
+                            z-index: 1000; text-align: center;
                         }
+                        .btn { 
+                            padding: 10px 24px; cursor: pointer; 
+                            background: #E65100; color: white; 
+                            border: none; border-radius: 6px; 
+                            font-weight: bold; font-size: 14px; 
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                        }
+                        .btn:hover { background: #EF6C00; }
                         
-                        @page {
-                            size: auto;
-                            margin: 10mm;
+                        @media print { 
+                            .print-actions { display: none !important; } 
+                            body { margin: 0; padding: 0; background-color: #fff; }
+                            .container { 
+                                width: 100%; max-width: none; 
+                                margin: 0; padding: 0; 
+                                box-shadow: none; border: none; 
+                            }
+                            @page { 
+                                size: A4; 
+                                margin: 15mm 15mm 15mm 15mm; /* Standard A4 Margins */
+                            }
                         }
                     </style>
                 </head>
                 <body>
                     <div class="print-actions">
-                        <button onclick="window.print()" class="btn-print">🖨️ Print</button>
-                        <button onclick="window.close()" class="btn-close">✖ Close</button>
+                        <button onclick="window.print()" class="btn">PRINT INVOICE</button>
                     </div>
-                    
-                    <div class="header">
-                        <h1>INVOICE</h1>
-                        <p><strong>${invoice.invoice_number}</strong></p>
-                    </div>
-                    
-                    <div class="company-info">
-                        <div>
-                            <h3>FROM:</h3>
-                            <div class="company-name">${companySettings?.company_name || 'PT Bakhtera Satu Indonesia'}</div>
-                            <p>${(companySettings?.company_address || 'Jakarta, Indonesia').replace(/\n/g, '<br/>')}</p>
-                            ${companySettings?.company_phone ? `<p>Phone: ${companySettings.company_phone}</p>` : ''}
-                            ${companySettings?.company_email ? `<p>Email: ${companySettings.company_email}</p>` : ''}
-                            ${companySettings?.company_npwp ? `<p style="margin-top: 4px;"><strong>NPWP: ${companySettings.company_npwp}</strong></p>` : ''}
-                        </div>
-                        <div>
-                            <h3>BILL TO:</h3>
-                            <div class="company-name">${invoice.customer_name || '-'}</div>
-                            ${invoice.customer_company ? `<p>${invoice.customer_company}</p>` : ''}
-                            ${invoice.customer_address ? `<p>${invoice.customer_address}</p>` : ''}
-                        </div>
-                    </div>
-                    
-                    <div class="invoice-details">
-                        <div class="detail-item">
-                            <div class="detail-label">Invoice Date:</div>
-                            <div class="detail-value">${invoice.invoice_date || '-'}</div>
-                        </div>
-                        <div class="detail-item">
-                            <div class="detail-label">Due Date:</div>
-                            <div class="detail-value">${invoice.due_date || '-'}</div>
-                        </div>
-                        <div class="detail-item">
-                            <div class="detail-label">Job Number:</div>
-                            <div class="detail-value">${invoice.job_number || '-'}</div>
-                        </div>
-                        <div class="detail-item">
-                            <div class="detail-label">Payment Terms:</div>
-                            <div class="detail-value">${invoice.payment_terms || '-'}</div>
-                        </div>
-                        ${invoice.origin && invoice.destination ? `
-                        <div class="detail-item" style="grid-column: span 2;">
-                            <div class="detail-label">Route:</div>
-                            <div class="detail-value">${invoice.origin} → ${invoice.destination}</div>
-                        </div>
-                        ` : ''}
-                    </div>
-                    
-                    ${(shipmentDetailsHtml || cargoDetailsHtml) ? `
-                    <div class="shipment-cargo">
-                        ${shipmentDetailsHtml}
-                        ${cargoDetailsHtml}
-                    </div>
-                    ` : ''}
-                    
-                    <table>
-                        <thead>
-                            <tr>
-                                <th style="width: 40px; text-align: center;">No</th>
-                                <th>Description</th>
-                                <th style="width: 60px; text-align: center;">Qty</th>
-                                <th style="width: 60px; text-align: center;">Unit</th>
-                                <th style="width: 100px; text-align: right;">Unit Price</th>
-                                <th style="width: 100px; text-align: right;">Amount</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${itemsRows}
-                        </tbody>
-                    </table>
-                    
-                    <!-- Notes & Totals Section: Side by Side -->
-                    <div style="display: flex; gap: 20px; margin-top: 15px;">
-                        <!-- Left: Notes & Bank Account -->
-                        <div style="flex: 1;">
-                            ${invoice.customer_notes ? `
-                            <div class="notes" style="margin-bottom: 12px;">
-                                <strong>Notes:</strong><br/>
-                                ${String(invoice.customer_notes).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>')}
+
+                    <div class="container">
+                        <!-- Header -->
+                        <div class="header-row">
+                            <div class="company-logo">
+                                <h1>${companySettings?.company_name?.split(' ')[0] || 'FREIGHT'}ONE</h1>
+                                <p>LOGISTICS SOLUTIONS</p>
                             </div>
-                            ` : ''}
+                            <div class="company-address">
+                                <strong>${companySettings?.company_name || 'PT. Freight One Indonesia'}</strong><br>
+                                ${(companySettings?.company_address || '').replace(/\n/g, '<br>')}<br>
+                                Phone: ${companySettings?.company_phone || '-'}<br>
+                                Email: ${companySettings?.company_email || '-'}
+                            </div>
+                        </div>
+
+                        <!-- Title -->
+                        <div class="invoice-title-bar">
+                            <span>TAX INVOICE ${invoice.invoice_number}</span>
+                             <span style="font-size: 10px; font-weight: normal; color: #555;">Page 1 of 1</span>
+                        </div>
+
+                        <!-- Top Info -->
+                        <div class="info-section">
+                            <div class="info-left">
+                                <div style="margin-bottom: 4px; font-weight: bold; font-size: 9px; color: #555;">BILL TO / CUSTOMER:</div>
+                                <div style="font-weight: bold; font-size: 12px; margin-bottom: 3px;">${invoice.customer_name}</div>
+                                <div style="margin-bottom: 3px; font-size: 10px;">${(invoice.customer_address || '').replace(/\n/g, '<br>')}</div>
+                                <div style="font-size: 10px;">Attn: ${invoice.customer_contact_name || invoice.customer_pic || '-'}</div>
+                            </div>
+                            <div class="info-right">
+                                <table class="info-table">
+                                    <tr><td class="label">INVOICE DATE</td><td class="val">: ${safeDate(invoice.invoice_date)}</td></tr>
+                                    <tr><td class="label">JOB NUMBER</td><td class="val">: ${invoice.job_number}</td></tr>
+                                    <tr><td class="label">DUE DATE</td><td class="val">: ${safeDate(invoice.due_date)}</td></tr>
+                                    <tr><td class="label">TERMS</td><td class="val">: ${invoice.payment_terms}</td></tr>
+                                    ${invoice.customer_npwp ? `<tr><td class="label">NPWP</td><td class="val">: ${invoice.customer_npwp}</td></tr>` : ''}
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Shipment Details -->
+                        <div class="shipment-box">
+                            <div class="shipment-header">SHIPMENT DETAILS</div>
                             
-                            <!-- Bank Account Information -->
-                            <div style="padding: 10px; background: #f9f9f9; border-left: 3px solid #0070BB; font-size: 9px;">
-                                <strong style="display: block; margin-bottom: 8px;">Bank Account:</strong>
-                                
-                                ${bankAccounts && bankAccounts.length > 0 ? bankAccounts.map(bank => `
-                                <div style="margin-bottom: 8px;">
-                                    <div style="font-weight: bold; font-size: 10px;">${bank.bank_name || 'Bank'}</div>
-                                    <div style="color: #666;">Account: ${bank.account_number}</div>
-                                    <div style="color: #666;">Name: ${bank.account_holder}</div>
+                            <div class="shipment-grid">
+                                <div class="shipment-cell">
+                                    <label>CONSIGNOR / SHIPPER</label>
+                                    <span>${safeStr(invoice.consignor || invoice.shipper_name)}</span>
                                 </div>
-                                `).join('') : `
-                                <div style="color: #666; font-style: italic;">No bank account details available</div>
-                                `}
+                                <div class="shipment-cell">
+                                    <label>CONSIGNEE</label>
+                                    <span>${safeStr(invoice.consignee || invoice.consignee_name || invoice.customer_name)}</span>
+                                </div>
+                            </div>
+                            
+                            <div class="grid-4">
+                                <div class="shipment-cell"><label>VESSEL / VOYAGE</label><span>${safeStr(invoice.vessel_name || invoice.vessel)} / ${safeStr(invoice.voyage_number || invoice.voyage)}</span></div>
+                                <div class="shipment-cell"><label>ETD</label><span>${safeDate(invoice.etd)}</span></div>
+                                <div class="shipment-cell"><label>ETA</label><span>${safeDate(invoice.eta)}</span></div>
+                                <div class="shipment-cell"><label>REF NO</label><span>${safeStr(invoice.order_reference)}</span></div>
+                            </div>
+
+                            <div class="grid-4">
+                                <div class="shipment-cell"><label>ORIGIN (POL)</label><span>${safeStr(invoice.origin)}</span></div>
+                                <div class="shipment-cell"><label>DESTINATION (POD)</label><span>${safeStr(invoice.destination)}</span></div>
+                                <div class="shipment-cell"><label>MASTER BL</label><span>${safeStr(invoice.ocean_bl || invoice.bl_awb_number)}</span></div>
+                                <div class="shipment-cell"><label>HOUSE BL</label><span>${safeStr(invoice.house_bl)}</span></div>
+                            </div>
+
+                            <div class="grid-4">
+                                <div class="shipment-cell"><label>PACKAGES</label><span>${safeStr(invoice.packages)}</span></div>
+                                <div class="shipment-cell"><label>GROSS WEIGHT</label><span>${invoice.weight || 0} KGS</span></div>
+                                <div class="shipment-cell"><label>MEASUREMENT</label><span>${invoice.cbm || 0} CBM</span></div>
+                                <div class="shipment-cell"><label>CHG WEIGHT</label><span>${invoice.chargeable_weight || 0} KGS</span></div>
+                            </div>
+                            
+                            <div class="shipment-row-border" style="display: grid; grid-template-columns: 2fr 1fr;">
+                                <div class="shipment-cell">
+                                    <label>DESCRIPTION OF GOODS</label>
+                                    <span>${safeStr(invoice.goods_description)}</span>
+                                </div>
+                                <div class="shipment-cell" style="border-right: none;">
+                                    <label>CONTAINER NOS</label>
+                                    <span>${safeStr(invoice.containers)}</span>
+                                </div>
+                            </div>
+                             <div class="shipment-cell" style="border: none;">
+                                <label>IMPORT BROKER</label>
+                                <span>${safeStr(invoice.import_broker)}</span>
                             </div>
                         </div>
+
+                        <!-- Charges -->
+                        <div style="margin-bottom: 2px; font-weight: bold; font-size: 11px;">CHARGES BREAKDOWN</div>
+                        <table class="charges-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 50%; text-align: left; padding-left: 10px;">DESCRIPTION</th>
+                                    <th style="width: 10%; text-align: center;">CURR</th>
+                                    <th style="width: 20%; text-align: right; padding-right: 10px;">AMOUNT</th>
+                                    <th style="width: 20%; text-align: right; padding-right: 10px;">TAX</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${itemsRows}
+                            </tbody>
+                        </table>
                         
-                        <!-- Right: Totals -->
-                        <div style="flex: 1;">
-                            <table class="totals-table" style="margin-left: auto;">
-                                <tr>
-                                    <td class="label">Subtotal</td>
-                                    <td class="colon">:</td>
-                                    <td class="value">${formatCurrency(invoice.subtotal || 0, invoice.currency)}</td>
-                                </tr>
-                                <tr>
-                                    <td class="label">Tax (${invoice.tax_rate || 0}%)</td>
-                                    <td class="colon">:</td>
-                                    <td class="value">${formatCurrency(invoice.tax_amount || 0, invoice.currency)}</td>
-                                </tr>
-                                ${invoice.discount_amount > 0 ? `
-                                <tr>
-                                    <td class="label">Discount</td>
-                                    <td class="colon">:</td>
-                                    <td class="value" style="color: #dc2626;">-${formatCurrency(invoice.discount_amount, invoice.currency)}</td>
-                                </tr>
-                                ` : ''}
-                                <tr class="grand-total">
-                                    <td class="label grand-total">TOTAL</td>
-                                    <td class="colon grand-total">:</td>
-                                    <td class="value grand-total">${formatCurrency(invoice.total_amount || 0, invoice.currency)}</td>
-                                </tr>
-                            </table>
+                        <div class="totals-wrapper">
+                            <div class="totals-box">
+                                <div class="totals-row border-bottom" style="background: #f9f9f9;">
+                                    <span>SUBTOTAL</span>
+                                    <span>${formatCurrency(invoice.subtotal || 0, invoice.currency)}</span>
+                                </div>
+                                <div class="totals-row border-bottom">
+                                    <span>TAX Total (${invoice.tax_rate}%)</span>
+                                    <span>${formatCurrency(invoice.tax_amount || 0, invoice.currency)}</span>
+                                </div>
+                                 <div class="totals-row grand-total">
+                                    <span>TOTAL AMOUNT DUE</span>
+                                    <span>${formatCurrency(invoice.total_amount || 0, invoice.currency)}</span>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <div class="footer">
-                        <p>Thank you for your business!</p>
-                        <p>For any questions, please contact us</p>
+
+                        <!-- Footer -->
+                        <div class="footer-section">
+                            <div class="footer-left">
+                                <div class="bank-box">
+                                    <b style="font-size: 11px;">PAYMENT DETAILS:</b><br><br>
+                                    Please transfer to:<br>
+                                    ${bankAccounts && bankAccounts.length > 0 ? bankAccounts.map(bank => `
+                                        <div style="margin-bottom: 8px;">
+                                            <b>${bank.bank_name} (${bank.currency || invoice.currency})</b><br>
+                                            A/C No: ${bank.account_number}<br>
+                                            A/N: ${bank.account_holder}<br>
+                                            Branch: ${bank.branch || '-'}
+                                        </div>
+                                    `).join('') : `
+                                        <b>BANK CENTRAL ASIA (BCA)</b><br>
+                                        A/C No: 000-000-000<br>
+                                        A/N: PT. BAKHTERA FREIGHT WORLDWIDE<br>
+                                        Branch: KCU JAKARTA
+                                    `}
+                                </div>
+                                
+                                <div style="margin-top: 10px; font-style: italic;">
+                                    <strong>Notes:</strong><br>
+                                    ${safeStr(invoice.customer_notes)}
+                                </div>
+                            </div>
+                            <div class="footer-right">
+                                <b>AUTHORIZED SIGNATURE</b>
+                                <br><br><br><br><br><br>
+                                <div class="signature-line">
+                                    ${companySettings?.company_name || 'PT. BAKHTERA FREIGHT WORLDWIDE'}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </body>
                 </html>
@@ -800,8 +789,8 @@ const InvoiceManagement = () => {
             printWindow.document.write(printContent);
             printWindow.document.close();
         } catch (error) {
-            console.error('Error printing invoice:', error);
-            alert('Gagal membuka print preview: ' + error.message);
+            console.error('Print error:', error);
+            alert('Error generating print preview');
         }
     };
 
@@ -1073,6 +1062,8 @@ const InvoiceManagement = () => {
                     <PrintPreviewModal
                         invoice={previewInvoiceData}
                         formatCurrency={formatCurrency}
+                        companySettings={companySettings}
+                        bankAccounts={bankAccounts}
                         onClose={() => {
                             setShowPrintPreview(false);
                             setPreviewInvoiceData(null);
@@ -1176,6 +1167,149 @@ const InvoiceCreateModal = ({ quotations, shipments, formData, setFormData, sele
                             </div>
                         </div>
                     )}
+
+
+                    {/* Extended Shipment Details for Print */}
+                    <div className="glass-card p-3 rounded-lg border border-dark-border/50">
+                        <h3 className="text-xs font-semibold text-accent-orange mb-3 flex items-center gap-2">
+                            Shipment Details (For Print Output)
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                            <div className="col-span-1 md:col-span-2">
+                                <label className="block text-[10px] text-silver-dark mb-1">Consignor / Shipper</label>
+                                <input
+                                    type="text"
+                                    value={formData.consignor}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, consignor: e.target.value }))}
+                                    className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-xs"
+                                    placeholder="Shipper Name"
+                                />
+                            </div>
+                            <div className="col-span-1 md:col-span-2">
+                                <label className="block text-[10px] text-silver-dark mb-1">Consignee</label>
+                                <input
+                                    type="text"
+                                    value={formData.consignee}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, consignee: e.target.value }))}
+                                    className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-xs"
+                                    placeholder="Consignee Name"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-[10px] text-silver-dark mb-1">Vessel Name</label>
+                                <input
+                                    type="text"
+                                    value={formData.vessel_name}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, vessel_name: e.target.value }))}
+                                    className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-xs"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] text-silver-dark mb-1">Voyage No.</label>
+                                <input
+                                    type="text"
+                                    value={formData.voyage_number}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, voyage_number: e.target.value }))}
+                                    className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-xs"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] text-silver-dark mb-1">Ocean BL (MBL)</label>
+                                <input
+                                    type="text"
+                                    value={formData.ocean_bl}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, ocean_bl: e.target.value }))}
+                                    className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-xs"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] text-silver-dark mb-1">House BL (HBL)</label>
+                                <input
+                                    type="text"
+                                    value={formData.house_bl}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, house_bl: e.target.value }))}
+                                    className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-xs"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-[10px] text-silver-dark mb-1">ETD</label>
+                                <input
+                                    type="date"
+                                    value={formData.etd}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, etd: e.target.value }))}
+                                    className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-xs"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] text-silver-dark mb-1">ETA</label>
+                                <input
+                                    type="date"
+                                    value={formData.eta}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, eta: e.target.value }))}
+                                    className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-xs"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] text-silver-dark mb-1">Chargeable W (Kg)</label>
+                                <input
+                                    type="number"
+                                    value={formData.chargeable_weight}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, chargeable_weight: e.target.value }))}
+                                    className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-xs"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] text-silver-dark mb-1">Packages</label>
+                                <input
+                                    type="text"
+                                    value={formData.packages}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, packages: e.target.value }))}
+                                    className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-xs"
+                                    placeholder="e.g. 10 CTNS"
+                                />
+                            </div>
+
+                            <div className="col-span-1 md:col-span-2">
+                                <label className="block text-[10px] text-silver-dark mb-1">Goods Description</label>
+                                <input
+                                    type="text"
+                                    value={formData.goods_description}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, goods_description: e.target.value }))}
+                                    className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-xs"
+                                />
+                            </div>
+                            <div className="col-span-1 md:col-span-2">
+                                <label className="block text-[10px] text-silver-dark mb-1">Containers</label>
+                                <input
+                                    type="text"
+                                    value={formData.containers}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, containers: e.target.value }))}
+                                    className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-xs"
+                                    placeholder="e.g. 1x20GP, 1x40HQ"
+                                />
+                            </div>
+                            <div className="col-span-1 md:col-span-2">
+                                <label className="block text-[10px] text-silver-dark mb-1">Order Ref / PO #</label>
+                                <input
+                                    type="text"
+                                    value={formData.order_reference}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, order_reference: e.target.value }))}
+                                    className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-xs"
+                                />
+                            </div>
+                            <div className="col-span-1 md:col-span-2">
+                                <label className="block text-[10px] text-silver-dark mb-1">Import Customs Broker</label>
+                                <input
+                                    type="text"
+                                    value={formData.import_broker}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, import_broker: e.target.value }))}
+                                    className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-xs"
+                                />
+                            </div>
+                        </div>
+                    </div>
 
                     {/* Payment Terms, Dates, Currency & Exchange Rate */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -2085,20 +2219,21 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
     );
 };
 
-// Print Preview Modal Component
-const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companySettings }) => {
-    const handlePrint = () => {
-        window.print();
-    };
+// Print Preview Modal Component - Updated to match handlePrintInvoice layout
+const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companySettings, bankAccounts }) => {
+
+    // Helper for empty fields default
+    const safeStr = (str) => str || '-';
+    const safeDate = (date) => date ? new Date(date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
 
     return (
         <Modal isOpen={true} onClose={onClose} maxWidth="max-w-4xl">
             <div className="p-6">
                 <div className="flex items-center justify-between mb-6">
                     <h2 className="text-2xl font-bold gradient-text">Print Preview</h2>
-                    <div className="flex gap-2 print:hidden">
+                    <div className="flex gap-2">
                         <button
-                            onClick={onPrint || handlePrint}
+                            onClick={onPrint}
                             className="flex items-center gap-2 px-4 py-2 bg-accent-orange hover:bg-accent-orange/80 text-white rounded-lg smooth-transition font-semibold"
                         >
                             <Download className="w-4 h-4" />
@@ -2113,220 +2248,199 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                     </div>
                 </div>
 
-                {/* Print-friendly invoice content */}
-                <div className="print-content bg-white text-black p-8 rounded-lg">
-                    {/* Header */}
-                    <div className="border-b-2 border-gray-800 pb-4 mb-6">
-                        <h1 className="text-3xl font-bold text-gray-800">INVOICE</h1>
-                        <p className="text-xl font-semibold text-gray-600 mt-1">{invoice.invoice_number}</p>
-                    </div>
+                {/* Print-friendly invoice content - WYSIWYG with handlePrintInvoice */}
+                <div className="bg-white text-black p-8 rounded-lg shadow-inner overflow-x-auto">
+                    <div style={{ fontFamily: "'Arimo', Arial, sans-serif", fontSize: '11px', color: '#000', width: '210mm', minHeight: '297mm', margin: '0 auto', padding: '15mm', backgroundColor: '#fff', boxSizing: 'border-box', position: 'relative' }}>
 
-                    {/* Company & Customer Info */}
-                    <div className="grid grid-cols-2 gap-8 mb-8">
-                        <div>
-                            <h3 className="text-sm font-bold text-gray-700 mb-2">FROM:</h3>
-                            <div className="text-sm text-gray-800">
-                                <p className="font-bold text-base text-[#0070BB]">{companySettings?.company_name || 'PT Bakhtera Satu Indonesia'}</p>
-                                <p className="mt-2 whitespace-pre-wrap">{companySettings?.company_address || 'Jakarta, Indonesia'}</p>
-                                {companySettings?.company_phone && <p className="mt-2">Phone: {companySettings.company_phone}</p>}
-                                {companySettings?.company_email && <p>Email: {companySettings.company_email}</p>}
-                                {companySettings?.company_npwp && <p className="mt-1 font-semibold">NPWP: {companySettings.company_npwp}</p>}
+                        {/* Header */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', alignItems: 'flex-start' }}>
+                            <div className="company-logo">
+                                <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', fontStyle: 'italic', color: '#000' }}>
+                                    {companySettings?.company_name?.split(' ')[0] || 'FREIGHT'}ONE
+                                </h1>
+                                <p style={{ margin: 0, fontSize: '8px', letterSpacing: '3px', color: '#555', textTransform: 'uppercase' }}>LOGISTICS SOLUTIONS</p>
+                            </div>
+                            <div style={{ textAlign: 'right', fontSize: '9px', lineHeight: '1.4', color: '#333' }}>
+                                <strong>{companySettings?.company_name || 'PT. Freight One Indonesia'}</strong><br />
+                                {(companySettings?.company_address || '').split('\n').map((line, i) => <span key={i}>{line}<br /></span>)}
+                                Phone: {companySettings?.company_phone || '-'}<br />
+                                Email: {companySettings?.company_email || '-'}
                             </div>
                         </div>
 
-                        <div>
-                            <h3 className="text-sm font-bold text-gray-700 mb-2">BILL TO:</h3>
-                            <div className="text-sm text-gray-800">
-                                <p className="font-bold text-base">{invoice.customer_name}</p>
-                                {invoice.customer_company && <p className="text-gray-600">{invoice.customer_company}</p>}
-                                {invoice.customer_address && <p className="mt-2">{invoice.customer_address}</p>}
-                            </div>
+                        {/* Invoice Title Bar */}
+                        <div style={{
+                            borderTop: '2px solid #000', borderBottom: '2px solid #000',
+                            backgroundColor: '#f0f0f0', padding: '8px 10px', marginBottom: '15px',
+                            fontWeight: 'bold', fontSize: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                        }}>
+                            <span>TAX INVOICE {invoice.invoice_number}</span>
+                            <span style={{ fontSize: '10px', fontWeight: 'normal', color: '#555' }}>Page 1 of 1</span>
                         </div>
-                    </div>
 
-                    {/* Invoice Details */}
-                    <div className="grid grid-cols-2 gap-4 mb-8 bg-gray-50 p-4 rounded">
-                        <div>
-                            <p className="text-xs text-gray-600">Invoice Date:</p>
-                            <p className="font-semibold text-gray-800">{invoice.invoice_date}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-gray-600">Due Date:</p>
-                            <p className="font-semibold text-gray-800">{invoice.due_date}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-gray-600">Job Number:</p>
-                            <p className="font-semibold text-gray-800">{invoice.job_number}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-gray-600">Payment Terms:</p>
-                            <p className="font-semibold text-gray-800">{invoice.payment_terms}</p>
-                        </div>
-                        {invoice.origin && invoice.destination && (
-                            <div className="col-span-2">
-                                <p className="text-xs text-gray-600">Route:</p>
-                                <p className="font-semibold text-gray-800">{invoice.origin} → {invoice.destination}</p>
+                        {/* Top Info */}
+                        <div style={{ display: 'flex', marginBottom: '25px' }}>
+                            <div style={{ width: '55%', paddingRight: '20px' }}>
+                                <div style={{ marginBottom: '4px', fontWeight: 'bold', fontSize: '9px', color: '#555' }}>BILL TO / CUSTOMER:</div>
+                                <div style={{ fontWeight: 'bold', fontSize: '12px', marginBottom: '3px' }}>{invoice.customer_name}</div>
+                                <div style={{ marginBottom: '3px', fontSize: '11px' }}>{(invoice.customer_address || '').split('\n').map((line, i) => <span key={i}>{line}<br /></span>)}</div>
+                                <div style={{ fontSize: '11px' }}>Attn: {invoice.customer_contact_name || invoice.customer_pic || '-'}</div>
                             </div>
-                        )}
-                    </div>
+                            <div style={{ width: '45%' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                    <tbody>
+                                        <tr><td style={{ width: '120px', fontWeight: 'bold', color: '#444', padding: '4px 0', verticalAlign: 'top', fontSize: '11px' }}>INVOICE DATE</td><td style={{ fontWeight: 'bold', padding: '4px 0', verticalAlign: 'top', fontSize: '11px' }}>: {safeDate(invoice.invoice_date)}</td></tr>
+                                        <tr><td style={{ fontWeight: 'bold', color: '#444', padding: '4px 0', verticalAlign: 'top', fontSize: '11px' }}>JOB NUMBER</td><td style={{ fontWeight: 'bold', padding: '4px 0', verticalAlign: 'top', fontSize: '11px' }}>: {invoice.job_number}</td></tr>
+                                        <tr><td style={{ fontWeight: 'bold', color: '#444', padding: '4px 0', verticalAlign: 'top', fontSize: '11px' }}>DUE DATE</td><td style={{ fontWeight: 'bold', padding: '4px 0', verticalAlign: 'top', fontSize: '11px' }}>: {safeDate(invoice.due_date)}</td></tr>
+                                        <tr><td style={{ fontWeight: 'bold', color: '#444', padding: '4px 0', verticalAlign: 'top', fontSize: '11px' }}>TERMS</td><td style={{ fontWeight: 'bold', padding: '4px 0', verticalAlign: 'top', fontSize: '11px' }}>: {invoice.payment_terms}</td></tr>
+                                        {invoice.customer_npwp && (
+                                            <tr><td style={{ fontWeight: 'bold', color: '#444', padding: '4px 0', verticalAlign: 'top', fontSize: '11px' }}>NPWP</td><td style={{ fontWeight: 'bold', padding: '4px 0', verticalAlign: 'top', fontSize: '11px' }}>: {invoice.customer_npwp}</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
 
-                    {/* Shipment & Container Details */}
-                    {(invoice.service_type || invoice.bl_awb_number || invoice.container_type || invoice.weight) && (
-                        <div className="grid grid-cols-2 gap-4 mb-8 p-4 border border-gray-300 rounded">
-                            <div>
-                                <h3 className="text-sm font-bold text-gray-700 mb-3">Shipment Details</h3>
-                                {invoice.service_type && (
-                                    <div className="mb-2">
-                                        <p className="text-xs text-gray-600">Service Type:</p>
-                                        <p className="text-sm text-gray-800">{invoice.service_type?.toUpperCase()}</p>
-                                    </div>
-                                )}
-                                {invoice.bl_awb_number && (
-                                    <div className="mb-2">
-                                        <p className="text-xs text-gray-600">BL/AWB Number:</p>
-                                        <p className="text-sm text-gray-800">{invoice.bl_awb_number}</p>
-                                    </div>
-                                )}
-                                {invoice.voyage && (
-                                    <div className="mb-2">
-                                        <p className="text-xs text-gray-600">Voyage:</p>
-                                        <p className="text-sm text-gray-800">{invoice.voyage}</p>
-                                    </div>
-                                )}
-                                {invoice.shipper_name && (
-                                    <div className="mb-2">
-                                        <p className="text-xs text-gray-600">Shipper:</p>
-                                        <p className="text-sm text-gray-800">{invoice.shipper_name}</p>
-                                    </div>
-                                )}
-                                {invoice.delivery_date && (
-                                    <div className="mb-2">
-                                        <p className="text-xs text-gray-600">Delivery Date:</p>
-                                        <p className="text-sm text-gray-800">{invoice.delivery_date}</p>
-                                    </div>
-                                )}
+                        {/* Shipment Details Box */}
+                        <div style={{ border: '1px solid #000', marginBottom: '20px' }}>
+                            <div style={{ background: '#333', color: '#fff', fontWeight: 'bold', padding: '4px 8px', textTransform: 'uppercase', fontSize: '11px', borderBottom: '1px solid #000' }}>
+                                SHIPMENT DETAILS
                             </div>
-                            <div>
-                                <h3 className="text-sm font-bold text-gray-700 mb-3">Cargo Details</h3>
-                                {invoice.container_type && (
-                                    <div className="mb-2">
-                                        <p className="text-xs text-gray-600">Container Type:</p>
-                                        <p className="text-sm text-gray-800">{invoice.container_type}</p>
-                                    </div>
-                                )}
-                                {invoice.weight && invoice.weight > 0 && (
-                                    <div className="mb-2">
-                                        <p className="text-xs text-gray-600">Weight:</p>
-                                        <p className="text-sm text-gray-800">{invoice.weight} kg</p>
-                                    </div>
-                                )}
-                                {invoice.dimensions && (
-                                    <div className="mb-2">
-                                        <p className="text-xs text-gray-600">Dimensions:</p>
-                                        <p className="text-sm text-gray-800">{invoice.dimensions}</p>
-                                    </div>
-                                )}
-                                {invoice.cbm && invoice.cbm > 0 && (
-                                    <div className="mb-2">
-                                        <p className="text-xs text-gray-600">CBM:</p>
-                                        <p className="text-sm text-gray-800">{invoice.cbm} m³</p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
 
-                    {/* Invoice Items Table */}
-                    <table className="w-full mb-8">
-                        <thead>
-                            <tr className="bg-gray-800 text-white">
-                                <th className="p-3 text-left text-xs">NO</th>
-                                <th className="p-3 text-left text-xs">DESCRIPTION</th>
-                                <th className="p-3 text-center text-xs w-16">QTY</th>
-                                <th className="p-3 text-center text-xs w-14">UNIT</th>
-                                <th className="p-3 text-right text-xs w-28">PRICE</th>
-                                <th className="p-3 text-right text-xs w-24">TOTAL</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {invoice.invoice_items?.map((item, index) => (
-                                <tr key={index} className="border-b border-gray-200">
-                                    <td className="p-3 text-sm text-gray-700 text-center">{index + 1}</td>
-                                    <td className="p-3 text-sm text-gray-800">{item.description}</td>
-                                    <td className="p-3 text-sm text-gray-700 text-center">{item.qty}</td>
-                                    <td className="p-3 text-sm text-gray-700 text-center">{item.unit}</td>
-                                    <td className="p-3 text-sm text-gray-700 text-right">{formatCurrency(item.rate, invoice.currency)}</td>
-                                    <td className="p-3 text-sm text-gray-800 text-right font-semibold">{formatCurrency(item.amount, invoice.currency)}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-
-                    {/* Add spacing before totals */}
-                    <div className="h-8"></div>
-
-                    {/* Totals */}
-                    <div className="flex justify-end mb-8">
-                        <div className="w-80">
-                            <div className="flex justify-between py-2 border-b border-gray-200">
-                                <span className="text-sm text-gray-600">Subtotal:</span>
-                                <span className="text-sm font-semibold text-gray-800">{formatCurrency(invoice.subtotal, invoice.currency)}</span>
-                            </div>
-                            <div className="flex justify-between py-2 border-b border-gray-200">
-                                <span className="text-sm text-gray-600">Tax ({invoice.tax_rate}%):</span>
-                                <span className="text-sm font-semibold text-gray-800">{formatCurrency(invoice.tax_amount, invoice.currency)}</span>
-                            </div>
-                            {invoice.discount_amount > 0 && (
-                                <div className="flex justify-between py-2 border-b border-gray-200">
-                                    <span className="text-sm text-gray-600">Discount:</span>
-                                    <span className="text-sm font-semibold text-red-600">-{formatCurrency(invoice.discount_amount, invoice.currency)}</span>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid #ccc' }}>
+                                <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}>
+                                    <label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>CONSIGNOR / SHIPPER</label>
+                                    <span style={{ display: 'block', fontWeight: 'bold', fontSize: '11px', color: '#000', minHeight: '12px' }}>{safeStr(invoice.consignor || invoice.shipper_name)}</span>
                                 </div>
-                            )}
-                            <div className="flex justify-between py-3 bg-gray-800 text-white px-4 rounded mt-2">
-                                <span className="font-bold">TOTAL:</span>
-                                <span className="font-bold text-lg">{formatCurrency(invoice.total_amount, invoice.currency)}</span>
+                                <div style={{ padding: '3px 6px' }}>
+                                    <label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>CONSIGNEE</label>
+                                    <span style={{ display: 'block', fontWeight: 'bold', fontSize: '11px', color: '#000', minHeight: '12px' }}>{safeStr(invoice.consignee || invoice.consignee_name || invoice.customer_name)}</span>
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1.5fr', borderBottom: '1px solid #ccc' }}>
+                                <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>VESSEL / VOYAGE</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeStr(invoice.vessel_name || invoice.vessel)} / {safeStr(invoice.voyage_number || invoice.voyage)}</span></div>
+                                <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>ETD</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeDate(invoice.etd)}</span></div>
+                                <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>ETA</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeDate(invoice.eta)}</span></div>
+                                <div style={{ padding: '3px 6px' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>REF NO</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeStr(invoice.order_reference)}</span></div>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1.5fr', borderBottom: '1px solid #ccc' }}>
+                                <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>ORIGIN (POL)</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeStr(invoice.origin)}</span></div>
+                                <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>DESTINATION (POD)</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeStr(invoice.destination)}</span></div>
+                                <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>MASTER BL</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeStr(invoice.ocean_bl || invoice.bl_awb_number)}</span></div>
+                                <div style={{ padding: '3px 6px' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>HOUSE BL</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeStr(invoice.house_bl)}</span></div>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1.5fr', borderBottom: '1px solid #ccc' }}>
+                                <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>PACKAGES</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeStr(invoice.packages)}</span></div>
+                                <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>GROSS WEIGHT</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{invoice.weight || 0} KGS</span></div>
+                                <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>MEASUREMENT</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{invoice.cbm || 0} CBM</span></div>
+                                <div style={{ padding: '3px 6px' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>CHG WEIGHT</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{invoice.chargeable_weight || 0} KGS</span></div>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', borderBottom: '1px solid #ccc' }}>
+                                <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}>
+                                    <label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>DESCRIPTION OF GOODS</label>
+                                    <span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeStr(invoice.goods_description)}</span>
+                                </div>
+                                <div style={{ padding: '3px 6px' }}>
+                                    <label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>CONTAINER NOS</label>
+                                    <span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeStr(invoice.containers)}</span>
+                                </div>
+                            </div>
+
+                            <div style={{ padding: '3px 6px' }}>
+                                <label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>IMPORT BROKER</label>
+                                <span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeStr(invoice.import_broker)}</span>
                             </div>
                         </div>
-                    </div>
 
-                    {/* Notes */}
-                    {invoice.customer_notes && (
-                        <div className="mt-8 p-4 bg-gray-50 rounded">
-                            <h4 className="text-xs font-bold text-gray-700 mb-2">NOTES:</h4>
-                            <p className="text-sm text-gray-700">{invoice.customer_notes}</p>
+                        {/* Charges Table */}
+                        <div style={{ marginBottom: '2px', fontWeight: 'bold', fontSize: '11px' }}>CHARGES BREAKDOWN</div>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '5px', border: '1px solid #000' }}>
+                            <thead>
+                                <tr>
+                                    <th style={{ background: '#e0e0e0', borderBottom: '1px solid #000', padding: '6px 8px', textAlign: 'left', fontWeight: 'bold', fontSize: '11px', width: '50%', paddingLeft: '10px' }}>DESCRIPTION</th>
+                                    <th style={{ background: '#e0e0e0', borderBottom: '1px solid #000', padding: '6px 8px', textAlign: 'center', fontWeight: 'bold', fontSize: '11px', width: '10%' }}>CURR</th>
+                                    <th style={{ background: '#e0e0e0', borderBottom: '1px solid #000', padding: '6px 8px', textAlign: 'right', fontWeight: 'bold', fontSize: '11px', width: '20%', paddingRight: '10px' }}>AMOUNT</th>
+                                    <th style={{ background: '#e0e0e0', borderBottom: '1px solid #000', padding: '6px 8px', textAlign: 'right', fontWeight: 'bold', fontSize: '11px', width: '20%', paddingRight: '10px' }}>TAX</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {invoice.invoice_items && invoice.invoice_items.length > 0 ? (
+                                    invoice.invoice_items.map((item, index) => (
+                                        <tr key={index}>
+                                            <td style={{ borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textTransform: 'capitalize' }}>{item.description}</td>
+                                            <td style={{ borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textAlign: 'center' }}>{invoice.currency}</td>
+                                            <td style={{ borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textAlign: 'right' }}>{formatCurrency(item.amount || 0, invoice.currency).replace('Rp ', '').replace('$', '')}</td>
+                                            <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textAlign: 'right' }}>{formatCurrency((item.amount || 0) * (invoice.tax_rate || 0) / 100, invoice.currency).replace('Rp ', '').replace('$', '')}</td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr><td colSpan="4" style={{ textAlign: 'center', padding: '10px', fontSize: '11px' }}>No items</td></tr>
+                                )}
+                            </tbody>
+                        </table>
+
+                        {/* Totals */}
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
+                            <div style={{ width: '320px', border: '1px solid #000', borderTop: 'none' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', fontWeight: 'bold', fontSize: '11px', borderBottom: '1px solid #ccc', background: '#f9f9f9' }}>
+                                    <span>SUBTOTAL</span>
+                                    <span>{formatCurrency(invoice.subtotal || 0, invoice.currency)}</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', fontWeight: 'bold', fontSize: '11px', borderBottom: '1px solid #ccc' }}>
+                                    <span>TAX Total ({invoice.tax_rate}%)</span>
+                                    <span>{formatCurrency(invoice.tax_amount || 0, invoice.currency)}</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', fontWeight: 'bold', fontSize: '13px', background: '#333', color: 'white' }}>
+                                    <span>TOTAL AMOUNT DUE</span>
+                                    <span>{formatCurrency(invoice.total_amount || 0, invoice.currency)}</span>
+                                </div>
+                            </div>
                         </div>
-                    )}
 
-                    {/* Footer */}
-                    <div className="mt-12 pt-6 border-t border-gray-300 text-center">
-                        <p className="text-xs text-gray-500">Thank you for your business!</p>
-                        <p className="text-xs text-gray-500 mt-1">For any questions, please contact us</p>
+                        {/* Footer */}
+                        <div style={{ display: 'flex', marginTop: 'auto', borderTop: '2px solid #000', paddingTop: '20px' }}>
+                            <div style={{ flex: '1', paddingRight: '40px', fontSize: '10px' }}>
+                                <div style={{ border: '1px solid #999', background: '#fcfcfc', padding: '10px', marginTop: '8px', borderRadius: '4px' }}>
+                                    <b style={{ fontSize: '11px' }}>PAYMENT DETAILS:</b><br /><br />
+                                    Please transfer to:<br />
+                                    {bankAccounts && bankAccounts.length > 0 ? bankAccounts.map((bank, index) => (
+                                        <div key={index} style={{ marginBottom: '8px' }}>
+                                            <b>{bank.bank_name} ({bank.currency || invoice.currency})</b><br />
+                                            A/C No: {bank.account_number}<br />
+                                            A/N: {bank.account_holder}<br />
+                                            Branch: {bank.branch || '-'}<br />
+                                        </div>
+                                    )) : (
+                                        <>
+                                            <b>BANK CENTRAL ASIA (BCA)</b><br />
+                                            A/C No: 000-000-000<br />
+                                            A/N: PT. BAKHTERA FREIGHT WORLDWIDE<br />
+                                            Branch: KCU JAKARTA
+                                        </>
+                                    )}
+                                </div>
+
+                                <div style={{ marginTop: '10px', fontStyle: 'italic' }}>
+                                    <strong>Notes:</strong><br />
+                                    {safeStr(invoice.customer_notes)}
+                                </div>
+                            </div>
+                            <div style={{ width: '200px', textAlign: 'center' }}>
+                                <b>AUTHORIZED SIGNATURE</b>
+                                <br /><br /><br /><br /><br /><br />
+                                <div style={{ marginTop: '70px', borderTop: '1px solid #000', paddingTop: '5px', fontWeight: 'bold', fontSize: '11px' }}>
+                                    {companySettings?.company_name || 'PT. BAKHTERA FREIGHT WORLDWIDE'}
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             </div>
-
-            {/* Print-specific styles */}
-            <style>{`
-                @media print {
-                    body * {
-                        visibility: hidden;
-                    }
-                    .print-content, .print-content * {
-                        visibility: visible;
-                    }
-                    .print-content {
-                        position: absolute;
-                        left: 0;
-                        top: 0;
-                        width: 100%;
-                        background: white !important;
-                        box-shadow: none !important;
-                    }
-                    .print:hidden {
-                        display: none !important;
-                    }
-                }
-            `}</style>
         </Modal>
     );
 };

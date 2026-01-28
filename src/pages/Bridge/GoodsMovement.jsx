@@ -8,7 +8,7 @@ import { exportToXLS } from '../../utils/exportXLS';
 
 const GoodsMovement = () => {
     const navigate = useNavigate();
-    const { mutationLogs = [], addMutationLog, updateMutationLog, updateInventoryStock, deleteMutationLog, companySettings } = useData();
+    const { mutationLogs = [], addMutationLog, updateMutationLog, updateInventoryStock, deleteMutationLog, companySettings, bridgeSettings } = useData();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedLog, setSelectedLog] = useState(null);
 
@@ -216,8 +216,8 @@ const GoodsMovement = () => {
         const period = `${formatDate(minDate)} - ${formatDate(maxDate)}`;
 
         const headerRows = [
-            { value: companySettings?.company_name || 'PT. BAKHTERA FREIGHT WORLDWIDE', style: 'company' },
-            { value: companySettings?.address || 'Jl. Contoh No. 123, Jakarta', style: 'normal' },
+            { value: bridgeSettings?.company_name || companySettings?.company_name || 'PT. BAKHTERA FREIGHT WORLDWIDE', style: 'company' },
+            { value: bridgeSettings?.company_address || companySettings?.company_address || 'Jl. Contoh No. 123, Jakarta', style: 'normal' },
             { value: '' },
             { value: title.toUpperCase(), style: 'title' },
             { value: `Periode: ${period}`, style: 'normal' },

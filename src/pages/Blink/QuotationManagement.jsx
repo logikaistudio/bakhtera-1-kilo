@@ -53,6 +53,13 @@ const QuotationManagement = () => {
         notes: '',
         validityDays: 30,
         notes: '',
+        incoterm: '',
+        paymentTerms: 'Net 30 Days',
+        packageType: '',
+        quantity: '',
+        customerContact: '',
+        customerEmail: '',
+        customerPhone: '',
         serviceItems: [],
         termsConditions: `1. All rates are subject to change without prior notice.
 2. Payment terms: Net 30 Days.
@@ -116,7 +123,15 @@ const QuotationManagement = () => {
                 grossWeight: q.gross_weight || q.grossWeight,
                 netWeight: q.net_weight || q.netWeight,
                 netWeight: q.net_weight || q.netWeight,
+                netWeight: q.net_weight || q.netWeight,
                 measure: q.measure || q.measure,
+                incoterm: q.incoterm,
+                paymentTerms: q.payment_terms || 'Net 30 Days',
+                packageType: q.package_type,
+                quantity: q.quantity,
+                customerContact: q.customer_contact_name,
+                customerEmail: q.customer_email,
+                customerPhone: q.customer_phone,
                 termsConditions: q.terms_and_conditions || `1. All rates are subject to change without prior notice.
 2. Payment terms: Net 30 Days.
 3. Subject to space and equipment availability.
@@ -148,7 +163,10 @@ const QuotationManagement = () => {
                 ...prev,
                 customerName: partner.partner_name,
                 customerCompany: partner.partner_name, // Or separate field if exists
-                customerAddress: `${partner.address_line1 || ''} ${partner.address_line2 || ''} ${partner.city || ''} ${partner.country || ''}`.trim()
+                customerAddress: `${partner.address_line1 || ''} ${partner.address_line2 || ''} ${partner.city || ''} ${partner.country || ''}`.trim(),
+                customerContact: partner.contact_person || '',
+                customerEmail: partner.email || '',
+                customerPhone: partner.phone || ''
             }));
         }
     };
@@ -193,7 +211,14 @@ const QuotationManagement = () => {
             status: status,
             notes: formData.notes,
             service_items: formData.serviceItems,
-            terms_and_conditions: formData.termsConditions
+            terms_and_conditions: formData.termsConditions,
+            incoterm: formData.incoterm,
+            payment_terms: formData.paymentTerms,
+            package_type: formData.packageType,
+            quantity: formData.quantity ? parseFloat(formData.quantity) : null,
+            customer_contact_name: formData.customerContact,
+            customer_email: formData.customerEmail,
+            customer_phone: formData.customerPhone
         };
 
         try {
@@ -261,7 +286,14 @@ const QuotationManagement = () => {
                     origin: editedQuotation.origin,
                     destination: editedQuotation.destination,
                     notes: editedQuotation.notes,
-                    terms_and_conditions: editedQuotation.termsConditions
+                    terms_and_conditions: editedQuotation.termsConditions,
+                    incoterm: editedQuotation.incoterm,
+                    payment_terms: editedQuotation.paymentTerms,
+                    package_type: editedQuotation.packageType,
+                    quantity: editedQuotation.quantity,
+                    customer_contact_name: editedQuotation.customerContact,
+                    customer_email: editedQuotation.customerEmail,
+                    customer_phone: editedQuotation.customerPhone
                 })
                 .eq('id', editedQuotation.id);
 
@@ -989,7 +1021,7 @@ const QuotationManagement = () => {
 
                     {/* Customer Selection - using PartnerPicker */}
                     <div>
-                        <label className="block text-sm font-medium text-silver mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                             Customer <span className="text-red-400">*</span>
                         </label>
                         <PartnerPicker
@@ -1009,14 +1041,14 @@ const QuotationManagement = () => {
 
                     {/* Sales Person Dropdown */}
                     <div>
-                        <label className="block text-sm font-medium text-silver mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                             Sales Person <span className="text-red-400">*</span>
                         </label>
                         <select
                             required
                             value={formData.salesPerson}
                             onChange={(e) => setFormData({ ...formData, salesPerson: e.target.value })}
-                            className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
+                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                         >
                             <option value="">Select Sales Person...</option>
                             <option value="Operations">Operations</option>
@@ -1029,14 +1061,14 @@ const QuotationManagement = () => {
                     {/* Quotation Type & Date */}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-silver mb-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Quotation Type <span className="text-red-400">*</span>
                             </label>
                             <select
                                 required
                                 value={formData.quotationType}
                                 onChange={(e) => setFormData({ ...formData, quotationType: e.target.value })}
-                                className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                             >
                                 <option value="RG">Regular (RG)</option>
                                 <option value="PJ">Project (PJ)</option>
@@ -1044,7 +1076,7 @@ const QuotationManagement = () => {
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-silver mb-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Quotation Date <span className="text-red-400">*</span>
                             </label>
                             <input
@@ -1052,7 +1084,7 @@ const QuotationManagement = () => {
                                 required
                                 value={formData.quotationDate}
                                 onChange={(e) => setFormData({ ...formData, quotationDate: e.target.value })}
-                                className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                             />
                         </div>
                     </div>
@@ -1060,7 +1092,7 @@ const QuotationManagement = () => {
                     {/* Route Information */}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-silver mb-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Origin <span className="text-red-400">*</span>
                             </label>
                             <input
@@ -1069,11 +1101,11 @@ const QuotationManagement = () => {
                                 value={formData.origin}
                                 onChange={(e) => setFormData({ ...formData, origin: e.target.value })}
                                 placeholder="e.g., Jakarta"
-                                className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-silver mb-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Destination <span className="text-red-400">*</span>
                             </label>
                             <input
@@ -1082,7 +1114,7 @@ const QuotationManagement = () => {
                                 value={formData.destination}
                                 onChange={(e) => setFormData({ ...formData, destination: e.target.value })}
                                 placeholder="e.g., Singapore"
-                                className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                             />
                         </div>
                     </div>
@@ -1090,14 +1122,14 @@ const QuotationManagement = () => {
                     {/* Service Type & Cargo Info */}
                     <div className="grid grid-cols-3 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-silver mb-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Service Type <span className="text-red-400">*</span>
                             </label>
                             <select
                                 required
                                 value={formData.serviceType}
                                 onChange={(e) => setFormData({ ...formData, serviceType: e.target.value })}
-                                className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                             >
                                 <option value="sea">Sea Freight</option>
                                 <option value="air">Air Freight</option>
@@ -1105,13 +1137,13 @@ const QuotationManagement = () => {
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-silver mb-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Cargo Type
                             </label>
                             <select
                                 value={formData.cargoType}
                                 onChange={(e) => setFormData({ ...formData, cargoType: e.target.value })}
-                                className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                             >
                                 <option value="">Select...</option>
                                 <option value="FCL">FCL (Full Container)</option>
@@ -1121,7 +1153,7 @@ const QuotationManagement = () => {
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-silver mb-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Commodity
                             </label>
                             <input
@@ -1129,14 +1161,14 @@ const QuotationManagement = () => {
                                 value={formData.commodity}
                                 onChange={(e) => setFormData({ ...formData, commodity: e.target.value })}
                                 placeholder="e.g., Electronic"
-                                className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                             />
                         </div>
                     </div>
 
                     {/* Volume (Standalone) */}
                     <div className="mb-4">
-                        <label className="block text-sm font-medium text-silver mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                             Volume (CBM)
                         </label>
                         <input
@@ -1146,14 +1178,14 @@ const QuotationManagement = () => {
                             value={formData.volume}
                             onChange={(e) => setFormData({ ...formData, volume: e.target.value })}
                             placeholder="5.5"
-                            className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
+                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                         />
                     </div>
 
                     {/* Gross Weight, Net Weight & Measure */}
                     <div className="grid grid-cols-3 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-silver mb-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Gross Weight (kgs)
                             </label>
                             <input
@@ -1163,11 +1195,11 @@ const QuotationManagement = () => {
                                 value={formData.grossWeight}
                                 onChange={(e) => setFormData({ ...formData, grossWeight: e.target.value })}
                                 placeholder="1200"
-                                className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-silver mb-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Net Weight (kgs)
                             </label>
                             <input
@@ -1177,11 +1209,11 @@ const QuotationManagement = () => {
                                 value={formData.netWeight}
                                 onChange={(e) => setFormData({ ...formData, netWeight: e.target.value })}
                                 placeholder="1000"
-                                className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-silver mb-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Measure (M³)
                             </label>
                             <input
@@ -1191,28 +1223,103 @@ const QuotationManagement = () => {
                                 value={formData.measure}
                                 onChange={(e) => setFormData({ ...formData, measure: e.target.value })}
                                 placeholder="5.500"
-                                className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                             />
+                        </div>
+                    </div>
+
+                    {/* Additional Shipment Details (Incoterm, Package, etc) */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 p-4 bg-white rounded-lg border border-gray-300">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Incoterm</label>
+                            <input
+                                type="text"
+                                value={formData.incoterm}
+                                onChange={(e) => setFormData({ ...formData, incoterm: e.target.value })}
+                                placeholder="e.g. FOB"
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black text-sm"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Payment Terms</label>
+                            <input
+                                type="text"
+                                value={formData.paymentTerms}
+                                onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })}
+                                placeholder="Net 30 Days"
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black text-sm"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Package Type</label>
+                            <input
+                                type="text"
+                                value={formData.packageType}
+                                onChange={(e) => setFormData({ ...formData, packageType: e.target.value })}
+                                placeholder="e.g. Cartons"
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black text-sm"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
+                            <input
+                                type="number"
+                                value={formData.quantity}
+                                onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                                placeholder="100"
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black text-sm"
+                            />
+                        </div>
+
+                        {/* Customer Contact Details Override */}
+                        <div className="col-span-2 md:col-span-4 grid grid-cols-3 gap-4 pt-2 border-t border-gray-300 mt-2">
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1">Contact Person (Attn)</label>
+                                <input
+                                    type="text"
+                                    value={formData.customerContact}
+                                    onChange={(e) => setFormData({ ...formData, customerContact: e.target.value })}
+                                    className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-black text-xs"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1">Contact Email</label>
+                                <input
+                                    type="email"
+                                    value={formData.customerEmail}
+                                    onChange={(e) => setFormData({ ...formData, customerEmail: e.target.value })}
+                                    className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-black text-xs"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1">Contact Phone</label>
+                                <input
+                                    type="text"
+                                    value={formData.customerPhone}
+                                    onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
+                                    className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-black text-xs"
+                                />
+                            </div>
                         </div>
                     </div>
 
                     {/* Currency, Amount & Validity */}
                     <div className="grid grid-cols-3 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-silver mb-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Currency
                             </label>
                             <select
                                 value={formData.currency}
                                 onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                                className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                             >
                                 <option value="USD">USD</option>
                                 <option value="IDR">IDR</option>
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-silver mb-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Total Amount
                             </label>
                             <input
@@ -1225,11 +1332,11 @@ const QuotationManagement = () => {
                                     }
                                 }}
                                 placeholder="0"
-                                className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-silver mb-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Valid for (days)
                             </label>
                             <input
@@ -1237,7 +1344,7 @@ const QuotationManagement = () => {
                                 min="1"
                                 value={formData.validityDays}
                                 onChange={(e) => setFormData({ ...formData, validityDays: e.target.value })}
-                                className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                             />
                         </div>
                     </div>
@@ -1256,7 +1363,7 @@ const QuotationManagement = () => {
 
                     {/* Notes */}
                     <div>
-                        <label className="block text-sm font-medium text-silver mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                             Notes / Remarks
                         </label>
                         <textarea
@@ -1264,13 +1371,13 @@ const QuotationManagement = () => {
                             value={formData.notes}
                             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                             placeholder="Additional information..."
-                            className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
+                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                         />
                     </div>
 
                     {/* Terms & Conditions */}
                     <div>
-                        <label className="block text-sm font-medium text-silver mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                             Terms & Conditions
                         </label>
                         <textarea
@@ -1278,7 +1385,7 @@ const QuotationManagement = () => {
                             value={formData.termsConditions}
                             onChange={(e) => setFormData({ ...formData, termsConditions: e.target.value })}
                             placeholder="Enter terms and conditions..."
-                            className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light font-mono text-xs"
+                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black font-mono text-xs"
                         />
                     </div>
 
@@ -1315,11 +1422,11 @@ const QuotationManagement = () => {
                     title="" // Clear the title prop as the header is now custom
                     size="large"
                 >
-                    <div className="pb-4 border-b border-dark-border">
+                    <div className="pb-4 border-b border-gray-200">
                         <div className="flex items-center justify-between mb-4">
                             <div>
-                                <h2 className="text-2xl font-bold text-silver-light">Quotation Details</h2>
-                                <p className="text-sm text-silver-dark mt-1">
+                                <h2 className="text-2xl font-bold text-gray-900">Quotation Details</h2>
+                                <p className="text-sm text-gray-500 mt-1">
                                     {viewingQuotation.jobNumber} | Created: {viewingQuotation.createdAt} | Valid: {viewingQuotation.validUntil}
                                 </p>
                             </div>
@@ -1371,9 +1478,9 @@ const QuotationManagement = () => {
                     </div>
                     <div className="space-y-6">
                         {/* Customer & Route & Quotation Info */}
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 p-4 bg-dark-surface rounded-lg">
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
                             <div>
-                                <p className="text-xs text-silver-dark mb-1">Customer</p>
+                                <p className="text-xs text-gray-500 font-medium mb-1">Customer</p>
                                 {isEditingQuotation ? (
                                     <PartnerPicker
                                         value={editedQuotation?.partnerId || editedQuotation?.customerId}
@@ -1402,33 +1509,33 @@ const QuotationManagement = () => {
                                         type="text"
                                         value={viewingQuotation.customerName || viewingQuotation.customer_name || ''}
                                         readOnly
-                                        className="w-full px-2 py-1 bg-dark-card border border-dark-border rounded text-silver-light text-sm"
+                                        className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm"
                                     />
                                 )}
                             </div>
                             <div>
-                                <p className="text-xs text-silver-dark mb-1">Customer Address</p>
+                                <p className="text-xs text-gray-500 font-medium mb-1">Customer Address</p>
                                 <input
                                     type="text"
                                     value={isEditingQuotation ? (editedQuotation?.customerAddress || '') : (viewingQuotation.customerAddress || viewingQuotation.customer_address || '')}
                                     readOnly={!isEditingQuotation}
                                     onChange={(e) => setEditedQuotation({ ...editedQuotation, customerAddress: e.target.value })}
-                                    className={`w-full px-2 py-1 bg-dark-card border border-dark-border rounded text-silver-light text-sm ${isEditingQuotation ? '' : 'disabled:opacity-70'}`}
+                                    className={`w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm ${isEditingQuotation ? '' : 'bg-gray-100/50'}`}
                                 />
                             </div>
                             <div>
-                                <p className="text-xs text-silver-dark mb-1">Sales Person</p>
+                                <p className="text-xs text-gray-500 font-medium mb-1">Sales Person</p>
                                 <input
                                     type="text"
                                     value={isEditingQuotation ? (editedQuotation?.salesPerson || '') : (viewingQuotation.salesPerson || '')}
                                     onChange={(e) => setEditedQuotation({ ...editedQuotation, salesPerson: e.target.value })}
                                     disabled={!isEditingQuotation}
-                                    className="w-full px-2 py-1 bg-dark-card border border-dark-border rounded text-silver-light text-sm disabled:opacity-70 disabled:cursor-not-allowed"
+                                    className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm disabled:bg-gray-100/50"
                                 />
                             </div>
                             <div>
-                                <p className="text-xs text-silver-dark mb-1">Quotation Type</p>
-                                <p className="text-silver-light font-medium">
+                                <p className="text-xs text-gray-500 font-medium mb-1">Quotation Type</p>
+                                <p className="text-gray-900 font-medium">
                                     {viewingQuotation.quotationType === 'RG' && 'Regular'}
                                     {viewingQuotation.quotationType === 'PJ' && 'Project'}
                                     {viewingQuotation.quotationType === 'EV' && 'Event'}
@@ -1437,11 +1544,84 @@ const QuotationManagement = () => {
                                 </p>
                             </div>
                             <div>
-                                <p className="text-xs text-silver-dark mb-1">Quotation Date</p>
-                                <p className="text-silver-light font-medium">{viewingQuotation.quotationDate || viewingQuotation.createdAt}</p>
+                                <p className="text-xs text-gray-500 font-medium mb-1">Quotation Date</p>
+                                <p className="text-gray-900 font-medium">{viewingQuotation.quotationDate || viewingQuotation.createdAt}</p>
                             </div>
+                            {/* New Fields Edit Section */}
+                            {isEditingQuotation && (
+                                <div className="col-span-2 md:col-span-5 grid grid-cols-2 md:grid-cols-4 gap-4 mt-2 p-3 bg-white border border-gray-300 rounded-lg">
+                                    <div>
+                                        <p className="text-xs text-gray-500 mb-1">Incoterm</p>
+                                        <input
+                                            type="text"
+                                            value={editedQuotation.incoterm || ''}
+                                            onChange={(e) => setEditedQuotation({ ...editedQuotation, incoterm: e.target.value })}
+                                            placeholder="FOB"
+                                            className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-black text-sm"
+                                        />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-500 mb-1">Payment Terms</p>
+                                        <input
+                                            type="text"
+                                            value={editedQuotation.paymentTerms || ''}
+                                            onChange={(e) => setEditedQuotation({ ...editedQuotation, paymentTerms: e.target.value })}
+                                            placeholder="Net 30 Days"
+                                            className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-black text-sm"
+                                        />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-500 mb-1">Package Type</p>
+                                        <input
+                                            type="text"
+                                            value={editedQuotation.packageType || ''}
+                                            onChange={(e) => setEditedQuotation({ ...editedQuotation, packageType: e.target.value })}
+                                            placeholder="Cartons"
+                                            className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-black text-sm"
+                                        />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-500 mb-1">Quantity</p>
+                                        <input
+                                            type="number"
+                                            value={editedQuotation.quantity || ''}
+                                            onChange={(e) => setEditedQuotation({ ...editedQuotation, quantity: e.target.value })}
+                                            placeholder="100"
+                                            className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-black text-sm"
+                                        />
+                                    </div>
+                                    {/* Additional Customer Details */}
+                                    <div>
+                                        <p className="text-xs text-gray-500 mb-1">Cust. Contact (Attn)</p>
+                                        <input
+                                            type="text"
+                                            value={editedQuotation.customerContact || ''}
+                                            onChange={(e) => setEditedQuotation({ ...editedQuotation, customerContact: e.target.value })}
+                                            className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-black text-sm"
+                                        />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-500 mb-1">Cust. Email</p>
+                                        <input
+                                            type="text"
+                                            value={editedQuotation.customerEmail || ''}
+                                            onChange={(e) => setEditedQuotation({ ...editedQuotation, customerEmail: e.target.value })}
+                                            className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-black text-sm"
+                                        />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-500 mb-1">Cust. Phone</p>
+                                        <input
+                                            type="text"
+                                            value={editedQuotation.customerPhone || ''}
+                                            onChange={(e) => setEditedQuotation({ ...editedQuotation, customerPhone: e.target.value })}
+                                            className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-black text-sm"
+                                        />
+                                    </div>
+                                </div>
+                            )}
                             <div>
-                                <p className="text-xs text-silver-dark mb-1">Route</p>
+                                <p className="text-xs text-gray-500 mb-1">Route</p>
                                 <div className="flex gap-2 items-center">
                                     <input
                                         type="text"
@@ -1449,28 +1629,28 @@ const QuotationManagement = () => {
                                         onChange={(e) => setEditedQuotation({ ...editedQuotation, origin: e.target.value })}
                                         disabled={!isEditingQuotation}
                                         placeholder="Origin"
-                                        className="w-full px-2 py-1 bg-dark-card border border-dark-border rounded text-silver-light text-sm disabled:opacity-70 disabled:cursor-not-allowed"
+                                        className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm disabled:bg-gray-100/50"
                                     />
-                                    <span>→</span>
+                                    <span className="text-gray-400">→</span>
                                     <input
                                         type="text"
                                         value={isEditingQuotation ? (editedQuotation?.destination || '') : (viewingQuotation.destination || '')}
                                         onChange={(e) => setEditedQuotation({ ...editedQuotation, destination: e.target.value })}
                                         disabled={!isEditingQuotation}
                                         placeholder="Destination"
-                                        className="w-full px-2 py-1 bg-dark-card border border-dark-border rounded text-silver-light text-sm disabled:opacity-70 disabled:cursor-not-allowed"
+                                        className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm disabled:bg-gray-100/50"
                                     />
                                 </div>
                             </div>
                         </div>
 
                         <div>
-                            <p className="text-xs text-silver-dark mb-1">Service Type</p>
+                            <p className="text-xs text-gray-500 mb-1">Service Type</p>
                             <select
                                 value={isEditingQuotation ? (editedQuotation?.serviceType || '') : (viewingQuotation.serviceType || '')}
                                 onChange={(e) => setEditedQuotation({ ...editedQuotation, serviceType: e.target.value })}
                                 disabled={!isEditingQuotation}
-                                className="w-full px-2 py-1 bg-dark-card border border-dark-border rounded text-silver-light text-sm disabled:opacity-70 disabled:cursor-not-allowed"
+                                className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm disabled:bg-gray-100/50"
                             >
                                 <option value="sea">Sea Freight</option>
                                 <option value="air">Air Freight</option>
@@ -1479,60 +1659,60 @@ const QuotationManagement = () => {
                         </div>
 
                         {/* Cargo Details */}
-                        <div className="p-3 bg-dark-card rounded-lg border border-dark-border">
-                            <h5 className="text-xs font-semibold text-silver-dark mb-3 uppercase tracking-wider">Cargo Details</h5>
+                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                            <h5 className="text-xs font-semibold text-gray-400 mb-3 uppercase tracking-wider">Cargo Details</h5>
 
                             <div className="mb-3">
-                                <p className="text-xs text-silver-dark mb-1">Volume (CBM)</p>
+                                <p className="text-xs text-gray-500 mb-1">Volume (CBM)</p>
                                 <input
                                     type="number"
                                     value={isEditingQuotation ? (editedQuotation?.volume || '') : (viewingQuotation.volume || '')}
                                     onChange={(e) => setEditedQuotation({ ...editedQuotation, volume: e.target.value })}
                                     disabled={!isEditingQuotation}
-                                    className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm disabled:opacity-70"
+                                    className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm disabled:bg-gray-100/50"
                                     placeholder="-"
                                 />
                             </div>
                             <div className="grid grid-cols-3 gap-3">
                                 <div>
-                                    <p className="text-xs text-silver-dark mb-1">Gross (kg)</p>
+                                    <p className="text-xs text-gray-500 mb-1">Gross (kg)</p>
                                     <input
                                         type="number"
                                         value={isEditingQuotation ? (editedQuotation?.grossWeight || '') : (viewingQuotation.grossWeight || '')}
                                         onChange={(e) => setEditedQuotation({ ...editedQuotation, grossWeight: e.target.value })}
                                         disabled={!isEditingQuotation}
-                                        className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm disabled:opacity-70"
+                                        className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm disabled:bg-gray-100/50"
                                         placeholder="-"
                                     />
                                 </div>
                                 <div>
-                                    <p className="text-xs text-silver-dark mb-1">Net (kg)</p>
+                                    <p className="text-xs text-gray-500 mb-1">Net (kg)</p>
                                     <input
                                         type="number"
                                         value={isEditingQuotation ? (editedQuotation?.netWeight || '') : (viewingQuotation.netWeight || '')}
                                         onChange={(e) => setEditedQuotation({ ...editedQuotation, netWeight: e.target.value })}
                                         disabled={!isEditingQuotation}
-                                        className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm disabled:opacity-70"
+                                        className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm disabled:bg-gray-100/50"
                                         placeholder="-"
                                     />
                                 </div>
                                 <div>
-                                    <p className="text-xs text-silver-dark mb-1">Measure (M³)</p>
+                                    <p className="text-xs text-gray-500 mb-1">Measure (M³)</p>
                                     <input
                                         type="number"
                                         value={isEditingQuotation ? (editedQuotation?.measure || '') : (viewingQuotation.measure || '')}
                                         onChange={(e) => setEditedQuotation({ ...editedQuotation, measure: e.target.value })}
                                         disabled={!isEditingQuotation}
-                                        className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm disabled:opacity-70"
+                                        className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm disabled:bg-gray-100/50"
                                         placeholder="-"
                                     />
                                 </div>
                             </div>
                         </div>
 
-                        <div className="p-4 bg-gradient-to-r from-accent-orange/10 to-transparent rounded-lg border border-accent-orange/20">
-                            <p className="text-sm text-silver-dark mb-1">Estimated Amount</p>
-                            <div className="text-2xl font-bold text-accent-orange">
+                        <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                            <p className="text-sm text-gray-500 mb-1">Estimated Amount</p>
+                            <div className="text-2xl font-bold text-orange-600">
                                 {viewingQuotation.currency === 'IDR' ? 'Rp ' : '$'}
                                 {(isEditingQuotation
                                     ? (editedQuotation?.totalAmount || 0)
@@ -1544,7 +1724,7 @@ const QuotationManagement = () => {
                                     type="number"
                                     value={editedQuotation?.totalAmount || 0}
                                     onChange={(e) => setEditedQuotation({ ...editedQuotation, totalAmount: parseFloat(e.target.value) || 0 })}
-                                    className="mt-2 w-full px-3 py-2 bg-dark-card border border-dark-border rounded text-silver-light text-sm"
+                                    className="mt-2 w-full px-3 py-2 bg-white border border-gray-300 rounded text-gray-900 text-sm"
                                     placeholder="Enter amount"
                                 />
                             )}
@@ -1552,7 +1732,7 @@ const QuotationManagement = () => {
 
                         {/* Cost Breakdown */}
                         {viewingQuotation.serviceItems && viewingQuotation.serviceItems.length > 0 && (
-                            <div className="p-4 bg-dark-surface rounded-lg">
+                            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
                                 <ServiceItemManager
                                     items={viewingQuotation.serviceItems}
                                     onChange={() => { }} // Read-only, no changes
@@ -1563,30 +1743,47 @@ const QuotationManagement = () => {
                         )}
 
                         {/* Terms & Conditions (View/Edit) */}
-                        <div className="p-4 bg-dark-card rounded-lg border border-dark-border">
-                            <h5 className="text-xs font-semibold text-silver-dark mb-2 uppercase tracking-wider">Terms & Conditions</h5>
+                        {/* Terms & Conditions (View/Edit) */}
+                        <div className="p-4 bg-white rounded-lg border border-gray-200">
+                            <h5 className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Terms & Conditions</h5>
                             {isEditingQuotation ? (
                                 <textarea
                                     rows={5}
                                     value={editedQuotation?.termsConditions || ''}
                                     onChange={(e) => setEditedQuotation({ ...editedQuotation, termsConditions: e.target.value })}
-                                    className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light font-mono text-xs"
+                                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black font-mono text-xs"
                                 />
                             ) : (
-                                <div className="text-sm text-silver-light whitespace-pre-line pl-4 border-l-2 border-accent-orange/30">
+                                <div className="text-sm text-gray-700 whitespace-pre-line pl-4 border-l-2 border-orange-200">
                                     {viewingQuotation.termsConditions}
                                 </div>
                             )}
                         </div>
 
                         {/* Department-Specific Actions */}
-                        <div className="flex justify-between gap-3 pt-4 border-t border-dark-border">
+                        <div className="flex justify-between gap-3 pt-4 border-t border-gray-200">
                             <div className="flex gap-2">
                                 {/* Draft Actions */}
-                                {viewingQuotation.status === 'draft' && (
-                                    <Button onClick={() => handleUpdateStatus(viewingQuotation.id, 'manager_approval')}>
-                                        Submit for Manager Approval
-                                    </Button>
+                                {viewingQuotation.status === 'draft' && !isEditingQuotation && (
+                                    <>
+                                        <Button onClick={() => handleUpdateStatus(viewingQuotation.id, 'manager_approval')}>
+                                            Submit for Manager Approval
+                                        </Button>
+                                        <Button variant="secondary" onClick={handleEditQuotation} icon={Edit}>
+                                            Edit
+                                        </Button>
+                                    </>
+                                )}
+
+                                {isEditingQuotation && (
+                                    <>
+                                        <Button onClick={handleSaveEditedQuotation} className="bg-green-600 hover:bg-green-700 text-white">
+                                            Save Changes
+                                        </Button>
+                                        <Button variant="secondary" onClick={handleCancelEdit}>
+                                            Cancel
+                                        </Button>
+                                    </>
                                 )}
 
                                 {/* Manager Approval */}
@@ -1664,176 +1861,226 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
     };
 
     return (
-        <Modal isOpen={true} onClose={onClose} maxWidth="max-w-4xl">
-            <div className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-2xl font-bold gradient-text">Quotation Preview</h2>
+        <Modal isOpen={true} onClose={onClose} maxWidth="max-w-5xl">
+            <div className="p-0 overflow-hidden rounded-lg">
+                <div className="flex items-center justify-between p-6 border-b border-dark-border bg-dark-card">
+                    <h2 className="text-xl font-bold text-silver-light">Quotation Preview</h2>
                     <div className="flex gap-2 print:hidden">
                         <button
                             onClick={() => onPrint(quotation)}
-                            className="flex items-center gap-2 px-4 py-2 bg-accent-orange hover:bg-accent-orange/80 text-white rounded-lg smooth-transition font-semibold"
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium text-sm"
                         >
                             <Download className="w-4 h-4" />
-                            Print / Save as PDF
+                            Print / Save PDF
                         </button>
                         <button
                             onClick={onClose}
-                            className="px-4 py-2 border border-dark-border text-silver-light rounded-lg hover:bg-dark-surface smooth-transition"
+                            className="px-4 py-2 border border-dark-border text-silver-light rounded-lg hover:bg-dark-surface transition-colors text-sm"
                         >
                             Close
                         </button>
                     </div>
                 </div>
 
-                {/* Print-friendly quotation content */}
-                <div className="print-content bg-white text-black p-8 rounded-lg">
-                    {/* Header */}
-                    <div className="border-b-2 border-gray-800 pb-4 mb-6 flex justify-between items-start">
+                {/* Modern Print Layout - 2025 SaaS Style */}
+                <div className="print-content bg-white text-slate-900 p-12 font-sans overflow-auto max-h-[80vh] print:max-h-none print:p-0">
+
+                    {/* Header: Logo & Company */}
+                    <header className="flex justify-between items-start mb-12">
                         <div>
-                            <h1 className="text-3xl font-bold text-gray-800">QUOTATION</h1>
-                            <p className="text-xl font-semibold text-gray-600 mt-1">{quotation.quotationNumber || quotation.quotation_number}</p>
+                            {companySettings?.logo_url ? (
+                                <img src={companySettings.logo_url} alt="Logo" className="h-10 object-contain mb-4" />
+                            ) : (
+                                <h1 className="text-2xl font-bold tracking-tight text-slate-900 mb-2">PT. Bakhtera Freight Worldwide</h1>
+                            )}
+                            <div className="text-sm text-slate-500 leading-relaxed max-w-xs">
+                                <p>{companySettings?.company_address}</p>
+                                <div className="mt-2 flex gap-4 text-xs">
+                                    <span>Phone: {companySettings?.company_phone}</span>
+                                    <span>Email: {companySettings?.company_email}</span>
+                                </div>
+                            </div>
                         </div>
                         <div className="text-right">
-                            <p className="text-sm text-gray-600">Date</p>
-                            <p className="font-bold text-gray-800">{new Date(quotation.quotationDate || quotation.created_at).toLocaleDateString('id-ID')}</p>
+                            <h2 className="text-4xl font-light tracking-tight text-slate-900 mb-2">Quotation</h2>
+                            <p className="text-accent-blue font-mono font-medium text-lg">{quotation.quotationNumber || quotation.quotation_number}</p>
+                            <p className="text-sm text-slate-400 mt-1">Issued Date: {new Date(quotation.quotationDate || quotation.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                        </div>
+                    </header>
+
+                    {/* Client & Logic Info Grid */}
+                    <div className="grid grid-cols-12 gap-12 mb-12">
+                        {/* Client Info */}
+                        <div className="col-span-5">
+                            <h3 className="text-xs uppercase tracking-widest text-slate-400 font-semibold mb-4">Bill To</h3>
+                            <div className="text-sm leading-relaxed">
+                                <p className="font-bold text-slate-900 text-lg mb-1">{quotation.customerName || quotation.customer_name}</p>
+                                <p className="text-slate-600 mb-2">{quotation.customerCompany || quotation.customer_company}</p>
+                                <p className="text-slate-500 whitespace-pre-line mb-4">{quotation.customerAddress || quotation.customer_address}</p>
+
+                                <dl className="space-y-1 text-slate-600 text-xs border-l-2 border-slate-100 pl-3">
+                                    {(quotation.customerContact || quotation.customer_contact_name) && (
+                                        <div className="flex gap-2"><dt className="font-medium text-slate-900 w-12">Attn:</dt> <dd>{quotation.customerContact || quotation.customer_contact_name}</dd></div>
+                                    )}
+                                    {(quotation.customerEmail || quotation.customer_email) && (
+                                        <div className="flex gap-2"><dt className="font-medium text-slate-900 w-12">Email:</dt> <dd>{quotation.customerEmail || quotation.customer_email}</dd></div>
+                                    )}
+                                    {(quotation.customerPhone || quotation.customer_phone) && (
+                                        <div className="flex gap-2"><dt className="font-medium text-slate-900 w-12">Phone:</dt> <dd>{quotation.customerPhone || quotation.customer_phone}</dd></div>
+                                    )}
+                                </dl>
+                            </div>
+                        </div>
+
+                        {/* Shipment Details */}
+                        <div className="col-span-7">
+                            <h3 className="text-xs uppercase tracking-widest text-slate-400 font-semibold mb-4">Shipment Details</h3>
+                            <div className="grid grid-cols-3 gap-y-6 gap-x-8 text-sm">
+                                <div>
+                                    <span className="block text-xs text-slate-400 mb-1">Origin (POL)</span>
+                                    <span className="font-semibold text-slate-800">{quotation.origin || '—'}</span>
+                                </div>
+                                <div>
+                                    <span className="block text-xs text-slate-400 mb-1">Destination (POD)</span>
+                                    <span className="font-semibold text-slate-800">{quotation.destination || '—'}</span>
+                                </div>
+                                <div>
+                                    <span className="block text-xs text-slate-400 mb-1">Service Mode</span>
+                                    <span className="font-semibold text-slate-800 capitalize">{quotation.serviceType || '—'}</span>
+                                </div>
+
+                                <div>
+                                    <span className="block text-xs text-slate-400 mb-1">Commodity</span>
+                                    <span className="font-semibold text-slate-800">{quotation.commodity || '—'}</span>
+                                </div>
+                                <div>
+                                    <span className="block text-xs text-slate-400 mb-1">Quantity/Package</span>
+                                    <span className="font-semibold text-slate-800">
+                                        {quotation.quantity || '-'} {quotation.packageType || quotation.package_type || ''}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="block text-xs text-slate-400 mb-1">Incoterm</span>
+                                    <span className="font-semibold text-slate-800 uppercase">{quotation.incoterm || '—'}</span>
+                                </div>
+
+                                <div>
+                                    <span className="block text-xs text-slate-400 mb-1">Weight / Volume</span>
+                                    <span className="font-semibold text-slate-800">
+                                        NW: {parseFloat(quotation.netWeight || 0).toLocaleString('id-ID')} / GW: {parseFloat(quotation.grossWeight || quotation.weight || 0).toLocaleString('id-ID')} KGS <br />
+                                        {parseFloat(quotation.volume || quotation.measure || 0).toLocaleString('id-ID')} CBM
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="block text-xs text-slate-400 mb-1">Payment Term</span>
+                                    <span className="font-semibold text-slate-800">{quotation.paymentTerms || quotation.payment_terms || 'Net 30 Days'}</span>
+                                </div>
+                                <div>
+                                    <span className="block text-xs text-slate-400 mb-1">Validity</span>
+                                    <span className="font-semibold text-slate-800">{quotation.validityDays || 30} Days</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Company & Customer Info */}
-                    <div className="grid grid-cols-2 gap-8 mb-8">
-                        <div>
-                            <h3 className="text-sm font-bold text-gray-700 mb-2">FROM:</h3>
-                            <div className="text-sm text-gray-800">
-                                <p className="font-bold text-base text-[#0070BB]">{companySettings?.company_name || 'PT Bakhtera Satu Indonesia'}</p>
-                                <p className="mt-2 whitespace-pre-wrap">{companySettings?.company_address || 'Jakarta, Indonesia'}</p>
-                                {companySettings?.company_phone && <p className="mt-2">Phone: {companySettings.company_phone}</p>}
-                                {companySettings?.company_email && <p>Email: {companySettings.company_email}</p>}
-                                {companySettings?.company_npwp && <p className="mt-1 font-semibold">NPWP: {companySettings.company_npwp}</p>}
-                            </div>
-                        </div>
-
-                        <div>
-                            <h3 className="text-sm font-bold text-gray-700 mb-2">TO:</h3>
-                            <div className="text-sm text-gray-800">
-                                <p className="font-bold text-base">{quotation.customerName || quotation.customer_name}</p>
-                                {(quotation.customerCompany || quotation.customer_company) && <p className="text-gray-600">{quotation.customerCompany || quotation.customer_company}</p>}
-                                {(quotation.customerAddress || quotation.customer_address) && <p className="mt-2">{quotation.customerAddress || quotation.customer_address}</p>}
-                                <p className="mt-4"><span className="font-semibold">Attn:</span> {quotation.salesPerson || quotation.sales_person || '-'}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Details Grid */}
-                    <div className="grid grid-cols-2 gap-4 mb-8 bg-gray-50 p-4 rounded">
-                        <div>
-                            <p className="text-xs text-gray-600">Service Type:</p>
-                            <p className="font-semibold text-gray-800">{(quotation.serviceType || quotation.service_type || '-').toUpperCase()}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-gray-600">Validity:</p>
-                            <p className="font-semibold text-gray-800">{quotation.validityDays || 30} Days</p>
-                        </div>
-                        {(quotation.origin || quotation.destination) && (
-                            <div className="col-span-2">
-                                <p className="text-xs text-gray-600">Route:</p>
-                                <p className="font-semibold text-gray-800">{quotation.origin || '-'} → {quotation.destination || '-'}</p>
-                            </div>
-                        )}
-                        <div className="col-span-2 grid grid-cols-3 gap-4">
-                            <div>
-                                <p className="text-xs text-gray-600">Commodity:</p>
-                                <p className="font-semibold text-gray-800">{quotation.commodity || '-'}</p>
-                            </div>
-                            <div>
-                                <p className="text-xs text-gray-600">Weight:</p>
-                                <p className="font-semibold text-gray-800">{quotation.weight || '-'} kg</p>
-                            </div>
-                            <div>
-                                <p className="text-xs text-gray-600">Volume:</p>
-                                <p className="font-semibold text-gray-800">{quotation.volume || '-'} m³</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Items Table */}
-                    <table className="w-full mb-8">
-                        <thead>
-                            <tr className="bg-gray-800 text-white">
-                                <th className="p-3 text-left text-xs font-bold">NO</th>
-                                <th className="p-3 text-left text-xs font-bold">DESCRIPTION</th>
-                                <th className="p-3 text-center text-xs font-bold">QTY</th>
-                                <th className="p-3 text-center text-xs font-bold">UNIT</th>
-                                <th className="p-3 text-right text-xs font-bold">UNIT PRICE</th>
-                                <th className="p-3 text-right text-xs font-bold">TOTAL</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {(quotation.serviceItems || quotation.service_items || []).map((item, index) => (
-                                <tr key={index} className="border-b border-gray-200">
-                                    <td className="p-3 text-sm text-gray-700 text-center">{index + 1}</td>
-                                    <td className="p-3 text-sm text-gray-800">{item.name || item.description}</td>
-                                    <td className="p-3 text-sm text-gray-700 text-center">{item.quantity || 1}</td>
-                                    <td className="p-3 text-sm text-gray-700 text-center">{item.unit || 'Job'}</td>
-                                    <td className="p-3 text-sm text-gray-700 text-right">{formatCurrency(item.unitPrice || item.price, quotation.currency)}</td>
-                                    <td className="p-3 text-sm text-gray-800 text-right font-semibold">{formatCurrency(item.total || ((item.quantity || 1) * (item.unitPrice || 0)), quotation.currency)}</td>
+                    {/* Pricing Table */}
+                    <div className="mb-6">
+                        <table className="w-full text-xs leading-tight">
+                            <thead>
+                                <tr className="border-b border-slate-200">
+                                    <th className="text-left font-semibold text-slate-900 py-1 uppercase text-[10px] tracking-wider w-[5%] bg-slate-50 pl-4 rounded-l-md">No</th>
+                                    <th className="text-left font-semibold text-slate-900 py-1 uppercase text-[10px] tracking-wider w-[40%] bg-slate-50">Description</th>
+                                    <th className="text-right font-semibold text-slate-900 py-1 uppercase text-[10px] tracking-wider w-[10%] bg-slate-50">Qty</th>
+                                    <th className="text-right font-semibold text-slate-900 py-1 uppercase text-[10px] tracking-wider w-[15%] bg-slate-50">Unit Price</th>
+                                    <th className="text-right font-semibold text-slate-900 py-1 uppercase text-[10px] tracking-wider w-[15%] bg-slate-50 pr-4 rounded-r-md">Total ({quotation.currency})</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {(quotation.serviceItems || quotation.service_items || []).map((item, index) => {
+                                    const amount = item.total || ((item.quantity || 1) * (item.unitPrice || 0));
+                                    return (
+                                        <tr key={index}>
+                                            <td className="py-0.5 pl-4 text-slate-400 font-mono text-[10px]">{index + 1}</td>
+                                            <td className="py-0.5 text-slate-800 font-medium capitalize">
+                                                {(item.name || item.description || '').toLowerCase()}
+                                                {item.notes && <p className="text-[10px] text-slate-400 capitalize">{(item.notes || '').toLowerCase()}</p>}
+                                            </td>
+                                            <td className="py-0.5 text-right text-slate-600">{item.quantity || 1} {item.unit || 'unit'}</td>
+                                            <td className="py-0.5 text-right text-slate-600 font-mono">
+                                                {formatCurrency(parseFloat(item.unitPrice || item.price || 0), quotation.currency).replace('Rp', '').replace('$', '')}
+                                            </td>
+                                            <td className="py-0.5 text-right text-slate-900 font-bold font-mono pr-4">
+                                                {formatCurrency(amount, quotation.currency)}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
 
-                    {/* Totals */}
-                    <div className="flex justify-end mb-8">
-                        <div className="w-80">
-                            <div className="flex justify-between py-3 bg-gray-800 text-white px-4 rounded">
-                                <span className="font-bold">TOTAL ESTIMATED:</span>
-                                <span className="font-bold text-lg">{formatCurrency(quotation.totalAmount || quotation.total_amount, quotation.currency)}</span>
+                        {/* Total Summary */}
+                        <div className="flex justify-end mt-4">
+                            <div className="w-64 bg-slate-50 p-6 rounded-lg">
+                                <div className="flex justify-between items-center mb-2">
+                                    <span className="text-slate-500 text-sm">Subtotal</span>
+                                    <span className="font-mono text-slate-700">{formatCurrency(quotation.totalAmount || quotation.total_amount, quotation.currency)}</span>
+                                </div>
+                                <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-200">
+                                    <span className="text-slate-500 text-sm">Tax (0%)</span>
+                                    <span className="font-mono text-slate-700">-</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="font-bold text-slate-900">Total</span>
+                                    <span className="font-bold text-xl text-blue-600">
+                                        {formatCurrency(quotation.totalAmount || quotation.total_amount, quotation.currency)}
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Terms */}
-                    <div className="mt-12 pt-6 border-t border-gray-300">
-                        <h4 className="text-xs font-bold text-gray-700 mb-2">TERMS & CONDITIONS:</h4>
-                        <div className="mt-12 pt-6 border-t border-gray-300">
-                            <h4 className="text-xs font-bold text-gray-700 mb-2">TERMS & CONDITIONS:</h4>
-                            <ol className="list-decimal pl-4 text-xs text-gray-600 space-y-1">
-                                {(quotation.termsConditions || `1. All rates are subject to change without prior notice.
-2. Payment terms: Net 30 Days.
-3. Subject to space and equipment availability.
-4. Standard Trading Conditions apply.`).split('\n').map((line, idx) => (
-                                    <li key={idx}>{line.replace(/^\d+\.\s*/, '')}</li>
-                                ))}
-                            </ol>
+                    {/* Terms & Footer */}
+                    <div className="grid grid-cols-2 gap-12 mt-auto">
+                        <div className="text-xs text-slate-500">
+                            <h4 className="font-bold text-slate-900 uppercase mb-2">Terms & Conditions</h4>
+                            <div className="whitespace-pre-line leading-relaxed">
+                                {quotation.termsConditions || 'Standard trading conditions apply.'}
+                            </div>
                         </div>
-                    </div>
-
-                    {/* Footer */}
-                    <div className="mt-12 text-center">
-                        <p className="text-xs text-gray-500">Thank you for your business inquiry!</p>
+                        <div className="flex flex-col justify-end">
+                            <div className="flex justify-between items-end gap-8 text-center pt-8">
+                                <div className="flex-1">
+                                    <div className="h-20 border-b border-slate-300 mb-2"></div>
+                                    <p className="font-semibold text-slate-900 text-sm">Prepared By</p>
+                                    <p className="text-xs text-slate-500">{quotation.salesPerson || 'Sales Representative'}</p>
+                                </div>
+                                <div className="flex-1">
+                                    <div className="h-20 border-b border-slate-300 mb-2"></div>
+                                    <p className="font-semibold text-slate-900 text-sm">Approved By</p>
+                                    <p className="text-xs text-slate-500">Management</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            {/* Print-specific styles */}
+            {/* Print Styles */}
             <style>{`
                 @media print {
-                    body * {
-                        visibility: hidden;
-                    }
-                    .print-content, .print-content * {
-                        visibility: visible;
-                    }
-                    .print-content {
+                    @page { margin: 0; size: A4; }
+                    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: white; }
+                    .print-content { 
+                        width: 210mm;
+                        min-height: 297mm;
+                        padding: 15mm;
+                        margin: 0 auto;
                         position: absolute;
-                        left: 0;
                         top: 0;
-                        width: 100%;
-                        background: white !important;
-                        box-shadow: none !important;
-                        color: black !important;
-                    }
-                    .print:hidden {
-                        display: none !important;
+                        left: 0;
+                        border: none;
+                        max-height: none !important;
+                        overflow: visible !important;
                     }
                 }
             `}</style>

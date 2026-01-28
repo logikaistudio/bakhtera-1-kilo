@@ -21,7 +21,6 @@ import FreightDashboard from './pages/FreightDashboard';
 import VendorManagement from './pages/Centralized/VendorManagement';
 import CustomerManagement from './pages/Centralized/CustomerManagement';
 import Finance from './pages/Centralized/Finance';
-import CompanySettings from './pages/Centralized/CompanySettings';
 import COAMaster from './pages/Centralized/COAMaster';
 
 // Blink Module
@@ -37,6 +36,7 @@ import SalesRevenue from './pages/Blink/SalesRevenue';
 import ProfitAnalysis from './pages/Blink/ProfitAnalysis';
 import MasterRoutes from './pages/Blink/MasterRoutes';
 import PartnerManagement from './pages/Blink/PartnerManagement';
+import BlinkCompanySettings from './pages/Blink/CompanySettings'; // New
 
 // Blink Finance Module
 import InvoiceManagement from './pages/Blink/InvoiceManagement';
@@ -63,6 +63,8 @@ import OutboundInventory from './pages/Bridge/OutboundInventory';
 import ActivityLogger from './pages/Bridge/ActivityLogger';
 import ApprovalManager from './pages/Bridge/ApprovalManager';
 import CodeOfAccount from './pages/Bridge/CodeOfAccount';
+import BridgePartnerManagement from './pages/Bridge/PartnerManagement';
+import BridgeCompanySettings from './pages/Bridge/CompanySettings'; // New
 
 // Big Module
 import BigDashboard from './pages/Big/BigDashboard';
@@ -71,6 +73,7 @@ import BigQuotations from './pages/Big/Sales/Quotations';
 import BigInvoices from './pages/Big/Finance/Invoices';
 import BigCosts from './pages/Big/Operations/EventCosts';
 import BigAR from './pages/Big/Finance/AccountsReceivable';
+import BigCompanySettings from './pages/Big/CompanySettings'; // New
 
 // Pabean Module
 import PabeanDashboard from './pages/Pabean/PabeanDashboard';
@@ -121,7 +124,7 @@ function App() {
                   <Route path="/customers" element={<CustomerManagement />} />
                   <Route path="/finance" element={<Finance />} />
                   <Route path="/finance/coa" element={<COAMaster />} />
-                  <Route path="/settings" element={<CompanySettings />} />
+                  {/* Removed /settings */}
 
                   {/* Blink Module - Sales & Operations */}
                   <Route path="/blink" element={<BlinkDashboard />} />
@@ -134,6 +137,7 @@ function App() {
                   <Route path="/blink/operations/bl" element={<BLManagement />} />
                   <Route path="/blink/master/routes" element={<MasterRoutes />} />
                   <Route path="/blink/master/partners" element={<PartnerManagement />} />
+                  <Route path="/blink/master/settings" element={<BlinkCompanySettings />} />
 
                   {/* Blink Finance Module */}
                   <Route path="/blink/finance/invoices" element={<InvoiceManagement />} />
@@ -166,9 +170,12 @@ function App() {
                   <Route path="/bridge/approvals" element={<ApprovalManager />} />
                   <Route path="/bridge/pergerakan" element={<PergerakanBarang />} />
                   <Route path="/bridge/code-of-account" element={<CodeOfAccount />} />
+                  <Route path="/bridge/master/partners" element={<BridgePartnerManagement />} />
+                  <Route path="/bridge/master/settings" element={<BridgeCompanySettings />} />
 
                   {/* Big Module */}
                   <Route path="/big" element={<BigDashboard />} />
+                  <Route path="/big/master/settings" element={<BigCompanySettings />} />
 
                   {/* Sales */}
                   <Route path="/big/quotations" element={<BigQuotations />} />

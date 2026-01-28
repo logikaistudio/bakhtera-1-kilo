@@ -7,149 +7,98 @@ import { exportToCSV } from '../../utils/exportCSV';
 import { exportToXLS } from '../../utils/exportXLS';
 
 const BarangMasuk = () => {
-    const { inboundTransactions = [], companySettings } = useData();
+    const { inboundTransactions = [], companySettings, bridgeSettings } = useData();
     const [searchTerm, setSearchTerm] = useState('');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [selectedTransaction, setSelectedTransaction] = useState(null);
 
-    // Group items by Transaction (Pengajuan)
-    // inboundTransactions is already grouped by default in DataContext (one transaction object contains items array)
-    // checking if we need to regroup or just use inboundTransactions directly.
-    // Based on DataContext, inboundTransactions is an array of transaction objects, each having an 'items' array.
-
-    // Filter transactions
+    // Filter Transactions
     const filteredTransactions = inboundTransactions.filter(t => {
-        const matchesSearch = (t.pengajuanNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (t.customsDocNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (t.customsDocType || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (t.sender || '').toLowerCase().includes(searchTerm.toLowerCase());
-
-        const tDate = new Date(t.date);
+        const docDate = new Date(t.date);
         const start = startDate ? new Date(startDate) : null;
         const end = endDate ? new Date(endDate) : null;
 
         if (end) end.setHours(23, 59, 59, 999);
 
-        const matchesDate = (!start || tDate >= start) && (!end || tDate <= end);
+        const matchesDate = (!start || docDate >= start) && (!end || docDate <= end);
+        const matchesSearch = (
+            (t.pengajuanNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (t.customsDocNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (t.sender || t.supplier || '').toLowerCase().includes(searchTerm.toLowerCase())
+        );
 
-        return matchesSearch && matchesDate;
+        return matchesDate && matchesSearch;
     });
 
-    // Helper to calc total value of a transaction
+    // Helper: Calculate Total Value
     const getTransactionTotal = (t) => {
-        if (!t.items || t.items.length === 0) return t.value || 0; // Fallback to header value if no items
-        return t.items.reduce((sum, item) => sum + (parseFloat(item.value) || 0), 0);
+        return (t.items || []).reduce((sum, item) => sum + (Number(item.value) || 0), 0);
     };
 
-    // Helper to calc total qty
+    // Helper: Calculate Total Qty
     const getTransactionQty = (t) => {
-        if (!t.items || t.items.length === 0) return t.quantity || 0;
-        return t.items.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0);
+        return (t.items || []).reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
     };
 
-    // Export to CSV handler
-    const handleExportCSV = () => {
-        // Export flattened data for CSV even if view is grouped
-        const allItems = filteredTransactions.flatMap(t => {
-            return (t.items || []).map((item, idx) => ({
-                ...t,
-                ...item,
-                noUrut: item.sequenceNumber || item.noUrut || (idx + 1),
-                totalValue: getTransactionTotal(t)
-            }));
-        });
-
-        const columns = [
-            { key: 'pengajuanNumber', header: 'No. Pengajuan' },
-            { key: 'customsDocType', header: 'Jenis Dokumen' },
-            { key: 'customsDocNumber', header: 'No. Dokumen (Pabean)' },
-            { key: 'customsDocDate', header: 'Tanggal Dokumen' },
-            { key: 'date', header: 'Tanggal Terima' },
-            { key: 'sender', header: 'Pengirim' },
-            { key: 'itemCode', header: 'Kode Barang' },
-            { key: 'assetName', header: 'Nama Barang' },
-            { key: 'quantity', header: 'Quantity' },
-            { key: 'unit', header: 'Satuan' },
-            { key: 'value', header: 'Nilai Item' },
-            { key: 'totalValue', header: 'Total Nilai Pengajuan' }
-        ];
-
-        const dataToExport = allItems.map(item => ({
-            ...item,
-            date: item.date ? new Date(item.date).toLocaleDateString('id-ID') : '-',
-            customsDocDate: item.customsDocDate ? new Date(item.customsDocDate).toLocaleDateString('id-ID') : '-'
-        }));
-
-        exportToCSV(dataToExport, 'Barang_Masuk', columns);
-    };
-
-    // Export to XLS handler
+    // Export Main Table to XLS
     const handleExportXLS = () => {
-        // Similar flattened approach for XLS details
-        if (filteredTransactions.length === 0) {
-            alert('Tidak ada data untuk diexport');
-            return;
-        }
-
-        const allItems = filteredTransactions.flatMap(t => {
-            return (t.items || []).map((item, idx) => ({
-                ...t,
-                ...item,
-                noUrut: item.sequenceNumber || item.noUrut || (idx + 1)
-            }));
-        });
-
         const headerRows = [
-            { value: companySettings?.company_name || 'PT. BAKHTERA FREIGHT WORLDWIDE', style: 'company' },
-            { value: companySettings?.address || 'Jl. Contoh No. 123, Jakarta', style: 'normal' },
+            { value: bridgeSettings?.company_name || companySettings?.company_name || 'PT. BAKHTERA FREIGHT WORLDWIDE', style: 'company' },
+            { value: bridgeSettings?.company_address || companySettings?.company_address || 'Jl. Contoh No. 123, Jakarta', style: 'normal' },
             { value: 'DATA BARANG MASUK (INBOUND)', style: 'title' }
         ];
 
         const xlsColumns = [
             { header: 'No', key: 'no', width: 5, align: 'center' },
             { header: 'No. Pengajuan', key: 'pengajuanNumber', width: 20 },
-            { header: 'Jenis Dokumen', key: 'customsDocType', width: 15 },
-            { header: 'No Pabean', key: 'customsDocNumber', width: 15 },
-            { header: 'Kode Barang', key: 'itemCode', width: 15 },
-            { header: 'Nama Barang', key: 'assetName', width: 30 },
-            { header: 'Jumlah', key: 'quantity', width: 10, align: 'center', render: (i) => Number(i.quantity) || 0 },
-            { header: 'Nilai', key: 'value', width: 15, align: 'right', render: (i) => formatCurrency(i.value) }
+            { header: 'Jenis Dok', key: 'customsDocType', width: 10, align: 'center' },
+            { header: 'No. Pabean', key: 'customsDocNumber', width: 20 },
+            { header: 'Tgl Dokumen', key: 'customsDocDate', width: 12, align: 'center' },
+            { header: 'Pengirim', key: 'sender', width: 25 },
+            { header: 'Jml Item', key: 'itemCount', width: 10, align: 'center' },
+            { header: 'Total Nilai', key: 'totalValue', width: 15, align: 'right' }
         ];
 
-        exportToXLS(allItems, 'Laporan_Barang_Masuk', headerRows, xlsColumns);
-        exportToXLS(filteredTransactions, 'Laporan_Barang_Masuk', headerRows, xlsColumns);
+        const data = filteredTransactions.map((t, idx) => ({
+            ...t,
+            no: idx + 1,
+            customsDocDate: t.customsDocDate ? new Date(t.customsDocDate).toLocaleDateString('id-ID') : '-',
+            itemCount: t.items ? t.items.length : 0,
+            totalValue: formatCurrency(getTransactionTotal(t))
+        }));
+
+        exportToXLS(data, 'Laporan_Barang_Masuk', headerRows, xlsColumns);
     };
 
-    // Modal Specific Exports
-    const handleModalExportCSV = () => {
-        if (!selectedTransaction) return;
-        const items = selectedTransaction.items || [];
+    // Export Main Table to CSV
+    const handleExportCSV = () => {
         const columns = [
-            { key: 'noUrut', header: 'No' },
-            { key: 'itemCode', header: 'Kode Barang' },
-            { key: 'hsCode', header: 'HS Code' },
-            { key: 'assetName', header: 'Uraian Barang' },
-            { key: 'quantity', header: 'Jumlah' },
-            { key: 'unit', header: 'Satuan' },
-            { key: 'value', header: 'Nilai Satuan' },
+            { key: 'pengajuanNumber', header: 'No. Pengajuan' },
+            { key: 'customsDocType', header: 'Jenis Dok' },
+            { key: 'customsDocNumber', header: 'No. Pabean' },
+            { key: 'date', header: 'Tgl Masuk' },
+            { key: 'sender', header: 'Pengirim' },
+            { key: 'totalItems', header: 'Jml Item' },
             { key: 'totalValue', header: 'Total Nilai' }
         ];
 
-        const data = items.map((item, idx) => ({
-            ...item,
-            noUrut: idx + 1,
-            totalValue: parseFloat(item.value || 0) * 1 // Assuming 1 for now or quantity if per unit
+        const data = filteredTransactions.map(t => ({
+            ...t,
+            date: new Date(t.date).toLocaleDateString('id-ID'),
+            totalItems: t.items?.length || 0,
+            totalValue: getTransactionTotal(t)
         }));
 
-        exportToCSV(data, `Detail_Pengajuan_${selectedTransaction.pengajuanNumber}`, columns);
+        exportToCSV(data, 'Barang_Masuk', columns);
     };
 
+    // Export Detail Modal to XLS
     const handleModalExportXLS = () => {
         if (!selectedTransaction) return;
 
         const headerRows = [
-            { value: companySettings?.company_name || 'PT. BAKHTERA FREIGHT WORLDWIDE', style: 'company' },
+            { value: bridgeSettings?.company_name || companySettings?.company_name || 'PT. BAKHTERA FREIGHT WORLDWIDE', style: 'company' },
             { value: `DETAIL PENGAJUAN: ${selectedTransaction.pengajuanNumber}`, style: 'title' },
             { value: `No Pabean: ${selectedTransaction.customsDocNumber} | Tgl: ${selectedTransaction.customsDocDate ? new Date(selectedTransaction.customsDocDate).toLocaleDateString() : '-'}`, style: 'normal' }
         ];
@@ -166,6 +115,22 @@ const BarangMasuk = () => {
         ];
 
         exportToXLS(selectedTransaction.items || [], `Detail_${selectedTransaction.pengajuanNumber}`, headerRows, xlsColumns);
+    };
+
+    // Export Detail Modal to CSV
+    const handleModalExportCSV = () => {
+        if (!selectedTransaction) return;
+
+        const columns = [
+            { key: 'itemCode', header: 'Kode Barang' },
+            { key: 'hsCode', header: 'HS Code' },
+            { key: 'assetName', header: 'Uraian Barang' },
+            { key: 'quantity', header: 'Jumlah' },
+            { key: 'unit', header: 'Satuan' },
+            { key: 'value', header: 'Nilai' }
+        ];
+
+        exportToCSV(selectedTransaction.items || [], `Detail_${selectedTransaction.pengajuanNumber}`, columns);
     };
 
     return (

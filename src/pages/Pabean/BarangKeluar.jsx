@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { ArrowUpCircle, Search, Package, Download, FileSpreadsheet } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import Button from '../../components/Common/Button';
@@ -7,257 +7,103 @@ import { exportToCSV } from '../../utils/exportCSV';
 import { exportToXLS } from '../../utils/exportXLS';
 
 const BarangKeluar = () => {
-    const {
-        inboundTransactions = [],
-        quotations = [], // Add quotations for source of truth
-        companySettings
-    } = useData();
+    const { inboundTransactions = [], companySettings, bridgeSettings } = useData();
     const [searchTerm, setSearchTerm] = useState('');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [selectedTransaction, setSelectedTransaction] = useState(null);
 
-    // Create a lookup map for inbound item UNIT PRICES
-    // Key: pengajuanNumber -> { itemsByCode: { itemCode: unitPrice } }
-    // Unit price = value / quantity (atau value jika quantity = 0 atau 1)
-    const inboundUnitPriceLookup = useMemo(() => {
-        const lookup = {};
-        inboundTransactions.forEach(t => {
-            const pengajuan = t.pengajuanNumber || t.pengajuan_number;
-            if (pengajuan) {
-                if (!lookup[pengajuan]) {
-                    lookup[pengajuan] = {
-                        itemsByCode: {}
-                    };
-                }
+    // Filter outbound transactions only
+    const outboundTransactions = inboundTransactions.filter(t => t.direction === 'outbound');
 
-                // If transaction has items array
-                if (t.items && Array.isArray(t.items)) {
-                    t.items.forEach(item => {
-                        const code = item.itemCode || item.item_code;
-                        const qty = parseFloat(item.quantity) || 1;
-                        const val = parseFloat(item.value) || 0;
-                        if (code && qty > 0) {
-                            lookup[pengajuan].itemsByCode[code] = val / qty;
-                        }
-                    });
-                } else {
-                    // Single item transaction
-                    const code = t.itemCode || t.item_code;
-                    const qty = parseFloat(t.quantity) || 1;
-                    const val = parseFloat(t.value) || 0;
-                    if (code && qty > 0) {
-                        lookup[pengajuan].itemsByCode[code] = val / qty;
-                    }
-                }
-            }
-        });
-        return lookup;
-    }, [inboundTransactions]);
+    // Filter Transactions
+    const filteredTransactions = outboundTransactions.filter(t => {
+        const docDate = new Date(t.date);
+        const start = startDate ? new Date(startDate) : null;
+        const end = endDate ? new Date(endDate) : null;
 
-    // Group transactions by pengajuanNumber - USING QUOTATIONS AS SOURCE
-    const groupedTransactions = useMemo(() => {
-        // Filter valid outbound quotations
-        // Status: submitted, approved, processed
-        const validQuotations = quotations.filter(q =>
-            q.type === 'outbound' &&
-            ['submitted', 'approved', 'processed'].includes(q.outbound_status || q.documentStatus || q.document_status)
+        if (end) end.setHours(23, 59, 59, 999);
+
+        const matchesDate = (!start || docDate >= start) && (!end || docDate <= end);
+        const matchesSearch = (
+            (t.pengajuanNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (t.customsDocNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (t.destination || t.receiver || '').toLowerCase().includes(searchTerm.toLowerCase())
         );
 
-        return validQuotations.map(q => {
-            const key = q.quotationNumber || q.quotation_number;
-            const sourcePengajuan = q.sourcePengajuanNumber || q.source_pengajuan_number;
-            const inboundData = sourcePengajuan ? inboundUnitPriceLookup[sourcePengajuan] : null;
+        return matchesDate && matchesSearch;
+    });
 
-            // Flatten items from packages
-            const flatItems = [];
-            let totalValue = 0;
-
-            (q.packages || []).forEach(pkg => {
-                (pkg.items || []).forEach(item => {
-                    const itemCode = item.itemCode || item.item_code;
-
-                    // FIX: Determine correct outbound quantity
-                    // Priority: outboundQuantity > outboundQty > quantity
-                    // If source is inventory, 'quantity' is often Initial Stock, so we must prioritize outboundQuantity
-                    let outboundQty = 0;
-                    if (item.outboundQuantity !== undefined && item.outboundQuantity !== null) {
-                        outboundQty = parseFloat(item.outboundQuantity);
-                    } else if (item.outboundQty !== undefined && item.outboundQty !== null) {
-                        outboundQty = parseFloat(item.outboundQty);
-                    } else {
-                        outboundQty = parseFloat(item.quantity) || 0;
-                    }
-
-                    // Skip if quantity is effectively 0
-                    if (outboundQty <= 0) return;
-
-                    const unitPrice = inboundData?.itemsByCode?.[itemCode] || 0;
-                    const itemValue = unitPrice * outboundQty;
-
-                    totalValue += itemValue;
-
-                    flatItems.push({
-                        itemCode: itemCode,
-                        hsCode: item.hsCode || item.hs_code,
-                        assetName: item.name || item.itemName || item.item_name,
-                        goodsType: item.goodsType || item.goods_type || 'Barang Jadi',
-                        quantity: outboundQty,
-                        unit: item.uom || item.unit || 'pcs',
-                        value: itemValue,
-                        sequenceNumber: item.serialNumber || item.serial_number,
-                        packageNumber: pkg.packageNumber || pkg.package_number,
-                        originalQuantity: item.quantity // Keep track of original stock for reference
-                    });
-                });
-            });
-
-            return {
-                id: q.id,
-                pengajuanNumber: key,
-                customsDocNumber: q.bcDocumentNumber || q.bc_document_number || '-',
-                customsDocType: q.bcDocType || q.bc_document_type || 'BC 2.7', // Default for outbound
-                customsDocDate: q.bcDocumentDate || q.bc_document_date,
-                date: q.outbound_date || q.approvedDate || q.approved_date || q.date,
-                destination: q.destination,
-                receiver: q.customer || q.receiver, // Use customer as receiver
-                sourcePengajuanNumber: sourcePengajuan,
-                items: flatItems,
-                totalValue: totalValue
-            };
-        });
-    }, [quotations, inboundUnitPriceLookup]); // Removed outboundTransactions dependency
-
-    // Filter transactions
-    const filteredTransactions = useMemo(() => {
-        return groupedTransactions.filter(t => {
-            const matchesSearch = (t.pengajuanNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (t.customsDocNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (t.customsDocType || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (t.destination || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (t.receiver || '').toLowerCase().includes(searchTerm.toLowerCase());
-
-            const tDate = new Date(t.date);
-            const start = startDate ? new Date(startDate) : null;
-            const end = endDate ? new Date(endDate) : null;
-
-            if (end) end.setHours(23, 59, 59, 999);
-
-            const matchesDate = (!start || tDate >= start) && (!end || tDate <= end);
-
-            return matchesSearch && matchesDate;
-        });
-    }, [groupedTransactions, searchTerm, startDate, endDate]);
-
-    // Helper to calc total value of a transaction
+    // Helper: Calculate Total Value
     const getTransactionTotal = (t) => {
-        // Use pre-calculated totalValue from grouping if available
-        if (t.totalValue !== undefined && t.totalValue > 0) return t.totalValue;
-        if (!t.items || t.items.length === 0) return parseFloat(t.value) || 0;
-        return t.items.reduce((sum, item) => sum + (parseFloat(item.value) || 0), 0);
+        return (t.items || []).reduce((sum, item) => sum + (Number(item.value) || 0), 0);
     };
 
-    // Export to CSV handler
-    const handleExportCSV = () => {
-        const allItems = filteredTransactions.flatMap(t => {
-            return (t.items || []).map((item, idx) => ({
-                ...t,
-                ...item,
-                noUrut: item.sequenceNumber || item.noUrut || (idx + 1),
-                totalValue: getTransactionTotal(t)
-            }));
-        });
-
-        const columns = [
-            { key: 'pengajuanNumber', header: 'No. Pengajuan' },
-            { key: 'customsDocType', header: 'Jenis Dokumen' },
-            { key: 'customsDocNumber', header: 'No. Dokumen (Pabean)' },
-            { key: 'customsDocDate', header: 'Tanggal Dokumen' },
-            { key: 'date', header: 'Tanggal Keluar' },
-            { key: 'destination', header: 'Tujuan' },
-            { key: 'receiver', header: 'Penerima' },
-            { key: 'itemCode', header: 'Kode Barang' },
-            { key: 'assetName', header: 'Nama Barang' },
-            { key: 'quantity', header: 'Quantity' },
-            { key: 'unit', header: 'Satuan' },
-            { key: 'value', header: 'Nilai Item' },
-            { key: 'totalValue', header: 'Total Nilai Pengajuan' }
-        ];
-
-        const dataToExport = allItems.map(item => ({
-            ...item,
-            date: item.date ? new Date(item.date).toLocaleDateString('id-ID') : '-',
-            customsDocDate: item.customsDocDate ? new Date(item.customsDocDate).toLocaleDateString('id-ID') : '-'
-        }));
-
-        exportToCSV(dataToExport, 'Barang_Keluar', columns);
+    // Helper: Calculate Total Qty
+    const getTransactionQty = (t) => {
+        return (t.items || []).reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
     };
 
-    // Export to XLS handler
+    // Export Main Table to XLS
     const handleExportXLS = () => {
-        if (filteredTransactions.length === 0) {
-            alert('Tidak ada data untuk diexport');
-            return;
-        }
-
-        const allItems = filteredTransactions.flatMap(t => {
-            return (t.items || []).map((item, idx) => ({
-                ...t,
-                ...item,
-                noUrut: item.sequenceNumber || item.noUrut || (idx + 1)
-            }));
-        });
-
         const headerRows = [
-            { value: companySettings?.company_name || 'PT. BAKHTERA FREIGHT WORLDWIDE', style: 'company' },
-            { value: companySettings?.address || 'Jl. Contoh No. 123, Jakarta', style: 'normal' },
+            { value: bridgeSettings?.company_name || companySettings?.company_name || 'PT. BAKHTERA FREIGHT WORLDWIDE', style: 'company' },
+            { value: bridgeSettings?.company_address || companySettings?.company_address || 'Jl. Contoh No. 123, Jakarta', style: 'normal' },
             { value: 'DATA BARANG KELUAR (OUTBOUND)', style: 'title' }
         ];
 
         const xlsColumns = [
             { header: 'No', key: 'no', width: 5, align: 'center' },
             { header: 'No. Pengajuan', key: 'pengajuanNumber', width: 20 },
-            { header: 'Jenis Dokumen', key: 'customsDocType', width: 15 },
-            { header: 'No Pabean', key: 'customsDocNumber', width: 15 },
-            { header: 'Tujuan', key: 'destination', width: 20 },
-            { header: 'Kode Barang', key: 'itemCode', width: 15 },
-            { header: 'Nama Barang', key: 'assetName', width: 30 },
-            { header: 'Jumlah', key: 'quantity', width: 10, align: 'center', render: (i) => Number(i.quantity) || 0 },
-            { header: 'Nilai', key: 'value', width: 15, align: 'right', render: (i) => formatCurrency(i.value) }
+            { header: 'Jenis Dok', key: 'customsDocType', width: 10, align: 'center' },
+            { header: 'No. Pabean', key: 'customsDocNumber', width: 20 },
+            { header: 'Tgl Dokumen', key: 'customsDocDate', width: 12, align: 'center' },
+            { header: 'Tujuan', key: 'destination', width: 25 },
+            { header: 'Jml Item', key: 'itemCount', width: 10, align: 'center' },
+            { header: 'Total Nilai', key: 'totalValue', width: 15, align: 'right' }
         ];
 
-        exportToXLS(allItems, 'Laporan_Barang_Keluar', headerRows, xlsColumns);
+        const data = filteredTransactions.map((t, idx) => ({
+            ...t,
+            no: idx + 1,
+            customsDocDate: t.customsDocDate ? new Date(t.customsDocDate).toLocaleDateString('id-ID') : '-',
+            destination: t.destination || t.receiver || '-',
+            itemCount: t.items ? t.items.length : 0,
+            totalValue: formatCurrency(getTransactionTotal(t))
+        }));
+
+        exportToXLS(data, 'Laporan_Barang_Keluar', headerRows, xlsColumns);
     };
 
-    // Modal Specific Exports
-    const handleModalExportCSV = () => {
-        if (!selectedTransaction) return;
-        const items = selectedTransaction.items || [];
+    // Export Main Table to CSV
+    const handleExportCSV = () => {
         const columns = [
-            { key: 'noUrut', header: 'No' },
-            { key: 'itemCode', header: 'Kode Barang' },
-            { key: 'hsCode', header: 'HS Code' },
-            { key: 'assetName', header: 'Uraian Barang' },
-            { key: 'quantity', header: 'Jumlah' },
-            { key: 'unit', header: 'Satuan' },
-            { key: 'value', header: 'Nilai Satuan' },
+            { key: 'pengajuanNumber', header: 'No. Pengajuan' },
+            { key: 'customsDocType', header: 'Jenis Dok' },
+            { key: 'customsDocNumber', header: 'No. Pabean' },
+            { key: 'date', header: 'Tgl Keluar' },
+            { key: 'destination', header: 'Tujuan' },
+            { key: 'totalItems', header: 'Jml Item' },
             { key: 'totalValue', header: 'Total Nilai' }
         ];
 
-        const data = items.map((item, idx) => ({
-            ...item,
-            noUrut: idx + 1,
-            totalValue: parseFloat(item.value || 0) * 1
+        const data = filteredTransactions.map(t => ({
+            ...t,
+            date: new Date(t.date).toLocaleDateString('id-ID'),
+            destination: t.destination || t.receiver || '-',
+            totalItems: t.items?.length || 0,
+            totalValue: getTransactionTotal(t)
         }));
 
-        exportToCSV(data, `Detail_Outbound_${selectedTransaction.pengajuanNumber}`, columns);
+        exportToCSV(data, 'Barang_Keluar', columns);
     };
 
+    // Export Detail Modal to XLS
     const handleModalExportXLS = () => {
         if (!selectedTransaction) return;
 
         const headerRows = [
-            { value: companySettings?.company_name || 'PT. BAKHTERA FREIGHT WORLDWIDE', style: 'company' },
+            { value: bridgeSettings?.company_name || companySettings?.company_name || 'PT. BAKHTERA FREIGHT WORLDWIDE', style: 'company' },
             { value: `DETAIL OUTBOUND: ${selectedTransaction.pengajuanNumber}`, style: 'title' },
             { value: `No Pabean: ${selectedTransaction.customsDocNumber} | Tgl: ${selectedTransaction.customsDocDate ? new Date(selectedTransaction.customsDocDate).toLocaleDateString() : '-'}`, style: 'normal' }
         ];
@@ -276,6 +122,22 @@ const BarangKeluar = () => {
         exportToXLS(selectedTransaction.items || [], `Detail_Outbound_${selectedTransaction.pengajuanNumber}`, headerRows, xlsColumns);
     };
 
+    // Export Detail Modal to CSV
+    const handleModalExportCSV = () => {
+        if (!selectedTransaction) return;
+
+        const columns = [
+            { key: 'itemCode', header: 'Kode Barang' },
+            { key: 'hsCode', header: 'HS Code' },
+            { key: 'assetName', header: 'Uraian Barang' },
+            { key: 'quantity', header: 'Jumlah' },
+            { key: 'unit', header: 'Satuan' },
+            { key: 'value', header: 'Nilai' }
+        ];
+
+        exportToCSV(selectedTransaction.items || [], `Detail_${selectedTransaction.pengajuanNumber}`, columns);
+    };
+
     return (
         <div className="p-6 space-y-6">
             {/* Header */}
@@ -284,7 +146,6 @@ const BarangKeluar = () => {
                 <p className="text-silver-dark mt-1">Daftar Pengajuan Barang Keluar (Per Dokumen)</p>
             </div>
 
-            {/* Search & Stats */}
             {/* Search & Stats */}
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div className="md:col-span-2 glass-card p-4 rounded-lg flex flex-col gap-3">
@@ -321,15 +182,10 @@ const BarangKeluar = () => {
                     <p className="text-xs text-silver-dark">Total Pengajuan</p>
                     <p className="text-2xl font-bold text-accent-orange">{filteredTransactions.length}</p>
                 </div>
-                {/* NEW: Barang Keluar Summary Box */}
                 <div className="glass-card p-4 rounded-lg border border-red-500">
                     <p className="text-xs text-silver-dark">Barang Keluar</p>
                     <p className="text-2xl font-bold text-red-500">
-                        {filteredTransactions.reduce((sum, t) => {
-                            // Calculate total quantity for each transaction
-                            const tQty = (t.items || []).reduce((iq, item) => iq + (Number(item.quantity) || 0), 0);
-                            return sum + tQty;
-                        }, 0)}
+                        {filteredTransactions.reduce((sum, t) => sum + getTransactionQty(t), 0)}
                     </p>
                 </div>
                 <div className="glass-card p-4 rounded-lg border border-accent-green">
