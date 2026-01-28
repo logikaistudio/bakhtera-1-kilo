@@ -47,8 +47,10 @@ export const DataProvider = ({ children }) => {
     const [warehouseInventory, setWarehouseInventory] = useState([]);
     const [mutationLogs, setMutationLogs] = useState([]);
     const [bcCodes, setBcCodes] = useState([]);
+    const [hsCodes, setHsCodes] = useState([]);
     const [invoices, setInvoices] = useState([]);
     const [purchases, setPurchases] = useState([]);
+    const [purchaseOrders, setPurchaseOrders] = useState([]);
     const [pendingApprovals, setPendingApprovals] = useState([]);
 
     // Activity Logs for audit tracking
