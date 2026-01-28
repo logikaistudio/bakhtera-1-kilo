@@ -93,6 +93,7 @@ const Sidebar = () => {
         // Master Data Category
         {
             type: 'category', label: '⚙️ Master Data', items: [
+                { path: '/bridge/master/partners', label: 'Mitra Bisnis' },
                 { path: '/bridge/bc-master', label: 'Master Kode BC' },
                 { path: '/bridge/hs-master', label: 'Master Kode HS' },
                 { path: '/bridge/item-master', label: 'Master Kode Barang' },

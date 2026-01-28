@@ -35,6 +35,7 @@ export const DataProvider = ({ children }) => {
     const [inboundTransactions, setInboundTransactions] = useState([]);
     const [outboundTransactions, setOutboundTransactions] = useState([]);
     const [rejectTransactions, setRejectTransactions] = useState([]);
+    const [bridgeBusinessPartners, setBridgeBusinessPartners] = useState([]); // Bridge-specific partners
 
     // Activity Logs for audit tracking
     const [activityLogs, setActivityLogs] = useState([]);
@@ -330,6 +331,23 @@ export const DataProvider = ({ children }) => {
                     console.log(`📊 Customers: ${customerRecords.length}, Vendors: ${vendorRecords.length}`);
                     setCustomers(customerRecords);
                     setVendors(vendorRecords);
+                }
+
+                // ========================================
+                // BRIDGE BUSINESS PARTNERS
+                // Load from bridge_business_partners table
+                // ========================================
+                console.log('🔄 Fetching Bridge business partners...');
+                const { data: bridgePartnerData, error: bridgePartnerError } = await supabase
+                    .from('bridge_business_partners')
+                    .select('*');
+
+                if (bridgePartnerError) {
+                    // Table might not exist yet - not critical
+                    console.log('⚠️ Bridge business partners table not found or error:', bridgePartnerError.message);
+                } else if (bridgePartnerData) {
+                    console.log(`✅ Loaded ${bridgePartnerData.length} Bridge business partners`);
+                    setBridgeBusinessPartners(bridgePartnerData);
                 }
 
 
@@ -3185,6 +3203,7 @@ export const DataProvider = ({ children }) => {
         vendors, // Deprecated: use businessPartners.filter(p => p.is_vendor)
         customers, // Deprecated: use businessPartners.filter(p => p.is_customer)
         businessPartners, // NEW: Unified partner management
+        bridgeBusinessPartners, // Bridge-specific partners
         finance,
 
         // Module-specific data

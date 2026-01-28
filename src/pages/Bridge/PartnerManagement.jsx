@@ -2,17 +2,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
-import { exportPartnerTemplate, parsePartnerImportFile, bulkImportPartners } from '../../utils/partnerExport';
 import {
     Users, Plus, Search, Edit, Trash2, Building2, User,
     Phone, Mail, MapPin, CreditCard, Filter, X, Check, Download, Upload
 } from 'lucide-react';
 
-const PartnerManagement = () => {
+const BridgePartnerManagement = () => {
     const [partners, setPartners] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
-    const [roleFilter, setRoleFilter] = useState('all'); // 'all', 'customer', 'vendor', 'agent'
+    const [roleFilter, setRoleFilter] = useState('all'); // 'all', 'customer', 'vendor', 'consignee', 'shipper'
     const [showModal, setShowModal] = useState(false);
     const [editingPartner, setEditingPartner] = useState(null);
     const fileInputRef = useRef(null);
@@ -30,10 +29,11 @@ const PartnerManagement = () => {
         postal_code: '',
         country: 'Indonesia',
         tax_id: '',
-        // Roles
+        // Roles for Bridge (customs/warehouse context)
         is_customer: false,
         is_vendor: false,
-        is_agent: false,
+        is_consignee: false, // Penerima barang
+        is_shipper: false,   // Pengirim barang
         is_transporter: false,
         // Financial
         payment_terms: 'NET 30',
@@ -62,7 +62,13 @@ const PartnerManagement = () => {
             setPartners(data || []);
         } catch (error) {
             console.error('Error fetching partners:', error);
-            alert('Failed to load partners: ' + error.message);
+            // If table doesn't exist, show empty list
+            if (error.code === '42P01') {
+                console.log('bridge_business_partners table not found, showing empty list');
+                setPartners([]);
+            } else {
+                alert('Failed to load partners: ' + error.message);
+            }
         } finally {
             setLoading(false);
         }
@@ -80,7 +86,7 @@ const PartnerManagement = () => {
                     .eq('id', editingPartner.id);
 
                 if (error) throw error;
-                alert('✅ Partner updated successfully');
+                alert('✅ Mitra berhasil diperbarui');
             } else {
                 // Create
                 const { error } = await supabase
@@ -88,14 +94,14 @@ const PartnerManagement = () => {
                     .insert([formData]);
 
                 if (error) throw error;
-                alert('✅ Partner created successfully');
+                alert('✅ Mitra baru berhasil ditambahkan');
             }
 
             fetchPartners();
             handleCloseModal();
         } catch (error) {
             console.error('Error saving partner:', error);
-            alert('❌ Failed to save partner: ' + error.message);
+            alert('❌ Gagal menyimpan mitra: ' + error.message);
         }
     };
 
@@ -109,11 +115,11 @@ const PartnerManagement = () => {
                 .eq('id', partnerId);
 
             if (error) throw error;
-            alert('✅ Partner deleted');
+            alert('✅ Mitra berhasil dihapus');
             fetchPartners();
         } catch (error) {
             console.error('Error deleting partner:', error);
-            alert('❌ Failed to delete: ' + error.message);
+            alert('❌ Gagal menghapus: ' + error.message);
         }
     };
 
@@ -141,7 +147,8 @@ const PartnerManagement = () => {
             tax_id: '',
             is_customer: false,
             is_vendor: false,
-            is_agent: false,
+            is_consignee: false,
+            is_shipper: false,
             is_transporter: false,
             payment_terms: 'NET 30',
             credit_limit: 0,
@@ -163,7 +170,8 @@ const PartnerManagement = () => {
         const matchesRole = roleFilter === 'all' ||
             (roleFilter === 'customer' && p.is_customer) ||
             (roleFilter === 'vendor' && p.is_vendor) ||
-            (roleFilter === 'agent' && p.is_agent) ||
+            (roleFilter === 'consignee' && p.is_consignee) ||
+            (roleFilter === 'shipper' && p.is_shipper) ||
             (roleFilter === 'transporter' && p.is_transporter);
 
         return matchesSearch && matchesRole;
@@ -173,9 +181,44 @@ const PartnerManagement = () => {
         const roles = [];
         if (partner.is_customer) roles.push({ label: 'Customer', color: 'bg-green-500/20 text-green-400' });
         if (partner.is_vendor) roles.push({ label: 'Vendor', color: 'bg-blue-500/20 text-blue-400' });
-        if (partner.is_agent) roles.push({ label: 'Agent', color: 'bg-purple-500/20 text-purple-400' });
+        if (partner.is_consignee) roles.push({ label: 'Consignee', color: 'bg-purple-500/20 text-purple-400' });
+        if (partner.is_shipper) roles.push({ label: 'Shipper', color: 'bg-yellow-500/20 text-yellow-400' });
         if (partner.is_transporter) roles.push({ label: 'Transporter', color: 'bg-orange-500/20 text-orange-400' });
         return roles;
+    };
+
+    // Export partners to CSV
+    const handleExportCSV = () => {
+        if (partners.length === 0) {
+            alert('Tidak ada data untuk diekspor');
+            return;
+        }
+
+        const headers = ['Kode', 'Nama', 'Tipe', 'Contact Person', 'Email', 'Phone', 'Alamat', 'Kota', 'NPWP', 'Customer', 'Vendor', 'Consignee', 'Shipper', 'Transporter'];
+        const rows = partners.map(p => [
+            p.partner_code || '',
+            p.partner_name || '',
+            p.partner_type || '',
+            p.contact_person || '',
+            p.email || '',
+            p.phone || '',
+            p.address_line1 || '',
+            p.city || '',
+            p.tax_id || '',
+            p.is_customer ? 'Ya' : 'Tidak',
+            p.is_vendor ? 'Ya' : 'Tidak',
+            p.is_consignee ? 'Ya' : 'Tidak',
+            p.is_shipper ? 'Ya' : 'Tidak',
+            p.is_transporter ? 'Ya' : 'Tidak'
+        ]);
+
+        const csvContent = [headers.join(','), ...rows.map(r => r.map(cell => `"${cell}"`).join(','))].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `bridge_mitra_bisnis_${new Date().toISOString().split('T')[0]}.csv`;
+        link.click();
+        alert(`✅ Diekspor ${partners.length} mitra ke CSV`);
     };
 
     if (loading) return <div className="p-12 text-center text-silver-dark">Loading...</div>;
@@ -185,10 +228,17 @@ const PartnerManagement = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text">Manajemen Mitra Bisnis</h1>
-                    <p className="text-silver-dark mt-1">Kelola Customer, Vendor, Agent, dan Partner lainnya</p>
+                    <h1 className="text-3xl font-bold gradient-text">Mitra Bisnis Bridge</h1>
+                    <p className="text-silver-dark mt-1">Kelola Customer, Vendor, Consignee, Shipper (TPB/Gudang Berikat)</p>
                 </div>
                 <div className="flex gap-2">
+                    <button
+                        onClick={handleExportCSV}
+                        className="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-colors flex items-center gap-2 text-sm"
+                    >
+                        <Download className="w-4 h-4" />
+                        Export CSV
+                    </button>
                     <Button onClick={() => setShowModal(true)} icon={Plus}>
                         Tambah Mitra Baru
                     </Button>
@@ -196,7 +246,7 @@ const PartnerManagement = () => {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
                 <div className="glass-card p-4 rounded-lg">
                     <p className="text-xs text-silver-dark">Total Mitra</p>
                     <p className="text-2xl font-bold text-silver-light mt-1">{partners.length}</p>
@@ -214,9 +264,15 @@ const PartnerManagement = () => {
                     </p>
                 </div>
                 <div className="glass-card p-4 rounded-lg">
-                    <p className="text-xs text-silver-dark">Agent</p>
+                    <p className="text-xs text-silver-dark">Consignee</p>
                     <p className="text-2xl font-bold text-purple-400 mt-1">
-                        {partners.filter(p => p.is_agent).length}
+                        {partners.filter(p => p.is_consignee).length}
+                    </p>
+                </div>
+                <div className="glass-card p-4 rounded-lg">
+                    <p className="text-xs text-silver-dark">Shipper</p>
+                    <p className="text-2xl font-bold text-yellow-400 mt-1">
+                        {partners.filter(p => p.is_shipper).length}
                     </p>
                 </div>
                 <div className="glass-card p-4 rounded-lg">
@@ -247,7 +303,8 @@ const PartnerManagement = () => {
                     <option value="all">Semua Role</option>
                     <option value="customer">Customer</option>
                     <option value="vendor">Vendor</option>
-                    <option value="agent">Agent</option>
+                    <option value="consignee">Consignee</option>
+                    <option value="shipper">Shipper</option>
                     <option value="transporter">Transporter</option>
                 </select>
             </div>
@@ -256,7 +313,7 @@ const PartnerManagement = () => {
             <div className="glass-card rounded-lg overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full">
-                        <thead className="bg-accent-blue">
+                        <thead className="bg-accent-orange">
                             <tr>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">Kode</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">Nama Mitra</th>
@@ -275,7 +332,7 @@ const PartnerManagement = () => {
                             ) : (
                                 filteredPartners.map((partner) => (
                                     <tr key={partner.id} className="hover:bg-dark-surface/50 transition-colors">
-                                        <td className="px-4 py-3 text-xs font-mono text-blue-400">{partner.partner_code}</td>
+                                        <td className="px-4 py-3 text-xs font-mono text-blue-400">{partner.partner_code || '-'}</td>
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-2">
                                                 {partner.partner_type === 'company' ? (
@@ -383,15 +440,16 @@ const PartnerManagement = () => {
                                 </div>
                             </div>
 
-                            {/* Roles */}
+                            {/* Roles - Bridge specific */}
                             <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
                                 <h3 className="text-sm font-bold text-purple-400 mb-3 uppercase">Role Partner (bisa lebih dari 1)</h3>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                                     {[
-                                        { key: 'is_customer', label: 'Customer', desc: 'Bisa ditagih Invoice' },
-                                        { key: 'is_vendor', label: 'Vendor', desc: 'Bisa terima PO' },
-                                        { key: 'is_agent', label: 'Agent', desc: 'Partner agent' },
-                                        { key: 'is_transporter', label: 'Transporter', desc: 'Trucking/Airline' }
+                                        { key: 'is_customer', label: 'Customer', desc: 'Bisa ditagih' },
+                                        { key: 'is_vendor', label: 'Vendor', desc: 'Supplier barang' },
+                                        { key: 'is_consignee', label: 'Consignee', desc: 'Penerima barang' },
+                                        { key: 'is_shipper', label: 'Shipper', desc: 'Pengirim barang' },
+                                        { key: 'is_transporter', label: 'Transporter', desc: 'Trucking/EMKL' }
                                     ].map(role => (
                                         <label key={role.key} className="flex items-start gap-2 p-2 rounded border border-dark-border hover:bg-dark-surface/50 cursor-pointer">
                                             <input
@@ -562,4 +620,4 @@ const PartnerManagement = () => {
     );
 };
 
-export default PartnerManagement;
+export default BridgePartnerManagement;

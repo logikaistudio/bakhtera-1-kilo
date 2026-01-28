@@ -15,10 +15,11 @@ CREATE TABLE IF NOT EXISTS bridge_business_partners (
     country TEXT DEFAULT 'Indonesia',
     tax_id TEXT,
     
-    -- Roles (a partner can have multiple roles)
+    -- Roles (a partner can have multiple roles) - Bridge specific
     is_customer BOOLEAN DEFAULT false,
     is_vendor BOOLEAN DEFAULT false,
-    is_agent BOOLEAN DEFAULT false,
+    is_consignee BOOLEAN DEFAULT false, -- Penerima barang (TPB)
+    is_shipper BOOLEAN DEFAULT false,   -- Pengirim barang (TPB)
     is_transporter BOOLEAN DEFAULT false,
     
     -- Financial
@@ -45,6 +46,8 @@ CREATE INDEX IF NOT EXISTS idx_bridge_partners_code ON bridge_business_partners(
 CREATE INDEX IF NOT EXISTS idx_bridge_partners_name ON bridge_business_partners(partner_name);
 CREATE INDEX IF NOT EXISTS idx_bridge_partners_customer ON bridge_business_partners(is_customer) WHERE is_customer = true;
 CREATE INDEX IF NOT EXISTS idx_bridge_partners_vendor ON bridge_business_partners(is_vendor) WHERE is_vendor = true;
+CREATE INDEX IF NOT EXISTS idx_bridge_partners_consignee ON bridge_business_partners(is_consignee) WHERE is_consignee = true;
+CREATE INDEX IF NOT EXISTS idx_bridge_partners_shipper ON bridge_business_partners(is_shipper) WHERE is_shipper = true;
 
 -- Auto-generate partner code
 CREATE OR REPLACE FUNCTION generate_bridge_partner_code()
