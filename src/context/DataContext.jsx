@@ -17,22 +17,13 @@ export const DataProvider = ({ children }) => {
     const [customers, setCustomers] = useState([]); // Deprecated: use businessPartners filtered by is_customer
     const [businessPartners, setBusinessPartners] = useState([]); // NEW: Unified partner management
     const [finance, setFinance] = useState([]);
-
-    // Module-Specific Company Settings (ISOLATED)
-    const [companySettings, setCompanySettings] = useState(null); // Blink (default)
-    const [bridgeSettings, setBridgeSettings] = useState(null); // Bridge
-    const [bigSettings, setBigSettings] = useState(null); // Big
-
-    const [bankAccounts, setBankAccounts] = useState([]); // Blink
-    const [bridgeBankAccounts, setBridgeBankAccounts] = useState([]); // Bridge
-    const [bigBankAccounts, setBigBankAccounts] = useState([]); // Big
+    const [companySettings, setCompanySettings] = useState(null);
+    const [bankAccounts, setBankAccounts] = useState([]);
 
     // Module-specific data
     const [shipments, setShipments] = useState([]);
     const [assets, setAssets] = useState([]);
     const [events, setEvents] = useState([]);
-
-    // ... (rest of state definitions)
 
     // Bridge TPPB specific data
     const [quotations, setQuotations] = useState([]);
@@ -44,51 +35,175 @@ export const DataProvider = ({ children }) => {
     const [inboundTransactions, setInboundTransactions] = useState([]);
     const [outboundTransactions, setOutboundTransactions] = useState([]);
     const [rejectTransactions, setRejectTransactions] = useState([]);
-    const [warehouseInventory, setWarehouseInventory] = useState([]);
-    const [mutationLogs, setMutationLogs] = useState([]);
-    const [bcCodes, setBcCodes] = useState([]);
-    const [hsCodes, setHsCodes] = useState([]);
-    const [invoices, setInvoices] = useState([]);
-    const [purchases, setPurchases] = useState([]);
-    const [purchaseOrders, setPurchaseOrders] = useState([]);
-    const [pendingApprovals, setPendingApprovals] = useState([]);
 
     // Activity Logs for audit tracking
     const [activityLogs, setActivityLogs] = useState([]);
 
-    // Activity logging function
-    const logActivity = (activity) => {
+    // Helper function to log activity
+    const logActivity = (module, action, entityType, entityId, entityName, details, user = 'System User') => {
         const newLog = {
-            id: Date.now().toString(),
-            ...activity,
-            timestamp: new Date().toISOString()
+            id: `log-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            module,
+            action,
+            entityType,
+            entityId,
+            entityName,
+            user,
+            details
         };
         setActivityLogs(prev => [newLog, ...prev]);
-        return newLog;
     };
 
-    // Approval workflow functions
-    const requestApproval = (request) => {
-        const newRequest = {
-            id: Date.now().toString(),
-            ...request,
-            status: 'pending',
-            createdAt: new Date().toISOString()
+    // Pending Approvals
+    const [pendingApprovals, setPendingApprovals] = useState([]);
+
+    const requestApproval = (type, module, entityType, entityId, entityName, changes, details, requestedBy = 'User') => {
+        const newRequest = { id: `approval-${Date.now()}`, requestDate: new Date().toISOString(), type, module, entityType, entityId, entityName, requestedBy, changes, details, status: 'pending' };
+        setPendingApprovals(prev => [newRequest, ...prev]);
+        logActivity(module, 'approval_request', entityType, entityId, entityName, `Requested ${type}: ${details}`, requestedBy);
+        return newRequest.id;
+    };
+
+    const approveRequest = (requestId, approvedBy = 'Manager') => {
+        setPendingApprovals(prev => prev.map(req => req.id === requestId ? { ...req, status: 'approved', approvedBy, approvalDate: new Date().toISOString() } : req));
+        const request = pendingApprovals.find(r => r.id === requestId);
+        if (request) logActivity(request.module, 'approved', request.entityType, request.entityId, request.entityName, `Approved ${request.type}`, approvedBy);
+    };
+
+    const rejectRequest = (requestId, rejectedBy = 'Manager', reason = '') => {
+        setPendingApprovals(prev => prev.map(req => req.id === requestId ? { ...req, status: 'rejected', rejectedBy, rejectionDate: new Date().toISOString(), rejectionReason: reason } : req));
+        const request = pendingApprovals.find(r => r.id === requestId);
+        if (request) logActivity(request.module, 'rejected', request.entityType, request.entityId, request.entityName, `Rejected: ${reason}`, rejectedBy);
+    };
+
+    const [warehouseInventory, setWarehouseInventory] = useState([]);
+    const [mutationLogs, setMutationLogs] = useState([]);
+    const [bcCodes, setBcCodes] = useState([]);
+    const [hsCodes, setHSCodes] = useState([]); // HS Master State
+
+    // Finance module data
+    const [invoices, setInvoices] = useState([]);
+    const [purchases, setPurchases] = useState([]);
+    const [purchaseOrders, setPurchaseOrders] = useState([]);
+    const [payroll, setPayroll] = useState([]);
+    const [leads, setLeads] = useState([]);
+
+    // Shared Helper: Map Quotation DB -> State
+    const normalizeQuotation = (q) => ({
+        ...q,
+        quotationNumber: q.quotation_number,
+        submissionDate: q.submission_date || q.date,
+        documentStatus: q.document_status,
+        customsStatus: q.customs_status,
+        bcDocumentNumber: q.bc_document_number,
+        bcDocumentDate: q.bc_document_date,
+        bcDocType: q.bc_document_type,
+        bcSupportingDocuments: q.bc_supporting_documents || [],
+        approvedDate: q.approved_date,
+        approvedBy: q.approved_by,
+        rejectionReason: q.rejection_reason,
+        rejectionDate: q.rejection_date,
+        itemCode: q.item_code,
+        // Outbound processing status
+        outboundStatus: q.outbound_status || null,
+        outboundDate: q.outbound_date || null,
+        // Source Reference Fields (For Outbound History)
+        sourcePengajuanId: q.source_pengajuan_id || null,
+        sourcePengajuanNumber: q.source_pengajuan_number || null,
+        sourceBcDocumentNumber: q.source_bc_document_number || null,
+        sourceBcDocumentDate: q.source_bc_document_date || null,
+    });
+
+    // Shared Helper: Map Inbound DB -> State (freight_inbound schema)
+    const mapInboundToState = (i) => {
+        // Parse documents JSONB
+        let parsedDocs = {};
+        if (typeof i.documents === 'string') {
+            try { parsedDocs = JSON.parse(i.documents); } catch (e) { parsedDocs = {}; }
+        } else {
+            parsedDocs = i.documents || {};
+        }
+
+        const items = parsedDocs.items || [];
+        // Extract supporting documents to prevent UI crash when mapping
+        const supportingDocs = parsedDocs.bcSupportingDocuments || [];
+
+        return {
+            ...i,
+            // CamelCase aliases for UI
+            pengajuanId: i.pengajuan_id,
+            pengajuanNumber: i.pengajuan_number,
+            customsDocNumber: i.customs_doc_number,
+            customsDocDate: i.customs_doc_date,
+            customsDocType: i.customs_doc_type,
+            receiptNumber: i.receipt_number,
+            itemCode: i.item_code,
+            hsCode: i.hs_code,
+            serialNumber: i.serial_number,
+            currency: i.currency,
+            quantity: i.quantity,
+            unit: i.unit,
+            value: i.value,
+            sender: i.sender,
+            assetName: i.asset_name,
+            assetId: i.item_code,
+            createdAt: i.created_at,
+            date: i.date,
+            // Items array for BarangMasuk.jsx flatMap
+            items: items,
+            // Use the extracted array for UI mapping
+            documents: supportingDocs,
+            // Keep original data just in case
+            originalDocuments: i.documents
         };
-        setPendingApprovals(prev => [...prev, newRequest]);
-        return newRequest;
     };
 
-    const approveRequest = (id) => {
-        setPendingApprovals(prev => prev.map(req =>
-            req.id === id ? { ...req, status: 'approved', approvedAt: new Date().toISOString() } : req
-        ));
-    };
+    // Shared Helper: Map Outbound DB -> State (freight_outbound schema)
+    const mapOutboundToState = (o) => {
+        // Parse documents JSONB
+        let parsedDocs = {};
+        if (typeof o.documents === 'string') {
+            try { parsedDocs = JSON.parse(o.documents); } catch (e) { parsedDocs = {}; }
+        } else {
+            parsedDocs = o.documents || {};
+        }
 
-    const rejectRequest = (id, reason = '') => {
-        setPendingApprovals(prev => prev.map(req =>
-            req.id === id ? { ...req, status: 'rejected', rejectedAt: new Date().toISOString(), rejectReason: reason } : req
-        ));
+        const items = parsedDocs.items || [];
+        // Extract supporting documents to prevent UI crash when mapping
+        const supportingDocs = parsedDocs.bcSupportingDocuments || [];
+
+        return {
+            ...o,
+            // CamelCase aliases for UI
+            pengajuanId: o.pengajuan_id,
+            pengajuanNumber: o.pengajuan_number,
+            customsDocNumber: o.customs_doc_number,
+            customsDocDate: o.customs_doc_date,
+            customsDocType: o.customs_doc_type,
+            receiptNumber: o.receipt_number,
+            itemCode: o.item_code,
+            hsCode: o.hs_code,
+            serialNumber: o.serial_number,
+            currency: o.currency,
+            quantity: o.quantity,
+            unit: o.unit,
+            value: o.value,
+            receiver: o.receiver,
+            destination: o.destination,
+            assetName: o.asset_name,
+            assetId: o.item_code,
+            createdAt: o.created_at,
+            date: o.date,
+            // Extracted Source Reference for Reconciliation
+            sourcePengajuanNumber: parsedDocs.source_pengajuan_number,
+            // Items array for BarangKeluar.jsx flatMap
+            items: items,
+            // Use the extracted array for UI mapping to prevent crash (.map on string)
+            documents: supportingDocs,
+            // Keep original data just in case
+            originalDocuments: o.documents
+        };
     };
 
     // Load data from localStorage on mount
@@ -103,14 +218,212 @@ export const DataProvider = ({ children }) => {
                 };
                 window.addEventListener('updateWarehouseInventory', handleWarehouseUpdate);
 
-                // ... (existing mapping functions)
+                // Helper: Map Quotation DB -> State
+                const mapQuotationToState = (q) => ({
+                    ...q,
+                    quotationNumber: q.quotation_number,
+                    submissionDate: q.submission_date || q.date,
+                    documentStatus: q.document_status,
+                    customsStatus: q.customs_status,
+                    bcDocumentNumber: q.bc_document_number,
+                    bcDocumentDate: q.bc_document_date,
+                    bcDocType: q.bc_document_type,
+                    bcSupportingDocuments: q.bc_supporting_documents || [],
+                    approvedDate: q.approved_date,
+                    approvedBy: q.approved_by,
+                    rejectionReason: q.rejection_reason,
+                    rejectionDate: q.rejection_date,
+                    itemCode: q.item_code,
+                    // Outbound processing status
+                    outboundStatus: q.outbound_status,
+                    outboundDate: q.outbound_date,
+                    // Source Reference Fields
+                    sourcePengajuanNumber: q.source_pengajuan_number || null,
+                    sourceBcDocumentNumber: q.source_bc_document_number || null,
+                    sourceBcDocumentDate: q.source_bc_document_date || null,
+                    // Keep original snake_case too just in case? Or rely on camelCase
+                });
 
-                // ... (existing data loading logic)
+                // Helper: Map Warehouse DB -> State (freight_warehouse schema)
+                const mapWarehouseToState = (w) => {
+                    // Parse location if stored as string
+                    let location = w.location;
+                    if (typeof location === 'string') {
+                        try { location = JSON.parse(location); } catch (e) { location = {}; }
+                    }
+                    return {
+                        ...w,
+                        // CamelCase aliases for UI
+                        pengajuanId: w.pengajuan_id,
+                        pengajuanNumber: w.pengajuan_number,
+                        bcDocumentNumber: w.bc_document_number,
+                        packageNumber: w.package_number,
+                        itemCode: w.item_code,
+                        itemName: w.item_name,
+                        assetName: w.asset_name || w.item_name,
+                        serialNumber: w.serial_number,
+                        entryDate: w.entry_date,
+                        submissionDate: w.submission_date,
+                        location: location,
+                        // Legacy compatibility
+                        assetId: w.item_code,
+                        currentStock: w.quantity,
+                    };
+                };
 
-                // Load Company Settings for ALL Modules
-                await fetchCompanySettings('blink');
-                await fetchCompanySettings('bridge');
-                await fetchCompanySettings('big');
+                // Load TPPB Workflow Data (Quotations, etc.)
+                const { data: quotData, error: quotError } = await supabase.from('freight_quotations').select('*');
+                if (quotError) console.error('Error fetching quotations:', quotError);
+                else setQuotations((quotData || []).map(normalizeQuotation));
+
+                // Load Warehouse Inventory
+                const { data: whData, error: whError } = await supabase.from('freight_warehouse').select('*');
+                if (whError) console.error('Error fetching inventory:', whError);
+                else setWarehouseInventory((whData || []).map(mapWarehouseToState));
+
+                // Load Master Data
+                const { data: bcData, error: bcError } = await supabase.from('freight_bc_codes').select('*');
+                if (bcError) console.error('Error fetching BC codes:', bcError);
+                else setBcCodes(bcData || []);
+
+                const { data: hsData, error: hsError } = await supabase.from('freight_hs_codes').select('*');
+                if (hsError) console.error('Error fetching HS codes:', hsError);
+                else setHSCodes(hsData.map(h => ({
+                    id: h.id,
+                    hsCode: h.hs_code,
+                    description: h.description
+                })) || []);
+
+                const { data: itemData, error: itemError } = await supabase.from('freight_inventory').select('*');
+                if (itemError) console.error('Error fetching Item master:', itemError);
+                else {
+                    // Map snake_case from DB to camelCase for UI
+                    const mappedItems = (itemData || []).map(item => ({
+                        id: item.id,
+                        itemCode: item.item_code,
+                        itemType: item.item_type,
+                        description: item.description
+                    }));
+                    setItemMaster(mappedItems);
+                }
+
+
+                // ========================================
+                // CENTRALIZED BUSINESS PARTNERS
+                // Load from unified blink_business_partners table
+                // ========================================
+                console.log('🔄 Fetching business partners from Supabase...');
+                const { data: partnerData, error: partnerError } = await supabase
+                    .from('blink_business_partners')
+                    .select('*');
+
+                if (partnerError) {
+                    console.error('❌ Error fetching business partners:', partnerError);
+                } else if (partnerData) {
+                    console.log(`✅ Loaded ${partnerData.length} business partners from Supabase`);
+                    setBusinessPartners(partnerData);
+
+                    // Backward compatibility: Populate old state
+                    const customerRecords = partnerData.filter(p => p.is_customer);
+                    const vendorRecords = partnerData.filter(p => p.is_vendor);
+
+                    console.log(`📊 Customers: ${customerRecords.length}, Vendors: ${vendorRecords.length}`);
+                    setCustomers(customerRecords);
+                    setVendors(vendorRecords);
+                }
+
+
+                // Load Transactions (Inbound, Outbound, Reject)
+                const { data: inData, error: inError } = await supabase.from('freight_inbound').select('*');
+                if (!inError) setInboundTransactions((inData || []).map(mapInboundToState));
+
+                const { data: outData, error: outError } = await supabase.from('freight_outbound').select('*');
+                if (!outError) setOutboundTransactions((outData || []).map(mapOutboundToState));
+
+                const { data: rejData, error: rejError } = await supabase.from('freight_reject').select('*');
+                if (!rejError) setRejectTransactions(rejData || []);
+
+                // Load Supporting Data
+                const { data: inspData, error: inspError } = await supabase.from('freight_inspections').select('*');
+                if (!inspError) setInspections(inspData || []);
+
+                const { data: custDocData, error: custDocError } = await supabase.from('freight_customs').select('*');
+                if (!custDocError) setCustomsDocuments(custDocData || []);
+
+                // Load Mutation Logs from freight_mutation_logs table
+                const { data: mLogData, error: mLogError } = await supabase.from('freight_mutation_logs').select('*');
+                if (!mLogError) {
+                    // Map snake_case to camelCase for UI
+                    const mappedLogs = (mLogData || []).map(log => {
+                        // Extract metadata from documents if valid object (and not array of files)
+                        // Note: older logs might have array of files in documents. 
+                        // Newer logs (post-fix) have object { files: [], ...meta }
+                        const docs = log.documents || {};
+                        const isMeta = docs && !Array.isArray(docs);
+                        const meta = isMeta ? docs : {};
+                        const files = isMeta ? (docs.files || []) : (Array.isArray(docs) ? docs : []);
+
+                        return {
+                            id: log.id?.toString(),
+                            pengajuanId: log.pengajuan_id,
+                            pengajuanNumber: log.pengajuan_number,
+                            bcDocumentNumber: log.bc_document_number,
+                            packageNumber: log.package_number || meta.packageNumber,
+                            itemCode: log.item_code,
+                            itemName: log.item_name,
+                            assetName: log.item_name,
+                            hsCode: log.hs_code || meta.hsCode,
+                            bcDocType: meta.bcDocType, // Extracted for Pabean Mutation Report
+                            serialNumber: log.serial_number,
+                            totalStock: log.total_stock,
+                            mutatedQty: log.mutated_qty,
+                            remainingStock: log.remaining_stock,
+                            origin: log.origin,
+                            destination: log.destination,
+                            condition: log.condition || meta.condition || 'Baik',
+                            date: log.date,
+                            time: log.time,
+                            pic: log.pic,
+                            remarks: log.remarks,
+                            documents: files, // Return array of files to UI for compatibility
+                            uom: log.uom || meta.uom || 'pcs',
+                            mutationLocation: log.mutation_location || meta.mutationLocation,
+                            storageLocation: log.storage_location || meta.storageLocation,
+                            sender: log.sender || meta.sender,
+                            createdAt: log.created_at,
+                            submissionDate: log.date,
+                            approvedDate: log.date
+                        };
+                    });
+                    setMutationLogs(mappedLogs);
+                    console.log(`✅ Loaded ${mappedLogs.length} mutation logs from Supabase`);
+                }
+
+                // Load Finance Data
+                const { data: invData, error: invError } = await supabase.from('freight_invoices').select('*');
+                if (!invError) setInvoices(invData || []);
+
+                const { data: purData, error: purError } = await supabase.from('freight_purchases').select('*');
+                if (!purError) setPurchases(purData || []);
+
+                const { data: finData, error: finError } = await supabase.from('freight_finance').select('*');
+                if (!finError) setFinance(finData || []);
+
+                // Load Module Data
+                const { data: shipData, error: shipError } = await supabase.from('freight_shipments').select('*');
+                if (!shipError) setShipments(shipData || []);
+
+                const { data: assetData, error: assetError } = await supabase.from('freight_assets').select('*');
+                if (!assetError) setAssets(assetData || []);
+
+                const { data: eventData, error: eventError } = await supabase.from('big_events').select('*');
+                if (!eventError) setEvents(eventData || []);
+
+                const { data: moveData, error: moveError } = await supabase.from('freight_movements').select('*');
+                if (!moveError) setGoodsMovements(moveData || []);
+
+                // Load Company Settings
+                await fetchCompanySettings();
 
             } catch (error) {
                 console.error("Failed to load data from Supabase:", error);
@@ -2292,74 +2605,62 @@ export const DataProvider = ({ children }) => {
         return vendors.filter(v => v.status !== 'inactive');
     };
 
-    // Company Settings operations (Module Isolated)
-    const fetchCompanySettings = async (module = 'blink') => {
+    // Company Settings operations
+    const fetchCompanySettings = async () => {
         try {
-            console.log(`🔄 Fetching company settings for ${module}...`);
-            const tableName = `${module}_company_settings`;
-            const bankTable = `${module}_company_bank_accounts`;
-
-            // Check table exists logic effectively handled by try-catch on query
-
-            // Fetch company settings
+            console.log('🔄 Fetching company settings...');
+            // Fetch company settings - use limit(1) instead of single() to avoid error
             try {
                 const { data: settingsData, error: settingsError } = await supabase
-                    .from(tableName)
+                    .from('company_settings')
                     .select('*')
                     .order('updated_at', { ascending: false })
                     .limit(1);
 
+                console.log('📦 Company settings response:', { settingsData, settingsError });
+
                 if (settingsError) {
-                    console.warn(`Warning: Could not fetch ${module} settings:`, settingsError.message);
+                    console.warn('Warning: Could not fetch company settings:', settingsError.message);
                 } else if (settingsData && settingsData.length > 0) {
-                    // Update specific state based on module
-                    if (module === 'blink') setCompanySettings(settingsData[0]); // Backward compat for Blink
-                    if (module === 'bridge') setBridgeSettings(settingsData[0]);
-                    if (module === 'big') setBigSettings(settingsData[0]);
+                    console.log('✅ Company settings loaded:', settingsData[0]);
+                    setCompanySettings(settingsData[0]);
                 } else {
-                    console.log(`ℹ️ No ${module} settings found`);
+                    console.log('ℹ️ No company settings found');
                 }
             } catch (e) {
-                console.warn(`${tableName} table may not exist:`, e.message);
+                console.warn('company_settings table may not exist:', e.message);
             }
 
-            // Fetch bank accounts
+            // Fetch bank accounts - wrapped in try-catch to handle missing table
             try {
                 const { data: bankData, error: bankError } = await supabase
-                    .from(bankTable)
+                    .from('company_bank_accounts')
                     .select('*')
                     .order('display_order', { ascending: true });
 
                 if (bankError) {
-                    console.warn(`Warning: Could not fetch ${module} bank accounts:`, bankError.message);
+                    console.warn('Warning: Could not fetch bank accounts:', bankError.message);
                 } else if (bankData) {
-                    if (module === 'blink') setBankAccounts(bankData);
-                    if (module === 'bridge') setBridgeBankAccounts(bankData);
-                    if (module === 'big') setBigBankAccounts(bankData);
+                    setBankAccounts(bankData);
                 }
             } catch (e) {
-                console.warn(`${bankTable} table may not exist:`, e.message);
+                console.warn('company_bank_accounts table may not exist:', e.message);
             }
         } catch (error) {
-            console.warn(`Error in fetchCompanySettings(${module}):`, error);
+            console.warn('Error in fetchCompanySettings (non-critical):', error);
         }
     };
 
-    const updateCompanySettings = async (settings, module = 'blink') => {
+    const updateCompanySettings = async (settings) => {
         try {
-            console.log(`📝 updateCompanySettings(${module}) called:`, settings);
-            const tableName = `${module}_company_settings`;
+            console.log('📝 updateCompanySettings called:', settings);
+            console.log('📝 Current companySettings:', companySettings);
 
-            // Get current ID
-            let currentId = null;
-            if (module === 'blink' && companySettings?.id) currentId = companySettings.id;
-            if (module === 'bridge' && bridgeSettings?.id) currentId = bridgeSettings.id;
-            if (module === 'big' && bigSettings?.id) currentId = bigSettings.id;
-
-            if (currentId) {
+            if (companySettings?.id) {
                 // Update existing
+                console.log('📝 Updating existing settings with ID:', companySettings.id);
                 const { data, error } = await supabase
-                    .from(tableName)
+                    .from('company_settings')
                     .update({
                         company_name: settings.company_name || null,
                         company_address: settings.company_address || null,
@@ -2370,19 +2671,19 @@ export const DataProvider = ({ children }) => {
                         logo_url: settings.logo_url || null,
                         updated_at: new Date().toISOString()
                     })
-                    .eq('id', currentId)
+                    .eq('id', companySettings.id)
                     .select();
 
-                if (error) throw error;
+                if (error) {
+                    console.error('❌ Update error:', error);
+                    throw error;
+                }
 
-                // Update State
-                if (module === 'blink') setCompanySettings({ ...companySettings, ...settings });
-                if (module === 'bridge') setBridgeSettings({ ...bridgeSettings, ...settings });
-                if (module === 'big') setBigSettings({ ...bigSettings, ...settings });
-
-                return data;
+                console.log('✅ Settings updated successfully:', data);
+                setCompanySettings({ ...companySettings, ...settings });
             } else {
                 // Insert new
+                console.log('📝 Inserting new settings...');
                 const newSettings = {
                     company_name: settings.company_name || null,
                     company_address: settings.company_address || null,
@@ -2394,25 +2695,26 @@ export const DataProvider = ({ children }) => {
                 };
 
                 const { data, error } = await supabase
-                    .from(tableName)
+                    .from('company_settings')
                     .insert([newSettings])
-                    .select();
+                    .select()
+                    .single();
 
-                if (error) throw error;
+                if (error) {
+                    console.error('❌ Insert error:', error);
+                    throw error;
+                }
 
-                // Update State
-                if (module === 'blink') setCompanySettings(data[0]);
-                if (module === 'bridge') setBridgeSettings(data[0]);
-                if (module === 'big') setBigSettings(data[0]);
-
-                return data;
+                console.log('✅ New settings inserted:', data);
+                setCompanySettings(data);
             }
         } catch (error) {
             console.error('Error updating company settings:', error);
             throw error;
         }
     };
-    const uploadCompanyLogo = async (file, module = 'blink') => {
+
+    const uploadCompanyLogo = async (file) => {
         try {
             const fileName = `logo-${Date.now()}.${file.name.split('.').pop()}`;
             const filePath = `${fileName}`;
@@ -2432,17 +2734,11 @@ export const DataProvider = ({ children }) => {
                 .from('company-logos')
                 .getPublicUrl(filePath);
 
-            // Determine current settings based on module
-            let currentSettings = {};
-            if (module === 'blink') currentSettings = companySettings || {};
-            if (module === 'bridge') currentSettings = bridgeSettings || {};
-            if (module === 'big') currentSettings = bigSettings || {};
-
             // Update company settings with new logo URL
             await updateCompanySettings({
-                ...currentSettings,
+                ...companySettings,
                 logo_url: publicUrl
-            }, module);
+            });
 
             return publicUrl;
         } catch (error) {
@@ -2451,48 +2747,38 @@ export const DataProvider = ({ children }) => {
         }
     };
 
-    const addBankAccount = async (bankAccount, module = 'blink') => {
+    const addBankAccount = async (bankAccount) => {
         try {
-            let parentSettings = null;
-            let setBankState = null;
-            let currentBankList = [];
-
-            if (module === 'blink') { parentSettings = companySettings; setBankState = setBankAccounts; currentBankList = bankAccounts; }
-            if (module === 'bridge') { parentSettings = bridgeSettings; setBankState = setBridgeBankAccounts; currentBankList = bridgeBankAccounts; }
-            if (module === 'big') { parentSettings = bigSettings; setBankState = setBigBankAccounts; currentBankList = bigBankAccounts; }
-
-            if (!parentSettings?.id) {
-                throw new Error(`Company settings not found for ${module}. Please save company information first.`);
+            if (!companySettings?.id) {
+                throw new Error('Company settings not found. Please save company information first.');
             }
 
-            const tableName = `${module}_company_bank_accounts`;
             const newBankAccount = {
                 ...bankAccount,
-                company_settings_id: parentSettings.id,
-                display_order: currentBankList.length + 1,
+                company_settings_id: companySettings.id,
+                display_order: bankAccounts.length + 1,
                 created_at: new Date().toISOString()
             };
 
             const { data, error } = await supabase
-                .from(tableName)
+                .from('company_bank_accounts')
                 .insert([newBankAccount])
                 .select()
                 .single();
 
             if (error) throw error;
 
-            setBankState([...currentBankList, data]);
+            setBankAccounts([...bankAccounts, data]);
         } catch (error) {
-            console.error(`Error adding bank account (${module}):`, error);
+            console.error('Error adding bank account:', error);
             throw error;
         }
     };
 
-    const updateBankAccount = async (id, updatedBankAccount, module = 'blink') => {
+    const updateBankAccount = async (id, updatedBankAccount) => {
         try {
-            const tableName = `${module}_company_bank_accounts`;
             const { error } = await supabase
-                .from(tableName)
+                .from('company_bank_accounts')
                 .update({
                     ...updatedBankAccount,
                     updated_at: new Date().toISOString()
@@ -2501,30 +2787,27 @@ export const DataProvider = ({ children }) => {
 
             if (error) throw error;
 
-            if (module === 'blink') setBankAccounts(prev => prev.map(bank => bank.id === id ? { ...bank, ...updatedBankAccount } : bank));
-            if (module === 'bridge') setBridgeBankAccounts(prev => prev.map(bank => bank.id === id ? { ...bank, ...updatedBankAccount } : bank));
-            if (module === 'big') setBigBankAccounts(prev => prev.map(bank => bank.id === id ? { ...bank, ...updatedBankAccount } : bank));
+            setBankAccounts(prev =>
+                prev.map(bank => bank.id === id ? { ...bank, ...updatedBankAccount } : bank)
+            );
         } catch (error) {
-            console.error(`Error updating bank account (${module}):`, error);
+            console.error('Error updating bank account:', error);
             throw error;
         }
     };
 
-    const deleteBankAccount = async (id, module = 'blink') => {
+    const deleteBankAccount = async (id) => {
         try {
-            const tableName = `${module}_company_bank_accounts`;
             const { error } = await supabase
-                .from(tableName)
+                .from('company_bank_accounts')
                 .delete()
                 .eq('id', id);
 
             if (error) throw error;
 
-            if (module === 'blink') setBankAccounts(prev => prev.filter(bank => bank.id !== id));
-            if (module === 'bridge') setBridgeBankAccounts(prev => prev.filter(bank => bank.id !== id));
-            if (module === 'big') setBigBankAccounts(prev => prev.filter(bank => bank.id !== id));
+            setBankAccounts(prev => prev.filter(bank => bank.id !== id));
         } catch (error) {
-            console.error(`Error deleting bank account (${module}):`, error);
+            console.error('Error deleting bank account:', error);
             throw error;
         }
     };
@@ -3047,13 +3330,6 @@ export const DataProvider = ({ children }) => {
         // Company Settings operations
         companySettings,
         bankAccounts,
-
-        // Module-Specific Settings (ISOLATED)
-        bridgeSettings,
-        bigSettings,
-        bridgeBankAccounts,
-        bigBankAccounts,
-
         fetchCompanySettings,
         updateCompanySettings,
         addBankAccount,
