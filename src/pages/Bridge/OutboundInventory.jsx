@@ -4,6 +4,8 @@ import { useData } from '../../context/DataContext';
 import Button from '../../components/Common/Button';
 import { exportToCSV } from '../../utils/exportCSV';
 import { createProcessOutboundHandler } from './handlers/processOutbound';
+import { calculateDaysDifference, getAgingStatus } from '../../utils/agingCalculator';
+import { AlertCircle } from 'lucide-react';
 
 const OutboundInventory = () => {
     const { quotations = [], addMutationLog, mutationLogs = [], updateQuotation } = useData();
@@ -553,6 +555,7 @@ const OutboundInventory = () => {
                                 <th className="px-3 py-1.5 text-left text-[11px] font-bold text-white whitespace-nowrap">No. Pengajuan</th>
                                 <th className="px-3 py-1.5 text-center text-[11px] font-bold text-white whitespace-nowrap">No. Pabean</th>
                                 <th className="px-3 py-1.5 text-center text-[11px] font-bold text-white whitespace-nowrap">Tgl Keluar</th>
+                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-white whitespace-nowrap">Lama Keluar</th>
                                 <th className="px-3 py-1.5 text-center text-[11px] font-bold text-white whitespace-nowrap">Tujuan</th>
                                 <th className="px-3 py-1.5 text-center text-[11px] font-bold text-white whitespace-nowrap">Customer</th>
                                 <th className="px-3 py-1.5 text-center text-[11px] font-bold text-white whitespace-nowrap">Pkg</th>
@@ -581,6 +584,18 @@ const OutboundInventory = () => {
                                             <td className="px-3 py-1.5 text-[11px] text-accent-purple font-semibold whitespace-nowrap">{pengajuan.quotationNumber || pengajuan.quotation_number || '-'}</td>
                                             <td className="px-3 py-1.5 text-[11px] text-silver text-center whitespace-nowrap">{pengajuan.bcDocumentNumber || pengajuan.bc_document_number || '-'}</td>
                                             <td className="px-3 py-1.5 text-[11px] text-silver text-center whitespace-nowrap">{formatDate(pengajuan.approvedDate || pengajuan.approved_date || pengajuan.date)}</td>
+                                            {(() => {
+                                                // Calculate based on outbound date if available, else approved date
+                                                const dateOut = pengajuan.outbound_date || pengajuan.approvedDate || pengajuan.approved_date || pengajuan.date;
+                                                const days = calculateDaysDifference(dateOut);
+                                                const status = getAgingStatus(days);
+                                                return (
+                                                    <td className={`px-3 py-1.5 text-[11px] text-center whitespace-nowrap font-medium ${status.color}`}>
+                                                        {status.isAlert && <AlertCircle className="w-3 h-3 inline mr-1" />}
+                                                        {days} Hari
+                                                    </td>
+                                                );
+                                            })()}
                                             <td className="px-3 py-1.5 text-[11px] text-silver text-center whitespace-nowrap">{pengajuan.destination || '-'}</td>
                                             <td className="px-3 py-1.5 text-[11px] text-silver text-center whitespace-nowrap">{pengajuan.customer || '-'}</td>
                                             <td className="px-3 py-1.5 text-[11px] text-accent-purple font-bold text-center whitespace-nowrap">{packageCount}</td>

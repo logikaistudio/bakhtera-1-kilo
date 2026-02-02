@@ -119,6 +119,48 @@ export const exportToXLS = (data, fileName, headerRows, columns) => {
         });
     });
 
+    // --- 5. Add Summary Row ---
+    // Check if any column needs a summary
+    const hasSummary = columns.some(c => c.summary);
+
+    if (hasSummary) {
+        const summaryRowIndex = tableStartRow + 1 + dataRows.length;
+        const summaryCells = columns.map((col, idx) => {
+            if (idx === 0) return 'TOTAL'; // Label in first column
+            if (col.summary) {
+                // Calculate sum for this column
+                const sum = data.reduce((acc, item) => {
+                    // removing strict validation to coerce fuzzy numbers if any
+                    const val = parseFloat(item[col.key]) || 0;
+                    return acc + val;
+                }, 0);
+                return sum;
+            }
+            return '';
+        });
+
+        // Add to worksheet
+        XLSX.utils.sheet_add_aoa(ws, [summaryCells], { origin: { r: summaryRowIndex, c: 0 } });
+
+        // Style the Summary Row
+        summaryCells.forEach((_, cIdx) => {
+            const cellRef = XLSX.utils.encode_cell({ r: summaryRowIndex, c: cIdx });
+            if (!ws[cellRef]) return; // Safety check
+
+            ws[cellRef].s = {
+                font: { bold: true, sz: 10, name: 'Arial', color: { rgb: "000000" } },
+                alignment: { horizontal: cIdx === 0 ? "left" : "center", vertical: "center" },
+                fill: { fgColor: { rgb: "FFD700" } }, // Gold highlight for visibility
+                border: {
+                    top: { style: "medium", color: { rgb: "000000" } },
+                    bottom: { style: "medium", color: { rgb: "000000" } },
+                    left: { style: "thin", color: { rgb: "000000" } },
+                    right: { style: "thin", color: { rgb: "000000" } }
+                }
+            };
+        });
+    }
+
     // Set Column Widths
     ws['!cols'] = columns.map(c => ({ wch: c.width || 15 }));
 

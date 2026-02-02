@@ -77,6 +77,7 @@ const Sidebar = () => {
                 { path: '/bridge/inventory', label: 'Inventaris Gudang' },
                 { path: '/bridge/outbound-inventory', label: 'Laporan Barang Keluar' },
                 { path: '/bridge/goods-movement', label: 'Pergerakan Barang' },
+                { path: '/bridge/delivery-notes', label: 'Surat Jalan' },
             ]
         },
 

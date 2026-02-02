@@ -64,6 +64,7 @@ import ActivityLogger from './pages/Bridge/ActivityLogger';
 import ApprovalManager from './pages/Bridge/ApprovalManager';
 import CodeOfAccount from './pages/Bridge/CodeOfAccount';
 import BridgePartnerManagement from './pages/Bridge/PartnerManagement';
+import DeliveryNotes from './pages/Bridge/DeliveryNotes';
 import BridgeCompanySettings from './pages/Bridge/CompanySettings'; // New
 
 // Big Module
@@ -169,6 +170,7 @@ function App() {
                   <Route path="/bridge/logger" element={<ActivityLogger />} />
                   <Route path="/bridge/approvals" element={<ApprovalManager />} />
                   <Route path="/bridge/pergerakan" element={<PergerakanBarang />} />
+                  <Route path="/bridge/delivery-notes" element={<DeliveryNotes />} />
                   <Route path="/bridge/code-of-account" element={<CodeOfAccount />} />
                   <Route path="/bridge/master/partners" element={<BridgePartnerManagement />} />
                   <Route path="/bridge/master/settings" element={<BridgeCompanySettings />} />

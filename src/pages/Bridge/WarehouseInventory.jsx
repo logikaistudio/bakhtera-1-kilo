@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { useData } from '../../context/DataContext';
 import Button from '../../components/Common/Button';
 import { exportToCSV } from '../../utils/exportCSV';
+import { calculateDaysDifference, getAgingStatus } from '../../utils/agingCalculator';
 
 const WarehouseInventory = () => {
     const navigate = useNavigate();
@@ -1080,6 +1081,7 @@ const WarehouseInventory = () => {
                                 <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">No. Pabean</th>
                                 <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">Tgl Masuk Gudang</th>
                                 <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">Jam Masuk</th>
+                                <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">Durasi</th>
                                 <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">Jml Package</th>
                                 <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">Jml Item</th>
                                 <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">PIC Penerima</th>
@@ -1094,6 +1096,16 @@ const WarehouseInventory = () => {
                                         <td className="px-2 py-0.5 text-xs text-silver text-center whitespace-nowrap">{pengajuan.bcDocumentNumber || pengajuan.bc_document_number || '-'}</td>
                                         <td className="px-2 py-0.5 text-xs text-silver text-center whitespace-nowrap">{formatDate(pengajuan.submissionDate || pengajuan.submission_date || pengajuan.date)}</td>
                                         <td className="px-2 py-0.5 text-xs text-silver text-center whitespace-nowrap">{formatTime(pengajuan.approvedDate || pengajuan.approved_date)}</td>
+                                        {(() => {
+                                            const days = calculateDaysDifference(pengajuan.submissionDate || pengajuan.submission_date || pengajuan.date);
+                                            const status = getAgingStatus(days);
+                                            return (
+                                                <td className={`px-2 py-0.5 text-xs text-center whitespace-nowrap font-medium ${status.color}`}>
+                                                    {status.isAlert && <AlertCircle className="w-3 h-3 inline mr-1" />}
+                                                    {days} Hari
+                                                </td>
+                                            );
+                                        })()}
                                         <td className="px-2 py-0.5 text-xs text-accent-blue font-bold text-center">{packageCount}</td>
                                         <td className="px-2 py-0.5 text-xs text-accent-blue font-bold text-center">{itemCount}</td>
                                         <td className="px-2 py-0.5 text-xs text-silver text-center whitespace-nowrap">{pengajuan.pic || pengajuan.receivedBy || '-'}</td>
@@ -1190,7 +1202,164 @@ const WarehouseInventory = () => {
                                 </div>
                             </div>
 
-                            {/* Mutation Info Section REMOVED - Using per-row columns */}
+                            {/* Monitoring Durasi & Timeline Section */}
+                            <div className="flex-shrink-0 px-4 pt-4 pb-4 border-b border-gray-200 dark:border-dark-border">
+                                <h3 className="text-base font-bold text-gray-800 dark:text-silver-light mb-3">⏱️ Monitoring Durasi & Timeline</h3>
+
+                                {(() => {
+                                    const entryDate = displayData.submissionDate || displayData.submission_date || displayData.date;
+                                    const days = calculateDaysDifference(entryDate);
+                                    const status = getAgingStatus(days);
+                                    const locationInfo = getItemsByLocation(displayData);
+
+                                    // Get all mutations for this pengajuan to build timeline
+                                    const pengajuanNumber = displayData.quotationNumber || displayData.quotation_number;
+                                    const pengajuanId = displayData.id;
+                                    const allMutations = mutationLogs.filter(m =>
+                                        m.pengajuanId === pengajuanId ||
+                                        normalize(m.pengajuanNumber) === normalize(pengajuanNumber)
+                                    ).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                                    return (
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            {/* Aging Status Card */}
+                                            <div className="glass-card p-4 rounded-lg border-l-4" style={{ borderLeftColor: status.color.replace('text-', '#') }}>
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <h4 className="text-sm font-semibold text-gray-700 dark:text-silver-light">Status Aging</h4>
+                                                    {status.isAlert && <AlertCircle className={`w-5 h-5 ${status.color}`} />}
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-xs text-gray-600 dark:text-silver-dark">Tanggal Masuk:</span>
+                                                        <span className="text-xs font-semibold text-gray-900 dark:text-silver-light">{formatDate(entryDate)}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-xs text-gray-600 dark:text-silver-dark">Jam Masuk:</span>
+                                                        <span className="text-xs font-semibold text-gray-900 dark:text-silver-light">{formatTime(displayData.approvedDate || displayData.approved_date)}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center pt-2 border-t border-gray-200 dark:border-dark-border">
+                                                        <span className="text-xs text-gray-600 dark:text-silver-dark">Durasi di Gudang:</span>
+                                                        <span className={`text-lg font-bold ${status.color}`}>{days} Hari</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Location Breakdown Card */}
+                                            <div className="glass-card p-4 rounded-lg">
+                                                <h4 className="text-sm font-semibold text-gray-700 dark:text-silver-light mb-2">Distribusi Lokasi</h4>
+                                                <div className="space-y-2">
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-xs text-gray-600 dark:text-silver-dark">Total Item:</span>
+                                                        <span className="text-xs font-bold text-accent-blue">{locationInfo.totalItems}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-xs text-green-600 dark:text-green-400">📦 Di Gudang:</span>
+                                                        <span className="text-xs font-bold text-green-700 dark:text-green-400">{locationInfo.itemsInWarehouse}</span>
+                                                    </div>
+                                                    {locationInfo.itemsAtPameran > 0 && (
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="text-xs text-orange-600 dark:text-orange-400">🎪 Di Pameran:</span>
+                                                            <span className="text-xs font-bold text-orange-700 dark:text-orange-400">{locationInfo.itemsAtPameran}</span>
+                                                        </div>
+                                                    )}
+                                                    {(locationInfo.totalItems - locationInfo.itemsInWarehouse - locationInfo.itemsAtPameran) > 0 && (
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="text-xs text-purple-600 dark:text-purple-400">📤 Keluar:</span>
+                                                            <span className="text-xs font-bold text-purple-700 dark:text-purple-400">
+                                                                {locationInfo.totalItems - locationInfo.itemsInWarehouse - locationInfo.itemsAtPameran}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Activity Timeline Card */}
+                                            <div className="glass-card p-4 rounded-lg">
+                                                <h4 className="text-sm font-semibold text-gray-700 dark:text-silver-light mb-2">Aktivitas & Frekuensi</h4>
+                                                {allMutations.length > 0 ? (
+                                                    <div className="space-y-3">
+                                                        {/* Mutation Statistics */}
+                                                        {(() => {
+                                                            // Calculate mutation frequencies
+                                                            const toPameran = allMutations.filter(m =>
+                                                                (m.destination || '').toLowerCase() === 'pameran'
+                                                            );
+                                                            const toGudang = allMutations.filter(m =>
+                                                                (m.destination || '').toLowerCase() === 'gudang' ||
+                                                                (m.destination || '').toLowerCase() === 'warehouse'
+                                                            );
+                                                            const toOther = allMutations.filter(m => {
+                                                                const dest = (m.destination || '').toLowerCase();
+                                                                return dest !== 'pameran' && dest !== 'gudang' && dest !== 'warehouse';
+                                                            });
+
+                                                            return (
+                                                                <div className="grid grid-cols-3 gap-2 pb-2 border-b border-gray-200 dark:border-dark-border">
+                                                                    {/* Pameran Counter */}
+                                                                    <div className="text-center">
+                                                                        <div className="text-[10px] text-orange-600 dark:text-orange-400 font-medium">Pameran</div>
+                                                                        <div className="text-lg font-bold text-orange-700 dark:text-orange-300">{toPameran.length}x</div>
+                                                                    </div>
+                                                                    {/* Gudang Counter */}
+                                                                    <div className="text-center">
+                                                                        <div className="text-[10px] text-green-600 dark:text-green-400 font-medium">Kembali</div>
+                                                                        <div className="text-lg font-bold text-green-700 dark:text-green-300">{toGudang.length}x</div>
+                                                                    </div>
+                                                                    {/* Other Counter */}
+                                                                    <div className="text-center">
+                                                                        <div className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">Lainnya</div>
+                                                                        <div className="text-lg font-bold text-purple-700 dark:text-purple-300">{toOther.length}x</div>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })()}
+
+                                                        {/* Recent Activity Timeline */}
+                                                        <div className="space-y-2 max-h-20 overflow-y-auto">
+                                                            {allMutations.slice(0, 3).map((mutation, idx) => {
+                                                                const dest = (mutation.destination || '').toLowerCase();
+                                                                const isPameran = dest === 'pameran';
+                                                                const isGudang = dest === 'gudang' || dest === 'warehouse';
+                                                                const dotColor = isPameran ? 'bg-orange-500' : isGudang ? 'bg-green-500' : 'bg-purple-500';
+
+                                                                return (
+                                                                    <div key={idx} className="flex items-start gap-2 text-xs">
+                                                                        <div className={`w-1.5 h-1.5 rounded-full ${dotColor} mt-1.5 flex-shrink-0`}></div>
+                                                                        <div className="flex-1">
+                                                                            <div className="flex justify-between items-start">
+                                                                                <span className="font-medium text-gray-700 dark:text-silver-light">
+                                                                                    {mutation.mutatedQty}x → {mutation.destination}
+                                                                                </span>
+                                                                                <span className="text-gray-500 dark:text-silver-dark text-[10px]">
+                                                                                    {formatDate(mutation.date)}
+                                                                                </span>
+                                                                            </div>
+                                                                            <span className="text-gray-500 dark:text-silver-dark text-[10px]">
+                                                                                {mutation.itemCode} • {mutation.pic || 'N/A'}
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                            {allMutations.length > 3 && (
+                                                                <div className="text-center pt-1">
+                                                                    <span className="text-[10px] text-accent-blue cursor-pointer hover:underline">
+                                                                        +{allMutations.length - 3} aktivitas lainnya
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-center py-2">
+                                                        <p className="text-xs text-gray-500 dark:text-silver-dark">Belum ada aktivitas mutasi</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
+                            </div>
 
                             {/* Detail Item Section Title */}
                             <div className="flex-shrink-0 px-4 pt-4 pb-3">

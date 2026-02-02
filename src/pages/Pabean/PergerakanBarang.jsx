@@ -241,23 +241,23 @@ const PergerakanBarang = () => {
     const handleExportXLS = () => {
         const headerRows = [
             { value: companySettings?.company_name || 'PT. FREIGHT ONE INDONESIA', style: 'company' },
-            { value: 'DATA MUTASI BARANG (REKONSILIASI PABEAN)', style: 'title' }
+            { value: 'Pabean - Mutasi Barang', style: 'title' }
         ];
         const xlsColumns = [
             { header: 'No', key: 'no', width: 5, align: 'center' },
             { header: 'No. Pengajuan', key: 'pengajuanNumber', width: 20 },
-            { header: 'Jenis BC Masuk', key: 'inboundDocType', width: 15 },
+            { header: 'Kode BC Masuk', key: 'inboundDocType', width: 15, align: 'center' },
             { header: 'No. Pabean', key: 'customsDocNumber', width: 20 },
             { header: 'No. Urut', key: 'noUrut', width: 8, align: 'center' },
             { header: 'Tgl. Masuk', key: 'date', width: 12, align: 'center' },
-            { header: 'Jenis BC Keluar', key: 'outboundDocType', width: 15 },
+            { header: 'Kode BC Keluar', key: 'outboundDocType', width: 15, align: 'center' },
             { header: 'Tgl. Keluar', key: 'latestOutboundDate', width: 12, align: 'center' },
-            { header: 'Kode Barang', key: 'itemCode', width: 15 },
+            { header: 'Kode Barang', key: 'itemCode', width: 15, align: 'center' },
             { header: 'Nama Barang', key: 'assetName', width: 30 },
             { header: 'Satuan', key: 'unit', width: 8, align: 'center' },
-            { header: 'Jml Masuk', key: 'qtyMasuk', width: 12, align: 'center' },
-            { header: 'Jml Keluar', key: 'qtyKeluar', width: 12, align: 'center' },
-            { header: 'Saldo Akhir', key: 'qtySisa', width: 12, align: 'center' },
+            { header: 'Jml Masuk', key: 'qtyMasuk', width: 12, align: 'center', summary: true },
+            { header: 'Jml Keluar', key: 'qtyKeluar', width: 12, align: 'center', summary: true },
+            { header: 'Saldo Akhir', key: 'qtySisa', width: 12, align: 'center', summary: true },
         ];
 
         const exportData = filteredData.map((item, idx) => ({
