@@ -23,7 +23,8 @@ const PengajuanManagement = () => {
         vendors = [],
         mutationLogs = [],
         warehouseInventory = [],
-        outboundTransactions = [] // Added for calculating already outbound stock
+        outboundTransactions = [], // Added for calculating already outbound stock
+        bridgeBusinessPartners = [] // NEW: Use Bridge Partners
     } = useData();
     const navigate = useNavigate();
     const [showForm, setShowForm] = useState(false);
@@ -1019,9 +1020,9 @@ const PengajuanManagement = () => {
                                     className="w-full"
                                 >
                                     <option value="">-- Pilih Pelanggan --</option>
-                                    {customers.map(cust => (
-                                        <option key={cust.id} value={cust.name}>
-                                            {cust.name}
+                                    {bridgeBusinessPartners.filter(p => p.is_customer).map(p => (
+                                        <option key={p.id} value={p.partner_name}>
+                                            {p.partner_name}
                                         </option>
                                     ))}
                                 </select>
@@ -1039,9 +1040,9 @@ const PengajuanManagement = () => {
                                     className="w-full"
                                 >
                                     <option value="">-- Pilih Shipper --</option>
-                                    {vendors.map(vendor => (
-                                        <option key={vendor.id} value={vendor.name}>
-                                            {vendor.name}
+                                    {bridgeBusinessPartners.filter(p => p.is_shipper || p.is_vendor).map(p => (
+                                        <option key={p.id} value={p.partner_name}>
+                                            {p.partner_name}
                                         </option>
                                     ))}
                                 </select>

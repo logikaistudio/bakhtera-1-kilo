@@ -290,7 +290,7 @@ const BLManagement = () => {
     const handleUpdateBL = async () => {
         try {
             // Find the selected quotation to save its reference data
-            const selectedQuotation = selectedQuotationId 
+            const selectedQuotation = selectedQuotationId
                 ? quotations.find(q => q.id === selectedQuotationId)
                 : null;
 

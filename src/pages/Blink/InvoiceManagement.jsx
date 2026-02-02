@@ -9,8 +9,10 @@ import COAPicker from '../../components/Common/COAPicker';
 import {
     FileText, DollarSign, Calendar, User, Clock, CheckCircle, XCircle,
     Plus, Send, AlertCircle, Download, Eye, Edit, Trash, Receipt,
-    TrendingUp, AlertTriangle, Search, Filter, X, Package
+    TrendingUp, AlertTriangle, Search, Filter, X, Package, Circle
 } from 'lucide-react';
+import InvoiceProfitSummary from '../../components/Blink/InvoiceProfitSummary';
+
 
 const InvoiceManagement = () => {
     const navigate = useNavigate();
@@ -45,6 +47,7 @@ const InvoiceManagement = () => {
         invoice_items: [
             { description: 'Ocean Freight', qty: 1, unit: 'Job', rate: 0, amount: 0, coa_id: null }
         ],
+        cogs_items: [],  // COGS items from shipment buying_items
         tax_rate: 11.00,
         discount_amount: 0,
         customer_notes: '',
@@ -257,6 +260,18 @@ const InvoiceManagement = () => {
                     rate: shipment.quoted_amount || 0,
                     amount: shipment.quoted_amount || 0
                 }],
+                // Extract COGS from shipment buying_items
+                cogs_items: shipment.buying_items && Array.isArray(shipment.buying_items)
+                    ? shipment.buying_items.map(item => ({
+                        description: item.description || item.name || 'Cost Item',
+                        qty: item.quantity || item.qty || 1,
+                        unit: item.unit || 'Job',
+                        rate: item.unitPrice || item.rate || item.price || 0,
+                        amount: item.total || item.amount || 0,
+                        vendor: item.vendor || item.supplier || '',
+                        currency: item.currency || shipment.currency || 'IDR'
+                    }))
+                    : [],
                 // Pre-fill fields from shipment
                 consignor: shipment.shipper_name || '',
                 consignee: shipment.consignee_name || shipment.customer || '',
@@ -327,7 +342,12 @@ const InvoiceManagement = () => {
         const taxAmount = (subtotal * formData.tax_rate) / 100;
         const total = subtotal + taxAmount - (formData.discount_amount || 0);
 
-        return { subtotal, taxAmount, total };
+        // Calculate COGS
+        const cogsSubtotal = (formData.cogs_items || []).reduce((sum, item) => sum + (item.amount || 0), 0);
+        const grossProfit = total - cogsSubtotal;
+        const profitMargin = total > 0 ? (grossProfit / total) * 100 : 0;
+
+        return { subtotal, taxAmount, total, cogsSubtotal, grossProfit, profitMargin };
     };
 
     const handleCreateInvoice = async (e) => {
@@ -344,25 +364,47 @@ const InvoiceManagement = () => {
         }
 
         try {
-            // 1. Check if active invoice already exists for this reference
+            // 1. Check if active invoice already exists for this reference + currency combination
             const referenceId = formData.quotation_id || formData.shipment_id;
             const referenceField = formData.quotation_id ? 'quotation_id' : 'shipment_id';
+            const selectedCurrency = formData.billing_currency || 'IDR';
 
+            // Check for existing invoices with same currency
             const { data: existingInvoices, error: checkError } = await supabase
                 .from('blink_invoices')
-                .select('id, invoice_number, status')
+                .select('id, invoice_number, status, currency')
                 .eq(referenceField, referenceId)
+                .eq('currency', selectedCurrency)
                 .neq('status', 'cancelled'); // Check for NON-cancelled invoices
 
             if (checkError) throw checkError;
 
             if (existingInvoices && existingInvoices.length > 0) {
                 const activeInv = existingInvoices[0];
-                alert(`Cannot create invoice: An active invoice (${activeInv.invoice_number}) already exists for this reference. Please cancel it first if you need to create a replacement.`);
+                alert(`Cannot create invoice: An active ${selectedCurrency} invoice (${activeInv.invoice_number}) already exists for this ${formData.quotation_id ? 'quotation' : 'shipment'}.\n\nNote: You can create a maximum of 2 invoices per quotation (1 IDR + 1 USD). Please cancel the existing invoice first if you need to create a replacement.`);
                 return;
             }
 
-            const { subtotal, taxAmount, total } = calculateTotals();
+            // 2. Additional check: Ensure not more than 2 different currencies
+            if (formData.quotation_id) {
+                const { data: allInvoices, error: allCheckError } = await supabase
+                    .from('blink_invoices')
+                    .select('currency')
+                    .eq('quotation_id', referenceId)
+                    .neq('status', 'cancelled');
+
+                if (allCheckError) throw allCheckError;
+
+                const existingCurrencies = [...new Set((allInvoices || []).map(inv => inv.currency))];
+
+                // If there are already 2 currencies and this is a new one, block it
+                if (existingCurrencies.length >= 2 && !existingCurrencies.includes(selectedCurrency)) {
+                    alert(`Cannot create invoice: This quotation already has invoices in ${existingCurrencies.join(' and ')}.\n\nMaximum 2 currencies (IDR and USD) are allowed per quotation.`);
+                    return;
+                }
+            }
+
+            const { subtotal, taxAmount, total, cogsSubtotal, grossProfit, profitMargin } = calculateTotals();
 
             // 2. Generate unique invoice number (async)
             // If previous invocies were cancelled, this will auto-generate suffix (e.g. -1)
@@ -398,6 +440,11 @@ const InvoiceManagement = () => {
                 paid_amount: 0,
                 outstanding_amount: total,
                 status: 'draft',
+                // COGS and Profit fields
+                cogs_items: formData.cogs_items || [],
+                cogs_subtotal: cogsSubtotal,
+                gross_profit: grossProfit,
+                profit_margin: profitMargin,
                 customer_notes: formData.customer_notes || null,
                 notes: formData.notes || null,
                 // Print fields
@@ -1082,7 +1129,7 @@ const InvoiceCreateModal = ({ quotations, shipments, formData, setFormData, sele
     addInvoiceItem, removeInvoiceItem, updateInvoiceItem, calculateTotals,
     handleCreateInvoice, formatCurrency, onClose }) => {
 
-    const { subtotal, taxAmount, total } = calculateTotals();
+    const { subtotal, taxAmount, total, cogsSubtotal, grossProfit, profitMargin } = calculateTotals();
 
     // Blend quotations and shipments into single list
     const blendedReferences = [
@@ -1142,6 +1189,10 @@ const InvoiceCreateModal = ({ quotations, shipments, formData, setFormData, sele
 
                     </div>
 
+                    {/* Existing Invoices Indicator */}
+                    {selectedQuotation && (
+                        <ExistingInvoicesIndicator quotationId={selectedQuotation.id} />
+                    )}
 
 
                     {/* Customer & Quotation Info - Auto populated */}
@@ -1563,6 +1614,49 @@ const InvoiceCreateModal = ({ quotations, shipments, formData, setFormData, sele
                         </div>
                     </div>
 
+                    {/* Profit Preview (if COGS available) */}
+                    {formData.cogs_items && formData.cogs_items.length > 0 && (
+                        <div className="glass-card p-3 rounded-lg border border-accent-orange/30 bg-accent-orange/5">
+                            <h4 className="text-xs font-semibold text-accent-orange mb-2 flex items-center gap-2">
+                                <TrendingUp className="w-3.5 h-3.5" />
+                                Profit Preview
+                            </h4>
+                            <div className="grid grid-cols-3 gap-2 mb-2">
+                                <div className="text-center p-2 rounded bg-blue-500/10 border border-blue-500/30">
+                                    <div className="text-[9px] text-silver-dark mb-0.5">Revenue</div>
+                                    <div className="text-xs font-bold text-blue-400">
+                                        {formatCurrency(total, formData.billing_currency)}
+                                    </div>
+                                </div>
+                                <div className="text-center p-2 rounded bg-orange-500/10 border border-orange-500/30">
+                                    <div className="text-[9px] text-silver-dark mb-0.5">COGS</div>
+                                    <div className="text-xs font-bold text-orange-400">
+                                        {formatCurrency(cogsSubtotal, formData.billing_currency)}
+                                    </div>
+                                </div>
+                                <div className="text-center p-2 rounded bg-green-500/10 border border-green-500/30">
+                                    <div className="text-[9px] text-silver-dark mb-0.5">Profit</div>
+                                    <div className="text-xs font-bold text-green-400">
+                                        {formatCurrency(grossProfit, formData.billing_currency)}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between p-2 rounded bg-dark-surface">
+                                <span className="text-[10px] text-silver-dark">Profit Margin:</span>
+                                <span className={`text-sm font-bold ${profitMargin >= 30 ? 'text-green-400' :
+                                        profitMargin >= 20 ? 'text-blue-400' :
+                                            profitMargin >= 10 ? 'text-yellow-400' :
+                                                profitMargin >= 0 ? 'text-orange-400' : 'text-red-400'
+                                    }`}>
+                                    {profitMargin.toFixed(2)}%
+                                </span>
+                            </div>
+                            <p className="text-[9px] text-silver-dark mt-2">
+                                💡 {formData.cogs_items.length} COGS item(s) from shipment will be tracked for profit analysis
+                            </p>
+                        </div>
+                    )}
+
                     {/* Notes */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -1866,6 +1960,9 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                             </div>
                         </div>
                     </div>
+
+                    {/* Profit Analysis Section */}
+                    <InvoiceProfitSummary invoice={invoice} formatCurrency={formatCurrency} />
 
                     {/* Payment History */}
                     <div className="glass-card p-4 rounded-lg">
@@ -2442,6 +2539,113 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                 </div>
             </div>
         </Modal>
+    );
+};
+
+// Existing Invoices Indicator Component
+const ExistingInvoicesIndicator = ({ quotationId }) => {
+    const [existingInvoices, setExistingInvoices] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchExistingInvoices = async () => {
+            if (!quotationId) return;
+
+            try {
+                const { data, error } = await supabase
+                    .from('blink_invoices')
+                    .select('invoice_number, currency, status, total_amount, created_at')
+                    .eq('quotation_id', quotationId)
+                    .neq('status', 'cancelled')
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+                setExistingInvoices(data || []);
+            } catch (error) {
+                console.error('Error fetching existing invoices:', error);
+                setExistingInvoices([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchExistingInvoices();
+    }, [quotationId]);
+
+    if (loading) return null;
+    if (existingInvoices.length === 0) return null;
+
+    const idrInvoice = existingInvoices.find(inv => inv.currency === 'IDR');
+    const usdInvoice = existingInvoices.find(inv => inv.currency === 'USD');
+    const canCreateIDR = !idrInvoice;
+    const canCreateUSD = !usdInvoice;
+
+    return (
+        <div className="glass-card p-3 rounded-lg border border-accent-orange/30 bg-accent-orange/5">
+            <div className="flex items-start gap-2 mb-2">
+                <AlertCircle className="w-4 h-4 text-accent-orange mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                    <h4 className="text-xs font-semibold text-accent-orange mb-1">
+                        Existing Invoices for this Quotation
+                    </h4>
+                    <p className="text-[10px] text-silver-dark mb-2">
+                        Maximum 2 invoices allowed: 1 IDR + 1 USD
+                    </p>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+                {/* IDR Status */}
+                <div className={`p-2 rounded border ${idrInvoice ? 'bg-green-500/10 border-green-500/30' : 'bg-dark-surface border-dark-border'}`}>
+                    <div className="flex items-center gap-1.5 mb-1">
+                        {idrInvoice ? (
+                            <CheckCircle className="w-3.5 h-3.5 text-green-400" />
+                        ) : (
+                            <Circle className="w-3.5 h-3.5 text-silver-dark" />
+                        )}
+                        <span className="text-[10px] font-semibold text-silver-light">IDR Invoice</span>
+                    </div>
+                    {idrInvoice ? (
+                        <div className="text-[9px] text-silver-dark space-y-0.5">
+                            <div className="font-mono text-green-400">{idrInvoice.invoice_number}</div>
+                            <div>Rp {idrInvoice.total_amount?.toLocaleString('id-ID')}</div>
+                            <div className="text-[8px] opacity-70">{idrInvoice.status}</div>
+                        </div>
+                    ) : (
+                        <div className="text-[9px] text-silver-dark">Available to create</div>
+                    )}
+                </div>
+
+                {/* USD Status */}
+                <div className={`p-2 rounded border ${usdInvoice ? 'bg-green-500/10 border-green-500/30' : 'bg-dark-surface border-dark-border'}`}>
+                    <div className="flex items-center gap-1.5 mb-1">
+                        {usdInvoice ? (
+                            <CheckCircle className="w-3.5 h-3.5 text-green-400" />
+                        ) : (
+                            <Circle className="w-3.5 h-3.5 text-silver-dark" />
+                        )}
+                        <span className="text-[10px] font-semibold text-silver-light">USD Invoice</span>
+                    </div>
+                    {usdInvoice ? (
+                        <div className="text-[9px] text-silver-dark space-y-0.5">
+                            <div className="font-mono text-green-400">{usdInvoice.invoice_number}</div>
+                            <div>${usdInvoice.total_amount?.toLocaleString('id-ID')}</div>
+                            <div className="text-[8px] opacity-70">{usdInvoice.status}</div>
+                        </div>
+                    ) : (
+                        <div className="text-[9px] text-silver-dark">Available to create</div>
+                    )}
+                </div>
+            </div>
+
+            {!canCreateIDR && !canCreateUSD && (
+                <div className="mt-2 p-2 bg-red-500/10 border border-red-500/30 rounded">
+                    <p className="text-[9px] text-red-400">
+                        ⚠️ Both IDR and USD invoices already exist. Cancel one to create a replacement.
+                    </p>
+                </div>
+            )}
+        </div>
     );
 };
 
