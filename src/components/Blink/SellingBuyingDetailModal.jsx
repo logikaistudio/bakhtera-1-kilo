@@ -69,6 +69,10 @@ const SellingBuyingDetailModal = ({ isOpen, onClose, shipment }) => {
         let grandTotalS = 0;
         let grandTotalB = 0;
         Object.values(categories).forEach(c => {
+            // Sort items for apple-to-apple alignment
+            c.selling.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            c.buying.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
             grandTotalS += c.totalS;
             grandTotalB += c.totalB;
         });
@@ -223,7 +227,7 @@ const SellingBuyingDetailModal = ({ isOpen, onClose, shipment }) => {
 
                 {/* Content Scrollable */}
                 <div className="flex-1 overflow-y-auto p-6 bg-white dark:bg-dark-bg">
-                    {/* Summary Cards - Grid Layout matching User Image */}
+                    {/* Summary Cards */}
                     <div className="grid grid-cols-4 gap-4 mb-8">
                         {/* Margin Card (Featured) */}
                         <div className={`p-4 rounded-xl border flex items-center justify-between ${isLoss ? 'bg-red-50 border-red-200 dark:bg-red-500/10 dark:border-red-500/30' :
@@ -274,7 +278,7 @@ const SellingBuyingDetailModal = ({ isOpen, onClose, shipment }) => {
                         <div className="grid grid-cols-12 bg-gray-50 dark:bg-dark-card py-3 px-6 border-b border-gray-100 dark:border-dark-border text-xs font-bold text-gray-500 dark:text-silver-dark uppercase tracking-wider">
                             <div className="col-span-2">Category</div>
                             <div className="col-span-5 border-r border-gray-200 dark:border-dark-border/50 pr-4">Selling Items</div>
-                            <div className="col-span-5 pl-4">Buying Items</div>
+                            <div className="col-span-5 pl-4">Buying Items (COGS)</div>
                         </div>
 
                         <div className="bg-white dark:bg-dark-surface">
@@ -293,47 +297,55 @@ const SellingBuyingDetailModal = ({ isOpen, onClose, shipment }) => {
                                                 </span>
                                             </div>
 
-                                            {/* Selling Column */}
-                                            <div className="col-span-5 border-r border-gray-100 dark:border-dark-border/30 pr-4 space-y-3">
-                                                {cat.selling.map((item, idx) => (
-                                                    <div key={idx} className="flex justify-between items-baseline text-xs">
-                                                        <span className="text-gray-700 dark:text-silver-light font-medium truncate mr-4 tracking-wide">{item.name}</span>
-                                                        <span className="text-green-600 dark:text-green-400 font-bold font-mono whitespace-nowrap">
-                                                            {item.amount.toLocaleString('id-ID')}
-                                                        </span>
-                                                    </div>
-                                                ))}
-                                                {cat.selling.length === 0 && <span className="text-xs text-gray-300 dark:text-silver-dark/30 italic">-</span>}
+                                            {/* Items Container - Aligned Rows */}
+                                            <div className="col-span-10 grid grid-cols-2">
+                                                {Array.from({ length: maxRows }).map((_, idx) => {
+                                                    const sItem = cat.selling[idx];
+                                                    const bItem = cat.buying[idx];
 
-                                                {/* Category Subtotal Selling */}
-                                                {cat.selling.length > 0 && (
-                                                    <div className="pt-2 mt-1 border-t border-gray-100 dark:border-dark-border/30 flex justify-end">
-                                                        <span className="text-[10px] text-green-600/60 dark:text-green-500/60 font-bold">
-                                                            {cat.totalS.toLocaleString('id-ID')}
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </div>
+                                                    return (
+                                                        <React.Fragment key={idx}>
+                                                            {/* Selling Item */}
+                                                            <div className={`col-span-1 border-r border-gray-100 dark:border-dark-border/30 pr-4 flex justify-between items-baseline text-xs ${idx > 0 ? 'mt-3' : ''}`}>
+                                                                {sItem ? (
+                                                                    <>
+                                                                        <span className="text-gray-700 dark:text-silver-light font-medium truncate mr-4 tracking-wide">{sItem.name}</span>
+                                                                        <span className="text-green-600 dark:text-green-400 font-bold font-mono whitespace-nowrap">
+                                                                            {sItem.amount.toLocaleString('id-ID')}
+                                                                        </span>
+                                                                    </>
+                                                                ) : <span className="text-gray-300 dark:text-silver-dark/30 italic">-</span>}
+                                                            </div>
 
-                                            {/* Buying Column */}
-                                            <div className="col-span-5 pl-4 space-y-3">
-                                                {cat.buying.map((item, idx) => (
-                                                    <div key={idx} className="flex justify-between items-baseline text-xs">
-                                                        <span className="text-gray-700 dark:text-silver-light font-medium truncate mr-4 tracking-wide">{item.name}</span>
-                                                        <span className="text-orange-600 dark:text-orange-400 font-bold font-mono whitespace-nowrap">
-                                                            {item.amount.toLocaleString('id-ID')}
-                                                        </span>
-                                                    </div>
-                                                ))}
-                                                {cat.buying.length === 0 && <span className="text-xs text-gray-300 dark:text-silver-dark/30 italic">-</span>}
+                                                            {/* Buying Item */}
+                                                            <div className={`col-span-1 pl-4 flex justify-between items-baseline text-xs ${idx > 0 ? 'mt-3' : ''}`}>
+                                                                {bItem ? (
+                                                                    <>
+                                                                        <span className="text-gray-700 dark:text-silver-light font-medium truncate mr-4 tracking-wide">{bItem.name}</span>
+                                                                        <span className="text-orange-600 dark:text-orange-400 font-bold font-mono whitespace-nowrap">
+                                                                            {bItem.amount.toLocaleString('id-ID')}
+                                                                        </span>
+                                                                    </>
+                                                                ) : <span className="text-gray-300 dark:text-silver-dark/30 italic">-</span>}
+                                                            </div>
+                                                        </React.Fragment>
+                                                    );
+                                                })}
 
-                                                {/* Category Subtotal Buying */}
-                                                {cat.buying.length > 0 && (
-                                                    <div className="pt-2 mt-1 border-t border-gray-100 dark:border-dark-border/30 flex justify-end">
-                                                        <span className="text-[10px] text-orange-600/60 dark:text-orange-500/60 font-bold">
-                                                            {cat.totalB.toLocaleString('id-ID')}
-                                                        </span>
-                                                    </div>
+                                                {/* Subtotals */}
+                                                {(cat.selling.length > 0 || cat.buying.length > 0) && (
+                                                    <React.Fragment>
+                                                        <div className="col-span-1 border-r border-gray-100 dark:border-dark-border/30 pr-4 pt-3 mt-1 border-t border-gray-100 dark:border-dark-border/30 flex justify-end">
+                                                            <span className="text-[10px] text-green-600/60 dark:text-green-500/60 font-bold">
+                                                                {cat.totalS.toLocaleString('id-ID')}
+                                                            </span>
+                                                        </div>
+                                                        <div className="col-span-1 pl-4 pt-3 mt-1 border-t border-gray-100 dark:border-dark-border/30 flex justify-end">
+                                                            <span className="text-[10px] text-orange-600/60 dark:text-orange-500/60 font-bold">
+                                                                {cat.totalB.toLocaleString('id-ID')}
+                                                            </span>
+                                                        </div>
+                                                    </React.Fragment>
                                                 )}
                                             </div>
                                         </div>
