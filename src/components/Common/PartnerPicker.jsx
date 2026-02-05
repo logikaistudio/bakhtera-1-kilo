@@ -45,6 +45,8 @@ const PartnerPicker = ({
     const fetchPartners = async () => {
         try {
             setLoading(true);
+            console.log('🔍 PartnerPicker: Fetching partners with roleFilter:', roleFilter);
+
             let query = supabase
                 .from('blink_business_partners')
                 .select('*')
@@ -53,15 +55,29 @@ const PartnerPicker = ({
             // Apply role filter
             if (roleFilter !== 'all') {
                 const roleColumn = `is_${roleFilter}`;
+                console.log('🔍 PartnerPicker: Applying filter:', roleColumn, '= true');
                 query = query.eq(roleColumn, true);
             }
 
             const { data, error } = await query.order('partner_name');
 
-            if (error) throw error;
+            if (error) {
+                console.error('❌ PartnerPicker: Error fetching partners:', error);
+                console.error('Error details:', {
+                    message: error.message,
+                    details: error.details,
+                    hint: error.hint,
+                    code: error.code
+                });
+                throw error;
+            }
+
+            console.log('✅ PartnerPicker: Successfully fetched', data?.length || 0, 'partners');
             setPartners(data || []);
         } catch (error) {
-            console.error('Error fetching partners:', error);
+            console.error('❌ PartnerPicker: Catch block error:', error);
+            // Show user-friendly error
+            alert(`Failed to load partners: ${error.message}\n\nPlease check:\n1. Database connection\n2. Table 'blink_business_partners' exists\n3. RLS policies are configured`);
         } finally {
             setLoading(false);
         }
