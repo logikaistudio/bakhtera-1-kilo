@@ -21,7 +21,8 @@ import {
     Upload,
     Download,
     Trash2,
-    MapPinned
+    MapPinned,
+    Receipt
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -572,6 +573,68 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
         onUpdate({ ...shipment, containers: updatedContainers });
     };
 
+    const handleGenerateInvoice = async () => {
+        if (!confirm('Create Invoice for this shipment? This will create a new draft Invoice.')) return;
+
+        try {
+            // 1. Generate Invoice Number
+            const { generateInvoiceNumber } = await import('../../utils/documentNumbers');
+            const invoiceNumber = await generateInvoiceNumber(shipment.jobNumber || shipment.soNumber);
+
+            // 2. Prepare Invoice Items
+            // Use quotedAmount as the main item
+            const invoiceItems = [{
+                description: `${(shipment.serviceType || 'Freight').toUpperCase()} - ${shipment.origin || ''} to ${shipment.destination || ''}`,
+                qty: 1,
+                unit: 'Shipment',
+                rate: shipment.quotedAmount || 0,
+                amount: shipment.quotedAmount || 0
+            }];
+
+            // 3. Create Invoice Object
+            const newInvoice = {
+                invoice_number: invoiceNumber,
+                invoice_date: new Date().toISOString().split('T')[0],
+                due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Default NET 30
+                payment_terms: 'NET 30',
+                quotation_id: shipment.quotationId || null,
+                shipment_id: shipment.id,
+                job_number: shipment.jobNumber,
+                so_number: shipment.soNumber,
+                customer_id: shipment.customerId,
+                customer_name: shipment.customer,
+                origin: shipment.origin,
+                destination: shipment.destination,
+                service_type: shipment.serviceType,
+                currency: shipment.currency || 'IDR', // Default to shipment currency
+                subtotal: shipment.quotedAmount || 0,
+                tax_rate: 11.0, // Default VAT
+                tax_amount: (shipment.quotedAmount || 0) * 0.11,
+                total_amount: (shipment.quotedAmount || 0) * 1.11,
+                outstanding_amount: (shipment.quotedAmount || 0) * 1.11,
+                status: 'draft',
+                invoice_items: invoiceItems,
+                // COGS from shipment (optional, but good to link)
+                cogs_items: [], // Populated later or leave empty
+                notes: `Generated from Shipment: ${shipment.jobNumber}`
+            };
+
+            const { data, error } = await supabase
+                .from('blink_invoices')
+                .insert([newInvoice])
+                .select();
+
+            if (error) throw error;
+
+            alert(`✅ Invoice ${invoiceNumber} created successfully!`);
+            onClose();
+            navigate('/blink/finance/invoices');
+        } catch (error) {
+            console.error('Error creating invoice:', error);
+            alert('Failed to create invoice: ' + error.message);
+        }
+    };
+
     const handleAddTracking = () => {
         if (!newTracking.location) {
             alert('Location is required');
@@ -904,6 +967,15 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                         }}
                                     >
                                         Edit
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="primary"
+                                        icon={Receipt}
+                                        onClick={handleGenerateInvoice}
+                                        title="Create Invoice from this Shipment"
+                                    >
+                                        Create Inv
                                     </Button>
                                     <Button
                                         size="sm"
