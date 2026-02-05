@@ -100,9 +100,9 @@ const ServiceItemManager = ({ items = [], onChange, currency = 'USD', readOnly =
                                             value={item.description}
                                             onChange={(e) => updateItem(item.id, 'description', e.target.value)}
                                             placeholder="e.g., Ocean Freight, THC, Documentation"
-                                            className="w-full px-2 py-1.5 text-sm bg-dark-surface border border-dark-border rounded text-silver-light resize-y min-h-[38px]"
+                                            className="w-full px-2 py-1.5 text-sm bg-dark-surface border border-dark-border rounded text-silver-light resize-y min-h-[60px] max-h-[300px]"
                                             readOnly={readOnly}
-                                            rows={2}
+                                            rows={4}
                                         />
                                     </td>
                                     <td className="py-2 px-2">

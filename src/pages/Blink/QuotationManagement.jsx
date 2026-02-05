@@ -278,22 +278,48 @@ const QuotationManagement = () => {
 
     const handleSaveEditedQuotation = async () => {
         try {
+            // Calculate total from service items if available
+            const total = editedQuotation.serviceItems?.reduce((sum, item) =>
+                sum + (parseFloat(item.amount) || 0), 0) || editedQuotation.totalAmount;
+
             // Update in Supabase
             const { error } = await supabase
                 .from('blink_quotations')
                 .update({
-                    total_amount: editedQuotation.totalAmount,
+                    // Customer info
+                    customer_name: editedQuotation.customerName,
+                    customer_address: editedQuotation.customerAddress,
+                    customer_contact_name: editedQuotation.customerContact,
+                    customer_email: editedQuotation.customerEmail,
+                    customer_phone: editedQuotation.customerPhone,
+                    sales_person: editedQuotation.salesPerson,
+
+                    // Route & Service
                     origin: editedQuotation.origin,
                     destination: editedQuotation.destination,
-                    notes: editedQuotation.notes,
-                    terms_and_conditions: editedQuotation.termsConditions,
+                    service_type: editedQuotation.serviceType,
+                    cargo_type: editedQuotation.cargoType,
+                    commodity: editedQuotation.commodity,
+
+                    // Cargo details
+                    volume: editedQuotation.volume ? parseFloat(editedQuotation.volume) : null,
+                    gross_weight: editedQuotation.grossWeight ? parseFloat(editedQuotation.grossWeight) : null,
+                    net_weight: editedQuotation.netWeight ? parseFloat(editedQuotation.netWeight) : null,
+                    measure: editedQuotation.measure ? parseFloat(editedQuotation.measure) : null,
+
+                    // Pricing
+                    total_amount: total,
+                    service_items: editedQuotation.serviceItems || [],
+
+                    // Additional details
                     incoterm: editedQuotation.incoterm,
                     payment_terms: editedQuotation.paymentTerms,
                     package_type: editedQuotation.packageType,
-                    quantity: editedQuotation.quantity,
-                    customer_contact_name: editedQuotation.customerContact,
-                    customer_email: editedQuotation.customerEmail,
-                    customer_phone: editedQuotation.customerPhone
+                    quantity: editedQuotation.quantity ? parseFloat(editedQuotation.quantity) : null,
+
+                    // Notes
+                    notes: editedQuotation.notes,
+                    terms_and_conditions: editedQuotation.termsConditions
                 })
                 .eq('id', editedQuotation.id);
 
@@ -303,7 +329,7 @@ const QuotationManagement = () => {
             await fetchQuotations();
             setViewingQuotation(editedQuotation);
             setIsEditingQuotation(false);
-            alert('Quotation updated successfully!');
+            alert('✅ Quotation updated successfully!');
         } catch (error) {
             console.error('Error updating quotation:', error);
             alert('Failed to update: ' + error.message);
@@ -1658,6 +1684,34 @@ const QuotationManagement = () => {
                             </select>
                         </div>
 
+                        <div>
+                            <p className="text-xs text-gray-500 mb-1">Cargo Type</p>
+                            <select
+                                value={isEditingQuotation ? (editedQuotation?.cargoType || '') : (viewingQuotation.cargoType || '')}
+                                onChange={(e) => setEditedQuotation({ ...editedQuotation, cargoType: e.target.value })}
+                                disabled={!isEditingQuotation}
+                                className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm disabled:bg-gray-100/50"
+                            >
+                                <option value="">Select...</option>
+                                <option value="FCL">FCL (Full Container)</option>
+                                <option value="LCL">LCL (Less Container)</option>
+                                <option value="General">General Cargo</option>
+                                <option value="Dangerous">Dangerous Goods</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <p className="text-xs text-gray-500 mb-1">Commodity</p>
+                            <input
+                                type="text"
+                                value={isEditingQuotation ? (editedQuotation?.commodity || '') : (viewingQuotation.commodity || '')}
+                                onChange={(e) => setEditedQuotation({ ...editedQuotation, commodity: e.target.value })}
+                                disabled={!isEditingQuotation}
+                                placeholder="e.g., Electronics"
+                                className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm disabled:bg-gray-100/50"
+                            />
+                        </div>
+
                         {/* Cargo Details */}
                         <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
                             <h5 className="text-xs font-semibold text-gray-400 mb-3 uppercase tracking-wider">Cargo Details</h5>
@@ -1731,16 +1785,20 @@ const QuotationManagement = () => {
                         </div>
 
                         {/* Cost Breakdown */}
-                        {viewingQuotation.serviceItems && viewingQuotation.serviceItems.length > 0 && (
+                        {(viewingQuotation.serviceItems && viewingQuotation.serviceItems.length > 0) || isEditingQuotation ? (
                             <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
                                 <ServiceItemManager
-                                    items={viewingQuotation.serviceItems}
-                                    onChange={() => { }} // Read-only, no changes
+                                    items={isEditingQuotation ? (editedQuotation?.serviceItems || []) : viewingQuotation.serviceItems}
+                                    onChange={(items) => {
+                                        if (isEditingQuotation) {
+                                            setEditedQuotation({ ...editedQuotation, serviceItems: items });
+                                        }
+                                    }}
                                     currency={viewingQuotation.currency}
-                                    readOnly={true}
+                                    readOnly={!isEditingQuotation}
                                 />
                             </div>
-                        )}
+                        ) : null}
 
                         {/* Terms & Conditions (View/Edit) */}
                         {/* Terms & Conditions (View/Edit) */}
