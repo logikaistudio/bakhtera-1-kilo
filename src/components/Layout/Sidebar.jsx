@@ -49,6 +49,50 @@ const Sidebar = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [expandedSection, setExpandedSection] = useState('');
     const [expandedCategories, setExpandedCategories] = useState(['marketing', 'operations', 'finance', 'costing', 'profit', 'data', 'bridge-operasional', 'bridge-finance', 'bridge-data']); // All expanded by default
+    const lastPathRef = React.useRef(null);
+
+    // Initial check and Listener for path changes
+    React.useEffect(() => {
+        const path = location.pathname;
+        const getSection = (p) => {
+            if (p.startsWith('/bridge')) return 'bridge';
+            if (p.startsWith('/pabean')) return 'pabean';
+            if (p.startsWith('/big')) return 'big';
+            if (p.startsWith('/blink')) return 'blink';
+            return '';
+        };
+
+        const currentSection = getSection(path);
+
+        // Handle initial load
+        if (lastPathRef.current === null) {
+            if (currentSection) {
+                setExpandedSection(currentSection);
+                scrollToElement('menu-' + currentSection);
+            }
+        } else {
+            // Handle navigation
+            const prevSection = getSection(lastPathRef.current);
+            if (currentSection && currentSection !== prevSection) {
+                setExpandedSection(currentSection);
+                scrollToElement('menu-' + currentSection);
+            } else if (!currentSection && prevSection) {
+                setExpandedSection('');
+            }
+        }
+
+        lastPathRef.current = path;
+    }, [location.pathname]);
+
+    // Helper to scroll to element
+    const scrollToElement = (elementId) => {
+        setTimeout(() => {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }, 100);
+    };
 
     const isActive = (path) => location.pathname === path;
 
@@ -74,6 +118,7 @@ const Sidebar = () => {
         {
             type: 'category', label: '📦 Operasional', items: [
                 { path: '/bridge/pengajuan', label: 'Pengajuan' },
+                { path: '/bridge/ata-carnet', label: 'ATA Carnet' },
                 { path: '/bridge/inventory', label: 'Inventaris Gudang' },
                 { path: '/bridge/outbound-inventory', label: 'Laporan Barang Keluar' },
                 { path: '/bridge/goods-movement', label: 'Pergerakan Barang' },
@@ -103,16 +148,6 @@ const Sidebar = () => {
             ]
         },
     ];
-
-    // ... Pabean and other definitions ...
-
-    // ... (Inside SidebarContent) ...
-    // Note: I need to replace the definition AND the rendering logic.
-    // Since replace_file_content handles a contiguous block, I will replace the definition first,
-    // then I'll need another call for the rendering logic if they are far apart.
-    // Wait, the definition is lines 72-83. The rendering is lines 215-271. 
-    // They are far apart. I should use multi_replace.
-
 
     // Pabean submenu items
     const pabeanSubMenuItems = [
@@ -212,7 +247,7 @@ const Sidebar = () => {
         <Link
             to={item.path}
             onClick={() => isMobile && setIsOpen(false)}
-            className={`flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition ${isActive(item.path)
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition text-sm ${isActive(item.path)
                 ? 'bg-silver text-dark-bg sidebar-active-item'
                 : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface'
                 }`}
@@ -252,16 +287,21 @@ const Sidebar = () => {
                         {mainMenuItems.map((item) => {
                             // Special handling for Bridge with submenu
                             if (item.path === '/bridge') {
-                                const isExpanded = expandedSection === 'bridge' || location.pathname.startsWith('/bridge');
+                                const isExpanded = expandedSection === 'bridge';
                                 const isBridgeActive = location.pathname.startsWith('/bridge');
 
                                 return (
                                     <div key={item.path}>
-                                        <div className="flex items-center gap-1">
+                                        <div className="flex items-center gap-1" id="menu-bridge">
                                             <Link
                                                 to={item.path}
-                                                onClick={() => isMobile && setIsOpen(false)}
-                                                className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition ${isBridgeActive
+                                                onClick={() => {
+                                                    if (isMobile) setIsOpen(false);
+                                                    const isCurrentlyExpanded = expandedSection === 'bridge';
+                                                    setExpandedSection(isCurrentlyExpanded ? '' : 'bridge');
+                                                    if (!isCurrentlyExpanded) scrollToElement('menu-bridge');
+                                                }}
+                                                className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition text-sm ${isBridgeActive
                                                     ? 'bg-accent-blue bg-opacity-20 text-accent-blue'
                                                     : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface'
                                                     }`}
@@ -275,7 +315,11 @@ const Sidebar = () => {
                                                 </div>
                                             </Link>
                                             <button
-                                                onClick={() => setExpandedSection(isExpanded ? '' : 'bridge')}
+                                                onClick={() => {
+                                                    const newState = isExpanded ? '' : 'bridge';
+                                                    setExpandedSection(newState);
+                                                    if (newState === 'bridge') scrollToElement('menu-bridge');
+                                                }}
                                                 className="p-2 hover:bg-dark-surface rounded-lg smooth-transition"
                                             >
                                                 <ChevronRight className={`w-4 h-4 transition-transform text-silver-dark ${isExpanded ? 'rotate-90' : ''}`} />
@@ -306,7 +350,7 @@ const Sidebar = () => {
                                                                                     : [...prev, categoryKey]
                                                                             );
                                                                         }}
-                                                                        className="w-full flex items-center justify-between px-4 py-2 text-xs font-semibold text-silver hover:text-silver-light smooth-transition"
+                                                                        className="w-full flex items-center justify-between px-4 py-2 text-sm font-semibold text-silver hover:text-silver-light smooth-transition"
                                                                     >
                                                                         <span>{subItem.label}</span>
                                                                         <ChevronRight className={`w-3 h-3 transition-transform ${isCategoryExpanded ? 'rotate-90' : ''}`} />
@@ -325,7 +369,7 @@ const Sidebar = () => {
                                                                                         key={menuItem.path}
                                                                                         to={menuItem.path}
                                                                                         onClick={() => isMobile && setIsOpen(false)}
-                                                                                        className={`block pl-12 pr-4 py-1.5 text-xs smooth-transition border-l-2 ml-4 ${isActive(menuItem.path)
+                                                                                        className={`block pl-12 pr-4 py-1.5 text-sm smooth-transition border-l-2 ml-4 ${isActive(menuItem.path)
                                                                                             ? 'bg-accent-blue/20 text-accent-blue font-medium border-accent-blue'
                                                                                             : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface/50 border-transparent hover:border-silver-dark/50'
                                                                                             }`}
@@ -365,16 +409,21 @@ const Sidebar = () => {
 
                             // Special handling for Pabean with submenu
                             if (item.path === '/pabean') {
-                                const isExpanded = expandedSection === 'pabean' || location.pathname.startsWith('/pabean');
+                                const isExpanded = expandedSection === 'pabean';
                                 const isPabeanActive = location.pathname.startsWith('/pabean');
 
                                 return (
                                     <div key={item.path}>
-                                        <div className="flex items-center gap-1">
+                                        <div className="flex items-center gap-1" id="menu-pabean">
                                             <Link
                                                 to={item.path}
-                                                onClick={() => isMobile && setIsOpen(false)}
-                                                className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition ${isPabeanActive
+                                                onClick={() => {
+                                                    if (isMobile) setIsOpen(false);
+                                                    const isCurrentlyExpanded = expandedSection === 'pabean';
+                                                    setExpandedSection(isCurrentlyExpanded ? '' : 'pabean');
+                                                    if (!isCurrentlyExpanded) scrollToElement('menu-pabean');
+                                                }}
+                                                className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition text-sm ${isPabeanActive
                                                     ? 'bg-accent-green bg-opacity-20 text-accent-green'
                                                     : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface'
                                                     }`}
@@ -388,7 +437,11 @@ const Sidebar = () => {
                                                 </div>
                                             </Link>
                                             <button
-                                                onClick={() => setExpandedSection(isExpanded ? '' : 'pabean')}
+                                                onClick={() => {
+                                                    const newState = isExpanded ? '' : 'pabean';
+                                                    setExpandedSection(newState);
+                                                    if (newState === 'pabean') scrollToElement('menu-pabean');
+                                                }}
                                                 className="p-2 hover:bg-dark-surface rounded-lg smooth-transition"
                                             >
                                                 <ChevronRight className={`w-4 h-4 transition-transform text-silver-dark ${isExpanded ? 'rotate-90' : ''}`} />
@@ -425,16 +478,21 @@ const Sidebar = () => {
 
                             // Special handling for BIG with submenu
                             if (item.path === '/big') {
-                                const isExpanded = expandedSection === 'big' || location.pathname.startsWith('/big');
+                                const isExpanded = expandedSection === 'big';
                                 const isBigActive = location.pathname.startsWith('/big');
 
                                 return (
                                     <div key={item.path}>
-                                        <div className="flex items-center gap-1">
+                                        <div className="flex items-center gap-1" id="menu-big">
                                             <Link
                                                 to={item.path}
-                                                onClick={() => isMobile && setIsOpen(false)}
-                                                className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition ${isBigActive
+                                                onClick={() => {
+                                                    if (isMobile) setIsOpen(false);
+                                                    const isCurrentlyExpanded = expandedSection === 'big';
+                                                    setExpandedSection(isCurrentlyExpanded ? '' : 'big');
+                                                    if (!isCurrentlyExpanded) scrollToElement('menu-big');
+                                                }}
+                                                className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition text-sm ${isBigActive
                                                     ? 'text-silver-light'
                                                     : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface'
                                                     }`}
@@ -448,7 +506,11 @@ const Sidebar = () => {
                                                 </div>
                                             </Link>
                                             <button
-                                                onClick={() => setExpandedSection(isExpanded ? '' : 'big')}
+                                                onClick={() => {
+                                                    const newState = isExpanded ? '' : 'big';
+                                                    setExpandedSection(newState);
+                                                    if (newState === 'big') scrollToElement('menu-big');
+                                                }}
                                                 className="p-2 hover:bg-dark-surface rounded-lg smooth-transition"
                                             >
                                                 <ChevronRight className={`w-4 h-4 transition-transform text-silver-dark ${isExpanded ? 'rotate-90' : ''}`} />
@@ -479,7 +541,7 @@ const Sidebar = () => {
                                                                                     : [...prev, categoryKey]
                                                                             );
                                                                         }}
-                                                                        className="w-full flex items-center justify-between px-4 py-2 text-xs font-semibold text-silver hover:text-silver-light smooth-transition"
+                                                                        className="w-full flex items-center justify-between px-4 py-2 text-sm font-semibold text-silver hover:text-silver-light smooth-transition"
                                                                     >
                                                                         <span>{subItem.label}</span>
                                                                         <ChevronRight className={`w-3 h-3 transition-transform ${isCategoryExpanded ? 'rotate-90' : ''}`} />
@@ -497,7 +559,7 @@ const Sidebar = () => {
                                                                                     if (menuItem.type === 'divider') {
                                                                                         return (
                                                                                             <div key={`divider-${itemIdx}`} className="pl-6 pr-4 pt-3 pb-1 border-t border-dark-border/30 mt-1 first:mt-0 first:border-t-0">
-                                                                                                <span className="text-[10px] font-bold text-silver uppercase tracking-wider">
+                                                                                                <span className="text-xs font-bold text-silver uppercase tracking-wider">
                                                                                                     {menuItem.label}
                                                                                                 </span>
                                                                                             </div>
@@ -509,7 +571,7 @@ const Sidebar = () => {
                                                                                             key={menuItem.path}
                                                                                             to={menuItem.path}
                                                                                             onClick={() => isMobile && setIsOpen(false)}
-                                                                                            className={`block pl-12 pr-4 py-1.5 text-xs smooth-transition border-l-2 ml-4 ${isActive(menuItem.path)
+                                                                                            className={`block pl-12 pr-4 py-1.5 text-sm smooth-transition border-l-2 ml-4 ${isActive(menuItem.path)
                                                                                                 ? 'bg-accent-orange/20 text-accent-orange font-medium border-accent-orange'
                                                                                                 : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface/50 border-transparent hover:border-silver-dark/50'
                                                                                                 }`}
@@ -550,16 +612,21 @@ const Sidebar = () => {
 
                             // Special handling for BLINK with submenu
                             if (item.path === '/blink') {
-                                const isExpanded = expandedSection === 'blink' || location.pathname.startsWith('/blink');
+                                const isExpanded = expandedSection === 'blink';
                                 const isBlinkActive = location.pathname.startsWith('/blink');
 
                                 return (
                                     <div key={item.path}>
-                                        <div className="flex items-center gap-1">
+                                        <div className="flex items-center gap-1" id="menu-blink">
                                             <Link
                                                 to={item.path}
-                                                onClick={() => isMobile && setIsOpen(false)}
-                                                className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition ${isBlinkActive
+                                                onClick={() => {
+                                                    if (isMobile) setIsOpen(false);
+                                                    const isCurrentlyExpanded = expandedSection === 'blink';
+                                                    setExpandedSection(isCurrentlyExpanded ? '' : 'blink');
+                                                    if (!isCurrentlyExpanded) scrollToElement('menu-blink');
+                                                }}
+                                                className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition text-sm ${isBlinkActive
                                                     ? 'text-silver-light'
                                                     : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface'
                                                     }`}
@@ -573,7 +640,11 @@ const Sidebar = () => {
                                                 </div>
                                             </Link>
                                             <button
-                                                onClick={() => setExpandedSection(isExpanded ? '' : 'blink')}
+                                                onClick={() => {
+                                                    const newState = isExpanded ? '' : 'blink';
+                                                    setExpandedSection(newState);
+                                                    if (newState === 'blink') scrollToElement('menu-blink');
+                                                }}
                                                 className="p-2 hover:bg-dark-surface rounded-lg smooth-transition"
                                             >
                                                 <ChevronRight className={`w-4 h-4 transition-transform text-silver-dark ${isExpanded ? 'rotate-90' : ''}`} />
@@ -605,7 +676,7 @@ const Sidebar = () => {
                                                                                     : [...prev, categoryKey]
                                                                             );
                                                                         }}
-                                                                        className="w-full flex items-center justify-between px-4 py-2 text-xs font-semibold text-silver hover:text-silver-light smooth-transition"
+                                                                        className="w-full flex items-center justify-between px-4 py-2 text-sm font-semibold text-silver hover:text-silver-light smooth-transition"
                                                                     >
                                                                         <span>{subItem.label}</span>
                                                                         <ChevronRight className={`w-3 h-3 transition-transform ${isCategoryExpanded ? 'rotate-90' : ''}`} />
@@ -625,7 +696,7 @@ const Sidebar = () => {
                                                                                     if (item.type === 'divider') {
                                                                                         return (
                                                                                             <div key={`divider-${itemIdx}`} className="pl-6 pr-4 pt-3 pb-1 border-t border-dark-border/30 mt-1 first:mt-0 first:border-t-0">
-                                                                                                <span className="text-[10px] font-bold text-silver uppercase tracking-wider">
+                                                                                                <span className="text-xs font-bold text-silver uppercase tracking-wider">
                                                                                                     {item.label}
                                                                                                 </span>
                                                                                             </div>
@@ -638,7 +709,7 @@ const Sidebar = () => {
                                                                                             key={item.path}
                                                                                             to={item.path}
                                                                                             onClick={() => isMobile && setIsOpen(false)}
-                                                                                            className={`block pl-12 pr-4 py-1.5 text-xs smooth-transition border-l-2 ml-4 ${isActive(item.path)
+                                                                                            className={`block pl-12 pr-4 py-1.5 text-sm smooth-transition border-l-2 ml-4 ${isActive(item.path)
                                                                                                 ? 'bg-accent-orange/20 text-accent-orange font-medium border-accent-orange'
                                                                                                 : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface/50 border-transparent hover:border-silver-dark/50'
                                                                                                 }`}
@@ -671,7 +742,7 @@ const Sidebar = () => {
                                                                 key={subItem.path}
                                                                 to={subItem.path}
                                                                 onClick={() => isMobile && setIsOpen(false)}
-                                                                className={`flex items-center gap-2 pl-10 pr-3 py-1.5 rounded-r-lg text-xs smooth-transition border-l-2 ${isActive(subItem.path)
+                                                                className={`flex items-center gap-2 pl-10 pr-3 py-1.5 rounded-r-lg text-sm smooth-transition border-l-2 ${isActive(subItem.path)
                                                                     ? 'bg-accent-orange/20 text-accent-orange font-medium border-accent-orange'
                                                                     : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface/50 font-normal border-transparent hover:border-silver-dark/30'
                                                                     }`}
@@ -791,7 +862,7 @@ const Sidebar = () => {
             </button>
 
             {/* Desktop Sidebar */}
-            <aside className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 glass-card border-r border-dark-border">
+            <aside className="hidden lg:flex lg:w-[308px] lg:flex-col lg:fixed lg:inset-y-0 glass-card border-r border-dark-border">
                 <SidebarContent />
             </aside>
 

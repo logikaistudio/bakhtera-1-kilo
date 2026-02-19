@@ -56,6 +56,7 @@ import BCMaster from './pages/Bridge/BCMaster';
 import ItemMaster from './pages/Bridge/ItemMaster';
 import HSMaster from './pages/Bridge/HSMaster';
 import PengajuanManagement from './pages/Bridge/PengajuanManagement';
+import AtaCarnet from './pages/Bridge/AtaCarnet';
 import BridgeFinance from './pages/Bridge/BridgeFinance';
 import GoodsMovement from './pages/Bridge/GoodsMovement';
 import WarehouseInventory from './pages/Bridge/WarehouseInventory';
@@ -163,6 +164,7 @@ function App() {
                   <Route path="/bridge/item-master" element={<ItemMaster />} />
                   <Route path="/bridge/hs-master" element={<HSMaster />} />
                   <Route path="/bridge/pengajuan" element={<PengajuanManagement />} />
+                  <Route path="/bridge/ata-carnet" element={<AtaCarnet />} />
                   <Route path="/bridge/finance/*" element={<BridgeFinance />} />
                   <Route path="/bridge/goods-movement" element={<GoodsMovement />} />
                   <Route path="/bridge/inventory" element={<WarehouseInventory />} />
