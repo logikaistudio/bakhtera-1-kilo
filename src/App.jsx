@@ -78,11 +78,11 @@ import BigAR from './pages/Big/Finance/AccountsReceivable';
 import BigCompanySettings from './pages/Big/CompanySettings'; // New
 
 // Pabean Module
-import PabeanDashboard from './pages/Pabean/PabeanDashboard';
-import BarangMasuk from './pages/Pabean/BarangMasuk';
-import BarangKeluar from './pages/Pabean/BarangKeluar';
-import BarangReject from './pages/Pabean/BarangReject';
-import PergerakanBarang from './pages/Pabean/PergerakanBarang';
+import PabeanDashboard from './pages/Bridge/Pabean/PabeanDashboard';
+import BarangMasuk from './pages/Bridge/Pabean/BarangMasuk';
+import BarangKeluar from './pages/Bridge/Pabean/BarangKeluar';
+import BarangReject from './pages/Bridge/Pabean/BarangReject';
+import PergerakanBarang from './pages/Bridge/Pabean/PergerakanBarang';
 
 function App() {
   // Test Supabase connection on app initialization
@@ -198,11 +198,11 @@ function App() {
                   <Route path="/big/finance/ar" element={<BigAR />} />
 
                   {/* Pabean Module */}
-                  <Route path="/pabean" element={<PabeanDashboard />} />
-                  <Route path="/pabean/barang-masuk" element={<BarangMasuk />} />
-                  <Route path="/pabean/barang-keluar" element={<BarangKeluar />} />
-                  <Route path="/pabean/barang-reject" element={<BarangReject />} />
-                  <Route path="/pabean/pergerakan" element={<PergerakanBarang />} />
+                  <Route path="/bridge/pabean" element={<PabeanDashboard />} />
+                  <Route path="/bridge/pabean/barang-masuk" element={<BarangMasuk />} />
+                  <Route path="/bridge/pabean/barang-keluar" element={<BarangKeluar />} />
+                  <Route path="/bridge/pabean/barang-reject" element={<BarangReject />} />
+                  <Route path="/bridge/pabean/pergerakan" element={<PergerakanBarang />} />
 
                   {/* Admin Module - Super Admin Only */}
                   <Route path="/admin/users" element={

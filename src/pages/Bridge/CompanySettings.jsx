@@ -266,7 +266,13 @@ const BridgeCompanySettings = () => {
                                 <CreditCard className="h-5 w-5 text-gray-500" />
                                 Rekening Bank
                             </h2>
-                            <Button size="sm" onClick={handleAddBank} Icon={Plus}>
+                            <Button
+                                size="sm"
+                                onClick={handleAddBank}
+                                Icon={Plus}
+                                disabled={bridgeBankAccounts && bridgeBankAccounts.length >= 4}
+                                title={bridgeBankAccounts && bridgeBankAccounts.length >= 4 ? "Maksimal 4 rekening bank" : ""}
+                            >
                                 Tambah Rekening
                             </Button>
                         </div>

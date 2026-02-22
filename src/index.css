@@ -256,8 +256,8 @@ textarea::placeholder {
   border-color: #005A9C;
 }
 
-[data-theme='light'] aside.glass-card a:hover,
-[data-theme='light'] aside.glass-card button:hover {
+[data-theme='light'] aside.glass-card a:not([class*="bg-accent"]):not(.bg-silver):hover,
+[data-theme='light'] aside.glass-card button:not([class*="bg-accent"]):not(.bg-silver):hover {
   background-color: rgba(255, 255, 255, 0.2) !important;
 }
 

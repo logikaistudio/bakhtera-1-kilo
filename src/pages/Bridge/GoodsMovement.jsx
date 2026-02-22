@@ -218,10 +218,10 @@ const GoodsMovement = () => {
         const headerRows = [
             { value: bridgeSettings?.company_name || companySettings?.company_name || 'PT. BAKHTERA FREIGHT WORLDWIDE', style: 'company' },
             { value: bridgeSettings?.company_address || companySettings?.company_address || 'Jl. Contoh No. 123, Jakarta', style: 'normal' },
+            { value: `NPWP: ${bridgeSettings?.company_npwp || companySettings?.company_npwp || '-'}`, style: 'normal' },
             { value: '' },
             { value: title.toUpperCase(), style: 'title' },
             { value: `Periode: ${period}`, style: 'normal' },
-            { value: '' },
             { value: '' }
         ];
 

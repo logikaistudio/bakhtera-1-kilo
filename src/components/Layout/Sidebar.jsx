@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     LayoutDashboard,
@@ -17,7 +17,8 @@ import {
     DollarSign,
     Package,
     FileCheck,
-    Shield
+    Shield,
+    LogOut
 } from 'lucide-react';
 
 import { Sun, Moon } from 'lucide-react';
@@ -45,10 +46,11 @@ const ThemeToggle = () => {
 
 const Sidebar = () => {
     const location = useLocation();
-    const { user } = useAuth();
+    const navigate = useNavigate();
+    const { user, logout } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
     const [expandedSection, setExpandedSection] = useState('');
-    const [expandedCategories, setExpandedCategories] = useState(['marketing', 'operations', 'finance', 'costing', 'profit', 'data', 'bridge-operasional', 'bridge-finance', 'bridge-data']); // All expanded by default
+    const [expandedCategories, setExpandedCategories] = useState(['marketing', 'operations', 'finance', 'costing', 'profit', 'data', 'bridge-operasional', 'bridge-finance', 'bridge-data', 'central-users']); // All expanded by default
     const lastPathRef = React.useRef(null);
 
     // Initial check and Listener for path changes
@@ -96,6 +98,15 @@ const Sidebar = () => {
 
     const isActive = (path) => location.pathname === path;
 
+    const handleLogout = async () => {
+        await logout();
+        navigate('/login');
+    };
+
+    // DEBUG: log user level (remove after verifying)
+    console.log('[Sidebar] user object:', user);
+    console.log('[Sidebar] user_level:', user?.user_level);
+
     const mainMenuItems = [
         { path: '/', label: 'Dashboard Bakhtera-1', icon: LayoutDashboard },
         { path: '/blink', label: 'BLINK', subtitle: 'Freight & Forward Management', icon: Plane },
@@ -117,8 +128,8 @@ const Sidebar = () => {
         // Operasional Category
         {
             type: 'category', label: '📦 Operasional', items: [
-                { path: '/bridge/pengajuan', label: 'Pengajuan' },
                 { path: '/bridge/ata-carnet', label: 'ATA Carnet' },
+                { path: '/bridge/pengajuan', label: 'Pengajuan' },
                 { path: '/bridge/inventory', label: 'Inventaris Gudang' },
                 { path: '/bridge/outbound-inventory', label: 'Laporan Barang Keluar' },
                 { path: '/bridge/goods-movement', label: 'Pergerakan Barang' },
@@ -370,7 +381,7 @@ const Sidebar = () => {
                                                                                         to={menuItem.path}
                                                                                         onClick={() => isMobile && setIsOpen(false)}
                                                                                         className={`block pl-12 pr-4 py-1.5 text-sm smooth-transition border-l-2 ml-4 ${isActive(menuItem.path)
-                                                                                            ? 'bg-accent-blue/20 text-accent-blue font-medium border-accent-blue'
+                                                                                            ? 'bg-accent-blue/20 text-accent-blue font-medium border-accent-blue active-sidebar-item'
                                                                                             : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface/50 border-transparent hover:border-silver-dark/50'
                                                                                             }`}
                                                                                     >
@@ -774,79 +785,116 @@ const Sidebar = () => {
                             <MenuLink key={item.path} item={item} isMobile={isMobile} />
                         ))}
 
-                        {/* Admin Menu - Super Admin Only */}
-                        {user?.user_level === 'super_admin' && (
+                        {/* Admin Menu - Admin & Super Admin */}
+                        {(['super_admin', 'admin', 'superuser'].includes(user?.user_level?.toLowerCase())) && (
                             <>
                                 <div className="px-4 pt-4 pb-2">
                                     <div className="border-t border-dark-border/30" />
                                 </div>
-                                <Link
-                                    to="/admin/users"
-                                    onClick={() => isMobile && setIsOpen(false)}
-                                    className={`flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition ${isActive('/admin/users')
-                                        ? 'bg-red-500 bg-opacity-20 text-red-400'
-                                        : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface'
-                                        }`}
+                                <button
+                                    onClick={() => {
+                                        setExpandedCategories(prev =>
+                                            prev.includes('central-users')
+                                                ? prev.filter(c => c !== 'central-users')
+                                                : [...prev, 'central-users']
+                                        );
+                                    }}
+                                    className="w-full flex items-center justify-between px-4 py-2 mt-2 text-sm font-semibold text-silver hover:text-silver-light smooth-transition focus:outline-none"
                                 >
-                                    <Shield className="w-5 h-5 flex-shrink-0" />
-                                    <div className="flex-1">
-                                        <div className="font-medium">User Management</div>
-                                        <div className={`text-xs ${isActive('/admin/users') ? 'text-red-300' : 'text-silver-dark'}`}>
-                                            Manage users & roles
-                                        </div>
+                                    <div className="flex items-center gap-2">
+                                        <Shield className="w-4 h-4 text-red-400" />
+                                        <span>Pengaturan User</span>
                                     </div>
-                                </Link>
-                                <Link
-                                    to="/admin/permissions"
-                                    onClick={() => isMobile && setIsOpen(false)}
-                                    className={`flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition ${isActive('/admin/permissions')
-                                        ? 'bg-red-500 bg-opacity-20 text-red-400'
-                                        : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface'
-                                        }`}
-                                >
-                                    <Shield className="w-5 h-5 flex-shrink-0" />
-                                    <div className="flex-1">
-                                        <div className="font-medium">Role Permissions</div>
-                                        <div className={`text-xs ${isActive('/admin/permissions') ? 'text-red-300' : 'text-silver-dark'}`}>
-                                            Assign by role
-                                        </div>
-                                    </div>
-                                </Link>
-                                <Link
-                                    to="/admin/user-permissions"
-                                    onClick={() => isMobile && setIsOpen(false)}
-                                    className={`flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition ${isActive('/admin/user-permissions')
-                                        ? 'bg-red-500 bg-opacity-20 text-red-400'
-                                        : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface'
-                                        }`}
-                                >
-                                    <Shield className="w-5 h-5 flex-shrink-0" />
-                                    <div className="flex-1">
-                                        <div className="font-medium">User Permissions</div>
-                                        <div className={`text-xs ${isActive('/admin/user-permissions') ? 'text-red-300' : 'text-silver-dark'}`}>
-                                            Assign by user
-                                        </div>
-                                    </div>
-                                </Link>
+                                    <ChevronRight className={`w-3 h-3 transition-transform ${expandedCategories.includes('central-users') ? 'rotate-90' : ''}`} />
+                                </button>
+
+                                <AnimatePresence>
+                                    {expandedCategories.includes('central-users') && (
+                                        <motion.div
+                                            initial={{ height: 0, opacity: 0 }}
+                                            animate={{ height: 'auto', opacity: 1 }}
+                                            exit={{ height: 0, opacity: 0 }}
+                                            className="overflow-hidden mt-1 space-y-1"
+                                        >
+                                            <Link
+                                                to="/admin/users"
+                                                onClick={() => isMobile && setIsOpen(false)}
+                                                className={`block pl-10 pr-4 py-1.5 text-sm smooth-transition border-l-2 ml-4 ${isActive('/admin/users')
+                                                    ? 'bg-red-500/20 text-red-500 font-medium border-red-500 active-sidebar-item'
+                                                    : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface/50 border-transparent hover:border-silver-dark/50'
+                                                    }`}
+                                            >
+                                                Manajemen User
+                                            </Link>
+                                            <Link
+                                                to="/admin/permissions"
+                                                onClick={() => isMobile && setIsOpen(false)}
+                                                className={`block pl-10 pr-4 py-1.5 text-sm smooth-transition border-l-2 ml-4 ${isActive('/admin/permissions')
+                                                    ? 'bg-red-500/20 text-red-500 font-medium border-red-500 active-sidebar-item'
+                                                    : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface/50 border-transparent hover:border-silver-dark/50'
+                                                    }`}
+                                            >
+                                                Manajemen Role
+                                            </Link>
+                                            <Link
+                                                to="/admin/user-permissions"
+                                                onClick={() => isMobile && setIsOpen(false)}
+                                                className={`block pl-10 pr-4 py-1.5 text-sm smooth-transition border-l-2 ml-4 ${isActive('/admin/user-permissions')
+                                                    ? 'bg-red-500/20 text-red-500 font-medium border-red-500 active-sidebar-item'
+                                                    : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface/50 border-transparent hover:border-silver-dark/50'
+                                                    }`}
+                                            >
+                                                Akses User
+                                            </Link>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
                             </>
                         )}
                     </div>
                 </div>
             </nav>
 
-            {/* Footer */}
-            <div className="px-6 py-4 border-t border-dark-border text-center">
-                <p className="text-xs text-silver-dark mb-0.5">
-                    © 2024 Bakhtera-1 • v1.0.0
-                </p>
-                <a
-                    href="https://logikai.studio"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[10px] text-accent-orange hover:text-accent-orange/80 transition-colors font-medium"
+            {/* Footer - User Info + Logout */}
+            <div className="px-4 py-3 border-t border-dark-border">
+                {/* User info row */}
+                <div className="flex items-center gap-3 px-2 py-2 mb-2 rounded-lg bg-dark-surface/50">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent-blue to-accent-cyan flex items-center justify-center flex-shrink-0">
+                        <UserCircle className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-silver-light truncate">
+                            {user?.full_name || user?.username || 'User'}
+                        </div>
+                        <div className="text-xs text-silver-dark truncate capitalize">
+                            {user?.user_level?.replace(/_/g, ' ') || 'User'}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Logout button */}
+                <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 smooth-transition font-medium"
                 >
-                    By : LogikAi.studio
-                </a>
+                    <LogOut className="w-4 h-4 flex-shrink-0" />
+                    <span>Keluar</span>
+                </button>
+
+                {/* Branding */}
+                <div className="text-center pt-2 border-t border-dark-border/30 mt-2">
+                    <p className="text-[10px] text-silver-dark/50">
+                        © 2024 Bakhtera-1 • v1.0.0
+                    </p>
+                    <a
+                        href="https://logikai.studio"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] text-accent-orange/60 hover:text-accent-orange/90 transition-colors"
+                    >
+                        By : LogikAi.studio
+                    </a>
+                </div>
             </div>
         </div>
     );

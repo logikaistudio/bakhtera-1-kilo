@@ -84,117 +84,97 @@ const UserManagement = () => {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 256 }}>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
             </div>
         );
     }
 
     return (
-        <div className="p-6">
+        <div style={{ padding: 24, fontFamily: 'inherit' }}>
             {/* Header */}
-            <div className="flex justify-between items-center mb-6">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                        <Shield className="w-7 h-7 text-blue-600" />
-                        User Management
+                    <h1 style={{ fontSize: 22, fontWeight: 700, color: '#111827', display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+                        <Shield style={{ width: 26, height: 26, color: '#2563eb' }} />
+                        Manajemen User
                     </h1>
-                    <p className="text-sm text-gray-600 mt-1">Manage users, roles, and permissions</p>
+                    <p style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>Kelola user, level, dan password</p>
                 </div>
                 <button
                     onClick={handleCreateUser}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}
                 >
-                    <Plus className="w-5 h-5" />
-                    Create User
+                    <Plus style={{ width: 16, height: 16 }} />
+                    Tambah User
                 </button>
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-4 gap-4 mb-6">
-                <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                    <div className="text-sm text-gray-600">Total Users</div>
-                    <div className="text-2xl font-bold text-gray-900">{users.length}</div>
-                </div>
-                <div className="bg-green-50 p-4 rounded-lg shadow-sm border border-green-200">
-                    <div className="text-sm text-green-600">Active</div>
-                    <div className="text-2xl font-bold text-green-700">{users.filter(u => u.is_active).length}</div>
-                </div>
-                <div className="bg-red-50 p-4 rounded-lg shadow-sm border border-red-200">
-                    <div className="text-sm text-red-600">Inactive</div>
-                    <div className="text-2xl font-bold text-red-700">{users.filter(u => !u.is_active).length}</div>
-                </div>
-                <div className="bg-blue-50 p-4 rounded-lg shadow-sm border border-blue-200">
-                    <div className="text-sm text-blue-600">Super Admins</div>
-                    <div className="text-2xl font-bold text-blue-700">{users.filter(u => u.user_level === 'super_admin').length}</div>
-                </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
+                {[
+                    { label: 'Total User', value: users.length, bg: '#f9fafb', border: '#e5e7eb', text: '#374151' },
+                    { label: 'Aktif', value: users.filter(u => u.is_active).length, bg: '#f0fdf4', border: '#bbf7d0', text: '#15803d' },
+                    { label: 'Tidak Aktif', value: users.filter(u => !u.is_active).length, bg: '#fef2f2', border: '#fecaca', text: '#b91c1c' },
+                    { label: 'Super Admin', value: users.filter(u => u.user_level === 'super_admin').length, bg: '#eff6ff', border: '#bfdbfe', text: '#1d4ed8' },
+                ].map(card => (
+                    <div key={card.label} style={{ background: card.bg, border: `1px solid ${card.border}`, borderRadius: 10, padding: '14px 18px' }}>
+                        <div style={{ fontSize: 12, color: card.text, fontWeight: 500, marginBottom: 4 }}>{card.label}</div>
+                        <div style={{ fontSize: 26, fontWeight: 700, color: card.text }}>{card.value}</div>
+                    </div>
+                ))}
             </div>
 
             {/* Users Table */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                        <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Username</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Full Name</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Level</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Login</th>
-                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+            <div style={{ background: '#ffffff', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                        <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                            {['Username', 'Nama Lengkap', 'Email', 'Level', 'Status', 'Terakhir Login', 'Aksi'].map((h, i) => (
+                                <th key={h} style={{ padding: '10px 20px', textAlign: i === 6 ? 'right' : 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>
+                            ))}
                         </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                        {users.map((u) => (
-                            <tr key={u.id} className="hover:bg-gray-50">
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="flex items-center gap-2">
-                                        <Users className="w-4 h-4 text-gray-400" />
-                                        <span className="font-medium text-gray-900">{u.username}</span>
+                    <tbody>
+                        {users.map((u, idx) => (
+                            <tr key={u.id} style={{ background: idx % 2 === 0 ? '#ffffff' : '#f9fafb', borderBottom: '1px solid #f3f4f6', transition: 'background 0.15s' }}
+                                onMouseEnter={e => e.currentTarget.style.background = '#eff6ff'}
+                                onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? '#ffffff' : '#f9fafb'}
+                            >
+                                <td style={{ padding: '12px 20px', whiteSpace: 'nowrap' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <Users style={{ width: 16, height: 16, color: '#9ca3af' }} />
+                                        <span style={{ fontWeight: 600, color: '#111827', fontSize: 14 }}>{u.username}</span>
                                     </div>
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{u.full_name}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{u.email || '-'}</td>
-                                <td className="px-6 py-4 whitespace-nowrap">{getUserLevelBadge(u.user_level)}</td>
-                                <td className="px-6 py-4 whitespace-nowrap">
+                                <td style={{ padding: '12px 20px', fontSize: 14, color: '#374151', whiteSpace: 'nowrap' }}>{u.full_name}</td>
+                                <td style={{ padding: '12px 20px', fontSize: 14, color: '#6b7280', whiteSpace: 'nowrap' }}>{u.email || '—'}</td>
+                                <td style={{ padding: '12px 20px', whiteSpace: 'nowrap' }}>{getUserLevelBadge(u.user_level)}</td>
+                                <td style={{ padding: '12px 20px', whiteSpace: 'nowrap' }}>
                                     {u.is_active ? (
-                                        <span className="flex items-center gap-1 text-green-600 text-sm">
-                                            <CheckCircle className="w-4 h-4" />
-                                            Active
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#16a34a', fontSize: 13, fontWeight: 500 }}>
+                                            <CheckCircle style={{ width: 15, height: 15 }} /> Aktif
                                         </span>
                                     ) : (
-                                        <span className="flex items-center gap-1 text-red-600 text-sm">
-                                            <Ban className="w-4 h-4" />
-                                            Inactive
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#dc2626', fontSize: 13, fontWeight: 500 }}>
+                                            <Ban style={{ width: 15, height: 15 }} /> Nonaktif
                                         </span>
                                     )}
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {u.last_login ? new Date(u.last_login).toLocaleDateString() : 'Never'}
+                                <td style={{ padding: '12px 20px', fontSize: 13, color: '#6b7280', whiteSpace: 'nowrap' }}>
+                                    {u.last_login ? new Date(u.last_login).toLocaleDateString('id-ID') : 'Belum pernah'}
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                    <div className="flex justify-end gap-2">
-                                        <button
-                                            onClick={() => handleEditUser(u)}
-                                            className="text-blue-600 hover:text-blue-900"
-                                            title="Edit User"
-                                        >
-                                            <Edit className="w-5 h-5" />
-                                        </button>
-                                        <button
-                                            onClick={() => handleResetPassword(u)}
-                                            className="text-green-600 hover:text-green-900"
-                                            title="Reset Password"
-                                        >
-                                            <Key className="w-5 h-5" />
-                                        </button>
-                                        <button
-                                            onClick={() => handleToggleActive(u)}
-                                            className={u.is_active ? "text-red-600 hover:text-red-900" : "text-green-600 hover:text-green-900"}
-                                            title={u.is_active ? "Disable User" : "Enable User"}
-                                        >
-                                            {u.is_active ? <Ban className="w-5 h-5" /> : <CheckCircle className="w-5 h-5" />}
-                                        </button>
+                                <td style={{ padding: '12px 20px', whiteSpace: 'nowrap', textAlign: 'right' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                                        <button onClick={() => handleEditUser(u)} title="Edit User"
+                                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2563eb', padding: 4, borderRadius: 6 }}
+                                        ><Edit style={{ width: 18, height: 18 }} /></button>
+                                        <button onClick={() => handleResetPassword(u)} title="Reset Password"
+                                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#16a34a', padding: 4, borderRadius: 6 }}
+                                        ><Key style={{ width: 18, height: 18 }} /></button>
+                                        <button onClick={() => handleToggleActive(u)} title={u.is_active ? 'Nonaktifkan' : 'Aktifkan'}
+                                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: u.is_active ? '#dc2626' : '#16a34a', padding: 4, borderRadius: 6 }}
+                                        >{u.is_active ? <Ban style={{ width: 18, height: 18 }} /> : <CheckCircle style={{ width: 18, height: 18 }} />}</button>
                                     </div>
                                 </td>
                             </tr>

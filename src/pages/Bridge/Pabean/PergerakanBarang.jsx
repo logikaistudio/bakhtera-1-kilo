@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Activity, Search, Package, ArrowDownCircle, Download, FileSpreadsheet } from 'lucide-react';
-import { useData } from '../../context/DataContext';
-import Button from '../../components/Common/Button';
-import { exportToCSV } from '../../utils/exportCSV';
-import { exportToXLS } from '../../utils/exportXLS';
+import { useData } from '../../../context/DataContext';
+import Button from '../../../components/Common/Button';
+import { exportToCSV } from '../../../utils/exportCSV';
+import { exportToXLS } from '../../../utils/exportXLS';
 
 const PergerakanBarang = () => {
     const [searchParams] = useSearchParams();
@@ -241,6 +241,9 @@ const PergerakanBarang = () => {
     const handleExportXLS = () => {
         const headerRows = [
             { value: companySettings?.company_name || 'PT. FREIGHT ONE INDONESIA', style: 'company' },
+            { value: companySettings?.company_address || 'Jl. Contoh No. 123, Jakarta', style: 'normal' },
+            { value: `NPWP: ${companySettings?.company_npwp || '-'}`, style: 'normal' },
+            { value: '', style: 'normal' },
             { value: 'Pabean - Mutasi Barang', style: 'title' }
         ];
         const xlsColumns = [

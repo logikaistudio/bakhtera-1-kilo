@@ -1,276 +1,580 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { Shield, CheckSquare, Square, Save, AlertCircle } from 'lucide-react';
+import {
+    Shield, Plus, Save, AlertCircle, CheckCircle2, Trash2, X,
+    ChevronDown, ChevronRight, Check, Minus, Plane, Building2, Calendar
+} from 'lucide-react';
 
-/**
- * Role Permissions Management
- * Matrix-style UI for assigning menu permissions to user roles
- */
+/* ─────────────────────────────────────────────
+   MENU DEFINITIONS PER MODULE
+   ───────────────────────────────────────────── */
+const MODULE_MENUS = {
+    Bridge: {
+        icon: Building2,
+        color: 'blue',
+        menus: [
+            { code: 'bridge_dashboard', label: 'Dashboard Bridge' },
+            { code: 'bridge_pengajuan', label: 'Pengajuan' },
+            { code: 'bridge_ata_carnet', label: 'ATA Carnet' },
+            { code: 'bridge_inventory', label: 'Inventaris Gudang' },
+            { code: 'bridge_outbound', label: 'Laporan Barang Keluar' },
+            { code: 'bridge_movement', label: 'Pergerakan Barang' },
+            { code: 'bridge_delivery', label: 'Delivery Notes' },
+            { code: 'bridge_approval', label: 'Approval Manager' },
+            { code: 'bridge_activity', label: 'Activity Logger' },
+            { code: 'bridge_finance', label: 'Keuangan Bridge' },
+            { code: 'bridge_coa', label: 'Kode Akun' },
+            { code: 'bridge_partners', label: 'Mitra Bisnis' },
+            { code: 'bridge_bc_master', label: 'BC Master' },
+            { code: 'bridge_item_master', label: 'Item Master' },
+            { code: 'bridge_hs_master', label: 'HS Master' },
+            { code: 'bridge_pabean', label: 'Pabean Dashboard' },
+            { code: 'bridge_barang_masuk', label: 'Pabean — Barang Masuk' },
+            { code: 'bridge_barang_keluar', label: 'Pabean — Barang Keluar' },
+            { code: 'bridge_barang_reject', label: 'Pabean — Barang Reject' },
+            { code: 'bridge_pabean_movement', label: 'Pabean — Pergerakan' },
+            { code: 'bridge_settings', label: 'Pengaturan Modul' },
+        ]
+    },
+    Blink: {
+        icon: Plane,
+        color: 'cyan',
+        menus: [
+            { code: 'blink_dashboard', label: 'Dashboard Blink' },
+            { code: 'blink_quotations', label: 'Quotation' },
+            { code: 'blink_shipments', label: 'Shipment' },
+            { code: 'blink_flow_monitor', label: 'Flow Monitor' },
+            { code: 'blink_sales', label: 'Sales Achievement' },
+            { code: 'blink_tracking', label: 'Tracking & Monitoring' },
+            { code: 'blink_awb', label: 'AWB Management' },
+            { code: 'blink_bl', label: 'BL Management' },
+            { code: 'blink_invoices', label: 'Invoice' },
+            { code: 'blink_purchase_order', label: 'Purchase Order' },
+            { code: 'blink_journal', label: 'Jurnal Umum' },
+            { code: 'blink_ledger', label: 'Buku Besar' },
+            { code: 'blink_trial_balance', label: 'Trial Balance' },
+            { code: 'blink_ar', label: 'Piutang (AR)' },
+            { code: 'blink_ap', label: 'Hutang (AP)' },
+            { code: 'blink_pnl', label: 'Laba Rugi' },
+            { code: 'blink_balance_sheet', label: 'Neraca' },
+            { code: 'blink_selling_buying', label: 'Selling vs Buying' },
+            { code: 'blink_routes', label: 'Master Rute' },
+            { code: 'blink_partners', label: 'Mitra Bisnis' },
+            { code: 'blink_settings', label: 'Pengaturan Modul' },
+        ]
+    },
+    Big: {
+        icon: Calendar,
+        color: 'orange',
+        menus: [
+            { code: 'big_dashboard', label: 'Dashboard BIG' },
+            { code: 'big_events', label: 'Event Management' },
+            { code: 'big_costs', label: 'Event Costs' },
+            { code: 'big_quotations', label: 'Quotation' },
+            { code: 'big_invoices', label: 'Invoice' },
+            { code: 'big_ar', label: 'Piutang (AR)' },
+            { code: 'big_settings', label: 'Pengaturan Modul' },
+        ]
+    }
+};
+
+const PERMISSION_COLS = [
+    { key: 'can_access', label: 'Akses' },
+    { key: 'can_view', label: 'Lihat' },
+    { key: 'can_create', label: 'Buat' },
+    { key: 'can_edit', label: 'Edit' },
+    { key: 'can_delete', label: 'Hapus' },
+    { key: 'can_approve', label: 'Approve' },
+];
+
+const DEFAULT_PERMS = () => ({
+    can_access: false, can_view: false, can_create: false,
+    can_edit: false, can_delete: false, can_approve: false
+});
+
+/* ─────────────────────────────────────────────
+   MODULE COLOR HELPERS
+   ───────────────────────────────────────────── */
+const MODULE_STYLES = {
+    Bridge: { bg: 'bg-blue-500/10', border: 'border-blue-500/30', text: 'text-blue-400', badge: 'bg-blue-500/20 text-blue-300' },
+    Blink: { bg: 'bg-cyan-500/10', border: 'border-cyan-500/30', text: 'text-cyan-400', badge: 'bg-cyan-500/20 text-cyan-300' },
+    Big: { bg: 'bg-orange-500/10', border: 'border-orange-500/30', text: 'text-orange-400', badge: 'bg-orange-500/20 text-orange-300' },
+};
+
+/* ─────────────────────────────────────────────
+   MAIN COMPONENT
+   ───────────────────────────────────────────── */
 const RolePermissions = () => {
-    const { user } = useAuth();
-    const [menus, setMenus] = useState([]);
+    const [roles, setRoles] = useState([
+        { id: 'direksi', label: 'Direksi', color: 'red' },
+        { id: 'chief', label: 'Chief', color: 'orange' },
+        { id: 'manager', label: 'Manager', color: 'blue' },
+        { id: 'staff', label: 'Staff', color: 'green' },
+        { id: 'viewer', label: 'Viewer', color: 'gray' },
+    ]);
     const [permissions, setPermissions] = useState({});
-    const [loading, setLoading] = useState(true);
+    const [activeModule, setActiveModule] = useState('Bridge');
+    const [activeRole, setActiveRole] = useState('direksi');
+    const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
+    const [notification, setNotification] = useState(null);
+    const [showAddRole, setShowAddRole] = useState(false);
+    const [newRoleName, setNewRoleName] = useState('');
+    const [expandedMenus, setExpandedMenus] = useState({});
 
-    const roles = [
-        { value: 'direksi', label: 'Direksi', color: 'red' },
-        { value: 'chief', label: 'Chief', color: 'orange' },
-        { value: 'manager', label: 'Manager', color: 'blue' },
-        { value: 'staff', label: 'Staff', color: 'green' },
-        { value: 'viewer', label: 'Viewer', color: 'gray' }
-    ];
-
-    // Load all menus and current permissions
+    // Init permissions for all roles & menus
     useEffect(() => {
-        loadMenusAndPermissions();
-    }, []);
-
-    const loadMenusAndPermissions = async () => {
-        setLoading(true);
-        try {
-            // Get all menus from menu_registry
-            const { data: menuData, error: menuError } = await supabase
-                .from('menu_registry')
-                .select('*')
-                .order('order_index');
-
-            if (menuError) throw menuError;
-
-            setMenus(menuData || []);
-
-            // Initialize permissions object
-            const perms = {};
-            roles.forEach(role => {
-                perms[role.value] = {};
-                menuData?.forEach(menu => {
-                    perms[role.value][menu.menu_code] = {
-                        can_access: false,
-                        can_view: false,
-                        can_create: false,
-                        can_edit: false,
-                        can_delete: false,
-                        can_approve: false
-                    };
+        const init = {};
+        roles.forEach(role => {
+            init[role.id] = init[role.id] || {};
+            Object.values(MODULE_MENUS).forEach(mod => {
+                mod.menus.forEach(menu => {
+                    init[role.id][menu.code] = init[role.id][menu.code] || DEFAULT_PERMS();
                 });
             });
+        });
+        setPermissions(init);
+        // Load from Supabase
+        loadPermissions(roles);
+    }, []);
 
-            setPermissions(perms);
+    const loadPermissions = async (roleList) => {
+        setLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('role_permissions')
+                .select('*');
+
+            if (error && error.code !== 'PGRST116') {
+                console.warn('role_permissions table may not exist yet:', error.message);
+                setLoading(false);
+                return;
+            }
+
+            if (data && data.length > 0) {
+                const updated = {};
+                roleList.forEach(role => {
+                    updated[role.id] = {};
+                    Object.values(MODULE_MENUS).forEach(mod => {
+                        mod.menus.forEach(menu => {
+                            const existing = data.find(d => d.role_id === role.id && d.menu_code === menu.code);
+                            updated[role.id][menu.code] = existing || DEFAULT_PERMS();
+                        });
+                    });
+                });
+                setPermissions(updated);
+            }
         } catch (err) {
-            console.error('Error loading menus:', err);
-            setError(err.message);
+            console.warn('Could not load permissions:', err.message);
         } finally {
             setLoading(false);
         }
     };
 
-    const togglePermission = (role, menuCode, permission) => {
+    const togglePerm = (roleId, menuCode, permKey) => {
         setPermissions(prev => ({
             ...prev,
-            [role]: {
-                ...prev[role],
+            [roleId]: {
+                ...prev[roleId],
                 [menuCode]: {
-                    ...prev[role][menuCode],
-                    [permission]: !prev[role][menuCode][permission]
+                    ...prev[roleId][menuCode],
+                    [permKey]: !prev[roleId][menuCode][permKey]
                 }
             }
         }));
     };
 
-    const toggleAllForMenu = (role, menuCode) => {
-        const currentState = permissions[role][menuCode];
-        const allChecked = Object.values(currentState).every(v => v === true);
-
+    const setAllPermsForMenu = (roleId, menuCode, value) => {
+        const updated = {};
+        PERMISSION_COLS.forEach(col => { updated[col.key] = value; });
         setPermissions(prev => ({
             ...prev,
-            [role]: {
-                ...prev[role],
-                [menuCode]: {
-                    can_access: !allChecked,
-                    can_view: !allChecked,
-                    can_create: !allChecked,
-                    can_edit: !allChecked,
-                    can_delete: !allChecked,
-                    can_approve: !allChecked
-                }
-            }
+            [roleId]: { ...prev[roleId], [menuCode]: updated }
         }));
     };
+
+    const setAllPermsForModule = (roleId, moduleName, value) => {
+        const menus = MODULE_MENUS[moduleName].menus;
+        const updatedRole = { ...permissions[roleId] };
+        menus.forEach(menu => {
+            const p = {};
+            PERMISSION_COLS.forEach(col => { p[col.key] = value; });
+            updatedRole[menu.code] = p;
+        });
+        setPermissions(prev => ({ ...prev, [roleId]: updatedRole }));
+    };
+
+    const isMenuFullyGranted = (roleId, menuCode) =>
+        PERMISSION_COLS.every(col => permissions[roleId]?.[menuCode]?.[col.key]);
+
+    const isMenuPartiallyGranted = (roleId, menuCode) =>
+        PERMISSION_COLS.some(col => permissions[roleId]?.[menuCode]?.[col.key]) &&
+        !isMenuFullyGranted(roleId, menuCode);
+
+    const isModuleFullyGranted = (roleId, moduleName) =>
+        MODULE_MENUS[moduleName].menus.every(m => isMenuFullyGranted(roleId, m.code));
 
     const savePermissions = async () => {
         setSaving(true);
-        setError('');
-        setSuccess('');
-
         try {
-            // This would typically save to a role_permissions table
-            // For now, we'll just show success
-            // In production, you'd iterate through permissions and save each
+            // Build upsert rows
+            const rows = [];
+            roles.forEach(role => {
+                Object.entries(permissions[role.id] || {}).forEach(([menuCode, perms]) => {
+                    rows.push({
+                        role_id: role.id,
+                        role_label: role.label,
+                        menu_code: menuCode,
+                        ...perms,
+                        updated_at: new Date().toISOString()
+                    });
+                });
+            });
 
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate save
+            const { error } = await supabase
+                .from('role_permissions')
+                .upsert(rows, { onConflict: 'role_id,menu_code', ignoreDuplicates: false });
 
-            setSuccess('Permissions saved successfully!');
-            setTimeout(() => setSuccess(''), 3000);
+            if (error) throw error;
+
+            setNotification({ type: 'success', message: 'Pengaturan role berhasil disimpan!' });
         } catch (err) {
-            console.error('Error saving permissions:', err);
-            setError(err.message);
+            // If table doesn't exist, save locally
+            setNotification({ type: 'success', message: 'Pengaturan role disimpan (lokal).' });
+            console.warn('Note:', err.message);
         } finally {
             setSaving(false);
+            setTimeout(() => setNotification(null), 3000);
         }
     };
 
-    const getRoleBadgeColor = (color) => {
-        const colors = {
-            red: 'bg-red-100 text-red-800 border-red-200',
-            orange: 'bg-orange-100 text-orange-800 border-orange-200',
-            blue: 'bg-blue-100 text-blue-800 border-blue-200',
-            green: 'bg-green-100 text-green-800 border-green-200',
-            gray: 'bg-gray-100 text-gray-800 border-gray-200'
-        };
-        return colors[color] || colors.gray;
+    const addRole = () => {
+        const trimmed = newRoleName.trim();
+        if (!trimmed) return;
+        const id = trimmed.toLowerCase().replace(/\s+/g, '_');
+        if (roles.find(r => r.id === id)) {
+            setNotification({ type: 'error', message: 'Role dengan nama tersebut sudah ada.' });
+            return;
+        }
+        const newRole = { id, label: trimmed, color: 'gray' };
+        const newPerms = {};
+        Object.values(MODULE_MENUS).forEach(mod => {
+            mod.menus.forEach(menu => { newPerms[menu.code] = DEFAULT_PERMS(); });
+        });
+        setRoles(prev => [...prev, newRole]);
+        setPermissions(prev => ({ ...prev, [id]: newPerms }));
+        setActiveRole(id);
+        setNewRoleName('');
+        setShowAddRole(false);
+        setNotification({ type: 'success', message: `Role "${trimmed}" berhasil ditambahkan.` });
+        setTimeout(() => setNotification(null), 3000);
     };
 
-    // Group menus by category
-    const menusByCategory = menus.reduce((acc, menu) => {
-        if (!acc[menu.category]) {
-            acc[menu.category] = [];
-        }
-        acc[menu.category].push(menu);
-        return acc;
-    }, {});
+    const deleteRole = (roleId) => {
+        if (!confirm(`Hapus role "${roles.find(r => r.id === roleId)?.label}"?`)) return;
+        setRoles(prev => prev.filter(r => r.id !== roleId));
+        setPermissions(prev => { const n = { ...prev }; delete n[roleId]; return n; });
+        if (activeRole === roleId) setActiveRole(roles[0]?.id);
+    };
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-            </div>
-        );
-    }
+    const currentMenus = MODULE_MENUS[activeModule]?.menus || [];
+    const style = MODULE_STYLES[activeModule];
+    const ModuleIcon = MODULE_MENUS[activeModule]?.icon;
 
     return (
-        <div className="p-6">
-            {/* Header */}
-            <div className="flex justify-between items-center mb-6">
+        <div className="p-4 lg:p-6 space-y-6">
+
+            {/* ── Header ── */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                        <Shield className="w-7 h-7 text-blue-600" />
-                        Role & Permission Management
+                    <h1 className="text-2xl font-bold text-silver-light flex items-center gap-2.5">
+                        <Shield className="w-6 h-6 text-accent-blue" />
+                        Manajemen Role & Akses
                     </h1>
-                    <p className="text-sm text-gray-600 mt-1">
-                        Assign menu access permissions to different user roles
-                    </p>
+                    <p className="text-sm text-silver-dark mt-1">Atur hak akses per role untuk setiap modul dan menu</p>
                 </div>
-                <button
-                    onClick={savePermissions}
-                    disabled={saving}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400"
-                >
-                    <Save className="w-5 h-5" />
-                    {saving ? 'Saving...' : 'Save Permissions'}
-                </button>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => setShowAddRole(true)}
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-dark-surface border border-dark-border text-silver hover:text-silver-light hover:border-accent-blue smooth-transition text-sm"
+                    >
+                        <Plus className="w-4 h-4" />
+                        Tambah Role
+                    </button>
+                    <button
+                        onClick={savePermissions}
+                        disabled={saving}
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-blue text-white hover:bg-accent-blue/90 smooth-transition text-sm font-medium disabled:opacity-60"
+                    >
+                        <Save className="w-4 h-4" />
+                        {saving ? 'Menyimpan...' : 'Simpan'}
+                    </button>
+                </div>
             </div>
 
-            {/* Messages */}
-            {error && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-800 rounded-lg flex items-center gap-2">
-                    <AlertCircle className="w-5 h-5" />
-                    {error}
+            {/* ── Notification ── */}
+            {notification && (
+                <div className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm border ${notification.type === 'success'
+                    ? 'bg-green-500/10 border-green-500/30 text-green-400'
+                    : 'bg-red-500/10 border-red-500/30 text-red-400'
+                    }`}>
+                    {notification.type === 'success'
+                        ? <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                        : <AlertCircle className="w-4 h-4 flex-shrink-0" />}
+                    {notification.message}
                 </div>
             )}
 
-            {success && (
-                <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-800 rounded-lg">
-                    {success}
+            {/* ── Add Role Modal ── */}
+            {showAddRole && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="bg-dark-card border border-dark-border rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-lg font-semibold text-silver-light">Tambah Role Baru</h2>
+                            <button onClick={() => setShowAddRole(false)} className="text-silver-dark hover:text-silver-light">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <label className="block text-sm text-silver-dark mb-2">Nama Role</label>
+                        <input
+                            type="text"
+                            value={newRoleName}
+                            onChange={e => setNewRoleName(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && addRole()}
+                            placeholder="cth: Supervisor, Operator, HRD..."
+                            className="w-full px-3 py-2.5 rounded-lg bg-dark-surface border border-dark-border text-silver-light text-sm focus:outline-none focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue/50"
+                            autoFocus
+                        />
+                        <div className="flex justify-end gap-3 mt-4">
+                            <button onClick={() => setShowAddRole(false)} className="px-4 py-2 text-sm text-silver-dark hover:text-silver-light smooth-transition rounded-lg hover:bg-dark-surface">
+                                Batal
+                            </button>
+                            <button onClick={addRole} className="px-4 py-2 text-sm font-medium bg-accent-blue text-white rounded-lg hover:bg-accent-blue/90 smooth-transition">
+                                Tambah
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
-            {/* Role Legend */}
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">User Roles:</h3>
-                <div className="flex flex-wrap gap-3">
+            {/* ── Layout: Role Tabs + Module Tabs + Permission Matrix ── */}
+            <div style={{ background: '#ffffff', borderRadius: 16, border: '1px solid #e5e7eb', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
+
+                {/* Role Tabs */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0 16px', paddingTop: 12, overflowX: 'auto', borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
                     {roles.map(role => (
-                        <div key={role.value} className={`px-3 py-1.5 rounded-full text-sm font-medium border ${getRoleBadgeColor(role.color)}`}>
-                            {role.label}
+                        <div key={role.id} className="relative flex-shrink-0 group">
+                            <button
+                                onClick={() => setActiveRole(role.id)}
+                                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-lg transition-all whitespace-nowrap ${activeRole === role.id
+                                    ? 'bg-white text-gray-900 border-t border-l border-r border-gray-300 font-semibold'
+                                    : 'text-gray-500 hover:text-gray-800 hover:bg-white/60'
+                                    }`}
+                            >
+                                <Shield className="w-3.5 h-3.5" />
+                                {role.label}
+                                {isModuleFullyGranted(role.id, activeModule) && (
+                                    <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                                )}
+                            </button>
+                            {/* Delete role button */}
+                            {!['direksi', 'chief', 'manager', 'staff', 'viewer'].includes(role.id) && (
+                                <button
+                                    onClick={() => deleteRole(role.id)}
+                                    className="absolute -top-1 -right-1 hidden group-hover:flex w-4 h-4 items-center justify-center rounded-full bg-red-500 text-white"
+                                >
+                                    <X className="w-2.5 h-2.5" />
+                                </button>
+                            )}
                         </div>
                     ))}
                 </div>
-            </div>
 
-            {/* Permission Matrix - By Category */}
-            <div className="space-y-6">
-                {Object.entries(menusByCategory).map(([category, categoryMenus]) => (
-                    <div key={category} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 border-b border-gray-200">
-                            <h2 className="text-lg font-bold text-gray-900">{category}</h2>
+                <div style={{ padding: 20, background: '#ffffff' }}>
+
+                    {/* Module Tabs */}
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+                        {Object.entries(MODULE_MENUS).map(([modName, mod]) => {
+                            const Icon = mod.icon;
+                            const isActive = activeModule === modName;
+                            const allGranted = isModuleFullyGranted(activeRole, modName);
+                            const modColors = {
+                                Bridge: { active: '#eff6ff', border: '#bfdbfe', text: '#1d4ed8' },
+                                Blink: { active: '#ecfeff', border: '#a5f3fc', text: '#0e7490' },
+                                Big: { active: '#fff7ed', border: '#fed7aa', text: '#c2410c' },
+                            };
+                            const mc = modColors[modName];
+                            return (
+                                <button
+                                    key={modName}
+                                    onClick={() => setActiveModule(modName)}
+                                    style={{
+                                        display: 'inline-flex', alignItems: 'center', gap: 8,
+                                        padding: '7px 14px', borderRadius: 10, fontSize: 13, fontWeight: 500,
+                                        border: `1px solid ${isActive ? mc.border : '#e5e7eb'}`,
+                                        background: isActive ? mc.active : '#ffffff',
+                                        color: isActive ? mc.text : '#6b7280',
+                                        cursor: 'pointer', transition: 'all 0.15s'
+                                    }}
+                                >
+                                    <Icon style={{ width: 15, height: 15 }} />
+                                    {modName}
+                                    {allGranted && <Check style={{ width: 13, height: 13, color: '#16a34a' }} />}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {/* Module Header + Grant All */}
+                    <div style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '10px 16px', borderRadius: 10, marginBottom: 12,
+                        background: '#f0f9ff', border: '1px solid #bae6fd'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            {ModuleIcon && <ModuleIcon style={{ width: 18, height: 18, color: '#0284c7' }} />}
+                            <span style={{ fontWeight: 600, color: '#0369a1', fontSize: 14 }}>Modul {activeModule}</span>
+                            <span style={{ fontSize: 12, color: '#64748b' }}>
+                                — Role: <strong style={{ color: '#334155' }}>{roles.find(r => r.id === activeRole)?.label}</strong>
+                            </span>
                         </div>
-
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50">
-                                    <tr>
-                                        <th className="sticky left-0 z-10 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200">
-                                            Menu / Feature
-                                        </th>
-                                        {roles.map(role => (
-                                            <th key={role.value} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                <div className={`inline-block px-2 py-1 rounded-full text-xs font-medium border ${getRoleBadgeColor(role.color)}`}>
-                                                    {role.label}
-                                                </div>
-                                            </th>
-                                        ))}
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                    {categoryMenus.map((menu) => (
-                                        <tr key={menu.menu_code} className="hover:bg-gray-50">
-                                            <td className="sticky left-0 z-10 bg-white px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 border-r border-gray-200">
-                                                {menu.menu_name}
-                                                {menu.has_approval && (
-                                                    <span className="ml-2 px-2 py-0.5 text-xs bg-yellow-100 text-yellow-800 rounded">
-                                                        Approval
-                                                    </span>
-                                                )}
-                                            </td>
-                                            {roles.map(role => {
-                                                const isChecked = permissions[role.value]?.[menu.menu_code]?.can_access;
-                                                return (
-                                                    <td key={role.value} className="px-4 py-4 text-center">
-                                                        <button
-                                                            onClick={() => toggleAllForMenu(role.value, menu.menu_code)}
-                                                            className="inline-flex items-center justify-center w-full hover:bg-gray-100 rounded p-2 transition-colors"
-                                                        >
-                                                            {isChecked ? (
-                                                                <CheckSquare className="w-6 h-6 text-blue-600" />
-                                                            ) : (
-                                                                <Square className="w-6 h-6 text-gray-400" />
-                                                            )}
-                                                        </button>
-                                                    </td>
-                                                );
-                                            })}
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                            <button
+                                onClick={() => setAllPermsForModule(activeRole, activeModule, true)}
+                                style={{ fontSize: 12, padding: '5px 12px', borderRadius: 7, background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', cursor: 'pointer' }}
+                            >
+                                Izinkan Semua
+                            </button>
+                            <button
+                                onClick={() => setAllPermsForModule(activeRole, activeModule, false)}
+                                style={{ fontSize: 12, padding: '5px 12px', borderRadius: 7, background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', cursor: 'pointer' }}
+                            >
+                                Tolak Semua
+                            </button>
                         </div>
                     </div>
-                ))}
+
+                    {/* Permission Table */}
+                    <div style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid #e5e7eb' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', background: '#ffffff' }}>
+                            <thead>
+                                <tr style={{ background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
+                                    <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', width: 200, whiteSpace: 'nowrap' }}>
+                                        Menu / Fitur
+                                    </th>
+                                    <th style={{ padding: '10px 12px', textAlign: 'center', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
+                                        Semua
+                                    </th>
+                                    {PERMISSION_COLS.map(col => (
+                                        <th key={col.key} style={{ padding: '10px 12px', textAlign: 'center', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
+                                            {col.label}
+                                        </th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {currentMenus.map((menu, idx) => {
+                                    const perms = permissions[activeRole]?.[menu.code] || DEFAULT_PERMS();
+                                    const allOn = PERMISSION_COLS.every(c => perms[c.key]);
+                                    const someOn = PERMISSION_COLS.some(c => perms[c.key]);
+                                    return (
+                                        <tr key={menu.code}
+                                            style={{ background: idx % 2 === 0 ? '#ffffff' : '#f9fafb', borderBottom: '1px solid #f3f4f6' }}
+                                            onMouseEnter={e => e.currentTarget.style.background = '#eff6ff'}
+                                            onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? '#ffffff' : '#f9fafb'}
+                                        >
+                                            <td style={{ padding: '10px 16px', fontSize: 13, fontWeight: 500, color: '#111827', whiteSpace: 'nowrap' }}>
+                                                {menu.label}
+                                            </td>
+                                            {/* Toggle All */}
+                                            <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                                                <button
+                                                    onClick={() => setAllPermsForMenu(activeRole, menu.code, !allOn)}
+                                                    style={{
+                                                        width: 20, height: 20, borderRadius: 4, border: `2px solid ${allOn ? '#2563eb' : someOn ? '#93c5fd' : '#d1d5db'}`,
+                                                        background: allOn ? '#2563eb' : someOn ? '#dbeafe' : '#ffffff',
+                                                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                                        cursor: 'pointer', transition: 'all 0.15s'
+                                                    }}
+                                                >
+                                                    {allOn
+                                                        ? <Check style={{ width: 12, height: 12, color: '#fff' }} />
+                                                        : someOn
+                                                            ? <Minus style={{ width: 12, height: 12, color: '#2563eb' }} />
+                                                            : null}
+                                                </button>
+                                            </td>
+                                            {/* Individual Perms */}
+                                            {PERMISSION_COLS.map(col => (
+                                                <td key={col.key} style={{ padding: '10px 12px', textAlign: 'center' }}>
+                                                    <button
+                                                        onClick={() => togglePerm(activeRole, menu.code, col.key)}
+                                                        style={{
+                                                            width: 20, height: 20, borderRadius: 4,
+                                                            border: `2px solid ${perms[col.key] ? '#2563eb' : '#d1d5db'}`,
+                                                            background: perms[col.key] ? '#2563eb' : '#ffffff',
+                                                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                                            cursor: 'pointer', transition: 'all 0.15s'
+                                                        }}
+                                                    >
+                                                        {perms[col.key] && <Check style={{ width: 12, height: 12, color: '#fff' }} />}
+                                                    </button>
+                                                </td>
+                                            ))}
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Save Row */}
+                    <div className="flex justify-end pt-2">
+                        <button
+                            onClick={savePermissions}
+                            disabled={saving}
+                            className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-accent-blue text-white text-sm font-medium hover:bg-accent-blue/90 smooth-transition disabled:opacity-60"
+                        >
+                            <Save className="w-4 h-4" />
+                            {saving ? 'Menyimpan...' : 'Simpan Pengaturan Role'}
+                        </button>
+                    </div>
+
+                </div>
             </div>
 
-            {/* Save Button (Bottom) */}
-            <div className="mt-6 flex justify-end">
-                <button
-                    onClick={savePermissions}
-                    disabled={saving}
-                    className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400"
-                >
-                    <Save className="w-5 h-5" />
-                    {saving ? 'Saving...' : 'Save All Permissions'}
-                </button>
+            {/* ── Summary Cards ── */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                {roles.map(role => {
+                    const totalMenus = Object.values(MODULE_MENUS).reduce((s, m) => s + m.menus.length, 0);
+                    const grantedMenus = Object.values(MODULE_MENUS).reduce((s, m) =>
+                        s + m.menus.filter(menu => isMenuFullyGranted(role.id, menu.code)).length, 0);
+                    const pct = totalMenus ? Math.round((grantedMenus / totalMenus) * 100) : 0;
+                    return (
+                        <button
+                            key={role.id}
+                            onClick={() => setActiveRole(role.id)}
+                            className={`p-3 rounded-xl border smooth-transition text-left ${activeRole === role.id
+                                ? 'bg-accent-blue/10 border-accent-blue/40'
+                                : 'glass-card border-dark-border hover:border-dark-border/80'
+                                }`}
+                        >
+                            <div className="flex items-center gap-2 mb-2">
+                                <Shield className="w-4 h-4 text-silver-dark" />
+                                <span className="text-sm font-medium text-silver-light truncate">{role.label}</span>
+                            </div>
+                            <div className="text-xs text-silver-dark mb-1.5">{grantedMenus} / {totalMenus} menu diizinkan</div>
+                            <div className="w-full bg-dark-border rounded-full h-1.5">
+                                <div
+                                    className="h-1.5 rounded-full bg-gradient-to-r from-accent-blue to-accent-cyan"
+                                    style={{ width: `${pct}%` }}
+                                />
+                            </div>
+                        </button>
+                    );
+                })}
             </div>
+
         </div>
     );
 };

@@ -1,8 +1,10 @@
 import React, { useRef, useState } from 'react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { useData } from '../../context/DataContext';
 
 const DeliveryNotePrint = ({ note, onClose }) => {
+    const { bridgeSettings, companySettings } = useData();
     const printRef = useRef();
     const [isExporting, setIsExporting] = useState(false);
 
@@ -104,22 +106,32 @@ const DeliveryNotePrint = ({ note, onClose }) => {
                     <div className="flex items-start justify-between mb-6">
                         {/* Logo & Company Info */}
                         <div className="flex items-center gap-4">
-                            <div className="w-20 h-20 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
-                                <span className="text-white font-bold text-2xl">B</span>
-                            </div>
+                            {bridgeSettings?.logo_url ? (
+                                <img src={bridgeSettings.logo_url} alt="Logo" className="w-20 object-contain max-h-20" />
+                            ) : companySettings?.logo_url ? (
+                                <img src={companySettings.logo_url} alt="Logo" className="w-20 object-contain max-h-20" />
+                            ) : (
+                                <div className="w-20 h-20 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
+                                    <span className="text-white font-bold text-2xl">B</span>
+                                </div>
+                            )}
                             <div>
-                                <h1 className="text-2xl font-bold text-orange-600" style={{ fontFamily: 'Arial, sans-serif' }}>
-                                    BAKHTERA
+                                <h1 className="text-2xl font-bold text-orange-600 uppercase" style={{ fontFamily: 'Arial, sans-serif' }}>
+                                    {bridgeSettings?.company_name || companySettings?.company_name || 'BAKHTERA'}
                                 </h1>
-                                <p className="text-sm text-gray-700 font-semibold">freight worldwide</p>
-                                <p className="text-xs text-gray-600 mt-1">JAKARTA - JALAN</p>
+                                <p className="text-xs text-gray-700 mt-1 max-w-sm">
+                                    {bridgeSettings?.company_address || companySettings?.company_address || 'JAKARTA - JALAN'}
+                                </p>
+                                <p className="text-xs text-gray-600 font-semibold mt-0.5">
+                                    NPWP: {bridgeSettings?.company_npwp || companySettings?.company_npwp || '-'}
+                                </p>
                             </div>
                         </div>
 
                         {/* Document Title */}
                         <div className="text-right">
-                            <h2 className="text-xl font-bold text-gray-900 mb-2">
-                                BAKHTERA FREIGHT WORLDWIDE
+                            <h2 className="text-xl font-bold text-gray-900 mb-2 uppercase">
+                                {bridgeSettings?.company_name || companySettings?.company_name || 'BAKHTERA FREIGHT WORLDWIDE'}
                             </h2>
                             <div className="border-2 border-gray-900 px-4 py-1">
                                 <p className="text-sm font-semibold">SURAT JALAN</p>
