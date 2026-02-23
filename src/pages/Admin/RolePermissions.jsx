@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
-    Shield, Plus, Save, AlertCircle, CheckCircle2, Trash2, X,
+    Shield, Plus, Save, AlertCircle, CheckCircle2, Trash2, X, Edit2,
     ChevronDown, ChevronRight, Check, Minus, Plane, Building2, Calendar
 } from 'lucide-react';
 
@@ -104,14 +104,17 @@ const MODULE_STYLES = {
 /* ─────────────────────────────────────────────
    MAIN COMPONENT
    ───────────────────────────────────────────── */
+// Default (built-in) roles — selalu ada
+const DEFAULT_ROLES = [
+    { id: 'direksi', label: 'Direksi', color: 'red' },
+    { id: 'chief', label: 'Chief', color: 'orange' },
+    { id: 'manager', label: 'Manager', color: 'blue' },
+    { id: 'staff', label: 'Staff', color: 'green' },
+    { id: 'viewer', label: 'Viewer', color: 'gray' },
+];
+
 const RolePermissions = () => {
-    const [roles, setRoles] = useState([
-        { id: 'direksi', label: 'Direksi', color: 'red' },
-        { id: 'chief', label: 'Chief', color: 'orange' },
-        { id: 'manager', label: 'Manager', color: 'blue' },
-        { id: 'staff', label: 'Staff', color: 'green' },
-        { id: 'viewer', label: 'Viewer', color: 'gray' },
-    ]);
+    const [roles, setRoles] = useState(DEFAULT_ROLES);
     const [permissions, setPermissions] = useState({});
     const [activeModule, setActiveModule] = useState('Bridge');
     const [activeRole, setActiveRole] = useState('direksi');
@@ -121,24 +124,15 @@ const RolePermissions = () => {
     const [showAddRole, setShowAddRole] = useState(false);
     const [newRoleName, setNewRoleName] = useState('');
     const [expandedMenus, setExpandedMenus] = useState({});
+    const [editingRoleId, setEditingRoleId] = useState(null);
+    const [editRoleName, setEditRoleName] = useState('');
 
-    // Init permissions for all roles & menus
+    // Load from Supabase on mount — custom roles juga ikut diload
     useEffect(() => {
-        const init = {};
-        roles.forEach(role => {
-            init[role.id] = init[role.id] || {};
-            Object.values(MODULE_MENUS).forEach(mod => {
-                mod.menus.forEach(menu => {
-                    init[role.id][menu.code] = init[role.id][menu.code] || DEFAULT_PERMS();
-                });
-            });
-        });
-        setPermissions(init);
-        // Load from Supabase
-        loadPermissions(roles);
+        loadPermissions();
     }, []);
 
-    const loadPermissions = async (roleList) => {
+    const loadPermissions = async () => {
         setLoading(true);
         try {
             const { data, error } = await supabase
@@ -147,23 +141,61 @@ const RolePermissions = () => {
 
             if (error && error.code !== 'PGRST116') {
                 console.warn('role_permissions table may not exist yet:', error.message);
+                // Inisialisasi default saja
+                const init = {};
+                DEFAULT_ROLES.forEach(role => {
+                    init[role.id] = {};
+                    Object.values(MODULE_MENUS).forEach(mod => {
+                        mod.menus.forEach(menu => {
+                            init[role.id][menu.code] = DEFAULT_PERMS();
+                        });
+                    });
+                });
+                setPermissions(init);
                 setLoading(false);
                 return;
             }
 
-            if (data && data.length > 0) {
-                const updated = {};
-                roleList.forEach(role => {
-                    updated[role.id] = {};
-                    Object.values(MODULE_MENUS).forEach(mod => {
-                        mod.menus.forEach(menu => {
-                            const existing = data.find(d => d.role_id === role.id && d.menu_code === menu.code);
-                            updated[role.id][menu.code] = existing || DEFAULT_PERMS();
-                        });
+            // ── Deteksi custom roles dari DB ──────────────────────────
+            const defaultIds = new Set(DEFAULT_ROLES.map(r => r.id));
+            const dbRoleIds = [...new Set((data || []).map(d => d.role_id))];
+            const customRoles = dbRoleIds
+                .filter(id => !defaultIds.has(id))
+                .map(id => {
+                    // Ambil label dari kolom role_label yang tersimpan di DB
+                    const sample = data.find(d => d.role_id === id);
+                    const label = sample?.role_label || id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                    return { id, label, color: 'gray' };
+                });
+
+            const allRoles = [...DEFAULT_ROLES, ...customRoles];
+            setRoles(allRoles);
+
+            // ── Build permissions untuk semua role ────────────────────
+            const updated = {};
+            allRoles.forEach(role => {
+                updated[role.id] = {};
+                Object.values(MODULE_MENUS).forEach(mod => {
+                    mod.menus.forEach(menu => {
+                        const existing = (data || []).find(d => d.role_id === role.id && d.menu_code === menu.code);
+                        if (existing) {
+                            // Hanya ambil 6 field boolean, JANGAN spread seluruh row DB
+                            updated[role.id][menu.code] = {
+                                can_access: !!existing.can_access,
+                                can_view: !!existing.can_view,
+                                can_create: !!existing.can_create,
+                                can_edit: !!existing.can_edit,
+                                can_delete: !!existing.can_delete,
+                                can_approve: !!existing.can_approve,
+                            };
+                        } else {
+                            updated[role.id][menu.code] = DEFAULT_PERMS();
+                        }
                     });
                 });
-                setPermissions(updated);
-            }
+            });
+            setPermissions(updated);
+
         } catch (err) {
             console.warn('Could not load permissions:', err.message);
         } finally {
@@ -217,7 +249,7 @@ const RolePermissions = () => {
     const savePermissions = async () => {
         setSaving(true);
         try {
-            // Build upsert rows
+            // Build upsert rows — hanya kirim 6 field boolean + identifiers
             const rows = [];
             roles.forEach(role => {
                 Object.entries(permissions[role.id] || {}).forEach(([menuCode, perms]) => {
@@ -225,30 +257,39 @@ const RolePermissions = () => {
                         role_id: role.id,
                         role_label: role.label,
                         menu_code: menuCode,
-                        ...perms,
+                        can_access: !!perms.can_access,
+                        can_view: !!perms.can_view,
+                        can_create: !!perms.can_create,
+                        can_edit: !!perms.can_edit,
+                        can_delete: !!perms.can_delete,
+                        can_approve: !!perms.can_approve,
                         updated_at: new Date().toISOString()
                     });
                 });
             });
 
-            const { error } = await supabase
-                .from('role_permissions')
-                .upsert(rows, { onConflict: 'role_id,menu_code', ignoreDuplicates: false });
+            // Upsert dalam batch kecil (max 500 per batch) untuk menghindari timeout
+            const BATCH_SIZE = 500;
+            for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+                const batch = rows.slice(i, i + BATCH_SIZE);
+                const { error } = await supabase
+                    .from('role_permissions')
+                    .upsert(batch, { onConflict: 'role_id,menu_code', ignoreDuplicates: false });
 
-            if (error) throw error;
+                if (error) throw error;
+            }
 
-            setNotification({ type: 'success', message: 'Pengaturan role berhasil disimpan!' });
+            setNotification({ type: 'success', message: `Pengaturan role berhasil disimpan! (${rows.length} entri)` });
         } catch (err) {
-            // If table doesn't exist, save locally
-            setNotification({ type: 'success', message: 'Pengaturan role disimpan (lokal).' });
-            console.warn('Note:', err.message);
+            console.error('Save error:', err);
+            setNotification({ type: 'error', message: 'Gagal menyimpan: ' + err.message });
         } finally {
             setSaving(false);
-            setTimeout(() => setNotification(null), 3000);
+            setTimeout(() => setNotification(null), 4000);
         }
     };
 
-    const addRole = () => {
+    const addRole = async () => {
         const trimmed = newRoleName.trim();
         if (!trimmed) return;
         const id = trimmed.toLowerCase().replace(/\s+/g, '_');
@@ -266,15 +307,92 @@ const RolePermissions = () => {
         setActiveRole(id);
         setNewRoleName('');
         setShowAddRole(false);
-        setNotification({ type: 'success', message: `Role "${trimmed}" berhasil ditambahkan.` });
+
+        // Simpan ke DB langsung agar tidak hilang saat reload
+        try {
+            const rows = Object.keys(newPerms).map(menuCode => ({
+                role_id: id,
+                role_label: trimmed,
+                menu_code: menuCode,
+                ...DEFAULT_PERMS(),
+                updated_at: new Date().toISOString()
+            }));
+            const { error } = await supabase
+                .from('role_permissions')
+                .upsert(rows, { onConflict: 'role_id,menu_code', ignoreDuplicates: false });
+            if (error) throw error;
+            setNotification({ type: 'success', message: `Role "${trimmed}" berhasil ditambahkan & disimpan!` });
+        } catch (err) {
+            setNotification({ type: 'success', message: `Role "${trimmed}" ditambahkan (belum tersimpan ke DB — klik Simpan).` });
+            console.warn('addRole DB error:', err.message);
+        }
+        setTimeout(() => setNotification(null), 4000);
+    };
+
+    const deleteRole = async (roleId) => {
+        const roleName = roles.find(r => r.id === roleId)?.label;
+        const isDefault = ['direksi', 'chief', 'manager', 'staff', 'viewer'].includes(roleId);
+        const msg = isDefault
+            ? `⚠️ Hapus role bawaan "${roleName}"?\n\nRole ini adalah role default. Penghapusan akan menghilangkan semua hak akses yang terkait.\n\nLanjutkan?`
+            : `Hapus role "${roleName}"? Semua pengaturan akses role ini akan dihapus.`;
+        if (!confirm(msg)) return;
+        setRoles(prev => prev.filter(r => r.id !== roleId));
+        setPermissions(prev => { const n = { ...prev }; delete n[roleId]; return n; });
+        if (activeRole === roleId) setActiveRole(roles.find(r => r.id !== roleId)?.id || DEFAULT_ROLES[0]?.id);
+        // Hapus dari DB
+        try {
+            const { error } = await supabase
+                .from('role_permissions')
+                .delete()
+                .eq('role_id', roleId);
+            if (error) throw error;
+            setNotification({ type: 'success', message: `Role "${roleName}" berhasil dihapus.` });
+        } catch (err) {
+            console.warn('deleteRole DB error:', err.message);
+            setNotification({ type: 'success', message: `Role "${roleName}" dihapus dari tampilan.` });
+        }
         setTimeout(() => setNotification(null), 3000);
     };
 
-    const deleteRole = (roleId) => {
-        if (!confirm(`Hapus role "${roles.find(r => r.id === roleId)?.label}"?`)) return;
-        setRoles(prev => prev.filter(r => r.id !== roleId));
-        setPermissions(prev => { const n = { ...prev }; delete n[roleId]; return n; });
-        if (activeRole === roleId) setActiveRole(roles[0]?.id);
+    // ── Edit / Rename Role ──
+    const startEditRole = (role) => {
+        setEditingRoleId(role.id);
+        setEditRoleName(role.label);
+    };
+
+    const cancelEditRole = () => {
+        setEditingRoleId(null);
+        setEditRoleName('');
+    };
+
+    const saveEditRole = async () => {
+        const trimmed = editRoleName.trim();
+        if (!trimmed) return;
+
+        const oldRole = roles.find(r => r.id === editingRoleId);
+        if (!oldRole) return;
+
+        // Update label di state
+        setRoles(prev => prev.map(r =>
+            r.id === editingRoleId ? { ...r, label: trimmed } : r
+        ));
+
+        // Update role_label di DB
+        try {
+            const { error } = await supabase
+                .from('role_permissions')
+                .update({ role_label: trimmed, updated_at: new Date().toISOString() })
+                .eq('role_id', editingRoleId);
+
+            if (error) throw error;
+            setNotification({ type: 'success', message: `Role diubah menjadi "${trimmed}"` });
+        } catch (err) {
+            console.warn('editRole DB error:', err.message);
+            setNotification({ type: 'error', message: 'Gagal mengubah nama role: ' + err.message });
+        }
+
+        cancelEditRole();
+        setTimeout(() => setNotification(null), 3000);
     };
 
     const currentMenus = MODULE_MENUS[activeModule]?.menus || [];
@@ -364,27 +482,61 @@ const RolePermissions = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0 16px', paddingTop: 12, overflowX: 'auto', borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
                     {roles.map(role => (
                         <div key={role.id} className="relative flex-shrink-0 group">
-                            <button
-                                onClick={() => setActiveRole(role.id)}
-                                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-lg transition-all whitespace-nowrap ${activeRole === role.id
-                                    ? 'bg-white text-gray-900 border-t border-l border-r border-gray-300 font-semibold'
-                                    : 'text-gray-500 hover:text-gray-800 hover:bg-white/60'
-                                    }`}
-                            >
-                                <Shield className="w-3.5 h-3.5" />
-                                {role.label}
-                                {isModuleFullyGranted(role.id, activeModule) && (
-                                    <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
-                                )}
-                            </button>
-                            {/* Delete role button */}
-                            {!['direksi', 'chief', 'manager', 'staff', 'viewer'].includes(role.id) && (
-                                <button
-                                    onClick={() => deleteRole(role.id)}
-                                    className="absolute -top-1 -right-1 hidden group-hover:flex w-4 h-4 items-center justify-center rounded-full bg-red-500 text-white"
-                                >
-                                    <X className="w-2.5 h-2.5" />
-                                </button>
+                            {editingRoleId === role.id ? (
+                                /* Inline Edit Mode */
+                                <div className="flex items-center gap-1 px-2 py-1.5">
+                                    <input
+                                        type="text"
+                                        value={editRoleName}
+                                        onChange={e => setEditRoleName(e.target.value)}
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter') saveEditRole();
+                                            if (e.key === 'Escape') cancelEditRole();
+                                        }}
+                                        className="px-2 py-1 text-sm border border-blue-400 rounded bg-white text-gray-800 outline-none w-28"
+                                        autoFocus
+                                    />
+                                    <button onClick={saveEditRole} className="p-1 text-green-600 hover:bg-green-50 rounded" title="Simpan">
+                                        <Check className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button onClick={cancelEditRole} className="p-1 text-gray-400 hover:bg-gray-100 rounded" title="Batal">
+                                        <X className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
+                            ) : (
+                                /* Normal Mode */
+                                <>
+                                    <button
+                                        onClick={() => setActiveRole(role.id)}
+                                        className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-lg transition-all whitespace-nowrap ${activeRole === role.id
+                                            ? 'bg-white text-gray-900 border-t border-l border-r border-gray-300 font-semibold'
+                                            : 'text-gray-500 hover:text-gray-800 hover:bg-white/60'
+                                            }`}
+                                    >
+                                        <Shield className="w-3.5 h-3.5" />
+                                        {role.label}
+                                        {isModuleFullyGranted(role.id, activeModule) && (
+                                            <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                                        )}
+                                    </button>
+                                    {/* Edit & Delete buttons on hover */}
+                                    <div className="absolute -top-1 -right-1 hidden group-hover:flex items-center gap-0.5">
+                                        <button
+                                            onClick={() => startEditRole(role)}
+                                            className="w-4 h-4 flex items-center justify-center rounded-full bg-blue-500 text-white"
+                                            title="Edit nama role"
+                                        >
+                                            <Edit2 className="w-2.5 h-2.5" />
+                                        </button>
+                                        <button
+                                            onClick={() => deleteRole(role.id)}
+                                            className="w-4 h-4 flex items-center justify-center rounded-full bg-red-500 text-white"
+                                            title="Hapus role"
+                                        >
+                                            <X className="w-2.5 h-2.5" />
+                                        </button>
+                                    </div>
+                                </>
                             )}
                         </div>
                     ))}

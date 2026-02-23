@@ -1,396 +1,428 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { Shield, Save, AlertCircle, CheckCircle } from 'lucide-react';
+import {
+    Users, Shield, CheckCircle2, AlertCircle, Edit2, Save, X,
+    UserCheck, UserX, Info, RefreshCw
+} from 'lucide-react';
 
 /**
- * User Permission Assignment
- * Table-based UI for assigning menu permissions to individual users
+ * Penugasan Role User
+ * Halaman untuk menetapkan/mengubah role pada setiap user individual.
+ * Roles diambil DINAMIS dari tabel role_permissions (sinkron dgn Manajemen Role & Akses).
  */
+
+const DEFAULT_ROLE_COLORS = {
+    super_admin: { color: '#ef4444', bg: '#fef2f2', border: '#fecaca' },
+    direksi: { color: '#f97316', bg: '#fff7ed', border: '#fed7aa' },
+    chief: { color: '#a855f7', bg: '#faf5ff', border: '#e9d5ff' },
+    manager: { color: '#3b82f6', bg: '#eff6ff', border: '#bfdbfe' },
+    staff: { color: '#10b981', bg: '#f0fdf4', border: '#bbf7d0' },
+    viewer: { color: '#6b7280', bg: '#f9fafb', border: '#e5e7eb' },
+};
+const fallbackColor = { color: '#0284c7', bg: '#f0f9ff', border: '#bae6fd' };
+
+const RoleBadge = ({ role, roles }) => {
+    const roleInfo = roles.find(r => r.id === role);
+    const c = DEFAULT_ROLE_COLORS[role] || fallbackColor;
+    const label = roleInfo?.label || role?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || '—';
+    return (
+        <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+            background: c.bg, color: c.color, border: `1px solid ${c.border}`
+        }}>
+            {label}
+        </span>
+    );
+};
+
 const UserPermissionAssignment = () => {
-    const { user } = useAuth();
     const [users, setUsers] = useState([]);
-    const [menus, setMenus] = useState([]);
-    const [permissions, setPermissions] = useState({});
+    const [roles, setRoles] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [editingId, setEditingId] = useState(null);
+    const [editRole, setEditRole] = useState('');
     const [saving, setSaving] = useState(false);
-    const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
+    const [notification, setNotification] = useState(null);
 
-    const userLevels = [
-        { value: 'direksi', label: 'Direksi' },
-        { value: 'chief', label: 'Chief' },
-        { value: 'manager', label: 'Manager' },
-        { value: 'staff', label: 'Staff' },
-        { value: 'viewer', label: 'Viewer' }
-    ];
+    const showNotif = (type, message) => {
+        setNotification({ type, message });
+        setTimeout(() => setNotification(null), 4000);
+    };
 
-    // Load users and menus
-    useEffect(() => {
-        loadData();
-    }, []);
-
-    const loadData = async () => {
-        setLoading(true);
+    const loadUsers = async () => {
         try {
-            // Get all users
-            const { data: userData, error: userError } = await supabase
+            const { data, error } = await supabase
                 .from('users')
-                .select('*')
+                .select('id, full_name, username, email, user_level, is_active, portal_access')
                 .order('full_name');
 
-            if (userError) throw userError;
+            if (error) throw error;
+            setUsers(data || []);
+        } catch (err) {
+            showNotif('error', 'Gagal memuat data user: ' + err.message);
+        }
+    };
 
-            // Get all menus
-            const { data: menuData, error: menuError } = await supabase
-                .from('menu_registry')
-                .select('*')
-                .order('category', { ascending: true })
-                .order('order_index', { ascending: true });
+    // Load roles dari tabel role_permissions + super_admin
+    const loadRoles = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('role_permissions')
+                .select('role_id, role_label');
 
-            if (menuError) throw menuError;
-
-            setUsers(userData || []);
-            setMenus(menuData || []);
-
-            // Get existing permissions
-            const { data: permData, error: permError } = await supabase
-                .from('user_menu_permissions')
-                .select('*');
-
-            if (permError) throw permError;
-
-            // Convert to permissions object
-            const perms = {};
-            (permData || []).forEach(p => {
-                const key = `${p.user_id}-${p.menu_code}`;
-                perms[key] = {
-                    can_access: p.can_access,
-                    can_view: p.can_view,
-                    can_create: p.can_create,
-                    can_edit: p.can_edit,
-                    can_delete: p.can_delete,
-                    can_approve: p.can_approve
-                };
+            const roleMap = new Map();
+            roleMap.set('super_admin', 'Super Admin');
+            (data || []).forEach(d => {
+                if (!roleMap.has(d.role_id)) {
+                    roleMap.set(d.role_id, d.role_label || d.role_id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()));
+                }
             });
 
-            setPermissions(perms);
+            setRoles(Array.from(roleMap, ([id, label]) => ({ id, label })));
         } catch (err) {
-            console.error('Error loading data:', err);
-            setError(err.message);
-        } finally {
-            setLoading(false);
+            console.warn('loadRoles error:', err);
+            // Fallback
+            setRoles([
+                { id: 'super_admin', label: 'Super Admin' },
+                { id: 'direksi', label: 'Direksi' },
+                { id: 'chief', label: 'Chief' },
+                { id: 'manager', label: 'Manager' },
+                { id: 'staff', label: 'Staff' },
+                { id: 'viewer', label: 'Viewer' },
+            ]);
         }
     };
 
-    const handleLevelChange = async (userId, newLevel) => {
-        try {
-            const { error } = await supabase
-                .from('users')
-                .update({ user_level: newLevel })
-                .eq('id', userId);
-
-            if (error) throw error;
-
-            // Update local state
-            setUsers(users.map(u => u.id === userId ? { ...u, user_level: newLevel } : u));
-            setSuccess('User level updated successfully');
-            setTimeout(() => setSuccess(''), 3000);
-        } catch (err) {
-            console.error('Error updating user level:', err);
-            setError(err.message);
-        }
+    const loadAll = async () => {
+        setLoading(true);
+        await Promise.all([loadUsers(), loadRoles()]);
+        setLoading(false);
     };
 
-    const handlePortalToggle = async (userId, currentStatus) => {
-        try {
-            const { error } = await supabase
-                .from('users')
-                .update({ portal_access: !currentStatus })
-                .eq('id', userId);
+    useEffect(() => {
+        loadAll();
+    }, []);
 
-            if (error) throw error;
-
-            // Update local state
-            setUsers(users.map(u => u.id === userId ? { ...u, portal_access: !currentStatus } : u));
-        } catch (err) {
-            console.error('Error updating portal access:', err);
-            setError(err.message);
-        }
+    const startEdit = (user) => {
+        setEditingId(user.id);
+        setEditRole(user.user_level || 'viewer');
     };
 
-    const handleActiveToggle = async (userId, currentStatus) => {
-        try {
-            const { error } = await supabase
-                .from('users')
-                .update({ is_active: !currentStatus })
-                .eq('id', userId);
-
-            if (error) throw error;
-
-            // Update local state
-            setUsers(users.map(u => u.id === userId ? { ...u, is_active: !currentStatus } : u));
-        } catch (err) {
-            console.error('Error updating active status:', err);
-            setError(err.message);
-        }
+    const cancelEdit = () => {
+        setEditingId(null);
+        setEditRole('');
     };
 
-    const handlePermissionToggle = async (userId, menuCode, permission) => {
-        const key = `${userId}-${menuCode}`;
-        const currentPerms = permissions[key] || {
-            can_access: false,
-            can_view: false,
-            can_create: false,
-            can_edit: false,
-            can_delete: false,
-            can_approve: false
-        };
-
-        const newValue = !currentPerms[permission];
-        const updatedPerms = { ...currentPerms, [permission]: newValue };
-
-        // Update local state immediately
-        setPermissions({ ...permissions, [key]: updatedPerms });
-
-        // Save to database
-        try {
-            const { error } = await supabase
-                .from('user_menu_permissions')
-                .upsert({
-                    user_id: userId,
-                    menu_code: menuCode,
-                    ...updatedPerms,
-                    created_by: user.id,
-                    updated_at: new Date().toISOString()
-                }, { onConflict: 'user_id,menu_code' });
-
-            if (error) throw error;
-        } catch (err) {
-            console.error('Error saving permission:', err);
-            setError(err.message);
-            // Revert on error
-            setPermissions({ ...permissions, [key]: currentPerms });
-        }
-    };
-
-    const saveAllPermissions = async () => {
+    const saveRole = async (userId) => {
         setSaving(true);
-        setError('');
-        setSuccess('');
-
         try {
-            await new Promise(resolve => setTimeout(resolve, 500));
-            setSuccess('All permissions saved successfully!');
-            setTimeout(() => setSuccess(''), 3000);
+            const { error } = await supabase
+                .from('users')
+                .update({ user_level: editRole })
+                .eq('id', userId);
+
+            if (error) throw error;
+
+            setUsers(prev => prev.map(u => u.id === userId ? { ...u, user_level: editRole } : u));
+            showNotif('success', 'Role berhasil diperbarui!');
+            cancelEdit();
         } catch (err) {
-            console.error('Error saving permissions:', err);
-            setError(err.message);
+            showNotif('error', 'Gagal menyimpan: ' + err.message);
         } finally {
             setSaving(false);
         }
     };
 
+    const toggleActive = async (userId, current) => {
+        try {
+            const { error } = await supabase
+                .from('users')
+                .update({ is_active: !current })
+                .eq('id', userId);
+
+            if (error) throw error;
+            setUsers(prev => prev.map(u => u.id === userId ? { ...u, is_active: !current } : u));
+            showNotif('success', `User ${!current ? 'diaktifkan' : 'dinonaktifkan'}.`);
+        } catch (err) {
+            showNotif('error', 'Gagal mengubah status: ' + err.message);
+        }
+    };
+
+    // Statistik per role
+    const stats = roles
+        .map(r => ({
+            ...r,
+            ...(DEFAULT_ROLE_COLORS[r.id] || fallbackColor),
+            count: users.filter(u => u.user_level === r.id).length,
+        }))
+        .filter(s => s.count > 0);
+
+    const activeCount = users.filter(u => u.is_active).length;
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                <div className="text-center space-y-3">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto" />
+                    <p className="text-sm text-gray-500">Memuat data...</p>
+                </div>
             </div>
         );
     }
 
-    // Group menus by category
-    const menusByCategory = menus.reduce((acc, menu) => {
-        if (!acc[menu.category]) {
-            acc[menu.category] = [];
-        }
-        acc[menu.category].push(menu);
-        return acc;
-    }, {});
-
     return (
-        <div className="p-6">
-            {/* Header */}
-            <div className="flex justify-between items-center mb-6">
+        <div className="p-4 lg:p-6 space-y-6 max-w-6xl mx-auto">
+
+            {/* ── Header ── */}
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                        <Shield className="w-7 h-7 text-blue-600" />
-                        User Permission Assignment
+                    <h1 className="text-2xl font-bold text-silver-light flex items-center gap-2.5">
+                        <Users className="w-6 h-6 text-accent-blue" />
+                        Penugasan Role User
                     </h1>
-                    <p className="text-sm text-gray-600 mt-1">
-                        Assign menu access permissions to individual users
+                    <p className="text-sm text-silver-dark mt-1">
+                        Tetapkan role untuk setiap user. Hak akses per role diatur di <strong className="text-silver">Manajemen Role & Akses</strong>.
                     </p>
                 </div>
                 <button
-                    onClick={saveAllPermissions}
-                    disabled={saving}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400"
+                    onClick={loadAll}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dark-border text-silver-dark hover:text-silver-light hover:border-accent-blue/50 smooth-transition text-sm"
                 >
-                    <Save className="w-5 h-5" />
-                    {saving ? 'Saving...' : 'Save All'}
+                    <RefreshCw className="w-4 h-4" />
+                    Refresh
                 </button>
             </div>
 
-            {/* Messages */}
-            {error && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-800 rounded-lg flex items-center gap-2">
-                    <AlertCircle className="w-5 h-5" />
-                    {error}
+            {/* ── Info Box ── */}
+            <div style={{
+                background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 12,
+                padding: '14px 16px', display: 'flex', gap: 12, alignItems: 'flex-start'
+            }}>
+                <Info style={{ width: 18, height: 18, color: '#3b82f6', flexShrink: 0, marginTop: 1 }} />
+                <div style={{ fontSize: 13, color: '#1e40af', lineHeight: 1.6 }}>
+                    <strong>Cara Kerja Terintegrasi:</strong>
+                    <ul style={{ marginTop: 4, paddingLeft: 16, color: '#1d4ed8' }}>
+                        <li><strong>Manajemen Role & Akses</strong> → membuat role dan mengatur hak akses per menu</li>
+                        <li><strong>Halaman ini</strong> → menentukan role mana yang diberikan kepada setiap user</li>
+                        <li><strong>Manajemen User</strong> → membuat/mengedit user beserta role awalnya</li>
+                    </ul>
+                </div>
+            </div>
+
+            {/* ── Notification ── */}
+            {notification && (
+                <div className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm border ${notification.type === 'success'
+                        ? 'bg-green-500/10 border-green-500/30 text-green-400'
+                        : 'bg-red-500/10 border-red-500/30 text-red-400'
+                    }`}>
+                    {notification.type === 'success'
+                        ? <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                        : <AlertCircle className="w-4 h-4 flex-shrink-0" />}
+                    {notification.message}
                 </div>
             )}
 
-            {success && (
-                <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-800 rounded-lg flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5" />
-                    {success}
-                </div>
-            )}
-
-            {/* Permissions Table - By Category */}
-            <div className="space-y-6">
-                {Object.entries(menusByCategory).map(([category, categoryMenus]) => (
-                    <div key={category} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 border-b border-gray-200">
-                            <h2 className="text-lg font-bold text-gray-900">{category}</h2>
-                        </div>
-
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50">
-                                    <tr>
-                                        <th className="sticky left-0 z-10 bg-gray-50 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200">
-                                            Menu / Feature
-                                        </th>
-                                        {users.map(u => (
-                                            <th key={u.id} className="px-3 py-3 text-center min-w-[200px]">
-                                                <div className="space-y-2">
-                                                    <div className="font-semibold text-gray-900 text-sm">{u.full_name}</div>
-                                                    <div className="text-xs text-gray-500">@{u.username}</div>
-                                                    <select
-                                                        value={u.user_level}
-                                                        onChange={(e) => handleLevelChange(u.id, e.target.value)}
-                                                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                    >
-                                                        {userLevels.map(level => (
-                                                            <option key={level.value} value={level.value}>{level.label}</option>
-                                                        ))}
-                                                    </select>
-                                                    <div className="flex items-center justify-center gap-2 text-xs">
-                                                        <label className="flex items-center gap-1">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={u.portal_access}
-                                                                onChange={() => handlePortalToggle(u.id, u.portal_access)}
-                                                                className="rounded border-gray-300"
-                                                            />
-                                                            <span>Portal</span>
-                                                        </label>
-                                                        <label className="flex items-center gap-1">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={u.is_active}
-                                                                onChange={() => handleActiveToggle(u.id, u.is_active)}
-                                                                className="rounded border-gray-300"
-                                                            />
-                                                            <span className={u.is_active ? 'text-green-600' : 'text-red-600'}>
-                                                                {u.is_active ? 'Active' : 'Inactive'}
-                                                            </span>
-                                                        </label>
-                                                    </div>
-                                                </div>
-                                            </th>
-                                        ))}
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                    {categoryMenus.map((menu) => (
-                                        <tr key={menu.menu_code} className="hover:bg-gray-50">
-                                            <td className="sticky left-0 z-10 bg-white px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 border-r border-gray-200">
-                                                {menu.menu_name}
-                                                {menu.has_approval && (
-                                                    <span className="ml-2 px-2 py-0.5 text-xs bg-yellow-100 text-yellow-800 rounded">
-                                                        Approval
-                                                    </span>
-                                                )}
-                                            </td>
-                                            {users.map(u => {
-                                                const key = `${u.id}-${menu.menu_code}`;
-                                                const perms = permissions[key] || {};
-
-                                                return (
-                                                    <td key={u.id} className="px-3 py-3">
-                                                        <div className="space-y-1 text-xs">
-                                                            <label className="flex items-center gap-1 hover:bg-gray-100 px-2 py-1 rounded cursor-pointer">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={perms.can_view || false}
-                                                                    onChange={() => handlePermissionToggle(u.id, menu.menu_code, 'can_view')}
-                                                                    className="rounded border-gray-300"
-                                                                />
-                                                                <span>View</span>
-                                                            </label>
-                                                            <label className="flex items-center gap-1 hover:bg-gray-100 px-2 py-1 rounded cursor-pointer">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={perms.can_create || false}
-                                                                    onChange={() => handlePermissionToggle(u.id, menu.menu_code, 'can_create')}
-                                                                    className="rounded border-gray-300"
-                                                                />
-                                                                <span>Add</span>
-                                                            </label>
-                                                            <label className="flex items-center gap-1 hover:bg-gray-100 px-2 py-1 rounded cursor-pointer">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={perms.can_edit || false}
-                                                                    onChange={() => handlePermissionToggle(u.id, menu.menu_code, 'can_edit')}
-                                                                    className="rounded border-gray-300"
-                                                                />
-                                                                <span>Edit</span>
-                                                            </label>
-                                                            <label className="flex items-center gap-1 hover:bg-gray-100 px-2 py-1 rounded cursor-pointer">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={perms.can_delete || false}
-                                                                    onChange={() => handlePermissionToggle(u.id, menu.menu_code, 'can_delete')}
-                                                                    className="rounded border-gray-300"
-                                                                />
-                                                                <span>Delete</span>
-                                                            </label>
-                                                            {menu.has_approval && (
-                                                                <label className="flex items-center gap-1 hover:bg-gray-100 px-2 py-1 rounded cursor-pointer">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={perms.can_approve || false}
-                                                                        onChange={() => handlePermissionToggle(u.id, menu.menu_code, 'can_approve')}
-                                                                        className="rounded border-gray-300"
-                                                                    />
-                                                                    <span>Approve</span>
-                                                                </label>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                );
-                                            })}
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+            {/* ── Statistik ── */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                {stats.map(s => (
+                    <div key={s.id} style={{
+                        background: s.bg, border: `1px solid ${s.border}`,
+                        borderRadius: 12, padding: '12px 14px', textAlign: 'center'
+                    }}>
+                        <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.count}</div>
+                        <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{s.label}</div>
                     </div>
                 ))}
+                <div style={{
+                    background: '#f0fdf4', border: '1px solid #bbf7d0',
+                    borderRadius: 12, padding: '12px 14px', textAlign: 'center'
+                }}>
+                    <div style={{ fontSize: 22, fontWeight: 700, color: '#16a34a' }}>{activeCount}</div>
+                    <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>Aktif</div>
+                </div>
             </div>
 
-            {/* Save Button (Bottom) */}
-            <div className="mt-6 flex justify-end">
-                <button
-                    onClick={saveAllPermissions}
-                    disabled={saving}
-                    className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400"
-                >
-                    <Save className="w-5 h-5" />
-                    {saving ? 'Saving...' : 'Save All Permissions'}
-                </button>
+            {/* ── Tabel User ── */}
+            <div style={{
+                background: '#ffffff', borderRadius: 14, border: '1px solid #e5e7eb',
+                overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.06)'
+            }}>
+                <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                            <tr style={{ background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
+                                {['User', 'Role Saat Ini', 'Status', 'Aksi'].map(h => (
+                                    <th key={h} style={{ padding: '12px 16px', textAlign: h === 'User' ? 'left' : 'center', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                        {h}
+                                    </th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {users.map((u, idx) => {
+                                const isEditing = editingId === u.id;
+                                const roleCfg = DEFAULT_ROLE_COLORS[u.user_level] || fallbackColor;
+
+                                return (
+                                    <tr
+                                        key={u.id}
+                                        style={{
+                                            background: isEditing ? '#fffbeb' : (idx % 2 === 0 ? '#ffffff' : '#f9fafb'),
+                                            borderBottom: '1px solid #f3f4f6',
+                                            transition: 'background 0.15s'
+                                        }}
+                                    >
+                                        {/* User Info */}
+                                        <td style={{ padding: '14px 16px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                                <div style={{
+                                                    width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+                                                    background: `linear-gradient(135deg, ${roleCfg.color}40, ${roleCfg.color}20)`,
+                                                    border: `2px solid ${roleCfg.color}40`,
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    fontSize: 14, fontWeight: 700, color: roleCfg.color
+                                                }}>
+                                                    {(u.full_name || u.username || 'U')[0].toUpperCase()}
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>
+                                                        {u.full_name || u.username}
+                                                    </div>
+                                                    <div style={{ fontSize: 12, color: '#6b7280' }}>
+                                                        @{u.username} {u.email && `• ${u.email}`}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+
+                                        {/* Role */}
+                                        <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                                            {isEditing ? (
+                                                <select
+                                                    value={editRole}
+                                                    onChange={e => setEditRole(e.target.value)}
+                                                    style={{
+                                                        padding: '6px 10px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                                                        border: '2px solid #f59e0b', outline: 'none', background: '#fffbeb',
+                                                        color: '#92400e', cursor: 'pointer'
+                                                    }}
+                                                    autoFocus
+                                                >
+                                                    {roles.map(r => (
+                                                        <option key={r.id} value={r.id}>{r.label}</option>
+                                                    ))}
+                                                </select>
+                                            ) : (
+                                                <RoleBadge role={u.user_level} roles={roles} />
+                                            )}
+                                        </td>
+
+                                        {/* Status */}
+                                        <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                                            <button
+                                                onClick={() => toggleActive(u.id, u.is_active)}
+                                                style={{
+                                                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                                                    padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+                                                    border: 'none', cursor: 'pointer', transition: 'all 0.15s',
+                                                    background: u.is_active ? '#f0fdf4' : '#fef2f2',
+                                                    color: u.is_active ? '#16a34a' : '#dc2626',
+                                                }}
+                                                title={u.is_active ? 'Klik untuk nonaktifkan' : 'Klik untuk aktifkan'}
+                                            >
+                                                {u.is_active
+                                                    ? <><UserCheck style={{ width: 13, height: 13 }} /> Aktif</>
+                                                    : <><UserX style={{ width: 13, height: 13 }} /> Nonaktif</>
+                                                }
+                                            </button>
+                                        </td>
+
+                                        {/* Actions */}
+                                        <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                                            {isEditing ? (
+                                                <div style={{ display: 'flex', justifyContent: 'center', gap: 8 }}>
+                                                    <button
+                                                        onClick={() => saveRole(u.id)}
+                                                        disabled={saving}
+                                                        style={{
+                                                            display: 'inline-flex', alignItems: 'center', gap: 5,
+                                                            padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                                                            background: '#16a34a', color: '#fff', border: 'none', cursor: 'pointer',
+                                                            opacity: saving ? 0.7 : 1
+                                                        }}
+                                                    >
+                                                        <Save style={{ width: 13, height: 13 }} />
+                                                        {saving ? 'Simpan...' : 'Simpan'}
+                                                    </button>
+                                                    <button
+                                                        onClick={cancelEdit}
+                                                        style={{
+                                                            display: 'inline-flex', alignItems: 'center', gap: 5,
+                                                            padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                                                            background: '#f3f4f6', color: '#6b7280', border: 'none', cursor: 'pointer'
+                                                        }}
+                                                    >
+                                                        <X style={{ width: 13, height: 13 }} />
+                                                        Batal
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    onClick={() => startEdit(u)}
+                                                    style={{
+                                                        display: 'inline-flex', alignItems: 'center', gap: 5,
+                                                        padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500,
+                                                        background: '#eff6ff', color: '#2563eb',
+                                                        border: '1px solid #bfdbfe', cursor: 'pointer',
+                                                        transition: 'all 0.15s'
+                                                    }}
+                                                >
+                                                    <Edit2 style={{ width: 13, height: 13 }} />
+                                                    Ubah Role
+                                                </button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+
+                    {users.length === 0 && (
+                        <div style={{ padding: '48px 24px', textAlign: 'center', color: '#6b7280' }}>
+                            <Users style={{ width: 40, height: 40, margin: '0 auto 12px', opacity: 0.4 }} />
+                            <p style={{ fontSize: 14 }}>Tidak ada user ditemukan</p>
+                        </div>
+                    )}
+                </div>
             </div>
+
+            {/* ── Legenda Role ── */}
+            <div style={{
+                background: '#f8fafc', border: '1px solid #e2e8f0',
+                borderRadius: 12, padding: '16px 20px'
+            }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>
+                    Role Tersedia (dari Manajemen Role & Akses)
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
+                    {roles.map(r => {
+                        const c = DEFAULT_ROLE_COLORS[r.id] || fallbackColor;
+                        return (
+                            <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <span style={{
+                                    display: 'inline-block', width: 10, height: 10,
+                                    borderRadius: '50%', background: c.color, flexShrink: 0
+                                }} />
+                                <span style={{ fontSize: 13, fontWeight: 600, color: c.color, minWidth: 90 }}>{r.label}</span>
+                                <span style={{ fontSize: 12, color: '#64748b' }}>({r.id})</span>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
         </div>
     );
 };

@@ -18,11 +18,17 @@ import {
     Package,
     FileCheck,
     Shield,
-    LogOut
+    LogOut,
+    Key,
+    Eye,
+    EyeOff,
+    CheckCircle,
+    AlertCircle
 } from 'lucide-react';
 
 import { Sun, Moon } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { changePassword } from '../../services/userService';
 import { useAuth } from '../../context/AuthContext';
 
 // Theme Toggle Component
@@ -51,6 +57,7 @@ const Sidebar = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [expandedSection, setExpandedSection] = useState('');
     const [expandedCategories, setExpandedCategories] = useState(['marketing', 'operations', 'finance', 'costing', 'profit', 'data', 'bridge-operasional', 'bridge-finance', 'bridge-data', 'central-users']); // All expanded by default
+    const [showChangePassword, setShowChangePassword] = useState(false);
     const lastPathRef = React.useRef(null);
 
     // Initial check and Listener for path changes
@@ -803,7 +810,7 @@ const Sidebar = () => {
                                 >
                                     <div className="flex items-center gap-2">
                                         <Shield className="w-4 h-4 text-red-400" />
-                                        <span>Pengaturan User</span>
+                                        <span>Administrasi</span>
                                     </div>
                                     <ChevronRight className={`w-3 h-3 transition-transform ${expandedCategories.includes('central-users') ? 'rotate-90' : ''}`} />
                                 </button>
@@ -834,7 +841,7 @@ const Sidebar = () => {
                                                     : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface/50 border-transparent hover:border-silver-dark/50'
                                                     }`}
                                             >
-                                                Manajemen Role
+                                                Manajemen Role & Akses
                                             </Link>
                                             <Link
                                                 to="/admin/user-permissions"
@@ -844,7 +851,7 @@ const Sidebar = () => {
                                                     : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface/50 border-transparent hover:border-silver-dark/50'
                                                     }`}
                                             >
-                                                Akses User
+                                                Penugasan Role User
                                             </Link>
                                         </motion.div>
                                     )}
@@ -879,6 +886,15 @@ const Sidebar = () => {
                 >
                     <LogOut className="w-4 h-4 flex-shrink-0" />
                     <span>Keluar</span>
+                </button>
+
+                {/* Change Password button */}
+                <button
+                    onClick={() => setShowChangePassword(true)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-accent-blue hover:text-blue-300 hover:bg-blue-500/10 smooth-transition font-medium"
+                >
+                    <Key className="w-4 h-4 flex-shrink-0" />
+                    <span>Ubah Password</span>
                 </button>
 
                 {/* Branding */}
@@ -940,7 +956,193 @@ const Sidebar = () => {
                     </>
                 )}
             </AnimatePresence>
+            {/* Change Password Modal */}
+            {showChangePassword && (
+                <ChangePasswordModal
+                    userId={user?.id}
+                    onClose={() => setShowChangePassword(false)}
+                />
+            )}
         </>
+    );
+};
+
+/* =============================================================================
+ * CHANGE PASSWORD MODAL
+ * ============================================================================= */
+const ChangePasswordModal = ({ userId, onClose }) => {
+    const [oldPassword, setOldPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [showOld, setShowOld] = useState(false);
+    const [showNew, setShowNew] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError('');
+        setSuccess('');
+
+        if (newPassword !== confirmPassword) {
+            setError('Konfirmasi password tidak cocok');
+            return;
+        }
+
+        setLoading(true);
+        const result = await changePassword(userId, oldPassword, newPassword);
+
+        if (result.success) {
+            setSuccess(result.message);
+            setOldPassword('');
+            setNewPassword('');
+            setConfirmPassword('');
+            setTimeout(() => onClose(), 2000);
+        } else {
+            setError(result.error);
+        }
+        setLoading(false);
+    };
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="bg-dark-card border border-dark-border rounded-2xl p-6 w-full max-w-sm shadow-2xl mx-4">
+                <div className="flex items-center justify-between mb-5">
+                    <h2 className="text-lg font-semibold text-silver-light flex items-center gap-2">
+                        <Key className="w-5 h-5 text-accent-blue" />
+                        Ubah Password
+                    </h2>
+                    <button onClick={onClose} className="text-silver-dark hover:text-silver-light smooth-transition">
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+
+                {error && (
+                    <div className="flex items-center gap-2 px-3 py-2.5 mb-4 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                        {error}
+                    </div>
+                )}
+
+                {success && (
+                    <div className="flex items-center gap-2 px-3 py-2.5 mb-4 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 text-sm">
+                        <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                        {success}
+                    </div>
+                )}
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    {/* Old Password */}
+                    <div>
+                        <label className="block text-sm text-silver-dark mb-1.5">Password Lama</label>
+                        <div className="relative">
+                            <input
+                                type={showOld ? 'text' : 'password'}
+                                value={oldPassword}
+                                onChange={e => setOldPassword(e.target.value)}
+                                className="w-full px-3 py-2.5 pr-10 rounded-lg bg-dark-surface border border-dark-border text-silver-light text-sm focus:outline-none focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue/50"
+                                placeholder="Masukkan password saat ini"
+                                required
+                                autoFocus
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowOld(!showOld)}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-silver-dark hover:text-silver-light"
+                            >
+                                {showOld ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* New Password */}
+                    <div>
+                        <label className="block text-sm text-silver-dark mb-1.5">Password Baru</label>
+                        <div className="relative">
+                            <input
+                                type={showNew ? 'text' : 'password'}
+                                value={newPassword}
+                                onChange={e => setNewPassword(e.target.value)}
+                                className="w-full px-3 py-2.5 pr-10 rounded-lg bg-dark-surface border border-dark-border text-silver-light text-sm focus:outline-none focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue/50"
+                                placeholder="Min 8 karakter, huruf & angka"
+                                required
+                                minLength={8}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowNew(!showNew)}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-silver-dark hover:text-silver-light"
+                            >
+                                {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                        </div>
+                        {/* Strength indicator */}
+                        {newPassword && (
+                            <div className="mt-1.5 space-y-1">
+                                <div className="flex gap-1">
+                                    {[1, 2, 3, 4].map(i => (
+                                        <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${newPassword.length >= 8 && /[a-zA-Z]/.test(newPassword) && /[0-9]/.test(newPassword)
+                                                ? i <= 3 ? 'bg-green-500' : (/[^a-zA-Z0-9]/.test(newPassword) ? 'bg-green-500' : 'bg-gray-600')
+                                                : newPassword.length >= 8
+                                                    ? i <= 2 ? 'bg-yellow-500' : 'bg-gray-600'
+                                                    : i <= 1 ? 'bg-red-500' : 'bg-gray-600'
+                                            }`} />
+                                    ))}
+                                </div>
+                                <p className={`text-[11px] ${newPassword.length >= 8 && /[a-zA-Z]/.test(newPassword) && /[0-9]/.test(newPassword)
+                                        ? 'text-green-400' : 'text-silver-dark'
+                                    }`}>
+                                    {newPassword.length < 8 ? `${8 - newPassword.length} karakter lagi` :
+                                        !/[a-zA-Z]/.test(newPassword) ? 'Tambahkan huruf' :
+                                            !/[0-9]/.test(newPassword) ? 'Tambahkan angka' :
+                                                '✓ Password kuat'}
+                                </p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Confirm Password */}
+                    <div>
+                        <label className="block text-sm text-silver-dark mb-1.5">Konfirmasi Password Baru</label>
+                        <input
+                            type={showNew ? 'text' : 'password'}
+                            value={confirmPassword}
+                            onChange={e => setConfirmPassword(e.target.value)}
+                            className={`w-full px-3 py-2.5 rounded-lg bg-dark-surface border text-silver-light text-sm focus:outline-none focus:ring-2 focus:ring-accent-blue/50 ${confirmPassword && confirmPassword !== newPassword
+                                    ? 'border-red-500/50'
+                                    : confirmPassword && confirmPassword === newPassword
+                                        ? 'border-green-500/50'
+                                        : 'border-dark-border'
+                                }`}
+                            placeholder="Ketik ulang password baru"
+                            required
+                        />
+                        {confirmPassword && confirmPassword !== newPassword && (
+                            <p className="text-[11px] text-red-400 mt-1">Password tidak cocok</p>
+                        )}
+                    </div>
+
+                    {/* Buttons */}
+                    <div className="flex justify-end gap-3 pt-2">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="px-4 py-2 text-sm text-silver-dark hover:text-silver-light smooth-transition rounded-lg hover:bg-dark-surface"
+                        >
+                            Batal
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={loading || !oldPassword || !newPassword || newPassword !== confirmPassword}
+                            className="px-4 py-2 text-sm font-medium bg-accent-blue text-white rounded-lg hover:bg-accent-blue/90 smooth-transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {loading ? 'Menyimpan...' : 'Ubah Password'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     );
 };
 

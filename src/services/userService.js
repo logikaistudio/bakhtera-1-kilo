@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { hashPassword } from './passwordService';
+import { hashPassword, verifyPassword } from './passwordService';
 
 /**
  * User Service
@@ -261,6 +261,152 @@ export const toggleUserActive = async (userId, isActive, toggledBy) => {
 
     } catch (error) {
         console.error('Error toggling user status:', error);
+        return { success: false, error: error.message };
+    }
+};
+
+/**
+ * Delete user permanently
+ * @param {string} userId - User ID to delete
+ * @param {string} deletedBy - ID of user performing delete (must be super_admin)
+ * @returns {Promise<object>} - Result
+ */
+export const deleteUser = async (userId, deletedBy) => {
+    try {
+        // Cannot delete self
+        if (userId === deletedBy) {
+            throw new Error('Tidak bisa menghapus akun sendiri');
+        }
+
+        // Verify deleter is super admin
+        const { data: deleter } = await supabase
+            .from('users')
+            .select('user_level')
+            .eq('id', deletedBy)
+            .single();
+
+        if (!deleter || deleter.user_level !== 'super_admin') {
+            throw new Error('Only Super Admin can delete users');
+        }
+
+        // Get user info before deletion
+        const { data: targetUser } = await supabase
+            .from('users')
+            .select('username, full_name, user_level')
+            .eq('id', userId)
+            .single();
+
+        // 1) Delete audit log entries referencing this user (FK constraint)
+        await supabase
+            .from('user_audit_log')
+            .delete()
+            .eq('target_user_id', userId);
+
+        // Also clean up audit entries where this user performed actions
+        await supabase
+            .from('user_audit_log')
+            .delete()
+            .eq('performed_by', userId);
+
+        // 2) Delete all sessions
+        await supabase
+            .from('user_sessions')
+            .delete()
+            .eq('user_id', userId);
+
+        // 3) Delete user menu permissions
+        await supabase
+            .from('user_menu_permissions')
+            .delete()
+            .eq('user_id', userId);
+
+        // 4) Delete user
+        const { error } = await supabase
+            .from('users')
+            .delete()
+            .eq('id', userId);
+
+        if (error) throw error;
+
+        // Log deletion by the admin (target_user_id = deletedBy since user no longer exists)
+        await logAudit({
+            action_type: 'delete_user',
+            target_user_id: deletedBy,
+            performed_by: deletedBy,
+            old_value: { deleted_user: targetUser }
+        });
+
+        return { success: true, message: `User "${targetUser?.username}" berhasil dihapus` };
+
+    } catch (error) {
+        console.error('Error deleting user:', error);
+        return { success: false, error: error.message };
+    }
+};
+
+/**
+ * Change own password (self-service)
+ * Verifies old password before allowing change
+ * @param {string} userId - User ID
+ * @param {string} oldPassword - Current password
+ * @param {string} newPassword - New password
+ * @returns {Promise<object>} - Result
+ */
+export const changePassword = async (userId, oldPassword, newPassword) => {
+    try {
+        // Get current password hash
+        const { data: user, error: fetchError } = await supabase
+            .from('users')
+            .select('id, username, password_hash')
+            .eq('id', userId)
+            .single();
+
+        if (fetchError || !user) {
+            throw new Error('User tidak ditemukan');
+        }
+
+        // Verify old password
+        const isValid = await verifyPassword(oldPassword, user.password_hash);
+        if (!isValid) {
+            throw new Error('Password lama salah');
+        }
+
+        // Validate new password strength
+        if (newPassword.length < 8) {
+            throw new Error('Password baru minimal 8 karakter');
+        }
+        if (!/[a-zA-Z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+            throw new Error('Password baru harus mengandung huruf dan angka');
+        }
+        if (oldPassword === newPassword) {
+            throw new Error('Password baru tidak boleh sama dengan password lama');
+        }
+
+        // Hash new password
+        const newHash = await hashPassword(newPassword);
+
+        // Update
+        const { error: updateError } = await supabase
+            .from('users')
+            .update({
+                password_hash: newHash,
+                requires_password_change: false
+            })
+            .eq('id', userId);
+
+        if (updateError) throw updateError;
+
+        // Log audit
+        await logAudit({
+            action_type: 'change_password',
+            target_user_id: userId,
+            performed_by: userId
+        });
+
+        return { success: true, message: 'Password berhasil diubah!' };
+
+    } catch (error) {
+        console.error('Error changing password:', error);
         return { success: false, error: error.message };
     }
 };
