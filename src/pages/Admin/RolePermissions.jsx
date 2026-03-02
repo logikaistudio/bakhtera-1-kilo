@@ -2,81 +2,33 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
     Shield, Plus, Save, AlertCircle, CheckCircle2, Trash2, X, Edit2,
-    ChevronDown, ChevronRight, Check, Minus, Plane, Building2, Calendar
+    ChevronDown, ChevronRight, Check, Minus, Plane, Building2, Calendar, Layers,
+    RefreshCw, Database
 } from 'lucide-react';
+import { APP_MENUS } from '../../config/menuConfig';
 
 /* ─────────────────────────────────────────────
-   MENU DEFINITIONS PER MODULE
+   MODULE_MENUS — derived dari APP_MENUS (menuConfig.js)
+   Tambahkan icon untuk render di UI
    ───────────────────────────────────────────── */
-const MODULE_MENUS = {
-    Bridge: {
-        icon: Building2,
-        color: 'blue',
-        menus: [
-            { code: 'bridge_dashboard', label: 'Dashboard Bridge' },
-            { code: 'bridge_pengajuan', label: 'Pengajuan' },
-            { code: 'bridge_ata_carnet', label: 'ATA Carnet' },
-            { code: 'bridge_inventory', label: 'Inventaris Gudang' },
-            { code: 'bridge_outbound', label: 'Laporan Barang Keluar' },
-            { code: 'bridge_movement', label: 'Pergerakan Barang' },
-            { code: 'bridge_delivery', label: 'Delivery Notes' },
-            { code: 'bridge_approval', label: 'Approval Manager' },
-            { code: 'bridge_activity', label: 'Activity Logger' },
-            { code: 'bridge_finance', label: 'Keuangan Bridge' },
-            { code: 'bridge_coa', label: 'Kode Akun' },
-            { code: 'bridge_partners', label: 'Mitra Bisnis' },
-            { code: 'bridge_bc_master', label: 'BC Master' },
-            { code: 'bridge_item_master', label: 'Item Master' },
-            { code: 'bridge_hs_master', label: 'HS Master' },
-            { code: 'bridge_pabean', label: 'Pabean Dashboard' },
-            { code: 'bridge_barang_masuk', label: 'Pabean — Barang Masuk' },
-            { code: 'bridge_barang_keluar', label: 'Pabean — Barang Keluar' },
-            { code: 'bridge_barang_reject', label: 'Pabean — Barang Reject' },
-            { code: 'bridge_pabean_movement', label: 'Pabean — Pergerakan' },
-            { code: 'bridge_settings', label: 'Pengaturan Modul' },
-        ]
-    },
-    Blink: {
-        icon: Plane,
-        color: 'cyan',
-        menus: [
-            { code: 'blink_dashboard', label: 'Dashboard Blink' },
-            { code: 'blink_quotations', label: 'Quotation' },
-            { code: 'blink_shipments', label: 'Shipment' },
-            { code: 'blink_flow_monitor', label: 'Flow Monitor' },
-            { code: 'blink_sales', label: 'Sales Achievement' },
-            { code: 'blink_tracking', label: 'Tracking & Monitoring' },
-            { code: 'blink_awb', label: 'AWB Management' },
-            { code: 'blink_bl', label: 'BL Management' },
-            { code: 'blink_invoices', label: 'Invoice' },
-            { code: 'blink_purchase_order', label: 'Purchase Order' },
-            { code: 'blink_journal', label: 'Jurnal Umum' },
-            { code: 'blink_ledger', label: 'Buku Besar' },
-            { code: 'blink_trial_balance', label: 'Trial Balance' },
-            { code: 'blink_ar', label: 'Piutang (AR)' },
-            { code: 'blink_ap', label: 'Hutang (AP)' },
-            { code: 'blink_pnl', label: 'Laba Rugi' },
-            { code: 'blink_balance_sheet', label: 'Neraca' },
-            { code: 'blink_selling_buying', label: 'Selling vs Buying' },
-            { code: 'blink_routes', label: 'Master Rute' },
-            { code: 'blink_partners', label: 'Mitra Bisnis' },
-            { code: 'blink_settings', label: 'Pengaturan Modul' },
-        ]
-    },
-    Big: {
-        icon: Calendar,
-        color: 'orange',
-        menus: [
-            { code: 'big_dashboard', label: 'Dashboard BIG' },
-            { code: 'big_events', label: 'Event Management' },
-            { code: 'big_costs', label: 'Event Costs' },
-            { code: 'big_quotations', label: 'Quotation' },
-            { code: 'big_invoices', label: 'Invoice' },
-            { code: 'big_ar', label: 'Piutang (AR)' },
-            { code: 'big_settings', label: 'Pengaturan Modul' },
-        ]
-    }
+const MODULE_ICON_MAP = {
+    Bridge: Building2,
+    Blink: Plane,
+    Big: Calendar,
+    Pusat: Layers,
 };
+
+// Bangun MODULE_MENUS dari APP_MENUS (single source of truth)
+const MODULE_MENUS = Object.fromEntries(
+    Object.entries(APP_MENUS).map(([modName, mod]) => [
+        modName,
+        {
+            icon: MODULE_ICON_MAP[modName] || Shield,
+            color: mod.color,
+            menus: mod.menus.map(({ code, label, group }) => ({ code, label, group })),
+        }
+    ])
+);
 
 const PERMISSION_COLS = [
     { key: 'can_access', label: 'Akses' },
@@ -99,6 +51,7 @@ const MODULE_STYLES = {
     Bridge: { bg: 'bg-blue-500/10', border: 'border-blue-500/30', text: 'text-blue-400', badge: 'bg-blue-500/20 text-blue-300' },
     Blink: { bg: 'bg-cyan-500/10', border: 'border-cyan-500/30', text: 'text-cyan-400', badge: 'bg-cyan-500/20 text-cyan-300' },
     Big: { bg: 'bg-orange-500/10', border: 'border-orange-500/30', text: 'text-orange-400', badge: 'bg-orange-500/20 text-orange-300' },
+    Pusat: { bg: 'bg-purple-500/10', border: 'border-purple-500/30', text: 'text-purple-400', badge: 'bg-purple-500/20 text-purple-300' },
 };
 
 /* ─────────────────────────────────────────────
@@ -245,6 +198,80 @@ const RolePermissions = () => {
 
     const isModuleFullyGranted = (roleId, moduleName) =>
         MODULE_MENUS[moduleName].menus.every(m => isMenuFullyGranted(roleId, m.code));
+
+    /**
+     * syncMenusToDatabase — pastikan semua menu yang ada di APP_MENUS
+     * sudah punya baris di tabel role_permissions untuk setiap role.
+     * Menu baru akan di-insert dengan semua permission = false.
+     * Menu yang sudah ada TIDAK diubah.
+     */
+    const syncMenusToDatabase = async () => {
+        setSaving(true);
+        try {
+            // 1. Ambil semua baris yang sudah ada
+            const { data: existing, error: fetchErr } = await supabase
+                .from('role_permissions')
+                .select('role_id, menu_code');
+            if (fetchErr) throw fetchErr;
+
+            const existingSet = new Set(
+                (existing || []).map(r => `${r.role_id}||${r.menu_code}`)
+            );
+
+            // 2. Bangun baris yang BELUM ada di DB
+            const toInsert = [];
+            roles.forEach(role => {
+                Object.values(APP_MENUS).forEach(mod => {
+                    mod.menus.forEach(menu => {
+                        const key = `${role.id}||${menu.code}`;
+                        if (!existingSet.has(key)) {
+                            toInsert.push({
+                                role_id: role.id,
+                                role_label: role.label,
+                                menu_code: menu.code,
+                                can_access: false,
+                                can_view: false,
+                                can_create: false,
+                                can_edit: false,
+                                can_delete: false,
+                                can_approve: false,
+                                updated_at: new Date().toISOString(),
+                            });
+                        }
+                    });
+                });
+            });
+
+            if (toInsert.length === 0) {
+                setNotification({ type: 'success', message: '✅ Database sudah sinkron — tidak ada menu baru yang perlu ditambahkan.' });
+                setTimeout(() => setNotification(null), 4000);
+                setSaving(false);
+                return;
+            }
+
+            // 3. Insert dalam batch
+            const BATCH = 500;
+            for (let i = 0; i < toInsert.length; i += BATCH) {
+                const { error } = await supabase
+                    .from('role_permissions')
+                    .insert(toInsert.slice(i, i + BATCH));
+                if (error) throw error;
+            }
+
+            setNotification({
+                type: 'success',
+                message: `✅ Sync berhasil! ${toInsert.length} entri menu baru ditambahkan ke database.`,
+            });
+            // Reload agar tampilan di-update
+            await loadPermissions();
+        } catch (err) {
+            console.error('Sync error:', err);
+            setNotification({ type: 'error', message: 'Gagal sync: ' + err.message });
+        } finally {
+            setSaving(false);
+            setTimeout(() => setNotification(null), 5000);
+        }
+    };
 
     const savePermissions = async () => {
         setSaving(true);
@@ -413,6 +440,15 @@ const RolePermissions = () => {
                 </div>
                 <div className="flex items-center gap-3">
                     <button
+                        onClick={syncMenusToDatabase}
+                        disabled={saving}
+                        title="Pastikan semua menu di aplikasi sudah ada di database"
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-dark-surface border border-dark-border text-silver hover:text-silver-light hover:border-accent-cyan smooth-transition text-sm disabled:opacity-60"
+                    >
+                        <Database className="w-4 h-4" />
+                        Sync DB
+                    </button>
+                    <button
                         onClick={() => setShowAddRole(true)}
                         className="flex items-center gap-2 px-4 py-2 rounded-lg bg-dark-surface border border-dark-border text-silver hover:text-silver-light hover:border-accent-blue smooth-transition text-sm"
                     >
@@ -554,6 +590,7 @@ const RolePermissions = () => {
                                 Bridge: { active: '#eff6ff', border: '#bfdbfe', text: '#1d4ed8' },
                                 Blink: { active: '#ecfeff', border: '#a5f3fc', text: '#0e7490' },
                                 Big: { active: '#fff7ed', border: '#fed7aa', text: '#c2410c' },
+                                Pusat: { active: '#faf5ff', border: '#ddd6fe', text: '#6d28d9' },
                             };
                             const mc = modColors[modName];
                             return (
@@ -625,57 +662,100 @@ const RolePermissions = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {currentMenus.map((menu, idx) => {
-                                    const perms = permissions[activeRole]?.[menu.code] || DEFAULT_PERMS();
-                                    const allOn = PERMISSION_COLS.every(c => perms[c.key]);
-                                    const someOn = PERMISSION_COLS.some(c => perms[c.key]);
-                                    return (
-                                        <tr key={menu.code}
-                                            style={{ background: idx % 2 === 0 ? '#ffffff' : '#f9fafb', borderBottom: '1px solid #f3f4f6' }}
-                                            onMouseEnter={e => e.currentTarget.style.background = '#eff6ff'}
-                                            onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? '#ffffff' : '#f9fafb'}
-                                        >
-                                            <td style={{ padding: '10px 16px', fontSize: 13, fontWeight: 500, color: '#111827', whiteSpace: 'nowrap' }}>
-                                                {menu.label}
-                                            </td>
-                                            {/* Toggle All */}
-                                            <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                                                <button
-                                                    onClick={() => setAllPermsForMenu(activeRole, menu.code, !allOn)}
-                                                    style={{
-                                                        width: 20, height: 20, borderRadius: 4, border: `2px solid ${allOn ? '#2563eb' : someOn ? '#93c5fd' : '#d1d5db'}`,
-                                                        background: allOn ? '#2563eb' : someOn ? '#dbeafe' : '#ffffff',
-                                                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                                        cursor: 'pointer', transition: 'all 0.15s'
-                                                    }}
+                                {(() => {
+                                    let lastGroup = null;
+                                    return currentMenus.map((menu, idx) => {
+                                        const perms = permissions[activeRole]?.[menu.code] || DEFAULT_PERMS();
+                                        const allOn = PERMISSION_COLS.every(c => perms[c.key]);
+                                        const someOn = PERMISSION_COLS.some(c => perms[c.key]);
+                                        const showGroupHeader = menu.group && menu.group !== lastGroup;
+                                        if (showGroupHeader) lastGroup = menu.group;
+
+                                        const GROUP_COLORS = {
+                                            'Operasional': '#dbeafe',
+                                            'Finance': '#dcfce7',
+                                            'Master Data': '#fef3c7',
+                                            'Pabean': '#ede9fe',
+                                            'Persetujuan & Log': '#fee2e2',
+                                            'Utama': '#f0f9ff',
+                                            'Sales & Marketing': '#fce7f3',
+                                            'Operations': '#e0f2fe',
+                                            'Profit & Costing': '#f0fdf4',
+                                            'Sales': '#fff7ed',
+                                            'Fungsi Terpusat': '#faf5ff',
+                                        };
+                                        const groupColor = GROUP_COLORS[menu.group] || '#f3f4f6';
+
+                                        return (
+                                            <React.Fragment key={menu.code}>
+                                                {showGroupHeader && (
+                                                    <tr>
+                                                        <td
+                                                            colSpan={2 + PERMISSION_COLS.length}
+                                                            style={{
+                                                                padding: '6px 16px',
+                                                                background: groupColor,
+                                                                fontSize: 11,
+                                                                fontWeight: 700,
+                                                                color: '#374151',
+                                                                textTransform: 'uppercase',
+                                                                letterSpacing: '0.07em',
+                                                                borderBottom: '1px solid #e5e7eb',
+                                                                borderTop: idx > 0 ? '2px solid #e5e7eb' : 'none',
+                                                            }}
+                                                        >
+                                                            {menu.group}
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                                <tr
+                                                    style={{ background: idx % 2 === 0 ? '#ffffff' : '#f9fafb', borderBottom: '1px solid #f3f4f6' }}
+                                                    onMouseEnter={e => e.currentTarget.style.background = '#eff6ff'}
+                                                    onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? '#ffffff' : '#f9fafb'}
                                                 >
-                                                    {allOn
-                                                        ? <Check style={{ width: 12, height: 12, color: '#fff' }} />
-                                                        : someOn
-                                                            ? <Minus style={{ width: 12, height: 12, color: '#2563eb' }} />
-                                                            : null}
-                                                </button>
-                                            </td>
-                                            {/* Individual Perms */}
-                                            {PERMISSION_COLS.map(col => (
-                                                <td key={col.key} style={{ padding: '10px 12px', textAlign: 'center' }}>
-                                                    <button
-                                                        onClick={() => togglePerm(activeRole, menu.code, col.key)}
-                                                        style={{
-                                                            width: 20, height: 20, borderRadius: 4,
-                                                            border: `2px solid ${perms[col.key] ? '#2563eb' : '#d1d5db'}`,
-                                                            background: perms[col.key] ? '#2563eb' : '#ffffff',
-                                                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                                            cursor: 'pointer', transition: 'all 0.15s'
-                                                        }}
-                                                    >
-                                                        {perms[col.key] && <Check style={{ width: 12, height: 12, color: '#fff' }} />}
-                                                    </button>
-                                                </td>
-                                            ))}
-                                        </tr>
-                                    );
-                                })}
+                                                    <td style={{ padding: '10px 16px 10px 24px', fontSize: 13, fontWeight: 500, color: '#111827', whiteSpace: 'nowrap' }}>
+                                                        {menu.label}
+                                                    </td>
+                                                    {/* Toggle All */}
+                                                    <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                                                        <button
+                                                            onClick={() => setAllPermsForMenu(activeRole, menu.code, !allOn)}
+                                                            style={{
+                                                                width: 20, height: 20, borderRadius: 4, border: `2px solid ${allOn ? '#2563eb' : someOn ? '#93c5fd' : '#d1d5db'}`,
+                                                                background: allOn ? '#2563eb' : someOn ? '#dbeafe' : '#ffffff',
+                                                                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                                                cursor: 'pointer', transition: 'all 0.15s'
+                                                            }}
+                                                        >
+                                                            {allOn
+                                                                ? <Check style={{ width: 12, height: 12, color: '#fff' }} />
+                                                                : someOn
+                                                                    ? <Minus style={{ width: 12, height: 12, color: '#2563eb' }} />
+                                                                    : null}
+                                                        </button>
+                                                    </td>
+                                                    {/* Individual Perms */}
+                                                    {PERMISSION_COLS.map(col => (
+                                                        <td key={col.key} style={{ padding: '10px 12px', textAlign: 'center' }}>
+                                                            <button
+                                                                onClick={() => togglePerm(activeRole, menu.code, col.key)}
+                                                                style={{
+                                                                    width: 20, height: 20, borderRadius: 4,
+                                                                    border: `2px solid ${perms[col.key] ? '#2563eb' : '#d1d5db'}`,
+                                                                    background: perms[col.key] ? '#2563eb' : '#ffffff',
+                                                                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                                                    cursor: 'pointer', transition: 'all 0.15s'
+                                                                }}
+                                                            >
+                                                                {perms[col.key] && <Check style={{ width: 12, height: 12, color: '#fff' }} />}
+                                                            </button>
+                                                        </td>
+                                                    ))}
+                                                </tr>
+                                            </React.Fragment>
+                                        );
+                                    });
+                                })()}
                             </tbody>
                         </table>
                     </div>

@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import Button from '../../components/Common/Button';
 import ShipmentDetailModal from '../../components/Blink/ShipmentDetailModalEnhanced';
 import SellingBuyingDetailModal from '../../components/Blink/SellingBuyingDetailModal';
-import { Ship, Plus, MapPin, Filter, Search, Download, X } from 'lucide-react';
+import { Ship, Plus, MapPin, Filter, Search, Download, X, ShoppingCart, FileText } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 
 const ShipmentManagement = () => {
@@ -17,6 +18,13 @@ const ShipmentManagement = () => {
     const [serviceFilter, setServiceFilter] = useState('all');
     const [showFilters, setShowFilters] = useState(false);
     const [loading, setLoading] = useState(true);
+    const navigate = useNavigate();
+
+    // PO generation from list
+    const [showListPOModal, setShowListPOModal] = useState(false);
+    const [listPOVendors, setListPOVendors] = useState([]);
+    const [listPOSelectedVendor, setListPOSelectedVendor] = useState('');
+    const [listPOShipment, setListPOShipment] = useState(null);
 
     // Load shipments from Supabase
     useEffect(() => {
@@ -71,7 +79,10 @@ const ShipmentManagement = () => {
                 mbl: s.mbl || null,
                 consignee_name: s.consignee_name || null,
                 shipperName: s.shipper_name || s.shipper || null,
-                shipper: s.shipper || s.shipper_name || null
+                shipper: s.shipper || s.shipper_name || null,
+                // Add items mapping
+                sellingItems: s.selling_items || s.sellingItems || [],
+                buyingItems: s.buying_items || s.buyingItems || []
             }));
 
             console.log(`✅ Mapped ${mapped.length} shipments`);
@@ -171,6 +182,121 @@ const ShipmentManagement = () => {
         setShowAnalysisModal(true);
     };
 
+    const handleGeneratePOFromList = async (ship, e) => {
+        e.stopPropagation();
+        try {
+            // Gather buying items from the shipment
+            const buyingItems = ship.buyingItems || ship.buying_items || [];
+            const cogsData = ship.cogs || {};
+
+            const poItemsRaw = [];
+
+            // Legacy COGS fields
+            const addIfPresent = (label, value) => {
+                const val = parseFloat(String(value || '').replace(/,/g, ''));
+                if (val && val > 0) {
+                    poItemsRaw.push({ item_name: label, description: `${label} - ${ship.jobNumber}`, qty: 1, unit: 'Job', unit_price: val, amount: val, coa_id: null });
+                }
+            };
+            addIfPresent('Ocean Freight', cogsData.oceanFreight);
+            addIfPresent('Air Freight', cogsData.airFreight);
+            addIfPresent('Trucking', cogsData.trucking);
+            addIfPresent('THC', cogsData.thc);
+            addIfPresent('Documentation', cogsData.documentation);
+            addIfPresent('Customs Clearance', cogsData.customs);
+            addIfPresent('Insurance', cogsData.insurance);
+            addIfPresent('Demurrage', cogsData.demurrage);
+            addIfPresent(cogsData.otherDescription || 'Other Charges', cogsData.other);
+
+            // Buying items with COA name lookup
+            const coaIds = buyingItems.map(i => i.coa_id).filter(Boolean);
+            let coaMap = {};
+            if (coaIds.length > 0) {
+                const { data: coaData } = await supabase.from('finance_coa').select('id, name').in('id', coaIds);
+                (coaData || []).forEach(c => { coaMap[c.id] = c; });
+            }
+            buyingItems.forEach(item => {
+                const val = parseFloat(String(item.amount || 0).replace(/,/g, ''));
+                if (val && val > 0) {
+                    const coaAccount = coaMap[item.coa_id];
+                    const itemName = coaAccount ? coaAccount.name : (item.description || 'Item');
+                    poItemsRaw.push({ item_name: itemName, description: item.description || itemName, qty: parseFloat(item.qty) || 1, unit: item.unit || 'Job', unit_price: parseFloat(item.rate) || val, amount: val, coa_id: item.coa_id || null });
+                }
+            });
+
+            if (poItemsRaw.length === 0) {
+                alert('No actual cost items found for this shipment. Please add COGS/Actual Costs first.');
+                return;
+            }
+
+            // Fetch vendors
+            const { data: vendorDataRaw } = await supabase
+                .from('blink_business_partners')
+                .select('*')
+                .order('partner_name');
+            const vendorData = (vendorDataRaw || []).filter(p => {
+                const val = p.is_vendor;
+                return val === true || val === 'true' || val === 1 || val === 't' || val === '1' || val === 'Y' || val === 'y' || String(val).toLowerCase() === 'true';
+            });
+            console.log('Raw Vendors List:', vendorDataRaw);
+            console.log('Filtered Vendors List:', vendorData);
+
+            setListPOShipment({ ...ship, pending_po_items: poItemsRaw });
+            setListPOVendors(vendorData || []);
+            setListPOSelectedVendor('');
+            setShowListPOModal(true);
+        } catch (error) {
+            console.error('Error preparing PO from list:', error);
+            alert('Failed to prepare PO: ' + error.message);
+        }
+    };
+
+    const handleConfirmListPO = async () => {
+        try {
+            if (!listPOSelectedVendor) {
+                alert('Please select a vendor.');
+                return;
+            }
+            const vendor = listPOVendors.find(v => v.id === listPOSelectedVendor);
+            const { generatePONumber } = await import('../../utils/documentNumbers');
+            const poNumber = await generatePONumber();
+            const items = listPOShipment.pending_po_items;
+            const totalAmount = items.reduce((sum, i) => sum + i.amount, 0);
+
+            const { error } = await supabase.from('blink_purchase_orders').insert([{
+                po_number: poNumber,
+                vendor_id: vendor.id,
+                vendor_name: vendor.partner_name,
+                vendor_email: vendor.email || '',
+                vendor_phone: vendor.phone || '',
+                vendor_address: vendor.address || '',
+                po_date: new Date().toISOString().split('T')[0],
+                payment_terms: '30 Days (NET 30)',
+                po_items: items,
+                currency: listPOShipment.cogsCurrency || listPOShipment.cogs_currency || 'IDR',
+                exchange_rate: parseFloat(listPOShipment.exchangeRate || listPOShipment.exchange_rate) || 1,
+                subtotal: totalAmount,
+                tax_rate: 0,
+                tax_amount: 0,
+                discount_amount: 0,
+                total_amount: totalAmount,
+                status: 'draft',
+                shipment_id: listPOShipment.id,
+                job_number: listPOShipment.soNumber || listPOShipment.jobNumber || listPOShipment.so_number || listPOShipment.job_number,
+                notes: `Generated from Shipment: ${listPOShipment.jobNumber}`
+            }]);
+
+            if (error) throw error;
+
+            setShowListPOModal(false);
+            alert(`✅ Purchase Order ${poNumber} generated successfully!`);
+            navigate('/blink/finance/purchase-orders');
+        } catch (error) {
+            console.error('Error generating PO from list:', error);
+            alert('Failed to generate PO: ' + error.message);
+        }
+    };
+
     // Handle update shipment
     const handleUpdateShipment = async (updatedShipment) => {
         try {
@@ -195,6 +321,7 @@ const ShipmentManagement = () => {
             };
 
             // Map to database format
+            // Only include buying/selling items if they are explicitly provided (not undefined)
             const dbFormat = {
                 job_number: updatedShipment.jobNumber,
                 so_number: updatedShipment.soNumber,
@@ -236,6 +363,15 @@ const ShipmentManagement = () => {
                 container_number: updatedShipment.container_number || null,
             };
 
+            // Only update buying/selling items if they are explicitly passed
+            // This prevents overwriting data with empty arrays when saving other fields
+            if (updatedShipment.sellingItems !== undefined) {
+                dbFormat.selling_items = updatedShipment.sellingItems;
+            }
+            if (updatedShipment.buyingItems !== undefined) {
+                dbFormat.buying_items = updatedShipment.buyingItems;
+            }
+
             const { error } = await supabase
                 .from('blink_shipments')
                 .update(dbFormat)
@@ -243,11 +379,18 @@ const ShipmentManagement = () => {
 
             if (error) throw error;
 
-            // Refresh list
+            // Refresh list - after refresh, update selectedShipment with fresh DB data
             await fetchShipments();
 
-            // Update selected
-            setSelectedShipment(updatedShipment);
+            // After refresh, get a fresh copy of the shipment from the updated list
+            // This ensures buying_items / selling_items are always from the latest DB state
+            // We merge with updatedShipment to keep any unsaved in-memory changes
+            setSelectedShipment(prev => ({
+                ...(prev || {}),
+                ...updatedShipment,
+                sellingItems: updatedShipment.sellingItems ?? prev?.sellingItems ?? [],
+                buyingItems: updatedShipment.buyingItems ?? prev?.buyingItems ?? []
+            }));
         } catch (error) {
             console.error('Error updating shipment:', error);
             alert('Failed to update shipment: ' + error.message);
@@ -475,17 +618,86 @@ const ShipmentManagement = () => {
                     fetchShipments();
                 }}
                 shipment={selectedShipment}
-                shipment={selectedShipment}
                 onUpdate={handleUpdateShipment}
                 onViewAnalysis={handleViewAnalysis}
             />
 
-            {/* Selling Buying Analysis Modal (Compact & Instant) */}
+            {/* Selling Buying Analysis Modal */}
             <SellingBuyingDetailModal
                 isOpen={showAnalysisModal}
                 onClose={() => setShowAnalysisModal(false)}
                 shipment={analysisShipment}
             />
+
+            {/* Generate PO from List - Vendor Selection Modal */}
+            {showListPOModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                    <div className="bg-dark-card border border-dark-border rounded-xl shadow-2xl w-full max-w-lg">
+                        <div className="px-6 py-4 border-b border-dark-border flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                                <ShoppingCart className="w-5 h-5 text-accent-orange" />
+                                <h3 className="text-lg font-bold text-silver-light">Generate Purchase Order</h3>
+                            </div>
+                            <button onClick={() => setShowListPOModal(false)} className="p-1 hover:bg-white/10 rounded-full text-silver-dark">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-5">
+                            {listPOShipment && (
+                                <div className="bg-dark-surface rounded-lg px-4 py-3 text-sm">
+                                    <p className="text-silver-dark text-xs mb-1">Shipment</p>
+                                    <p className="text-accent-orange font-bold">{listPOShipment.jobNumber}</p>
+                                    <p className="text-silver-light text-xs mt-1">{listPOShipment.customer} • {listPOShipment.origin} → {listPOShipment.destination}</p>
+                                </div>
+                            )}
+                            <div>
+                                <p className="text-sm font-medium text-silver mb-2">Items ({listPOShipment?.pending_po_items?.length || 0})</p>
+                                <div className="max-h-40 overflow-y-auto rounded-lg border border-dark-border">
+                                    <table className="w-full text-xs">
+                                        <thead className="bg-dark-surface">
+                                            <tr>
+                                                <th className="px-3 py-2 text-left text-silver-dark">Item</th>
+                                                <th className="px-3 py-2 text-left text-silver-dark">Description</th>
+                                                <th className="px-3 py-2 text-right text-silver-dark">Amount</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-dark-border">
+                                            {(listPOShipment?.pending_po_items || []).map((item, idx) => (
+                                                <tr key={idx}>
+                                                    <td className="px-3 py-2 text-blue-300 font-medium">{item.item_name}</td>
+                                                    <td className="px-3 py-2 text-silver-light">{item.description}</td>
+                                                    <td className="px-3 py-2 text-right text-green-400 font-mono">{item.amount.toLocaleString('id-ID')}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-silver mb-2">Select Vendor (Blink Mitra) <span className="text-red-400">*</span></label>
+                                {listPOVendors.length === 0 ? (
+                                    <p className="text-yellow-400 text-sm">⚠️ No active vendor found in Blink Mitra.</p>
+                                ) : (
+                                    <select
+                                        value={listPOSelectedVendor}
+                                        onChange={e => setListPOSelectedVendor(e.target.value)}
+                                        className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:outline-none focus:border-accent-orange"
+                                    >
+                                        <option value="">-- Select Vendor --</option>
+                                        {listPOVendors.map(v => (
+                                            <option key={v.id} value={v.id}>{v.partner_name}{v.partner_code ? ` (${v.partner_code})` : ''}</option>
+                                        ))}
+                                    </select>
+                                )}
+                            </div>
+                            <div className="flex justify-end gap-2 pt-2">
+                                <Button variant="secondary" onClick={() => setShowListPOModal(false)}>Cancel</Button>
+                                <Button onClick={handleConfirmListPO} disabled={!listPOSelectedVendor}>Generate PO</Button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

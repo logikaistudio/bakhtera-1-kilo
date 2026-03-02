@@ -100,7 +100,7 @@ const PartnerManagement = () => {
     };
 
     const handleDelete = async (partnerId) => {
-        if (!confirm('Yakin hapus mitra ini? Data transaksi terkait tidak akan terhapus.')) return;
+        if (!confirm('Are you sure you want to delete mitra ini? Data transaksi terkait tidak akan terhapus.')) return;
 
         try {
             const { error } = await supabase
@@ -329,7 +329,7 @@ const PartnerManagement = () => {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-silver-dark" />
                     <input
                         type="text"
-                        placeholder="Cari nama, kode, atau email..."
+                        placeholder="Search nama, kode, atau email..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
@@ -626,7 +626,7 @@ const PartnerManagement = () => {
 
                             {/* Notes */}
                             <div>
-                                <label className="block text-xs text-silver-dark mb-1">Catatan</label>
+                                <label className="block text-xs text-silver-dark mb-1">Notes</label>
                                 <textarea
                                     value={formData.notes}
                                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}

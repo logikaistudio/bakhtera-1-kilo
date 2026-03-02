@@ -215,7 +215,7 @@ const BalanceSheet = () => {
             </div>
             <div className="divide-y divide-dark-border/30">
                 {data.length === 0 ? (
-                    <div className="p-4 text-center text-silver-dark text-sm">Tidak ada data</div>
+                    <div className="p-4 text-center text-silver-dark text-sm">No data</div>
                 ) : (
                     data.map(acc => <AccountRow key={acc.id} acc={acc} />)
                 )}

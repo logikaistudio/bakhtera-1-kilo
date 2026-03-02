@@ -56,24 +56,79 @@ export const DataProvider = ({ children }) => {
         setActivityLogs(prev => [newLog, ...prev]);
     };
 
-    // Pending Approvals
+    // Pending Approvals (persisted to Supabase)
     const [pendingApprovals, setPendingApprovals] = useState([]);
 
-    const requestApproval = (type, module, entityType, entityId, entityName, changes, details, requestedBy = 'User') => {
-        const newRequest = { id: `approval-${Date.now()}`, requestDate: new Date().toISOString(), type, module, entityType, entityId, entityName, requestedBy, changes, details, status: 'pending' };
-        setPendingApprovals(prev => [newRequest, ...prev]);
+    // Helper: normalize DB row -> camelCase for UI
+    const normalizeApprovalRow = (row) => ({
+        id: row.id,
+        requestDate: row.created_at,
+        type: row.type,
+        module: row.module,
+        entityType: row.entity_type,
+        entityId: row.entity_id,
+        entityName: row.entity_name,
+        requestedBy: row.requested_by_name,
+        requestedById: row.requested_by_id,
+        changes: row.changes || {},
+        details: row.details || '',
+        status: row.status,
+        approvedBy: row.approved_by,
+        approvalDate: row.approval_date,
+        rejectionReason: row.rejection_reason,
+        rejectionDate: row.rejection_date,
+    });
+
+    const requestApproval = async (type, module, entityType, entityId, entityName, changes, details, requestedBy = 'User', requestedById = null) => {
+        const row = {
+            type,
+            module,
+            entity_type: entityType,
+            entity_id: String(entityId),
+            entity_name: entityName,
+            requested_by_id: requestedById,
+            requested_by_name: requestedBy,
+            changes: changes || {},
+            details: details || '',
+            status: 'pending',
+        };
+        const { data, error } = await supabase.from('approval_requests').insert([row]).select();
+        if (error) {
+            console.error('Error creating approval request:', error);
+            // Fallback: in-memory only
+            const fallback = { id: `approval-${Date.now()}`, requestDate: new Date().toISOString(), ...row, requestedBy, changes: changes || {}, details: details || '' };
+            setPendingApprovals(prev => [normalizeApprovalRow({ ...row, id: fallback.id, created_at: fallback.requestDate }), ...prev]);
+            logActivity(module, 'approval_request', entityType, entityId, entityName, `Requested ${type}: ${details}`, requestedBy);
+            return fallback.id;
+        }
+        const created = data[0];
+        setPendingApprovals(prev => [normalizeApprovalRow(created), ...prev]);
         logActivity(module, 'approval_request', entityType, entityId, entityName, `Requested ${type}: ${details}`, requestedBy);
-        return newRequest.id;
+        return created.id;
     };
 
-    const approveRequest = (requestId, approvedBy = 'Manager') => {
-        setPendingApprovals(prev => prev.map(req => req.id === requestId ? { ...req, status: 'approved', approvedBy, approvalDate: new Date().toISOString() } : req));
+    const approveRequest = async (requestId, approvedBy = 'Manager') => {
+        const now = new Date().toISOString();
+        const { error } = await supabase.from('approval_requests').update({
+            status: 'approved',
+            approved_by: approvedBy,
+            approval_date: now,
+        }).eq('id', requestId);
+        if (error) console.error('Error approving request:', error);
+        setPendingApprovals(prev => prev.map(req => req.id === requestId ? { ...req, status: 'approved', approvedBy, approvalDate: now } : req));
         const request = pendingApprovals.find(r => r.id === requestId);
         if (request) logActivity(request.module, 'approved', request.entityType, request.entityId, request.entityName, `Approved ${request.type}`, approvedBy);
     };
 
-    const rejectRequest = (requestId, rejectedBy = 'Manager', reason = '') => {
-        setPendingApprovals(prev => prev.map(req => req.id === requestId ? { ...req, status: 'rejected', rejectedBy, rejectionDate: new Date().toISOString(), rejectionReason: reason } : req));
+    const rejectRequest = async (requestId, rejectedBy = 'Manager', reason = '') => {
+        const now = new Date().toISOString();
+        const { error } = await supabase.from('approval_requests').update({
+            status: 'rejected',
+            rejection_reason: reason,
+            rejection_date: now,
+        }).eq('id', requestId);
+        if (error) console.error('Error rejecting request:', error);
+        setPendingApprovals(prev => prev.map(req => req.id === requestId ? { ...req, status: 'rejected', rejectionReason: reason, rejectionDate: now } : req));
         const request = pendingApprovals.find(r => r.id === requestId);
         if (request) logActivity(request.module, 'rejected', request.entityType, request.entityId, request.entityName, `Rejected: ${reason}`, rejectedBy);
     };
@@ -114,6 +169,15 @@ export const DataProvider = ({ children }) => {
         sourcePengajuanNumber: q.source_pengajuan_number || null,
         sourceBcDocumentNumber: q.source_bc_document_number || null,
         sourceBcDocumentDate: q.source_bc_document_date || null,
+        // Invoice / Currency fields
+        invoiceNumber: q.invoice_number || q.invoiceNumber || null,
+        invoiceValue: q.invoice_value || q.invoiceValue || null,
+        invoiceCurrency: q.invoice_currency || q.invoiceCurrency || 'IDR',
+        exchangeRate: q.exchange_rate || q.exchangeRate || null,
+        exchangeRateDate: q.exchange_rate_date || q.exchangeRateDate || null,
+        blNumber: q.bl_number || q.blNumber || null,
+        blDate: q.bl_date || q.blDate || null,
+        itemDate: q.item_date || q.itemDate || null,
     });
 
     // Shared Helper: Map Inbound DB -> State (freight_inbound schema)
@@ -440,6 +504,18 @@ export const DataProvider = ({ children }) => {
                 const { data: moveData, error: moveError } = await supabase.from('freight_movements').select('*');
                 if (!moveError) setGoodsMovements(moveData || []);
 
+                // Load Approval Requests from Supabase
+                const { data: approvalData, error: approvalError } = await supabase
+                    .from('approval_requests')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+                if (approvalError) {
+                    console.warn('⚠️ Could not load approval_requests (table may not exist yet):', approvalError.message);
+                } else {
+                    setPendingApprovals((approvalData || []).map(normalizeApprovalRow));
+                    console.log(`✅ Loaded ${(approvalData || []).length} approval requests`);
+                }
+
                 // Load Company Settings
                 await fetchCompanySettings();
 
@@ -655,6 +731,20 @@ export const DataProvider = ({ children }) => {
                 if (payload.eventType === 'INSERT') setBcCodes(prev => [...prev, payload.new]);
                 else if (payload.eventType === 'UPDATE') setBcCodes(prev => prev.map(item => item.id === payload.new.id ? payload.new : item));
                 else if (payload.eventType === 'DELETE') setBcCodes(prev => prev.filter(item => item.id !== payload.old.id));
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'approval_requests' }, (payload) => {
+                console.log('⚡ Realtime Approval Request Update:', payload);
+                if (payload.eventType === 'INSERT') {
+                    setPendingApprovals(prev => [normalizeApprovalRow(payload.new), ...prev]);
+                }
+                else if (payload.eventType === 'UPDATE') {
+                    setPendingApprovals(prev => prev.map(item =>
+                        item.id === payload.new.id ? normalizeApprovalRow(payload.new) : item
+                    ));
+                }
+                else if (payload.eventType === 'DELETE') {
+                    setPendingApprovals(prev => prev.filter(item => item.id !== payload.old.id));
+                }
             })
             .subscribe();
 
@@ -1288,6 +1378,7 @@ export const DataProvider = ({ children }) => {
             notes: newTransaction.notes,
             created_at: newTransaction.createdAt,
             date: newTransaction.date || new Date().toISOString().split('T')[0], // Add date column mapping (NOT NULL)
+            currency: newTransaction.currency || 'IDR',
             documents: {
                 totalOperationalCost: newTransaction.totalOperationalCost,
                 netRevenue: newTransaction.netRevenue,
@@ -1842,6 +1933,16 @@ export const DataProvider = ({ children }) => {
             rejection_date: quotation.rejectionDate || null,
             pic: quotation.pic || null,
 
+            // Invoice / Currency fields
+            bl_number: quotation.blNumber || null,
+            bl_date: quotation.blDate || null,
+            invoice_number: quotation.invoiceNumber || null,
+            invoice_value: quotation.invoiceValue ? Number(quotation.invoiceValue) : null,
+            invoice_currency: quotation.invoiceCurrency || 'IDR',
+            exchange_rate: quotation.exchangeRate ? Number(quotation.exchangeRate) : null,
+            exchange_rate_date: quotation.exchangeRateDate || null,
+            item_date: quotation.itemDate || null,
+
             // Timestamps
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
@@ -2225,6 +2326,15 @@ export const DataProvider = ({ children }) => {
         if (updatedData.sourcePengajuanNumber !== undefined) dbUpdateData.source_pengajuan_number = updatedData.sourcePengajuanNumber;
         if (updatedData.sourceBcDocumentNumber !== undefined) dbUpdateData.source_bc_document_number = updatedData.sourceBcDocumentNumber;
         if (updatedData.sourceBcDocumentDate !== undefined) dbUpdateData.source_bc_document_date = updatedData.sourceBcDocumentDate || null;
+        // Invoice / Currency fields
+        if (updatedData.invoiceNumber !== undefined) dbUpdateData.invoice_number = updatedData.invoiceNumber;
+        if (updatedData.invoiceValue !== undefined) dbUpdateData.invoice_value = updatedData.invoiceValue ? Number(updatedData.invoiceValue) : null;
+        if (updatedData.invoiceCurrency !== undefined) dbUpdateData.invoice_currency = updatedData.invoiceCurrency;
+        if (updatedData.exchangeRate !== undefined) dbUpdateData.exchange_rate = updatedData.exchangeRate ? Number(updatedData.exchangeRate) : null;
+        if (updatedData.exchangeRateDate !== undefined) dbUpdateData.exchange_rate_date = updatedData.exchangeRateDate || null;
+        if (updatedData.blNumber !== undefined) dbUpdateData.bl_number = updatedData.blNumber;
+        if (updatedData.blDate !== undefined) dbUpdateData.bl_date = updatedData.blDate || null;
+        if (updatedData.itemDate !== undefined) dbUpdateData.item_date = updatedData.itemDate || null;
 
         // Always update timestamp
         dbUpdateData.updated_at = new Date().toISOString();
@@ -2334,7 +2444,7 @@ export const DataProvider = ({ children }) => {
                     quantity: flatItems.reduce((sum, i) => sum + (i.quantity || 0), 0),
                     unit: 'pcs',
                     value: flatItems.reduce((sum, i) => sum + (i.value || 0), 0),
-                    currency: 'IDR',
+                    currency: updatedQuotation.invoiceCurrency || updatedQuotation.invoice_currency || quotation.invoice_currency || 'IDR',
 
                     pic: updatedQuotation.pic || updatedQuotation.approvedBy,
                     documents: JSON.stringify({
@@ -2416,7 +2526,7 @@ export const DataProvider = ({ children }) => {
                 quantity: updatedQuotation.packages?.reduce((sum, pkg) => sum + (pkg.items?.length || 0), 0) || 0,
                 unit: 'pcs',
                 value: updatedQuotation.packages?.reduce((sum, pkg) => sum + (pkg.items?.reduce((s, i) => s + (i.value || 0), 0) || 0), 0) || 0,
-                currency: 'IDR',
+                currency: updatedQuotation.invoiceCurrency || updatedQuotation.invoice_currency || quotation.invoice_currency || 'IDR',
 
                 pic: updatedQuotation.pic || 'Admin',
                 notes: updatedQuotation.notes,

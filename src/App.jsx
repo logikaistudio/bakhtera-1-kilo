@@ -22,10 +22,12 @@ import VendorManagement from './pages/Centralized/VendorManagement';
 import CustomerManagement from './pages/Centralized/CustomerManagement';
 import Finance from './pages/Centralized/Finance';
 import COAMaster from './pages/Centralized/COAMaster';
+import CompanySettings from './pages/Centralized/CompanySettings';
 
 // Blink Module
 import BlinkDashboard from './pages/Blink/BlinkDashboard';
 import QuotationManagement from './pages/Blink/QuotationManagement';
+import SalesQuotation from './pages/Blink/SalesQuotation';
 import FlowMonitor from './pages/Blink/FlowMonitor';
 import SalesAchievement from './pages/Blink/SalesAchievement';
 import ShipmentManagement from './pages/Blink/ShipmentManagement';
@@ -37,6 +39,7 @@ import ProfitAnalysis from './pages/Blink/ProfitAnalysis';
 import MasterRoutes from './pages/Blink/MasterRoutes';
 import PartnerManagement from './pages/Blink/PartnerManagement';
 import BlinkCompanySettings from './pages/Blink/CompanySettings'; // New
+import BlinkApproval from './pages/Blink/BlinkApproval';
 
 // Blink Finance Module
 import InvoiceManagement from './pages/Blink/InvoiceManagement';
@@ -116,112 +119,117 @@ function App() {
 
             {/* App Routes - With Layout */}
             <Route path="/*" element={
-              <MainLayout>
-                <Routes>
-                  {/* Main Dashboard */}
-                  <Route path="/" element={<FreightDashboard />} />
+              <ProtectedRoute>
+                <MainLayout>
+                  <Routes>
+                    {/* Main Dashboard */}
+                    <Route path="/" element={<FreightDashboard />} />
 
-                  {/* Centralized Modules */}
-                  <Route path="/vendors" element={<VendorManagement />} />
-                  <Route path="/customers" element={<CustomerManagement />} />
-                  <Route path="/finance" element={<Finance />} />
-                  <Route path="/finance/coa" element={<COAMaster />} />
-                  {/* Removed /settings */}
+                    {/* Centralized Modules — dilindungi per menuCode */}
+                    <Route path="/vendors" element={<ProtectedRoute menuCode="central_vendors"><VendorManagement /></ProtectedRoute>} />
+                    <Route path="/customers" element={<ProtectedRoute menuCode="central_customers"><CustomerManagement /></ProtectedRoute>} />
+                    <Route path="/finance" element={<ProtectedRoute menuCode="central_finance"><Finance /></ProtectedRoute>} />
+                    <Route path="/finance/coa" element={<ProtectedRoute menuCode="central_coa"><COAMaster /></ProtectedRoute>} />
+                    <Route path="/settings" element={<ProtectedRoute menuCode="central_settings"><CompanySettings /></ProtectedRoute>} />
 
-                  {/* Blink Module - Sales & Operations */}
-                  <Route path="/blink" element={<BlinkDashboard />} />
-                  <Route path="/blink/quotations" element={<QuotationManagement />} />
-                  <Route path="/blink/flow-monitor" element={<FlowMonitor />} />
-                  <Route path="/blink/sales-achievement" element={<SalesAchievement />} />
-                  <Route path="/blink/shipments" element={<ShipmentManagement />} />
-                  <Route path="/blink/operations/tracking" element={<TrackingMonitoring />} />
-                  <Route path="/blink/operations/awb" element={<AWBManagement />} />
-                  <Route path="/blink/operations/bl" element={<BLManagement />} />
-                  <Route path="/blink/master/routes" element={<MasterRoutes />} />
-                  <Route path="/blink/master/partners" element={<PartnerManagement />} />
-                  <Route path="/blink/master/settings" element={<BlinkCompanySettings />} />
+                    {/* Blink Module - Sales & Operations */}
+                    <Route path="/blink" element={<ProtectedRoute menuCode="blink_dashboard"><BlinkDashboard /></ProtectedRoute>} />
+                    <Route path="/blink/sales-quotations" element={<ProtectedRoute menuCode="blink_sales_quotations"><SalesQuotation /></ProtectedRoute>} />
+                    <Route path="/blink/operations/quotations" element={<ProtectedRoute menuCode="blink_quotations"><QuotationManagement /></ProtectedRoute>} />
+                    <Route path="/blink/flow-monitor" element={<ProtectedRoute menuCode="blink_flow_monitor"><FlowMonitor /></ProtectedRoute>} />
+                    <Route path="/blink/sales-achievement" element={<ProtectedRoute menuCode="blink_sales"><SalesAchievement /></ProtectedRoute>} />
+                    <Route path="/blink/shipments" element={<ProtectedRoute menuCode="blink_shipments"><ShipmentManagement /></ProtectedRoute>} />
+                    <Route path="/blink/operations/tracking" element={<ProtectedRoute menuCode="blink_tracking"><TrackingMonitoring /></ProtectedRoute>} />
+                    <Route path="/blink/operations/awb" element={<ProtectedRoute menuCode="blink_awb"><AWBManagement /></ProtectedRoute>} />
+                    <Route path="/blink/operations/bl" element={<ProtectedRoute menuCode="blink_bl"><BLManagement /></ProtectedRoute>} />
+                    <Route path="/blink/master/routes" element={<ProtectedRoute menuCode="blink_routes"><MasterRoutes /></ProtectedRoute>} />
+                    <Route path="/blink/master/partners" element={<ProtectedRoute menuCode="blink_partners"><PartnerManagement /></ProtectedRoute>} />
+                    <Route path="/blink/master/settings" element={<ProtectedRoute menuCode="blink_settings"><BlinkCompanySettings /></ProtectedRoute>} />
 
-                  {/* Blink Finance Module */}
-                  <Route path="/blink/finance/invoices" element={<InvoiceManagement />} />
-                  <Route path="/blink/finance/purchase-orders" element={<PurchaseOrder />} />
-                  <Route path="/blink/finance/general-journal" element={<GeneralJournal />} />
-                  <Route path="/blink/finance/general-ledger" element={<GeneralLedger />} />
-                  <Route path="/blink/finance/trial-balance" element={<TrialBalance />} />
-                  <Route path="/blink/finance/ar" element={<AccountsReceivable />} />
-                  <Route path="/blink/finance/ap" element={<AccountsPayable />} />
-                  <Route path="/blink/finance/profit-loss" element={<ProfitLoss />} />
-                  <Route path="/blink/finance/balance-sheet" element={<BalanceSheet />} />
-                  <Route path="/blink/finance/selling-buying" element={<SellingVsBuying />} />
-                  <Route path="/blink/sales-revenue" element={<SalesRevenue />} />
+                    {/* Blink Finance Module */}
+                    <Route path="/blink/finance/invoices" element={<ProtectedRoute menuCode="blink_invoices"><InvoiceManagement /></ProtectedRoute>} />
+                    <Route path="/blink/finance/purchase-orders" element={<ProtectedRoute menuCode="blink_purchase_order"><PurchaseOrder /></ProtectedRoute>} />
+                    <Route path="/blink/finance/general-journal" element={<ProtectedRoute menuCode="blink_journal"><GeneralJournal /></ProtectedRoute>} />
+                    <Route path="/blink/finance/general-ledger" element={<ProtectedRoute menuCode="blink_ledger"><GeneralLedger /></ProtectedRoute>} />
+                    <Route path="/blink/finance/trial-balance" element={<ProtectedRoute menuCode="blink_trial_balance"><TrialBalance /></ProtectedRoute>} />
+                    <Route path="/blink/finance/ar" element={<ProtectedRoute menuCode="blink_ar"><AccountsReceivable /></ProtectedRoute>} />
+                    <Route path="/blink/finance/ap" element={<ProtectedRoute menuCode="blink_ap"><AccountsPayable /></ProtectedRoute>} />
+                    <Route path="/blink/finance/profit-loss" element={<ProtectedRoute menuCode="blink_pnl"><ProfitLoss /></ProtectedRoute>} />
+                    <Route path="/blink/finance/balance-sheet" element={<ProtectedRoute menuCode="blink_balance_sheet"><BalanceSheet /></ProtectedRoute>} />
+                    <Route path="/blink/finance/selling-buying" element={<ProtectedRoute menuCode="blink_selling_buying"><SellingVsBuying /></ProtectedRoute>} />
+                    <Route path="/blink/sales-revenue" element={<ProtectedRoute menuCode="blink_dashboard"><SalesRevenue /></ProtectedRoute>} />
 
-                  {/* Legacy Blink Routes - Redirects */}
-                  <Route path="/blink/invoices" element={<InvoiceManagement />} />
-                  <Route path="/blink/finance/profit" element={<ProfitAnalysis />} />
+                    {/* Legacy Blink Routes - Redirects */}
+                    <Route path="/blink/invoices" element={<ProtectedRoute menuCode="blink_invoices"><InvoiceManagement /></ProtectedRoute>} />
+                    <Route path="/blink/finance/profit" element={<ProtectedRoute menuCode="blink_pnl"><ProfitAnalysis /></ProtectedRoute>} />
+                    <Route path="/blink/approvals" element={<ProtectedRoute menuCode="blink_approval"><BlinkApproval /></ProtectedRoute>} />
 
-                  {/* Bridge Module */}
-                  <Route path="/bridge" element={<BridgeOverview />} />
-                  <Route path="/bridge/bc-master" element={<BCMaster />} />
-                  <Route path="/bridge/item-master" element={<ItemMaster />} />
-                  <Route path="/bridge/hs-master" element={<HSMaster />} />
-                  <Route path="/bridge/pengajuan" element={<PengajuanManagement />} />
-                  <Route path="/bridge/ata-carnet" element={<AtaCarnet />} />
-                  <Route path="/bridge/finance/*" element={<BridgeFinance />} />
-                  <Route path="/bridge/goods-movement" element={<GoodsMovement />} />
-                  <Route path="/bridge/inventory" element={<WarehouseInventory />} />
-                  <Route path="/bridge/outbound-inventory" element={<OutboundInventory />} />
-                  <Route path="/bridge/logger" element={<ActivityLogger />} />
-                  <Route path="/bridge/approvals" element={<ApprovalManager />} />
-                  <Route path="/bridge/pergerakan" element={<PergerakanBarang />} />
-                  <Route path="/bridge/delivery-notes" element={<DeliveryNotes />} />
-                  <Route path="/bridge/code-of-account" element={<CodeOfAccount />} />
-                  <Route path="/bridge/master/partners" element={<BridgePartnerManagement />} />
-                  <Route path="/bridge/master/settings" element={<BridgeCompanySettings />} />
+                    {/* Bridge Module */}
+                    <Route path="/bridge" element={<ProtectedRoute menuCode="bridge_dashboard"><BridgeOverview /></ProtectedRoute>} />
+                    <Route path="/bridge/bc-master" element={<ProtectedRoute menuCode="bridge_bc_master"><BCMaster /></ProtectedRoute>} />
+                    <Route path="/bridge/item-master" element={<ProtectedRoute menuCode="bridge_item_master"><ItemMaster /></ProtectedRoute>} />
+                    <Route path="/bridge/hs-master" element={<ProtectedRoute menuCode="bridge_hs_master"><HSMaster /></ProtectedRoute>} />
+                    <Route path="/bridge/pengajuan" element={<ProtectedRoute menuCode="bridge_pengajuan"><PengajuanManagement /></ProtectedRoute>} />
+                    <Route path="/bridge/ata-carnet" element={<ProtectedRoute menuCode="bridge_ata_carnet"><AtaCarnet /></ProtectedRoute>} />
+                    <Route path="/bridge/finance/*" element={<ProtectedRoute menuCode="bridge_finance"><BridgeFinance /></ProtectedRoute>} />
+                    <Route path="/bridge/goods-movement" element={<ProtectedRoute menuCode="bridge_movement"><GoodsMovement /></ProtectedRoute>} />
+                    <Route path="/bridge/inventory" element={<ProtectedRoute menuCode="bridge_inventory"><WarehouseInventory /></ProtectedRoute>} />
+                    <Route path="/bridge/outbound-inventory" element={<ProtectedRoute menuCode="bridge_outbound"><OutboundInventory /></ProtectedRoute>} />
+                    <Route path="/bridge/logger" element={<ProtectedRoute menuCode="bridge_activity"><ActivityLogger /></ProtectedRoute>} />
+                    <Route path="/bridge/approvals" element={<ProtectedRoute menuCode="bridge_approval"><ApprovalManager /></ProtectedRoute>} />
+                    <Route path="/bridge/approval" element={<ProtectedRoute menuCode="bridge_approval"><ApprovalManager /></ProtectedRoute>} />
+                    <Route path="/bridge/pergerakan" element={<ProtectedRoute menuCode="bridge_movement"><PergerakanBarang /></ProtectedRoute>} />
+                    <Route path="/bridge/delivery-notes" element={<ProtectedRoute menuCode="bridge_delivery"><DeliveryNotes /></ProtectedRoute>} />
+                    <Route path="/bridge/code-of-account" element={<ProtectedRoute menuCode="bridge_coa"><CodeOfAccount /></ProtectedRoute>} />
+                    <Route path="/bridge/master/partners" element={<ProtectedRoute menuCode="bridge_partners"><BridgePartnerManagement /></ProtectedRoute>} />
+                    <Route path="/bridge/master/settings" element={<ProtectedRoute menuCode="bridge_settings"><BridgeCompanySettings /></ProtectedRoute>} />
 
-                  {/* Big Module */}
-                  <Route path="/big" element={<BigDashboard />} />
-                  <Route path="/big/master/settings" element={<BigCompanySettings />} />
+                    {/* Big Module */}
+                    <Route path="/big" element={<ProtectedRoute menuCode="big_dashboard"><BigDashboard /></ProtectedRoute>} />
+                    <Route path="/big/master/settings" element={<ProtectedRoute menuCode="big_settings"><BigCompanySettings /></ProtectedRoute>} />
 
-                  {/* Sales */}
-                  <Route path="/big/quotations" element={<BigQuotations />} />
-                  <Route path="/big/sales/quotations" element={<BigQuotations />} />
+                    {/* Sales */}
+                    <Route path="/big/quotations" element={<ProtectedRoute menuCode="big_quotations"><BigQuotations /></ProtectedRoute>} />
+                    <Route path="/big/sales/quotations" element={<ProtectedRoute menuCode="big_quotations"><BigQuotations /></ProtectedRoute>} />
 
-                  {/* Operations */}
-                  <Route path="/big/events" element={<EventManagement />} />
-                  <Route path="/big/operations/events" element={<EventManagement />} />
-                  <Route path="/big/costs" element={<BigCosts />} />
-                  <Route path="/big/operations/costs" element={<BigCosts />} />
+                    {/* Operations */}
+                    <Route path="/big/events" element={<ProtectedRoute menuCode="big_events"><EventManagement /></ProtectedRoute>} />
+                    <Route path="/big/operations/events" element={<ProtectedRoute menuCode="big_events"><EventManagement /></ProtectedRoute>} />
+                    <Route path="/big/costs" element={<ProtectedRoute menuCode="big_costs"><BigCosts /></ProtectedRoute>} />
+                    <Route path="/big/operations/costs" element={<ProtectedRoute menuCode="big_costs"><BigCosts /></ProtectedRoute>} />
 
-                  {/* Finance */}
-                  <Route path="/big/invoices" element={<BigInvoices />} />
-                  <Route path="/big/finance/invoices" element={<BigInvoices />} />
-                  <Route path="/big/ar" element={<BigAR />} />
-                  <Route path="/big/finance/ar" element={<BigAR />} />
+                    {/* Finance */}
+                    <Route path="/big/invoices" element={<ProtectedRoute menuCode="big_invoices"><BigInvoices /></ProtectedRoute>} />
+                    <Route path="/big/finance/invoices" element={<ProtectedRoute menuCode="big_invoices"><BigInvoices /></ProtectedRoute>} />
+                    <Route path="/big/ar" element={<ProtectedRoute menuCode="big_ar"><BigAR /></ProtectedRoute>} />
+                    <Route path="/big/finance/ar" element={<ProtectedRoute menuCode="big_ar"><BigAR /></ProtectedRoute>} />
 
-                  {/* Pabean Module */}
-                  <Route path="/bridge/pabean" element={<PabeanDashboard />} />
-                  <Route path="/bridge/pabean/barang-masuk" element={<BarangMasuk />} />
-                  <Route path="/bridge/pabean/barang-keluar" element={<BarangKeluar />} />
-                  <Route path="/bridge/pabean/barang-reject" element={<BarangReject />} />
-                  <Route path="/bridge/pabean/pergerakan" element={<PergerakanBarang />} />
+                    {/* Pabean Module */}
+                    <Route path="/bridge/pabean" element={<ProtectedRoute menuCode="bridge_pabean"><PabeanDashboard /></ProtectedRoute>} />
+                    <Route path="/bridge/pabean/barang-masuk" element={<ProtectedRoute menuCode="bridge_barang_masuk"><BarangMasuk /></ProtectedRoute>} />
+                    <Route path="/bridge/pabean/barang-keluar" element={<ProtectedRoute menuCode="bridge_barang_keluar"><BarangKeluar /></ProtectedRoute>} />
+                    <Route path="/bridge/pabean/barang-reject" element={<ProtectedRoute menuCode="bridge_barang_reject"><BarangReject /></ProtectedRoute>} />
+                    <Route path="/bridge/pabean/pergerakan" element={<ProtectedRoute menuCode="bridge_pabean_movement"><PergerakanBarang /></ProtectedRoute>} />
 
-                  {/* Admin Module - Super Admin Only */}
-                  <Route path="/admin/users" element={
-                    <ProtectedRoute requireSuperAdmin={true}>
-                      <UserManagement />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/permissions" element={
-                    <ProtectedRoute requireSuperAdmin={true}>
-                      <RolePermissions />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/user-permissions" element={
-                    <ProtectedRoute requireSuperAdmin={true}>
-                      <UserPermissionAssignment />
-                    </ProtectedRoute>
-                  } />
-                </Routes>
-              </MainLayout>
+                    {/* Admin Module - Super Admin Only */}
+                    <Route path="/admin/users" element={
+                      <ProtectedRoute requireSuperAdmin={true}>
+                        <UserManagement />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/admin/permissions" element={
+                      <ProtectedRoute requireSuperAdmin={true}>
+                        <RolePermissions />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/admin/user-permissions" element={
+                      <ProtectedRoute requireSuperAdmin={true}>
+                        <UserPermissionAssignment />
+                      </ProtectedRoute>
+                    } />
+                  </Routes>
+                </MainLayout>
+              </ProtectedRoute>
             } />
           </Routes>
         </Router>

@@ -7,8 +7,13 @@ import DocumentUploadManager from '../../components/Common/DocumentUploadManager
 import WarehouseItemSelectorModal from '../../components/Bridge/WarehouseItemSelectorModal';
 import { useNavigate } from 'react-router-dom';
 import { exportToCSV } from '../../utils/exportCSV';
+import { useAuth } from '../../context/AuthContext';
 
 const PengajuanManagement = () => {
+    const { canCreate, canEdit, canDelete } = useAuth();
+    const hasCreate = canCreate('bridge_pengajuan');
+    const hasEdit = canEdit('bridge_pengajuan');
+    const hasDelete = canDelete('bridge_pengajuan');
     const {
         quotations = [],
         customers = [],
@@ -180,6 +185,7 @@ const PengajuanManagement = () => {
     };
 
     const handleFullEdit = (p) => {
+        if (!hasEdit) return;
         // Prevent editing if document is approved
         const docStatus = p.documentStatus || p.document_status || 'pengajuan';
         if (docStatus === 'approved') {
@@ -220,6 +226,7 @@ const PengajuanManagement = () => {
     };
 
     const handleEditPengajuan = (pengajuan) => {
+        if (!hasEdit) return;
         // Check if document is approved - show view-only modal
         const docStatus = pengajuan.documentStatus || pengajuan.document_status || 'pengajuan';
 
@@ -371,6 +378,7 @@ const PengajuanManagement = () => {
 
     const handleDeleteQuotation = async () => {
         console.log('🗑️ Delete button clicked');
+        if (!hasDelete) return;
         if (!editModal.pengajuan) {
             console.error('❌ editModal.pengajuan is missing');
             return;
@@ -774,6 +782,11 @@ const PengajuanManagement = () => {
             sourceBcDocumentNumber: inboundPengajuan.bcDocumentNumber || inboundPengajuan.bc_document_number,
             sourceBcDocumentDate: inboundPengajuan.bcDocumentDate || inboundPengajuan.bc_document_date,
 
+            // Inherit currency from source for consistency
+            invoiceCurrency: inboundPengajuan.invoiceCurrency || inboundPengajuan.invoice_currency || 'IDR',
+            exchangeRate: inboundPengajuan.exchangeRate || inboundPengajuan.exchange_rate || '',
+            exchangeRateDate: inboundPengajuan.exchangeRateDate || inboundPengajuan.exchange_rate_date || '',
+
             // Defaults
             documentStatus: 'pengajuan',
             customsStatus: 'pending'
@@ -826,9 +839,11 @@ const PengajuanManagement = () => {
                     <h1 className="text-3xl font-bold gradient-text">Manajemen Pengajuan</h1>
                     <p className="text-silver-dark mt-1">Pengajuan Layanan TPPB & Tracking Status Bea Cukai</p>
                 </div>
-                <Button onClick={() => setShowForm(!showForm)} icon={Plus}>
-                    {showForm ? 'Batal' : 'Buat Pengajuan Baru'}
-                </Button>
+                {hasCreate && (
+                    <Button onClick={() => setShowForm(!showForm)} icon={Plus}>
+                        {showForm ? 'Batal' : 'Buat Pengajuan Baru'}
+                    </Button>
+                )}
             </div>
 
             {/* Form */}
@@ -1692,15 +1707,17 @@ const PengajuanManagement = () => {
 
                                 {/* Buttons */}
                                 {/* Buttons */}
-                                <div className="flex justify-between items-center pt-4 border-t border-dark-border">
-                                    <Button
-                                        variant="danger"
-                                        onClick={handleDeleteQuotation}
-                                        icon={Trash2}
-                                        className="bg-red-500/10 text-red-400 hover:bg-red-500/20 border-red-500/20"
-                                    >
-                                        Hapus
-                                    </Button>
+                                <div className="mt-8 flex justify-between items-center border-t border-dark-border pt-4">
+                                    {hasDelete && (
+                                        <Button
+                                            variant="danger"
+                                            onClick={handleDeleteQuotation}
+                                            icon={Trash2}
+                                            className="bg-red-500/10 text-red-400 hover:bg-red-500/20 border-red-500/20"
+                                        >
+                                            Hapus
+                                        </Button>
+                                    )}
 
                                     {editModal.pengajuan.type === 'inbound' &&
                                         (editModal.pengajuan.documentStatus || editModal.pengajuan.document_status) === 'approved' && (
@@ -1735,13 +1752,15 @@ const PengajuanManagement = () => {
                                             </Button>
                                         )}
 
-                                    <div className="flex gap-3">
-                                        <Button variant="secondary" onClick={handleCancelEdit}>
+                                    <div className="flex gap-3 mt-4 sm:mt-0 sm:ml-auto">
+                                        <Button variant="secondary" onClick={handleCancelEdit} className="w-full sm:w-auto">
                                             Batal
                                         </Button>
-                                        <Button onClick={handleSaveEdit} icon={CheckCircle}>
-                                            Simpan Perubahan
-                                        </Button>
+                                        {hasEdit && (
+                                            <Button onClick={handleSaveEdit} icon={CheckCircle} className="w-full sm:w-auto text-sm whitespace-nowrap px-3 sm:px-4">
+                                                Simpan Perubahan
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
                             </div>

@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { FileText, Clock, CheckCircle, XCircle, Eye } from 'lucide-react';
 import { useData } from '../../context/DataContext';
+import { useAuth } from '../../context/AuthContext';
 import Button from '../../components/Common/Button';
-import { formatCurrency } from '../../utils/currencyFormatter';
+import { formatCurrency, getCurrencySymbol } from '../../utils/currencyFormatter';
 
 const CustomsDocuments = () => {
     const { customsDocuments = [], approveBC, rejectBC } = useData();
+    const { canEdit } = useAuth();
+    const hasEdit = canEdit('bridge_docs');
     const [filter, setFilter] = useState('all');
     const [selectedDoc, setSelectedDoc] = useState(null);
     const [rejectionReason, setRejectionReason] = useState('');
@@ -142,7 +145,7 @@ const CustomsDocuments = () => {
                                     <strong>{doc.items?.length || 0}</strong> items •
                                     <strong className="ml-2">{doc.totalItems || 0}</strong> total units •
                                     <strong className="ml-2 text-accent-green">
-                                        Rp {formatCurrency(doc.totalValue || 0)}
+                                        {getCurrencySymbol(doc.currency || 'IDR')} {formatCurrency(doc.totalValue || 0)}
                                     </strong>
                                 </p>
                                 {doc.items && doc.items.length > 0 && (
@@ -171,7 +174,7 @@ const CustomsDocuments = () => {
                             )}
 
                             {/* Actions */}
-                            {doc.status === 'pending' && (
+                            {hasEdit && doc.status === 'pending' && (
                                 <div className="flex gap-2 pt-3 border-t border-dark-border">
                                     <Button
                                         size="sm"

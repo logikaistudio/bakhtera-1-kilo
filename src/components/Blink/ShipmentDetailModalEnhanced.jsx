@@ -25,6 +25,7 @@ import {
     Receipt
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import COAPicker from '../Common/COAPicker';
 
 const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onViewAnalysis }) => {
     const navigate = useNavigate();
@@ -32,6 +33,13 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
     const [isEditing, setIsEditing] = useState(false);
     const [isEditingCOGS, setIsEditingCOGS] = useState(false);
     const [editedShipment, setEditedShipment] = useState(shipment || {});
+
+    // PO Generation state
+    const [showPOVendorModal, setShowPOVendorModal] = useState(false);
+    const [poVendors, setPOVendors] = useState([]);
+    const [selectedPOVendorId, setSelectedPOVendorId] = useState('');
+    const [pendingPOItems, setPendingPOItems] = useState([]);
+    const [pendingPOTotal, setPendingPOTotal] = useState(0);
 
     // Auto-population state
     const [vendors, setVendors] = useState([]);
@@ -156,6 +164,11 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                     console.log('📋 Auto-populating from quotation:', quotation);
                     setQuotationData(quotation);
 
+                    // Auto-populate selling items from quotation if we don't have them yet
+                    if (sellingItems.length === 0) {
+                        setSellingItems(quotation.service_items || quotation.serviceItems || []);
+                    }
+
                     // Only populate if fields are empty
                     setEditedShipment(prev => ({
                         ...prev,
@@ -260,9 +273,15 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                 eta: ''
             });
             setDocuments(shipment.documents || []);
-            // Sync selling and buying items
-            setSellingItems(shipment.sellingItems || []);
-            setBuyingItems(shipment.buyingItems || []);
+            // Sync selling and buying items — only update if incoming has data, or if local is empty
+            const incomingSellingItems = shipment.sellingItems || shipment.selling_items || [];
+            const incomingBuyingItems = shipment.buyingItems || shipment.buying_items || [];
+            if (incomingSellingItems.length > 0) {
+                setSellingItems(incomingSellingItems);
+            }
+            if (incomingBuyingItems.length > 0) {
+                setBuyingItems(incomingBuyingItems);
+            }
         }
     }, [shipment]);
 
@@ -306,25 +325,26 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
     };
 
     const handleGeneratePO = async () => {
-        if (!confirm('Generate Purchase Order from these COGS items? This will create a new draft PO.')) return;
-
         try {
-            // 1. Gather Items
-            const poItems = [];
+            // 1. Gather Items - only from buyingItems (actual costs with COA)
+            const poItemsRaw = [];
+
+            // Legacy COGS fields
             const addIfPresent = (label, value) => {
-                const val = parseFloat(String(value).replace(/,/g, ''));
+                const val = parseFloat(String(value || '').replace(/,/g, ''));
                 if (val && val > 0) {
-                    poItems.push({
-                        description: `${label} - ${shipment.job_number}`,
+                    poItemsRaw.push({
+                        item_name: label,
+                        description: `${label} - ${shipment.job_number || shipment.jobNumber}`,
                         qty: 1,
                         unit: 'Job',
                         unit_price: val,
-                        amount: val
+                        amount: val,
+                        coa_id: null
                     });
                 }
             };
-
-            const cogs = cogsData;
+            const cogs = cogsData || {};
             addIfPresent('Ocean Freight', cogs.oceanFreight);
             addIfPresent('Air Freight', cogs.airFreight);
             addIfPresent('Trucking', cogs.trucking);
@@ -335,56 +355,112 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
             addIfPresent('Demurrage', cogs.demurrage);
             addIfPresent(cogs.otherDescription || 'Other Charges', cogs.other);
 
-            if (poItems.length === 0) {
-                alert('No COGS amounts found to generate PO items.');
+            // Buying items with COA account name lookup
+            const coaIds = (buyingItems || []).map(i => i.coa_id).filter(Boolean);
+            let coaMap = {};
+            if (coaIds.length > 0) {
+                const { data: coaData } = await supabase
+                    .from('finance_coa')
+                    .select('id, name, code')
+                    .in('id', coaIds);
+                (coaData || []).forEach(c => { coaMap[c.id] = c; });
+            }
+
+            (buyingItems || []).forEach(item => {
+                const val = parseFloat(String(item.amount || 0).replace(/,/g, ''));
+                if (val && val > 0) {
+                    const coaAccount = coaMap[item.coa_id];
+                    const itemName = coaAccount ? coaAccount.name : (item.description || 'Item');
+                    poItemsRaw.push({
+                        item_name: itemName,
+                        description: item.description || itemName,
+                        qty: parseFloat(item.qty) || 1,
+                        unit: item.unit || 'Job',
+                        unit_price: parseFloat(item.rate) || val,
+                        amount: val,
+                        coa_id: item.coa_id || null
+                    });
+                }
+            });
+
+            if (poItemsRaw.length === 0) {
+                alert('No COGS/Actual Costs found to generate PO items.');
                 return;
             }
 
-            // 2. Generate PO number using centralized generator
+            // 2. Fetch vendors from blink_business_partners
+            const { data: vendorDataRaw } = await supabase
+                .from('blink_business_partners')
+                .select('*')
+                .order('partner_name');
+            const vendorData = (vendorDataRaw || []).filter(p => {
+                const val = p.is_vendor;
+                return val === true || val === 'true' || val === 1 || val === 't' || val === '1' || val === 'Y' || val === 'y' || String(val).toLowerCase() === 'true';
+            });
+            console.log('Raw Vendors:', vendorDataRaw);
+            console.log('Filtered Vendors:', vendorData);
+
+            const totalAmount = poItemsRaw.reduce((sum, i) => sum + i.amount, 0);
+
+            // Store pending items and show vendor selection modal
+            setPendingPOItems(poItemsRaw);
+            setPendingPOTotal(totalAmount);
+            setPOVendors(vendorData || []);
+            setSelectedPOVendorId('');
+            setShowPOVendorModal(true);
+
+        } catch (error) {
+            console.error('Error preparing PO:', error);
+            alert('Failed to prepare PO: ' + error.message);
+        }
+    };
+
+    const handleConfirmGeneratePO = async () => {
+        try {
+            if (!selectedPOVendorId) {
+                alert('Please select a vendor first.');
+                return;
+            }
+
+            const vendor = poVendors.find(v => v.id === selectedPOVendorId);
             const { generatePONumber } = await import('../../utils/documentNumbers');
             const poNumber = await generatePONumber();
 
-            // 3. Create PO
-            const totalAmount = poItems.reduce((sum, item) => sum + item.amount, 0);
-
             const newPO = {
                 po_number: poNumber,
-                vendor_id: null, // User must select vendor later
-                vendor_name: 'To Be Assigned',
+                vendor_id: vendor.id,
+                vendor_name: vendor.partner_name,
+                vendor_email: vendor.email || '',
+                vendor_phone: vendor.phone || '',
+                vendor_address: vendor.address || '',
                 po_date: new Date().toISOString().split('T')[0],
                 delivery_date: null,
                 payment_terms: 'NET 30',
-                po_items: poItems,
+                po_items: pendingPOItems,
                 currency: cogsCurrency || 'IDR',
-                exchange_rate: exchangeRate || 1,
-                subtotal: totalAmount,
-                tax_rate: 0, // Default 0 for freight usually, user can change
+                exchange_rate: parseFloat(exchangeRate) || 1,
+                subtotal: pendingPOTotal,
+                tax_rate: 0,
                 tax_amount: 0,
                 discount_amount: 0,
-                total_amount: totalAmount,
+                total_amount: pendingPOTotal,
                 status: 'draft',
-                notes: `Generated from Shipment Job: ${shipment.job_number}`
+                shipment_id: shipment.id || null,
+                job_number: shipment.job_number || shipment.jobNumber || null,
+                notes: `Generated from Shipment Job: ${shipment.job_number || shipment.jobNumber}`
             };
 
-            const { data, error } = await supabase
+            const { error } = await supabase
                 .from('blink_purchase_orders')
                 .insert([newPO])
                 .select();
 
-            if (error) {
-                console.error('Supabase insert error:', error);
-                throw error;
-            }
+            if (error) throw error;
 
-            console.log('✅ PO inserted successfully:', data);
+            setShowPOVendorModal(false);
             alert(`✅ Purchase Order ${poNumber} generated successfully!`);
-
-            // Close the shipment modal
             onClose();
-
-            // Navigate to Purchase Order page
             navigate('/blink/finance/purchase-orders');
-
         } catch (error) {
             console.error('Error generating PO:', error);
             alert('Failed to generate PO: ' + error.message);
@@ -396,7 +472,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
             // Helper to safely parse numbers
             const parseNumber = (value) => {
                 if (value === '' || value === null || value === undefined) return null;
-                const parsed = parseFloat(value);
+                const parsed = parseFloat(String(value).replace(/,/g, ''));
                 return isNaN(parsed) ? null : parsed;
             };
 
@@ -416,8 +492,15 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
 
             // Parse buying items
             const parsedBuyingItems = buyingItems.map(item => ({
+                id: item.id || `item-${Date.now()}-${Math.random()}`,
                 description: item.description || '',
-                amount: parseNumber(item.amount)
+                qty: parseNumber(item.qty) || 1,
+                unit: item.unit || 'Job',
+                rate: parseNumber(item.rate) || parseNumber(item.amount) || 0,
+                amount: parseNumber(item.amount) || ((parseNumber(item.qty) || 1) * (parseNumber(item.rate) || 0)),
+                coa_id: item.coa_id || null,
+                vendor: item.vendor || '',
+                currency: item.currency || cogsCurrency
             }));
 
             // Update shipment with COGS data
@@ -474,42 +557,58 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
     };
 
     const calculateTotalCOGS = () => {
+        const parseVal = (val) => {
+            const parsed = parseFloat(String(val || 0).replace(/,/g, ''));
+            return isNaN(parsed) ? 0 : parsed;
+        };
+
         // Base COGS items
         const baseCOGS =
-            parseFloat(cogsData.oceanFreight || 0) +
-            parseFloat(cogsData.airFreight || 0) +
-            parseFloat(cogsData.trucking || 0) +
-            parseFloat(cogsData.thc || 0) +
-            parseFloat(cogsData.documentation || 0) +
-            parseFloat(cogsData.customs || 0) +
-            parseFloat(cogsData.insurance || 0) +
-            parseFloat(cogsData.demurrage || 0) +
-            parseFloat(cogsData.other || 0);
+            parseVal(cogsData.oceanFreight) +
+            parseVal(cogsData.airFreight) +
+            parseVal(cogsData.trucking) +
+            parseVal(cogsData.thc) +
+            parseVal(cogsData.documentation) +
+            parseVal(cogsData.customs) +
+            parseVal(cogsData.insurance) +
+            parseVal(cogsData.demurrage) +
+            parseVal(cogsData.other);
 
         // Additional costs from array
-        const additionalTotal = (cogsData.additionalCosts || []).reduce((sum, item) => {
-            return sum + parseFloat(item.amount || 0);
-        }, 0);
+        const additionalTotal = (cogsData.additionalCosts || []).reduce((sum, item) => sum + parseVal(item.amount), 0);
 
         // Buying items total
-        const buyingTotal = (buyingItems || []).reduce((sum, item) => {
-            return sum + parseFloat(item.amount || 0);
-        }, 0);
+        const buyingTotal = (buyingItems || []).reduce((sum, item) => sum + parseVal(item.amount), 0);
 
         return baseCOGS + additionalTotal + buyingTotal;
     };
 
-    // Convert COGS to USD if in IDR
-    const calculateTotalCOGSInUSD = () => {
+    // Convert COGS to quoted/shipment currency
+    const calculateTotalCOGSConverted = () => {
         const total = calculateTotalCOGS();
-        if (cogsCurrency === 'IDR' && exchangeRate) {
-            return total / parseFloat(exchangeRate);
+        const baseCurrency = shipment?.currency || 'USD';
+
+        if (cogsCurrency === baseCurrency) {
+            return total;
         }
+
+        const rate = parseFloat(exchangeRate) || 0;
+        if (!rate) return total; // Fallback to avoid NaN if rate is empty
+
+        // Convert to IDR
+        if (baseCurrency === 'IDR' && cogsCurrency === 'USD') {
+            return total * rate;
+        }
+        // Convert to USD
+        else if (baseCurrency === 'USD' && cogsCurrency === 'IDR') {
+            return total / rate;
+        }
+
         return total;
     };
 
     const calculateProfit = () => {
-        return calculateQuotedAmount() - calculateTotalCOGSInUSD();
+        return calculateQuotedAmount() - calculateTotalCOGSConverted();
     };
 
     const calculateMargin = () => {
@@ -581,15 +680,43 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
             const { generateInvoiceNumber } = await import('../../utils/documentNumbers');
             const invoiceNumber = await generateInvoiceNumber(shipment.jobNumber || shipment.soNumber);
 
-            // 2. Prepare Invoice Items
-            // Use quotedAmount as the main item
-            const invoiceItems = [{
-                description: `${(shipment.serviceType || 'Freight').toUpperCase()} - ${shipment.origin || ''} to ${shipment.destination || ''}`,
-                qty: 1,
-                unit: 'Shipment',
-                rate: shipment.quotedAmount || 0,
-                amount: shipment.quotedAmount || 0
-            }];
+            // 2. Prepare Invoice Items from selling items (quotation service items)
+            const sourceItems = sellingItems.length > 0
+                ? sellingItems
+                : (shipment.service_items || shipment.serviceItems || []);
+
+            let invoiceItems = [];
+            let subtotal = 0;
+
+            if (sourceItems.length > 0) {
+                invoiceItems = sourceItems.map(item => {
+                    const qty = parseFloat(item.qty || item.quantity || 1);
+                    const rate = parseFloat(item.selling_rate || item.sellingRate || item.rate || item.price || 0);
+                    const amount = parseFloat(item.total || item.amount || item.sellingTotal || (qty * rate) || 0);
+                    subtotal += amount;
+                    return {
+                        description: item.name || item.description || item.item_code || 'Service',
+                        qty,
+                        unit: item.unit || 'Job',
+                        rate,
+                        amount
+                    };
+                });
+            } else {
+                // Fallback: single row from quotedAmount
+                subtotal = parseFloat(shipment.quotedAmount || 0);
+                invoiceItems = [{
+                    description: `${(shipment.serviceType || 'Freight').toUpperCase()} - ${shipment.origin || ''} to ${shipment.destination || ''}`,
+                    qty: 1,
+                    unit: 'Shipment',
+                    rate: subtotal,
+                    amount: subtotal
+                }];
+            }
+
+            const taxRate = 11.0;
+            const taxAmount = subtotal * (taxRate / 100);
+            const totalAmount = subtotal + taxAmount;
 
             // 3. Create Invoice Object
             const newInvoice = {
@@ -606,16 +733,15 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                 origin: shipment.origin,
                 destination: shipment.destination,
                 service_type: shipment.serviceType,
-                currency: shipment.currency || 'IDR', // Default to shipment currency
-                subtotal: shipment.quotedAmount || 0,
-                tax_rate: 11.0, // Default VAT
-                tax_amount: (shipment.quotedAmount || 0) * 0.11,
-                total_amount: (shipment.quotedAmount || 0) * 1.11,
-                outstanding_amount: (shipment.quotedAmount || 0) * 1.11,
+                currency: shipment.currency || 'IDR',
+                subtotal,
+                tax_rate: taxRate,
+                tax_amount: taxAmount,
+                total_amount: totalAmount,
+                outstanding_amount: totalAmount,
                 status: 'draft',
                 invoice_items: invoiceItems,
-                // COGS from shipment (optional, but good to link)
-                cogs_items: [], // Populated later or leave empty
+                cogs_items: [],
                 notes: `Generated from Shipment: ${shipment.jobNumber}`
             };
 
@@ -626,7 +752,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
 
             if (error) throw error;
 
-            alert(`✅ Invoice ${invoiceNumber} created successfully!`);
+            alert(`✅ Invoice ${invoiceNumber} created successfully with ${invoiceItems.length} line item(s)!`);
             onClose();
             navigate('/blink/finance/invoices');
         } catch (error) {
@@ -879,7 +1005,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
             alert('✅ Dokumen berhasil dihapus');
         } catch (error) {
             console.error('Error deleting document:', error);
-            alert('❌ Gagal menghapus dokumen: ' + error.message);
+            alert('❌ Failed to delete dokumen: ' + error.message);
         }
     };
 
@@ -968,6 +1094,16 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                     >
                                         Edit
                                     </Button>
+                                    {activeTab === 'cogs' && calculateTotalCOGS() > 0 && (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={handleGeneratePO}
+                                            title="Generate a Purchase Order from actual costs"
+                                        >
+                                            Generate PO
+                                        </Button>
+                                    )}
                                     <Button
                                         size="sm"
                                         variant="primary"
@@ -1003,15 +1139,8 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                     >
                                         Save Changes
                                     </Button>
-                                    {activeTab === 'cogs' && calculateTotalCOGS() > 0 && (
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={handleGeneratePO}
-                                            title="Generate a PO from these costs"
-                                        >
-                                            Generate PO
-                                        </Button>
+                                    {activeTab === 'cogs' && isEditingCOGS && (
+                                        <span className="text-xs text-silver-dark italic px-1">Save first to generate PO</span>
                                     )}
                                     <Button
                                         size="sm"
@@ -1809,10 +1938,10 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                                         <option value="IDR">IDR (Rp)</option>
                                                     </select>
                                                 </div>
-                                                {cogsCurrency === 'IDR' && (
+                                                {cogsCurrency !== (shipment?.currency || 'USD') && (
                                                     <>
                                                         <div>
-                                                            <label className="text-silver-dark text-sm">Exchange Rate (USD to IDR)</label>
+                                                            <label className="text-silver-dark text-sm">Exchange Rate (USD ↔ IDR)</label>
                                                             <input
                                                                 type="number"
                                                                 value={exchangeRate || ''}
@@ -1835,10 +1964,10 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                                     </>
                                                 )}
                                             </div>
-                                            {cogsCurrency === 'IDR' && exchangeRate && (
+                                            {cogsCurrency !== (shipment?.currency || 'USD') && exchangeRate && (
                                                 <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded">
                                                     <p className="text-sm text-blue-400">
-                                                        💱 1 USD = Rp {parseFloat(exchangeRate).toLocaleString('id-ID')} (as of {rateDate})
+                                                        💱 1 USD = Rp {parseFloat(exchangeRate).toLocaleString('id-ID')} (as of {rateDate || 'Today'})
                                                     </p>
                                                 </div>
                                             )}
@@ -1859,12 +1988,12 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                             <div className="glass-card p-4 rounded-lg">
                                                 <div className="text-sm text-silver-dark mb-1">Total COGS</div>
                                                 <div className="text-2xl font-bold text-orange-400">
-                                                    {cogsCurrency === 'USD' ? '$' : 'Rp '}{(calculateTotalCOGS() || 0).toLocaleString('id-ID')}
+                                                    {cogsCurrency === 'USD' ? '$' : 'Rp '}{(calculateTotalCOGS() || 0).toLocaleString('id-ID', { minimumFractionDigits: 2 })}
                                                 </div>
                                                 <div className="text-xs text-silver-dark mt-1">
                                                     {cogsCurrency}
-                                                    {cogsCurrency === 'IDR' && exchangeRate && (
-                                                        <> ≈ ${(calculateTotalCOGSInUSD() || 0).toLocaleString('id-ID')}</>
+                                                    {cogsCurrency !== (shipment?.currency || 'USD') && exchangeRate && (
+                                                        <> ≈ {shipment?.currency === 'IDR' ? 'Rp' : '$'} {(calculateTotalCOGSConverted() || 0).toLocaleString('id-ID', { minimumFractionDigits: 2 })}</>
                                                     )}
                                                 </div>
                                             </div>
@@ -1887,291 +2016,170 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                         </div>
 
                                         {/* COGS Input Form */}
-                                        <div className="glass-card p-6 rounded-lg">
-                                            <h4 className="font-semibold text-silver-light mb-4">
-                                                Actual Costs (COGS) - {cogsCurrency}
-                                            </h4>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                {shipment.serviceType === 'sea' && (
-                                                    <div>
-                                                        <label className="text-silver-dark text-sm">Ocean Freight ({cogsCurrency})</label>
-                                                        {isEditingCOGS ? (
-                                                            <input
-                                                                type="text"
-                                                                value={cogsData.oceanFreight ? parseFloat(cogsData.oceanFreight.toString().replace(/\./g, '')).toLocaleString('id-ID') : ''}
-                                                                onChange={(e) => {
-                                                                    const value = e.target.value.replace(/\./g, '');
-                                                                    setCogsData({ ...cogsData, oceanFreight: value });
-                                                                }}
-                                                                placeholder="0"
-                                                                className="w-full mt-1 px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
-                                                            />
-                                                        ) : (
-                                                            <p className="text-silver-light font-medium mt-1">
-                                                                {cogsData.oceanFreight ? parseFloat(cogsData.oceanFreight).toLocaleString('id-ID') : '-'}
-                                                            </p>
-                                                        )}
-                                                    </div>
+                                        <div className="glass-card p-6 rounded-lg mt-6">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h4 className="font-semibold text-silver-light">
+                                                    Actual Costs (COGS) - {cogsCurrency}
+                                                </h4>
+                                                {isEditingCOGS && (
+                                                    <Button
+                                                        size="sm"
+                                                        onClick={() => {
+                                                            setBuyingItems([...buyingItems, {
+                                                                id: `item-${Date.now()}`,
+                                                                description: '',
+                                                                qty: 1,
+                                                                unit: 'Job',
+                                                                rate: 0,
+                                                                amount: 0,
+                                                                coa_id: null
+                                                            }]);
+                                                        }}
+                                                        icon={Plus}
+                                                    >
+                                                        Tambah Biaya
+                                                    </Button>
                                                 )}
-                                                {shipment.serviceType === 'air' && (
-                                                    <div>
-                                                        <label className="text-silver-dark text-sm">Air Freight ({cogsCurrency})</label>
-                                                        {isEditingCOGS ? (
-                                                            <input
-                                                                type="text"
-                                                                value={cogsData.airFreight ? parseFloat(cogsData.airFreight.toString().replace(/\./g, '')).toLocaleString('id-ID') : ''}
-                                                                onChange={(e) => {
-                                                                    const value = e.target.value.replace(/\./g, '');
-                                                                    setCogsData({ ...cogsData, airFreight: value });
-                                                                }}
-                                                                placeholder="0"
-                                                                className="w-full mt-1 px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
-                                                            />
-                                                        ) : (
-                                                            <p className="text-silver-light font-medium mt-1">
-                                                                {cogsData.airFreight ? parseFloat(cogsData.airFreight).toLocaleString('id-ID') : '-'}
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                )}
-                                                <div>
-                                                    <label className="text-silver-dark text-sm">Trucking ({cogsCurrency})</label>
-                                                    {isEditingCOGS ? (
-                                                        <input
-                                                            type="text"
-                                                            value={cogsData.trucking ? parseFloat(cogsData.trucking.toString().replace(/\./g, '')).toLocaleString('id-ID') : ''}
-                                                            onChange={(e) => {
-                                                                const value = e.target.value.replace(/\./g, '');
-                                                                setCogsData({ ...cogsData, trucking: value });
-                                                            }}
-                                                            placeholder="0"
-                                                            className="w-full mt-1 px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
-                                                        />
-                                                    ) : (
-                                                        <p className="text-silver-light font-medium mt-1">
-                                                            {cogsData.trucking ? parseFloat(cogsData.trucking).toLocaleString('id-ID') : '-'}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                                <div>
-                                                    <label className="text-silver-dark text-sm">THC - Terminal Handling ({cogsCurrency})</label>
-                                                    {isEditingCOGS ? (
-                                                        <input
-                                                            type="text"
-                                                            value={cogsData.thc ? parseFloat(cogsData.thc.toString().replace(/\./g, '')).toLocaleString('id-ID') : ''}
-                                                            onChange={(e) => {
-                                                                const value = e.target.value.replace(/\./g, '');
-                                                                setCogsData({ ...cogsData, thc: value });
-                                                            }}
-                                                            placeholder="0"
-                                                            className="w-full mt-1 px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
-                                                        />
-                                                    ) : (
-                                                        <p className="text-silver-light font-medium mt-1">
-                                                            {cogsData.thc ? parseFloat(cogsData.thc).toLocaleString('id-ID') : '-'}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                                <div>
-                                                    <label className="text-silver-dark text-sm">Documentation Fee ({cogsCurrency})</label>
-                                                    {isEditingCOGS ? (
-                                                        <input
-                                                            type="text"
-                                                            value={cogsData.documentation ? parseFloat(cogsData.documentation.toString().replace(/\./g, '')).toLocaleString('id-ID') : ''}
-                                                            onChange={(e) => {
-                                                                const value = e.target.value.replace(/\./g, '');
-                                                                setCogsData({ ...cogsData, documentation: value });
-                                                            }}
-                                                            placeholder="0"
-                                                            className="w-full mt-1 px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
-                                                        />
-                                                    ) : (
-                                                        <p className="text-silver-light font-medium mt-1">
-                                                            {cogsData.documentation ? parseFloat(cogsData.documentation).toLocaleString('id-ID') : '-'}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                                <div>
-                                                    <label className="text-silver-dark text-sm">Customs Clearance ({cogsCurrency})</label>
-                                                    {isEditingCOGS ? (
-                                                        <input
-                                                            type="text"
-                                                            value={cogsData.customs ? parseFloat(cogsData.customs.toString().replace(/\./g, '')).toLocaleString('id-ID') : ''}
-                                                            onChange={(e) => {
-                                                                const value = e.target.value.replace(/\./g, '');
-                                                                setCogsData({ ...cogsData, customs: value });
-                                                            }}
-                                                            placeholder="0"
-                                                            className="w-full mt-1 px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
-                                                        />
-                                                    ) : (
-                                                        <p className="text-silver-light font-medium mt-1">
-                                                            {cogsData.customs ? parseFloat(cogsData.customs).toLocaleString('id-ID') : '-'}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                                <div>
-                                                    <label className="text-silver-dark text-sm">Insurance ({cogsCurrency})</label>
-                                                    {isEditingCOGS ? (
-                                                        <input
-                                                            type="text"
-                                                            value={cogsData.insurance ? parseFloat(cogsData.insurance.toString().replace(/\./g, '')).toLocaleString('id-ID') : ''}
-                                                            onChange={(e) => {
-                                                                const value = e.target.value.replace(/\./g, '');
-                                                                setCogsData({ ...cogsData, insurance: value });
-                                                            }}
-                                                            placeholder="0"
-                                                            className="w-full mt-1 px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
-                                                        />
-                                                    ) : (
-                                                        <p className="text-silver-light font-medium mt-1">
-                                                            {cogsData.insurance ? parseFloat(cogsData.insurance).toLocaleString('id-ID') : '-'}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                                <div>
-                                                    <label className="text-silver-dark text-sm">Demurrage/Detention ({cogsCurrency})</label>
-                                                    {isEditingCOGS ? (
-                                                        <input
-                                                            type="text"
-                                                            value={cogsData.demurrage ? parseFloat(cogsData.demurrage.toString().replace(/\./g, '')).toLocaleString('id-ID') : ''}
-                                                            onChange={(e) => {
-                                                                const value = e.target.value.replace(/\./g, '');
-                                                                setCogsData({ ...cogsData, demurrage: value });
-                                                            }}
-                                                            placeholder="0"
-                                                            className="w-full mt-1 px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
-                                                        />
-                                                    ) : (
-                                                        <p className="text-silver-light font-medium mt-1">
-                                                            {cogsData.demurrage ? parseFloat(cogsData.demurrage).toLocaleString('id-ID') : '-'}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                                <div>
-                                                    <label className="text-silver-dark text-sm">Other Costs ({cogsCurrency})</label>
-                                                    {isEditingCOGS ? (
-                                                        <input
-                                                            type="text"
-                                                            value={cogsData.other ? parseFloat(cogsData.other.toString().replace(/\./g, '')).toLocaleString('id-ID') : ''}
-                                                            onChange={(e) => {
-                                                                const value = e.target.value.replace(/\./g, '');
-                                                                setCogsData({ ...cogsData, other: value });
-                                                            }}
-                                                            placeholder="0"
-                                                            className="w-full mt-1 px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
-                                                        />
-                                                    ) : (
-                                                        <p className="text-silver-light font-medium mt-1">
-                                                            {cogsData.other ? parseFloat(cogsData.other).toLocaleString('id-ID') : '-'}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                                <div>
-                                                    <label className="text-silver-dark text-sm">Other Description</label>
-                                                    {isEditingCOGS ? (
-                                                        <input
-                                                            type="text"
-                                                            value={cogsData.otherDescription}
-                                                            onChange={(e) => setCogsData({ ...cogsData, otherDescription: e.target.value })}
-                                                            placeholder="Description for other costs"
-                                                            className="w-full mt-1 px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
-                                                        />
-                                                    ) : (
-                                                        <p className="text-silver-light font-medium mt-1">
-                                                            {cogsData.otherDescription || '-'}
-                                                        </p>
-                                                    )}
-                                                </div>
                                             </div>
 
-                                            {/* Additional Other Costs - Dynamic List */}
-                                            {isEditingCOGS && (
-                                                <div className="mt-6 p-4 border border-dashed border-dark-border rounded-lg">
-                                                    <div className="flex items-center justify-between mb-3">
-                                                        <h5 className="text-sm font-semibold text-silver-light">Biaya Lain-lain Tambahan</h5>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                const newCosts = [...(cogsData.additionalCosts || []), { description: '', amount: '' }];
-                                                                setCogsData({ ...cogsData, additionalCosts: newCosts });
-                                                            }}
-                                                            className="text-accent-orange hover:text-accent-orange/80 text-xs flex items-center gap-1"
-                                                        >
-                                                            <Plus className="w-4 h-4" /> Tambah Biaya
-                                                        </button>
-                                                    </div>
-
-                                                    {(cogsData.additionalCosts || []).length === 0 && (
-                                                        <p className="text-xs text-silver-dark text-center py-3">
-                                                            Belum ada biaya tambahan. Klik "Tambah Biaya" untuk menambahkan.
-                                                        </p>
-                                                    )}
-
-                                                    <div className="space-y-2">
-                                                        {(cogsData.additionalCosts || []).map((cost, index) => (
-                                                            <div key={index} className="grid grid-cols-12 gap-2 items-center">
-                                                                <div className="col-span-6">
-                                                                    <input
-                                                                        type="text"
-                                                                        value={cost.description}
-                                                                        onChange={(e) => {
-                                                                            const updated = [...cogsData.additionalCosts];
-                                                                            updated[index].description = e.target.value;
-                                                                            setCogsData({ ...cogsData, additionalCosts: updated });
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full">
+                                                    <thead className="bg-accent-orange">
+                                                        <tr>
+                                                            <th className="px-2 py-2 text-center text-xs text-white w-10 font-normal">No</th>
+                                                            <th className="px-2 py-2 text-left text-xs text-white min-w-[180px] font-normal">Item</th>
+                                                            <th className="px-2 py-2 text-left text-xs text-white min-w-[200px] font-normal">Description</th>
+                                                            <th className="px-2 py-2 text-center text-xs text-white w-20 font-normal">Qty</th>
+                                                            <th className="px-2 py-2 text-center text-xs text-white w-24 font-normal">Unit</th>
+                                                            <th className="px-2 py-2 text-right text-xs text-white min-w-[120px] font-normal">Price</th>
+                                                            <th className="px-2 py-2 text-right text-xs text-white min-w-[120px] font-normal">Total</th>
+                                                            {isEditingCOGS && <th className="px-2 py-2 text-center text-xs text-white w-10 font-normal">Aksi</th>}
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-dark-border">
+                                                        {buyingItems.length === 0 && (
+                                                            <tr>
+                                                                <td colSpan={isEditingCOGS ? 8 : 7} className="text-center py-6 text-silver-dark text-sm">
+                                                                    Belum ada rincian biaya aktual.
+                                                                </td>
+                                                            </tr>
+                                                        )}
+                                                        {buyingItems.map((item, index) => (
+                                                            <tr key={index} className="hover:bg-dark-surface/50 smooth-transition">
+                                                                <td className="px-2 py-2 text-center text-silver-light text-xs">{index + 1}</td>
+                                                                <td className="px-2 py-2">
+                                                                    <COAPicker
+                                                                        value={item.coa_id}
+                                                                        onChange={(coaId) => {
+                                                                            const updated = [...buyingItems];
+                                                                            updated[index].coa_id = coaId;
+                                                                            setBuyingItems(updated);
                                                                         }}
-                                                                        placeholder="Deskripsi biaya"
-                                                                        className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light text-sm"
+                                                                        context="EXPENSE"
+                                                                        minLevel={3}
+                                                                        placeholder="Pilih Item"
+                                                                        size="sm"
+                                                                        showCode={false}
+                                                                        disabled={!isEditingCOGS}
                                                                     />
-                                                                </div>
-                                                                <div className="col-span-4">
-                                                                    <input
-                                                                        type="text"
-                                                                        value={cost.amount ? parseFloat(cost.amount.toString().replace(/\./g, '')).toLocaleString('id-ID') : ''}
-                                                                        onChange={(e) => {
-                                                                            const value = e.target.value.replace(/\./g, '');
-                                                                            const updated = [...cogsData.additionalCosts];
-                                                                            updated[index].amount = value;
-                                                                            setCogsData({ ...cogsData, additionalCosts: updated });
-                                                                        }}
-                                                                        placeholder="Jumlah"
-                                                                        className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light text-sm"
-                                                                    />
-                                                                </div>
-                                                                <div className="col-span-2 flex justify-center">
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => {
-                                                                            const updated = cogsData.additionalCosts.filter((_, i) => i !== index);
-                                                                            setCogsData({ ...cogsData, additionalCosts: updated });
-                                                                        }}
-                                                                        className="p-2 hover:bg-red-500/20 text-red-400 rounded"
-                                                                    >
-                                                                        <Trash2 className="w-4 h-4" />
-                                                                    </button>
-                                                                </div>
-                                                            </div>
+                                                                </td>
+                                                                <td className="px-3 py-2">
+                                                                    {isEditingCOGS ? (
+                                                                        <input
+                                                                            type="text"
+                                                                            value={item.description || ''}
+                                                                            onChange={(e) => {
+                                                                                const updated = [...buyingItems];
+                                                                                updated[index].description = e.target.value;
+                                                                                setBuyingItems(updated);
+                                                                            }}
+                                                                            className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm"
+                                                                            placeholder="Deskripsi biaya"
+                                                                        />
+                                                                    ) : (
+                                                                        <span className="text-silver-light text-sm">{item.description}</span>
+                                                                    )}
+                                                                </td>
+                                                                <td className="px-3 py-2 text-center">
+                                                                    {isEditingCOGS ? (
+                                                                        <input
+                                                                            type="number"
+                                                                            value={item.qty || 0}
+                                                                            onChange={(e) => {
+                                                                                const updated = [...buyingItems];
+                                                                                updated[index].qty = e.target.value;
+                                                                                updated[index].amount = (parseFloat(e.target.value) || 0) * parseFloat(updated[index].rate || 0);
+                                                                                setBuyingItems(updated);
+                                                                            }}
+                                                                            className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm text-center"
+                                                                            min="0"
+                                                                            step="0.01"
+                                                                        />
+                                                                    ) : (
+                                                                        <span className="text-silver-light text-sm">{item.qty}</span>
+                                                                    )}
+                                                                </td>
+                                                                <td className="px-3 py-2 text-center">
+                                                                    {isEditingCOGS ? (
+                                                                        <input
+                                                                            type="text"
+                                                                            value={item.unit || ''}
+                                                                            onChange={(e) => {
+                                                                                const updated = [...buyingItems];
+                                                                                updated[index].unit = e.target.value;
+                                                                                setBuyingItems(updated);
+                                                                            }}
+                                                                            className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm text-center"
+                                                                            placeholder="Unit"
+                                                                        />
+                                                                    ) : (
+                                                                        <span className="text-silver-light text-sm">{item.unit}</span>
+                                                                    )}
+                                                                </td>
+                                                                <td className="px-3 py-2 text-right">
+                                                                    {isEditingCOGS ? (
+                                                                        <input
+                                                                            type="text"
+                                                                            value={item.rate !== undefined ? parseFloat(item.rate.toString().replace(/\./g, '')).toLocaleString('id-ID') : ''}
+                                                                            onChange={(e) => {
+                                                                                const valStr = e.target.value.replace(/\./g, '');
+                                                                                const numVal = parseFloat(valStr) || 0;
+                                                                                const updated = [...buyingItems];
+                                                                                updated[index].rate = numVal;
+                                                                                updated[index].amount = numVal * parseFloat(updated[index].qty || 1);
+                                                                                setBuyingItems(updated);
+                                                                            }}
+                                                                            className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm text-right"
+                                                                            placeholder="0"
+                                                                        />
+                                                                    ) : (
+                                                                        <span className="text-silver-light text-sm">{parseFloat(item.rate || 0).toLocaleString('id-ID')}</span>
+                                                                    )}
+                                                                </td>
+                                                                <td className="px-2 py-2 text-right">
+                                                                    <span className="text-silver-light text-sm font-medium">
+                                                                        {parseFloat(item.amount || 0).toLocaleString('id-ID')}
+                                                                    </span>
+                                                                </td>
+                                                                {isEditingCOGS && (
+                                                                    <td className="px-2 py-2 text-center">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                const updated = buyingItems.filter((_, i) => i !== index);
+                                                                                setBuyingItems(updated);
+                                                                            }}
+                                                                            className="p-1.5 hover:bg-red-500/20 text-red-500 rounded transition-colors"
+                                                                        >
+                                                                            <Trash2 className="w-4 h-4" />
+                                                                        </button>
+                                                                    </td>
+                                                                )}
+                                                            </tr>
                                                         ))}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Display Additional Costs in View Mode */}
-                                            {!isEditingCOGS && (cogsData.additionalCosts || []).length > 0 && (
-                                                <div className="mt-4 p-3 bg-dark-card rounded-lg">
-                                                    <h5 className="text-xs font-semibold text-silver-dark mb-2">Biaya Lain-lain Tambahan:</h5>
-                                                    <div className="space-y-1">
-                                                        {(cogsData.additionalCosts || []).map((cost, index) => (
-                                                            <div key={index} className="flex justify-between text-sm">
-                                                                <span className="text-silver-light">{cost.description || `Biaya #${index + 1}`}</span>
-                                                                <span className="text-silver-light font-medium">
-                                                                    {cost.amount ? parseFloat(cost.amount).toLocaleString('id-ID') : '-'}
-                                                                </span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
+                                                    </tbody>
+                                                </table>
+                                            </div>
 
                                             <div className="mt-6">
                                                 {calculateProfit() < 0 && (
@@ -2206,9 +2214,19 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                                 </div>
                                                 <button
                                                     onClick={() => {
+                                                        const currentShipmentState = {
+                                                            ...shipment,
+                                                            ...editedShipment,
+                                                            cogs: cogsData,
+                                                            cogsCurrency,
+                                                            exchangeRate,
+                                                            rateDate,
+                                                            buyingItems,
+                                                            sellingItems
+                                                        };
                                                         onClose();
                                                         if (onViewAnalysis) {
-                                                            onViewAnalysis(shipment);
+                                                            onViewAnalysis(currentShipmentState);
                                                         } else {
                                                             // Fallback if prop not provided
                                                             window.location.href = `/blink/finance/selling-buying?id=${shipment.id}`;
@@ -2309,6 +2327,101 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                     </div>
                 </div>
             </Modal >
+
+            {/* Generate PO - Vendor Selector Modal */}
+            <Modal
+                isOpen={showPOVendorModal}
+                onClose={() => setShowPOVendorModal(false)}
+                title="Generate Purchase Order"
+                size="medium"
+            >
+                <div className="space-y-5">
+                    {/* PO Items Preview */}
+                    <div>
+                        <p className="text-sm font-medium text-silver mb-3">
+                            PO Items Preview ({pendingPOItems.length} items)
+                        </p>
+                        <div className="max-h-52 overflow-y-auto rounded-lg border border-dark-border">
+                            <table className="w-full text-xs">
+                                <thead className="bg-dark-surface sticky top-0">
+                                    <tr>
+                                        <th className="px-3 py-2 text-left text-silver-dark">Item</th>
+                                        <th className="px-3 py-2 text-left text-silver-dark">Description</th>
+                                        <th className="px-3 py-2 text-center text-silver-dark">Qty</th>
+                                        <th className="px-3 py-2 text-right text-silver-dark">Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-dark-border">
+                                    {pendingPOItems.map((item, idx) => (
+                                        <tr key={idx} className="hover:bg-dark-surface/50">
+                                            <td className="px-3 py-2 text-blue-300 font-medium">{item.item_name}</td>
+                                            <td className="px-3 py-2 text-silver-light">{item.description}</td>
+                                            <td className="px-3 py-2 text-center text-silver-dark">{item.qty}</td>
+                                            <td className="px-3 py-2 text-right text-green-400 font-mono">
+                                                {item.amount.toLocaleString('id-ID')}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                                <tfoot className="bg-dark-card border-t border-accent-orange/50">
+                                    <tr>
+                                        <td colSpan="3" className="px-3 py-2 text-right font-bold text-silver-light text-xs">TOTAL</td>
+                                        <td className="px-3 py-2 text-right font-bold text-accent-orange text-sm font-mono">
+                                            {cogsCurrency} {pendingPOTotal.toLocaleString('id-ID')}
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Vendor Selection */}
+                    <div>
+                        <label className="block text-sm font-medium text-silver mb-2">
+                            Select Vendor (Blink Mitra) <span className="text-red-400">*</span>
+                        </label>
+                        {poVendors.length === 0 ? (
+                            <div className="px-3 py-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-yellow-400 text-sm">
+                                ⚠️ No vendor mitra found. Please add vendors in Blink Master Data → Business Partners and check the "Vendor" role.
+                            </div>
+                        ) : (
+                            <div className="space-y-1 max-h-52 overflow-y-auto rounded-lg border border-dark-border">
+                                {poVendors.map(v => (
+                                    <button
+                                        type="button"
+                                        key={v.id}
+                                        onClick={() => setSelectedPOVendorId(v.id)}
+                                        className={`w-full text-left px-4 py-3 transition-colors flex items-center justify-between ${selectedPOVendorId === v.id
+                                            ? 'bg-accent-orange/30 border-l-4 border-accent-orange text-accent-orange'
+                                            : 'bg-dark-surface hover:bg-dark-card text-silver-light'
+                                            }`}
+                                    >
+                                        <div>
+                                            <span className="font-medium">{v.partner_name}</span>
+                                            {v.partner_code && <span className="ml-2 text-xs text-silver-dark">({v.partner_code})</span>}
+                                        </div>
+                                        {selectedPOVendorId === v.id && (
+                                            <span className="text-accent-orange text-sm">✓ Selected</span>
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2">
+                        <Button variant="secondary" onClick={() => setShowPOVendorModal(false)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleConfirmGeneratePO}
+                            disabled={!selectedPOVendorId}
+                        >
+                            Generate PO
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
         </>
     );
 };

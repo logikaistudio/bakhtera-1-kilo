@@ -68,6 +68,7 @@ export const createProcessOutboundHandler = (selectedItem, setIsSaving, setShowD
                         asset_name: itemName,
                         quantity: quantity,
                         unit: item.uom || 'pcs',
+                        currency: itemToProcess.invoiceCurrency || itemToProcess.invoice_currency || 'IDR',
                         destination: (itemToProcess.destination && itemToProcess.destination.toLowerCase() !== 'pameran') ? itemToProcess.destination : 'Outbound',
                         receiver: itemToProcess.customer,
                         date: (itemToProcess.approvedDate || itemToProcess.approved_date || new Date().toISOString()).split('T')[0],

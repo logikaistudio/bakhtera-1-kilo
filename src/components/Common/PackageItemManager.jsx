@@ -324,7 +324,7 @@ const PackageItemManager = ({ items = [], onChange, readOnly = false }) => {
                                     )}
                                 </div>
                                 <div className="flex gap-2">
-                                    <Button size="sm" variant="secondary" onClick={handleCancel}>Batal</Button>
+                                    <Button size="sm" variant="secondary" onClick={handleCancel}>Cancel</Button>
                                     <Button size="sm" onClick={handleAdd} icon={editingId ? Check : Plus}>
                                         {editingId ? 'Update' : 'Tambah'}
                                     </Button>

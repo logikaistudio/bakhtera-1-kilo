@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { AlertTriangle, Search, Eye, Package, Download } from 'lucide-react';
 import { useData } from '../../../context/DataContext';
 import Button from '../../../components/Common/Button';
-import { formatCurrency } from '../../../utils/currencyFormatter';
+import { formatCurrency, getCurrencySymbol } from '../../../utils/currencyFormatter';
 import { exportToCSV } from '../../../utils/exportCSV';
 
 const BarangReject = () => {
@@ -147,7 +147,7 @@ const BarangReject = () => {
                                         <td className="px-4 py-3 text-sm text-center text-red-500 font-semibold">{item.quantity}</td>
                                         <td className="px-4 py-3 text-sm text-center text-silver-light">{item.unit}</td>
                                         <td className="px-4 py-3 text-sm text-right text-silver-light">
-                                            {formatCurrency(item.value)}
+                                            {getCurrencySymbol(item.currency || 'IDR')} {formatCurrency(item.value)}
                                         </td>
                                         <td className="px-4 py-3 text-sm text-center text-silver-light">{item.currency || 'IDR'}</td>
                                     </tr>
@@ -220,7 +220,7 @@ const BarangReject = () => {
                                 </div>
                                 <div>
                                     <label className="text-xs text-silver-dark">Nilai</label>
-                                    <p className="text-lg font-bold text-accent-green">{formatCurrency(selectedItem.value)}</p>
+                                    <p className="text-lg font-bold text-accent-green">{getCurrencySymbol(selectedItem.currency || 'IDR')} {formatCurrency(selectedItem.value)}</p>
                                 </div>
                                 {selectedItem.notes && (
                                     <div className="col-span-2">

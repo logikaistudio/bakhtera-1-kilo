@@ -2,12 +2,17 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Package, Download, Trash2, ArrowUpRight, ArrowLeftRight } from 'lucide-react';
 import { useData } from '../../context/DataContext';
+import { useAuth } from '../../context/AuthContext';
 import Button from '../../components/Common/Button';
 import { exportToCSV } from '../../utils/exportCSV';
 import { exportToXLS } from '../../utils/exportXLS';
 
 const GoodsMovement = () => {
     const navigate = useNavigate();
+    const { canCreate, canEdit, canDelete } = useAuth();
+    const hasCreate = canCreate('bridge_movement');
+    const hasEdit = canEdit('bridge_movement');
+    const hasDelete = canDelete('bridge_movement');
     const { mutationLogs = [], addMutationLog, updateMutationLog, updateInventoryStock, deleteMutationLog, companySettings, bridgeSettings } = useData();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedLog, setSelectedLog] = useState(null);
@@ -167,6 +172,7 @@ const GoodsMovement = () => {
     // Delete Handler
     const handleDeleteRow = async (e, id) => {
         e.stopPropagation();
+        if (!hasDelete) return;
         if (!window.confirm('Yakin ingin menghapus data mutasi ini secara permanen?\nData yang dihapus tidak dapat dikembalikan.')) return;
 
         if (deleteMutationLog) {
@@ -413,15 +419,17 @@ const GoodsMovement = () => {
                                         <td className="px-4 py-3 text-sm text-silver-dark max-w-xs truncate">
                                             {log.remarks || '-'}
                                         </td>
-                                        <td className="px-4 py-3 text-center">
-                                            <button
-                                                onClick={(e) => handleDeleteRow(e, log.id)}
-                                                className="p-1.5 hover:bg-red-500/10 text-gray-500 hover:text-red-500 rounded-lg transition-colors"
-                                                title="Hapus Data"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </td>
+                                        {hasDelete && (
+                                            <td className="px-4 py-3 text-center">
+                                                <button
+                                                    onClick={(e) => handleDeleteRow(e, log.id)}
+                                                    className="p-1.5 hover:bg-red-500/10 text-gray-500 hover:text-red-500 rounded-lg transition-colors"
+                                                    title="Hapus Data"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </td>
+                                        )}
                                     </tr>
                                 );
                             })}
@@ -496,7 +504,7 @@ const GoodsMovement = () => {
                                     >
                                         ✕ Batal
                                     </button>
-                                    {isOutbound && (
+                                    {isOutbound && (hasCreate || hasEdit) && (
                                         <button
                                             onClick={() => {
                                                 const qty = parseInt(document.getElementById('remutationQty')?.value) || totalRemutated;

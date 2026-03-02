@@ -156,9 +156,10 @@ export const validateSession = async (sessionToken) => {
 };
 
 /**
- * Get user permissions based on user level and menu permissions
+ * Get user permissions based on user level and menu permissions.
+ * Priority: user_menu_permissions (user-specific) overrides role_permissions (role-level).
  * @param {string} userId - User ID
- * @param {string} userLevel - User level
+ * @param {string} userLevel - User level / role_id
  * @returns {Promise<object>} - Permissions object
  */
 export const getUserPermissions = async (userId, userLevel) => {
@@ -186,23 +187,46 @@ export const getUserPermissions = async (userId, userLevel) => {
             return permissions;
         }
 
-        // Get user menu permissions
+        const isViewOnly = userLevel === 'view_only';
+        const permissions = {};
+
+        // Step 1: Load role-level permissions from role_permissions table.
+        // This is what the Role Manager UI (Admin → Manajemen Role & Akses) configures.
+        const { data: rolePerms } = await supabase
+            .from('role_permissions')
+            .select('*')
+            .eq('role_id', userLevel);
+
+        rolePerms?.forEach(perm => {
+            permissions[perm.menu_code] = {
+                can_access: perm.can_access,
+                can_view: perm.can_view,
+                can_create: isViewOnly ? false : perm.can_create,
+                can_edit: isViewOnly ? false : perm.can_edit,
+                can_delete: isViewOnly ? false : perm.can_delete,
+                can_approve: isViewOnly ? false : perm.can_approve,
+                requires_approval_for_edit: perm.requires_approval_for_edit ?? false,
+                requires_approval_for_delete: perm.requires_approval_for_delete ?? false
+            };
+        });
+
+        // Step 2: Apply user-specific overrides from user_menu_permissions.
+        // These take priority over role-level permissions for the same menu_code.
         const { data: userPermissions } = await supabase
             .from('user_menu_permissions')
             .select('*')
             .eq('user_id', userId);
 
-        const permissions = {};
         userPermissions?.forEach(perm => {
             permissions[perm.menu_code] = {
                 can_access: perm.can_access,
-                can_view: userLevel === 'view_only' ? perm.can_view : perm.can_view,
-                can_create: userLevel === 'view_only' ? false : perm.can_create,
-                can_edit: userLevel === 'view_only' ? false : perm.can_edit,
-                can_delete: userLevel === 'view_only' ? false : perm.can_delete,
-                can_approve: userLevel === 'view_only' ? false : perm.can_approve,
-                requires_approval_for_edit: perm.requires_approval_for_edit,
-                requires_approval_for_delete: perm.requires_approval_for_delete
+                can_view: perm.can_view,
+                can_create: isViewOnly ? false : perm.can_create,
+                can_edit: isViewOnly ? false : perm.can_edit,
+                can_delete: isViewOnly ? false : perm.can_delete,
+                can_approve: isViewOnly ? false : perm.can_approve,
+                requires_approval_for_edit: perm.requires_approval_for_edit ?? false,
+                requires_approval_for_delete: perm.requires_approval_for_delete ?? false
             };
         });
 

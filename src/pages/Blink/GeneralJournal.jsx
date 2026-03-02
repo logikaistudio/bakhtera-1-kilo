@@ -246,7 +246,7 @@ const GeneralJournal = () => {
             fetchEntries();
         } catch (error) {
             console.error('Error saving journal entry:', error);
-            alert('Gagal menyimpan jurnal: ' + error.message);
+            alert('Failed to save jurnal: ' + error.message);
         }
     };
 
@@ -385,7 +385,7 @@ const GeneralJournal = () => {
 
     // Delete journal entry batch
     const deleteJournalEntry = async (batchId) => {
-        if (!confirm('Apakah Anda yakin ingin menghapus jurnal ini? Tindakan ini tidak dapat dibatalkan.')) return;
+        if (!confirm('Are you sure you want to delete jurnal ini? This action cannot be undone.')) return;
 
         try {
             setLoading(true);
@@ -401,7 +401,7 @@ const GeneralJournal = () => {
             fetchEntries();
         } catch (error) {
             console.error('Error deleting journal:', error);
-            alert('Gagal menghapus jurnal: ' + error.message);
+            alert('Failed to delete jurnal: ' + error.message);
         } finally {
             setLoading(false);
         }
@@ -421,7 +421,7 @@ const GeneralJournal = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text">Jurnal Umum</h1>
+                    <h1 className="text-3xl font-bold gradient-text">General Journal</h1>
                     <p className="text-silver-dark mt-1">General Journal - Pencatatan transaksi double-entry</p>
                 </div>
                 <div className="flex gap-2">
@@ -490,7 +490,7 @@ const GeneralJournal = () => {
                     <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                     <input
                         type="text"
-                        placeholder="Cari No. Jurnal, Keterangan, atau Akun..."
+                        placeholder="Search No. Jurnal, Keterangan, atau Akun..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-12 pr-4 py-2.5 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm"

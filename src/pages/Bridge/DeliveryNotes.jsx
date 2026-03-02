@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useData } from '../../context/DataContext';
+import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { FileText, Plus, Eye, Printer, Edit, Trash2, Search, Filter, Calendar, Truck, Package, CheckCircle, Clock, Send, Download } from 'lucide-react';
 import DeliveryNoteForm from './DeliveryNoteForm';
 import DeliveryNotePrint from './DeliveryNotePrint';
 
 const DeliveryNotes = () => {
+    const { canCreate, canEdit, canDelete } = useAuth();
+    const hasCreate = canCreate('bridge_delivery');
+    const hasEdit = canEdit('bridge_delivery');
+    const hasDelete = canDelete('bridge_delivery');
     const { quotations } = useData();
     const [deliveryNotes, setDeliveryNotes] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -93,6 +98,7 @@ const DeliveryNotes = () => {
 
     // Delete delivery note
     const handleDelete = async (id) => {
+        if (!hasDelete) return;
         if (!window.confirm('Apakah Anda yakin ingin menghapus surat jalan ini?')) return;
 
         try {
@@ -129,16 +135,18 @@ const DeliveryNotes = () => {
                             Kelola surat jalan pengiriman barang
                         </p>
                     </div>
-                    <button
-                        onClick={() => {
-                            setSelectedNote(null);
-                            setViewMode('create');
-                        }}
-                        className="btn-primary flex items-center gap-2"
-                    >
-                        <Plus className="w-4 h-4" />
-                        Buat Surat Jalan
-                    </button>
+                    {hasCreate && (
+                        <button
+                            onClick={() => {
+                                setSelectedNote(null);
+                                setViewMode('create');
+                            }}
+                            className="btn-primary flex items-center gap-2"
+                        >
+                            <Plus className="w-4 h-4" />
+                            Buat Surat Jalan
+                        </button>
+                    )}
                 </div>
 
                 {/* Filters */}
@@ -321,23 +329,27 @@ const DeliveryNotes = () => {
                                                 </button>
                                                 {note.status === 'draft' && (
                                                     <>
-                                                        <button
-                                                            onClick={() => {
-                                                                setSelectedNote(note);
-                                                                setViewMode('edit');
-                                                            }}
-                                                            className="p-1.5 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded transition-colors"
-                                                            title="Edit"
-                                                        >
-                                                            <Edit className="w-4 h-4" />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDelete(note.id)}
-                                                            className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
-                                                            title="Hapus"
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </button>
+                                                        {hasEdit && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    setSelectedNote(note);
+                                                                    setViewMode('edit');
+                                                                }}
+                                                                className="p-1.5 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded transition-colors"
+                                                                title="Edit"
+                                                            >
+                                                                <Edit className="w-4 h-4" />
+                                                            </button>
+                                                        )}
+                                                        {hasDelete && (
+                                                            <button
+                                                                onClick={() => handleDelete(note.id)}
+                                                                className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                                                                title="Hapus"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        )}
                                                     </>
                                                 )}
                                             </div>

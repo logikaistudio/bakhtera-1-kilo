@@ -14,6 +14,7 @@ const COAMaster = () => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterType, setFilterType] = useState('ALL');
+    const [selectedIds, setSelectedIds] = useState([]);
     const fileInputRef = useRef(null);
 
     // Modals
@@ -24,6 +25,7 @@ const COAMaster = () => {
         code: '',
         name: '',
         type: 'ASSET',
+        job_type: '',
         description: '',
         parent_code: '',
         level: 1,
@@ -37,6 +39,13 @@ const COAMaster = () => {
     });
 
     const accountTypes = ['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'];
+    const jobTypes = [
+        { value: '', label: 'All / General' },
+        { value: 'FREIGHT', label: 'Freight' },
+        { value: 'CUSTOMS', label: 'Customs (Pabean)' },
+        { value: 'WAREHOUSE', label: 'Warehouse' },
+        { value: 'GENERAL', label: 'General' },
+    ];
 
     useEffect(() => {
         fetchAccounts();
@@ -75,9 +84,12 @@ const COAMaster = () => {
             try {
                 const bstr = evt.target.result;
                 const wb = read(bstr, { type: 'binary' });
-                const wsname = wb.SheetNames[0];
-                const ws = wb.Sheets[wsname];
-                const data = utils.sheet_to_json(ws);
+                let data = [];
+                for (const wsname of wb.SheetNames) {
+                    const ws = wb.Sheets[wsname];
+                    const sheetData = utils.sheet_to_json(ws);
+                    data = data.concat(sheetData);
+                }
 
                 console.log('==================================================');
                 console.log('[COA Import] FILE LOADED:', file.name);
@@ -91,17 +103,27 @@ const COAMaster = () => {
                     return;
                 }
 
-                // Helper: Find column value by checking if column header CONTAINS any keyword
+                // Helper: Find exact column match first, then fallback
                 const getVal = (row, ...keywords) => {
                     const rowKeys = Object.keys(row);
-                    for (const key of rowKeys) {
-                        const keyClean = key.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
-                        for (const kw of keywords) {
-                            const kwClean = kw.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
-                            if (keyClean.includes(kwClean) || kwClean.includes(keyClean)) {
-                                return row[key];
-                            }
-                        }
+
+                    for (const kw of keywords) {
+                        const exactKey = rowKeys.find(k => k.toLowerCase().trim() === kw.toLowerCase().trim());
+                        if (exactKey) return row[exactKey];
+                    }
+
+                    for (const kw of keywords) {
+                        const kwClean = kw.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+                        if (kwClean.length < 3) continue;
+
+                        const partialKey = rowKeys.find(k => {
+                            const keyClean = k.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+                            // Prevent 'master code' or 'parent code' matching when just looking for 'code'
+                            if (kwClean === 'code' && (keyClean.includes('master') || keyClean.includes('parent') || keyClean.includes('induk'))) return false;
+
+                            return keyClean.includes(kwClean);
+                        });
+                        if (partialKey) return row[partialKey];
                     }
                     return undefined;
                 };
@@ -169,9 +191,13 @@ const COAMaster = () => {
                     const rawCode = getVal(row, 'Code', 'Kode', 'No', 'Nomor', 'Account');
                     const rawName = getVal(row, 'Name', 'Nama', 'Account Name');
                     const rawParent = getVal(row, 'Master Code', 'Parent Code', 'Parent', 'Induk', 'Header');
-                    const rawGroup = getVal(row, 'Group', 'Type', 'Tipe', 'Jenis', 'Kategori', 'Category');
+
+                    // 'Type' column = ASSET/LIABILITY/EQUITY/REVENUE/EXPENSE
+                    const rawType = getVal(row, 'Type', 'Tipe', 'Kategori', 'Category', 'Group', 'Grup');
+
                     const rawLevel = getVal(row, 'Level', 'Lvl', 'Tingkat');
                     const rawDesc = getVal(row, 'Description', 'Keterangan', 'Notes');
+                    const rawJobType = getVal(row, 'Job Type', 'Job', 'Jenis Pekerjaan', 'JobType');
 
                     // Skip empty rows
                     if (!rawCode && !rawName) return null;
@@ -186,7 +212,15 @@ const COAMaster = () => {
                         return null;
                     }
 
-                    const mappedType = mapToType(rawGroup);
+                    // Determine the main type:
+                    const VALID_TYPES = ['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'];
+                    let mappedType = 'ASSET'; // default
+                    if (rawType && VALID_TYPES.includes(String(rawType).toUpperCase().trim())) {
+                        mappedType = String(rawType).toUpperCase().trim();
+                    } else if (rawType) {
+                        mappedType = mapToType(rawType);
+                    }
+
                     const defaultPL = mappedType === 'REVENUE' || mappedType === 'EXPENSE';
                     const defaultBS = mappedType === 'ASSET' || mappedType === 'LIABILITY' || mappedType === 'EQUITY';
 
@@ -198,11 +232,23 @@ const COAMaster = () => {
                     const rawAP = getVal(row, 'AP', 'Hutang', 'Payable');
                     const rawCF = getVal(row, 'Cashflow', 'CF', 'Arus Kas');
 
+                    // Map job_type to valid values, or preserve original if no specific keyword matched
+                    const mapJobType = (val) => {
+                        if (!val) return null;
+                        const v = String(val).toUpperCase().trim();
+                        if (v.includes('FREIGHT') || v.includes('ANGKUT')) return 'FREIGHT';
+                        if (v.includes('CUSTOMS') || v.includes('PABEAN')) return 'CUSTOMS';
+                        if (v.includes('WAREHOUSE') || v.includes('GUDANG')) return 'WAREHOUSE';
+                        if (v.includes('GENERAL') || v.includes('UMUM')) return 'GENERAL';
+                        // Return the raw value (e.g., 'AIR EXPORT', 'OCEAN IMPORT')
+                        return v.substring(0, 50);
+                    };
+
                     const result = {
                         code: String(rawCode).trim(),
                         name: String(rawName).trim(),
                         type: mappedType,
-                        group_name: rawGroup ? String(rawGroup).trim() : null, // Store original group from Excel
+                        job_type: mapJobType(rawJobType),
                         parent_code: rawParent ? String(rawParent).trim() : null,
                         description: rawDesc ? String(rawDesc).trim() : '',
                         level: parseInt(rawLevel) || 1,
@@ -231,15 +277,7 @@ const COAMaster = () => {
                     return acc;
                 }, {});
 
-                // Count by group_name for sub-category distribution
-                const groupCounts = validData.reduce((acc, item) => {
-                    const groupName = item.group_name || 'Unknown';
-                    acc[groupName] = (acc[groupName] || 0) + 1;
-                    return acc;
-                }, {});
-
                 console.log(`[COA Import] Type distribution:`, typeCounts);
-                console.log(`[COA Import] Group distribution:`, groupCounts);
                 console.log(`[COA Import] =============================`);
 
                 if (validData.length === 0) {
@@ -252,8 +290,7 @@ const COAMaster = () => {
                     totalRows: data.length,
                     validRows: validData.length,
                     skippedRows: skippedRows.length,
-                    typeCounts,
-                    groupCounts
+                    typeCounts
                 });
 
                 setPendingImportData(validData);
@@ -297,12 +334,34 @@ const COAMaster = () => {
 
             } else {
                 setLoading(true);
-                const { error } = await supabase
-                    .from('finance_coa')
-                    .upsert(pendingImportData, { onConflict: 'code' });
 
-                if (error) throw error;
-                alert(`✅ APPEND Import Berhasil!\n\n📊 Statistik Import:\n• Data dibaca dari Excel: ${importStats.totalRows}\n• Data valid: ${importStats.validRows}\n• Data dilewati: ${importStats.skippedRows}\n• Data berhasil diupload: ${pendingImportData.length}`);
+                // Deduplicate by code (keep last occurrence)
+                // Fixes: "ON CONFLICT DO UPDATE command cannot affect row a second time"
+                const dedupMap = new Map();
+                pendingImportData.forEach(row => dedupMap.set(row.code, row));
+                const dedupedData = Array.from(dedupMap.values());
+                const duplicatesRemoved = pendingImportData.length - dedupedData.length;
+
+                if (duplicatesRemoved > 0) {
+                    console.warn(`[COA Import] Removed ${duplicatesRemoved} duplicate code(s)`);
+                }
+
+                // Upsert in chunks of 50 to avoid request size limits
+                const CHUNK_SIZE = 50;
+                let totalUpserted = 0;
+                for (let i = 0; i < dedupedData.length; i += CHUNK_SIZE) {
+                    const chunk = dedupedData.slice(i, i + CHUNK_SIZE);
+                    const { error } = await supabase
+                        .from('finance_coa')
+                        .upsert(chunk, { onConflict: 'code' });
+                    if (error) throw error;
+                    totalUpserted += chunk.length;
+                }
+
+                const dupInfo = duplicatesRemoved > 0
+                    ? `\n• Duplikat kode dihilangkan: ${duplicatesRemoved} (diambil data terakhir)`
+                    : '';
+                alert(`✅ APPEND Import Berhasil!\n\n📊 Statistik Import:\n• Data dibaca dari Excel: ${importStats.totalRows}\n• Data valid: ${importStats.validRows}\n• Data dilewati: ${importStats.skippedRows}${dupInfo}\n• Data berhasil diupload: ${totalUpserted}`);
             }
 
             setShowImportModal(false);
@@ -320,24 +379,55 @@ const COAMaster = () => {
     const handleDownloadTemplate = () => {
         const data = [
             {
-                "Code": "1101",
-                "Name": "Example Account",
-                "Master Code": "1100",
-                "Group": "ASSET",
-                "Level": "1",
+                "Code": "1-01-100-0-1-00",
+                "Name": "Kas Besar",
+                "Master Code": "1-01-000-0-1-00",
+                "Type": "ASSET",
+                "Job Type": "FREIGHT",
+                "Level": "3",
                 "Trial Balance": "TRUE",
                 "Profit & Loss": "FALSE",
                 "Balance Sheet": "TRUE",
                 "AR": "FALSE",
                 "AP": "FALSE",
+                "Cashflow": "TRUE",
+                "Description": "Kas operasional harian"
+            },
+            {
+                "Code": "4-01-100-0-1-00",
+                "Name": "Pendapatan Jasa Freight",
+                "Master Code": "4-01-000-0-1-00",
+                "Type": "REVENUE",
+                "Job Type": "FREIGHT",
+                "Level": "3",
+                "Trial Balance": "TRUE",
+                "Profit & Loss": "TRUE",
+                "Balance Sheet": "FALSE",
+                "AR": "FALSE",
+                "AP": "FALSE",
                 "Cashflow": "FALSE",
-                "Description": "Optional description"
+                "Description": ""
+            },
+            {
+                "Code": "",
+                "Name": "--- PANDUAN KOLOM ---",
+                "Master Code": "",
+                "Type": "ASSET / LIABILITY / EQUITY / REVENUE / EXPENSE",
+                "Job Type": "FREIGHT / CUSTOMS / WAREHOUSE / GENERAL / (kosong = semua)",
+                "Level": "1-9",
+                "Trial Balance": "TRUE / FALSE",
+                "Profit & Loss": "TRUE / FALSE",
+                "Balance Sheet": "TRUE / FALSE",
+                "AR": "TRUE / FALSE",
+                "AP": "TRUE / FALSE",
+                "Cashflow": "TRUE / FALSE",
+                "Description": "Keterangan opsional"
             }
         ];
 
         const ws = utils.json_to_sheet(data);
         ws['!cols'] = [
-            { wch: 20 }, { wch: 35 }, { wch: 20 }, { wch: 20 },
+            { wch: 22 }, { wch: 35 }, { wch: 22 }, { wch: 12 }, { wch: 20 },
             { wch: 8 }, { wch: 15 }, { wch: 15 }, { wch: 15 },
             { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 30 }
         ];
@@ -354,6 +444,7 @@ const COAMaster = () => {
                 code: formData.code,
                 name: formData.name,
                 type: formData.type,
+                job_type: formData.job_type || null,
                 description: formData.description,
                 parent_code: formData.parent_code || null,
                 level: parseInt(formData.level) || 1,
@@ -404,12 +495,98 @@ const COAMaster = () => {
         }
     };
 
+    const handleDeleteAll = async () => {
+        if (accounts.length === 0) {
+            alert('Tidak ada data COA untuk dihapus.');
+            return;
+        }
+
+        const confirm1 = confirm(`⚠️ PERINGATAN: Anda yakin ingin menghapus SELURUH ${accounts.length} data COA?\n\nTindakan ini akan menghapus semua akun secara permanen.`);
+        if (!confirm1) return;
+
+        const userInput = prompt('Ketik "HAPUS SEMUA" (huruf kapital) untuk konfirmasi:');
+        if (userInput !== 'HAPUS SEMUA') {
+            alert('Konfirmasi tidak sesuai. Operasi dibatalkan.');
+            return;
+        }
+
+        try {
+            setLoading(true);
+            const { error } = await supabase
+                .from('finance_coa')
+                .delete()
+                .neq('id', '00000000-0000-0000-0000-000000000000');
+
+            if (error) {
+                if (error.code === '23503' || error.message?.includes('foreign key')) {
+                    alert('❌ Gagal: Sebagian akun sudah terhubung ke transaksi dan tidak dapat dihapus.');
+                    return;
+                }
+                throw error;
+            }
+
+            alert('✅ Seluruh data COA berhasil dihapus.');
+            fetchAccounts();
+        } catch (error) {
+            console.error('Error deleting all accounts:', error);
+            alert('❌ Error: ' + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDeleteSelected = async () => {
+        if (selectedIds.length === 0) return;
+
+        if (!confirm(`Hapus ${selectedIds.length} akun yang dipilih? Tindakan ini tidak dapat dibatalkan.`)) return;
+
+        try {
+            setLoading(true);
+            const { error } = await supabase
+                .from('finance_coa')
+                .delete()
+                .in('id', selectedIds);
+
+            if (error) {
+                if (error.code === '23503' || error.message?.includes('foreign key')) {
+                    alert('❌ Gagal: Sebagian akun sudah terhubung ke transaksi.');
+                    return;
+                }
+                throw error;
+            }
+
+            alert(`✅ ${selectedIds.length} akun berhasil dihapus.`);
+            setSelectedIds([]);
+            fetchAccounts();
+        } catch (error) {
+            console.error('Error deleting selected accounts:', error);
+            alert('❌ Error: ' + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedIds.length === filteredAccounts.length) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(filteredAccounts.map(a => a.id));
+        }
+    };
+
+    const toggleSelectOne = (id) => {
+        setSelectedIds(prev =>
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        );
+    };
+
     const resetForm = () => {
         setFormData({
             id: null,
             code: '',
             name: '',
             type: 'ASSET',
+            job_type: '',
             description: '',
             parent_code: '',
             level: 1,
@@ -444,7 +621,7 @@ const COAMaster = () => {
                     <h1 className="text-3xl font-bold gradient-text">Chart of Accounts</h1>
                     <p className="text-silver-dark mt-1">Master Data Kode Akuntansi Keuangan</p>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex gap-2 items-center">
                     <input
                         type="file"
                         ref={fileInputRef}
@@ -452,24 +629,43 @@ const COAMaster = () => {
                         className="hidden"
                         accept=".xlsx, .xls"
                     />
-                    <Button
-                        variant="plain"
-                        icon={FileText}
+                    {selectedIds.length > 0 && (
+                        <button
+                            onClick={handleDeleteSelected}
+                            className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-red-500/20 text-red-400 border border-red-500/30 rounded-md hover:bg-red-500/30 transition-colors"
+                        >
+                            <Trash2 className="w-3 h-3" />
+                            Hapus {selectedIds.length} Dipilih
+                        </button>
+                    )}
+                    <button
                         onClick={handleDownloadTemplate}
-                        className="bg-blue-500/10 text-blue-400 border-blue-500/20 hover:bg-blue-500/20"
+                        className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-md hover:bg-blue-500/20 transition-colors"
                     >
-                        Download Template
-                    </Button>
-                    <Button
-                        variant="secondary"
-                        icon={Upload}
+                        <FileText className="w-3 h-3" />
+                        Template
+                    </button>
+                    <button
                         onClick={() => fileInputRef.current.click()}
+                        className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-dark-surface text-silver-light border border-dark-border rounded-md hover:border-accent-blue transition-colors"
                     >
-                        Import Excel
-                    </Button>
-                    <Button onClick={() => { resetForm(); setShowModal(true); }} icon={Plus}>
+                        <Upload className="w-3 h-3" />
+                        Import
+                    </button>
+                    <button
+                        onClick={handleDeleteAll}
+                        className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-red-600/80 text-white rounded-md hover:bg-red-700 transition-colors"
+                    >
+                        <Trash2 className="w-3 h-3" />
+                        Delete All
+                    </button>
+                    <button
+                        onClick={() => { resetForm(); setShowModal(true); }}
+                        className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-accent-blue text-white rounded-md hover:bg-accent-cyan transition-colors"
+                    >
+                        <Plus className="w-3 h-3" />
                         Add Account
-                    </Button>
+                    </button>
                 </div>
             </div>
 
@@ -503,10 +699,19 @@ const COAMaster = () => {
                     <table className="w-full">
                         <thead className="bg-dark-surface border-b border-dark-border">
                             <tr className="leading-tight">
+                                <th className="px-2 py-1 text-center w-8">
+                                    <input
+                                        type="checkbox"
+                                        checked={filteredAccounts.length > 0 && selectedIds.length === filteredAccounts.length}
+                                        onChange={toggleSelectAll}
+                                        className="w-3 h-3 accent-accent-blue cursor-pointer"
+                                        title="Pilih semua"
+                                    />
+                                </th>
                                 <th className="px-2 py-1 text-left text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">Code</th>
                                 <th className="px-2 py-1 text-left text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">Name</th>
                                 <th className="px-2 py-1 text-left text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">Type</th>
-                                <th className="px-2 py-1 text-left text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">Group</th>
+                                <th className="px-2 py-1 text-center text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">Job Type</th>
                                 <th className="px-2 py-1 text-center text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">Master Code</th>
                                 <th className="px-2 py-1 text-center text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">Lvl</th>
                                 <th className="px-2 py-1 text-center text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">TB</th>
@@ -527,13 +732,20 @@ const COAMaster = () => {
                                 filteredAccounts.map((acc) => (
                                     <tr
                                         key={acc.id}
-                                        onClick={() => handleEdit(acc)}
-                                        className="hover:bg-dark-surface/50 cursor-pointer h-6"
+                                        className={`hover:bg-dark-surface/50 h-6 ${selectedIds.includes(acc.id) ? 'bg-accent-blue/5 border-l-2 border-accent-blue' : ''}`}
                                     >
-                                        <td className="px-2 text-[11px] font-semibold text-accent-blue font-mono whitespace-nowrap">{acc.code}</td>
-                                        <td className="px-2 text-[11px] text-silver-light whitespace-nowrap">{acc.name}</td>
-                                        <td className="px-2 whitespace-nowrap">
-                                            <span className={`px-1 text-[9px] font-bold rounded
+                                        <td className="px-2 text-center" onClick={(e) => e.stopPropagation()}>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedIds.includes(acc.id)}
+                                                onChange={() => toggleSelectOne(acc.id)}
+                                                className="w-3 h-3 accent-accent-blue cursor-pointer"
+                                            />
+                                        </td>
+                                        <td className="px-2 text-[11px] font-semibold text-accent-blue font-mono whitespace-nowrap cursor-pointer" onClick={() => handleEdit(acc)}>{acc.code}</td>
+                                        <td className="px-2 text-[11px] text-silver-light whitespace-nowrap cursor-pointer" onClick={() => handleEdit(acc)}>{acc.name}</td>
+                                        <td className="px-2 whitespace-nowrap cursor-pointer" onClick={() => handleEdit(acc)}>
+                                            <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded
                                                 ${acc.type === 'ASSET' ? 'bg-blue-500/20 text-blue-400' :
                                                     acc.type === 'LIABILITY' ? 'bg-orange-500/20 text-orange-400' :
                                                         acc.type === 'EQUITY' ? 'bg-purple-500/20 text-purple-400' :
@@ -543,16 +755,26 @@ const COAMaster = () => {
                                                 {acc.type}
                                             </span>
                                         </td>
-                                        <td className="px-2 text-[10px] text-silver-dark whitespace-nowrap">{acc.group_name || '-'}</td>
-                                        <td className="px-2 text-[10px] text-silver-dark text-center whitespace-nowrap">{acc.parent_code || '-'}</td>
-                                        <td className="px-2 text-[10px] text-silver-dark text-center">{acc.level || 1}</td>
-                                        <td className="px-1 text-center">{acc.is_trial_balance ? <CheckCircle className="w-3 h-3 text-green-400 inline" /> : null}</td>
-                                        <td className="px-1 text-center">{acc.is_profit_loss ? <CheckCircle className="w-3 h-3 text-green-400 inline" /> : null}</td>
-                                        <td className="px-1 text-center">{acc.is_balance_sheet ? <CheckCircle className="w-3 h-3 text-green-400 inline" /> : null}</td>
-                                        <td className="px-1 text-center">{acc.is_ar ? <CheckCircle className="w-3 h-3 text-green-400 inline" /> : null}</td>
-                                        <td className="px-1 text-center">{acc.is_ap ? <CheckCircle className="w-3 h-3 text-green-400 inline" /> : null}</td>
-                                        <td className="px-1 text-center">{acc.is_cashflow ? <CheckCircle className="w-3 h-3 text-green-400 inline" /> : null}</td>
-                                        <td className="px-2 text-[10px] text-silver-dark text-right font-mono whitespace-nowrap">
+                                        <td className="px-2 text-center cursor-pointer" onClick={() => handleEdit(acc)}>
+                                            {acc.job_type ? (
+                                                <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded whitespace-nowrap
+                                                    ${acc.job_type === 'FREIGHT' ? 'bg-blue-500/20 text-blue-400' :
+                                                        acc.job_type === 'CUSTOMS' ? 'bg-orange-500/20 text-orange-400' :
+                                                            acc.job_type === 'WAREHOUSE' ? 'bg-purple-500/20 text-purple-400' :
+                                                                'bg-gray-500/20 text-gray-400'}`}>
+                                                    {acc.job_type}
+                                                </span>
+                                            ) : <span className="text-[10px] text-silver-dark/50">-</span>}
+                                        </td>
+                                        <td className="px-2 text-[10px] text-silver-dark text-center whitespace-nowrap cursor-pointer" onClick={() => handleEdit(acc)}>{acc.parent_code || '-'}</td>
+                                        <td className="px-2 text-[10px] text-silver-dark text-center cursor-pointer" onClick={() => handleEdit(acc)}>{acc.level || 1}</td>
+                                        <td className="px-1 text-center cursor-pointer" onClick={() => handleEdit(acc)}>{acc.is_trial_balance ? <CheckCircle className="w-3 h-3 text-green-400 inline" /> : null}</td>
+                                        <td className="px-1 text-center cursor-pointer" onClick={() => handleEdit(acc)}>{acc.is_profit_loss ? <CheckCircle className="w-3 h-3 text-green-400 inline" /> : null}</td>
+                                        <td className="px-1 text-center cursor-pointer" onClick={() => handleEdit(acc)}>{acc.is_balance_sheet ? <CheckCircle className="w-3 h-3 text-green-400 inline" /> : null}</td>
+                                        <td className="px-1 text-center cursor-pointer" onClick={() => handleEdit(acc)}>{acc.is_ar ? <CheckCircle className="w-3 h-3 text-green-400 inline" /> : null}</td>
+                                        <td className="px-1 text-center cursor-pointer" onClick={() => handleEdit(acc)}>{acc.is_ap ? <CheckCircle className="w-3 h-3 text-green-400 inline" /> : null}</td>
+                                        <td className="px-1 text-center cursor-pointer" onClick={() => handleEdit(acc)}>{acc.is_cashflow ? <CheckCircle className="w-3 h-3 text-green-400 inline" /> : null}</td>
+                                        <td className="px-2 text-[10px] text-silver-dark text-right font-mono whitespace-nowrap cursor-pointer" onClick={() => handleEdit(acc)}>
                                             {new Date(acc.updated_at || acc.created_at || Date.now()).toLocaleDateString('id-ID', {
                                                 day: 'numeric', month: 'short'
                                             })}
@@ -720,7 +942,7 @@ const COAMaster = () => {
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-3 gap-3">
                             <div>
                                 <label className="block text-xs font-medium text-silver-dark mb-1">Group (Type)</label>
                                 <select
@@ -734,6 +956,27 @@ const COAMaster = () => {
                                         </option>
                                     ))}
                                 </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-silver-dark mb-1">Job Type</label>
+                                <input
+                                    type="text"
+                                    list="job-types-list"
+                                    value={formData.job_type || ''}
+                                    onChange={(e) => setFormData({ ...formData, job_type: e.target.value.toUpperCase() })}
+                                    className="w-full px-3 py-1.5 text-sm bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue outline-none uppercase"
+                                    placeholder="e.g. FREIGHT or AIR EXPORT"
+                                />
+                                <datalist id="job-types-list">
+                                    <option value="FREIGHT" />
+                                    <option value="CUSTOMS" />
+                                    <option value="WAREHOUSE" />
+                                    <option value="GENERAL" />
+                                    <option value="AIR EXPORT" />
+                                    <option value="AIR IMPORT" />
+                                    <option value="OCEAN EXPORT" />
+                                    <option value="OCEAN IMPORT" />
+                                </datalist>
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-silver-dark mb-1">Level</label>

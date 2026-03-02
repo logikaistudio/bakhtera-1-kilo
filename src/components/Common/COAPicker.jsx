@@ -71,6 +71,12 @@ const COAPicker = ({
                     flagField: 'is_ap',
                     flagValue: true
                 };
+            case 'EXPENSE':
+                return {
+                    types: ['EXPENSE', 'COGS'],
+                    flagField: null,
+                    flagValue: null
+                };
             case 'ASSET':
                 return {
                     types: ['ASSET'],
@@ -269,7 +275,7 @@ const COAPicker = ({
                                 type="text"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                placeholder="Cari kode atau nama akun..."
+                                placeholder="Search kode atau nama akun..."
                                 className="w-full pl-9 pr-4 py-2 bg-white border border-gray-300 rounded-lg 
                                     text-xs text-gray-800 placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
                             />

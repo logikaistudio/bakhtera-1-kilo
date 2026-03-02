@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
 import {
@@ -8,6 +9,10 @@ import {
 } from 'lucide-react';
 
 const BridgePartnerManagement = () => {
+    const { canCreate, canEdit, canDelete } = useAuth();
+    const hasCreate = canCreate('bridge_partners');
+    const hasEdit = canEdit('bridge_partners');
+    const hasDelete = canDelete('bridge_partners');
     const [partners, setPartners] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -106,6 +111,7 @@ const BridgePartnerManagement = () => {
     };
 
     const handleDelete = async (partnerId) => {
+        if (!hasDelete) return;
         if (!confirm('Yakin hapus mitra ini? Data transaksi terkait tidak akan terhapus.')) return;
 
         try {
@@ -124,6 +130,7 @@ const BridgePartnerManagement = () => {
     };
 
     const handleEdit = (partner) => {
+        if (!hasEdit) return;
         setEditingPartner(partner);
         setFormData(partner);
         setShowModal(true);
@@ -239,9 +246,11 @@ const BridgePartnerManagement = () => {
                         <Download className="w-4 h-4" />
                         Export CSV
                     </button>
-                    <Button onClick={() => setShowModal(true)} icon={Plus}>
-                        Tambah Mitra Baru
-                    </Button>
+                    {hasCreate && (
+                        <Button onClick={() => setShowModal(true)} icon={Plus}>
+                            Tambah Mitra Baru
+                        </Button>
+                    )}
                 </div>
             </div>
 
@@ -335,11 +344,11 @@ const BridgePartnerManagement = () => {
                                 filteredPartners.map((partner) => (
                                     <tr
                                         key={partner.id}
-                                        className="hover:bg-dark-surface/50 transition-colors cursor-pointer"
-                                        onClick={() => handleEdit(partner)}
+                                        className={`hover:bg-dark-surface/50 transition-colors ${hasEdit ? 'cursor-pointer' : ''}`}
+                                        onClick={() => hasEdit && handleEdit(partner)}
                                         onContextMenu={(e) => {
                                             e.preventDefault();
-                                            handleDelete(partner.id);
+                                            hasDelete && handleDelete(partner.id);
                                         }}
                                     >
                                         <td className="px-4 py-3 text-xs font-mono text-blue-400">{partner.partner_code || '-'}</td>
@@ -603,9 +612,11 @@ const BridgePartnerManagement = () => {
                             <Button type="button" variant="secondary" onClick={handleCloseModal}>
                                 Batal
                             </Button>
-                            <Button type="submit" icon={editingPartner ? Edit : Plus}>
-                                {editingPartner ? 'Update Mitra' : 'Simpan Mitra'}
-                            </Button>
+                            {(!editingPartner || hasEdit) && (
+                                <Button type="submit" icon={editingPartner ? Edit : Plus}>
+                                    {editingPartner ? 'Update Mitra' : 'Simpan Mitra'}
+                                </Button>
+                            )}
                         </div>
                     </form>
                 </Modal>

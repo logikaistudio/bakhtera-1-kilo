@@ -21,17 +21,17 @@ const FreightDashboard = () => {
     const navigate = useNavigate();
 
     // Calculate statistics
-    const totalRevenue = finance
-        .filter(t => t.type === 'income')
-        .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
+    const totalRevenue = (finance || [])
+        .filter(t => t?.type === 'income')
+        .reduce((sum, t) => sum + parseFloat(t?.amount || 0), 0);
 
-    const totalExpense = finance
-        .filter(t => t.type === 'expense')
-        .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
+    const totalExpense = (finance || [])
+        .filter(t => t?.type === 'expense')
+        .reduce((sum, t) => sum + parseFloat(t?.amount || 0), 0);
 
-    const activeShipments = shipments.filter(s => s.status !== 'completed').length;
-    const activeAssets = assets.filter(a => a.status === 'in-use').length;
-    const upcomingEvents = events.filter(e => e.status === 'planning' || e.status === 'confirmed').length;
+    const activeShipments = (shipments || []).filter(s => s?.status !== 'completed').length;
+    const activeAssets = (assets || []).filter(a => a?.status === 'in-use').length;
+    const upcomingEvents = (events || []).filter(e => e?.status === 'planning' || e?.status === 'confirmed').length;
 
     const moduleCards = [
         {
@@ -82,13 +82,13 @@ const FreightDashboard = () => {
                 <StatCard
                     icon={Users}
                     label="Total Vendor"
-                    value={vendors.length}
+                    value={(vendors || []).length}
                     iconColor="text-blue-400"
                 />
                 <StatCard
                     icon={UserCircle}
                     label="Total Pelanggan"
-                    value={customers.length}
+                    value={(customers || []).length}
                     iconColor="text-green-400"
                 />
                 <StatCard

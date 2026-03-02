@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useData } from '../../context/DataContext';
 import { generateInvoiceNumber } from '../../utils/documentNumbers';
+import { getCurrencySymbol } from '../../utils/currencyFormatter';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
 import COAPicker from '../../components/Common/COAPicker';
@@ -34,6 +35,7 @@ const InvoiceManagement = () => {
     const [selectedQuotation, setSelectedQuotation] = useState(null);
     const [selectedShipment, setSelectedShipment] = useState(null);
     const [referenceType, setReferenceType] = useState('quotation'); // 'quotation' or 'so'
+    const [revenueAccounts, setRevenueAccounts] = useState([]);
 
     // Form state for creating invoice
     const [formData, setFormData] = useState({
@@ -45,7 +47,7 @@ const InvoiceManagement = () => {
         billing_currency: 'IDR',
         exchange_rate: 1,
         invoice_items: [
-            { description: 'Ocean Freight', qty: 1, unit: 'Job', rate: 0, amount: 0, coa_id: null }
+            { item_name: 'Freight', description: 'Ocean Freight', qty: 1, unit: 'Job', rate: 0, amount: 0, coa_id: null }
         ],
         cogs_items: [],  // COGS items from shipment buying_items
         tax_rate: 11.00,
@@ -83,7 +85,23 @@ const InvoiceManagement = () => {
         fetchInvoices();
         fetchApprovedQuotations();
         fetchShipments();
+        fetchRevenueAccounts();
     }, []);
+
+    const fetchRevenueAccounts = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('finance_coa')
+                .select('*')
+                .eq('type', 'REVENUE')
+                .order('code');
+            if (!error && data) {
+                setRevenueAccounts(data);
+            }
+        } catch (error) {
+            console.error('Error fetching revenue accounts:', error);
+        }
+    };
 
     const fetchInvoices = async () => {
         try {
@@ -196,13 +214,16 @@ const InvoiceManagement = () => {
                 // Initialize with service items from quotation
                 invoice_items: quotation.service_items && quotation.service_items.length > 0
                     ? quotation.service_items.map(item => ({
-                        description: item.description || item.name,
-                        qty: item.quantity || 1,
+                        item_name: revenueAccounts.find(acc => acc.code === item.itemCode)?.name || item.itemCode || item.name || item.service_name || 'Item',
+                        description: item.description || item.name || '',
+                        qty: parseFloat(item.quantity) || parseFloat(item.qty) || 1,
                         unit: item.unit || 'Job',
-                        rate: item.unitPrice || item.price || 0,
-                        amount: item.total || (item.quantity * item.unitPrice) || 0
+                        rate: parseFloat(item.unitPrice) || parseFloat(item.price) || parseFloat(item.rate) || 0,
+                        amount: parseFloat(item.amount) || parseFloat(item.total) ||
+                            ((parseFloat(item.quantity) || 1) * (parseFloat(item.unitPrice) || parseFloat(item.price) || parseFloat(item.rate) || 0))
                     }))
                     : [{
+                        item_name: (quotation.serviceType || quotation.service_type || 'Freight').toUpperCase(),
                         description: `${(quotation.serviceType || quotation.service_type || 'Freight').toUpperCase()} - ${quotation.origin} to ${quotation.destination}`,
                         qty: 1,
                         unit: 'Job',
@@ -254,6 +275,7 @@ const InvoiceManagement = () => {
                 },
                 // Initialize with quoted amount as single line item
                 invoice_items: [{
+                    item_name: (shipment.service_type || 'Freight').toUpperCase(),
                     description: `${(shipment.service_type || 'Freight').toUpperCase()} - ${shipment.origin} to ${shipment.destination}`,
                     qty: 1,
                     unit: 'Shipment',
@@ -309,7 +331,7 @@ const InvoiceManagement = () => {
             ...prev,
             invoice_items: [
                 ...prev.invoice_items,
-                { description: '', qty: 1, unit: 'Job', rate: 0, amount: 0, coa_id: null }
+                { item_name: '', description: '', qty: 1, unit: 'Job', rate: 0, amount: 0 }
             ]
         }));
     };
@@ -364,42 +386,31 @@ const InvoiceManagement = () => {
         }
 
         try {
-            // 1. Check if active invoice already exists for this reference + currency combination
-            const referenceId = formData.quotation_id || formData.shipment_id;
-            const referenceField = formData.quotation_id ? 'quotation_id' : 'shipment_id';
-            const selectedCurrency = formData.billing_currency || 'IDR';
-
-            // Check for existing invoices with same currency
-            const { data: existingInvoices, error: checkError } = await supabase
-                .from('blink_invoices')
-                .select('id, invoice_number, status, currency')
-                .eq(referenceField, referenceId)
-                .eq('currency', selectedCurrency)
-                .neq('status', 'cancelled'); // Check for NON-cancelled invoices
-
-            if (checkError) throw checkError;
-
-            if (existingInvoices && existingInvoices.length > 0) {
-                const activeInv = existingInvoices[0];
-                alert(`Cannot create invoice: An active ${selectedCurrency} invoice (${activeInv.invoice_number}) already exists for this ${formData.quotation_id ? 'quotation' : 'shipment'}.\n\nNote: You can create a maximum of 2 invoices per quotation (1 IDR + 1 USD). Please cancel the existing invoice first if you need to create a replacement.`);
-                return;
-            }
-
-            // 2. Additional check: Ensure not more than 2 different currencies
-            if (formData.quotation_id) {
+            // 1. Check if active invoice already exists for this job + currency combination
+            // Check by job_number ensures no duplicates per job, instead of just checking quotation/shipment IDs
+            if (formData.job_number) {
                 const { data: allInvoices, error: allCheckError } = await supabase
                     .from('blink_invoices')
-                    .select('currency')
-                    .eq('quotation_id', referenceId)
+                    .select('id, invoice_number, status, currency')
+                    .eq('job_number', formData.job_number)
                     .neq('status', 'cancelled');
 
                 if (allCheckError) throw allCheckError;
+
+                const selectedCurrency = formData.billing_currency || 'IDR';
+                const existingCurrencyInvoices = (allInvoices || []).filter(inv => inv.currency === selectedCurrency);
+
+                if (existingCurrencyInvoices.length > 0) {
+                    const activeInv = existingCurrencyInvoices[0];
+                    alert(`Cannot create invoice: An active ${selectedCurrency} invoice (${activeInv.invoice_number}) already exists for Job ${formData.job_number}.\n\nNote: You can create a maximum of 2 invoices per job (1 IDR + 1 USD). Please cancel the existing invoice first if you need to create a replacement.`);
+                    return;
+                }
 
                 const existingCurrencies = [...new Set((allInvoices || []).map(inv => inv.currency))];
 
                 // If there are already 2 currencies and this is a new one, block it
                 if (existingCurrencies.length >= 2 && !existingCurrencies.includes(selectedCurrency)) {
-                    alert(`Cannot create invoice: This quotation already has invoices in ${existingCurrencies.join(' and ')}.\n\nMaximum 2 currencies (IDR and USD) are allowed per quotation.`);
+                    alert(`Cannot create invoice: This job already has invoices in ${existingCurrencies.join(' and ')}.\n\nMaximum 2 currencies (IDR and USD) are allowed per job.`);
                     return;
                 }
             }
@@ -492,7 +503,7 @@ const InvoiceManagement = () => {
             billing_currency: 'IDR',
             exchange_rate: 1,
             invoice_items: [
-                { description: 'Ocean Freight', qty: 1, unit: 'Job', rate: 0, amount: 0, coa_id: null }
+                { item_name: 'Freight', description: 'Ocean Freight', qty: 1, unit: 'Job', rate: 0, amount: 0, coa_id: null }
             ],
             tax_rate: 11.00,
             discount_amount: 0,
@@ -519,9 +530,7 @@ const InvoiceManagement = () => {
     };
 
     const formatCurrency = (value, currency = 'IDR') => {
-        return currency === 'USD'
-            ? `$${value.toLocaleString('id-ID')}`
-            : `Rp ${value.toLocaleString('id-ID')}`;
+        return `${getCurrencySymbol(currency)} ${Number(value || 0).toLocaleString('id-ID')}`;
     };
 
     const handlePrintInvoice = (invoice) => {
@@ -944,7 +953,7 @@ const InvoiceManagement = () => {
                     <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                     <input
                         type="text"
-                        placeholder="Cari invoice, job number, atau customer..."
+                        placeholder="Search invoice, job number, atau customer..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-12 pr-4 py-3 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-base"
@@ -1191,7 +1200,7 @@ const InvoiceCreateModal = ({ quotations, shipments, formData, setFormData, sele
 
                     {/* Existing Invoices Indicator */}
                     {selectedQuotation && (
-                        <ExistingInvoicesIndicator quotationId={selectedQuotation.id} />
+                        <ExistingInvoicesIndicator jobNumber={formData.job_number} />
                     )}
 
 
@@ -1428,6 +1437,9 @@ const InvoiceCreateModal = ({ quotations, shipments, formData, setFormData, sele
                             >
                                 <option value="IDR">IDR (Rupiah)</option>
                                 <option value="USD">USD (US Dollar)</option>
+                                <option value="SGD">SGD (Singapore Dollar)</option>
+                                <option value="EUR">EUR (Euro)</option>
+                                <option value="RMB">RMB (Chinese Yuan)</option>
                             </select>
                         </div>
 
@@ -1470,12 +1482,12 @@ const InvoiceCreateModal = ({ quotations, shipments, formData, setFormData, sele
                                 <thead className="bg-accent-orange">
                                     <tr>
                                         <th className="px-2 py-2 text-center text-xs text-white w-10 font-normal">No</th>
+                                        <th className="px-2 py-2 text-left text-xs text-white min-w-[150px] font-normal">Item</th>
                                         <th className="px-2 py-2 text-left text-xs text-white min-w-[200px] font-normal">Description</th>
                                         <th className="px-2 py-2 text-center text-xs text-white w-24 font-normal">Qty</th>
                                         <th className="px-2 py-2 text-center text-xs text-white w-24 font-normal">Unit</th>
                                         <th className="px-2 py-2 text-right text-xs text-white min-w-[140px] font-normal">Price</th>
                                         <th className="px-2 py-2 text-right text-xs text-white min-w-[100px] font-normal">Total</th>
-                                        <th className="px-2 py-2 text-left text-xs text-white min-w-[180px] font-normal">Revenue Account</th>
                                         <th className="px-2 py-2 text-center text-xs text-white w-10 font-normal">Action</th>
                                     </tr>
                                 </thead>
@@ -1483,6 +1495,16 @@ const InvoiceCreateModal = ({ quotations, shipments, formData, setFormData, sele
                                     {formData.invoice_items.map((item, index) => (
                                         <tr key={index} className="hover:bg-dark-surface/50 smooth-transition">
                                             <td className="px-2 py-2 text-center text-silver-light text-xs">{index + 1}</td>
+                                            <td className="px-3 py-2">
+                                                <input
+                                                    type="text"
+                                                    value={item.item_name}
+                                                    onChange={(e) => updateInvoiceItem(index, 'item_name', e.target.value)}
+                                                    className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm"
+                                                    placeholder="Nama Item (e.g. THL, Freight)"
+                                                    required
+                                                />
+                                            </td>
                                             <td className="px-3 py-2">
                                                 <input
                                                     type="text"
@@ -1527,16 +1549,6 @@ const InvoiceCreateModal = ({ quotations, shipments, formData, setFormData, sele
                                             </td>
                                             <td className="px-2 py-2 text-right">
                                                 <span className="text-silver-light text-sm">{formatCurrency(item.amount, formData.billing_currency)}</span>
-                                            </td>
-                                            <td className="px-2 py-2">
-                                                <COAPicker
-                                                    value={item.coa_id}
-                                                    onChange={(coaId) => updateInvoiceItem(index, 'coa_id', coaId)}
-                                                    context="AR"
-                                                    minLevel={3}
-                                                    placeholder="Pilih Akun"
-                                                    size="sm"
-                                                />
                                             </td>
                                             <td className="px-2 py-2 text-center">
                                                 <button
@@ -1644,9 +1656,9 @@ const InvoiceCreateModal = ({ quotations, shipments, formData, setFormData, sele
                             <div className="flex items-center justify-between p-2 rounded bg-dark-surface">
                                 <span className="text-[10px] text-silver-dark">Profit Margin:</span>
                                 <span className={`text-sm font-bold ${profitMargin >= 30 ? 'text-green-400' :
-                                        profitMargin >= 20 ? 'text-blue-400' :
-                                            profitMargin >= 10 ? 'text-yellow-400' :
-                                                profitMargin >= 0 ? 'text-orange-400' : 'text-red-400'
+                                    profitMargin >= 20 ? 'text-blue-400' :
+                                        profitMargin >= 10 ? 'text-yellow-400' :
+                                            profitMargin >= 0 ? 'text-orange-400' : 'text-red-400'
                                     }`}>
                                     {profitMargin.toFixed(2)}%
                                 </span>
@@ -1888,24 +1900,26 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                             <h3 className="font-semibold text-white">Invoice Items</h3>
                         </div>
                         <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead className="bg-dark-surface border-b border-dark-border">
-                                    <tr>
-                                        <th className="px-4 py-2 text-left text-xs font-semibold text-silver-dark uppercase">Deskripsi</th>
-                                        <th className="px-4 py-2 text-center text-xs font-semibold text-silver-dark uppercase w-20">Qty</th>
-                                        <th className="px-4 py-2 text-center text-xs font-semibold text-silver-dark uppercase w-24">Unit</th>
-                                        <th className="px-4 py-2 text-right text-xs font-semibold text-silver-dark uppercase w-32">Rate</th>
-                                        <th className="px-4 py-2 text-right text-xs font-semibold text-silver-dark uppercase w-32">Amount</th>
+                            <table className="w-full text-sm">
+                                <thead className="bg-[#0070bc]">
+                                    <tr className="text-left">
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase rounded-tl-lg">Item</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase">Description</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-center w-20">Qty</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-center w-24">Unit</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right w-32">Rate</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right w-32 rounded-tr-lg">Amount</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-dark-border">
+                                <tbody className="divide-y divide-dark-border/50 bg-dark-bg">
                                     {invoice.invoice_items?.map((item, index) => (
-                                        <tr key={index}>
-                                            <td className="px-4 py-3 text-silver-light">{item.description}</td>
-                                            <td className="px-4 py-3 text-center text-silver-light">{item.qty}</td>
-                                            <td className="px-4 py-3 text-center text-silver-dark">{item.unit}</td>
-                                            <td className="px-4 py-3 text-right text-silver-light">{(parseFloat(item.rate) || 0).toLocaleString('id-ID')}</td>
-                                            <td className="px-4 py-3 text-right text-silver-light font-medium">{formatCurrency(item.amount, invoice.currency)}</td>
+                                        <tr key={index} className="hover:bg-blue-500/5 transition-colors">
+                                            <td className="px-4 py-3 text-silver-light font-medium align-top">{item.item_name || 'Item ' + (index + 1)}</td>
+                                            <td className="px-4 py-3 text-silver-light align-top">{item.description}</td>
+                                            <td className="px-4 py-3 text-center text-silver-light align-top">{item.qty}</td>
+                                            <td className="px-4 py-3 text-center text-silver-dark align-top">{item.unit}</td>
+                                            <td className="px-4 py-3 text-right text-silver-light align-top">{(parseFloat(item.rate) || 0).toLocaleString('id-ID')}</td>
+                                            <td className="px-4 py-3 text-right text-silver-light font-medium align-top">{formatCurrency(item.amount, invoice.currency)}</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -2323,31 +2337,150 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
     const safeStr = (str) => str || '-';
     const safeDate = (date) => date ? new Date(date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
 
+    const [splitItems, setSplitItems] = useState(() =>
+        invoice.invoice_items ? invoice.invoice_items.map(item => ({ ...item, isSelected: true, splitQty: item.qty || 1, splitRate: item.rate || 0 })) : []
+    );
+    const [splitLabel, setSplitLabel] = useState('FULL PAYMENT');
+
+    const handleSplitItemChange = (index, field, value) => {
+        setSplitItems(prev => {
+            const newItems = [...prev];
+            newItems[index] = { ...newItems[index], [field]: value };
+            return newItems;
+        });
+    };
+
+    const isSplit = splitItems.some(item => !item.isSelected || item.splitQty !== (item.qty || 1) || item.splitRate !== (item.rate || 0));
+
+    // Calculate split totals
+    const splitSubtotal = splitItems.reduce((sum, item) => sum + (item.isSelected ? (item.splitQty * item.splitRate) : 0), 0);
+    const splitTax = splitSubtotal * (invoice.tax_rate || 0) / 100;
+    const splitTotal = splitSubtotal + splitTax - (invoice.discount_amount || 0);
+
+    const handlePrintClick = () => {
+        // We inject the split calculation dynamically to the onPrint method if needed
+        // Since onPrint uses handlePrintInvoice, we could pass split details, but it's cleaner to handle printing internally here or modify handlePrintInvoice
+        // Because handlePrintInvoice is defined above and doesn't take split options, let's just trigger the native browser print for the preview window.
+        // The user can print the preview directly!
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            alert('Pop-up blocked! Please allow pop-ups for this site.');
+            return;
+        }
+        printWindow.document.write('<html><head><title>Print Invoice</title>');
+        // inject styles
+        printWindow.document.write('<style>@import url("https://fonts.googleapis.com/css2?family=Arimo:wght@400;700&display=swap"); * { box-sizing: border-box; } body { font-family: "Arimo", Arial, sans-serif; font-size: 11px; margin: 0; padding: 20px; color: #000; background-color: #fff; -webkit-print-color-adjust: exact; } .container { width: 100%; max-width: 210mm; margin: 0 auto; padding: 0; box-shadow: none; position: relative; } table { width: 100%; border-collapse: collapse; } </style>');
+        printWindow.document.write('</head><body><div class="container">');
+        printWindow.document.write(document.getElementById('invoice-print-area').innerHTML);
+        printWindow.document.write('</div><script>window.onload = function() { window.print(); };</script></body></html>');
+    };
+
     return (
         <Modal isOpen={true} onClose={onClose} maxWidth="max-w-4xl">
             <div className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-2xl font-bold gradient-text">Print Preview</h2>
-                    <div className="flex gap-2">
+                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+                    <div>
+                        <h2 className="text-2xl font-bold gradient-text">Print Preview</h2>
+                        <p className="text-sm text-silver-dark mt-1">Gunakan opsi Split Invoice untuk membagi tagihan per termin perjalanan.</p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex items-center gap-2 bg-dark-bg p-2 rounded-lg border border-dark-border">
+                            <label className="text-xs text-silver-light font-medium whitespace-nowrap">Print Label:</label>
+                            <input
+                                type="text"
+                                placeholder="Misal: Termin 1 (DP)"
+                                value={splitLabel}
+                                onChange={(e) => setSplitLabel(e.target.value)}
+                                className="bg-dark-surface border border-dark-border text-silver-light px-2 py-1 rounded text-sm w-full ml-2"
+                            />
+                        </div>
+
                         <button
-                            onClick={onPrint}
-                            className="flex items-center gap-2 px-4 py-2 bg-accent-orange hover:bg-accent-orange/80 text-white rounded-lg smooth-transition font-semibold"
+                            onClick={handlePrintClick}
+                            className="flex items-center gap-2 px-4 py-2 bg-accent-orange hover:bg-accent-orange/80 text-white rounded-lg smooth-transition font-semibold h-[38px]"
                         >
                             <Download className="w-4 h-4" />
-                            Print / Save as PDF
+                            Print / PDF
                         </button>
                         <button
                             onClick={onClose}
-                            className="px-4 py-2 border border-dark-border text-silver-light rounded-lg hover:bg-dark-surface smooth-transition"
+                            className="px-4 py-2 border border-dark-border text-silver-light rounded-lg hover:bg-dark-surface smooth-transition h-[38px]"
                         >
                             Close
                         </button>
                     </div>
                 </div>
 
+                {/* Custom Split Invoice Configurator */}
+                <div className="bg-dark-surface mb-6 p-4 rounded-lg border border-dark-border">
+                    <h3 className="text-sm font-semibold text-silver-light mb-3">Pilih Item untuk Dicetak</h3>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm text-silver-light">
+                            <thead className="text-xs text-silver-dark uppercase bg-dark-bg">
+                                <tr>
+                                    <th className="px-3 py-2 text-center w-10">Pilih</th>
+                                    <th className="px-3 py-2">Item deskripsi</th>
+                                    <th className="px-3 py-2 w-24 text-center">Qty Total</th>
+                                    <th className="px-3 py-2 w-24 text-center">Qty Cetak</th>
+                                    <th className="px-3 py-2 w-32 text-right">Harga Asli</th>
+                                    <th className="px-3 py-2 w-32 text-right">Harga Cetak</th>
+                                    <th className="px-3 py-2 w-32 text-right">Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {splitItems.map((item, index) => (
+                                    <tr key={index} className="border-b border-dark-border hover:bg-white/5">
+                                        <td className="px-3 py-2 text-center">
+                                            <input
+                                                type="checkbox"
+                                                checked={item.isSelected}
+                                                onChange={(e) => handleSplitItemChange(index, 'isSelected', e.target.checked)}
+                                                className="w-4 h-4 rounded bg-dark-bg border-dark-border text-accent-orange focus:ring-accent-orange"
+                                            />
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            {item.item_name ? <span className="font-semibold">{item.item_name} - </span> : ''}
+                                            {item.description}
+                                        </td>
+                                        <td className="px-3 py-2 text-center text-silver-dark">{item.qty || 1} {item.unit}</td>
+                                        <td className="px-3 py-2 text-center">
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max={item.qty || 1000}
+                                                step="0.01"
+                                                value={item.splitQty}
+                                                onChange={(e) => handleSplitItemChange(index, 'splitQty', parseFloat(e.target.value) || 0)}
+                                                disabled={!item.isSelected}
+                                                className="w-16 bg-dark-bg border border-dark-border text-silver-light px-1 py-0.5 rounded text-center disabled:opacity-50"
+                                            />
+                                        </td>
+                                        <td className="px-3 py-2 text-right text-silver-dark">{formatCurrency(item.rate || 0, invoice.currency)}</td>
+                                        <td className="px-3 py-2 text-right">
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={item.splitRate}
+                                                onChange={(e) => handleSplitItemChange(index, 'splitRate', parseFloat(e.target.value) || 0)}
+                                                disabled={!item.isSelected}
+                                                className="w-24 bg-dark-bg border border-dark-border text-silver-light px-1 py-0.5 rounded text-right disabled:opacity-50"
+                                            />
+                                        </td>
+                                        <td className="px-3 py-2 text-right text-accent-orange font-medium">
+                                            {item.isSelected ? formatCurrency(item.splitQty * item.splitRate, invoice.currency) : '-'}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
                 {/* Print-friendly invoice content - WYSIWYG with handlePrintInvoice */}
                 <div className="bg-white text-black p-8 rounded-lg shadow-inner overflow-x-auto">
-                    <div style={{ fontFamily: "'Arimo', Arial, sans-serif", fontSize: '11px', color: '#000', width: '210mm', minHeight: '297mm', margin: '0 auto', padding: '15mm', backgroundColor: '#fff', boxSizing: 'border-box', position: 'relative' }}>
+                    <div id="invoice-print-area" style={{ fontFamily: "'Arimo', Arial, sans-serif", fontSize: '11px', color: '#000', width: '210mm', minHeight: '297mm', margin: '0 auto', padding: '15mm', backgroundColor: '#fff', boxSizing: 'border-box', position: 'relative' }}>
 
                         {/* Header */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', alignItems: 'flex-start' }}>
@@ -2465,35 +2598,50 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                                 </tr>
                             </thead>
                             <tbody>
-                                {invoice.invoice_items && invoice.invoice_items.length > 0 ? (
-                                    invoice.invoice_items.map((item, index) => (
-                                        <tr key={index}>
-                                            <td style={{ borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textTransform: 'capitalize' }}>{item.description}</td>
-                                            <td style={{ borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textAlign: 'center' }}>{invoice.currency}</td>
-                                            <td style={{ borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textAlign: 'right' }}>{formatCurrency(item.amount || 0, invoice.currency).replace('Rp ', '').replace('$', '')}</td>
-                                            <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textAlign: 'right' }}>{formatCurrency((item.amount || 0) * (invoice.tax_rate || 0) / 100, invoice.currency).replace('Rp ', '').replace('$', '')}</td>
-                                        </tr>
-                                    ))
+                                {splitItems.filter(item => item.isSelected).length > 0 ? (
+                                    splitItems.filter(item => item.isSelected).map((item, index) => {
+                                        const calcAmount = item.splitQty * item.splitRate;
+                                        const calcTax = calcAmount * (invoice.tax_rate || 0) / 100;
+                                        return (
+                                            <tr key={index}>
+                                                <td style={{ borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textTransform: 'capitalize' }}>
+                                                    {item.item_name ? <b>{item.item_name}</b> : null} {item.item_name ? '- ' : ''}{item.description}
+                                                    <div style={{ fontSize: '9px', color: '#555', marginTop: '2px' }}>
+                                                        {item.splitQty} {item.unit} x {formatCurrency(item.splitRate, invoice.currency).replace('Rp ', '').replace('$', '')}
+                                                    </div>
+                                                </td>
+                                                <td style={{ borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textAlign: 'center' }}>{invoice.currency}</td>
+                                                <td style={{ borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textAlign: 'right' }}>{formatCurrency(calcAmount, invoice.currency).replace('Rp ', '').replace('$', '')}</td>
+                                                <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textAlign: 'right' }}>{formatCurrency(calcTax, invoice.currency).replace('Rp ', '').replace('$', '')}</td>
+                                            </tr>
+                                        );
+                                    })
                                 ) : (
                                     <tr><td colSpan="4" style={{ textAlign: 'center', padding: '10px', fontSize: '11px' }}>No items</td></tr>
                                 )}
                             </tbody>
                         </table>
 
+                        {isSplit && (
+                            <div style={{ fontStyle: 'italic', marginBottom: '10px', fontSize: '11px', color: '#444' }}>
+                                * This is a partial billing: <strong>{splitLabel}</strong>
+                            </div>
+                        )}
+
                         {/* Totals */}
                         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
                             <div style={{ width: '320px', border: '1px solid #000', borderTop: 'none' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', fontWeight: 'bold', fontSize: '11px', borderBottom: '1px solid #ccc', background: '#f9f9f9' }}>
                                     <span>SUBTOTAL</span>
-                                    <span>{formatCurrency(invoice.subtotal || 0, invoice.currency)}</span>
+                                    <span>{formatCurrency(splitSubtotal, invoice.currency)}</span>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', fontWeight: 'bold', fontSize: '11px', borderBottom: '1px solid #ccc' }}>
                                     <span>TAX Total ({invoice.tax_rate}%)</span>
-                                    <span>{formatCurrency(invoice.tax_amount || 0, invoice.currency)}</span>
+                                    <span>{formatCurrency(splitTax, invoice.currency)}</span>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', fontWeight: 'bold', fontSize: '13px', background: '#333', color: 'white' }}>
                                     <span>TOTAL AMOUNT DUE</span>
-                                    <span>{formatCurrency(invoice.total_amount || 0, invoice.currency)}</span>
+                                    <span>{formatCurrency(splitTotal, invoice.currency)}</span>
                                 </div>
                             </div>
                         </div>
@@ -2543,19 +2691,19 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
 };
 
 // Existing Invoices Indicator Component
-const ExistingInvoicesIndicator = ({ quotationId }) => {
+const ExistingInvoicesIndicator = ({ jobNumber }) => {
     const [existingInvoices, setExistingInvoices] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchExistingInvoices = async () => {
-            if (!quotationId) return;
+            if (!jobNumber) return;
 
             try {
                 const { data, error } = await supabase
                     .from('blink_invoices')
                     .select('invoice_number, currency, status, total_amount, created_at')
-                    .eq('quotation_id', quotationId)
+                    .eq('job_number', jobNumber)
                     .neq('status', 'cancelled')
                     .order('created_at', { ascending: false });
 
@@ -2570,7 +2718,7 @@ const ExistingInvoicesIndicator = ({ quotationId }) => {
         };
 
         fetchExistingInvoices();
-    }, [quotationId]);
+    }, [jobNumber]);
 
     if (loading) return null;
     if (existingInvoices.length === 0) return null;
@@ -2586,7 +2734,7 @@ const ExistingInvoicesIndicator = ({ quotationId }) => {
                 <AlertCircle className="w-4 h-4 text-accent-orange mt-0.5 flex-shrink-0" />
                 <div className="flex-1">
                     <h4 className="text-xs font-semibold text-accent-orange mb-1">
-                        Existing Invoices for this Quotation
+                        Existing Invoices for Job {jobNumber}
                     </h4>
                     <p className="text-[10px] text-silver-dark mb-2">
                         Maximum 2 invoices allowed: 1 IDR + 1 USD

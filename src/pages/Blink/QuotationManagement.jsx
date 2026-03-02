@@ -238,7 +238,7 @@ const QuotationManagement = () => {
             const message = status === 'draft'
                 ? `Job Number ${jobNumber} saved as draft!`
                 : `Job Number ${jobNumber} created and sent for Finance approval!`;
-            alert(message + '\nIni akan menjadi reference untuk SO, Shipment, dan BL/AWB.');
+            alert(message + '\nThis will be the reference for SO, Shipment, and BL/AWB.');
         } catch (error) {
             console.error('Error creating quotation:', error);
             alert('Failed to create quotation: ' + error.message);
@@ -249,7 +249,7 @@ const QuotationManagement = () => {
 
 
     const handleManagerReject = async (quotationId, reason) => {
-        const rejectionReason = prompt('Alasan reject (optional):');
+        const rejectionReason = prompt('Reject reason (optional):');
         try {
             const { error } = await supabase
                 .from('blink_quotations')
@@ -262,7 +262,7 @@ const QuotationManagement = () => {
             if (error) throw error;
 
             await fetchQuotations();
-            alert('❌ Quotation ditolak. Sales perlu revisi.');
+            alert('❌ Quotation rejected. Sales needs revision.');
             setShowViewModal(false);
         } catch (error) {
             console.error('Error rejecting quotation:', error);
@@ -396,8 +396,8 @@ const QuotationManagement = () => {
                 .eq('quotation_id', quotationId);
 
             // Build confirmation message
-            let confirmMessage = `Yakin hapus quotation ${quotation?.jobNumber || 'ini'}?\n\n`;
-            confirmMessage += `Data yang akan dihapus:\n`;
+            let confirmMessage = `Are you sure you want to delete quotation ${quotation?.jobNumber || 'this'}?\n\n`;
+            confirmMessage += `Data that will be deleted:\n`;
             confirmMessage += `- 1 Quotation\n`;
 
             if (relatedShipments && relatedShipments.length > 0) {
@@ -408,7 +408,7 @@ const QuotationManagement = () => {
                 confirmMessage += `- ${relatedInvoices.length} Invoice(s)\n`;
             }
 
-            confirmMessage += `\n⚠️ Aksi ini tidak dapat dibatalkan!`;
+            confirmMessage += `\n⚠️ This action cannot be undone!`;
 
             if (!confirm(confirmMessage)) {
                 return;
@@ -416,7 +416,7 @@ const QuotationManagement = () => {
 
             // Extra confirmation for converted quotations
             if (quotation?.status === 'converted' && (relatedShipments?.length > 0 || relatedInvoices?.length > 0)) {
-                if (!confirm('Quotation ini sudah dikonversi ke SO dengan shipment/invoice aktif. Yakin lanjutkan?')) {
+                if (!confirm('This Quotation is already converted to SO with active shipment/invoice. Are you sure you want to continue?')) {
                     return;
                 }
             }
@@ -466,7 +466,7 @@ const QuotationManagement = () => {
             await fetchQuotations();
 
             // Success message with details
-            let successMsg = '✅ Berhasil menghapus:\n';
+            let successMsg = '✅ Successfully deleted:\n';
             successMsg += `- 1 Quotation\n`;
             if (relatedShipments?.length > 0) successMsg += `- ${relatedShipments.length} Shipment(s)\n`;
             if (relatedInvoices?.length > 0) successMsg += `- ${relatedInvoices.length} Invoice(s)\n`;
@@ -475,15 +475,15 @@ const QuotationManagement = () => {
             setShowViewModal(false);
         } catch (error) {
             console.error('❌ Error deleting quotation:', error);
-            alert('❌ Gagal menghapus quotation: ' + error.message);
+            alert('❌ Failed to delete quotation: ' + error.message);
         }
     };
 
     // Request revision from customer
     const handleRequestRevision = async (quotationId) => {
-        const reason = prompt('Alasan revisi dari customer:');
+        const reason = prompt('Revision reason from customer:');
         if (!reason || reason.trim() === '') {
-            alert('Alasan revisi harus diisi');
+            alert('Revision reason is required');
             return;
         }
 
@@ -852,11 +852,11 @@ const QuotationManagement = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text">Quotation Management</h1>
-                    <p className="text-silver-dark mt-1">Kelola penawaran harga untuk customer</p>
+                    <h1 className="text-3xl font-bold gradient-text">Operations Quotation</h1>
+                    <p className="text-silver-dark mt-1">Manage operational quotations</p>
                 </div>
                 <Button onClick={() => setShowModal(true)} icon={Plus}>
-                    Quotation Baru
+                    New Quotation
                 </Button>
             </div>
 
@@ -865,7 +865,7 @@ const QuotationManagement = () => {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                 <input
                     type="text"
-                    placeholder="Cari Job Number, Customer, atau Route..."
+                    placeholder="Search Job Number, Customer, or Route..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:outline-none focus:border-accent-orange smooth-transition"
@@ -930,8 +930,8 @@ const QuotationManagement = () => {
                                         <FileText className="w-12 h-12 text-silver-dark mx-auto mb-3" />
                                         <p className="text-silver-dark">
                                             {searchTerm
-                                                ? `Tidak ada quotation yang cocok dengan pencarian "${searchTerm}"`
-                                                : 'Belum ada quotation. Klik "Quotation Baru" untuk memulai.'
+                                                ? `No quotation matches the search for "${searchTerm}"`
+                                                : 'No quotation yet. Click "New Quotation" to start.'
                                             }
                                         </p>
                                     </td>
@@ -1039,7 +1039,7 @@ const QuotationManagement = () => {
                     setShowModal(false);
                     resetForm();
                 }}
-                title="Quotation Baru"
+                title="New Quotation"
                 size="large"
             >
                 <form onSubmit={(e) => handleSubmit(e, 'draft')} className="space-y-6">
@@ -1055,8 +1055,9 @@ const QuotationManagement = () => {
                             onChange={handlePartnerChange}
                             onPartnerLoad={handlePartnerLoad}
                             roleFilter="customer"
-                            placeholder="Pilih Customer..."
+                            placeholder="Select Customer..."
                             required={true}
+                            theme="light"
                         />
                         {formData.customerAddress && (
                             <p className="text-xs text-silver-dark mt-1">
@@ -1065,10 +1066,10 @@ const QuotationManagement = () => {
                         )}
                     </div>
 
-                    {/* Sales Person Dropdown */}
+                    {/* Person in Charge Dropdown */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Sales Person <span className="text-red-400">*</span>
+                            Person in Charge <span className="text-red-400">*</span>
                         </label>
                         <select
                             required
@@ -1076,7 +1077,7 @@ const QuotationManagement = () => {
                             onChange={(e) => setFormData({ ...formData, salesPerson: e.target.value })}
                             className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                         >
-                            <option value="">Select Sales Person...</option>
+                            <option value="">Select Person in Charge...</option>
                             <option value="Operations">Operations</option>
                             <option value="John Doe">John Doe</option>
                             <option value="Jane Smith">Jane Smith</option>
@@ -1550,7 +1551,7 @@ const QuotationManagement = () => {
                                 />
                             </div>
                             <div>
-                                <p className="text-xs text-gray-500 font-medium mb-1">Sales Person</p>
+                                <p className="text-xs text-gray-500 font-medium mb-1">Person in Charge</p>
                                 <input
                                     type="text"
                                     value={isEditingQuotation ? (editedQuotation?.salesPerson || '') : (viewingQuotation.salesPerson || '')}
@@ -1849,7 +1850,7 @@ const QuotationManagement = () => {
                                     <>
                                         <Button
                                             onClick={() => {
-                                                if (confirm('Approve dan langsung buat Sales Order (SO)?\n\nIni akan:\n1. Mengubah status menjadi Converted\n2. Membuat nomor SO otomatis\n3. Membuat Shipment baru di Operations')) {
+                                                if (confirm('Approve and directly create Sales Order (SO)?\n\nThis will:\n1. Change status to Converted\n2. Auto-generate SO number\n3. Create new Shipment in Operations')) {
                                                     handleCreateSO(viewingQuotation);
                                                 }
                                             }}

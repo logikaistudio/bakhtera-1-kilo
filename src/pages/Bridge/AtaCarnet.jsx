@@ -2,10 +2,16 @@
 import React, { useState } from 'react';
 import { Plus, Edit2, Trash2, Search, Filter, FileText, Calendar, Box, Globe, CreditCard, Download, Printer } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { useAuth } from '../../context/AuthContext';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
 
 const AtaCarnet = () => {
+    const { canCreate, canEdit, canDelete } = useAuth();
+    const hasCreate = canCreate('bridge_ata_carnet');
+    const hasEdit = canEdit('bridge_ata_carnet');
+    const hasDelete = canDelete('bridge_ata_carnet');
+
     // Dummy Data
     const [carnetList, setCarnetList] = useState([
         {
@@ -173,10 +179,12 @@ const AtaCarnet = () => {
                         <Download className="w-4 h-4 mr-2" />
                         Export Excel
                     </Button>
-                    <Button onClick={handleOpenAdd} variant="primary">
-                        <Plus className="w-4 h-4 mr-2" />
-                        New Carnet
-                    </Button>
+                    {hasCreate && (
+                        <Button onClick={handleOpenAdd} variant="primary">
+                            <Plus className="w-4 h-4 mr-2" />
+                            New Carnet
+                        </Button>
+                    )}
                 </div>
             </div>
 
@@ -258,9 +266,9 @@ const AtaCarnet = () => {
             </div>
 
             {/* Add/Edit Modal */}
-            <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={isEditing ? 'Edit ATA Carnet' : 'New ATA Carnet'}>
+            <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={isEditing ? (hasEdit ? 'Edit ATA Carnet' : 'View ATA Carnet') : 'New ATA Carnet'}>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <fieldset disabled={isEditing && !hasEdit} className="grid grid-cols-1 md:grid-cols-2 gap-4 border-none p-0 m-0">
                         {/* Section 1: Document Info */}
                         <div className="col-span-full space-y-4 pb-4 border-b border-dark-border">
                             <h3 className="text-sm font-semibold text-silver-dark uppercase tracking-wider mb-2 flex items-center gap-2">
@@ -269,19 +277,19 @@ const AtaCarnet = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-medium text-silver-dark mb-1">Carnet Number</label>
-                                    <input required name="carnetNumber" value={formData.carnetNumber} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2" placeholder="e.g. ATA-2024-XXX" />
+                                    <input required name="carnetNumber" value={formData.carnetNumber} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed" placeholder="e.g. ATA-2024-XXX" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-silver-dark mb-1">Holder Name</label>
-                                    <input required name="holder" value={formData.holder} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2" placeholder="Company or Individual Name" />
+                                    <input required name="holder" value={formData.holder} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed" placeholder="Company or Individual Name" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-silver-dark mb-1">Origin Country</label>
-                                    <input required name="origin" value={formData.origin} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2" placeholder="e.g. Indonesia" />
+                                    <input required name="origin" value={formData.origin} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed" placeholder="e.g. Indonesia" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-silver-dark mb-1">Destination</label>
-                                    <input required name="destination" value={formData.destination} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2" placeholder="e.g. Singapore" />
+                                    <input required name="destination" value={formData.destination} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed" placeholder="e.g. Singapore" />
                                 </div>
                             </div>
                         </div>
@@ -294,15 +302,15 @@ const AtaCarnet = () => {
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
                                     <label className="block text-xs font-medium text-silver-dark mb-1">Entry Date</label>
-                                    <input type="date" required name="entryDate" value={formData.entryDate} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2" />
+                                    <input type="date" required name="entryDate" value={formData.entryDate} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-silver-dark mb-1">Expiry Date</label>
-                                    <input type="date" required name="expiryDate" value={formData.expiryDate} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2" />
+                                    <input type="date" required name="expiryDate" value={formData.expiryDate} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-silver-dark mb-1">Status</label>
-                                    <select name="status" value={formData.status} onChange={handleChange} className="form-select w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2">
+                                    <select name="status" value={formData.status} onChange={handleChange} className="form-select w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed">
                                         <option value="In">In (Import)</option>
                                         <option value="Out">Out (Export)</option>
                                     </select>
@@ -318,20 +326,20 @@ const AtaCarnet = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="md:col-span-2">
                                     <label className="block text-xs font-medium text-silver-dark mb-1">Item Description</label>
-                                    <textarea required name="description" value={formData.description} onChange={handleChange} rows="2" className="form-textarea w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2" placeholder="Detailed description of goods..." />
+                                    <textarea required name="description" value={formData.description} onChange={handleChange} rows="2" className="form-textarea w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed" placeholder="Detailed description of goods..." />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-silver-dark mb-1">Serial Number</label>
-                                    <input name="serialNumber" value={formData.serialNumber} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2" placeholder="Unique Serial No." />
+                                    <input name="serialNumber" value={formData.serialNumber} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed" placeholder="Unique Serial No." />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-silver-dark mb-1">Quantity</label>
-                                    <input type="number" required name="quantity" value={formData.quantity} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2" placeholder="0" />
+                                    <input type="number" required name="quantity" value={formData.quantity} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed" placeholder="0" />
                                 </div>
                                 <div className="grid grid-cols-3 gap-2 md:col-span-2">
                                     <div className="col-span-1">
                                         <label className="block text-xs font-medium text-silver-dark mb-1">Currency</label>
-                                        <select name="currency" value={formData.currency} onChange={handleChange} className="form-select w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2">
+                                        <select name="currency" value={formData.currency} onChange={handleChange} className="form-select w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed">
                                             <option value="IDR">IDR</option>
                                             <option value="USD">USD</option>
                                             <option value="SGD">SGD</option>
@@ -340,24 +348,26 @@ const AtaCarnet = () => {
                                     </div>
                                     <div className="col-span-2">
                                         <label className="block text-xs font-medium text-silver-dark mb-1">Value</label>
-                                        <input type="number" required name="value" value={formData.value} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2" placeholder="Total Value" />
+                                        <input type="number" required name="value" value={formData.value} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed" placeholder="Total Value" />
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </fieldset>
 
                     <div className="flex justify-between items-center mt-6 pt-4 border-t border-dark-border">
                         {/* Left Side: Additional Actions in Edit Mode */}
                         <div className="flex gap-2">
                             {isEditing && (
                                 <>
-                                    <Button type="button" variant="danger" onClick={() => {
-                                        handleDelete(formData.id);
-                                        setShowModal(false);
-                                    }}>
-                                        <Trash2 className="w-4 h-4 mr-1" /> Delete
-                                    </Button>
+                                    {hasDelete && (
+                                        <Button type="button" variant="danger" onClick={() => {
+                                            handleDelete(formData.id);
+                                            setShowModal(false);
+                                        }}>
+                                            <Trash2 className="w-4 h-4 mr-1" /> Delete
+                                        </Button>
+                                    )}
                                     <Button type="button" variant="secondary" onClick={handlePrint}>
                                         <Printer className="w-4 h-4 mr-1" /> Print
                                     </Button>
@@ -367,8 +377,15 @@ const AtaCarnet = () => {
 
                         {/* Right Side: Standard Actions */}
                         <div className="flex gap-2">
-                            <Button type="button" variant="secondary" onClick={() => setShowModal(false)}>Cancel</Button>
-                            <Button type="submit" variant="primary">{isEditing ? 'Update Changes' : 'Create Carnet'}</Button>
+                            <Button type="button" variant="secondary" onClick={() => setShowModal(false)}>
+                                {isEditing && !hasEdit ? 'Close' : 'Cancel'}
+                            </Button>
+                            {!isEditing && hasCreate && (
+                                <Button type="submit" variant="primary">Create Carnet</Button>
+                            )}
+                            {isEditing && hasEdit && (
+                                <Button type="submit" variant="primary">Update Changes</Button>
+                            )}
                         </div>
                     </div>
                 </form>

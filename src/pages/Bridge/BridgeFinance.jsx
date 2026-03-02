@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { DollarSign, FileText, TrendingUp, TrendingDown, Plus, Edit, Check, X, Trash2 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
+import { useAuth } from '../../context/AuthContext';
 import Button from '../../components/Common/Button';
 import LineItemManager from '../../components/Common/LineItemManager';
 import ServiceBreakdown from '../../components/Common/ServiceBreakdown';
@@ -32,6 +33,11 @@ const BridgeFinance = () => {
         getActiveCustomers,
         getActiveVendors
     } = useData();
+
+    const { canCreate, canEdit, canDelete } = useAuth();
+    const hasCreate = canCreate('bridge_finance');
+    const hasEdit = canEdit('bridge_finance');
+    const hasDelete = canDelete('bridge_finance');
 
     const [activeTab, setActiveTab] = useState('invoices');
 
@@ -77,6 +83,7 @@ const BridgeFinance = () => {
     const unpaidPurchases = totalPurchases - paidPurchases;
 
     const handleMarkAsPaid = (type, id) => {
+        if (!hasEdit) return;
         if (window.confirm('Tandai sebagai terbayar?')) {
             const updates = {
                 status: 'paid',
@@ -280,15 +287,17 @@ const BridgeFinance = () => {
                     Purchase Orders ({purchaseOrders.length})
                 </button>
 
-                {activeTab === 'invoices' ? (
+                {hasCreate && activeTab === 'invoices' && (
                     <Button onClick={handleAddInvoice} icon={Plus} size="sm" className="ml-auto">
                         Buat Invoice
                     </Button>
-                ) : activeTab === 'purchases' ? (
+                )}
+                {hasCreate && activeTab === 'purchases' && (
                     <Button onClick={handleAddPurchase} icon={Plus} size="sm" className="ml-auto">
                         Buat Purchase
                     </Button>
-                ) : (
+                )}
+                {hasCreate && activeTab === 'pos' && (
                     <Button onClick={() => setShowPOForm(true)} icon={Plus} size="sm" className="ml-auto">
                         Buat PO
                     </Button>
@@ -364,7 +373,7 @@ const BridgeFinance = () => {
                                                 </td>
                                                 <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                                                     <div className="flex items-center justify-center gap-2">
-                                                        {invoice.status !== 'paid' && (
+                                                        {hasEdit && invoice.status !== 'paid' && (
                                                             <button
                                                                 onClick={() => handleMarkAsPaid('invoice', invoice.id)}
                                                                 className="p-1 hover:bg-green-500 hover:bg-opacity-20 rounded smooth-transition"
@@ -441,7 +450,7 @@ const BridgeFinance = () => {
                                                 </td>
                                                 <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                                                     <div className="flex items-center justify-center gap-2">
-                                                        {purchase.status !== 'paid' && (
+                                                        {hasEdit && purchase.status !== 'paid' && (
                                                             <button
                                                                 onClick={() => handleMarkAsPaid('purchase', purchase.id)}
                                                                 className="p-1 hover:bg-green-500 hover:bg-opacity-20 rounded smooth-transition"

@@ -304,7 +304,7 @@ const LineItemManager = ({ items = [], onChange }) => {
 
                 <div className="flex justify-end gap-2 mt-4">
                     {editingItem && (
-                        <Button type="button" variant="secondary" onClick={handleCancel}>Batal</Button>
+                        <Button type="button" variant="secondary" onClick={handleCancel}>Cancel</Button>
                     )}
                     <Button type="button" onClick={handleAdd} icon={editingItem ? null : Plus}>
                         {editingItem ? 'Update Item' : 'Tambah Item'}
@@ -321,7 +321,7 @@ const LineItemManager = ({ items = [], onChange }) => {
                                 <th className="px-3 py-2 text-left text-silver-light">Paket</th>
                                 <th className="px-3 py-2 text-left text-silver-light">HS Code</th>
                                 <th className="px-3 py-2 text-left text-silver-light">Kode/Nama Barang</th>
-                                <th className="px-3 py-2 text-right text-silver-light">Jumlah</th>
+                                <th className="px-3 py-2 text-right text-silver-light">Amount</th>
                                 <th className="px-3 py-2 text-right text-silver-light">Harga (@)</th>
                                 <th className="px-3 py-2 text-right text-silver-light">Total</th>
                                 <th className="px-3 py-2 text-left text-silver-light">Dim/Berat</th>

@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 
 const PurchaseOrder = () => {
-    const { companySettings } = useData();
+    const { companySettings, businessPartners } = useData();
     const [pos, setPOs] = useState([]);
     const [vendors, setVendors] = useState([]);
     const [shipments, setShipments] = useState([]);
@@ -54,7 +54,7 @@ const PurchaseOrder = () => {
 
     const statusConfig = {
         draft: { label: 'Draft', color: 'bg-gray-500/20 text-gray-400', icon: FileText },
-        submitted: { label: 'Submitted', color: 'bg-blue-500/20 text-blue-400', icon: Clock },
+        submitted: { label: 'Pending Approval', color: 'bg-yellow-500/20 text-yellow-400', icon: Clock },
         approved: { label: 'Approved', color: 'bg-green-500/20 text-green-400', icon: CheckCircle },
         received: { label: 'Received', color: 'bg-purple-500/20 text-purple-400', icon: Package },
         cancelled: { label: 'Cancelled', color: 'bg-red-500/20 text-red-400', icon: XCircle }
@@ -66,6 +66,19 @@ const PurchaseOrder = () => {
         fetchShipments();
         fetchQuotations();
     }, []);
+
+    // Fallback: sync vendors from DataContext if Supabase query returns empty
+    useEffect(() => {
+        if (vendors.length === 0 && businessPartners && businessPartners.length > 0) {
+            const vendorList = businessPartners.filter(
+                p => p.is_vendor === true || p.is_vendor === 'true' || p.is_vendor === 1
+            );
+            if (vendorList.length > 0) {
+                console.log('[PO] Syncing vendors from DataContext businessPartners:', vendorList.length);
+                setVendors(vendorList);
+            }
+        }
+    }, [businessPartners, vendors.length]);
 
     const fetchPOs = async () => {
         try {
@@ -88,16 +101,29 @@ const PurchaseOrder = () => {
 
     const fetchVendors = async () => {
         try {
+            // Fetch all partners then filter client-side
+            // (avoids boolean type mismatch issues with Supabase)
             const { data, error } = await supabase
-                .from('freight_vendors')
-                .select('*')
-                .order('name');
+                .from('blink_business_partners')
+                .select('id, partner_name, partner_code, email, phone, address, is_vendor')
+                .order('partner_name');
 
             if (error) throw error;
-            setVendors(data || []);
+            const allPartners = data || [];
+            // Filter truthy values (handles boolean true, 1, "true", "1")
+            const vendorPartners = allPartners.filter(p => p.is_vendor === true || p.is_vendor === 'true' || p.is_vendor === 1);
+            console.log('[PO] All partners:', allPartners.length, '| Vendors:', vendorPartners.length);
+            setVendors(vendorPartners);
         } catch (error) {
             console.error('Error fetching vendors:', error);
-            setVendors([]);
+            // Fallback: use DataContext businessPartners
+            if (businessPartners && businessPartners.length > 0) {
+                const fallback = businessPartners.filter(p => p.is_vendor === true || p.is_vendor === 'true' || p.is_vendor === 1);
+                console.log('[PO] Using DataContext fallback vendors:', fallback.length);
+                setVendors(fallback);
+            } else {
+                setVendors([]);
+            }
         }
     };
 
@@ -135,8 +161,11 @@ const PurchaseOrder = () => {
         if (vendor) {
             setFormData(prev => ({
                 ...prev,
-                vendor_id: vendor.id
+                vendor_id: vendor.id,
+                vendor_name: vendor.partner_name
             }));
+        } else {
+            setFormData(prev => ({ ...prev, vendor_id: '' }));
         }
     };
 
@@ -201,7 +230,7 @@ const PurchaseOrder = () => {
                 .from('blink_purchase_orders')
                 .insert([{
                     vendor_id: vendor.id,
-                    vendor_name: vendor.name,
+                    vendor_name: vendor.partner_name,
                     vendor_email: vendor.email || '',
                     vendor_phone: vendor.phone || '',
                     vendor_address: vendor.address || '',
@@ -321,8 +350,75 @@ const PurchaseOrder = () => {
 
             console.log('AP entry created successfully:', apData);
 
+            // 5. Create Journal Entries
+            console.log('Fetching COA for Journal Entries...');
+            const { data: coaData, error: coaError } = await supabase
+                .from('finance_coa')
+                .select('id, code, name');
+
+            if (coaError) {
+                console.error('Error fetching COA, skipping journal:', coaError);
+            } else if (apData && apData.length > 0) {
+                // Find AP account (210) and Expense account (500)
+                const apCoa = coaData?.find(c => c.code.startsWith('210'));
+                const expenseCoa = po.coa_id
+                    ? coaData?.find(c => c.id === po.coa_id)
+                    : coaData?.find(c => c.code.startsWith('500'));
+
+                const batchId = crypto.randomUUID();
+                const entryNum = `JE-AP-${Date.now().toString().slice(-6)}`;
+
+                const debitEntry = {
+                    entry_number: entryNum + '-D',
+                    entry_date: billDate,
+                    entry_type: 'po',
+                    reference_type: 'ap',
+                    reference_id: apData[0].id,
+                    reference_number: apData[0].ap_number,
+                    account_code: expenseCoa?.code || '500-001',
+                    account_name: (expenseCoa?.name || 'Beban Operasional') + ' - PO ' + po.po_number,
+                    debit: po.total_amount,
+                    credit: 0,
+                    currency: po.currency || 'IDR',
+                    description: 'PO ' + po.po_number + ' - ' + po.vendor_name,
+                    batch_id: batchId,
+                    source: 'auto',
+                    coa_id: expenseCoa?.id || null,
+                    party_name: po.vendor_name
+                };
+
+                const creditEntry = {
+                    entry_number: entryNum + '-C',
+                    entry_date: billDate,
+                    entry_type: 'po',
+                    reference_type: 'ap',
+                    reference_id: apData[0].id,
+                    reference_number: apData[0].ap_number,
+                    account_code: apCoa?.code || '210-001',
+                    account_name: (apCoa?.name || 'Hutang Usaha') + ' - ' + po.vendor_name,
+                    debit: 0,
+                    credit: po.total_amount,
+                    currency: po.currency || 'IDR',
+                    description: 'PO ' + po.po_number + ' - ' + po.vendor_name,
+                    batch_id: batchId,
+                    source: 'auto',
+                    coa_id: apCoa?.id || null,
+                    party_name: po.vendor_name
+                };
+
+                const { error: journalError } = await supabase
+                    .from('blink_journal_entries')
+                    .insert([debitEntry, creditEntry]);
+
+                if (journalError) {
+                    console.error('Error creating journal entries:', journalError);
+                } else {
+                    console.log('Journal entries created successfully.');
+                }
+            }
+
             await fetchPOs();
-            alert(`✅ PO approved!\n\nAP Entry Created:\n• AP Number: ${apNumber}\n• Amount: ${formatCurrency(po.total_amount, po.currency)}\n• Due Date: ${dueDateStr}`);
+            alert(`✅ PO approved!\n\nAP Entry Created:\n• AP Number: ${apNumber}\n• Amount: ${formatCurrency(po.total_amount, po.currency)}\n• Due Date: ${dueDateStr}\n• Recorded in Ledger.`);
         } catch (error) {
             console.error('Error approving PO:', error);
             alert('Failed to approve PO: ' + error.message);
@@ -330,18 +426,20 @@ const PurchaseOrder = () => {
     };
 
     const handleSubmitPO = async (po) => {
-        if (!confirm(`Submit PO ${po.po_number} for approval?`)) return;
+        if (!confirm(`Submit PO ${po.po_number} for manager approval?`)) return;
 
         try {
             const { error } = await supabase
                 .from('blink_purchase_orders')
-                .update({ status: 'submitted' })
+                .update({
+                    status: 'submitted'
+                })
                 .eq('id', po.id);
 
             if (error) throw error;
 
             await fetchPOs();
-            alert('PO submitted for approval!');
+            alert('✅ PO berhasil disubmit!\nCek Approval Center untuk proses persetujuan.');
         } catch (error) {
             console.error('Error submitting PO:', error);
             alert('Failed to submit PO: ' + error.message);
@@ -355,12 +453,30 @@ const PurchaseOrder = () => {
             return;
         }
 
-        if (!confirm(`Hapus PO ${po.po_number}?\n\nPerhatian: Tindakan ini tidak dapat dibatalkan dan akan menghapus AP yang terkait.`)) return;
+        if (!confirm(`Hapus PO ${po.po_number}?\n\nPerhatian: This action cannot be undone dan akan menghapus AP yang terkait.`)) return;
 
         try {
             console.log('Deleting PO:', po.po_number);
 
-            // 1. Delete linked AP entry if exists
+            // 1. Fetch linked AP entry to delete its related journal entries
+            const { data: linkedAp } = await supabase
+                .from('blink_ap_transactions')
+                .select('id')
+                .eq('po_id', po.id)
+                .single();
+
+            if (linkedAp) {
+                const { error: journalError } = await supabase
+                    .from('blink_journal_entries')
+                    .delete()
+                    .eq('reference_id', linkedAp.id);
+
+                if (journalError) {
+                    console.warn('Could not delete linked journal entries:', journalError);
+                }
+            }
+
+            // 2. Delete linked AP entry if exists
             const { error: apError } = await supabase
                 .from('blink_ap_transactions')
                 .delete()
@@ -395,38 +511,28 @@ const PurchaseOrder = () => {
             alert(`✅ PO ${po.po_number} berhasil dihapus.`);
         } catch (error) {
             console.error('Error deleting PO:', error);
-            alert('Gagal menghapus PO: ' + error.message);
+            alert('Failed to delete PO: ' + error.message);
         }
     };
 
-    const handlePrintPO = (po) => {
-        try {
-            // Create printable content
-            const printWindow = window.open('', '_blank');
+    // Helper: build and open print window using Blob URL (fixes blank print bug)
+    const buildPrintWindow = (po, autoPrint = false) => {
+        const itemsRows = po.po_items.map(item => {
+            const desc = String(item.description || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return `
+                <tr>
+                    <td>${desc}</td>
+                    <td style="text-align: center;">${item.qty || 0}</td>
+                    <td style="text-align: right;">${formatCurrency(item.unit_price || 0, po.currency)}</td>
+                    <td style="text-align: right;">${formatCurrency(item.amount || 0, po.currency)}</td>
+                </tr>
+            `;
+        }).join('');
 
-            if (!printWindow) {
-                alert('Pop-up blocked! Please allow pop-ups for this site.');
-                return;
-            }
+        const approvalDate = po.approved_at ? new Date(po.approved_at).toLocaleDateString('id-ID') : '-';
+        const approvedBy = po.approved_by || '-';
 
-            // Generate items rows
-            const itemsRows = po.po_items.map(item => {
-                const desc = String(item.description || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                return `
-                    <tr>
-                        <td>${desc}</td>
-                        <td style="text-align: center;">${item.qty || 0}</td>
-                        <td style="text-align: right;">${formatCurrency(item.unit_price || 0, po.currency)}</td>
-                        <td style="text-align: right;">${formatCurrency(item.amount || 0, po.currency)}</td>
-                    </tr>
-                `;
-            }).join('');
-
-            // Format approval date if exists
-            const approvalDate = po.approved_at ? new Date(po.approved_at).toLocaleDateString('id-ID') : '-';
-            const approvedBy = po.approved_by || '-';
-
-            const printContent = `
+        const printContent = `
                 <!DOCTYPE html>
                 <html>
                 <head>
@@ -436,69 +542,100 @@ const PurchaseOrder = () => {
                         * { margin: 0; padding: 0; box-sizing: border-box; }
                         body {
                             font-family: Arial, Helvetica, sans-serif;
-                            margin: 15px;
-                            color: #333;
-                            line-height: 1.4;
+                            margin: 18px 22px;
+                            color: #222;
+                            line-height: 1.45;
                             font-size: 11px;
                         }
-                        .header {
-                            text-align: center;
-                            margin-bottom: 20px;
-                            padding-bottom: 15px;
-                            border-bottom: 2px solid #0070BB;
+
+                        /* ===================== HEADER ===================== */
+                        .doc-header {
+                            display: table;
+                            width: 100%;
+                            border-bottom: 2.5px solid #0070BB;
+                            padding-bottom: 12px;
+                            margin-bottom: 16px;
                         }
-                        .header h1 {
-                            margin: 0 0 8px 0;
+                        .doc-header-left {
+                            display: table-cell;
+                            vertical-align: middle;
+                            width: 60%;
+                        }
+                        .doc-header-right {
+                            display: table-cell;
+                            vertical-align: middle;
+                            text-align: right;
+                            width: 40%;
+                        }
+                        .company-logo {
+                            max-height: 52px;
+                            max-width: 140px;
+                            object-fit: contain;
+                            margin-bottom: 6px;
+                            display: block;
+                        }
+                        .company-name {
+                            font-size: 15px;
+                            font-weight: bold;
                             color: #0070BB;
-                            font-size: 20px;
+                            margin-bottom: 2px;
+                        }
+                        .company-detail {
+                            font-size: 9px;
+                            color: #555;
+                            line-height: 1.5;
+                        }
+                        .po-label {
+                            font-size: 26px;
+                            font-weight: 900;
+                            color: #0070BB;
+                            letter-spacing: 1px;
+                            line-height: 1.1;
+                        }
+                        .po-number {
+                            font-size: 13px;
+                            color: #444;
+                            margin-top: 3px;
                             font-weight: bold;
                         }
-                        .header p {
-                            font-size: 13px;
-                            color: #666;
-                            margin: 0;
-                        }
 
-                        /* Info table for aligned colons */
+                        /* ===================== INFO TABLE ===================== */
                         .info-table {
                             width: 100%;
-                            margin-bottom: 20px;
+                            margin-bottom: 16px;
                             border-collapse: collapse;
                         }
                         .info-table td {
-                            padding: 3px 0;
+                            padding: 2.5px 0;
                             font-size: 11px;
                         }
                         .info-table .label {
-                            width: 130px;
+                            width: 115px;
                             font-weight: bold;
                             color: #555;
                         }
-                        .info-table .colon {
-                            width: 10px;
-                            font-weight: bold;
-                        }
-                        .info-table .value {
-                            color: #333;
-                        }
+                        .info-table .colon { width: 10px; font-weight: bold; }
+                        .info-table .value { color: #222; }
 
                         h3 {
-                            margin: 15px 0 10px 0;
+                            margin: 12px 0 8px 0;
                             color: #0070BB;
-                            font-size: 12px;
+                            font-size: 11px;
+                            text-transform: uppercase;
+                            letter-spacing: 0.5px;
                         }
 
-                        /* Items table */
+                        /* ===================== ITEMS TABLE ===================== */
                         table.items-table {
                             width: 100%;
                             border-collapse: collapse;
-                            margin-bottom: 15px;
+                            margin-bottom: 14px;
                         }
                         table.items-table th,
                         table.items-table td {
                             border: 1px solid #ddd;
-                            padding: 6px 8px;
-                            font-size: 10px;
+                            padding: 5px 7px;
+                            font-size: 13px;
                         }
                         table.items-table th {
                             background-color: #0070BB;
@@ -507,154 +644,184 @@ const PurchaseOrder = () => {
                             text-align: left;
                         }
                         table.items-table tbody tr:nth-child(even) td {
-                            background-color: #f9f9f9;
+                            background-color: #f7f9fc;
                         }
 
-                        /* Footer section with 2 columns */
+                        /* ===================== FOOTER SECTION ===================== */
                         .footer-section {
                             display: table;
                             width: 100%;
-                            margin-top: 15px;
+                            margin-top: 12px;
                         }
                         .footer-left {
                             display: table-cell;
-                            width: 50%;
+                            width: 48%;
                             vertical-align: top;
-                            padding-right: 20px;
+                            padding-right: 18px;
                         }
                         .footer-right {
                             display: table-cell;
-                            width: 50%;
+                            width: 52%;
                             vertical-align: top;
                         }
 
-                        /* Approval info on left */
-                        .approval-info {
-                            margin-bottom: 15px;
-                        }
-                        .approval-info table {
-                            border-collapse: collapse;
-                        }
-                        .approval-info td {
-                            padding: 3px 0;
-                            font-size: 11px;
-                        }
-                        .approval-info .label {
-                            width: 100px;
-                            font-weight: bold;
-                            color: #555;
-                        }
-                        .approval-info .colon {
-                            width: 10px;
-                            font-weight: bold;
-                        }
-                        .approval-info .value {
-                            color: #333;
-                        }
-
-                        /* Notes section on left */
+                        /* Notes */
                         .notes-section {
-                            padding: 10px;
+                            padding: 8px 10px;
                             background: #f9f9f9;
                             border-left: 3px solid #0070BB;
                             font-size: 10px;
+                            margin-bottom: 10px;
                         }
                         .notes-section strong {
-                            font-size: 11px;
+                            font-size: 10px;
                             display: block;
-                            margin-bottom: 5px;
+                            margin-bottom: 4px;
                         }
 
-                        /* Totals table on right */
+                        /* Approval meta info */
+                        .approval-meta td {
+                            padding: 2.5px 0;
+                            font-size: 10px;
+                        }
+                        .approval-meta .label {
+                            width: 90px;
+                            font-weight: bold;
+                            color: #555;
+                        }
+                        .approval-meta .colon { width: 8px; }
+
+                        /* Totals table */
                         .totals-table {
                             width: 100%;
                             border-collapse: collapse;
                         }
                         .totals-table tr td {
-                            padding: 3px 0;
+                            padding: 3px 2px;
                             font-size: 11px;
                         }
                         .totals-table .label {
-                            width: 100px;
+                            width: 110px;
                             text-align: right;
                             font-weight: bold;
-                            padding-right: 5px;
+                            padding-right: 6px;
+                            color: #555;
                         }
-                        .totals-table .colon {
-                            width: 10px;
-                            font-weight: bold;
-                        }
+                        .totals-table .colon { width: 10px; font-weight: bold; }
                         .totals-table .value {
-                            width: 150px;
                             text-align: right;
-                            padding-left: 10px;
+                            padding-left: 8px;
                         }
-                        .totals-table .grand-total {
+                        .totals-table .grand-total td {
                             font-size: 13px;
                             font-weight: bold;
                             border-top: 2px solid #0070BB;
-                            padding-top: 8px !important;
-                        }
-                        .totals-table .grand-total .value {
+                            padding-top: 6px !important;
                             color: #0070BB;
                         }
 
+                        /* ===================== SIGNATURE BOXES (compact) ===================== */
+                        .sig-section {
+                            margin-top: 20px;
+                            page-break-inside: avoid;
+                        }
+                        .sig-section h3 { margin-bottom: 8px; }
+                        .sig-row {
+                            display: table;
+                            width: 55%;   /* Only 2 boxes, left-aligned */
+                        }
+                        .sig-cell {
+                            display: table-cell;
+                            width: 50%;
+                            padding-right: 10px;
+                            vertical-align: top;
+                        }
+                        .sig-cell:last-child { padding-right: 0; }
+                        .sig-box {
+                            border: 1px solid #ccc;
+                            padding: 7px 10px 6px;
+                            background: #f9f9f9;
+                            text-align: center;
+                        }
+                        .sig-box.approved {
+                            border: 2px solid #0070BB;
+                            background: #f3f8fd;
+                        }
+                        .sig-box-title {
+                            font-weight: bold;
+                            font-size: 10px;
+                            color: #555;
+                            margin-bottom: 28px;
+                        }
+                        .sig-box.approved .sig-box-title { color: #0070BB; }
+                        .sig-box-line {
+                            border-top: 1px solid #999;
+                            padding-top: 4px;
+                            font-size: 9px;
+                            color: #333;
+                        }
+                        .sig-box.approved .sig-box-line { border-color: #0070BB; }
+                        .sig-box-date {
+                            font-size: 8.5px;
+                            color: #777;
+                            margin-top: 2px;
+                        }
+
+                        /* ===================== BUTTONS ===================== */
                         .button-container {
-                            margin-top: 30px;
+                            margin-top: 24px;
                             text-align: center;
                         }
                         button {
-                            padding: 10px 25px;
-                            margin: 0 8px;
+                            padding: 8px 22px;
+                            margin: 0 6px;
                             border: none;
                             border-radius: 4px;
                             cursor: pointer;
                             font-size: 12px;
                             font-weight: bold;
                         }
-                        .btn-print {
-                            background: #0070BB;
-                            color: white;
-                        }
-                        .btn-print:hover {
-                            background: #005a99;
-                        }
-                        .btn-close {
-                            background: #666;
-                            color: white;
-                        }
-                        .btn-close:hover {
-                            background: #555;
-                        }
+                        .btn-print { background: #0070BB; color: white; }
+                        .btn-print:hover { background: #005a99; }
+                        .btn-preview { background: #28a745; color: white; }
+                        .btn-preview:hover { background: #218838; }
+                        .btn-close { background: #666; color: white; }
+                        .btn-close:hover { background: #555; }
+
                         @media print {
-                            button { display: none; }
                             .button-container { display: none; }
-                            body { margin: 10px; }
+                            body { margin: 8px 12px; }
                         }
                     </style>
                 </head>
                 <body>
-                    <!-- Company Letterhead -->
-                    <div style="margin-bottom: 20px;">
-                        <div style="text-align: center;">
-                            <h1 style="margin: 0 0 5px 0; color: #0070BB; font-size: 18px;">${companySettings?.company_name || 'PT Bakhtera Satu Indonesia'}</h1>
-                            <p style="margin: 0 0 3px 0; font-size: 10px; color: #444;">${(companySettings?.company_address || 'Jakarta, Indonesia').replace(/\n/g, ', ')}</p>
-                            ${companySettings?.company_phone || companySettings?.company_email ? `<p style="margin: 0; font-size: 9px; color: #666;">${companySettings?.company_phone ? 'Tel: ' + companySettings.company_phone : ''}${companySettings?.company_phone && companySettings?.company_email ? ' | ' : ''}${companySettings?.company_email ? 'Email: ' + companySettings.company_email : ''}</p>` : ''}
+
+                    <!-- ===== TOP HEADER: Company Left | PO Label Right ===== -->
+                    <div class="doc-header">
+                        <div class="doc-header-left">
+                            ${companySettings?.logo_url
+                ? `<img src="${companySettings.logo_url}" alt="Logo" class="company-logo" />`
+                : ''}
+                            <div class="company-name">Bakhtera Freight Worldwide</div>
+                            <div class="company-detail">
+                                Office Park Puri Mansion, Jl. Outer Ring Road Blok C No.36 Kembangan Selatan,<br/>
+                                Jakarta Barat 11610
+                                ${companySettings?.company_phone ? '<br/>Tel: ' + companySettings.company_phone : ''}
+                                ${companySettings?.company_email ? ' &nbsp;|&nbsp; ' + companySettings.company_email : ''}
+                            </div>
                         </div>
-                        <div style="margin-top: 10px; border-top: 2px solid #0070BB;"></div>
-                    </div>
-                    
-                    <div class="header">
-                        <h1>PURCHASE ORDER</h1>
-                        <p><strong>${po.po_number}</strong></p>
+                        <div class="doc-header-right">
+                            <div class="po-label">PURCHASE ORDER</div>
+                            <div class="po-number">${po.po_number}</div>
+                        </div>
                     </div>
 
-                    <!--Info section with aligned colons -->
+                    <!-- ===== PO INFO ===== -->
                     <table class="info-table">
                         <tr>
                             <td class="label">Vendor</td>
                             <td class="colon">:</td>
-                            <td class="value">${po.vendor_name || '-'}</td>
+                            <td class="value"><strong>${po.vendor_name || '-'}</strong></td>
                         </tr>
                         <tr>
                             <td class="label">PO Date</td>
@@ -676,41 +843,22 @@ const PurchaseOrder = () => {
                             <td class="colon">:</td>
                             <td class="value">${po.currency || 'IDR'}</td>
                         </tr>
+                        ${po.job_number ? `<tr>
+                            <td class="label">Job / SO No.</td>
+                            <td class="colon">:</td>
+                            <td class="value">${po.job_number}</td>
+                        </tr>` : ''}
                     </table>
 
-                    <!-- Shipper & Consignee Section -->
-                    ${po.shipper_name || po.consignee_name ? `
-                        <h3>Shipping Details</h3>
-                        <div style="display: table; width: 100%; margin-bottom: 15px;">
-                            ${po.shipper_name ? `
-                                <div style="display: table-cell; width: 50%; padding-right: 20px; vertical-align: top;">
-                                    <div style="padding: 10px; background: #f9f9f9; border-left: 3px solid #0070BB;">
-                                        <strong style="display: block; margin-bottom: 5px; color: #0070BB;">Shipper</strong>
-                                        <div style="font-size: 11px;">${po.shipper_name}</div>
-                                        ${po.shipper_address ? `<div style="font-size: 10px; color: #666; margin-top: 3px;">${po.shipper_address.replace(/\n/g, '<br>')}</div>` : ''}
-                                    </div>
-                                </div>
-                            ` : ''}
-                            ${po.consignee_name ? `
-                                <div style="display: table-cell; width: 50%; padding-left: ${po.shipper_name ? '0' : '0'}; vertical-align: top;">
-                                    <div style="padding: 10px; background: #f9f9f9; border-left: 3px solid #0070BB;">
-                                        <strong style="display: block; margin-bottom: 5px; color: #0070BB;">Consignee</strong>
-                                        <div style="font-size: 11px;">${po.consignee_name}</div>
-                                        ${po.consignee_address ? `<div style="font-size: 10px; color: #666; margin-top: 3px;">${po.consignee_address.replace(/\n/g, '<br>')}</div>` : ''}
-                                    </div>
-                                </div>
-                            ` : ''}
-                        </div>
-                    ` : ''}
-
+                    <!-- ===== ITEMS ===== -->
                     <h3>Order Items</h3>
                     <table class="items-table">
                         <thead>
                             <tr>
                                 <th>Description</th>
-                                <th style="width: 60px; text-align: center;">Qty</th>
-                                <th style="width: 120px; text-align: right;">Unit Price</th>
-                                <th style="width: 120px; text-align: right;">Amount</th>
+                                <th style="width:55px; text-align:center;">Qty</th>
+                                <th style="width:115px; text-align:right;">Unit Price</th>
+                                <th style="width:115px; text-align:right;">Amount</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -718,36 +866,25 @@ const PurchaseOrder = () => {
                         </tbody>
                     </table>
 
-                    <!-- Footer section: Left (Approval + Notes) | Right (Totals) -->
+                    <!-- gap antara tabel item dan footer -->
+                    <div style="margin-top: 20px;"></div>
+
+                    <!-- ===== FOOTER: Approval Info Left | Totals Right ===== -->
                     <div class="footer-section">
-                        <!-- Left column: Approval and Notes -->
                         <div class="footer-left">
-                            <!-- Approval Info -->
-                            <div class="approval-info">
-                                <table>
-                                    <tr>
-                                        <td class="label">Approved Date</td>
-                                        <td class="colon">:</td>
-                                        <td class="value">${approvalDate}</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="label">Approved By</td>
-                                        <td class="colon">:</td>
-                                        <td class="value">${approvedBy}</td>
-                                    </tr>
-                                </table>
-                            </div>
-
-                            <!-- Notes (aligned with Tax row on right) -->
-                            ${po.notes ? `
-                                <div class="notes-section">
-                                    <strong>Notes:</strong>
-                                    ${String(po.notes).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>')}
-                                </div>
-                            ` : ''}
+                            <table class="approval-meta" style="border-collapse:collapse;">
+                                <tr>
+                                    <td class="label">Approved By</td>
+                                    <td class="colon">:</td>
+                                    <td>${approvedBy}</td>
+                                </tr>
+                                <tr>
+                                    <td class="label">Approved Date</td>
+                                    <td class="colon">:</td>
+                                    <td>${approvalDate}</td>
+                                </tr>
+                            </table>
                         </div>
-
-                        <!-- Right column: Totals -->
                         <div class="footer-right">
                             <table class="totals-table">
                                 <tr>
@@ -761,79 +898,116 @@ const PurchaseOrder = () => {
                                     <td class="value">${formatCurrency(po.tax_amount || 0, po.currency)}</td>
                                 </tr>
                                 <tr class="grand-total">
-                                    <td class="label grand-total">TOTAL</td>
-                                    <td class="colon grand-total">:</td>
-                                    <td class="value grand-total">${formatCurrency(po.total_amount || 0, po.currency)}</td>
+                                    <td class="label">TOTAL</td>
+                                    <td class="colon">:</td>
+                                    <td class="value">${formatCurrency(po.total_amount || 0, po.currency)}</td>
                                 </tr>
                             </table>
                         </div>
                     </div>
 
-                    <!-- Approval Signature Section -->
-                    <div style="margin-top: 40px; page-break-inside: avoid;">
-                        <h3>Approval Signature</h3>
-                        <div style="display: table; width: 100%;">
-                            <!-- Prepared By -->
-                            <div style="display: table-cell; width: 33%; text-align: center; padding: 10px; vertical-align: top;">
-                                <div style="border: 1px solid #ddd; padding: 15px; min-height: 100px; background: #f9f9f9;">
-                                    <div style="font-weight: bold; margin-bottom: 60px; color: #555;">Prepared By</div>
-                                    <div style="border-top: 1px solid #999; padding-top: 5px; font-size: 10px;">
-                                        (__________________)
-                                    </div>
-                                    <div style="font-size: 9px; color: #666; margin-top: 3px;">Date: __________</div>
-                                </div>
-                            </div>
-                            <!-- Approved By -->
-                            <div style="display: table-cell; width: 33%; text-align: center; padding: 10px; vertical-align: top;">
-                                <div style="border: 2px solid #0070BB; padding: 15px; min-height: 100px; background: #f7fcff;">
-                                    <div style="font-weight: bold; margin-bottom: 10px; color: #0070BB;">Approved By</div>
-                                    ${po.approval_signature ? `
-                                        <img src="${po.approval_signature}" alt="Signature" style="max-width: 100px; max-height: 40px; margin: 5px auto; display: block;" />
-                                    ` : `
-                                        <div style="margin: 20px 0;"></div>
-                                    `}
-                                    <div style="border-top: 1px solid #0070BB; padding-top: 5px; font-size: 10px; margin-top: 10px;">
-                                        <strong>${approvedBy}</strong>
-                                    </div>
-                                    <div style="font-size: 9px; color: #666; margin-top: 3px;">Date: ${approvalDate}</div>
-                                </div>
-                            </div>
-                            <!-- Received By -->
-                            <div style="display: table-cell; width: 33%; text-align: center; padding: 10px; vertical-align: top;">
-                                <div style="border: 1px solid #ddd; padding: 15px; min-height: 100px; background: #f9f9f9;">
-                                    <div style="font-weight: bold; margin-bottom: 60px; color: #555;">Received By</div>
-                                    <div style="border-top: 1px solid #999; padding-top: 5px; font-size: 10px;">
-                                        (__________________)
-                                    </div>
-                                    <div style="font-size: 9px; color: #666; margin-top: 3px;">Date: __________</div>
-                                </div>
-                            </div>
+                    <!-- ===== NOTES: Di bawah total, kolom kiri ===== -->
+                    ${po.notes ? `
+                    <div style="margin-top: 14px; width: 48%;">
+                        <div class="notes-section">
+                            <strong>Catatan:</strong>
+                            ${String(po.notes).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>')}
                         </div>
                     </div>
+                    ` : ''}
 
+
+
+                    <!-- ===== ACTION BUTTONS ===== -->
                     <div class="button-container">
-                        <button onclick="window.print()" class="btn-print">🖨️ Print</button>
-                        <button onclick="window.close()" class="btn-close">✖ Close</button>
+                        <button onclick="window.focus(); window.print();" class="btn-print">🖨️ Cetak Dokumen</button>
+                        <button onclick="window.close()" class="btn-close">✖ Tutup</button>
                     </div>
                 </body>
                 </html>
             `;
 
-            printWindow.document.write(printContent);
-            printWindow.document.close();
-        } catch (error) {
+        // ✅ Blob URL approach — fixes blank print (document.write doesn't render for printing)
+        const blob = new Blob([printContent], { type: 'text/html; charset=UTF-8' });
+        const blobUrl = URL.createObjectURL(blob);
+
+        if (autoPrint) {
+            // Print PO: open and auto-trigger print dialog when loaded
+            const printWindow = window.open(blobUrl, '_blank');
+            if (!printWindow) {
+                alert('Pop-up diblokir! Izinkan pop-up untuk situs ini.');
+                URL.revokeObjectURL(blobUrl);
+                return;
+            }
+            printWindow.onload = () => {
+                setTimeout(() => {
+                    printWindow.focus();
+                    printWindow.print();
+                    // Clean up blob URL after a delay
+                    setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+                }, 200);
+            };
+        } else {
+            // Print Preview: just open the document to view
+            const previewWindow = window.open(blobUrl, '_blank');
+            if (!previewWindow) {
+                alert('Pop-up diblokir! Izinkan pop-up untuk situs ini.');
+                URL.revokeObjectURL(blobUrl);
+                return;
+            }
+            // Clean up blob URL after it's loaded
+            previewWindow.onload = () => {
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+            };
+        }
+    };
+
+    const handlePrintPO = (po) => {
+        // Print PO = langsung cetak (auto-trigger dialog)
+        try { buildPrintWindow(po, true); }
+        catch (error) {
             console.error('Error printing PO:', error);
+            alert('Gagal membuka print: ' + error.message);
+        }
+    };
+
+    const handlePrintPreviewPO = (po) => {
+        // Print Preview = tampilkan dokumen saja, user cetak sendiri
+        try { buildPrintWindow(po, false); }
+        catch (error) {
+            console.error('Error print preview PO:', error);
             alert('Gagal membuka print preview: ' + error.message);
         }
     };
 
-    const handleEditPO = (po) => {
+    const handleEditPO = (po, currentVendors) => {
+        // Try to match vendor_id to blink_business_partners by ID first, then by name
+        const vendorList = currentVendors || vendors;
+        let matchedVendorId = '';
+        if (po.vendor_id) {
+            const byId = vendorList.find(v => v.id === po.vendor_id);
+            if (byId) {
+                matchedVendorId = byId.id;
+            } else if (po.vendor_name) {
+                // Fallback: match by name
+                const byName = vendorList.find(v =>
+                    v.partner_name?.toLowerCase().trim() === po.vendor_name?.toLowerCase().trim()
+                );
+                matchedVendorId = byName ? byName.id : '';
+            }
+        } else if (po.vendor_name) {
+            const byName = vendorList.find(v =>
+                v.partner_name?.toLowerCase().trim() === po.vendor_name?.toLowerCase().trim()
+            );
+            matchedVendorId = byName ? byName.id : '';
+        }
+
         setFormData({
-            vendor_id: po.vendor_id || '',
+            vendor_id: matchedVendorId,
             po_date: po.po_date,
             delivery_date: po.delivery_date || '',
             payment_terms: po.payment_terms || 'NET 30',
-            po_items: po.po_items && po.po_items.length > 0 ? po.po_items : [{ description: '', qty: 1, unit: 'Unit', unit_price: 0, amount: 0, coa_id: null }],
+            po_items: po.po_items && po.po_items.length > 0 ? po.po_items : [{ item_name: '', description: '', qty: 1, unit: 'Job', unit_price: 0, amount: 0, coa_id: null }],
             tax_rate: po.tax_rate || 11.00,
             discount_amount: po.discount_amount || 0,
             notes: po.notes || '',
@@ -841,8 +1015,7 @@ const PurchaseOrder = () => {
             shipment_id: po.shipment_id || null,
             quotation_id: po.quotation_id || null,
             job_number: po.job_number || '',
-            coa_id: po.coa_id || '', // Load existing COA
-            // NEW: Shipper & Consignee details
+            coa_id: po.coa_id || '',
             shipper_id: po.shipper_id || '',
             shipper_name: po.shipper_name || '',
             shipper_address: po.shipper_address || '',
@@ -853,7 +1026,6 @@ const PurchaseOrder = () => {
         setIsEditing(true);
         setEditId(po.id);
         setShowCreateModal(true);
-        // If coming from View Modal, close it? Or keep it open? Better close View Modal first usually.
         setShowViewModal(false);
     };
 
@@ -890,7 +1062,7 @@ const PurchaseOrder = () => {
             // Build update object
             const updates = {
                 vendor_id: vendor.id,
-                vendor_name: vendor.name,
+                vendor_name: vendor.partner_name,
                 vendor_email: vendor.email || '',
                 vendor_phone: vendor.phone || '',
                 vendor_address: vendor.address || '',
@@ -924,7 +1096,7 @@ const PurchaseOrder = () => {
             if (wasApproved) {
                 updates.status = 'submitted'; // Needs re-approval
                 // Append revision note to existing notes instead of using separate column
-                const revisionNote = `[REVISED ${new Date().toLocaleDateString('id-ID')}] `;
+                const revisionNote = `[REVISED ${new Date().toLocaleDateString('id-ID')}]`;
                 updates.notes = revisionNote + (formData.notes || '');
 
                 // Update linked AP entry if exists
@@ -934,7 +1106,7 @@ const PurchaseOrder = () => {
                         .update({
                             original_amount: total,
                             outstanding_amount: total,
-                            notes: `PO Revised - Amount updated from ${formatCurrency(currentPO.total_amount, currentPO.currency)} to ${formatCurrency(total, formData.currency)}`,
+                            notes: `PO Revised - Amount updated from ${formatCurrency(currentPO.total_amount, currentPO.currency)} to ${formatCurrency(total, formData.currency)} `,
                             status: 'pending_revision'
                         })
                         .eq('po_id', currentPO.id);
@@ -995,8 +1167,8 @@ const PurchaseOrder = () => {
 
     const formatCurrency = (value, currency = 'IDR') => {
         return currency === 'USD'
-            ? `$${value.toLocaleString('id-ID')}`
-            : `Rp ${value.toLocaleString('id-ID')}`;
+            ? `$${value.toLocaleString('id-ID')} `
+            : `Rp ${value.toLocaleString('id-ID')} `;
     };
 
     const filteredPOs = pos.filter(po => {
@@ -1034,7 +1206,7 @@ const PurchaseOrder = () => {
                     <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                     <input
                         type="text"
-                        placeholder="Cari PO number atau vendor..."
+                        placeholder="Search PO number atau vendor..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-12 pr-4 py-3 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-base"
@@ -1054,6 +1226,7 @@ const PurchaseOrder = () => {
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Delivery Date</th>
                                 <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">Amount</th>
                                 <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap">Status</th>
+                                <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
@@ -1103,10 +1276,20 @@ const PurchaseOrder = () => {
                                                 <span className="font-semibold text-silver-light">{formatCurrency(po.total_amount, po.currency)}</span>
                                             </td>
                                             <td className="px-3 py-2 text-center whitespace-nowrap">
-                                                <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${config?.color}`}>
+                                                <div className={`inline - flex items - center gap - 1 px - 2 py - 0.5 rounded - full text - xs font - medium ${config?.color} `}>
                                                     <StatusIcon className="w-3 h-3" />
                                                     <span>{config?.label}</span>
                                                 </div>
+                                            </td>
+                                            <td className="px-3 py-2 text-center whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                                                <button
+                                                    onClick={() => handleEditPO(po, vendors)}
+                                                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-500/20 hover:bg-blue-500/40 text-blue-400 rounded text-xs font-medium transition-colors"
+                                                    title="Edit PO"
+                                                >
+                                                    <Edit className="w-3 h-3" />
+                                                    Edit
+                                                </button>
                                             </td>
                                         </tr>
                                     );
@@ -1163,6 +1346,7 @@ const PurchaseOrder = () => {
                             setShowViewModal(false);
                         }}
                         onPrint={() => handlePrintPO(selectedPO)}
+                        onPrintPreview={() => handlePrintPreviewPO(selectedPO)}
                         onDelete={() => handleDeletePO(selectedPO)}
                         statusConfig={statusConfig}
                     />
@@ -1172,15 +1356,59 @@ const PurchaseOrder = () => {
     );
 };
 
-// PO Create/Edit Modal Component
-const POCreateModal = ({ isEditing, vendors, shipments, quotations, accounts, formData, setFormData, handleVendorSelect, addPOItem, removePOItem,
+const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, setFormData, handleVendorSelect, addPOItem, removePOItem,
     updatePOItem, calculateTotals, handleSubmit, formatCurrency, onClose }) => {
+
+    const [vendorSearch, setVendorSearch] = useState('');
+    const [showVendorDropdown, setShowVendorDropdown] = useState(false);
+    const [coaList, setCoaList] = useState([]);
+    const [coaSearchMap, setCoaSearchMap] = useState({});   // { [itemIndex]: searchTerm }
+    const [coaDropdownMap, setCoaDropdownMap] = useState({}); // { [itemIndex]: boolean open }
+    const [paymentMode, setPaymentMode] = useState('30'); // '30','60','90','manual'
+
+    // Fetch COA on mount
+    useEffect(() => {
+        const fetchCOA = async () => {
+            const { data } = await supabase.from('finance_coa').select('id,code,name,type').in('type', ['EXPENSE', 'COGS']).order('code', { ascending: true });
+            setCoaList(data || []);
+        };
+        fetchCOA();
+    }, []);
+
+    // Sync paymentMode from existing formData on edit
+    useEffect(() => {
+        if (formData.payment_terms === 'NET 30' || formData.payment_terms === '30 Days') setPaymentMode('30');
+        else if (formData.payment_terms === 'NET 60' || formData.payment_terms === '60 Days') setPaymentMode('60');
+        else if (formData.payment_terms === 'NET 90' || formData.payment_terms === '90 Days') setPaymentMode('90');
+        else if (formData.payment_terms) setPaymentMode('manual');
+    }, []);
+
+    const handlePaymentModeChange = (mode) => {
+        setPaymentMode(mode);
+        if (mode === '30') setFormData(prev => ({ ...prev, payment_terms: '30 Days (NET 30)' }));
+        else if (mode === '60') setFormData(prev => ({ ...prev, payment_terms: '60 Days (NET 60)' }));
+        else if (mode === '90') setFormData(prev => ({ ...prev, payment_terms: '90 Days (NET 90)' }));
+        // manual: user types in payment_terms directly
+    };
+
+    const filteredVendors = vendors.filter(v =>
+        v.partner_name?.toLowerCase().includes(vendorSearch.toLowerCase()) ||
+        v.partner_code?.toLowerCase().includes(vendorSearch.toLowerCase())
+    );
+
+    const selectedVendorName = vendors.find(v => v.id === formData.vendor_id)?.partner_name || '';
+
+    const getFilteredCOA = (search) => coaList.filter(c =>
+        c.name?.toLowerCase().includes((search || '').toLowerCase()) ||
+        c.code?.toLowerCase().includes((search || '').toLowerCase())
+    ).slice(0, 30);
 
     const { subtotal, taxAmount, total } = calculateTotals();
 
+
     // Combine shipments and quotations for selection logic
-    const handleAllocationSelect = (e) => {
-        const val = e.target.value; // format: "shipment|ID" or "quotation|ID"
+    const handleAllocationSelect = async (e) => {
+        const val = e.target.value;
 
         if (!val) {
             setFormData(prev => ({
@@ -1195,11 +1423,54 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, accounts, fo
         const [type, id] = val.split('|');
         if (type === 'shipment') {
             const ship = shipments.find(s => s.id === id);
+
+            // Auto-populate po_items from shipment's buying_items and cogs
+            let autoItems = [];
+            const buyingItems = ship?.buying_items || ship?.buyingItems || [];
+            const cogs = ship?.cogs || {};
+
+            // Legacy COGS fields
+            const addIfPresent = (label, value) => {
+                const val2 = parseFloat(String(value || '').replace(/,/g, ''));
+                if (val2 && val2 > 0) {
+                    autoItems.push({ item_name: label, description: `${label} - ${ship.job_number || ''} `, qty: 1, unit: 'Job', unit_price: val2, amount: val2, coa_id: null });
+                }
+            };
+            addIfPresent('Ocean Freight', cogs.oceanFreight);
+            addIfPresent('Air Freight', cogs.airFreight);
+            addIfPresent('Trucking', cogs.trucking);
+            addIfPresent('THC', cogs.thc);
+            addIfPresent('Documentation', cogs.documentation);
+            addIfPresent('Customs Clearance', cogs.customs);
+            addIfPresent('Insurance', cogs.insurance);
+            addIfPresent('Demurrage', cogs.demurrage);
+            addIfPresent(cogs.otherDescription || 'Other Charges', cogs.other);
+
+            // Buying items with COA name lookup
+            if (buyingItems.length > 0) {
+                const coaIds = buyingItems.map(i => i.coa_id).filter(Boolean);
+                let coaMap = {};
+                if (coaIds.length > 0) {
+                    const { data: coaData } = await supabase.from('finance_coa').select('id, name').in('id', coaIds);
+                    (coaData || []).forEach(c => { coaMap[c.id] = c; });
+                }
+                buyingItems.forEach(item => {
+                    const v = parseFloat(String(item.amount || 0).replace(/,/g, ''));
+                    if (v && v > 0) {
+                        const coaName = coaMap[item.coa_id]?.name || item.description || 'Item';
+                        autoItems.push({ item_name: coaName, description: item.description || coaName, qty: parseFloat(item.qty) || 1, unit: item.unit || 'Job', unit_price: parseFloat(item.rate) || v, amount: v, coa_id: item.coa_id || null });
+                    }
+                });
+            }
+
             setFormData(prev => ({
                 ...prev,
                 shipment_id: id,
                 quotation_id: null,
-                job_number: ship?.job_number || '' // Assuming job_number will be added to shipment soon or exists
+                job_number: ship?.job_number || '',
+                currency: ship?.cogs_currency || ship?.cogsCurrency || prev.currency,
+                // Only replace items if we found actual COGS data
+                po_items: autoItems.length > 0 ? autoItems : prev.po_items
             }));
         } else if (type === 'quotation') {
             const quot = quotations.find(q => q.id === id);
@@ -1207,7 +1478,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, accounts, fo
                 ...prev,
                 shipment_id: null,
                 quotation_id: id,
-                job_number: quot?.quotation_number || '' // Use Quote No as fallback if no job number
+                job_number: quot?.quotation_number || ''
             }));
         }
     };
@@ -1215,21 +1486,21 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, accounts, fo
     // Prepare options
     const allocationOptions = [
         ...shipments.map(s => ({
-            value: `shipment|${s.id}`,
+            value: `shipment | ${s.id} `,
             label: `Shipment: ${s.origin} -> ${s.destination} (${s.customer_name})`,
             type: 'Shipment'
         })),
         ...quotations.map(q => ({
-            value: `quotation|${q.id}`,
-            label: `Quote: ${q.quotation_number} - ${q.customer?.name || 'Customer'}`,
+            value: `quotation | ${q.id} `,
+            label: `Quote: ${q.quotation_number} - ${q.customer?.name || 'Customer'} `,
             type: 'Quotation'
         }))
     ];
 
     const currentAllocationValue = formData.shipment_id
-        ? `shipment|${formData.shipment_id}`
+        ? `shipment | ${formData.shipment_id} `
         : formData.quotation_id
-            ? `quotation|${formData.quotation_id}`
+            ? `quotation | ${formData.quotation_id} `
             : '';
 
     return (
@@ -1248,56 +1519,135 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, accounts, fo
                         <label className="block text-sm font-semibold text-accent-blue mb-2">
                             Alokasi Job / Shipment
                         </label>
-                        <p className="text-xs text-silver-dark mb-3">
-                            Hubungkan PO ini dengan Shipment atau Quotation untuk menghitung profit per job.
-                        </p>
-                        <select
-                            value={currentAllocationValue}
-                            onChange={handleAllocationSelect}
-                            className="w-full px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
-                        >
-                            <option value="">-- Tidak Ada Alokasi (Biaya Umum/Overhead) --</option>
-                            <optgroup label="Shipments">
-                                {shipments.map(s => (
-                                    <option key={s.id} value={`shipment|${s.id}`}>
-                                        {s.customer_name ? `[${s.customer_name}] ` : ''}
-                                        {s.origin} → {s.destination}
-                                        {s.job_number ? ` (#${s.job_number})` : ''}
-                                    </option>
-                                ))}
-                            </optgroup>
-                            <optgroup label="Quotations">
-                                {quotations.map(q => (
-                                    <option key={q.id} value={`quotation|${q.id}`}>
-                                        {q.quotation_number} - {q.customer?.name || 'Unknown'}
-                                        ({q.origin} → {q.destination})
-                                    </option>
-                                ))}
-                            </optgroup>
-                        </select>
-                        {(formData.job_number) && (
-                            <p className="mt-2 text-xs text-green-400">
-                                ✓ Linked to Job: <strong>{formData.job_number}</strong>
-                            </p>
+
+                        {formData.shipment_id ? (
+                            /* Locked: PO linked to specific SO — read-only */
+                            <div className="flex items-center gap-3 px-4 py-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                                <span className="text-green-400 text-lg">🔗</span>
+                                <div className="flex-1">
+                                    {(() => {
+                                        const linked = shipments.find(s => s.id === formData.shipment_id);
+                                        return (
+                                            <div>
+                                                <p className="text-sm font-semibold text-green-400">
+                                                    Linked to Shipment
+                                                    {formData.job_number && <span className="ml-2 font-mono">#{formData.job_number}</span>}
+                                                </p>
+                                                {linked && (
+                                                    <p className="text-xs text-silver-dark mt-0.5">
+                                                        {linked.origin} → {linked.destination}
+                                                        {linked.customer_name && ` • ${linked.customer_name} `}
+                                                    </p>
+                                                )}
+                                                {!linked && formData.job_number && (
+                                                    <p className="text-xs text-silver-dark mt-0.5">Job: {formData.job_number}</p>
+                                                )}
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                                <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded-full font-medium">
+                                    Auto-linked from SO
+                                </span>
+                            </div>
+                        ) : (
+                            /* Free dropdown for manual PO */
+                            <>
+                                <p className="text-xs text-silver-dark mb-3">
+                                    Hubungkan PO ini dengan Shipment atau Quotation untuk menghitung profit per job.
+                                </p>
+                                <select
+                                    value={currentAllocationValue}
+                                    onChange={handleAllocationSelect}
+                                    className="w-full px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
+                                >
+                                    <option value="">-- Tidak Ada Alokasi (Biaya Umum/Overhead) --</option>
+                                    <optgroup label="Shipments">
+                                        {shipments.map(s => (
+                                            <option key={s.id} value={`shipment | ${s.id} `}>
+                                                {s.customer_name ? `[${s.customer_name}]` : ''}
+                                                {s.origin} → {s.destination}
+                                                {s.job_number ? ` (#${s.job_number})` : ''}
+                                            </option>
+                                        ))}
+                                    </optgroup>
+                                    <optgroup label="Quotations">
+                                        {quotations.map(q => (
+                                            <option key={q.id} value={`quotation | ${q.id} `}>
+                                                {q.quotation_number} - {q.customer?.name || 'Unknown'}
+                                                ({q.origin} → {q.destination})
+                                            </option>
+                                        ))}
+                                    </optgroup>
+                                </select>
+                                {(formData.job_number) && (
+                                    <p className="mt-2 text-xs text-green-400">
+                                        ✓ Linked to Job: <strong>{formData.job_number}</strong>
+                                    </p>
+                                )}
+                            </>
                         )}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-silver-light mb-2">Vendor *</label>
-                            <select
-                                value={formData.vendor_id}
-                                onChange={handleVendorSelect}
-                                required
-                                className="w-full px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
-                            >
-                                <option value="">Pilih Vendor</option>
-                                {vendors.map(vendor => (
-                                    <option key={vendor.id} value={vendor.id}>{vendor.name}</option>
-                                ))}
-                            </select>
+                            {/* Custom vendor dropdown – white background for macOS compatibility */}
+                            <div className="relative">
+                                <div
+                                    className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg cursor-pointer flex justify-between items-center shadow-sm"
+                                    onClick={() => setShowVendorDropdown(prev => !prev)}
+                                >
+                                    <span className={selectedVendorName ? 'text-gray-800 font-medium' : 'text-gray-400'}>
+                                        {selectedVendorName || 'Pilih Vendor...'}
+                                    </span>
+                                    <span className="text-gray-400 text-xs">▼</span>
+                                </div>
+                                {showVendorDropdown && (
+                                    <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-2xl max-h-60 flex flex-col">
+                                        <div className="p-2 border-b border-gray-100">
+                                            <input
+                                                type="text"
+                                                placeholder="Cari vendor..."
+                                                value={vendorSearch}
+                                                onChange={e => setVendorSearch(e.target.value)}
+                                                className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded text-gray-800 text-sm focus:outline-none focus:border-orange-400"
+                                                autoFocus
+                                            />
+                                        </div>
+                                        <div className="overflow-y-auto flex-1">
+                                            {filteredVendors.length === 0 ? (
+                                                <div className="px-4 py-3 text-gray-500 text-sm">
+                                                    {vendors.length === 0 ? '⚠️ Belum ada vendor. Tambahkan di Master Data → Business Partners.' : 'Tidak ditemukan'}
+                                                </div>
+                                            ) : (
+                                                filteredVendors.map(v => (
+                                                    <button
+                                                        type="button"
+                                                        key={v.id}
+                                                        onClick={() => {
+                                                            handleVendorSelect({ target: { value: v.id } });
+                                                            setShowVendorDropdown(false);
+                                                            setVendorSearch('');
+                                                        }}
+                                                        className={`w - full text - left px - 4 py - 2.5 hover: bg - orange - 50 transition - colors text - sm border - b border - gray - 50 last: border - 0 ${formData.vendor_id === v.id
+                                                            ? 'bg-orange-50 text-orange-600 font-semibold'
+                                                            : 'text-gray-700'
+                                                            } `}
+                                                    >
+                                                        <span className="font-medium">{v.partner_name}</span>
+                                                        {v.partner_code && <span className="ml-2 text-xs text-gray-400">({v.partner_code})</span>}
+                                                    </button>
+                                                ))
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                            {vendors.length === 0 && (
+                                <p className="mt-1 text-xs text-yellow-400">⚠️ No vendors loaded. Go to Blink Master Data → Business Partners and mark partners as "Vendor".</p>
+                            )}
                         </div>
-                        {/* ... currency ... */}
                         <div>
                             <label className="block text-sm font-medium text-silver-light mb-2">Currency</label>
                             <select
@@ -1336,15 +1686,35 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, accounts, fo
                         <div>
                             <label className="block text-sm font-medium text-silver-light mb-2">Payment Terms</label>
                             <select
-                                value={formData.payment_terms}
-                                onChange={(e) => setFormData(prev => ({ ...prev, payment_terms: e.target.value }))}
-                                className="w-full px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
+                                value={formData.payment_terms || ''}
+                                onChange={e => {
+                                    const val = e.target.value;
+                                    setFormData(prev => ({ ...prev, payment_terms: val }));
+                                    if (val === 'manual') {
+                                        setPaymentMode('manual');
+                                        setFormData(prev => ({ ...prev, payment_terms: '' }));
+                                    } else {
+                                        setPaymentMode(val);
+                                    }
+                                }}
+                                className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm focus:outline-none focus:border-accent-orange"
                             >
-                                <option value="NET 15">NET 15</option>
-                                <option value="NET 30">NET 30</option>
-                                <option value="NET 45">NET 45</option>
-                                <option value="NET 60">NET 60</option>
+                                <option value="">-- Pilih Termin Pembayaran --</option>
+                                <option value="30 Days (NET 30)">30 Hari (NET 30)</option>
+                                <option value="60 Days (NET 60)">60 Hari (NET 60)</option>
+                                <option value="90 Days (NET 90)">90 Hari (NET 90)</option>
+                                <option value="Cash on Delivery">Cash on Delivery (COD)</option>
+                                <option value="manual">Manual / Lainnya</option>
                             </select>
+                            {(formData.payment_terms === 'manual' || paymentMode === 'manual') && (
+                                <input
+                                    type="text"
+                                    placeholder="Contoh: NET 45, Cash Before Delivery..."
+                                    value={formData.payment_terms === 'manual' ? '' : formData.payment_terms}
+                                    onChange={e => setFormData(prev => ({ ...prev, payment_terms: e.target.value }))}
+                                    className="mt-2 w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm focus:outline-none focus:border-accent-orange"
+                                />
+                            )}
                         </div>
                     </div>
 
@@ -1359,8 +1729,11 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, accounts, fo
 
                         {/* Header Row */}
                         <div className="grid grid-cols-12 gap-2 mb-2 px-3">
-                            <div className="col-span-4">
-                                <label className="text-xs font-semibold text-silver-dark uppercase">Deskripsi</label>
+                            <div className="col-span-3">
+                                <label className="text-xs font-semibold text-silver-dark uppercase">Item</label>
+                            </div>
+                            <div className="col-span-3">
+                                <label className="text-xs font-semibold text-silver-dark uppercase">Description</label>
                             </div>
                             <div className="col-span-1">
                                 <label className="text-xs font-semibold text-silver-dark uppercase">Qty</label>
@@ -1371,16 +1744,65 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, accounts, fo
                             <div className="col-span-2">
                                 <label className="text-xs font-semibold text-silver-dark uppercase">Total</label>
                             </div>
-                            <div className="col-span-2">
-                                <label className="text-xs font-semibold text-silver-dark uppercase">Akun Biaya</label>
-                            </div>
                             <div className="col-span-1"></div>
                         </div>
 
                         <div className="space-y-3">
                             {formData.po_items.map((item, index) => (
                                 <div key={index} className="grid grid-cols-12 gap-2 items-start glass-card p-3 rounded-lg">
-                                    <div className="col-span-4">
+                                    <div className="col-span-3">
+                                        {/* COA dropdown for item_name */}
+                                        <div className="relative">
+                                            <div
+                                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg cursor-pointer flex justify-between items-center text-sm shadow-sm"
+                                                onClick={() => setCoaDropdownMap(prev => ({ ...prev, [index]: !prev[index] }))}
+                                            >
+                                                <span className={item.item_name ? 'text-blue-600 font-medium' : 'text-gray-400 text-xs'}>
+                                                    {item.item_name || 'Pilih Akun COA...'}
+                                                </span>
+                                                <span className="text-gray-400 text-xs">▼</span>
+                                            </div>
+                                            {coaDropdownMap[index] && (
+                                                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-2xl max-h-52 flex flex-col" style={{ minWidth: '260px' }}>
+                                                    <div className="p-2 border-b border-gray-100">
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Cari nama / kode COA..."
+                                                            value={coaSearchMap[index] || ''}
+                                                            onChange={e => setCoaSearchMap(prev => ({ ...prev, [index]: e.target.value }))}
+                                                            className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-gray-800 text-xs focus:outline-none focus:border-orange-400"
+                                                            autoFocus
+                                                        />
+                                                    </div>
+                                                    <div className="overflow-y-auto flex-1">
+                                                        {getFilteredCOA(coaSearchMap[index]).length === 0 ? (
+                                                            <div className="px-3 py-2 text-gray-400 text-xs">Tidak ditemukan</div>
+                                                        ) : (
+                                                            getFilteredCOA(coaSearchMap[index]).map(coa => (
+                                                                <button
+                                                                    type="button"
+                                                                    key={coa.id}
+                                                                    onClick={() => {
+                                                                        updatePOItem(index, 'item_name', coa.name);
+                                                                        updatePOItem(index, 'coa_id', coa.id);
+                                                                        setCoaDropdownMap(prev => ({ ...prev, [index]: false }));
+                                                                        setCoaSearchMap(prev => ({ ...prev, [index]: '' }));
+                                                                    }}
+                                                                    className={`w - full text - left px - 3 py - 2 hover: bg - orange - 50 transition - colors text - xs border - b border - gray - 50 last: border - 0 ${item.coa_id === coa.id ? 'bg-orange-50 text-orange-600 font-semibold' : 'text-gray-700'
+                                                                        } `}
+                                                                >
+                                                                    <span className="font-mono text-gray-400 mr-1">{coa.code}</span>
+                                                                    <span className="font-medium">{coa.name}</span>
+                                                                    <span className="ml-1 text-gray-300 text-xs">({coa.type})</span>
+                                                                </button>
+                                                            ))
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="col-span-3">
                                         <input
                                             type="text"
                                             placeholder="Deskripsi item"
@@ -1413,19 +1835,9 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, accounts, fo
                                         />
                                     </div>
                                     <div className="col-span-2">
-                                        <div className="px-3 py-2 bg-dark-card border border-dark-border rounded-lg text-silver-light text-sm font-semibold">
+                                        <div className="px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm font-semibold">
                                             {formatCurrency(item.amount, formData.currency)}
                                         </div>
-                                    </div>
-                                    <div className="col-span-2">
-                                        <COAPicker
-                                            value={item.coa_id}
-                                            onChange={(coaId) => updatePOItem(index, 'coa_id', coaId)}
-                                            context="AP"
-                                            minLevel={3}
-                                            placeholder="Pilih Akun"
-                                            size="sm"
-                                        />
                                     </div>
                                     <div className="col-span-1 flex items-center justify-center">
                                         {formData.po_items.length > 1 && (
@@ -1503,20 +1915,32 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, accounts, fo
 };
 
 // PO View Modal Component
-const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove, onPrint, onDelete, statusConfig }) => {
+const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove, onPrint, onPrintPreview, onDelete, statusConfig }) => {
     const config = statusConfig[po.status];
     const StatusIcon = config?.icon || FileText;
 
     return (
         <Modal isOpen={true} onClose={onClose} maxWidth="max-w-4xl">
             <div className="p-6">
+                {/* Status Header */}
                 <div className="flex items-center justify-between mb-6">
                     <h2 className="text-2xl font-bold gradient-text">Purchase Order Details</h2>
-                    <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg ${config?.color}`}>
+                    <div className={`inline - flex items - center gap - 2 px - 4 py - 2 rounded - lg ${config?.color} `}>
                         <StatusIcon className="w-5 h-5" />
                         <span className="font-semibold">{config?.label}</span>
                     </div>
                 </div>
+
+                {/* Pending Approval Banner */}
+                {(po.status === 'submitted' || po.status === 'manager_approval') && (
+                    <div className="mb-4 p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/40 flex items-center gap-3">
+                        <Clock className="w-6 h-6 text-yellow-400 flex-shrink-0" />
+                        <div>
+                            <p className="text-yellow-300 font-semibold text-sm">Menunggu Persetujuan Manager</p>
+                            <p className="text-yellow-400/70 text-xs mt-0.5">PO ini sedang dalam proses review. Persetujuan dilakukan melalui menu <span className="font-bold">Approval Center</span>. PO tidak dapat diubah saat ini.</p>
+                        </div>
+                    </div>
+                )}
 
                 {/* ... PO Info ... */}
                 <div className="space-y-6">
@@ -1564,29 +1988,32 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                     )}
 
 
-                    {/* ... Items Table ... */}
                     <div>
                         <h3 className="text-lg font-semibold text-silver-light mb-3">Items</h3>
-                        <table className="w-full">
-                            <thead className="bg-dark-surface">
-                                <tr>
-                                    <th className="px-4 py-2 text-left text-xs text-silver-dark">Description</th>
-                                    <th className="px-4 py-2 text-right text-xs text-silver-dark">Qty</th>
-                                    <th className="px-4 py-2 text-right text-xs text-silver-dark">Unit Price</th>
-                                    <th className="px-4 py-2 text-right text-xs text-silver-dark">Amount</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-dark-border">
-                                {po.po_items.map((item, idx) => (
-                                    <tr key={idx}>
-                                        <td className="px-4 py-2 text-silver-light">{item.description}</td>
-                                        <td className="px-4 py-2 text-right text-silver-light">{item.qty}</td>
-                                        <td className="px-4 py-2 text-right text-silver-light">{formatCurrency(item.unit_price, po.currency)}</td>
-                                        <td className="px-4 py-2 text-right font-semibold text-silver-light">{formatCurrency(item.amount, po.currency)}</td>
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead className="bg-dark-surface">
+                                    <tr>
+                                        <th className="px-4 py-2 text-left text-xs text-blue-400 font-semibold">Item</th>
+                                        <th className="px-4 py-2 text-left text-xs text-silver-dark">Description</th>
+                                        <th className="px-4 py-2 text-right text-xs text-silver-dark">Qty</th>
+                                        <th className="px-4 py-2 text-right text-xs text-silver-dark">Unit Price</th>
+                                        <th className="px-4 py-2 text-right text-xs text-silver-dark">Amount</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-dark-border">
+                                    {(po.po_items || []).map((item, idx) => (
+                                        <tr key={idx}>
+                                            <td className="px-4 py-2 text-blue-300 font-medium text-sm">{item.item_name || '-'}</td>
+                                            <td className="px-4 py-2 text-silver-light">{item.description}</td>
+                                            <td className="px-4 py-2 text-right text-silver-light">{item.qty}</td>
+                                            <td className="px-4 py-2 text-right text-silver-light">{formatCurrency(item.unit_price, po.currency)}</td>
+                                            <td className="px-4 py-2 text-right font-semibold text-silver-light">{formatCurrency(item.amount, po.currency)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
 
                     {/* ... Totals ... */}
@@ -1623,7 +2050,7 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                                 </div>
                                 <div className="text-center p-3 rounded-lg bg-dark-surface">
                                     <p className="text-xs text-silver-dark mb-1">Sisa</p>
-                                    <p className={`font-bold ${(po.outstanding_amount || po.total_amount) <= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                    <p className={`font - bold ${(po.outstanding_amount || po.total_amount) <= 0 ? 'text-green-400' : 'text-red-400'} `}>
                                         {formatCurrency(po.outstanding_amount ?? po.total_amount, po.currency)}
                                     </p>
                                 </div>
@@ -1683,11 +2110,21 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                             icon={Download}
                             variant="secondary"
                         >
-                            Print PO
+                            🖨️ Print PO
                         </Button>
 
-                        {/* Edit Button - Show for draft/submitted/approved, hide only if paid_amount > 0 */}
-                        {(po.status === 'draft' || po.status === 'submitted' || po.status === 'approved') && (!po.paid_amount || po.paid_amount <= 0) && (
+                        {/* Print Preview Button - opens and auto-triggers print dialog */}
+                        <Button
+                            onClick={onPrintPreview}
+                            icon={Download}
+                            variant="secondary"
+                            className="!border-green-500/50 !text-green-400 hover:!bg-green-500/10"
+                        >
+                            🔍 Print Preview
+                        </Button>
+
+                        {/* Edit Button - Only for draft, locked during pending/approved with payment */}
+                        {po.status === 'draft' && (!po.paid_amount || po.paid_amount <= 0) && (
                             <Button
                                 onClick={onEdit}
                                 icon={Edit}
@@ -1708,11 +2145,22 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                             </Button>
                         )}
 
-                        {/* Approve Button - Only for submitted */}
-                        {po.status === 'submitted' && (
-                            <Button onClick={onApprove} icon={CheckCircle}>
-                                Approve PO
-                            </Button>
+                        {/* Approve Button */}
+                        {(po.status === 'submitted' || po.status === 'manager_approval') && (
+                            <>
+                                <span className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-yellow-500/10 text-yellow-400 text-sm border border-yellow-500/30">
+                                    <Clock className="w-4 h-4" />
+                                    Menunggu Approval Center
+                                </span>
+                                <Button
+                                    onClick={onApprove}
+                                    icon={CheckCircle}
+                                    variant="primary"
+                                    className="!bg-green-600 hover:!bg-green-700 !border-transparent text-white"
+                                >
+                                    Approve PO
+                                </Button>
+                            </>
                         )}
 
                         {/* Delete Button - Only if no payment */}
@@ -1790,7 +2238,7 @@ const POPaymentRecordModal = ({ po, formatCurrency, onClose, onSuccess }) => {
         }
 
         if (formData.amount > outstandingAmount) {
-            alert(`Payment amount cannot exceed outstanding amount (${formatCurrency(outstandingAmount, po.currency)})`);
+            alert(`Payment amount cannot exceed outstanding amount(${formatCurrency(outstandingAmount, po.currency)})`);
             return;
         }
 
@@ -1799,7 +2247,7 @@ const POPaymentRecordModal = ({ po, formatCurrency, onClose, onSuccess }) => {
 
             // Generate payment number
             const year = new Date().getFullYear();
-            const paymentNumber = `PMT-OUT-${year}-${String(Date.now()).slice(-6)}`;
+            const paymentNumber = `PMT - OUT - ${year} -${String(Date.now()).slice(-6)} `;
 
             // Get selected bank info
             const selectedBank = bankAccounts.find(b => b.id === formData.bank_account);
@@ -1815,9 +2263,9 @@ const POPaymentRecordModal = ({ po, formatCurrency, onClose, onSuccess }) => {
                 amount: parseFloat(formData.amount),
                 currency: po.currency,
                 payment_method: formData.payment_method,
-                bank_account: selectedBank ? `${selectedBank.bank_name} - ${selectedBank.account_number}` : null,
+                bank_account: selectedBank ? `${selectedBank.bank_name} - ${selectedBank.account_number} ` : null,
                 transaction_ref: formData.transaction_ref || null,
-                description: `Payment for PO ${po.po_number} to ${po.vendor_name}`,
+                description: `Payment for PO ${po.po_number} to ${po.vendor_name} `,
                 notes: formData.notes || null,
                 status: 'completed'
             };
@@ -1891,16 +2339,16 @@ const POPaymentRecordModal = ({ po, formatCurrency, onClose, onSuccess }) => {
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-silver-dark">Sisa Outstanding:</span>
-                                <span className={`font-bold ${successData.newOutstanding <= 0 ? 'text-green-400' : 'text-yellow-400'}`}>
+                                <span className={`font - bold ${successData.newOutstanding <= 0 ? 'text-green-400' : 'text-yellow-400'} `}>
                                     {formatCurrency(Math.max(0, successData.newOutstanding), successData.currency)}
                                 </span>
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-silver-dark">Status Baru:</span>
-                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${successData.newStatus === 'received' ? 'bg-purple-500/20 text-purple-400' :
+                                <span className={`px - 3 py - 1 rounded - full text - xs font - semibold ${successData.newStatus === 'received' ? 'bg-purple-500/20 text-purple-400' :
                                     successData.newStatus === 'approved' ? 'bg-green-500/20 text-green-400' :
                                         'bg-blue-500/20 text-blue-400'
-                                    }`}>
+                                    } `}>
                                     {successData.newStatus === 'received' ? 'LUNAS' :
                                         successData.newStatus === 'approved' ? 'APPROVED' : successData.newStatus?.toUpperCase()}
                                 </span>

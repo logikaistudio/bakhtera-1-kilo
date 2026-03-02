@@ -204,7 +204,7 @@ const AccountsReceivable = () => {
                     <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                     <input
                         type="text"
-                        placeholder="Cari AR number, invoice, atau customer..."
+                        placeholder="Search AR number, invoice, atau customer..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-12 pr-4 py-3 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-base"
@@ -404,7 +404,7 @@ const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency }) => {
             alert('Alokasi akun pendapatan berhasil disimpan!');
         } catch (error) {
             console.error('Error updating invoice items:', error);
-            alert('Gagal menyimpan perubahan: ' + error.message);
+            alert('Failed to save perubahan: ' + error.message);
         } finally {
             setSavingItems(false);
         }

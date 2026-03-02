@@ -143,7 +143,7 @@ const BlinkCompanySettings = () => {
                 await deleteBankAccount(id, MODULE);
                 alert('Rekening dihapus');
             } catch (error) {
-                alert('Gagal menghapus rekening');
+                alert('Failed to delete rekening');
             }
         }
     };
@@ -159,7 +159,7 @@ const BlinkCompanySettings = () => {
             setIsBankModalOpen(false);
             // alert('Rekening berhasil disimpan'); // Optional feedback
         } catch (error) {
-            alert('Gagal menyimpan rekening: ' + error.message);
+            alert('Failed to save rekening: ' + error.message);
         }
     };
 
@@ -212,17 +212,6 @@ const BlinkCompanySettings = () => {
                                         type="text"
                                         value={companyPhone}
                                         onChange={(e) => setCompanyPhone(e.target.value)}
-                                        className="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
-                                        <Phone className="h-3 w-3" /> Fax
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={companyFax}
-                                        onChange={(e) => setCompanyFax(e.target.value)}
                                         className="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
                                     />
                                 </div>

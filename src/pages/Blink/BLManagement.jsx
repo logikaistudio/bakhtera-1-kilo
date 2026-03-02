@@ -222,7 +222,7 @@ const BLManagement = () => {
     });
 
     const handleDeleteBL = async (blId) => {
-        if (!confirm('Yakin hapus BL ini? Data BL akan dihapus dari shipment.')) return;
+        if (!confirm('Are you sure you want to delete BL ini? Data BL akan dihapus dari shipment.')) return;
         try {
             const { error } = await supabase.from('blink_shipments')
                 .update({ bl_number: null, bl_type: null, bl_status: null }).eq('id', blId);
@@ -231,7 +231,7 @@ const BLManagement = () => {
             fetchBLs();
         } catch (error) {
             console.error('Error deleting BL:', error);
-            alert('❌ Gagal menghapus BL');
+            alert('❌ Failed to delete BL');
         }
     };
 

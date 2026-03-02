@@ -20,9 +20,9 @@ const BlinkDashboard = () => {
     // Menu items organized by department
     const salesMarketingMenus = [
         {
-            path: '/blink/quotations',
-            label: 'Quotation Management',
-            description: 'Kelola penawaran harga untuk customer',
+            path: '/blink/sales-quotations',
+            label: 'Sales Quotation',
+            description: 'Manage quotations untuk customer',
             icon: FileText,
             color: 'blue'
         },
@@ -36,6 +36,13 @@ const BlinkDashboard = () => {
     ];
 
     const operationsMenus = [
+        {
+            path: '/blink/operations/quotations',
+            label: 'Quotation Management',
+            description: 'Manage quotations operasional',
+            icon: FileText,
+            color: 'blue'
+        },
         {
             path: '/blink/shipments',
             label: 'Shipment Management',

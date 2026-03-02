@@ -198,7 +198,7 @@ const GeneralLedger = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text">Buku Besar</h1>
+                    <h1 className="text-3xl font-bold gradient-text">General Ledger</h1>
                     <p className="text-silver-dark mt-1">General Ledger - Detail transaksi per akun</p>
                 </div>
                 <div className="flex gap-2">

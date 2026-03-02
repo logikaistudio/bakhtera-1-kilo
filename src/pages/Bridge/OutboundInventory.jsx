@@ -6,9 +6,12 @@ import { exportToCSV } from '../../utils/exportCSV';
 import { createProcessOutboundHandler } from './handlers/processOutbound';
 import { calculateDaysDifference, getAgingStatus } from '../../utils/agingCalculator';
 import { AlertCircle } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 const OutboundInventory = () => {
-    const { quotations = [], addMutationLog, mutationLogs = [], updateQuotation } = useData();
+    const { canEdit, user } = useAuth();
+    const hasEdit = canEdit('bridge_outbound');
+    const { quotations = [], addMutationLog, mutationLogs = [], updateQuotation, requestApproval } = useData();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedItem, setSelectedItem] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
@@ -456,6 +459,34 @@ const OutboundInventory = () => {
                     console.error("Failed to update status:", statusError);
                     alert("Data terkirim ke Pabean, tetapi gagal update status dokumen.");
                 } else {
+                    // Create approval request for monitoring
+                    if (requestApproval) {
+                        const userName = user?.full_name || user?.username || 'User';
+                        const userId = user?.id || null;
+                        const totalItems = (itemToSubmit.packages || []).reduce((sum, pkg) => sum + (pkg.items?.length || 0), 0);
+                        try {
+                            await requestApproval(
+                                'outbound',
+                                'Bridge',
+                                'Outbound',
+                                itemToSubmit.id,
+                                itemToSubmit.quotationNumber || itemToSubmit.quotation_number,
+                                {
+                                    destination: itemToSubmit.destination || '-',
+                                    customer: itemToSubmit.customer || '-',
+                                    totalItems,
+                                    bcDocumentNumber: itemToSubmit.bcDocumentNumber || itemToSubmit.bc_document_number || '-'
+                                },
+                                `Barang keluar: ${totalItems} item ke ${itemToSubmit.destination || 'Pabean'}`,
+                                userName,
+                                userId
+                            );
+                            console.log('📋 Approval request created for outbound tracking');
+                        } catch (approvalErr) {
+                            console.warn('⚠️ Failed to create approval request (non-critical):', approvalErr);
+                        }
+                    }
+
                     alert('Berhasil mengirim data ke Pabean - Barang Keluar! Status dokumen diperbarui.');
                     setShowDetailModal(false);
                     // Force refresh or rely on realtime if available
@@ -664,7 +695,7 @@ const OutboundInventory = () => {
                                 </button>
 
                                 {/* SUBMIT/KIRIM BUTTON - Show only when NOT editing and NOT already processed */}
-                                {!isEditing && (!selectedItem?.outbound_status || selectedItem?.outbound_status === 'approved') && (
+                                {hasEdit && !isEditing && (!selectedItem?.outbound_status || selectedItem?.outbound_status === 'approved') && (
                                     <button
                                         onClick={handleProcessOutbound}
                                         disabled={isSaving}
@@ -710,13 +741,15 @@ const OutboundInventory = () => {
                                             </button>
                                         </>
                                     ) : (
-                                        <button
-                                            onClick={() => setIsEditing(true)}
-                                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
-                                        >
-                                            <Edit className="w-4 h-4" />
-                                            Edit
-                                        </button>
+                                        hasEdit && (
+                                            <button
+                                                onClick={() => setIsEditing(true)}
+                                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+                                            >
+                                                <Edit className="w-4 h-4" />
+                                                Edit
+                                            </button>
+                                        )
                                     )
                                 ) : (
                                     /* Read-only indicator when processed */

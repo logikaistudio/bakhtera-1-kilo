@@ -23,41 +23,50 @@ import {
     Eye,
     EyeOff,
     CheckCircle,
-    AlertCircle
+    AlertCircle,
+    Bell
 } from 'lucide-react';
 
-import { Sun, Moon } from 'lucide-react';
-import { useTheme } from '../../context/ThemeContext';
+
 import { changePassword } from '../../services/userService';
 import { useAuth } from '../../context/AuthContext';
+import { useData } from '../../context/DataContext';
 
-// Theme Toggle Component
-const ThemeToggle = () => {
-    const { theme, toggleTheme } = useTheme();
 
-    return (
-        <button
-            onClick={toggleTheme}
-            className="p-2 rounded-lg bg-dark-surface hover:bg-dark-card border border-dark-border transition-all duration-300 hover:border-accent-blue"
-            title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-        >
-            {theme === 'dark' ? (
-                <Sun className="w-5 h-5 text-accent-orange" />
-            ) : (
-                <Moon className="w-5 h-5 text-accent-blue" />
-            )}
-        </button>
-    );
-};
 
 const Sidebar = () => {
     const location = useLocation();
     const navigate = useNavigate();
-    const { user, logout } = useAuth();
+    const { user, logout, canAccess, isSuperAdmin, isAdmin } = useAuth();
+    // Helper: check if user can access a portal (admin/super_admin always can)
+    const canAccessPortal = (menuCode) => isSuperAdmin() || isAdmin() || canAccess(menuCode);
+    const { pendingApprovals = [] } = useData();
     const [isOpen, setIsOpen] = useState(false);
     const [expandedSection, setExpandedSection] = useState('');
-    const [expandedCategories, setExpandedCategories] = useState(['marketing', 'operations', 'finance', 'costing', 'profit', 'data', 'bridge-operasional', 'bridge-finance', 'bridge-data', 'central-users']); // All expanded by default
+    const [expandedCategories, setExpandedCategories] = useState(['blink-marketing', 'blink-operations', 'blink-finance', 'blink-costing', 'blink-profit', 'blink-data', 'blink-approval', 'bridge-operasional', 'bridge-finance', 'bridge-data', 'bridge-persetujuan', 'central-users']); // All expanded by default
     const [showChangePassword, setShowChangePassword] = useState(false);
+
+    // Count pending approvals for badge (only relevant for bridge_manager and super_admin)
+    const isApprover = ['super_admin', 'bridge_manager', 'admin'].includes(user?.user_level);
+    const pendingApprovalCount = isApprover
+        ? pendingApprovals.filter(r => r.status === 'pending').length
+        : 0;
+    const [blinkPendingCount, setBlinkPendingCount] = React.useState(0);
+    React.useEffect(() => {
+        const fetchBlinkPending = async () => {
+            try {
+                const { supabase } = await import('../../lib/supabase');
+                const { count } = await supabase
+                    .from('blink_quotations')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('status', 'manager_approval');
+                setBlinkPendingCount(count || 0);
+            } catch (e) { /* silent */ }
+        };
+        fetchBlinkPending();
+        const interval = setInterval(fetchBlinkPending, 60000); // refresh every 60s
+        return () => clearInterval(interval);
+    }, []);
     const lastPathRef = React.useRef(null);
 
     // Initial check and Listener for path changes
@@ -110,10 +119,6 @@ const Sidebar = () => {
         navigate('/login');
     };
 
-    // DEBUG: log user level (remove after verifying)
-    console.log('[Sidebar] user object:', user);
-    console.log('[Sidebar] user_level:', user?.user_level);
-
     const mainMenuItems = [
         { path: '/', label: 'Dashboard Bakhtera-1', icon: LayoutDashboard },
         { path: '/blink', label: 'BLINK', subtitle: 'Freight & Forward Management', icon: Plane },
@@ -123,81 +128,101 @@ const Sidebar = () => {
     ];
 
     const centralizedMenuItems = [
-        { path: '/vendors', label: 'Manajemen Vendor', icon: Users },
-        { path: '/customers', label: 'Manajemen Pelanggan', icon: UserCircle },
-        { path: '/finance', label: 'Keuangan', icon: Wallet },
-        { path: '/finance/coa', label: 'Master Akun (COA)', icon: FileCheck },
-        { path: '/settings', label: 'Pengaturan Perusahaan', icon: Building2 },
+        { path: '/vendors', label: 'Manajemen Vendor', icon: Users, menuCode: 'central_vendors' },
+        { path: '/customers', label: 'Manajemen Pelanggan', icon: UserCircle, menuCode: 'central_customers' },
+        { path: '/finance', label: 'Keuangan', icon: Wallet, menuCode: 'central_finance' },
+        { path: '/finance/coa', label: 'Master Akun (COA)', icon: FileCheck, menuCode: 'central_coa' },
+        { path: '/settings', label: 'Pengaturan Perusahaan', icon: Building2, menuCode: 'central_settings' },
     ];
 
-    // Bridge submenu items
+    // Bridge submenu items (with menuCode for per-menu access control)
     const bridgeSubMenuItems = [
+        // Dashboard standalone
+        { path: '/bridge', label: 'Dashboard Bridge', icon: LayoutDashboard, menuCode: 'bridge_dashboard' },
+
         // Operasional Category
         {
             type: 'category', label: '📦 Operasional', items: [
-                { path: '/bridge/ata-carnet', label: 'ATA Carnet' },
-                { path: '/bridge/pengajuan', label: 'Pengajuan' },
-                { path: '/bridge/inventory', label: 'Inventaris Gudang' },
-                { path: '/bridge/outbound-inventory', label: 'Laporan Barang Keluar' },
-                { path: '/bridge/goods-movement', label: 'Pergerakan Barang' },
-                { path: '/bridge/delivery-notes', label: 'Surat Jalan' },
+                { path: '/bridge/ata-carnet', label: 'ATA Carnet', menuCode: 'bridge_ata_carnet' },
+                { path: '/bridge/pengajuan', label: 'Pengajuan', menuCode: 'bridge_pengajuan' },
+                { path: '/bridge/inventory', label: 'Inventaris Gudang', menuCode: 'bridge_inventory' },
+                { path: '/bridge/outbound-inventory', label: 'Laporan Barang Keluar', menuCode: 'bridge_outbound' },
+                { path: '/bridge/goods-movement', label: 'Pergerakan Barang', menuCode: 'bridge_movement' },
+                { path: '/bridge/delivery-notes', label: 'Surat Jalan', menuCode: 'bridge_delivery' },
             ]
         },
 
         // Finance Category
         {
             type: 'category', label: '💰 Finance', items: [
-                { path: '/bridge/finance/invoices', label: 'Invoice' },
-                { path: '/bridge/finance/po', label: 'PO' },
-                { path: '/bridge/finance/ar', label: 'AR' },
-                { path: '/bridge/finance/ap', label: 'AP' },
+                { path: '/bridge/finance/invoices', label: 'Invoice', menuCode: 'bridge_finance' },
+                { path: '/bridge/finance/po', label: 'PO', menuCode: 'bridge_finance' },
+                { path: '/bridge/finance/ar', label: 'AR', menuCode: 'bridge_finance' },
+                { path: '/bridge/finance/ap', label: 'AP', menuCode: 'bridge_finance' },
             ]
         },
 
         // Master Data Category
         {
             type: 'category', label: '⚙️ Master Data', items: [
-                { path: '/bridge/master/partners', label: 'Mitra Bisnis' },
-                { path: '/bridge/bc-master', label: 'Master Kode BC' },
-                { path: '/bridge/hs-master', label: 'Master Kode HS' },
-                { path: '/bridge/item-master', label: 'Master Kode Barang' },
-                { path: '/bridge/pic-master', label: 'Master PIC' },
-                { path: '/bridge/code-of-account', label: 'Code of Account' },
+                { path: '/bridge/master/partners', label: 'Mitra Bisnis', menuCode: 'bridge_partners' },
+                { path: '/bridge/bc-master', label: 'Master Kode BC', menuCode: 'bridge_bc_master' },
+                { path: '/bridge/hs-master', label: 'Master Kode HS', menuCode: 'bridge_hs_master' },
+                { path: '/bridge/item-master', label: 'Master Kode Barang', menuCode: 'bridge_item_master' },
+                { path: '/bridge/code-of-account', label: 'Code of Account', menuCode: 'bridge_coa' },
+            ]
+        },
+
+        // Persetujuan & Log Category
+        {
+            type: 'category', label: '🔔 Persetujuan & Log', items: [
+                { path: '/bridge/approvals', label: 'Approval Manager', menuCode: 'bridge_approval', showBadge: true },
+                { path: '/bridge/logger', label: 'Activity Logger', menuCode: 'bridge_activity' },
+                { path: '/bridge/master/settings', label: 'Pengaturan Modul', menuCode: 'bridge_settings' },
             ]
         },
     ];
 
-    // Pabean submenu items
+    // Pabean submenu items (with menuCode for per-menu access control)
     const pabeanSubMenuItems = [
-        { path: '/pabean/barang-masuk', label: 'Barang Masuk' },
-        { path: '/pabean/barang-keluar', label: 'Barang Keluar' },
-        { path: '/pabean/pergerakan', label: 'Barang Mutasi' },
+        { path: '/bridge/pabean', label: 'Dashboard Pabean', menuCode: 'bridge_pabean' },
+        { path: '/bridge/pabean/barang-masuk', label: 'Barang Masuk', menuCode: 'bridge_barang_masuk' },
+        { path: '/bridge/pabean/barang-keluar', label: 'Barang Keluar', menuCode: 'bridge_barang_keluar' },
+        { path: '/bridge/pabean/barang-reject', label: 'Barang Reject', menuCode: 'bridge_barang_reject' },
+        { path: '/bridge/pabean/pergerakan', label: 'Barang Mutasi', menuCode: 'bridge_pabean_movement' },
     ];
 
     // BIG submenu - Event Organizer
     const bigSubMenuItems = [
-        { path: '/big', label: 'Dashboard', icon: LayoutDashboard },
+        { path: '/big', label: 'Dashboard BIG', icon: LayoutDashboard, menuCode: 'big_dashboard' },
 
         // Sales Category
         {
             type: 'category', label: '📋 Sales', items: [
-                { path: '/big/sales/quotations', label: 'Quotations' },
+                { path: '/big/sales/quotations', label: 'Quotations', menuCode: 'big_quotations' },
             ]
         },
 
         // Operations Category
         {
             type: 'category', label: '⚙️ Operations', items: [
-                { path: '/big/operations/events', label: 'Event Management' },
-                { path: '/big/operations/costs', label: 'Event Costs' },
+                { path: '/big/operations/events', label: 'Event Management', menuCode: 'big_events' },
+                { path: '/big/operations/costs', label: 'Event Costs', menuCode: 'big_costs' },
             ]
         },
 
         // Finance Category
         {
             type: 'category', label: '💰 Finance', items: [
-                { path: '/big/finance/invoices', label: 'Invoices' },
-                { path: '/big/finance/ar', label: 'Piutang (AR)' },
+                { path: '/big/finance/invoices', label: 'Invoice', menuCode: 'big_invoices' },
+                { path: '/big/finance/ar', label: 'Piutang (AR)', menuCode: 'big_ar' },
+            ]
+        },
+
+        // Master Data Category
+        {
+            type: 'category', label: '⚙️ Master Data', items: [
+                { path: '/big/master/settings', label: 'Pengaturan Modul', menuCode: 'big_settings' },
             ]
         },
     ];
@@ -205,29 +230,30 @@ const Sidebar = () => {
     // BLINK submenu - dengan Dashboard terpisah + 3 department categories + Master Data
     const blinkSubMenuItems = [
         // Dashboard - Standalone (outside categories)
-        { path: '/blink', label: 'Dashboard', icon: LayoutDashboard },
+        { path: '/blink', label: 'Dashboard', icon: LayoutDashboard, menuCode: 'blink_dashboard' },
 
         // Sales & Marketing Category
         {
             type: 'category', label: '📋 Sales & Marketing', items: [
-                { path: '/blink/quotations', label: 'Quotations' },
-                { path: '/blink/flow-monitor', label: 'Flow Monitor' },
-                { path: '/blink/sales-achievement', label: 'Sales Achievement' }
+                { path: '/blink/sales-quotations', label: 'Sales Quotation', menuCode: 'blink_sales_quotations' },
+                { path: '/blink/flow-monitor', label: 'Flow Monitor', menuCode: 'blink_flow_monitor' },
+                { path: '/blink/sales-achievement', label: 'Sales Achievement', menuCode: 'blink_sales' }
             ]
         },
 
         // Operations Category
         {
             type: 'category', label: '🚚 Operations', items: [
-                { path: '/blink/shipments', label: 'Shipment Management' },
-                { path: '/blink/operations/bl', label: 'Document BL/AWB' },
+                { path: '/blink/operations/quotations', label: 'Quotation', menuCode: 'blink_quotations' },
+                { path: '/blink/shipments', label: 'Shipment Management', menuCode: 'blink_shipments' },
+                { path: '/blink/operations/bl', label: 'BL/AWB Documents', menuCode: 'blink_bl' },
             ]
         },
 
-        // Profit & Costing Category (New - Promoted for Visibility)
+        // Profit & Costing Category
         {
             type: 'category', label: '📈 Profit & Costing', items: [
-                { path: '/blink/finance/selling-buying', label: 'Selling vs Buying Analysis' },
+                { path: '/blink/finance/selling-buying', label: 'Selling vs Buying Analysis', menuCode: 'blink_selling_buying' },
             ]
         },
 
@@ -235,28 +261,36 @@ const Sidebar = () => {
         {
             type: 'category', label: '💰 Finance', items: [
                 // Subcategory: Transaksi
-                { type: 'divider', label: '📋 Transaksi' },
-                { path: '/blink/finance/invoices', label: 'Invoice' },
-                { path: '/blink/finance/purchase-orders', label: 'Purchase Order' },
-                { path: '/blink/finance/ar', label: 'Piutang (AR)' },
-                { path: '/blink/finance/ap', label: 'Hutang (AP)' },
+                { type: 'divider', label: '📋 Transactions' },
+                { path: '/blink/finance/invoices', label: 'Invoice', menuCode: 'blink_invoices' },
+                { path: '/blink/finance/purchase-orders', label: 'Purchase Order', menuCode: 'blink_purchase_order' },
+                { path: '/blink/finance/ar', label: 'Account Receivables (AR)', menuCode: 'blink_ar' },
+                { path: '/blink/finance/ap', label: 'Account Payables (AP)', menuCode: 'blink_ap' },
                 // Subcategory: Pencatatan
-                { type: 'divider', label: '📝 Pencatatan' },
-                { path: '/blink/finance/general-journal', label: 'Jurnal Umum' },
-                { path: '/blink/finance/general-ledger', label: 'Buku Besar' },
-                { path: '/blink/finance/trial-balance', label: 'Neraca Saldo' },
+                { type: 'divider', label: '📝 Records' },
+                { path: '/blink/finance/general-journal', label: 'General Journal', menuCode: 'blink_journal' },
+                { path: '/blink/finance/general-ledger', label: 'General Ledger', menuCode: 'blink_ledger' },
+                { path: '/blink/finance/trial-balance', label: 'Trial Balance', menuCode: 'blink_trial_balance' },
                 // Subcategory: Laporan
-                { type: 'divider', label: '📊 Laporan' },
-                { path: '/blink/finance/profit-loss', label: 'Laba Rugi' },
-                { path: '/blink/finance/balance-sheet', label: 'Neraca' },
+                { type: 'divider', label: '📊 Reports' },
+                { path: '/blink/finance/profit-loss', label: 'Profit & Loss (P&L)', menuCode: 'blink_pnl' },
+                { path: '/blink/finance/balance-sheet', label: 'Balance Sheet', menuCode: 'blink_balance_sheet' },
             ]
         },
 
         // Master Data Category
         {
             type: 'category', label: '⚙️ Master Data', items: [
-                { path: '/blink/master/partners', label: 'Mitra Bisnis' },
-                { path: '/blink/master/routes', label: 'Master Routes' },
+                { path: '/blink/master/partners', label: 'Business Partners', menuCode: 'blink_partners' },
+                { path: '/blink/master/routes', label: 'Master Routes', menuCode: 'blink_routes' },
+                { path: '/blink/master/settings', label: 'Module Settings', menuCode: 'blink_settings' },
+            ]
+        },
+
+        // Approval Category
+        {
+            type: 'category', label: '🔔 Approval', items: [
+                { path: '/blink/approvals', label: 'Approval Center', menuCode: 'blink_approval', showBadge: true },
             ]
         },
     ];
@@ -285,13 +319,11 @@ const Sidebar = () => {
     const SidebarContent = ({ isMobile = false }) => (
         <div className="flex flex-col h-full">
             {/* Logo */}
-            <div className="px-6 py-6 border-b border-dark-border flex items-center justify-between">
+            <div className="px-6 py-6 border-b border-dark-border">
                 <div>
                     <h1 className="text-2xl font-bold gradient-text">BAKHTERA-1</h1>
                     <p className="text-xs text-silver-dark mt-1">Freight & Asset Management</p>
                 </div>
-                {/* Theme Toggle */}
-                <ThemeToggle />
             </div>
 
             {/* Navigation */}
@@ -305,6 +337,7 @@ const Sidebar = () => {
                         {mainMenuItems.map((item) => {
                             // Special handling for Bridge with submenu
                             if (item.path === '/bridge') {
+                                if (!canAccessPortal('bridge_dashboard')) return null;
                                 const isExpanded = expandedSection === 'bridge';
                                 const isBridgeActive = location.pathname.startsWith('/bridge');
 
@@ -320,14 +353,14 @@ const Sidebar = () => {
                                                     if (!isCurrentlyExpanded) scrollToElement('menu-bridge');
                                                 }}
                                                 className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition text-sm ${isBridgeActive
-                                                    ? 'bg-accent-blue bg-opacity-20 text-accent-blue'
-                                                    : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface'
+                                                    ? 'bg-white/20 text-white'
+                                                    : 'text-silver-dark hover:text-white hover:bg-white/10'
                                                     }`}
                                             >
                                                 <item.icon className="w-5 h-5 flex-shrink-0" />
                                                 <div className="flex-1 text-left">
                                                     <div className="font-medium">{item.label}</div>
-                                                    <div className={`text-xs ${isBridgeActive ? 'text-accent-blue/70' : 'text-silver-dark'}`}>
+                                                    <div className={`text-xs ${isBridgeActive ? 'text-white/70' : 'text-silver-dark'}`}>
                                                         {item.subtitle}
                                                     </div>
                                                 </div>
@@ -358,6 +391,12 @@ const Sidebar = () => {
                                                             const categoryKey = 'bridge-' + subItem.label.toLowerCase().split(' ').pop();
                                                             const isCategoryExpanded = expandedCategories.includes(categoryKey);
 
+                                                            // Hide category if no accessible items
+                                                            const accessibleItems = subItem.items.filter(menuItem =>
+                                                                !menuItem.menuCode || canAccessPortal(menuItem.menuCode)
+                                                            );
+                                                            if (accessibleItems.length === 0) return null;
+
                                                             return (
                                                                 <div key={`category-${idx}`}>
                                                                     <button
@@ -382,17 +421,24 @@ const Sidebar = () => {
                                                                                 exit={{ height: 0, opacity: 0 }}
                                                                                 className="overflow-hidden"
                                                                             >
-                                                                                {subItem.items.map((menuItem) => (
+                                                                                {subItem.items.filter(menuItem =>
+                                                                                    !menuItem.menuCode || canAccessPortal(menuItem.menuCode)
+                                                                                ).map((menuItem) => (
                                                                                     <Link
                                                                                         key={menuItem.path}
                                                                                         to={menuItem.path}
                                                                                         onClick={() => isMobile && setIsOpen(false)}
-                                                                                        className={`block pl-12 pr-4 py-1.5 text-sm smooth-transition border-l-2 ml-4 ${isActive(menuItem.path)
-                                                                                            ? 'bg-accent-blue/20 text-accent-blue font-medium border-accent-blue active-sidebar-item'
-                                                                                            : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface/50 border-transparent hover:border-silver-dark/50'
+                                                                                        className={`flex items-center pl-12 pr-4 py-1.5 text-sm smooth-transition border-l-2 ml-4 ${isActive(menuItem.path)
+                                                                                            ? 'bg-white/20 text-white font-medium border-white sidebar-active-item'
+                                                                                            : 'text-silver-dark hover:text-white hover:bg-white/10 border-transparent hover:border-white/50'
                                                                                             }`}
                                                                                     >
-                                                                                        {menuItem.label}
+                                                                                        <span className="flex-1">{menuItem.label}</span>
+                                                                                        {menuItem.showBadge && pendingApprovalCount > 0 && (
+                                                                                            <span className="ml-2 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1 animate-pulse">
+                                                                                                {pendingApprovalCount > 99 ? '99+' : pendingApprovalCount}
+                                                                                            </span>
+                                                                                        )}
                                                                                     </Link>
                                                                                 ))}
                                                                             </motion.div>
@@ -402,15 +448,16 @@ const Sidebar = () => {
                                                             );
                                                         }
 
-                                                        // Standalone menu items
+                                                        // Standalone menu items (with access check)
+                                                        if (subItem.menuCode && !canAccessPortal(subItem.menuCode)) return null;
                                                         return (
                                                             <Link
                                                                 key={subItem.path}
                                                                 to={subItem.path}
                                                                 onClick={() => isMobile && setIsOpen(false)}
                                                                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm smooth-transition ${isActive(subItem.path)
-                                                                    ? 'bg-accent-blue text-white'
-                                                                    : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface'
+                                                                    ? 'bg-white/20 text-white font-medium'
+                                                                    : 'text-silver-dark hover:text-white hover:bg-white/10'
                                                                     }`}
                                                             >
                                                                 {subItem.icon && <subItem.icon className="w-4 h-4" />}
@@ -427,6 +474,7 @@ const Sidebar = () => {
 
                             // Special handling for Pabean with submenu
                             if (item.path === '/pabean') {
+                                if (!canAccessPortal('bridge_pabean')) return null;
                                 const isExpanded = expandedSection === 'pabean';
                                 const isPabeanActive = location.pathname.startsWith('/pabean');
 
@@ -442,14 +490,14 @@ const Sidebar = () => {
                                                     if (!isCurrentlyExpanded) scrollToElement('menu-pabean');
                                                 }}
                                                 className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition text-sm ${isPabeanActive
-                                                    ? 'bg-accent-green bg-opacity-20 text-accent-green'
-                                                    : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface'
+                                                    ? 'bg-white/20 text-white'
+                                                    : 'text-silver-dark hover:text-white hover:bg-white/10'
                                                     }`}
                                             >
                                                 <item.icon className="w-5 h-5 flex-shrink-0" />
                                                 <div className="flex-1 text-left">
                                                     <div className="font-medium">{item.label}</div>
-                                                    <div className={`text-xs ${isPabeanActive ? 'text-accent-green/70' : 'text-silver-dark'}`}>
+                                                    <div className={`text-xs ${isPabeanActive ? 'text-white/70' : 'text-silver-dark'}`}>
                                                         {item.subtitle}
                                                     </div>
                                                 </div>
@@ -474,7 +522,9 @@ const Sidebar = () => {
                                                     exit={{ height: 0, opacity: 0 }}
                                                     className="ml-8 mt-1 space-y-1 overflow-hidden"
                                                 >
-                                                    {pabeanSubMenuItems.map((subItem) => (
+                                                    {pabeanSubMenuItems.filter(subItem =>
+                                                        !subItem.menuCode || canAccessPortal(subItem.menuCode)
+                                                    ).map((subItem) => (
                                                         <Link
                                                             key={subItem.path}
                                                             to={subItem.path}
@@ -496,6 +546,7 @@ const Sidebar = () => {
 
                             // Special handling for BIG with submenu
                             if (item.path === '/big') {
+                                if (!canAccessPortal('big_dashboard')) return null;
                                 const isExpanded = expandedSection === 'big';
                                 const isBigActive = location.pathname.startsWith('/big');
 
@@ -544,10 +595,35 @@ const Sidebar = () => {
                                                     className="ml-8 mt-1 space-y-1 overflow-hidden"
                                                 >
                                                     {bigSubMenuItems.map((subItem, idx) => {
+                                                        // Standalone menu items (Dashboard)
+                                                        if (!subItem.type) {
+                                                            if (subItem.menuCode && !canAccessPortal(subItem.menuCode)) return null;
+                                                            return (
+                                                                <Link
+                                                                    key={subItem.path}
+                                                                    to={subItem.path}
+                                                                    onClick={() => isMobile && setIsOpen(false)}
+                                                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm smooth-transition ${isActive(subItem.path)
+                                                                        ? 'bg-accent-orange text-white'
+                                                                        : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface'
+                                                                        }`}
+                                                                >
+                                                                    {subItem.icon && <subItem.icon className="w-4 h-4" />}
+                                                                    <span>{subItem.label}</span>
+                                                                </Link>
+                                                            );
+                                                        }
+
                                                         // Render category dengan nested items
                                                         if (subItem.type === 'category') {
                                                             const categoryKey = 'big-' + subItem.label.toLowerCase().split(' ').pop();
                                                             const isCategoryExpanded = expandedCategories.includes(categoryKey);
+
+                                                            // Filter items yang bisa diakses
+                                                            const accessibleItems = subItem.items.filter(menuItem =>
+                                                                !menuItem.menuCode || canAccessPortal(menuItem.menuCode)
+                                                            );
+                                                            if (accessibleItems.length === 0) return null;
 
                                                             return (
                                                                 <div key={`category-${idx}`}>
@@ -573,7 +649,7 @@ const Sidebar = () => {
                                                                                 exit={{ height: 0, opacity: 0 }}
                                                                                 className="overflow-hidden"
                                                                             >
-                                                                                {subItem.items.map((menuItem, itemIdx) => {
+                                                                                {accessibleItems.map((menuItem, itemIdx) => {
                                                                                     if (menuItem.type === 'divider') {
                                                                                         return (
                                                                                             <div key={`divider-${itemIdx}`} className="pl-6 pr-4 pt-3 pb-1 border-t border-dark-border/30 mt-1 first:mt-0 first:border-t-0">
@@ -590,8 +666,8 @@ const Sidebar = () => {
                                                                                             to={menuItem.path}
                                                                                             onClick={() => isMobile && setIsOpen(false)}
                                                                                             className={`block pl-12 pr-4 py-1.5 text-sm smooth-transition border-l-2 ml-4 ${isActive(menuItem.path)
-                                                                                                ? 'bg-accent-orange/20 text-accent-orange font-medium border-accent-orange'
-                                                                                                : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface/50 border-transparent hover:border-silver-dark/50'
+                                                                                                ? 'bg-white/10 text-white font-medium border-white'
+                                                                                                : 'text-silver-dark hover:text-white hover:bg-white/10 border-transparent hover:border-white/50'
                                                                                                 }`}
                                                                                         >
                                                                                             {menuItem.label}
@@ -605,21 +681,7 @@ const Sidebar = () => {
                                                             );
                                                         }
 
-                                                        // Standalone menu items
-                                                        return (
-                                                            <Link
-                                                                key={subItem.path}
-                                                                to={subItem.path}
-                                                                onClick={() => isMobile && setIsOpen(false)}
-                                                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm smooth-transition ${isActive(subItem.path)
-                                                                    ? 'bg-accent-orange text-white'
-                                                                    : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface'
-                                                                    }`}
-                                                            >
-                                                                {subItem.icon && <subItem.icon className="w-4 h-4" />}
-                                                                <span>{subItem.label}</span>
-                                                            </Link>
-                                                        );
+                                                        return null;
                                                     })}
                                                 </motion.div>
                                             )}
@@ -630,6 +692,7 @@ const Sidebar = () => {
 
                             // Special handling for BLINK with submenu
                             if (item.path === '/blink') {
+                                if (!canAccessPortal('blink_dashboard')) return null;
                                 const isExpanded = expandedSection === 'blink';
                                 const isBlinkActive = location.pathname.startsWith('/blink');
 
@@ -678,10 +741,38 @@ const Sidebar = () => {
                                                     className="ml-8 mt-1 space-y-1 overflow-hidden"
                                                 >
                                                     {blinkSubMenuItems.map((subItem, idx) => {
+                                                        // Standalone items (Dashboard)
+                                                        if (!subItem.type) {
+                                                            if (subItem.menuCode && !canAccessPortal(subItem.menuCode)) return null;
+                                                            return (
+                                                                <Link
+                                                                    key={subItem.path}
+                                                                    to={subItem.path}
+                                                                    onClick={() => isMobile && setIsOpen(false)}
+                                                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm smooth-transition ${isActive(subItem.path)
+                                                                        ? 'bg-white/20 text-white font-medium'
+                                                                        : 'text-silver-dark hover:text-white hover:bg-white/10'
+                                                                        }`}
+                                                                >
+                                                                    {subItem.icon && <subItem.icon className="w-4 h-4" />}
+                                                                    <span>{subItem.label}</span>
+                                                                </Link>
+                                                            );
+                                                        }
+
                                                         // Render category dengan nested items
                                                         if (subItem.type === 'category') {
-                                                            const categoryKey = subItem.label.toLowerCase().split(' ').pop(); // 'sales', 'operations', 'finance'
+                                                            const lastWord = subItem.label.toLowerCase().split(' ').pop();
+                                                            const categoryKey = 'blink-' + lastWord;
                                                             const isCategoryExpanded = expandedCategories.includes(categoryKey);
+
+                                                            // Filter items yang bisa diakses (skip dividers in filter)
+                                                            const accessibleItems = subItem.items.filter(itemObj =>
+                                                                itemObj.type === 'divider' || !itemObj.menuCode || canAccessPortal(itemObj.menuCode)
+                                                            );
+                                                            // Count actual menu items (non-divider) accessible
+                                                            const hasAccessibleMenuItems = accessibleItems.some(itemObj => itemObj.type !== 'divider');
+                                                            if (!hasAccessibleMenuItems) return null;
 
                                                             return (
                                                                 <div key={`category-${idx}`}>
@@ -700,7 +791,7 @@ const Sidebar = () => {
                                                                         <ChevronRight className={`w-3 h-3 transition-transform ${isCategoryExpanded ? 'rotate-90' : ''}`} />
                                                                     </button>
 
-                                                                    {/* Category Items - dengan indentation */}
+                                                                    {/* Category Items */}
                                                                     <AnimatePresence>
                                                                         {isCategoryExpanded && (
                                                                             <motion.div
@@ -709,13 +800,13 @@ const Sidebar = () => {
                                                                                 exit={{ height: 0, opacity: 0 }}
                                                                                 className="overflow-hidden"
                                                                             >
-                                                                                {subItem.items.map((item, itemIdx) => {
+                                                                                {accessibleItems.map((itemObj, itemIdx) => {
                                                                                     // Handle divider type for subcategory headers
-                                                                                    if (item.type === 'divider') {
+                                                                                    if (itemObj.type === 'divider') {
                                                                                         return (
                                                                                             <div key={`divider-${itemIdx}`} className="pl-6 pr-4 pt-3 pb-1 border-t border-dark-border/30 mt-1 first:mt-0 first:border-t-0">
                                                                                                 <span className="text-xs font-bold text-silver uppercase tracking-wider">
-                                                                                                    {item.label}
+                                                                                                    {itemObj.label}
                                                                                                 </span>
                                                                                             </div>
                                                                                         );
@@ -724,15 +815,20 @@ const Sidebar = () => {
                                                                                     // Regular menu item with indentation
                                                                                     return (
                                                                                         <Link
-                                                                                            key={item.path}
-                                                                                            to={item.path}
+                                                                                            key={itemObj.path}
+                                                                                            to={itemObj.path}
                                                                                             onClick={() => isMobile && setIsOpen(false)}
-                                                                                            className={`block pl-12 pr-4 py-1.5 text-sm smooth-transition border-l-2 ml-4 ${isActive(item.path)
-                                                                                                ? 'bg-accent-orange/20 text-accent-orange font-medium border-accent-orange'
-                                                                                                : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface/50 border-transparent hover:border-silver-dark/50'
+                                                                                            className={`flex items-center pl-12 pr-4 py-1.5 text-sm smooth-transition border-l-2 ml-4 ${isActive(itemObj.path)
+                                                                                                ? 'bg-white/20 text-white font-medium border-white sidebar-active-item'
+                                                                                                : 'text-silver-dark hover:text-white hover:bg-white/10 border-transparent hover:border-white/50'
                                                                                                 }`}
                                                                                         >
-                                                                                            {item.label}
+                                                                                            <span className="flex-1">{itemObj.label}</span>
+                                                                                            {itemObj.showBadge && blinkPendingCount > 0 && (
+                                                                                                <span className="ml-2 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-yellow-500 text-white text-[10px] font-bold px-1 animate-pulse">
+                                                                                                    {blinkPendingCount > 99 ? '99+' : blinkPendingCount}
+                                                                                                </span>
+                                                                                            )}
                                                                                         </Link>
                                                                                     );
                                                                                 })}
@@ -743,32 +839,7 @@ const Sidebar = () => {
                                                             );
                                                         }
 
-                                                        // Render standalone menu items (non-category)
-                                                        // Handle divider type for subcategory headers
-                                                        if (subItem.type === 'divider') {
-                                                            return (
-                                                                <div key={`divider-${idx}`} className="px-3 pt-4 pb-1 border-t border-dark-border/30 mt-2 first:mt-0 first:border-t-0">
-                                                                    <span className="text-xs font-bold text-silver uppercase tracking-wider">
-                                                                        {subItem.label === 'Pendaftaran' ? 'Pengajuan' : subItem.label}
-                                                                    </span>
-                                                                </div>
-                                                            );
-                                                        }
-
-                                                        return (
-                                                            <Link
-                                                                key={subItem.path}
-                                                                to={subItem.path}
-                                                                onClick={() => isMobile && setIsOpen(false)}
-                                                                className={`flex items-center gap-2 pl-10 pr-3 py-1.5 rounded-r-lg text-sm smooth-transition border-l-2 ${isActive(subItem.path)
-                                                                    ? 'bg-accent-orange/20 text-accent-orange font-medium border-accent-orange'
-                                                                    : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface/50 font-normal border-transparent hover:border-silver-dark/30'
-                                                                    }`}
-                                                            >
-                                                                {subItem.icon && <subItem.icon className="w-3 h-3" />}
-                                                                <span>{subItem.label}</span>
-                                                            </Link>
-                                                        );
+                                                        return null;
                                                     })}
                                                 </motion.div>
                                             )}
@@ -782,84 +853,91 @@ const Sidebar = () => {
                     </div>
                 </div>
 
-                {/* Fungsi Terpusat */}
-                <div>
-                    <h3 className="px-4 mb-3 text-xs font-semibold text-silver-dark uppercase tracking-wider">
-                        Fungsi Terpusat
-                    </h3>
-                    <div className="space-y-1">
-                        {centralizedMenuItems.map((item) => (
-                            <MenuLink key={item.path} item={item} isMobile={isMobile} />
-                        ))}
+                {/* Fungsi Terpusat — hanya tampil jika ada item yang dapat diakses atau user adalah admin */}
+                {(() => {
+                    const accessibleCentralItems = centralizedMenuItems.filter((item) => canAccessPortal(item.menuCode));
+                    const isAdminUser = ['super_admin', 'admin', 'superuser'].includes(user?.user_level?.toLowerCase());
+                    if (accessibleCentralItems.length === 0 && !isAdminUser) return null;
+                    return (
+                        <div>
+                            <h3 className="px-4 mb-3 text-xs font-semibold text-silver-dark uppercase tracking-wider">
+                                Fungsi Terpusat
+                            </h3>
+                            <div className="space-y-1">
+                                {accessibleCentralItems.map((item) => (
+                                    <MenuLink key={item.path} item={item} isMobile={isMobile} />
+                                ))}
 
-                        {/* Admin Menu - Admin & Super Admin */}
-                        {(['super_admin', 'admin', 'superuser'].includes(user?.user_level?.toLowerCase())) && (
-                            <>
-                                <div className="px-4 pt-4 pb-2">
-                                    <div className="border-t border-dark-border/30" />
-                                </div>
-                                <button
-                                    onClick={() => {
-                                        setExpandedCategories(prev =>
-                                            prev.includes('central-users')
-                                                ? prev.filter(c => c !== 'central-users')
-                                                : [...prev, 'central-users']
-                                        );
-                                    }}
-                                    className="w-full flex items-center justify-between px-4 py-2 mt-2 text-sm font-semibold text-silver hover:text-silver-light smooth-transition focus:outline-none"
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <Shield className="w-4 h-4 text-red-400" />
-                                        <span>Administrasi</span>
-                                    </div>
-                                    <ChevronRight className={`w-3 h-3 transition-transform ${expandedCategories.includes('central-users') ? 'rotate-90' : ''}`} />
-                                </button>
-
-                                <AnimatePresence>
-                                    {expandedCategories.includes('central-users') && (
-                                        <motion.div
-                                            initial={{ height: 0, opacity: 0 }}
-                                            animate={{ height: 'auto', opacity: 1 }}
-                                            exit={{ height: 0, opacity: 0 }}
-                                            className="overflow-hidden mt-1 space-y-1"
+                                {/* Admin Menu - Admin & Super Admin */}
+                                {(['super_admin', 'admin', 'superuser'].includes(user?.user_level?.toLowerCase())) && (
+                                    <>
+                                        <div className="px-4 pt-4 pb-2">
+                                            <div className="border-t border-dark-border/30" />
+                                        </div>
+                                        <button
+                                            onClick={() => {
+                                                setExpandedCategories(prev =>
+                                                    prev.includes('central-users')
+                                                        ? prev.filter(c => c !== 'central-users')
+                                                        : [...prev, 'central-users']
+                                                );
+                                            }}
+                                            className="w-full flex items-center justify-between px-4 py-2 mt-2 text-sm font-semibold text-silver hover:text-silver-light smooth-transition focus:outline-none"
                                         >
-                                            <Link
-                                                to="/admin/users"
-                                                onClick={() => isMobile && setIsOpen(false)}
-                                                className={`block pl-10 pr-4 py-1.5 text-sm smooth-transition border-l-2 ml-4 ${isActive('/admin/users')
-                                                    ? 'bg-red-500/20 text-red-500 font-medium border-red-500 active-sidebar-item'
-                                                    : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface/50 border-transparent hover:border-silver-dark/50'
-                                                    }`}
-                                            >
-                                                Manajemen User
-                                            </Link>
-                                            <Link
-                                                to="/admin/permissions"
-                                                onClick={() => isMobile && setIsOpen(false)}
-                                                className={`block pl-10 pr-4 py-1.5 text-sm smooth-transition border-l-2 ml-4 ${isActive('/admin/permissions')
-                                                    ? 'bg-red-500/20 text-red-500 font-medium border-red-500 active-sidebar-item'
-                                                    : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface/50 border-transparent hover:border-silver-dark/50'
-                                                    }`}
-                                            >
-                                                Manajemen Role & Akses
-                                            </Link>
-                                            <Link
-                                                to="/admin/user-permissions"
-                                                onClick={() => isMobile && setIsOpen(false)}
-                                                className={`block pl-10 pr-4 py-1.5 text-sm smooth-transition border-l-2 ml-4 ${isActive('/admin/user-permissions')
-                                                    ? 'bg-red-500/20 text-red-500 font-medium border-red-500 active-sidebar-item'
-                                                    : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface/50 border-transparent hover:border-silver-dark/50'
-                                                    }`}
-                                            >
-                                                Penugasan Role User
-                                            </Link>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-                            </>
-                        )}
-                    </div>
-                </div>
+                                            <div className="flex items-center gap-2">
+                                                <Shield className="w-4 h-4 text-red-400" />
+                                                <span>Administrasi</span>
+                                            </div>
+                                            <ChevronRight className={`w-3 h-3 transition-transform ${expandedCategories.includes('central-users') ? 'rotate-90' : ''}`} />
+                                        </button>
+
+                                        <AnimatePresence>
+                                            {expandedCategories.includes('central-users') && (
+                                                <motion.div
+                                                    initial={{ height: 0, opacity: 0 }}
+                                                    animate={{ height: 'auto', opacity: 1 }}
+                                                    exit={{ height: 0, opacity: 0 }}
+                                                    className="overflow-hidden mt-1 space-y-1"
+                                                >
+                                                    <Link
+                                                        to="/admin/users"
+                                                        onClick={() => isMobile && setIsOpen(false)}
+                                                        className={`block pl-10 pr-4 py-1.5 text-sm smooth-transition border-l-2 ml-4 ${isActive('/admin/users')
+                                                            ? 'bg-red-500/20 text-red-500 font-medium border-red-500 active-sidebar-item'
+                                                            : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface/50 border-transparent hover:border-silver-dark/50'
+                                                            }`}
+                                                    >
+                                                        Manajemen User
+                                                    </Link>
+                                                    <Link
+                                                        to="/admin/permissions"
+                                                        onClick={() => isMobile && setIsOpen(false)}
+                                                        className={`block pl-10 pr-4 py-1.5 text-sm smooth-transition border-l-2 ml-4 ${isActive('/admin/permissions')
+                                                            ? 'bg-red-500/20 text-red-500 font-medium border-red-500 active-sidebar-item'
+                                                            : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface/50 border-transparent hover:border-silver-dark/50'
+                                                            }`}
+                                                    >
+                                                        Manajemen Role & Akses
+                                                    </Link>
+                                                    <Link
+                                                        to="/admin/user-permissions"
+                                                        onClick={() => isMobile && setIsOpen(false)}
+                                                        className={`block pl-10 pr-4 py-1.5 text-sm smooth-transition border-l-2 ml-4 ${isActive('/admin/user-permissions')
+                                                            ? 'bg-red-500/20 text-red-500 font-medium border-red-500 active-sidebar-item'
+                                                            : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface/50 border-transparent hover:border-silver-dark/50'
+                                                            }`}
+                                                    >
+                                                        Penugasan Role User
+                                                    </Link>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })()}
             </nav>
 
             {/* Footer - User Info + Logout */}
@@ -1083,15 +1161,15 @@ const ChangePasswordModal = ({ userId, onClose }) => {
                                 <div className="flex gap-1">
                                     {[1, 2, 3, 4].map(i => (
                                         <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${newPassword.length >= 8 && /[a-zA-Z]/.test(newPassword) && /[0-9]/.test(newPassword)
-                                                ? i <= 3 ? 'bg-green-500' : (/[^a-zA-Z0-9]/.test(newPassword) ? 'bg-green-500' : 'bg-gray-600')
-                                                : newPassword.length >= 8
-                                                    ? i <= 2 ? 'bg-yellow-500' : 'bg-gray-600'
-                                                    : i <= 1 ? 'bg-red-500' : 'bg-gray-600'
+                                            ? i <= 3 ? 'bg-green-500' : (/[^a-zA-Z0-9]/.test(newPassword) ? 'bg-green-500' : 'bg-gray-600')
+                                            : newPassword.length >= 8
+                                                ? i <= 2 ? 'bg-yellow-500' : 'bg-gray-600'
+                                                : i <= 1 ? 'bg-red-500' : 'bg-gray-600'
                                             }`} />
                                     ))}
                                 </div>
                                 <p className={`text-[11px] ${newPassword.length >= 8 && /[a-zA-Z]/.test(newPassword) && /[0-9]/.test(newPassword)
-                                        ? 'text-green-400' : 'text-silver-dark'
+                                    ? 'text-green-400' : 'text-silver-dark'
                                     }`}>
                                     {newPassword.length < 8 ? `${8 - newPassword.length} karakter lagi` :
                                         !/[a-zA-Z]/.test(newPassword) ? 'Tambahkan huruf' :
@@ -1110,10 +1188,10 @@ const ChangePasswordModal = ({ userId, onClose }) => {
                             value={confirmPassword}
                             onChange={e => setConfirmPassword(e.target.value)}
                             className={`w-full px-3 py-2.5 rounded-lg bg-dark-surface border text-silver-light text-sm focus:outline-none focus:ring-2 focus:ring-accent-blue/50 ${confirmPassword && confirmPassword !== newPassword
-                                    ? 'border-red-500/50'
-                                    : confirmPassword && confirmPassword === newPassword
-                                        ? 'border-green-500/50'
-                                        : 'border-dark-border'
+                                ? 'border-red-500/50'
+                                : confirmPassword && confirmPassword === newPassword
+                                    ? 'border-green-500/50'
+                                    : 'border-dark-border'
                                 }`}
                             placeholder="Ketik ulang password baru"
                             required

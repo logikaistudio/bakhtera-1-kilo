@@ -13,8 +13,13 @@ import {
     FileSpreadsheet,
     Filter
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 const CodeOfAccount = () => {
+    const { canCreate, canEdit, canDelete } = useAuth();
+    const hasCreate = canCreate('bridge_coa');
+    const hasEdit = canEdit('bridge_coa');
+    const hasDelete = canDelete('bridge_coa');
     const [accounts, setAccounts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -108,6 +113,7 @@ const CodeOfAccount = () => {
     };
 
     const handleEdit = (account) => {
+        if (!hasEdit) return;
         setEditingAccount(account);
         setForm({
             code: account.code,
@@ -127,6 +133,7 @@ const CodeOfAccount = () => {
     };
 
     const handleDelete = async (account) => {
+        if (!hasDelete) return;
         if (!confirm(`Delete account ${account.code} - ${account.name}?`)) return;
 
         try {
@@ -141,6 +148,35 @@ const CodeOfAccount = () => {
         } catch (error) {
             console.error('Error deleting account:', error);
             alert('❌ Error: ' + error.message);
+        }
+    };
+
+    const handleDeleteAll = async () => {
+        if (!hasDelete) return;
+        if (accounts.length === 0) return;
+
+        const confirm1 = confirm("⚠️ PERINGATAN: Anda yakin ingin menghapus SELURUH data COA?\n\nSemua akun yang aktif saat ini akan dinonaktifkan.");
+        if (!confirm1) return;
+
+        const confirm2 = confirm("KONFIRMASI TERAKHIR: Tindakan ini tidak dapat dibatalkan melalui aplikasi. Lanjutkan?");
+        if (!confirm2) return;
+
+        try {
+            setLoading(true);
+            const { error } = await supabase
+                .from('code_of_accounts')
+                .update({ is_active: false })
+                .eq('is_active', true);
+
+            if (error) throw error;
+
+            alert('✅ Seluruh data COA berhasil dinonaktifkan.');
+            fetchAccounts();
+        } catch (error) {
+            console.error('Error deleting all accounts:', error);
+            alert('❌ Error: ' + error.message);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -209,16 +245,29 @@ const CodeOfAccount = () => {
                     <h1 className="text-3xl font-bold gradient-text">Code of Account</h1>
                     <p className="text-silver-dark mt-1">Master data kode akun untuk klasifikasi anggaran</p>
                 </div>
-                <Button
-                    icon={Plus}
-                    onClick={() => {
-                        resetForm();
-                        setEditingAccount(null);
-                        setShowModal(true);
-                    }}
-                >
-                    Add Account
-                </Button>
+                <div className="flex gap-2">
+                    {hasDelete && accounts.length > 0 && (
+                        <Button
+                            variant="danger"
+                            icon={Trash2}
+                            onClick={handleDeleteAll}
+                        >
+                            Delete All
+                        </Button>
+                    )}
+                    {hasCreate && (
+                        <Button
+                            icon={Plus}
+                            onClick={() => {
+                                resetForm();
+                                setEditingAccount(null);
+                                setShowModal(true);
+                            }}
+                        >
+                            Add Account
+                        </Button>
+                    )}
+                </div>
             </div>
 
             {/* Stats */}
@@ -342,20 +391,24 @@ const CodeOfAccount = () => {
                                             </td>
                                             <td className="px-4 py-2 text-center">
                                                 <div className="flex items-center justify-center gap-1">
-                                                    <button
-                                                        onClick={() => handleEdit(account)}
-                                                        className="p-1.5 rounded hover:bg-blue-500/20 text-blue-400"
-                                                        title="Edit"
-                                                    >
-                                                        <Edit2 className="w-4 h-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDelete(account)}
-                                                        className="p-1.5 rounded hover:bg-red-500/20 text-red-400"
-                                                        title="Delete"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
+                                                    {hasEdit && (
+                                                        <button
+                                                            onClick={() => handleEdit(account)}
+                                                            className="p-1.5 rounded hover:bg-blue-500/20 text-blue-400"
+                                                            title="Edit"
+                                                        >
+                                                            <Edit2 className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                    {hasDelete && (
+                                                        <button
+                                                            onClick={() => handleDelete(account)}
+                                                            className="p-1.5 rounded hover:bg-red-500/20 text-red-400"
+                                                            title="Delete"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
@@ -493,8 +546,8 @@ const CodeOfAccount = () => {
                                         <label
                                             key={item.key}
                                             className={`flex items-center gap-2 p-2 rounded border cursor-pointer transition-colors ${form[item.key]
-                                                    ? 'border-accent-orange bg-accent-orange/10'
-                                                    : 'border-dark-border hover:border-silver-dark'
+                                                ? 'border-accent-orange bg-accent-orange/10'
+                                                : 'border-dark-border hover:border-silver-dark'
                                                 }`}
                                         >
                                             <input
@@ -534,9 +587,11 @@ const CodeOfAccount = () => {
                                 >
                                     Cancel
                                 </Button>
-                                <Button type="submit" icon={Save}>
-                                    {editingAccount ? 'Update' : 'Save'}
-                                </Button>
+                                {(!editingAccount || hasEdit) && (
+                                    <Button type="submit" icon={Save}>
+                                        {editingAccount ? 'Update' : 'Save'}
+                                    </Button>
+                                )}
                             </div>
                         </form>
                     </div>

@@ -207,41 +207,41 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
                         <CheckCircle className="w-12 h-12 text-green-500" />
                     </div>
 
-                    <h2 className="text-2xl font-bold text-green-500 mb-2">Pembayaran Berhasil!</h2>
-                    <p className="text-silver-dark mb-6">Pembayaran telah dicatat dalam sistem</p>
+                    <h2 className="text-2xl font-bold text-green-500 mb-2">Payment Successful!</h2>
+                    <p className="text-silver-dark mb-6">Payment has been recorded in the system</p>
 
                     {/* Payment Details */}
                     <div className="glass-card p-4 rounded-lg mb-6 text-left bg-green-500/5 border border-green-500/20">
                         <div className="space-y-3">
                             <div className="flex justify-between">
-                                <span className="text-silver-dark">No. Pembayaran:</span>
+                                <span className="text-silver-dark">Payment Number:</span>
                                 <span className="text-silver-light font-mono font-medium">{successData.paymentNumber}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-silver-dark">Jumlah Dibayar:</span>
+                                <span className="text-silver-dark">Amount Paid:</span>
                                 <span className="text-green-400 font-bold">{formatCurrency(successData.amountPaid, successData.currency)}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-silver-dark">Sisa Hutang:</span>
+                                <span className="text-silver-dark">Outstanding Balance:</span>
                                 <span className={`font-bold ${successData.newOutstanding <= 0 ? 'text-green-400' : 'text-yellow-400'}`}>
                                     {formatCurrency(Math.max(0, successData.newOutstanding), successData.currency)}
                                 </span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-silver-dark">Status Baru:</span>
+                                <span className="text-silver-dark">New Status:</span>
                                 <span className={`px-3 py-1 rounded-full text-xs font-semibold ${successData.newStatus === 'paid' ? 'bg-green-500/20 text-green-400' :
                                     successData.newStatus === 'partial' ? 'bg-yellow-500/20 text-yellow-400' :
                                         'bg-blue-500/20 text-blue-400'
                                     }`}>
-                                    {successData.newStatus === 'paid' ? 'LUNAS' :
-                                        successData.newStatus === 'partial' ? 'SEBAGIAN' : 'BELUM BAYAR'}
+                                    {successData.newStatus === 'paid' ? 'PAID' :
+                                        successData.newStatus === 'partial' ? 'PARTIAL' : 'OUTSTANDING'}
                                 </span>
                             </div>
                         </div>
                     </div>
 
                     <Button onClick={() => { onSuccess(); }} className="w-full">
-                        Tutup
+                        Close
                     </Button>
                 </div>
             </Modal>
@@ -509,7 +509,7 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment }) => {
             alert('Alokasi akun berhasil disimpan!');
         } catch (error) {
             console.error('Error updating items:', error);
-            alert('Gagal menyimpan perubahan: ' + error.message);
+            alert('Failed to save perubahan: ' + error.message);
         } finally {
             setSavingItems(false);
         }
@@ -526,10 +526,10 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment }) => {
                                 ap.status === 'outstanding' ? 'bg-blue-500/20 text-blue-400' :
                                     'bg-gray-500/20 text-gray-400'
                         }`}>
-                        {ap.status === 'paid' ? 'LUNAS' :
-                            ap.status === 'partial' ? 'SEBAGIAN' :
-                                ap.status === 'overdue' ? 'JATUH TEMPO' :
-                                    ap.status === 'outstanding' ? 'BELUM BAYAR' : ap.status?.toUpperCase()}
+                        {ap.status === 'paid' ? 'PAID' :
+                            ap.status === 'partial' ? 'PARTIAL' :
+                                ap.status === 'overdue' ? 'OVERDUE' :
+                                    ap.status === 'outstanding' ? 'OUTSTANDING' : ap.status?.toUpperCase()}
                     </span>
                 </div>
 
@@ -552,61 +552,42 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment }) => {
                 {/* Item-Level Account / Cost Center Assignment */}
                 <div className="glass-card p-4 rounded-lg mb-6 bg-blue-500/5 border border-blue-500/20">
                     <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-semibold text-accent-blue flex items-center gap-2">
-                            <Building className="w-4 h-4" /> Alokasi Akun Per Item (Finance)
+                        <h3 className="font-semibold text-white flex items-center gap-2">
+                            <Building className="w-4 h-4" /> Item Allocation (Finance)
                         </h3>
-                        {ap.po_id ? (
-                            <Button
-                                size="sm"
-                                icon={CheckCircle}
-                                onClick={handleSaveChanges}
-                                disabled={savingItems || loadingItems}
-                                className={savingItems ? 'opacity-50' : ''}
-                            >
-                                {savingItems ? 'Menyimpan...' : 'Simpan Perubahan'}
-                            </Button>
-                        ) : (
-                            <span className="text-xs text-red-400 italic">* Tidak ada PO terkait</span>
-                        )}
                     </div>
 
                     {loadingItems ? (
-                        <div className="text-center py-4 text-silver-dark text-sm animate-pulse">Memuat detail item...</div>
+                        <div className="text-center py-4 text-silver-dark text-sm animate-pulse">Loading item details...</div>
                     ) : poItems.length > 0 ? (
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b border-dark-border text-left">
-                                        <th className="py-2 text-silver-dark font-medium pl-2">Deskripsi Item</th>
-                                        <th className="py-2 text-silver-dark font-medium text-right pr-4">Nilai</th>
-                                        <th className="py-2 text-silver-dark font-medium w-1/2">Akun Biaya (COA)</th>
+                                <thead className="bg-[#0070bc]">
+                                    <tr className="text-left">
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase rounded-tl-lg">Item</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase">Description</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right">Qty</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right">Unit Price</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right rounded-tr-lg">Amount</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-dark-border/50">
                                     {poItems.map((item, idx) => (
                                         <tr key={idx} className="hover:bg-blue-500/5 transition-colors">
-                                            <td className="py-2 pl-2 text-silver-light">
-                                                <div className="font-medium">{item.description || item.item_name || 'Item ' + (idx + 1)}</div>
-                                                <div className="text-xs text-silver-dark">
-                                                    {item.qty} {item.unit} x {formatCurrency(item.rate || 0, ap.currency)}
-                                                </div>
+                                            <td className="py-3 px-4 text-silver-light font-medium align-top">
+                                                {item.item_name || 'Item ' + (idx + 1)}
                                             </td>
-                                            <td className="py-2 text-right pr-4 text-silver-light font-medium">
-                                                {formatCurrency(item.amount || (item.qty * item.rate) || 0, ap.currency)}
+                                            <td className="py-3 px-4 text-silver-light align-top">
+                                                {item.description || '-'}
                                             </td>
-                                            <td className="py-2">
-                                                <select
-                                                    value={item.coa_id || ''}
-                                                    onChange={(e) => handleItemCoaChange(idx, e.target.value)}
-                                                    className="w-full px-2 py-1.5 bg-dark-bg border border-dark-border rounded text-xs text-silver-light focus:border-accent-blue transition-colors"
-                                                >
-                                                    <option value="">-- Pilih Akun --</option>
-                                                    {accounts.map(acc => (
-                                                        <option key={acc.id} value={acc.id}>
-                                                            {acc.code} - {acc.name} {acc.group_name ? `(${acc.group_name})` : ''}
-                                                        </option>
-                                                    ))}
-                                                </select>
+                                            <td className="py-3 px-4 text-right text-silver-light align-top">
+                                                {item.qty} {item.unit}
+                                            </td>
+                                            <td className="py-3 px-4 text-right text-silver-light align-top">
+                                                {formatCurrency(item.unit_price || item.rate || 0, ap.currency)}
+                                            </td>
+                                            <td className="py-3 px-4 text-right text-silver-light font-medium align-top">
+                                                {formatCurrency(item.amount || (item.qty * (item.unit_price || item.rate)) || 0, ap.currency)}
                                             </td>
                                         </tr>
                                     ))}
@@ -615,7 +596,7 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment }) => {
                         </div>
                     ) : (
                         <div className="text-center py-4 text-silver-dark text-sm italic">
-                            Tidak ada detail item yang ditemukan di PO ini.
+                            No item details found for this PO.
                         </div>
                     )}
                 </div>
@@ -659,16 +640,16 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment }) => {
                     <div className="glass-card p-4 rounded-lg mb-6">
                         <div className="flex items-center gap-2 mb-3">
                             <History className="w-5 h-5 text-accent-blue" />
-                            <h3 className="font-semibold text-silver-light">Riwayat Pembayaran</h3>
+                            <h3 className="font-semibold text-silver-light">Payment History</h3>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b border-dark-border">
-                                        <th className="text-left py-2 text-silver-dark font-medium">Tanggal</th>
-                                        <th className="text-left py-2 text-silver-dark font-medium">No. Pembayaran</th>
-                                        <th className="text-left py-2 text-silver-dark font-medium">Metode</th>
-                                        <th className="text-right py-2 text-silver-dark font-medium">Jumlah</th>
+                                        <th className="text-left py-2 text-silver-dark font-medium">Date</th>
+                                        <th className="text-left py-2 text-silver-dark font-medium">Payment Number</th>
+                                        <th className="text-left py-2 text-silver-dark font-medium">Method</th>
+                                        <th className="text-right py-2 text-silver-dark font-medium">Amount</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -695,7 +676,7 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment }) => {
                 {loadingHistory && (
                     <div className="glass-card p-4 rounded-lg mb-6 text-center">
                         <div className="animate-spin w-6 h-6 border-2 border-accent-orange border-t-transparent rounded-full mx-auto"></div>
-                        <p className="text-silver-dark text-sm mt-2">Memuat riwayat pembayaran...</p>
+                        <p className="text-silver-dark text-sm mt-2">Loading payment history...</p>
                     </div>
                 )}
 
@@ -710,11 +691,11 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment }) => {
                 {/* Actions */}
                 <div className="flex gap-3 justify-end pt-4 border-t border-dark-border">
                     <Button variant="secondary" onClick={onClose}>
-                        Tutup
+                        Close
                     </Button>
                     {ap.outstanding_amount > 0 && (
                         <Button icon={DollarSign} onClick={onRecordPayment}>
-                            Catat Pembayaran
+                            Record Payment
                         </Button>
                     )}
                 </div>
@@ -837,7 +818,7 @@ const AccountsPayable = () => {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold gradient-text">Accounts Payable (AP)</h1>
-                    <p className="text-silver-dark mt-1">Kelola hutang kepada vendor</p>
+                    <p className="text-silver-dark mt-1">Manage vendor payables</p>
                 </div>
                 <Button icon={Download}>Export to Excel</Button>
             </div>
@@ -846,34 +827,34 @@ const AccountsPayable = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="glass-card p-4 rounded-lg">
                     <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark">Total Tagihan AP</p>
+                        <p className="text-xs text-silver-dark">Total AP Amount</p>
                         <DollarSign className="w-4 h-4 text-blue-400" />
                     </div>
                     <p className="text-xl font-bold text-blue-400">{formatCurrency(totalAPAmount)}</p>
-                    <p className="text-xs text-silver-dark">{apTransactions.length} transaksi</p>
+                    <p className="text-xs text-silver-dark">{apTransactions.length} transactions</p>
                 </div>
 
                 <div className="glass-card p-4 rounded-lg">
                     <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark">Total Dibayar</p>
+                        <p className="text-xs text-silver-dark">Total Paid</p>
                         <CheckCircle className="w-4 h-4 text-green-400" />
                     </div>
                     <p className="text-xl font-bold text-green-400">{formatCurrency(totalPaidAmount)}</p>
-                    <p className="text-xs text-silver-dark">{apTransactions.filter(ap => ap.status === 'paid').length} lunas</p>
+                    <p className="text-xs text-silver-dark">{apTransactions.filter(ap => ap.status === 'paid').length} paid</p>
                 </div>
 
                 <div className="glass-card p-4 rounded-lg">
                     <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark">Sisa Hutang</p>
+                        <p className="text-xs text-silver-dark">Outstanding Balance</p>
                         <AlertCircle className="w-4 h-4 text-red-400" />
                     </div>
                     <p className="text-xl font-bold text-red-400">{formatCurrency(totalOutstanding)}</p>
-                    <p className="text-xs text-silver-dark">{apTransactions.filter(ap => ap.outstanding_amount > 0).length} belum lunas</p>
+                    <p className="text-xs text-silver-dark">{apTransactions.filter(ap => ap.outstanding_amount > 0).length} unpaid</p>
                 </div>
 
                 <div className="glass-card p-4 rounded-lg">
                     <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark">Jatuh Tempo</p>
+                        <p className="text-xs text-silver-dark">Overdue</p>
                         <Clock className="w-4 h-4 text-orange-400" />
                     </div>
                     <p className="text-xl font-bold text-orange-400">{overdueCount}</p>
@@ -909,7 +890,7 @@ const AccountsPayable = () => {
                     <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                     <input
                         type="text"
-                        placeholder="Cari AP number, PO, atau vendor..."
+                        placeholder="Search AP number, PO, atau vendor..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-12 pr-4 py-3 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-base"
@@ -946,7 +927,7 @@ const AccountsPayable = () => {
                                 <tr>
                                     <td colSpan="9" className="px-3 py-8 text-center">
                                         <FileText className="w-10 h-10 text-silver-dark mx-auto mb-2" />
-                                        <p className="text-silver-dark text-sm">Belum ada transaksi AP.</p>
+                                        <p className="text-silver-dark text-sm">No AP transactions yet.</p>
                                     </td>
                                 </tr>
                             ) : (
@@ -989,10 +970,10 @@ const AccountsPayable = () => {
                                                         ap.status === 'outstanding' ? 'bg-blue-500/20 text-blue-400' :
                                                             'bg-gray-500/20 text-gray-400'
                                                 }`}>
-                                                {ap.status === 'paid' ? 'Lunas' :
-                                                    ap.status === 'partial' ? 'Sebagian' :
-                                                        ap.status === 'overdue' ? 'Jatuh Tempo' :
-                                                            ap.status === 'outstanding' ? 'Belum Bayar' : ap.status}
+                                                {ap.status === 'paid' ? 'Paid' :
+                                                    ap.status === 'partial' ? 'Partial' :
+                                                        ap.status === 'overdue' ? 'Overdue' :
+                                                            ap.status === 'outstanding' ? 'Outstanding' : ap.status}
                                             </span>
                                         </td>
                                     </tr>

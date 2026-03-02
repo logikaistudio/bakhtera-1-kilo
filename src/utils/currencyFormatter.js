@@ -1,4 +1,4 @@
-// Helper function to format number to Indonesian currency format (xxx.xxx.xxx)
+// Helper function to format number to IDR-style format (xxx.xxx.xxx)
 export const formatCurrency = (value) => {
     if (value === null || value === undefined || value === '') {
         return '0';
@@ -14,6 +14,27 @@ export const formatCurrency = (value) => {
         minimumFractionDigits: 0,
         maximumFractionDigits: 0
     });
+};
+
+// Format currency with prefix symbol based on currency code
+export const formatWithCurrency = (value, currencyCode = 'IDR') => {
+    const formatted = formatCurrency(value);
+    const prefix = getCurrencySymbol(currencyCode);
+    return `${prefix} ${formatted}`;
+};
+
+// Get currency symbol/prefix
+export const getCurrencySymbol = (code) => {
+    const symbols = {
+        'IDR': 'Rp',
+        'USD': '$',
+        'EUR': '€',
+        'SGD': 'S$',
+        'JPY': '¥',
+        'CNY': '¥',
+        'GBP': '£',
+    };
+    return symbols[code] || code;
 };
 
 // Helper function to parse formatted currency back to number

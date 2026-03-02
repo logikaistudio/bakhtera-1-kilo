@@ -11,36 +11,36 @@ const BridgeOverview = () => {
     } = useData();
 
     // Calculate statistics based on real data
-    const pengajuanMasuk = quotations.filter(q => q.type === 'inbound').length;
-    const pengajuanKeluar = quotations.filter(q => q.type === 'outbound').length;
+    const pengajuanMasuk = (quotations || []).filter(q => q?.type === 'inbound').length;
+    const pengajuanKeluar = (quotations || []).filter(q => q?.type === 'outbound').length;
 
     // Items in warehouse - count from warehouse_inventory table
-    const itemsInWarehouse = warehouseInventory.length;
+    const itemsInWarehouse = (warehouseInventory || []).length;
 
     // Items in exhibition/fair - count items from goods_movements with destination 'pameran'
     // Get latest movement for each item to determine current location
     const itemLocations = {};
-    goodsMovements.forEach(movement => {
-        const itemKey = `${movement.itemCode || movement.assetName}-${movement.serialNumber}`;
-        if (!itemLocations[itemKey] || new Date(movement.date) > new Date(itemLocations[itemKey].date)) {
+    (goodsMovements || []).forEach(movement => {
+        const itemKey = `${movement?.itemCode || movement?.assetName}-${movement?.serialNumber}`;
+        if (!itemLocations[itemKey] || new Date(movement?.date) > new Date(itemLocations[itemKey]?.date)) {
             itemLocations[itemKey] = movement;
         }
     });
     const itemsInFair = Object.values(itemLocations).filter(m =>
-        m.destination === 'pameran' || m.position === 'pameran'
+        m?.destination === 'pameran' || m?.position === 'pameran'
     ).length;
 
     // Total inbound items - flatten and count all items from inbound transactions
-    const totalInboundItems = inboundTransactions.reduce((total, transaction) => {
-        if (transaction.items && transaction.items.length > 0) {
+    const totalInboundItems = (inboundTransactions || []).reduce((total, transaction) => {
+        if (transaction?.items && transaction?.items?.length > 0) {
             return total + transaction.items.length;
         }
         return total + 1; // If no items array, count the transaction itself as 1 item
     }, 0);
 
     // Total outbound items - flatten and count all items from outbound transactions
-    const totalOutboundItems = outboundTransactions.reduce((total, transaction) => {
-        if (transaction.items && transaction.items.length > 0) {
+    const totalOutboundItems = (outboundTransactions || []).reduce((total, transaction) => {
+        if (transaction?.items && transaction?.items?.length > 0) {
             return total + transaction.items.length;
         }
         return total + 1; // If no items array, count the transaction itself as 1 item

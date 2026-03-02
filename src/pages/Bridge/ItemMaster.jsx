@@ -1,10 +1,15 @@
 import React, { useState } from 'react';
 import { Package, Search, Plus, Edit2, Trash2, Download } from 'lucide-react';
 import { useData } from '../../context/DataContext';
+import { useAuth } from '../../context/AuthContext';
 import Button from '../../components/Common/Button';
 import { exportToCSV } from '../../utils/exportCSV';
 
 const ItemMaster = () => {
+    const { canCreate, canEdit, canDelete } = useAuth();
+    const hasCreate = canCreate('bridge_item_master');
+    const hasEdit = canEdit('bridge_item_master');
+    const hasDelete = canDelete('bridge_item_master');
     const { itemMaster = [], addItemCode, updateItemCode, deleteItemCode } = useData();
     const [searchTerm, setSearchTerm] = useState('');
     const [showModal, setShowModal] = useState(false);
@@ -33,6 +38,7 @@ const ItemMaster = () => {
     };
 
     const handleEdit = (item) => {
+        if (!hasEdit) return;
         setEditingItem(item);
         setFormData({ itemCode: item.itemCode, itemType: item.itemType });
         setShowModal(true);
@@ -62,10 +68,12 @@ const ItemMaster = () => {
                     <h1 className="text-3xl font-bold gradient-text">Master Kode Barang</h1>
                     <p className="text-silver-dark mt-1">Manajemen Kode & Tipe Barang</p>
                 </div>
-                <Button onClick={() => setShowModal(true)}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Tambah Kode Barang
-                </Button>
+                {hasCreate && (
+                    <Button onClick={() => setShowModal(true)}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Tambah Kode Barang
+                    </Button>
+                )}
             </div>
 
             {/* Search & Stats */}
@@ -128,8 +136,8 @@ const ItemMaster = () => {
                                 filteredItems.map((item, idx) => (
                                     <tr
                                         key={item.id}
-                                        onClick={() => handleEdit(item)}
-                                        className="border-t border-dark-border hover:bg-dark-surface/50 cursor-pointer"
+                                        onClick={() => hasEdit && handleEdit(item)}
+                                        className={`border-t border-dark-border hover:bg-dark-surface/50 ${hasEdit ? 'cursor-pointer' : ''}`}
                                     >
                                         <td className="px-4 py-3 text-sm text-center text-silver-light">{idx + 1}</td>
                                         <td className="px-4 py-3 text-sm text-accent-blue font-mono">{item.itemCode}</td>
@@ -173,7 +181,7 @@ const ItemMaster = () => {
                                 />
                             </div>
                             <div className="flex gap-2 justify-between mt-6">
-                                {editingItem && (
+                                {editingItem && hasDelete && (
                                     <Button
                                         type="button"
                                         variant="danger"
@@ -199,9 +207,11 @@ const ItemMaster = () => {
                                     >
                                         Batal
                                     </Button>
-                                    <Button type="submit">
-                                        {editingItem ? 'Update' : 'Simpan'}
-                                    </Button>
+                                    {(!editingItem || hasEdit) && (
+                                        <Button type="submit">
+                                            {editingItem ? 'Update' : 'Simpan'}
+                                        </Button>
+                                    )}
                                 </div>
                             </div>
                         </form>

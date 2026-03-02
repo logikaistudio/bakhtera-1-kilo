@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ArrowDownCircle, Search, Eye, Package, Download, FileSpreadsheet } from 'lucide-react';
 import { useData } from '../../../context/DataContext';
 import Button from '../../../components/Common/Button';
-import { formatCurrency } from '../../../utils/currencyFormatter';
+import { formatCurrency, getCurrencySymbol } from '../../../utils/currencyFormatter';
 import { exportToCSV } from '../../../utils/exportCSV';
 import { exportToXLS } from '../../../utils/exportXLS';
 
@@ -241,7 +241,7 @@ const BarangMasuk = () => {
                                         <td className="px-4 py-3 text-sm text-silver">{t.sender || t.supplier || '-'}</td>
                                         <td className="px-4 py-3 text-sm text-silver text-center font-bold">{t.items ? t.items.length : 0}</td>
                                         <td className="px-4 py-3 text-sm text-accent-green text-right font-medium">
-                                            {formatCurrency(getTransactionTotal(t))}
+                                            {getCurrencySymbol(t.currency || 'IDR')} {formatCurrency(getTransactionTotal(t))}
                                         </td>
                                     </tr>
                                 ))
@@ -322,7 +322,7 @@ const BarangMasuk = () => {
                                                 <td className="px-4 py-2.5 text-center text-xs font-bold text-gray-800 dark:text-white">{item.quantity}</td>
                                                 <td className="px-4 py-2.5 text-center text-xs text-gray-600 dark:text-silver">{item.unit || 'pcs'}</td>
                                                 <td className="px-4 py-2.5 text-right text-xs text-gray-800 dark:text-white font-medium">
-                                                    {formatCurrency(item.value)}
+                                                    {getCurrencySymbol(selectedTransaction.currency || 'IDR')} {formatCurrency(item.value)}
                                                 </td>
                                             </tr>
                                         ))}
@@ -331,7 +331,7 @@ const BarangMasuk = () => {
                                         <tr>
                                             <td colSpan="6" className="px-4 py-2 text-right text-xs font-bold text-gray-700 dark:text-silver">GRAND TOTAL:</td>
                                             <td className="px-4 py-2 text-right text-xs font-bold text-accent-green">
-                                                {formatCurrency(getTransactionTotal(selectedTransaction))}
+                                                {getCurrencySymbol(selectedTransaction.currency || 'IDR')} {formatCurrency(getTransactionTotal(selectedTransaction))}
                                             </td>
                                         </tr>
                                     </tfoot>

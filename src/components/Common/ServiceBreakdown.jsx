@@ -56,7 +56,7 @@ const ServiceBreakdown = ({ services = {}, onChange, totalItems = 0 }) => {
                 {/* Handling */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
                     <div className="md:col-span-2">
-                        <label className="block text-xs font-medium text-silver mb-1">Deskripsi</label>
+                        <label className="block text-xs font-medium text-silver mb-1">Description</label>
                         <input
                             type="text"
                             value={defaultServices.handling.description}

@@ -1,10 +1,15 @@
 import React, { useState } from 'react';
 import { BookOpen, Plus, Edit2, Trash2, Download } from 'lucide-react';
 import { useData } from '../../context/DataContext';
+import { useAuth } from '../../context/AuthContext';
 import Button from '../../components/Common/Button';
 import { exportToCSV } from '../../utils/exportCSV';
 
 const BCMaster = () => {
+    const { canCreate, canEdit, canDelete } = useAuth();
+    const hasCreate = canCreate('bridge_bc_master');
+    const hasEdit = canEdit('bridge_bc_master');
+    const hasDelete = canDelete('bridge_bc_master');
     const { bcCodes, addBCCode, updateBCCode, deleteBCCode } = useData();
 
     const [showForm, setShowForm] = useState(false);
@@ -38,6 +43,7 @@ const BCMaster = () => {
     };
 
     const handleEdit = (bcCode) => {
+        if (!hasEdit) return; // Block edit if no permission
         setEditingCode(bcCode);
         setFormData({
             code: bcCode.code,
@@ -84,9 +90,11 @@ const BCMaster = () => {
                     <h1 className="text-3xl font-bold gradient-text">Master Kode BC</h1>
                     <p className="text-silver-dark mt-1">CEISA 4.0 - Jenis Dokumen Pabean</p>
                 </div>
-                <Button onClick={() => setShowForm(!showForm)} icon={Plus}>
-                    {showForm ? 'Batal' : 'Tambah Kode BC'}
-                </Button>
+                {hasCreate && (
+                    <Button onClick={() => setShowForm(!showForm)} icon={Plus}>
+                        {showForm ? 'Batal' : 'Tambah Kode BC'}
+                    </Button>
+                )}
             </div>
 
             {/* Info */}
@@ -163,23 +171,38 @@ const BCMaster = () => {
                         </div>
                     </div>
 
-                    <div className="flex justify-end gap-3">
-                        <Button type="button" variant="secondary" onClick={() => {
-                            setShowForm(false);
-                            setEditingCode(null);
-                            setFormData({
-                                code: '',
-                                name: '',
-                                category: 'inbound',
-                                description: '',
-                                isActive: true
-                            });
-                        }}>
-                            Batal
-                        </Button>
-                        <Button type="submit" icon={editingCode ? Edit2 : Plus}>
-                            {editingCode ? 'Perbarui' : 'Tambah'} Kode BC
-                        </Button>
+                    <div className="flex justify-between gap-3">
+                        <div>
+                            {editingCode && hasDelete && (
+                                <Button type="button" variant="danger" onClick={() => {
+                                    handleRemove(editingCode.id);
+                                    setShowForm(false);
+                                    setEditingCode(null);
+                                }}>
+                                    <Trash2 className="w-4 h-4 mr-1" /> Hapus
+                                </Button>
+                            )}
+                        </div>
+                        <div className="flex gap-3">
+                            <Button type="button" variant="secondary" onClick={() => {
+                                setShowForm(false);
+                                setEditingCode(null);
+                                setFormData({
+                                    code: '',
+                                    name: '',
+                                    category: 'inbound',
+                                    description: '',
+                                    isActive: true
+                                });
+                            }}>
+                                Batal
+                            </Button>
+                            {(!editingCode || hasEdit) && (
+                                <Button type="submit" icon={editingCode ? Edit2 : Plus}>
+                                    {editingCode ? 'Perbarui' : 'Tambah'} Kode BC
+                                </Button>
+                            )}
+                        </div>
                     </div>
                 </form>
             )}
@@ -215,8 +238,8 @@ const BCMaster = () => {
                             {bcCodes.map(bc => (
                                 <tr
                                     key={bc.id}
-                                    className="hover:bg-dark-surface smooth-transition cursor-pointer"
-                                    onClick={() => handleEdit(bc)}
+                                    className={`hover:bg-dark-surface smooth-transition ${hasEdit ? 'cursor-pointer' : ''}`}
+                                    onClick={() => hasEdit && handleEdit(bc)}
                                 >
                                     <td className="px-4 py-3 text-sm font-bold text-accent-blue">{bc.code}</td>
                                     <td className="px-4 py-3 text-sm text-silver-light font-medium">{bc.name}</td>

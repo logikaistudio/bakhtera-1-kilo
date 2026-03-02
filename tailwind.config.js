@@ -4,27 +4,27 @@ export default {
         "./index.html",
         "./src/**/*.{js,ts,jsx,tsx}",
     ],
-    darkMode: 'class',
+    darkMode: false,
     theme: {
         extend: {
             colors: {
-                'dark-bg': '#0A0A0F',
-                'dark-surface': '#0F0F17',
-                'dark-card': '#16161F',
-                'dark-border': '#2A2A35',
+                'dark-bg': '#FFFFFF',
+                'dark-surface': '#F2F3F4',
+                'dark-card': '#F2F3F4',
+                'dark-border': '#D1D5DB',
 
-                // Modern silver tones with slight blue tint
-                'silver': '#E0E5F0',
-                'silver-light': '#F0F3FA',
-                'silver-dark': '#A0A8B8',
+                // Text tones for light theme
+                'silver': '#111827',
+                'silver-light': '#1F2937',
+                'silver-dark': '#4B5563',
                 'silver-muted': '#6B7280',
 
-                // Vibrant accent colors
-                'accent-blue': '#60A5FA',
-                'accent-purple': '#A78BFA',
-                'accent-cyan': '#22D3EE',
-                'accent-green': '#34D399',
-                'accent-orange': '#FB923C',
+                // Vibrant accent colors (light-friendly)
+                'accent-blue': '#0070BB',
+                'accent-purple': '#7C3AED',
+                'accent-cyan': '#0891B2',
+                'accent-green': '#059669',
+                'accent-orange': '#EA580C',
             },
             fontFamily: {
                 sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],

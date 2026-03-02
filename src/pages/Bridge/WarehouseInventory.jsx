@@ -3,14 +3,18 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Warehouse, Search, Download, X, Edit2, Save, XCircle, ArrowRightLeft, Upload, FileText, Trash2, ExternalLink, AlertCircle, CheckCircle, Box, MapPin, LogOut } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useData } from '../../context/DataContext';
+import { useAuth } from '../../context/AuthContext';
 import Button from '../../components/Common/Button';
 import { exportToCSV } from '../../utils/exportCSV';
 import { calculateDaysDifference, getAgingStatus } from '../../utils/agingCalculator';
 
 const WarehouseInventory = () => {
+    const { canEdit, canDelete, user } = useAuth();
+    const hasEdit = canEdit('bridge_inventory');
+    const hasDelete = canDelete('bridge_inventory');
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    const { quotations, updateQuotation, addMutationLog, mutationLogs = [], deleteMutationLog, updateInventoryStock, outboundTransactions = [], updateItemCheckout } = useData();
+    const { quotations, updateQuotation, addMutationLog, mutationLogs = [], deleteMutationLog, updateInventoryStock, outboundTransactions = [], updateItemCheckout, requestApproval } = useData();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedPengajuan, setSelectedPengajuan] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
@@ -107,6 +111,7 @@ const WarehouseInventory = () => {
     };
 
     const handleStartEdit = () => {
+        if (!hasEdit) return;
         setIsEditing(true);
     };
 
@@ -238,6 +243,25 @@ const WarehouseInventory = () => {
                     }
                 }
                 alert(`Data berhasil disimpan! ${mutations.length} mutasi diproses.`);
+
+                // Create approval request for monitoring
+                if (requestApproval) {
+                    const userName = user?.full_name || user?.username || 'User';
+                    const userId = user?.id || null;
+                    const mutationTypes = [...new Set(mutations.map(m => m._type))];
+                    const typeLabel = mutationTypes.includes('inbound') ? 'mutation_in' : 'mutation_out';
+                    try {
+                        await requestApproval(
+                            typeLabel, 'Bridge', 'Mutation', selectedPengajuan.id,
+                            editData.quotationNumber || editData.quotation_number,
+                            { items: mutations.map(m => ({ itemCode: m.itemCode, itemName: m.itemName, qty: m.mutatedQty, type: m._type })), totalItems: mutations.length },
+                            `Mutasi ${mutations.length} item (inline edit)`,
+                            userName, userId
+                        );
+                    } catch (approvalErr) {
+                        console.warn('⚠️ Approval request failed (non-critical):', approvalErr);
+                    }
+                }
             } else {
                 alert('Data berhasil disimpan!');
             }
@@ -384,6 +408,7 @@ const WarehouseInventory = () => {
     };
 
     const handleStartMutation = (data) => {
+        if (!hasEdit) return;
         // Fix: If 'data' is an event object (from button click) or undefined, use selectedPengajuan
         const pengajuanToProcess = (data && !data.packages && !data.quotationNumber && !data.quotation_number)
             ? selectedPengajuan
@@ -703,6 +728,49 @@ const WarehouseInventory = () => {
 
             console.log('✅ Mutasi berhasil disimpan:', mutations.length, 'records');
 
+            // Create approval request for monitoring in Approval Manager
+            if (requestApproval && mutations.length > 0) {
+                const userName = user?.full_name || user?.username || 'User';
+                const userId = user?.id || null;
+                const mutationTypes = [...new Set(mutations.map(m => m._type))];
+                const typeLabel = mutationTypes.includes('outbound') && mutationTypes.includes('inbound')
+                    ? 'mutation_out' : mutationTypes.includes('inbound') ? 'mutation_in' : 'mutation_out';
+
+                const mutationSummary = mutations.map(m =>
+                    `${m.itemName}: ${m.mutatedQty} ${m.uom || 'pcs'} (${m._type === 'outbound' ? 'Keluar' : 'Masuk'})`
+                ).join(', ');
+
+                try {
+                    await requestApproval(
+                        typeLabel,
+                        'Bridge',
+                        'Mutation',
+                        qId,
+                        qNumber,
+                        {
+                            items: mutations.map(m => ({
+                                itemCode: m.itemCode,
+                                itemName: m.itemName,
+                                qty: m.mutatedQty,
+                                type: m._type,
+                                origin: m.origin,
+                                destination: m.destination,
+                                date: m.date,
+                                pic: m.pic
+                            })),
+                            totalItems: mutations.length,
+                            location: mutationData.mutationLocation || 'Pameran'
+                        },
+                        `Mutasi ${mutations.length} item: ${mutationSummary}`,
+                        userName,
+                        userId
+                    );
+                    console.log('📋 Approval request created for mutation tracking');
+                } catch (approvalErr) {
+                    console.warn('⚠️ Failed to create approval request (non-critical):', approvalErr);
+                }
+            }
+
             // Auto-navigate to Goods Movement page (RESTORED LOGIC)
             navigate(`/bridge/goods-movement?pengajuan=${encodeURIComponent(qNumber)}`);
 
@@ -920,6 +988,10 @@ const WarehouseInventory = () => {
 
     // Handle delete all mutations for an item
     const handleDeleteMutations = async (itemCode, packageNumber) => {
+        if (!hasDelete) {
+            alert('Anda tidak memiliki izin untuk menghapus mutasi');
+            return;
+        }
         if (!deleteMutationLog) {
             alert('Fungsi hapus tidak tersedia');
             return;
@@ -964,6 +1036,10 @@ const WarehouseInventory = () => {
 
     // Handle delete ALL mutations for entire pengajuan
     const handleDeleteAllMutations = async () => {
+        if (!hasDelete) {
+            alert('Anda tidak memiliki izin untuk menghapus mutasi');
+            return;
+        }
         if (!deleteMutationLog) {
             alert('Fungsi hapus tidak tersedia');
             return;
@@ -1140,10 +1216,17 @@ const WarehouseInventory = () => {
                                             {/* Only show mutation buttons for inbound pengajuan */}
                                             {selectedPengajuan.type !== 'outbound' && (
                                                 <>
-                                                    <Button onClick={handleDeleteAllMutations} variant="secondary" icon={Trash2} className="text-sm text-red-600 hover:text-red-800">Hapus Mutasi</Button>
+                                                    {hasDelete && (
+                                                        <Button onClick={handleDeleteAllMutations} variant="secondary" icon={Trash2} className="text-sm text-red-600 hover:text-red-800">Hapus Mutasi</Button>
+                                                    )}
+                                                    {hasEdit && (
+                                                        <Button onClick={() => handleStartMutation(selectedPengajuan)} variant="primary" icon={ArrowRightLeft} className="text-sm">Mutasi</Button>
+                                                    )}
                                                 </>
                                             )}
-                                            <Button onClick={handleStartEdit} variant="secondary" icon={Edit2} className="text-sm">Kelola</Button>
+                                            {hasEdit && (
+                                                <Button onClick={handleStartEdit} variant="secondary" icon={Edit2} className="text-sm">Kelola</Button>
+                                            )}
                                         </>
                                     ) : (
                                         <>
