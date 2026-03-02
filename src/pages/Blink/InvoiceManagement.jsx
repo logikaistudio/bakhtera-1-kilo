@@ -2341,6 +2341,8 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
         invoice.invoice_items ? invoice.invoice_items.map(item => ({ ...item, isSelected: true, splitQty: item.qty || 1, splitRate: item.rate || 0 })) : []
     );
     const [splitLabel, setSplitLabel] = useState('FULL PAYMENT');
+    const [printCurrency, setPrintCurrency] = useState(invoice.currency || 'IDR');
+    const [exchangeRate, setExchangeRate] = useState(1);
 
     const handleSplitItemChange = (index, field, value) => {
         setSplitItems(prev => {
@@ -2353,9 +2355,9 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
     const isSplit = splitItems.some(item => !item.isSelected || item.splitQty !== (item.qty || 1) || item.splitRate !== (item.rate || 0));
 
     // Calculate split totals
-    const splitSubtotal = splitItems.reduce((sum, item) => sum + (item.isSelected ? (item.splitQty * item.splitRate) : 0), 0);
+    const splitSubtotal = splitItems.reduce((sum, item) => sum + (item.isSelected ? (item.splitQty * (item.splitRate * exchangeRate)) : 0), 0);
     const splitTax = splitSubtotal * (invoice.tax_rate || 0) / 100;
-    const splitTotal = splitSubtotal + splitTax - (invoice.discount_amount || 0);
+    const splitTotal = splitSubtotal + splitTax - ((invoice.discount_amount || 0) * exchangeRate);
 
     const handlePrintClick = () => {
         // We inject the split calculation dynamically to the onPrint method if needed
@@ -2392,9 +2394,36 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                                 placeholder="Misal: Termin 1 (DP)"
                                 value={splitLabel}
                                 onChange={(e) => setSplitLabel(e.target.value)}
-                                className="bg-dark-surface border border-dark-border text-silver-light px-2 py-1 rounded text-sm w-full ml-2"
+                                className="bg-dark-surface border border-dark-border text-silver-light px-2 py-1 rounded text-sm w-32 ml-1"
                             />
                         </div>
+
+                        <div className="flex items-center gap-2 bg-dark-bg p-2 rounded-lg border border-dark-border">
+                            <label className="text-xs text-silver-light font-medium whitespace-nowrap">Print Curr:</label>
+                            <select
+                                value={printCurrency}
+                                onChange={(e) => setPrintCurrency(e.target.value)}
+                                className="bg-dark-surface border border-dark-border text-silver-light px-2 py-1 rounded text-sm w-20 ml-1 shadow-none"
+                            >
+                                <option value="IDR">IDR</option>
+                                <option value="USD">USD</option>
+                                <option value="SGD">SGD</option>
+                            </select>
+                        </div>
+
+                        {(printCurrency !== invoice.currency || exchangeRate !== 1) && (
+                            <div className="flex items-center gap-2 bg-dark-bg p-2 rounded-lg border border-dark-border">
+                                <label className="text-xs text-silver-light font-medium whitespace-nowrap">Kurs/Rate:</label>
+                                <input
+                                    type="number"
+                                    value={exchangeRate}
+                                    onChange={(e) => setExchangeRate(parseFloat(e.target.value) || 1)}
+                                    className="bg-dark-surface border border-dark-border text-silver-light px-2 py-1 rounded text-sm w-24 ml-1 text-right"
+                                    min="0"
+                                    step="0.01"
+                                />
+                            </div>
+                        )}
 
                         <button
                             onClick={handlePrintClick}
@@ -2469,7 +2498,7 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                                             />
                                         </td>
                                         <td className="px-3 py-2 text-right text-accent-orange font-medium">
-                                            {item.isSelected ? formatCurrency(item.splitQty * item.splitRate, invoice.currency) : '-'}
+                                            {item.isSelected ? formatCurrency(item.splitQty * item.splitRate * exchangeRate, printCurrency) : '-'}
                                         </td>
                                     </tr>
                                 ))}
@@ -2600,19 +2629,19 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                             <tbody>
                                 {splitItems.filter(item => item.isSelected).length > 0 ? (
                                     splitItems.filter(item => item.isSelected).map((item, index) => {
-                                        const calcAmount = item.splitQty * item.splitRate;
+                                        const calcAmount = item.splitQty * item.splitRate * exchangeRate;
                                         const calcTax = calcAmount * (invoice.tax_rate || 0) / 100;
                                         return (
                                             <tr key={index}>
                                                 <td style={{ borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textTransform: 'capitalize' }}>
                                                     {item.item_name ? <b>{item.item_name}</b> : null} {item.item_name ? '- ' : ''}{item.description}
                                                     <div style={{ fontSize: '9px', color: '#555', marginTop: '2px' }}>
-                                                        {item.splitQty} {item.unit} x {formatCurrency(item.splitRate, invoice.currency).replace('Rp ', '').replace('$', '')}
+                                                        {item.splitQty} {item.unit} x {formatCurrency(item.splitRate * exchangeRate, printCurrency).replace('Rp ', '').replace('$', '')}
                                                     </div>
                                                 </td>
-                                                <td style={{ borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textAlign: 'center' }}>{invoice.currency}</td>
-                                                <td style={{ borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textAlign: 'right' }}>{formatCurrency(calcAmount, invoice.currency).replace('Rp ', '').replace('$', '')}</td>
-                                                <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textAlign: 'right' }}>{formatCurrency(calcTax, invoice.currency).replace('Rp ', '').replace('$', '')}</td>
+                                                <td style={{ borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textAlign: 'center' }}>{printCurrency}</td>
+                                                <td style={{ borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textAlign: 'right' }}>{formatCurrency(calcAmount, printCurrency).replace('Rp ', '').replace('$', '')}</td>
+                                                <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textAlign: 'right' }}>{formatCurrency(calcTax, printCurrency).replace('Rp ', '').replace('$', '')}</td>
                                             </tr>
                                         );
                                     })
@@ -2633,15 +2662,15 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                             <div style={{ width: '320px', border: '1px solid #000', borderTop: 'none' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', fontWeight: 'bold', fontSize: '11px', borderBottom: '1px solid #ccc', background: '#f9f9f9' }}>
                                     <span>SUBTOTAL</span>
-                                    <span>{formatCurrency(splitSubtotal, invoice.currency)}</span>
+                                    <span>{formatCurrency(splitSubtotal, printCurrency)}</span>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', fontWeight: 'bold', fontSize: '11px', borderBottom: '1px solid #ccc' }}>
                                     <span>TAX Total ({invoice.tax_rate}%)</span>
-                                    <span>{formatCurrency(splitTax, invoice.currency)}</span>
+                                    <span>{formatCurrency(splitTax, printCurrency)}</span>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', fontWeight: 'bold', fontSize: '13px', background: '#333', color: 'white' }}>
                                     <span>TOTAL AMOUNT DUE</span>
-                                    <span>{formatCurrency(splitTotal, invoice.currency)}</span>
+                                    <span>{formatCurrency(splitTotal, printCurrency)}</span>
                                 </div>
                             </div>
                         </div>
