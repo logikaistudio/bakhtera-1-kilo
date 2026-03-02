@@ -220,7 +220,8 @@ const InvoiceManagement = () => {
                         unit: item.unit || 'Job',
                         rate: parseFloat(item.unitPrice) || parseFloat(item.price) || parseFloat(item.rate) || 0,
                         amount: parseFloat(item.amount) || parseFloat(item.total) ||
-                            ((parseFloat(item.quantity) || 1) * (parseFloat(item.unitPrice) || parseFloat(item.price) || parseFloat(item.rate) || 0))
+                            ((parseFloat(item.quantity) || 1) * (parseFloat(item.unitPrice) || parseFloat(item.price) || parseFloat(item.rate) || 0)),
+                        currency: item.currency || quotation.currency || 'IDR'
                     }))
                     : [{
                         item_name: (quotation.serviceType || quotation.service_type || 'Freight').toUpperCase(),
@@ -228,7 +229,8 @@ const InvoiceManagement = () => {
                         qty: 1,
                         unit: 'Job',
                         rate: quotation.totalAmount || quotation.total_amount || 0,
-                        amount: quotation.totalAmount || quotation.total_amount || 0
+                        amount: quotation.totalAmount || quotation.total_amount || 0,
+                        currency: quotation.currency || 'IDR'
                     }],
                 // Pre-fill fields from quotation where possible
                 consignor: quotation.shipper_name || '', // Assuming shipper map to consignor often
@@ -331,7 +333,7 @@ const InvoiceManagement = () => {
             ...prev,
             invoice_items: [
                 ...prev.invoice_items,
-                { item_name: '', description: '', qty: 1, unit: 'Job', rate: 0, amount: 0 }
+                { item_name: '', description: '', qty: 1, unit: 'Job', rate: 0, amount: 0, currency: prev.billing_currency || 'IDR' }
             ]
         }));
     };
@@ -360,7 +362,16 @@ const InvoiceManagement = () => {
     };
 
     const calculateTotals = () => {
-        const subtotal = formData.invoice_items.reduce((sum, item) => sum + (item.amount || 0), 0);
+        const subtotal = formData.invoice_items.reduce((sum, item) => {
+            let itemVal = item.amount || 0;
+            const itemCurr = item.currency || formData.billing_currency;
+            if (itemCurr !== formData.billing_currency) {
+                if (formData.billing_currency === 'IDR' && itemCurr !== 'IDR') itemVal *= (formData.exchange_rate || 16000);
+                else if (formData.billing_currency !== 'IDR' && itemCurr === 'IDR') itemVal /= (formData.exchange_rate || 16000);
+                // simplified mapping for USD/SGD vs IDR assuming IDR is base for non-matching ones except same
+            }
+            return sum + itemVal;
+        }, 0);
         const taxAmount = (subtotal * formData.tax_rate) / 100;
         const total = subtotal + taxAmount - (formData.discount_amount || 0);
 
@@ -1486,6 +1497,7 @@ const InvoiceCreateModal = ({ quotations, shipments, formData, setFormData, sele
                                         <th className="px-2 py-2 text-left text-xs text-white min-w-[200px] font-normal">Description</th>
                                         <th className="px-2 py-2 text-center text-xs text-white w-24 font-normal">Qty</th>
                                         <th className="px-2 py-2 text-center text-xs text-white w-24 font-normal">Unit</th>
+                                        <th className="px-2 py-2 text-center text-xs text-white w-16 font-normal">Curr</th>
                                         <th className="px-2 py-2 text-right text-xs text-white min-w-[140px] font-normal">Price</th>
                                         <th className="px-2 py-2 text-right text-xs text-white min-w-[100px] font-normal">Total</th>
                                         <th className="px-2 py-2 text-center text-xs text-white w-10 font-normal">Action</th>
@@ -1536,6 +1548,18 @@ const InvoiceCreateModal = ({ quotations, shipments, formData, setFormData, sele
                                                     required
                                                 />
                                             </td>
+                                            <td className="px-1 py-2">
+                                                <select
+                                                    value={item.currency || formData.billing_currency}
+                                                    onChange={(e) => updateInvoiceItem(index, 'currency', e.target.value)}
+                                                    className="w-full px-1 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-xs text-center"
+                                                >
+                                                    <option value="IDR">IDR</option>
+                                                    <option value="USD">USD</option>
+                                                    <option value="SGD">SGD</option>
+                                                    <option value="EUR">EUR</option>
+                                                </select>
+                                            </td>
                                             <td className="px-3 py-2">
                                                 <input
                                                     type="number"
@@ -1548,7 +1572,7 @@ const InvoiceCreateModal = ({ quotations, shipments, formData, setFormData, sele
                                                 />
                                             </td>
                                             <td className="px-2 py-2 text-right">
-                                                <span className="text-silver-light text-sm">{formatCurrency(item.amount, formData.billing_currency)}</span>
+                                                <span className="text-silver-light text-sm">{formatCurrency(item.amount, item.currency || formData.billing_currency)}</span>
                                             </td>
                                             <td className="px-2 py-2 text-center">
                                                 <button
@@ -2342,7 +2366,9 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
     );
     const [splitLabel, setSplitLabel] = useState('FULL PAYMENT');
     const [printCurrency, setPrintCurrency] = useState(invoice.currency || 'IDR');
-    const [exchangeRate, setExchangeRate] = useState(1);
+
+    // Extract unique currencies from items
+    const availableCurrencies = Array.from(new Set(invoice.invoice_items?.map(item => item.currency || invoice.currency) || [invoice.currency || 'IDR']));
 
     const handleSplitItemChange = (index, field, value) => {
         setSplitItems(prev => {
@@ -2355,9 +2381,17 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
     const isSplit = splitItems.some(item => !item.isSelected || item.splitQty !== (item.qty || 1) || item.splitRate !== (item.rate || 0));
 
     // Calculate split totals
-    const splitSubtotal = splitItems.reduce((sum, item) => sum + (item.isSelected ? (item.splitQty * (item.splitRate * exchangeRate)) : 0), 0);
+    const splitSubtotal = splitItems.reduce((sum, item) => sum + (item.isSelected ? (item.splitQty * item.splitRate) : 0), 0);
     const splitTax = splitSubtotal * (invoice.tax_rate || 0) / 100;
-    const splitTotal = splitSubtotal + splitTax - ((invoice.discount_amount || 0) * exchangeRate);
+    const splitTotal = splitSubtotal + splitTax - (invoice.discount_amount || 0);
+
+    const handleCurrencyFilter = (curr) => {
+        setPrintCurrency(curr);
+        setSplitItems(prev => prev.map(item => ({
+            ...item,
+            isSelected: (item.currency || invoice.currency) === curr
+        })));
+    };
 
     const handlePrintClick = () => {
         // We inject the split calculation dynamically to the onPrint method if needed
@@ -2399,31 +2433,17 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                         </div>
 
                         <div className="flex items-center gap-2 bg-dark-bg p-2 rounded-lg border border-dark-border">
-                            <label className="text-xs text-silver-light font-medium whitespace-nowrap">Print Curr:</label>
+                            <label className="text-xs text-silver-light font-medium whitespace-nowrap">Filter Kurs / Cetak:</label>
                             <select
                                 value={printCurrency}
-                                onChange={(e) => setPrintCurrency(e.target.value)}
-                                className="bg-dark-surface border border-dark-border text-silver-light px-2 py-1 rounded text-sm w-20 ml-1 shadow-none"
+                                onChange={(e) => handleCurrencyFilter(e.target.value)}
+                                className="bg-dark-surface border border-dark-border text-silver-light px-2 py-1 rounded text-sm w-24 ml-1 shadow-none"
                             >
-                                <option value="IDR">IDR</option>
-                                <option value="USD">USD</option>
-                                <option value="SGD">SGD</option>
+                                {availableCurrencies.map(c => (
+                                    <option key={c} value={c}>{c}</option>
+                                ))}
                             </select>
                         </div>
-
-                        {(printCurrency !== invoice.currency || exchangeRate !== 1) && (
-                            <div className="flex items-center gap-2 bg-dark-bg p-2 rounded-lg border border-dark-border">
-                                <label className="text-xs text-silver-light font-medium whitespace-nowrap">Kurs/Rate:</label>
-                                <input
-                                    type="number"
-                                    value={exchangeRate}
-                                    onChange={(e) => setExchangeRate(parseFloat(e.target.value) || 1)}
-                                    className="bg-dark-surface border border-dark-border text-silver-light px-2 py-1 rounded text-sm w-24 ml-1 text-right"
-                                    min="0"
-                                    step="0.01"
-                                />
-                            </div>
-                        )}
 
                         <button
                             onClick={handlePrintClick}
@@ -2485,7 +2505,7 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                                                 className="w-16 bg-dark-bg border border-dark-border text-silver-light px-1 py-0.5 rounded text-center disabled:opacity-50"
                                             />
                                         </td>
-                                        <td className="px-3 py-2 text-right text-silver-dark">{formatCurrency(item.rate || 0, invoice.currency)}</td>
+                                        <td className="px-3 py-2 text-right text-silver-dark">{formatCurrency(item.rate || 0, item.currency || invoice.currency)}</td>
                                         <td className="px-3 py-2 text-right">
                                             <input
                                                 type="number"
@@ -2498,7 +2518,7 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                                             />
                                         </td>
                                         <td className="px-3 py-2 text-right text-accent-orange font-medium">
-                                            {item.isSelected ? formatCurrency(item.splitQty * item.splitRate * exchangeRate, printCurrency) : '-'}
+                                            {item.isSelected ? formatCurrency(item.splitQty * item.splitRate, printCurrency) : '-'}
                                         </td>
                                     </tr>
                                 ))}
@@ -2629,14 +2649,14 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                             <tbody>
                                 {splitItems.filter(item => item.isSelected).length > 0 ? (
                                     splitItems.filter(item => item.isSelected).map((item, index) => {
-                                        const calcAmount = item.splitQty * item.splitRate * exchangeRate;
+                                        const calcAmount = item.splitQty * item.splitRate;
                                         const calcTax = calcAmount * (invoice.tax_rate || 0) / 100;
                                         return (
                                             <tr key={index}>
                                                 <td style={{ borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textTransform: 'capitalize' }}>
                                                     {item.item_name ? <b>{item.item_name}</b> : null} {item.item_name ? '- ' : ''}{item.description}
                                                     <div style={{ fontSize: '9px', color: '#555', marginTop: '2px' }}>
-                                                        {item.splitQty} {item.unit} x {formatCurrency(item.splitRate * exchangeRate, printCurrency).replace('Rp ', '').replace('$', '')}
+                                                        {item.splitQty} {item.unit} x {formatCurrency(item.splitRate, printCurrency).replace('Rp ', '').replace('$', '')}
                                                     </div>
                                                 </td>
                                                 <td style={{ borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textAlign: 'center' }}>{printCurrency}</td>
