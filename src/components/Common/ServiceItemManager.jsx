@@ -220,7 +220,7 @@ const ServiceItemManager = ({ items = [], onChange, currency = 'USD', readOnly =
                     <table className="w-full">
                         <thead className="bg-accent-blue/10">
                             <tr className="border-b border-dark-border">
-                                <th className="text-left text-xs font-bold text-white px-2 py-2 w-32">Kode</th>
+                                <th className="text-left text-xs font-bold text-white px-2 py-2 w-48">Kode</th>
                                 <th className="text-left text-xs font-bold text-white px-2 py-2 w-48">Item</th>
                                 <th className="text-left text-xs font-bold text-white px-2 py-2">Service / Description</th>
                                 <th className="text-right text-xs font-bold text-white px-2 py-2 w-20">Qty</th>

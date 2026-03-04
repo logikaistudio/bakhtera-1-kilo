@@ -2062,7 +2062,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                                     <thead className="bg-accent-orange">
                                                         <tr>
                                                             <th className="px-2 py-2 text-center text-xs text-white w-10 font-normal">No</th>
-                                                            <th className="px-2 py-2 text-left text-xs text-white w-28 font-normal">Kode</th>
+                                                            <th className="px-2 py-2 text-left text-xs text-white w-44 font-normal">Kode</th>
                                                             <th className="px-2 py-2 text-left text-xs text-white min-w-[180px] font-normal">Item</th>
                                                             <th className="px-2 py-2 text-left text-xs text-white min-w-[200px] font-normal">Description</th>
                                                             <th className="px-2 py-2 text-center text-xs text-white w-20 font-normal">Qty</th>
