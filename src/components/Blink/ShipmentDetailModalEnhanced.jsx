@@ -2079,7 +2079,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                                                         minLevel={3}
                                                                         placeholder="Pilih Item"
                                                                         size="sm"
-                                                                        showCode={false}
+                                                                        showCode={true}
                                                                         disabled={!isEditingCOGS}
                                                                     />
                                                                 </td>

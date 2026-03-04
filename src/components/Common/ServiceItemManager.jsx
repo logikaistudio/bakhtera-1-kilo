@@ -38,7 +38,7 @@ const ItemPicker = ({ value, onChange, accounts }) => {
                 className="w-full flex items-center justify-between gap-1 px-2 py-1.5 text-sm border border-dark-border rounded bg-dark-surface text-silver-light text-left"
             >
                 <span className="truncate">
-                    {selected ? selected.name : <span className="text-silver-dark">Select Item...</span>}
+                    {selected ? <>{selected.code} – {selected.name}</> : <span className="text-silver-dark">Select Item...</span>}
                 </span>
                 <ChevronDown className={`w-3 h-3 text-silver-dark flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
             </button>
