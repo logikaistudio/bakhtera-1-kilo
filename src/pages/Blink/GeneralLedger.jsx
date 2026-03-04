@@ -6,8 +6,10 @@ import {
     BookOpen, Search, Calendar, Download, RefreshCw,
     ArrowUpRight, ArrowDownLeft, TrendingUp, TrendingDown,
     FileText, ExternalLink, Info, ChevronDown, ChevronRight,
-    BarChart2, Filter, X, DollarSign, Layers, Tag
+    BarChart2, Filter, X, DollarSign, Layers, Tag, Printer
 } from 'lucide-react';
+import { printReport, fmtDatePrint } from '../../utils/printPDF';
+import { useData } from '../../context/DataContext';
 
 // ─── COA Type Config ─────────────────────────────────────────────────────────
 const COA_TYPE_CONFIG = {
@@ -93,11 +95,106 @@ const Sparkline = ({ data, color = '#f97316', width = 80, height = 24 }) => {
         </svg>
     );
 };
+// ── Export PDF ─────────────────────────────────────────────────────────────
+const exportToPDF = (selectedAccount, accountInfo, dateRange, openingBalance, totalDebit, totalCredit, closingBalance, rows, typeConfig, companyInfo) => {
+    if (!selectedAccount || !accountInfo) return;
+    const period = `${fmtDatePrint(dateRange.start)} – ${fmtDatePrint(dateRange.end)}`;
+    const fmtP = (v) => {
+        if (v === undefined || v === null) return '-';
+        const neg = v < 0;
+        const s = `Rp ${Math.abs(v).toLocaleString('id-ID')}`;
+        return neg ? `(${s})` : s;
+    };
+    const fmtAmt = (value, currency, exchangeRate) => {
+        if (!value || value === 0) return '';
+        if (currency && currency !== 'IDR' && (exchangeRate || 1) > 1)
+            return `Rp ${Math.abs(value * exchangeRate).toLocaleString('id-ID')}`;
+        if (currency === 'USD') return `$${Math.abs(value).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+        return `Rp ${Math.abs(value).toLocaleString('id-ID')}`;
+    };
+
+    const bodyHTML = `
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <div class="label">Opening Balance</div>
+                    <div class="value">${fmtP(openingBalance)}</div>
+                    <div style="font-size:8px;color:#94a3b8">Before ${fmtDatePrint(dateRange.start)}</div>
+                </div>
+                <div class="summary-card green-card">
+                    <div class="label">Total Debit</div>
+                    <div class="value">${fmtP(totalDebit)}</div>
+                    <div style="font-size:8px;color:#94a3b8">${rows.filter(r => r.debit > 0).length} lines</div>
+                </div>
+                <div class="summary-card blue-card">
+                    <div class="label">Total Credit</div>
+                    <div class="value">${fmtP(totalCredit)}</div>
+                    <div style="font-size:8px;color:#94a3b8">${rows.filter(r => r.credit > 0).length} lines</div>
+                </div>
+                <div class="summary-card ${closingBalance >= 0 ? 'purple-card' : 'red-card'}">
+                    <div class="label">Closing Balance</div>
+                    <div class="value">${fmtP(closingBalance)}</div>
+                    <div style="font-size:8px;color:#94a3b8">${fmtDatePrint(dateRange.end)}</div>
+                </div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="min-width:90px">Date</th>
+                        <th style="min-width:130px">Entry No.</th>
+                        <th style="min-width:180px">Description</th>
+                        <th style="min-width:110px">Reference</th>
+                        <th style="min-width:100px">Party</th>
+                        <th style="min-width:80px">Source</th>
+                        <th class="text-right" style="min-width:110px">Debit</th>
+                        <th class="text-right" style="min-width:110px">Credit</th>
+                        <th class="text-right" style="min-width:120px">Balance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="row-opening">
+                        <td colspan="6" class="yellow-label">↑ Opening Balance
+                            <span style="font-weight:normal;color:#92400e;font-size:8px"> (before ${fmtDatePrint(dateRange.start)})</span>
+                        </td>
+                        <td></td><td></td>
+                        <td class="text-right mono yellow-label">${fmtP(openingBalance)}</td>
+                    </tr>
+                    ${rows.map(entry => `
+                    <tr>
+                        <td class="muted">${fmtDatePrint(entry.entry_date)}</td>
+                        <td class="code">${entry.entry_number || '-'}</td>
+                        <td>${(entry.description || '-').substring(0, 50)}</td>
+                        <td class="muted">${entry.reference_number || '-'}</td>
+                        <td class="muted">${(entry.party_name || '-').substring(0, 20)}</td>
+                        <td class="muted">${(entry.reference_type || entry.source || 'auto').toUpperCase()}</td>
+                        <td class="text-right mono green">${entry.debit > 0 ? fmtAmt(entry.debit, entry.currency, entry.exchange_rate) : ''}</td>
+                        <td class="text-right mono" style="color:#1d4ed8">${entry.credit > 0 ? fmtAmt(entry.credit, entry.currency, entry.exchange_rate) : ''}</td>
+                        <td class="text-right mono ${entry.runningBalance < 0 ? 'red' : ''}">${fmtP(entry.runningBalance)}</td>
+                    </tr>`).join('')}
+                    <tr class="row-closing">
+                        <td colspan="6" class="purple">↓ Closing Balance
+                            <span style="font-weight:normal;color:#7c3aed;font-size:8px"> (${fmtDatePrint(dateRange.end)})</span>
+                        </td>
+                        <td class="text-right mono green bold">${fmtP(totalDebit)}</td>
+                        <td class="text-right mono bold" style="color:#1d4ed8">${fmtP(totalCredit)}</td>
+                        <td class="text-right mono ${closingBalance < 0 ? 'red' : 'purple'} bold">${fmtP(closingBalance)}</td>
+                    </tr>
+                </tbody>
+            </table>`;
+
+    printReport({
+        reportName: 'General Ledger',
+        companyInfo,
+        period,
+        bodyHTML,
+        note: `Account: [${accountInfo.code}] ${accountInfo.name} | Type: ${typeConfig.label} | Normal Balance: ${typeConfig.normalBalance} | Showing ${rows.length} transactions.`
+    });
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 const GeneralLedger = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const { companySettings } = useData();
 
     const [accounts, setAccounts] = useState([]);
     const [selectedAccount, setSelectedAccount] = useState('');
@@ -351,12 +448,8 @@ const GeneralLedger = () => {
     const groupedAccounts = useMemo(() => {
         const groups = {};
         const term = coaSearchTerm.toLowerCase();
-
         accounts.forEach(acc => {
-            // Apply search filter if active
-            if (term && !(acc.code.toLowerCase().includes(term) || acc.name.toLowerCase().includes(term))) {
-                return;
-            }
+            if (term && !(acc.code.toLowerCase().includes(term) || acc.name.toLowerCase().includes(term))) return;
             if (!groups[acc.type]) groups[acc.type] = [];
             groups[acc.type].push(acc);
         });
@@ -370,116 +463,92 @@ const GeneralLedger = () => {
         return next;
     });
 
+
     // ─────────────────────────────────────────────────────────────────────────
     return (
-        <div className="space-y-6">
-            {/* ── Header ── */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold gradient-text">General Ledger</h1>
-                    <p className="text-silver-dark mt-1">Per-account transaction detail with running balance</p>
-                </div>
-                <div className="flex gap-2">
-                    <button
-                        onClick={() => setShowSidebar(v => !v)}
-                        className="flex items-center gap-2 px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-xs hover:bg-dark-card smooth-transition"
-                    >
-                        <Layers className="w-4 h-4" />
-                        {showSidebar ? 'Hide' : 'Show'} Accounts
-                    </button>
-                    <Button variant="secondary" icon={RefreshCw} onClick={fetchLedgerData} disabled={!selectedAccount}>Refresh</Button>
-                    <button
-                        onClick={exportCSV}
-                        disabled={!selectedAccount || loading}
-                        className={`flex items-center gap-2 px-3 py-2 bg-dark-surface text-silver-light hover:bg-dark-card rounded-lg border border-dark-border smooth-transition text-xs ${(!selectedAccount || loading) ? 'opacity-40 cursor-not-allowed' : ''}`}
-                    >
-                        <FileText className="w-4 h-4" /> Export CSV
-                    </button>
-                </div>
-            </div>
+        <div className="flex flex-col gap-3" style={{ minHeight: 'calc(100vh - 80px)' }}>
 
-            {/* ── Date Range Bar ── */}
-            <div className="glass-card p-3 rounded-lg flex flex-col md:flex-row gap-3 items-start md:items-end">
-                <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-silver-dark" />
-                    <span className="text-xs text-silver-dark uppercase tracking-wider">Period</span>
+            {/* ── TOP BAR ── */}
+            <div className="glass-card rounded-xl px-4 py-3 flex flex-col md:flex-row md:items-center gap-3 border border-dark-border">
+                <div className="flex items-center gap-2.5 shrink-0">
+                    <BookOpen className="w-5 h-5 text-accent-orange" />
+                    <div>
+                        <h1 className="text-base font-bold gradient-text leading-tight">General Ledger</h1>
+                        <p className="text-[10px] text-silver-dark">Per-account transaction detail with running balance</p>
+                    </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="w-px h-7 bg-dark-border hidden md:block mx-1 shrink-0" />
+                <div className="flex items-center gap-2 flex-wrap flex-1">
+                    <Calendar className="w-3.5 h-3.5 text-silver-dark shrink-0" />
                     <input type="date" value={dateRange.start}
                         onChange={e => setDateRange({ ...dateRange, start: e.target.value })}
-                        className="px-3 py-2 bg-dark-bg border border-dark-border rounded-lg text-silver-light text-sm" />
-                    <span className="text-silver-dark">—</span>
+                        className="px-2.5 py-1.5 bg-dark-bg border border-dark-border rounded text-silver-light text-xs" />
+                    <span className="text-silver-dark text-xs">—</span>
                     <input type="date" value={dateRange.end}
                         onChange={e => setDateRange({ ...dateRange, end: e.target.value })}
-                        className="px-3 py-2 bg-dark-bg border border-dark-border rounded-lg text-silver-light text-sm" />
+                        className="px-2.5 py-1.5 bg-dark-bg border border-dark-border rounded text-silver-light text-xs" />
+                    <div className="flex gap-1">
+                        {[
+                            { label: 'This Month', fn: () => { const d = new Date(); setDateRange({ start: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`, end: d.toISOString().split('T')[0] }); } },
+                            { label: 'Quarter', fn: () => { const d = new Date(); const q = Math.floor(d.getMonth() / 3); setDateRange({ start: `${d.getFullYear()}-${String(q * 3 + 1).padStart(2, '0')}-01`, end: d.toISOString().split('T')[0] }); } },
+                            { label: 'This Year', fn: () => { const d = new Date(); setDateRange({ start: `${d.getFullYear()}-01-01`, end: d.toISOString().split('T')[0] }); } },
+                        ].map(({ label, fn }) => (
+                            <button key={label} onClick={fn} className="px-2 py-1 text-[10px] bg-dark-surface border border-dark-border text-silver-dark hover:text-white hover:border-accent-blue/50 rounded smooth-transition">
+                                {label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
-                {/* Quick period buttons */}
-                <div className="flex gap-1.5 ml-auto">
-                    {[
-                        {
-                            label: 'This Month', fn: () => {
-                                const d = new Date();
-                                setDateRange({ start: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`, end: d.toISOString().split('T')[0] });
-                            }
-                        },
-                        {
-                            label: 'This Quarter', fn: () => {
-                                const d = new Date(); const q = Math.floor(d.getMonth() / 3);
-                                setDateRange({ start: `${d.getFullYear()}-${String(q * 3 + 1).padStart(2, '0')}-01`, end: d.toISOString().split('T')[0] });
-                            }
-                        },
-                        {
-                            label: 'This Year', fn: () => {
-                                const d = new Date();
-                                setDateRange({ start: `${d.getFullYear()}-01-01`, end: d.toISOString().split('T')[0] });
-                            }
-                        },
-                    ].map(({ label, fn }) => (
-                        <button key={label} onClick={fn}
-                            className="px-2.5 py-1 text-xs bg-dark-surface border border-dark-border text-silver-dark hover:text-silver-light hover:bg-dark-card rounded smooth-transition">
-                            {label}
-                        </button>
-                    ))}
+                <div className="flex items-center gap-1.5 shrink-0">
+                    <button onClick={() => setShowSidebar(v => !v)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded border text-xs smooth-transition ${showSidebar ? 'bg-accent-orange/10 border-accent-orange/40 text-accent-orange' : 'bg-dark-surface border-dark-border text-silver-dark hover:text-white'}`}>
+                        <Layers className="w-3.5 h-3.5" />{showSidebar ? 'Hide' : 'Show'} Accounts
+                    </button>
+                    <button onClick={fetchLedgerData} disabled={!selectedAccount}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded border border-dark-border text-xs text-silver-dark hover:text-white hover:bg-dark-card smooth-transition disabled:opacity-40">
+                        <RefreshCw className="w-3.5 h-3.5" /> Refresh
+                    </button>
+                    <button onClick={exportCSV} disabled={!selectedAccount || loading}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded border border-dark-border text-xs text-silver-dark hover:text-white hover:bg-dark-card smooth-transition disabled:opacity-40">
+                        <FileText className="w-3.5 h-3.5" /> CSV
+                    </button>
+                    <button onClick={() => exportToPDF(selectedAccount, accountInfo, dateRange, openingBalance, totalDebit, totalCredit, closingBalance, rows, typeConfig, companySettings)} disabled={!selectedAccount || loading || rows.length === 0}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded border border-dark-border text-xs text-red-400 hover:text-red-300 hover:bg-dark-card smooth-transition disabled:opacity-40">
+                        <Printer className="w-3.5 h-3.5" /> Print PDF
+                    </button>
                 </div>
             </div>
 
-            {/* ── Main Layout: Sidebar + Content ── */}
-            <div className="flex gap-4">
+            {/* ── BODY: Sidebar + Content (each scrolls independently) ── */}
+            <div className="flex gap-3 flex-1 overflow-hidden" style={{ height: 'calc(100vh - 145px)' }}>
 
-                {/* ── Account Sidebar ── */}
+                {/* ── COA SIDEBAR ── */}
                 {showSidebar && (
-                    <div className="w-72 shrink-0 glass-card rounded-lg flex flex-col border border-dark-border shadow-xl relative" style={{ height: 'auto', minHeight: '600px', maxHeight: 'calc(100vh - 12rem)' }}>
-                        <div className="p-3 border-b border-dark-border bg-dark-bg/80 backdrop-blur-md rounded-t-lg z-10 sticky top-0">
+                    <div className="w-60 shrink-0 glass-card rounded-xl border border-dark-border flex flex-col overflow-hidden">
+                        <div className="px-3 pt-3 pb-2 border-b border-dark-border bg-dark-bg/80 shrink-0">
                             <div className="flex items-center justify-between mb-2">
-                                <p className="text-xs font-semibold text-silver-light uppercase tracking-wider flex items-center gap-1.5">
-                                    <BookOpen className="w-3.5 h-3.5 text-accent-orange" /> Chart of Accounts
-                                </p>
-                                <span className="text-[10px] text-silver-dark bg-dark-surface px-1.5 py-0.5 rounded">YTD Bal</span>
+                                <span className="text-[10px] font-bold text-silver-light uppercase tracking-widest">Chart of Accounts</span>
+                                <span className="text-[9px] text-silver-dark bg-dark-surface px-1.5 py-0.5 rounded border border-dark-border">YTD</span>
                             </div>
-                            <div className="relative mt-2 text-silver-light">
-                                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-silver-dark" />
-                                <input
-                                    type="text"
-                                    placeholder="Cari akun atau kode..."
-                                    value={coaSearchTerm}
-                                    onChange={(e) => setCoaSearchTerm(e.target.value)}
-                                    className="w-full pl-8 pr-3 py-1.5 bg-dark-surface border border-dark-border rounded text-xs focus:border-accent-blue focus:ring-1 focus:ring-accent-blue/30 smooth-transition"
-                                />
+                            <div className="relative">
+                                <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-silver-dark" />
+                                <input type="text" placeholder="Search account code or name..."
+                                    value={coaSearchTerm} onChange={e => setCoaSearchTerm(e.target.value)}
+                                    className="w-full pl-6 pr-5 py-1.5 bg-dark-surface border border-dark-border rounded text-[11px] text-silver-light placeholder:text-silver-dark/40 focus:border-accent-blue/50 smooth-transition" />
                                 {coaSearchTerm && (
-                                    <button onClick={() => setCoaSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2">
-                                        <X className="w-3 h-3 text-silver-dark hover:text-white" />
+                                    <button onClick={() => setCoaSearchTerm('')} className="absolute right-1.5 top-1/2 -translate-y-1/2">
+                                        <X className="w-2.5 h-2.5 text-silver-dark hover:text-white" />
                                     </button>
                                 )}
                             </div>
                         </div>
-                        <div className="overflow-y-auto flex-1 custom-scrollbar pb-2">
+                        <div className="overflow-y-auto flex-1">
                             {loadingAccounts ? (
-                                <div className="flex items-center justify-center py-8">
-                                    <div className="animate-spin w-5 h-5 border-2 border-accent-orange border-t-transparent rounded-full" />
-                                </div>
+                                <div className="flex justify-center py-8"><div className="animate-spin w-4 h-4 border-2 border-accent-orange border-t-transparent rounded-full" /></div>
                             ) : Object.keys(groupedAccounts).length === 0 ? (
-                                <div className="py-8 px-4 text-center text-sm text-silver-dark font-medium">
-                                    Tidak ada data untuk "{coaSearchTerm}"
+                                <div className="py-8 px-3 text-center">
+                                    <Search className="w-5 h-5 text-silver-dark/30 mx-auto mb-1.5" />
+                                    <p className="text-[10px] text-silver-dark">No results for "{coaSearchTerm}"</p>
                                 </div>
                             ) : (
                                 Object.entries(groupedAccounts).map(([type, accs]) => {
@@ -488,33 +557,29 @@ const GeneralLedger = () => {
                                     const typeTotal = accs.reduce((s, a) => s + (accountBalances[a.id] || 0), 0);
                                     return (
                                         <div key={type}>
-                                            <button
-                                                onClick={() => toggleType(type)}
-                                                className="w-full flex items-center justify-between px-3 py-2 bg-dark-surface/40 hover:bg-dark-surface smooth-transition border-b border-dark-border/50"
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    {isEx ? <ChevronDown className="w-3 h-3 text-silver-dark" /> : <ChevronRight className="w-3 h-3 text-silver-dark" />}
-                                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${cfg.color}`}>{cfg.label}</span>
+                                            <button onClick={() => toggleType(type)}
+                                                className="w-full flex items-center justify-between px-2.5 py-1.5 bg-dark-surface/60 hover:bg-dark-surface smooth-transition border-b border-dark-border/40">
+                                                <div className="flex items-center gap-1.5">
+                                                    {isEx ? <ChevronDown className="w-2.5 h-2.5 text-silver-dark" /> : <ChevronRight className="w-2.5 h-2.5 text-silver-dark" />}
+                                                    <span className={`px-1 py-0.5 rounded text-[9px] font-bold border ${cfg.color}`}>{cfg.label}</span>
+                                                    <span className="text-[9px] text-silver-dark/50">({accs.length})</span>
                                                 </div>
-                                                <span className={`text-xs font-mono ${typeTotal >= 0 ? 'text-silver-dark' : 'text-red-400'}`}>
-                                                    {balancesLoading ? '...' : fmtIDR(typeTotal).replace('Rp ', '').substring(0, 12)}
+                                                <span className={`text-[9px] font-mono ${typeTotal >= 0 ? 'text-silver-dark' : 'text-red-400'}`}>
+                                                    {balancesLoading ? '...' : Math.abs(typeTotal) > 1e9 ? `${(typeTotal / 1e9).toFixed(1)}B` : Math.abs(typeTotal) > 1e6 ? `${(typeTotal / 1e6).toFixed(1)}M` : Math.abs(typeTotal) > 1e3 ? `${(typeTotal / 1e3).toFixed(0)}K` : '-'}
                                                 </span>
                                             </button>
                                             {isEx && accs.map(acc => {
                                                 const bal = accountBalances[acc.id] || 0;
                                                 const isSelected = selectedAccount === acc.id;
                                                 return (
-                                                    <button
-                                                        key={acc.id}
-                                                        onClick={() => setSelectedAccount(acc.id)}
-                                                        className={`w-full px-3 py-2 text-left flex items-center justify-between border-b border-dark-border/30 smooth-transition ${isSelected ? 'bg-accent-orange/10 border-l-2 border-l-accent-orange' : 'hover:bg-dark-surface/50'}`}
-                                                    >
-                                                        <div className="min-w-0">
-                                                            <p className={`text-xs font-mono truncate ${isSelected ? 'text-accent-orange' : 'text-silver-dark'}`}>{acc.code}</p>
-                                                            <p className={`text-xs truncate leading-snug ${isSelected ? 'text-silver-light font-medium' : 'text-silver-dark'}`}>{acc.name}</p>
+                                                    <button key={acc.id} onClick={() => setSelectedAccount(acc.id)}
+                                                        className={`w-full px-2.5 py-1.5 text-left flex items-center justify-between border-b border-dark-border/20 smooth-transition group ${isSelected ? 'bg-accent-orange/10 border-l-2 border-l-accent-orange' : 'hover:bg-dark-surface/40'}`}>
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className={`text-[9px] font-mono truncate ${isSelected ? 'text-accent-orange' : 'text-silver-dark/60'}`}>{acc.code}</p>
+                                                            <p className={`text-[10px] truncate mt-0.5 ${isSelected ? 'text-white font-medium' : 'text-silver-dark group-hover:text-silver-light'}`}>{acc.name}</p>
                                                         </div>
-                                                        <span className={`text-xs ml-2 shrink-0 font-mono ${bal < 0 ? 'text-red-400' : bal > 0 ? 'text-silver-light' : 'text-silver-dark/40'}`}>
-                                                            {balancesLoading ? '…' : (bal === 0 ? '-' : (Math.abs(bal) > 1e9 ? `${(Math.abs(bal) / 1e9).toFixed(1)}B` : Math.abs(bal) > 1e6 ? `${(Math.abs(bal) / 1e6).toFixed(1)}M` : `${(Math.abs(bal) / 1e3).toFixed(0)}K`))}
+                                                        <span className={`text-[9px] ml-1 shrink-0 font-mono ${bal < 0 ? 'text-red-400' : bal > 0 ? 'text-silver-light' : 'text-silver-dark/20'}`}>
+                                                            {bal === 0 ? '' : Math.abs(bal) > 1e9 ? `${(Math.abs(bal) / 1e9).toFixed(1)}B` : Math.abs(bal) > 1e6 ? `${(Math.abs(bal) / 1e6).toFixed(1)}M` : `${(Math.abs(bal) / 1e3).toFixed(0)}K`}
                                                         </span>
                                                     </button>
                                                 );
@@ -527,228 +592,151 @@ const GeneralLedger = () => {
                     </div>
                 )}
 
-                {/* ── Main Content ── */}
-                <div className="flex-1 min-w-0 space-y-4">
+                {/* ── MAIN CONTENT ── */}
+                <div className="flex-1 min-w-0 overflow-y-auto space-y-3">
                     {!selectedAccount ? (
-                        <div className="flex flex-col items-center justify-center py-24 opacity-50">
-                            <BookOpen className="w-16 h-16 text-silver-dark mb-4" />
-                            <p className="text-xl font-medium text-silver-light">Select an Account to View Ledger</p>
-                            <p className="text-sm text-silver-dark mt-2">Choose a COA account from the left sidebar</p>
+                        <div className="glass-card rounded-xl border border-dark-border p-12 flex flex-col items-center justify-center text-center">
+                            <div className="w-14 h-14 rounded-2xl bg-accent-orange/10 flex items-center justify-center mb-4">
+                                <BookOpen className="w-7 h-7 text-accent-orange/50" />
+                            </div>
+                            <p className="text-sm font-semibold text-silver-light">Select a COA Account</p>
+                            <p className="text-xs text-silver-dark mt-1">Click an account in the left sidebar to view the ledger</p>
+                            {!showSidebar && (
+                                <button onClick={() => setShowSidebar(true)}
+                                    className="mt-4 px-4 py-2 bg-accent-orange/10 border border-accent-orange/30 text-accent-orange text-xs rounded-lg hover:bg-accent-orange/20 smooth-transition">
+                                    Show Account Sidebar
+                                </button>
+                            )}
                         </div>
                     ) : (
                         <>
-                            {/* ── Account Info Header ── */}
-                            <div className="glass-card p-4 rounded-lg">
-                                <div className="flex items-start justify-between">
-                                    <div>
-                                        <div className="flex items-center gap-3 flex-wrap">
-                                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${typeConfig.color}`}>{typeConfig.label}</span>
-                                            <span className="font-mono text-accent-blue text-sm font-bold">{accountInfo?.code}</span>
-                                            <span className="text-silver-light font-semibold">{accountInfo?.name}</span>
-                                        </div>
-                                        <div className="flex gap-4 mt-2 text-xs text-silver-dark">
-                                            <span>Normal Balance: <span className="text-silver-light font-medium">{typeConfig.normalBalance}</span></span>
-                                            {accountInfo?.group_name && <span>Group: <span className="text-silver-light">{accountInfo.group_name}</span></span>}
-                                            <span>{filteredEntries.length} transaction{filteredEntries.length !== 1 ? 's' : ''} in period</span>
-                                        </div>
-                                    </div>
-                                    {sparkData.length > 1 && (
-                                        <Sparkline data={sparkData} color={typeConfig.accent} width={100} height={28} />
-                                    )}
-                                </div>
+                            {/* Account info banner */}
+                            <div className="glass-card rounded-xl border border-dark-border px-4 py-2.5 flex items-center gap-2 flex-wrap">
+                                <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold border ${typeConfig.color}`}>{typeConfig.label}</span>
+                                <span className="font-mono text-accent-blue text-xs font-bold">{accountInfo?.code}</span>
+                                <span className="text-silver-light font-semibold text-sm">{accountInfo?.name}</span>
+                                <span className="text-[10px] text-silver-dark border border-dark-border rounded px-1.5 py-0.5">Normal Balance: {typeConfig.normalBalance}</span>
+                                <span className="text-[10px] text-silver-dark">{filteredEntries.length} transactions</span>
+                                {sparkData.length > 1 && <span className="ml-auto"><Sparkline data={sparkData} color={typeConfig.accent} width={80} height={22} /></span>}
                             </div>
 
-                            {/* ── Summary Cards ── */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                <div className="glass-card p-4 rounded-lg border-l-4 border-yellow-500">
-                                    <p className="text-xs text-silver-dark uppercase tracking-wider">Opening Balance</p>
-                                    <p className="text-base font-bold text-silver-light mt-1 font-mono">{fmtIDR(openingBalance)}</p>
-                                    <p className="text-xs text-silver-dark mt-0.5">
-                                        Before {new Date(dateRange.start + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
-                                    </p>
-                                </div>
-                                <div className="glass-card p-4 rounded-lg border-l-4 border-green-500">
-                                    <p className="text-xs text-silver-dark uppercase tracking-wider">Period Debit</p>
-                                    <p className="text-base font-bold text-green-400 mt-1 font-mono">{fmtIDR(totalDebit)}</p>
-                                    <p className="text-xs text-silver-dark mt-0.5">{filteredEntries.filter(e => e.debit > 0).length} debit lines</p>
-                                </div>
-                                <div className="glass-card p-4 rounded-lg border-l-4 border-blue-500">
-                                    <p className="text-xs text-silver-dark uppercase tracking-wider">Period Credit</p>
-                                    <p className="text-base font-bold text-blue-400 mt-1 font-mono">{fmtIDR(totalCredit)}</p>
-                                    <p className="text-xs text-silver-dark mt-0.5">{filteredEntries.filter(e => e.credit > 0).length} credit lines</p>
-                                </div>
-                                <div className={`glass-card p-4 rounded-lg border-l-4 ${closingBalance >= 0 ? 'border-purple-500' : 'border-red-500'}`}>
-                                    <p className="text-xs text-silver-dark uppercase tracking-wider">Closing Balance</p>
-                                    <p className={`text-base font-bold mt-1 font-mono ${closingBalance >= 0 ? 'text-purple-400' : 'text-red-400'}`}>{fmtIDR(closingBalance)}</p>
-                                    <div className="flex items-center gap-1 mt-0.5">
-                                        <BalanceTag bal={closingBalance} />
-                                        <span className="text-xs text-silver-dark">net balance</span>
+                            {/* Summary Cards */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                {[
+                                    { label: 'Opening Balance', value: fmtIDR(openingBalance), sub: `Before ${new Date(dateRange.start + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}`, border: 'border-yellow-500', text: 'text-silver-light' },
+                                    { label: 'Total Debit', value: fmtIDR(totalDebit), sub: `${filteredEntries.filter(e => e.debit > 0).length} lines`, border: 'border-green-500', text: 'text-green-400' },
+                                    { label: 'Total Credit', value: fmtIDR(totalCredit), sub: `${filteredEntries.filter(e => e.credit > 0).length} lines`, border: 'border-blue-500', text: 'text-blue-400' },
+                                    { label: 'Closing Balance', value: fmtIDR(closingBalance), sub: new Date(dateRange.end + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }), border: closingBalance >= 0 ? 'border-purple-500' : 'border-red-500', text: closingBalance >= 0 ? 'text-purple-400' : 'text-red-400' },
+                                ].map(c => (
+                                    <div key={c.label} className={`glass-card p-3 rounded-xl border-l-4 ${c.border} border border-dark-border`}>
+                                        <p className="text-[9px] text-silver-dark uppercase tracking-wider">{c.label}</p>
+                                        <p className={`text-xs font-bold mt-1 font-mono ${c.text}`}>{c.value}</p>
+                                        <p className="text-[9px] text-silver-dark mt-0.5">{c.sub}</p>
                                     </div>
-                                </div>
+                                ))}
                             </div>
 
-                            {/* ── Filters Row ── */}
-                            <div className="flex gap-2 flex-wrap items-center">
-                                <div className="relative flex-1 min-w-[200px]">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-silver-dark" />
+                            {/* Search + Filter */}
+                            <div className="flex gap-2 items-center flex-wrap">
+                                <div className="relative flex-1 min-w-[180px]">
+                                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-silver-dark" />
                                     <input type="text" placeholder="Search description, reference, party..."
                                         value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm" />
+                                        className="w-full pl-7 pr-4 py-1.5 bg-dark-surface border border-dark-border rounded text-silver-light text-xs" />
                                     {searchTerm && (
-                                        <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2">
-                                            <X className="w-3.5 h-3.5 text-silver-dark hover:text-silver-light" />
+                                        <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                                            <X className="w-2.5 h-2.5 text-silver-dark hover:text-white" />
                                         </button>
                                     )}
                                 </div>
-                                {/* Source filter */}
                                 <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)}
-                                    className="px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm">
+                                    className="px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded text-silver-light text-xs">
                                     <option value="all">All Sources</option>
-                                    {availableSources.map(s => (
-                                        <option key={s} value={s}>{SOURCE_CONFIG[s]?.label || s}</option>
-                                    ))}
+                                    {availableSources.map(s => <option key={s} value={s}>{SOURCE_CONFIG[s]?.label || s}</option>)}
                                 </select>
                                 {(searchTerm || sourceFilter !== 'all') && (
                                     <button onClick={() => { setSearchTerm(''); setSourceFilter('all'); }}
-                                        className="flex items-center gap-1 px-2.5 py-2 text-xs text-silver-dark border border-dark-border rounded-lg hover:text-silver-light smooth-transition">
-                                        <X className="w-3 h-3" /> Clear
+                                        className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-silver-dark border border-dark-border rounded hover:text-white smooth-transition">
+                                        <X className="w-2.5 h-2.5" /> Reset
                                     </button>
                                 )}
-                                <span className="text-xs text-silver-dark ml-auto">
-                                    {rows.length} of {entries.length} entries
-                                </span>
+                                <span className="text-[10px] text-silver-dark ml-auto">{rows.length}/{entries.length} entries</span>
                             </div>
 
-                            {/* ── Ledger Table ── */}
-                            <div className="glass-card rounded-lg overflow-hidden">
+                            {/* Ledger Table */}
+                            <div className="glass-card rounded-xl border border-dark-border overflow-hidden">
                                 {loading ? (
-                                    <div className="flex items-center justify-center py-16">
-                                        <div className="animate-spin w-8 h-8 border-2 border-accent-orange border-t-transparent rounded-full mr-3" />
-                                        <span className="text-silver-dark">Loading ledger data...</span>
+                                    <div className="flex items-center justify-center py-12">
+                                        <div className="animate-spin w-6 h-6 border-2 border-accent-orange border-t-transparent rounded-full mr-3" />
+                                        <span className="text-silver-dark text-xs">Loading ledger data...</span>
                                     </div>
                                 ) : (
                                     <div className="overflow-x-auto">
-                                        <table className="w-full text-sm min-w-max">
+                                        <table className="w-full text-xs min-w-max">
                                             <thead>
                                                 <tr className="bg-accent-orange">
-                                                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '90px' }}>Date</th>
-                                                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '160px' }}>Entry No.</th>
-                                                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '220px' }}>Description</th>
-                                                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '130px' }}>Ref. No.</th>
-                                                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '120px' }}>Party</th>
-                                                    <th className="px-3 py-2.5 text-center text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '110px' }}>Source</th>
-                                                    <th className="px-3 py-2.5 text-right text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '130px' }}>Debit</th>
-                                                    <th className="px-3 py-2.5 text-right text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '130px' }}>Credit</th>
-                                                    <th className="px-3 py-2.5 text-right text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '150px' }}>Balance</th>
+                                                    {['Date', 'Entry No.', 'Description', 'Reference', 'Party', 'Source', 'Debit', 'Credit', 'Balance'].map((h, i) => (
+                                                        <th key={h} className={`px-3 py-2 font-semibold text-white uppercase whitespace-nowrap ${i >= 6 ? 'text-right' : i === 5 ? 'text-center' : 'text-left'}`}
+                                                            style={{ minWidth: [90, 150, 200, 120, 110, 90, 120, 120, 130][i] }}>{h}</th>
+                                                    ))}
                                                 </tr>
                                             </thead>
-                                            <tbody className="divide-y divide-dark-border">
-                                                {/* Opening Balance Row */}
+                                            <tbody className="divide-y divide-dark-border/40">
                                                 <tr className="bg-yellow-500/5 border-l-2 border-yellow-500">
-                                                    <td className="px-3 py-3 text-xs text-silver-dark" colSpan={6}>
+                                                    <td className="px-3 py-1.5" colSpan={6}>
                                                         <span className="font-semibold text-yellow-400">↑ Opening Balance</span>
-                                                        <span className="ml-2 text-silver-dark text-xs">
-                                                            (before {new Date(dateRange.start + 'T00:00:00').toLocaleDateString('en-GB', { dateStyle: 'medium' })})
-                                                        </span>
+                                                        <span className="ml-2 text-silver-dark text-[10px]">(before {new Date(dateRange.start + 'T00:00:00').toLocaleDateString('en-GB', { dateStyle: 'medium' })})</span>
                                                     </td>
-                                                    <td className="px-3 py-3" />
-                                                    <td className="px-3 py-3" />
-                                                    <td className="px-3 py-3 text-right font-bold text-yellow-400 font-mono text-sm">
-                                                        {fmtIDR(openingBalance)}
-                                                        <div className="flex justify-end mt-0.5"><BalanceTag bal={openingBalance} /></div>
-                                                    </td>
+                                                    <td className="px-3 py-1.5" />
+                                                    <td className="px-3 py-1.5" />
+                                                    <td className="px-3 py-1.5 text-right font-bold text-yellow-400 font-mono">{fmtIDR(openingBalance)}</td>
                                                 </tr>
-
-                                                {/* Transaction Rows */}
                                                 {rows.length === 0 ? (
-                                                    <tr>
-                                                        <td colSpan={9} className="px-4 py-12 text-center text-silver-dark">
-                                                            No transactions found in this period for the selected account.
-                                                        </td>
-                                                    </tr>
-                                                ) : (
-                                                    rows.map((entry, idx) => {
-                                                        const srcCfg = getSourceConfig(entry);
-                                                        const isLinked = entry.reference_type && entry.reference_type !== 'adjustment' && entry.reference_number;
-                                                        const debitAmt = fmtAmount(entry.debit, entry.currency, entry.exchange_rate);
-                                                        const creditAmt = fmtAmount(entry.credit, entry.currency, entry.exchange_rate);
-                                                        return (
-                                                            <tr key={entry.id || idx} className="hover:bg-dark-surface/60 smooth-transition group">
-                                                                <td className="px-3 py-2.5 text-silver-dark whitespace-nowrap text-xs">
-                                                                    {new Date(entry.entry_date + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                                                </td>
-                                                                <td className="px-3 py-2.5 text-accent-orange text-xs font-mono whitespace-nowrap">
-                                                                    {entry.entry_number}
-                                                                </td>
-                                                                <td className="px-3 py-2.5 text-silver-light max-w-[220px]" title={entry.description}>
-                                                                    <span className="block truncate text-xs">{entry.description || '-'}</span>
-                                                                </td>
-                                                                <td className="px-3 py-2.5 whitespace-nowrap">
-                                                                    {isLinked ? (
-                                                                        <button onClick={() => goToSource(entry)}
-                                                                            className="flex items-center gap-1 text-xs text-accent-blue hover:text-blue-300 smooth-transition">
-                                                                            {entry.reference_number}
-                                                                            <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                                        </button>
-                                                                    ) : (
-                                                                        <span className="text-silver-dark text-xs">{entry.reference_number || '-'}</span>
-                                                                    )}
-                                                                </td>
-                                                                <td className="px-3 py-2.5 text-silver-dark text-xs whitespace-nowrap max-w-[120px]">
-                                                                    <span className="block truncate">{entry.party_name || '-'}</span>
-                                                                </td>
-                                                                <td className="px-3 py-2.5 text-center">
-                                                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${srcCfg.color}`}>
-                                                                        {srcCfg.label}
-                                                                    </span>
-                                                                </td>
-                                                                {/* Debit */}
-                                                                <td className="px-3 py-2.5 text-right font-mono text-xs whitespace-nowrap">
-                                                                    {debitAmt ? (
-                                                                        <div>
-                                                                            <span className="text-green-400 font-medium">{debitAmt.primary}</span>
-                                                                            {debitAmt.secondary && <div className="text-[10px] text-silver-dark">{debitAmt.secondary}</div>}
-                                                                        </div>
-                                                                    ) : <span className="text-silver-dark/40">—</span>}
-                                                                </td>
-                                                                {/* Credit */}
-                                                                <td className="px-3 py-2.5 text-right font-mono text-xs whitespace-nowrap">
-                                                                    {creditAmt ? (
-                                                                        <div>
-                                                                            <span className="text-blue-400 font-medium">{creditAmt.primary}</span>
-                                                                            {creditAmt.secondary && <div className="text-[10px] text-silver-dark">{creditAmt.secondary}</div>}
-                                                                        </div>
-                                                                    ) : <span className="text-silver-dark/40">—</span>}
-                                                                </td>
-                                                                {/* Running Balance */}
-                                                                <td className="px-3 py-2.5 text-right font-mono font-medium whitespace-nowrap">
-                                                                    <span className={entry.runningBalance >= 0 ? 'text-silver-light' : 'text-red-400'}>
-                                                                        {fmtIDR(entry.runningBalance)}
-                                                                    </span>
-                                                                    <div className="flex justify-end mt-0.5">
-                                                                        <BalanceTag bal={entry.runningBalance} />
-                                                                    </div>
-                                                                </td>
-                                                            </tr>
-                                                        );
-                                                    })
-                                                )}
-
-                                                {/* Closing Balance Row */}
+                                                    <tr><td colSpan={9} className="px-4 py-10 text-center text-silver-dark">Tidak ada transactions pada periode dan akun ini.</td></tr>
+                                                ) : rows.map((entry, idx) => {
+                                                    const srcCfg = getSourceConfig(entry);
+                                                    const isLinked = entry.reference_type && entry.reference_type !== 'adjustment' && entry.reference_number;
+                                                    const debitAmt = fmtAmount(entry.debit, entry.currency, entry.exchange_rate);
+                                                    const creditAmt = fmtAmount(entry.credit, entry.currency, entry.exchange_rate);
+                                                    return (
+                                                        <tr key={entry.id || idx} className="hover:bg-accent-orange/5 smooth-transition group">
+                                                            <td className="px-3 py-2 text-silver-dark whitespace-nowrap">{new Date(entry.entry_date + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                                                            <td className="px-3 py-2 text-accent-orange font-mono whitespace-nowrap">{entry.entry_number}</td>
+                                                            <td className="px-3 py-2 max-w-[200px]" title={entry.description}><span className="block truncate text-silver-light">{entry.description || '-'}</span></td>
+                                                            <td className="px-3 py-2 whitespace-nowrap">
+                                                                {isLinked ? (
+                                                                    <button onClick={() => goToSource(entry)} className="flex items-center gap-1 text-accent-blue hover:text-blue-300 smooth-transition">
+                                                                        {entry.reference_number}<ExternalLink className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100" />
+                                                                    </button>
+                                                                ) : <span className="text-silver-dark">{entry.reference_number || '-'}</span>}
+                                                            </td>
+                                                            <td className="px-3 py-2 text-silver-dark whitespace-nowrap max-w-[110px]"><span className="block truncate">{entry.party_name || '-'}</span></td>
+                                                            <td className="px-3 py-2 text-center">
+                                                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-medium border ${srcCfg.color}`}>{srcCfg.label}</span>
+                                                            </td>
+                                                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">
+                                                                {debitAmt ? <><span className="text-green-400 font-medium">{debitAmt.primary}</span>{debitAmt.secondary && <div className="text-[9px] text-silver-dark">{debitAmt.secondary}</div>}</> : <span className="text-silver-dark/30">—</span>}
+                                                            </td>
+                                                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">
+                                                                {creditAmt ? <><span className="text-blue-400 font-medium">{creditAmt.primary}</span>{creditAmt.secondary && <div className="text-[9px] text-silver-dark">{creditAmt.secondary}</div>}</> : <span className="text-silver-dark/30">—</span>}
+                                                            </td>
+                                                            <td className="px-3 py-2 text-right font-mono font-medium whitespace-nowrap">
+                                                                <span className={entry.runningBalance >= 0 ? 'text-silver-light' : 'text-red-400'}>{fmtIDR(entry.runningBalance)}</span>
+                                                                <div className="flex justify-end mt-0.5"><BalanceTag bal={entry.runningBalance} /></div>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
                                                 {rows.length > 0 && (
                                                     <tr className="bg-purple-500/5 border-l-2 border-purple-500">
-                                                        <td className="px-3 py-3" colSpan={6}>
+                                                        <td className="px-3 py-1.5" colSpan={6}>
                                                             <span className="font-semibold text-purple-400">↓ Closing Balance</span>
-                                                            <span className="ml-2 text-silver-dark text-xs">
-                                                                ({new Date(dateRange.end + 'T00:00:00').toLocaleDateString('en-GB', { dateStyle: 'medium' })})
-                                                            </span>
+                                                            <span className="ml-2 text-silver-dark text-[10px]">({new Date(dateRange.end + 'T00:00:00').toLocaleDateString('en-GB', { dateStyle: 'medium' })})</span>
                                                         </td>
-                                                        <td className="px-3 py-3 text-right font-bold text-green-400 font-mono text-sm">{fmtIDR(totalDebit)}</td>
-                                                        <td className="px-3 py-3 text-right font-bold text-blue-400 font-mono text-sm">{fmtIDR(totalCredit)}</td>
-                                                        <td className="px-3 py-3 text-right font-mono">
-                                                            <span className={`font-bold text-sm ${closingBalance >= 0 ? 'text-purple-400' : 'text-red-400'}`}>
-                                                                {fmtIDR(closingBalance)}
-                                                            </span>
+                                                        <td className="px-3 py-1.5 text-right font-bold text-green-400 font-mono">{fmtIDR(totalDebit)}</td>
+                                                        <td className="px-3 py-1.5 text-right font-bold text-blue-400 font-mono">{fmtIDR(totalCredit)}</td>
+                                                        <td className="px-3 py-1.5 text-right font-mono">
+                                                            <span className={`font-bold ${closingBalance >= 0 ? 'text-purple-400' : 'text-red-400'}`}>{fmtIDR(closingBalance)}</span>
                                                             <div className="flex justify-end mt-0.5"><BalanceTag bal={closingBalance} /></div>
                                                         </td>
                                                     </tr>
@@ -758,39 +746,6 @@ const GeneralLedger = () => {
                                     </div>
                                 )}
                             </div>
-
-                            {/* ── Period Summary Footer ── */}
-                            {rows.length > 0 && (
-                                <div className="glass-card p-4 rounded-lg">
-                                    <h3 className="text-xs font-semibold text-silver-light uppercase tracking-wider mb-3 flex items-center gap-2">
-                                        <BarChart2 className="w-4 h-4 text-accent-blue" /> Period Summary
-                                    </h3>
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                        <div>
-                                            <p className="text-xs text-silver-dark mb-0.5">Total Transactions</p>
-                                            <p className="font-semibold text-silver-light">{rows.length}</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-silver-dark mb-0.5">Net Movement</p>
-                                            <p className={`font-semibold font-mono ${(totalDebit - totalCredit) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                {fmtIDR(totalDebit - totalCredit, true)}
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-silver-dark mb-0.5">Avg per Transaction</p>
-                                            <p className="font-semibold text-silver-light font-mono">
-                                                {fmtIDR(Math.max(totalDebit, totalCredit) / Math.max(rows.length, 1))}
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-silver-dark mb-0.5">Balance Change</p>
-                                            <p className={`font-semibold font-mono ${(closingBalance - openingBalance) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                {fmtIDR(closingBalance - openingBalance, true)}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
                         </>
                     )}
                 </div>

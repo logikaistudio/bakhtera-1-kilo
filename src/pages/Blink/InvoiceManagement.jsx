@@ -885,80 +885,11 @@ const InvoiceManagement = () => {
 
             console.log('Invoice status updated successfully:', data);
 
-            // ── AUTO JOURNAL ENTRY saat Invoice diapprove ───────────────────────
-            // Double-entry: Dr Piutang Usaha (AR) | Cr Pendapatan (Revenue)
-            try {
-                const invData = data[0];
-                const invDate = invData.invoice_date || new Date().toISOString().split('T')[0];
-                const batchId = crypto.randomUUID();
-                const ts = Date.now();
-                const jeNum = `JE-INV-${new Date(invDate).toISOString().slice(2, 7).replace('-', '')}-${ts.toString().slice(-6)}`;
 
-                const exRate = invData.currency === 'IDR' ? 1 : (invData.exchange_rate || 16000);
-
-                // Fetch COA: AR (Piutang Usaha) dan Revenue
-                const [{ data: arCOAs }, { data: revCOAs }] = await Promise.all([
-                    supabase.from('finance_coa').select('id, code, name').eq('type', 'ASSET').ilike('code', '1-03%').limit(1),
-                    supabase.from('finance_coa').select('id, code, name').eq('type', 'REVENUE').ilike('code', '4-%').limit(1),
-                ]);
-                const arCOA = arCOAs?.[0] || null;
-                const revCOA = revCOAs?.[0] || null;
-
-                const idrNote = invData.currency !== 'IDR' ? ` (Rate: ${exRate.toLocaleString('id-ID')})` : '';
-
-                const journalEntries = [
-                    {
-                        entry_number: `${jeNum}-D`,
-                        entry_date: invDate,
-                        entry_type: 'invoice',
-                        reference_type: 'ar_invoice',
-                        reference_id: invData.id,
-                        reference_number: invData.invoice_number,
-                        account_code: arCOA?.code || '1-03-001',
-                        account_name: arCOA?.name || 'Piutang Usaha',
-                        debit: invData.total_amount,
-                        credit: 0,
-                        currency: invData.currency || 'IDR',
-                        exchange_rate: exRate,
-                        description: `Invoice ${invData.invoice_number} - ${invData.customer_name}${idrNote}`,
-                        batch_id: batchId,
-                        source: 'auto',
-                        coa_id: arCOA?.id || null,
-                        party_name: invData.customer_name,
-                        party_id: invData.customer_id?.toString() || null
-                    },
-                    {
-                        entry_number: `${jeNum}-C`,
-                        entry_date: invDate,
-                        entry_type: 'invoice',
-                        reference_type: 'ar_invoice',
-                        reference_id: invData.id,
-                        reference_number: invData.invoice_number,
-                        account_code: revCOA?.code || '4-01-001',
-                        account_name: revCOA?.name || 'Pendapatan Jasa',
-                        debit: 0,
-                        credit: invData.total_amount,
-                        currency: invData.currency || 'IDR',
-                        exchange_rate: exRate,
-                        description: `Invoice ${invData.invoice_number} - ${invData.customer_name}${idrNote}`,
-                        batch_id: batchId,
-                        source: 'auto',
-                        coa_id: revCOA?.id || null,
-                        party_name: invData.customer_name,
-                        party_id: invData.customer_id?.toString() || null
-                    }
-                ];
-
-                const { error: jeError } = await supabase.from('blink_journal_entries').insert(journalEntries);
-                if (jeError) {
-                    console.warn('Journal entry creation failed (non-critical):', jeError.message);
-                } else {
-                    console.log('Invoice journal entries created successfully.');
-                }
-            } catch (jeError) {
-                console.warn('Journal entry creation failed (non-critical):', jeError.message);
-            }
-            // ────────────────────────────────────────────────────────────────────
+            // ── Journal entries auto-created by Supabase trigger ────────────
+            // Migration 066: trigger_journal_from_blink_invoice
+            // Dr Piutang Usaha / Cr Revenue (per invoice item with COA linkage)
+            // ────────────────────────────────────────────────────────────────
 
             alert('Invoice approved! Invoice sekarang masuk hitungan AR.');
             window.location.reload(); // Force refresh to update UI

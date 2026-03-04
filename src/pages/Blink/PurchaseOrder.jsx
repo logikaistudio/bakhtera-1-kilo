@@ -351,79 +351,12 @@ const PurchaseOrder = () => {
 
             console.log('AP entry created successfully:', apData);
 
-            // 5. Create Journal Entries
-            console.log('Fetching COA for Journal Entries...');
 
-            // Use ilike queries matching the actual COA code format (e.g. 2-01-001, 5-01-001)
-            const [{ data: apCOAs }, { data: expenseCOAs }] = await Promise.all([
-                supabase.from('finance_coa').select('id, code, name').eq('type', 'LIABILITY').ilike('code', '2-%').limit(1),
-                supabase.from('finance_coa').select('id, code, name').eq('type', 'EXPENSE').ilike('code', '5-%').limit(1),
-            ]);
+            // ── Journal entries auto-created by Supabase trigger ────────────
+            // Migration 066: trigger_journal_from_blink_po
+            // Dr Expense (per PO item with COA linkage) / Cr Hutang Usaha (AP)
+            // ────────────────────────────────────────────────────────────────
 
-            if (apData && apData.length > 0) {
-                // Use PO-level COA if set, otherwise fallback to first expense COA
-                let expenseCoa = expenseCOAs?.[0] || null;
-                if (po.coa_id) {
-                    const { data: poCoaData } = await supabase.from('finance_coa').select('id, code, name').eq('id', po.coa_id).single();
-                    if (poCoaData) expenseCoa = poCoaData;
-                }
-                const apCoa = apCOAs?.[0] || null;
-
-                const batchId = crypto.randomUUID();
-                const entryNum = `JE-PO-${Date.now().toString().slice(-6)}`;
-
-                const poExchangeRate = po.exchange_rate || 1;
-
-                const debitEntry = {
-                    entry_number: entryNum + '-D',
-                    entry_date: billDate,
-                    entry_type: 'po',
-                    reference_type: 'ap',
-                    reference_id: apData[0].id,
-                    reference_number: apData[0].ap_number,
-                    account_code: expenseCoa?.code || '5-01-001',
-                    account_name: (expenseCoa?.name || 'Beban Operasional') + ' - PO ' + po.po_number,
-                    debit: po.total_amount,
-                    credit: 0,
-                    currency: po.currency || 'IDR',
-                    exchange_rate: poExchangeRate,
-                    description: 'PO ' + po.po_number + ' - ' + po.vendor_name + (po.currency !== 'IDR' ? ` (Rate: ${poExchangeRate.toLocaleString('id-ID')})` : ''),
-                    batch_id: batchId,
-                    source: 'auto',
-                    coa_id: expenseCoa?.id || null,
-                    party_name: po.vendor_name
-                };
-
-                const creditEntry = {
-                    entry_number: entryNum + '-C',
-                    entry_date: billDate,
-                    entry_type: 'po',
-                    reference_type: 'ap',
-                    reference_id: apData[0].id,
-                    reference_number: apData[0].ap_number,
-                    account_code: apCoa?.code || '2-01-001',
-                    account_name: (apCoa?.name || 'Hutang Usaha') + ' - ' + po.vendor_name,
-                    debit: 0,
-                    credit: po.total_amount,
-                    currency: po.currency || 'IDR',
-                    exchange_rate: poExchangeRate,
-                    description: 'PO ' + po.po_number + ' - ' + po.vendor_name + (po.currency !== 'IDR' ? ` (Rate: ${poExchangeRate.toLocaleString('id-ID')})` : ''),
-                    batch_id: batchId,
-                    source: 'auto',
-                    coa_id: apCoa?.id || null,
-                    party_name: po.vendor_name
-                };
-
-                const { error: journalError } = await supabase
-                    .from('blink_journal_entries')
-                    .insert([debitEntry, creditEntry]);
-
-                if (journalError) {
-                    console.error('Error creating journal entries:', journalError);
-                } else {
-                    console.log('Journal entries created successfully.');
-                }
-            }
 
             await fetchPOs();
             alert(`✅ PO approved!\n\nAP Entry Created:\n• AP Number: ${apNumber}\n• Amount: ${formatCurrency(po.total_amount, po.currency)}\n• Due Date: ${dueDateStr}\n• Recorded in Ledger.`);

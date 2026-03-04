@@ -127,13 +127,8 @@ const Sidebar = () => {
         { path: '/pabean', label: 'Pabean', subtitle: 'Customs Portal', icon: Building2 },
     ];
 
-    const centralizedMenuItems = [
-        { path: '/vendors', label: 'Manajemen Vendor', icon: Users, menuCode: 'central_vendors' },
-        { path: '/customers', label: 'Manajemen Pelanggan', icon: UserCircle, menuCode: 'central_customers' },
-        { path: '/finance', label: 'Keuangan', icon: Wallet, menuCode: 'central_finance' },
-        { path: '/finance/coa', label: 'Master Akun (COA)', icon: FileCheck, menuCode: 'central_coa' },
-        { path: '/settings', label: 'Pengaturan Perusahaan', icon: Building2, menuCode: 'central_settings' },
-    ];
+    const centralizedMenuItems = [];
+
 
     // Bridge submenu items (with menuCode for per-menu access control)
     const bridgeSubMenuItems = [
@@ -281,6 +276,7 @@ const Sidebar = () => {
         // Master Data Category
         {
             type: 'category', label: '⚙️ Master Data', items: [
+                { path: '/blink/master/coa', label: 'COA Master', menuCode: 'blink_coa' },
                 { path: '/blink/master/partners', label: 'Business Partners', menuCode: 'blink_partners' },
                 { path: '/blink/master/routes', label: 'Master Routes', menuCode: 'blink_routes' },
                 { path: '/blink/master/settings', label: 'Module Settings', menuCode: 'blink_settings' },
@@ -853,91 +849,74 @@ const Sidebar = () => {
                     </div>
                 </div>
 
-                {/* Fungsi Terpusat — hanya tampil jika ada item yang dapat diakses atau user adalah admin */}
-                {(() => {
-                    const accessibleCentralItems = centralizedMenuItems.filter((item) => canAccessPortal(item.menuCode));
-                    const isAdminUser = ['super_admin', 'admin', 'superuser'].includes(user?.user_level?.toLowerCase());
-                    if (accessibleCentralItems.length === 0 && !isAdminUser) return null;
-                    return (
-                        <div>
-                            <h3 className="px-4 mb-3 text-xs font-semibold text-silver-dark uppercase tracking-wider">
-                                Fungsi Terpusat
-                            </h3>
-                            <div className="space-y-1">
-                                {accessibleCentralItems.map((item) => (
-                                    <MenuLink key={item.path} item={item} isMobile={isMobile} />
-                                ))}
+                {/* Admin Section - only for admin/super_admin */}
+                {(['super_admin', 'admin', 'superuser'].includes(user?.user_level?.toLowerCase())) && (
+                    <div>
+                        <h3 className="px-4 mb-3 text-xs font-semibold text-silver-dark uppercase tracking-wider">
+                            Administrasi
+                        </h3>
+                        <div className="space-y-1">
+                            <button
+                                onClick={() => {
+                                    setExpandedCategories(prev =>
+                                        prev.includes('central-users')
+                                            ? prev.filter(c => c !== 'central-users')
+                                            : [...prev, 'central-users']
+                                    );
+                                }}
+                                className="w-full flex items-center justify-between px-4 py-2 mt-2 text-sm font-semibold text-silver hover:text-silver-light smooth-transition focus:outline-none"
+                            >
+                                <div className="flex items-center gap-2">
+                                    <Shield className="w-4 h-4 text-red-400" />
+                                    <span>User Management</span>
+                                </div>
+                                <ChevronRight className={`w-3 h-3 transition-transform ${expandedCategories.includes('central-users') ? 'rotate-90' : ''}`} />
+                            </button>
 
-                                {/* Admin Menu - Admin & Super Admin */}
-                                {(['super_admin', 'admin', 'superuser'].includes(user?.user_level?.toLowerCase())) && (
-                                    <>
-                                        <div className="px-4 pt-4 pb-2">
-                                            <div className="border-t border-dark-border/30" />
-                                        </div>
-                                        <button
-                                            onClick={() => {
-                                                setExpandedCategories(prev =>
-                                                    prev.includes('central-users')
-                                                        ? prev.filter(c => c !== 'central-users')
-                                                        : [...prev, 'central-users']
-                                                );
-                                            }}
-                                            className="w-full flex items-center justify-between px-4 py-2 mt-2 text-sm font-semibold text-silver hover:text-silver-light smooth-transition focus:outline-none"
+                            <AnimatePresence>
+                                {expandedCategories.includes('central-users') && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: 'auto', opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        className="overflow-hidden mt-1 space-y-1"
+                                    >
+                                        <Link
+                                            to="/admin/users"
+                                            onClick={() => isMobile && setIsOpen(false)}
+                                            className={`block pl-10 pr-4 py-1.5 text-sm smooth-transition border-l-2 ml-4 ${isActive('/admin/users')
+                                                ? 'bg-red-500/20 text-red-500 font-medium border-red-500 active-sidebar-item'
+                                                : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface/50 border-transparent hover:border-silver-dark/50'
+                                                }`}
                                         >
-                                            <div className="flex items-center gap-2">
-                                                <Shield className="w-4 h-4 text-red-400" />
-                                                <span>Administrasi</span>
-                                            </div>
-                                            <ChevronRight className={`w-3 h-3 transition-transform ${expandedCategories.includes('central-users') ? 'rotate-90' : ''}`} />
-                                        </button>
-
-                                        <AnimatePresence>
-                                            {expandedCategories.includes('central-users') && (
-                                                <motion.div
-                                                    initial={{ height: 0, opacity: 0 }}
-                                                    animate={{ height: 'auto', opacity: 1 }}
-                                                    exit={{ height: 0, opacity: 0 }}
-                                                    className="overflow-hidden mt-1 space-y-1"
-                                                >
-                                                    <Link
-                                                        to="/admin/users"
-                                                        onClick={() => isMobile && setIsOpen(false)}
-                                                        className={`block pl-10 pr-4 py-1.5 text-sm smooth-transition border-l-2 ml-4 ${isActive('/admin/users')
-                                                            ? 'bg-red-500/20 text-red-500 font-medium border-red-500 active-sidebar-item'
-                                                            : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface/50 border-transparent hover:border-silver-dark/50'
-                                                            }`}
-                                                    >
-                                                        Manajemen User
-                                                    </Link>
-                                                    <Link
-                                                        to="/admin/permissions"
-                                                        onClick={() => isMobile && setIsOpen(false)}
-                                                        className={`block pl-10 pr-4 py-1.5 text-sm smooth-transition border-l-2 ml-4 ${isActive('/admin/permissions')
-                                                            ? 'bg-red-500/20 text-red-500 font-medium border-red-500 active-sidebar-item'
-                                                            : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface/50 border-transparent hover:border-silver-dark/50'
-                                                            }`}
-                                                    >
-                                                        Manajemen Role & Akses
-                                                    </Link>
-                                                    <Link
-                                                        to="/admin/user-permissions"
-                                                        onClick={() => isMobile && setIsOpen(false)}
-                                                        className={`block pl-10 pr-4 py-1.5 text-sm smooth-transition border-l-2 ml-4 ${isActive('/admin/user-permissions')
-                                                            ? 'bg-red-500/20 text-red-500 font-medium border-red-500 active-sidebar-item'
-                                                            : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface/50 border-transparent hover:border-silver-dark/50'
-                                                            }`}
-                                                    >
-                                                        Penugasan Role User
-                                                    </Link>
-                                                </motion.div>
-                                            )}
-                                        </AnimatePresence>
-                                    </>
+                                            Manajemen User
+                                        </Link>
+                                        <Link
+                                            to="/admin/permissions"
+                                            onClick={() => isMobile && setIsOpen(false)}
+                                            className={`block pl-10 pr-4 py-1.5 text-sm smooth-transition border-l-2 ml-4 ${isActive('/admin/permissions')
+                                                ? 'bg-red-500/20 text-red-500 font-medium border-red-500 active-sidebar-item'
+                                                : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface/50 border-transparent hover:border-silver-dark/50'
+                                                }`}
+                                        >
+                                            Manajemen Role & Akses
+                                        </Link>
+                                        <Link
+                                            to="/admin/user-permissions"
+                                            onClick={() => isMobile && setIsOpen(false)}
+                                            className={`block pl-10 pr-4 py-1.5 text-sm smooth-transition border-l-2 ml-4 ${isActive('/admin/user-permissions')
+                                                ? 'bg-red-500/20 text-red-500 font-medium border-red-500 active-sidebar-item'
+                                                : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface/50 border-transparent hover:border-silver-dark/50'
+                                                }`}
+                                        >
+                                            Penugasan Role User
+                                        </Link>
+                                    </motion.div>
                                 )}
-                            </div>
+                            </AnimatePresence>
                         </div>
-                    );
-                })()}
+                    </div>
+                )}
             </nav>
 
             {/* Footer - User Info + Logout */}

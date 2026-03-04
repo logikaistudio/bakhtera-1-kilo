@@ -89,9 +89,10 @@ export const APP_MENUS = {
             { code: 'blink_pnl', label: 'Laba Rugi', group: 'Finance', path: '/blink/finance/profit-loss' },
             { code: 'blink_balance_sheet', label: 'Neraca', group: 'Finance', path: '/blink/finance/balance-sheet' },
             // ─── Master Data ───
+            { code: 'blink_coa', label: 'COA Master', group: 'Master Data', path: '/blink/master/coa' },
             { code: 'blink_routes', label: 'Master Routes', group: 'Master Data', path: '/blink/master/routes' },
-            { code: 'blink_partners', label: 'Mitra Bisnis', group: 'Master Data', path: '/blink/master/partners' },
-            { code: 'blink_settings', label: 'Pengaturan Modul', group: 'Master Data', path: '/blink/master/settings' },
+            { code: 'blink_partners', label: 'Business Partners', group: 'Master Data', path: '/blink/master/partners' },
+            { code: 'blink_settings', label: 'Module Settings', group: 'Master Data', path: '/blink/master/settings' },
         ],
     },
 
@@ -114,18 +115,9 @@ export const APP_MENUS = {
         ],
     },
 
-    Pusat: {
-        label: 'Pusat',
-        color: 'purple',
-        menus: [
-            { code: 'central_vendors', label: 'Manajemen Vendor', group: 'Fungsi Terpusat', path: '/vendors' },
-            { code: 'central_customers', label: 'Manajemen Pelanggan', group: 'Fungsi Terpusat', path: '/customers' },
-            { code: 'central_finance', label: 'Keuangan', group: 'Fungsi Terpusat', path: '/finance' },
-            { code: 'central_coa', label: 'Master Akun (COA)', group: 'Fungsi Terpusat', path: '/finance/coa' },
-            { code: 'central_settings', label: 'Pengaturan Perusahaan', group: 'Fungsi Terpusat', path: '/settings' },
-        ],
-    },
+    // Pusat group removed — vendor/customer/finance/coa/settings each exist within their own portals.
 };
+
 
 /**
  * Helper: ambil flat array semua menu dari semua modul

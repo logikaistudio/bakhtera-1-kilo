@@ -8,8 +8,10 @@ import {
     ArrowUpRight, ArrowDownLeft, CheckCircle, AlertCircle,
     FileText, DollarSign, Eye, Trash2, X,
     RefreshCw, FileSpreadsheet, ExternalLink, ChevronDown, ChevronRight,
-    Tag, Calendar, TrendingUp, TrendingDown, Layers
+    Tag, Calendar, TrendingUp, TrendingDown, Layers, Printer
 } from 'lucide-react';
+import { printReport, fmtDatePrint } from '../../utils/printPDF';
+import { useData } from '../../context/DataContext';
 
 // ─── Source badge config ─────────────────────────────────────────────────────
 const SOURCE_CONFIG = {
@@ -75,6 +77,7 @@ const fmtIDR = (value) => {
 // ─── Main Component ──────────────────────────────────────────────────────────
 const GeneralJournal = () => {
     const navigate = useNavigate();
+    const { companySettings } = useData();
 
     const [entries, setEntries] = useState([]);
     const [accounts, setAccounts] = useState([]);
@@ -335,6 +338,87 @@ const GeneralJournal = () => {
         else if (rt === 'ap_payment') navigate('/blink/finance/ap');
     };
 
+    // ── Export PDF ──────────────────────────────────────────────────────────────
+    const exportToPDF = () => {
+        const period = `${fmtDatePrint(dateRange.start)} – ${fmtDatePrint(dateRange.end)}`;
+        const fmt2 = (v, cur) => {
+            if (!v || v === 0) return '-';
+            const abs = Math.abs(v);
+            return cur && cur !== 'IDR'
+                ? `$${abs.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                : `Rp ${abs.toLocaleString('id-ID')}`;
+        };
+
+        const groupsHTML = groupedEntries.map(group => {
+            const badge = getSourceBadge(group);
+            const linesHTML = group.lines.map(line => `
+                <tr>
+                    <td></td>
+                    <td class="code">${line.account_code || ''}</td>
+                    <td style="padding-left:16px">${line.account_name || '-'}</td>
+                    <td class="text-right mono green">${line.debit > 0 ? fmt2(line.debit, line.currency) : ''}</td>
+                    <td class="text-right mono" style="color:#1d4ed8">${line.credit > 0 ? fmt2(line.credit, line.currency) : ''}</td>
+                </tr>`).join('');
+
+            const totalDebit = group.lines.reduce((s, l) => s + (l.debit || 0), 0);
+            const totalCredit = group.lines.reduce((s, l) => s + (l.credit || 0), 0);
+            const cur = group.lines[0]?.currency || 'IDR';
+
+            return `
+                <tr class="row-header">
+                    <td class="muted" style="white-space:nowrap">${fmtDatePrint(group.date)}</td>
+                    <td class="code">${group.entry_number || ''}</td>
+                    <td><b>${group.description || '-'}</b>${group.party_name ? ` &mdash; <span style="color:#64748b">${group.party_name}</span>` : ''}</td>
+                    <td class="text-right mono green bold">${fmt2(totalDebit, cur)}</td>
+                    <td class="text-right mono bold" style="color:#1d4ed8">${fmt2(totalCredit, cur)}</td>
+                </tr>
+                ${linesHTML}`;
+        }).join('');
+
+        const bodyHTML = `
+            <div class="summary-grid" style="grid-template-columns:repeat(3,1fr)">
+                <div class="summary-card green-card">
+                    <div class="label">Total Debit</div>
+                    <div class="value">Rp ${Math.round(totals.totalDebit).toLocaleString('id-ID')}</div>
+                </div>
+                <div class="summary-card blue-card">
+                    <div class="label">Total Credit</div>
+                    <div class="value">Rp ${Math.round(totals.totalCredit).toLocaleString('id-ID')}</div>
+                </div>
+                <div class="summary-card ${Math.abs(totals.balance) < 1 ? '' : 'red-card'}">
+                    <div class="label">Balance (D−C)</div>
+                    <div class="value">Rp ${Math.round(Math.abs(totals.balance)).toLocaleString('id-ID')}</div>
+                </div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="min-width:90px">Date</th>
+                        <th style="min-width:110px">Entry No.</th>
+                        <th style="min-width:250px">Description / Account</th>
+                        <th class="text-right" style="min-width:130px">Debit</th>
+                        <th class="text-right" style="min-width:130px">Credit</th>
+                    </tr>
+                </thead>
+                <tbody>${groupsHTML}</tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="3" style="text-align:right;text-transform:uppercase">Grand Total</td>
+                        <td class="text-right">Rp ${Math.round(totals.totalDebit).toLocaleString('id-ID')}</td>
+                        <td class="text-right">Rp ${Math.round(totals.totalCredit).toLocaleString('id-ID')}</td>
+                    </tr>
+                </tfoot>
+            </table>`;
+
+        printReport({
+            reportName: 'General Journal',
+            companyInfo: companySettings,
+            period,
+            bodyHTML,
+            note: `Showing ${groupedEntries.length} journal entries (${filteredEntries.length} lines). ${totals.hasMixedCcy ? 'Note: some USD entries without exchange rate are excluded from IDR totals.' : ''}`
+        });
+    };
+
     // ─────────────────────────────────────────────────────────────────────────────
     return (
         <div className="space-y-6">
@@ -348,6 +432,10 @@ const GeneralJournal = () => {
                     <Button variant="secondary" icon={RefreshCw} onClick={fetchEntries}>Refresh</Button>
                     <button onClick={exportCSV} className="flex items-center gap-2 px-3 py-2 bg-dark-surface text-silver-light hover:bg-dark-card border border-dark-border rounded-lg smooth-transition text-xs">
                         <FileText className="w-4 h-4" /> CSV
+                    </button>
+                    <button onClick={exportToPDF} disabled={loading || groupedEntries.length === 0}
+                        className="flex items-center gap-2 px-3 py-2 bg-dark-surface text-red-400 hover:bg-dark-card border border-dark-border rounded-lg smooth-transition text-xs disabled:opacity-40">
+                        <Printer className="w-4 h-4" /> Print PDF
                     </button>
                     <Button icon={Plus} onClick={() => setShowNewEntryModal(true)}>Manual Entry</Button>
                 </div>

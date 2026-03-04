@@ -3,13 +3,16 @@ import { supabase } from '../../lib/supabase';
 import Button from '../../components/Common/Button';
 import {
     Scale, Search, Calendar, Download, Filter,
-    CheckCircle, AlertCircle, RefreshCw, FileSpreadsheet, FileText
+    CheckCircle, AlertCircle, RefreshCw, FileSpreadsheet, FileText, Printer
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import XLSX from 'xlsx-js-style';
+import { printReport, fmtPrint, fmtDatePrint } from '../../utils/printPDF';
+import { useData } from '../../context/DataContext';
 
 const TrialBalance = () => {
     const navigate = useNavigate();
+    const { companySettings } = useData();
     const [loading, setLoading] = useState(true);
     const [balances, setBalances] = useState([]);
     const [totals, setTotals] = useState({ opening: 0, debit: 0, credit: 0, closing: 0 });
@@ -175,23 +178,23 @@ const TrialBalance = () => {
 
     const getExportData = () => {
         const rows = balances.map(acc => ({
-            'Kode Akun': acc.code,
-            'Nama Akun': acc.name,
+            'Account Code': acc.code,
+            'Account Name': acc.name,
             'Level': acc.level || '-',
-            'Saldo Awal': formatExportCurrency(acc.opening),
+            'Opening Balance': formatExportCurrency(acc.opening),
             'Debit': formatExportCurrency(acc.debitPeriod),
-            'Kredit': formatExportCurrency(acc.creditPeriod),
-            'Saldo Akhir': formatExportCurrency(acc.closing)
+            'Credit': formatExportCurrency(acc.creditPeriod),
+            'Closing Balance': formatExportCurrency(acc.closing)
         }));
 
         const totalRow = {
-            'Kode Akun': 'TOTAL',
-            'Nama Akun': '',
+            'Account Code': 'TOTAL',
+            'Account Name': '',
             'Level': '',
-            'Saldo Awal': formatExportCurrency(totals.opening),
+            'Opening Balance': formatExportCurrency(totals.opening),
             'Debit': formatExportCurrency(totals.debit),
-            'Kredit': formatExportCurrency(totals.credit),
-            'Saldo Akhir': formatExportCurrency(totals.closing)
+            'Credit': formatExportCurrency(totals.credit),
+            'Closing Balance': formatExportCurrency(totals.closing)
         };
 
         return [...rows, totalRow];
@@ -214,7 +217,7 @@ const TrialBalance = () => {
 
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "TrialBalance");
-        XLSX.writeFile(wb, `NeracaSaldo_${dateRange.start}_${dateRange.end}.xlsx`);
+        XLSX.writeFile(wb, `TrialBalance_${dateRange.start}_${dateRange.end}.xlsx`);
     };
 
     const exportToCSV = () => {
@@ -222,7 +225,67 @@ const TrialBalance = () => {
         const ws = XLSX.utils.json_to_sheet(data);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "TrialBalance");
-        XLSX.writeFile(wb, `NeracaSaldo_${dateRange.start}_${dateRange.end}.csv`);
+        XLSX.writeFile(wb, `TrialBalance_${dateRange.start}_${dateRange.end}.csv`);
+    };
+
+    const exportToPDF = () => {
+        const isBalanced = Math.abs(totals.closing) < 1;
+        const period = `${fmtDatePrint(dateRange.start)} – ${fmtDatePrint(dateRange.end)}`;
+
+        const rows = balances.map(acc => {
+            const isHeader = acc.level === '1' || acc.level === '2';
+            return `<tr class="${isHeader ? 'row-header' : ''}">
+                <td class="code">${acc.code}</td>
+                <td>${acc.name}</td>
+                <td class="text-center muted">${acc.level || '-'}</td>
+                <td class="text-right mono ${acc.opening !== 0 ? '' : 'muted'}">${formatBalance(acc.opening)}</td>
+                <td class="text-right mono ${acc.debitPeriod !== 0 ? 'blue' : 'muted'}">${formatCurrency(acc.debitPeriod)}</td>
+                <td class="text-right mono ${acc.creditPeriod !== 0 ? '' : 'muted'}">${formatCurrency(acc.creditPeriod)}</td>
+                <td class="text-right mono bold ${acc.closing < 0 ? 'red' : acc.closing > 0 ? 'green' : 'muted'}">${formatBalance(acc.closing)}</td>
+            </tr>`;
+        }).join('');
+
+        const bodyHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                <div>
+                    <span class="badge ${isBalanced ? 'badge-balanced' : 'badge-unbalanced'}">
+                        ${isBalanced ? '✓ BALANCED' : '✗ OUT OF BALANCE'}
+                    </span>
+                    <span style="font-size:9px;color:#64748b;margin-left:8px">Difference: ${formatBalance(totals.closing)}</span>
+                </div>
+                <div style="font-size:9px;color:#64748b">${balances.length} accounts with activity</div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="min-width:90px">COA Code</th>
+                        <th style="min-width:200px">Account Name</th>
+                        <th class="text-center" style="width:50px">Level</th>
+                        <th class="text-right" style="min-width:120px">Prev Balance</th>
+                        <th class="text-right" style="min-width:120px">Debit</th>
+                        <th class="text-right" style="min-width:120px">Credit</th>
+                        <th class="text-right" style="min-width:120px">Balance</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="3" style="text-align:right;text-transform:uppercase;letter-spacing:.05em">Grand Total</td>
+                        <td class="text-right">${formatBalance(totals.opening)}</td>
+                        <td class="text-right">${formatCurrency(totals.debit)}</td>
+                        <td class="text-right">${formatCurrency(totals.credit)}</td>
+                        <td class="text-right">${formatBalance(totals.closing)}</td>
+                    </tr>
+                </tfoot>
+            </table>`;
+
+        printReport({
+            reportName: 'Trial Balance',
+            companyInfo: companySettings,
+            period,
+            bodyHTML,
+            note: 'Values in parentheses ( ) represent Credit-normal balances (Liabilities / Equity / Revenue). Total Debit and Credit movements must always be balanced.'
+        });
     };
 
     const isBalanced = Math.abs(totals.closing) < 1; // Tolerance for float
@@ -234,9 +297,9 @@ const TrialBalance = () => {
                 <div>
                     <h1 className="text-3xl font-bold gradient-text flex items-center gap-2">
                         <Scale className="w-8 h-8" />
-                        Neraca Saldo
+                        Trial Balance
                     </h1>
-                    <p className="text-silver-dark mt-1">Laporan Neraca Saldo (Daftar Akun & Mutasi)</p>
+                    <p className="text-silver-dark mt-1">Account balances and period movements</p>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -255,6 +318,13 @@ const TrialBalance = () => {
                     >
                         <FileText className="w-4 h-4" /> CSV
                     </button>
+                    <button
+                        onClick={exportToPDF}
+                        disabled={loading || balances.length === 0}
+                        className="flex items-center gap-2 px-3 py-2 bg-dark-surface text-red-400 hover:bg-dark-card smooth-transition rounded-lg border border-dark-border text-xs disabled:opacity-40"
+                    >
+                        <Printer className="w-4 h-4" /> Print PDF
+                    </button>
                 </div>
             </div>
 
@@ -262,7 +332,7 @@ const TrialBalance = () => {
             <div className="flex flex-col md:flex-row gap-4">
                 <div className="glass-card p-4 rounded-lg flex items-center gap-4 flex-1">
                     <div>
-                        <label className="block text-xs text-silver-dark uppercase mb-1">Periode Awal</label>
+                        <label className="block text-xs text-silver-dark uppercase mb-1">Start Date</label>
                         <input
                             type="date"
                             value={dateRange.start}
@@ -272,7 +342,7 @@ const TrialBalance = () => {
                     </div>
                     <div className="h-px w-4 bg-silver-dark"></div>
                     <div>
-                        <label className="block text-xs text-silver-dark uppercase mb-1">Periode Akhir</label>
+                        <label className="block text-xs text-silver-dark uppercase mb-1">End Date</label>
                         <input
                             type="date"
                             value={dateRange.end}
@@ -284,23 +354,23 @@ const TrialBalance = () => {
 
                 <div className={`glass-card p-4 rounded-lg flex items-center justify-between gap-6 border-l-4 ${isBalanced ? 'border-green-500' : 'border-red-500'} min-w-[300px]`}>
                     <div>
-                        <p className="text-xs text-silver-dark uppercase tracking-wider">Status Balance</p>
+                        <p className="text-xs text-silver-dark uppercase tracking-wider">Balance Status</p>
                         <div className="flex items-center gap-2 mt-1">
                             {isBalanced ? (
                                 <>
                                     <CheckCircle className="w-5 h-5 text-green-400" />
-                                    <span className="text-lg font-bold text-green-400">SEIMBANG</span>
+                                    <span className="text-lg font-bold text-green-400">BALANCED</span>
                                 </>
                             ) : (
                                 <>
                                     <AlertCircle className="w-5 h-5 text-red-500" />
-                                    <span className="text-lg font-bold text-red-500">TIDAK BALANCE</span>
+                                    <span className="text-lg font-bold text-red-500">OUT OF BALANCE</span>
                                 </>
                             )}
                         </div>
                     </div>
                     <div className="text-right">
-                        <p className="text-xs text-silver-dark">Selisih</p>
+                        <p className="text-xs text-silver-dark">Difference</p>
                         <p className={`font-mono font-bold ${isBalanced ? 'text-silver-light' : 'text-red-400'}`}>
                             {formatCurrency(totals.closing)}
                         </p>
@@ -316,19 +386,19 @@ const TrialBalance = () => {
                         <table className="w-full text-sm">
                             <thead className="bg-[#0070BB] text-white">
                                 <tr>
-                                    <th className="px-4 py-3 text-left font-semibold uppercase tracking-wider">Kode COA</th>
-                                    <th className="px-4 py-3 text-left font-semibold uppercase tracking-wider">Nama Akun</th>
+                                    <th className="px-4 py-3 text-left font-semibold uppercase tracking-wider">COA Code</th>
+                                    <th className="px-4 py-3 text-left font-semibold uppercase tracking-wider">Account Name</th>
                                     <th className="px-4 py-3 text-center font-semibold uppercase tracking-wider">Level</th>
                                     <th className="px-4 py-3 text-right font-semibold uppercase tracking-wider">Prev Balance</th>
                                     <th className="px-4 py-3 text-right font-semibold uppercase tracking-wider">Debit</th>
-                                    <th className="px-4 py-3 text-right font-semibold uppercase tracking-wider">Kredit</th>
+                                    <th className="px-4 py-3 text-right font-semibold uppercase tracking-wider">Credit</th>
                                     <th className="px-4 py-3 text-right font-semibold uppercase tracking-wider">Balance</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-dark-border/40">
                                 {balances.length === 0 ? (
                                     <tr>
-                                        <td colSpan="7" className="px-4 py-8 text-center text-silver-dark">Tidak ada data transaksi.</td>
+                                        <td colSpan="7" className="px-4 py-8 text-center text-silver-dark">No transaction data found.</td>
                                     </tr>
                                 ) : (
                                     balances.map(acc => {
@@ -384,7 +454,7 @@ const TrialBalance = () => {
                 </div>
             )}
             <div className="text-center text-xs text-silver-dark mt-6 italic bg-dark-surface/30 p-4 rounded border border-white/5">
-                Note: Nilai di dalam kurung ( ) menandakan saldo bersaldo normal Kredit (Liabilities/Equity/Revenue) atau nilai mines. Total debit dan kredit di mutasi harus selalu seimbang.
+                Note: Values in parentheses ( ) represent Credit-normal balances (Liabilities / Equity / Revenue). Total Debit and Credit movements must always be balanced.
             </div>
         </div>
     );

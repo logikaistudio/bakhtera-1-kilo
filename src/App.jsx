@@ -144,6 +144,7 @@ function App() {
                     <Route path="/blink/operations/bl" element={<ProtectedRoute menuCode="blink_bl"><BLManagement /></ProtectedRoute>} />
                     <Route path="/blink/master/routes" element={<ProtectedRoute menuCode="blink_routes"><MasterRoutes /></ProtectedRoute>} />
                     <Route path="/blink/master/partners" element={<ProtectedRoute menuCode="blink_partners"><PartnerManagement /></ProtectedRoute>} />
+                    <Route path="/blink/master/coa" element={<ProtectedRoute menuCode="blink_coa"><COAMaster /></ProtectedRoute>} />
                     <Route path="/blink/master/settings" element={<ProtectedRoute menuCode="blink_settings"><BlinkCompanySettings /></ProtectedRoute>} />
 
                     {/* Blink Finance Module */}
