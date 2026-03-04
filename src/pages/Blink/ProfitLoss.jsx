@@ -63,27 +63,57 @@ const ProfitLoss = () => {
 
             if (coaError) throw coaError;
 
-            const coaMap = (coaData || []).reduce((acc, coa) => {
-                acc[coa.id] = { ...coa, amount: 0 };
-                return acc;
-            }, {});
+            // Removed the old coaMap initialization to use the new one below after fetching entries.
 
             // 2. Fetch Journal Entries within date range
-            const { data: entries, error: entriesError } = await supabase
-                .from('blink_journal_entries')
-                .select('coa_id, debit, credit, entry_date')
-                .gte('entry_date', dateRange.startDate)
-                .lte('entry_date', dateRange.endDate);
+            const [r1, r2] = await Promise.all([
+                supabase.from('blink_journal_entries')
+                    .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate')
+                    .not('coa_id', 'is', null)
+                    .gte('entry_date', dateRange.startDate)
+                    .lte('entry_date', dateRange.endDate),
+                supabase.from('blink_journal_entries')
+                    .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate')
+                    .is('coa_id', null)
+                    .gte('entry_date', dateRange.startDate)
+                    .lte('entry_date', dateRange.endDate)
+            ]);
 
-            if (entriesError) throw entriesError;
+            if (r1.error) throw r1.error;
+            if (r2.error) throw r2.error;
+
+            const combined = [...(r1.data || []), ...(r2.data || [])];
+            // deduplicate by id
+            const entries = [...new Map(combined.map(r => [r.id, r])).values()];
 
             // 3. Aggregate by COA
+            const coaMap = {};
+            const accCodeMap = {};
+
+            (coaData || []).forEach(coa => {
+                coaMap[coa.id] = { ...coa, amount: 0 };
+                if (coa.code) accCodeMap[coa.code] = coa.id;
+            });
+
+            // Conversion helper
+            const toIDR = (value, currency, exchangeRate) => {
+                if (!value) return 0;
+                if (currency && currency !== 'IDR' && exchangeRate > 1) {
+                    return value * exchangeRate;
+                }
+                return value;
+            };
+
             entries.forEach(e => {
-                const acc = coaMap[e.coa_id];
+                // Match by ID first, fallback to code
+                const targetId = e.coa_id || accCodeMap[e.account_code];
+                if (!targetId) return;
+
+                const acc = coaMap[targetId];
                 if (!acc) return;
 
-                const debit = e.debit || 0;
-                const credit = e.credit || 0;
+                const debit = toIDR(e.debit, e.currency, e.exchange_rate);
+                const credit = toIDR(e.credit, e.currency, e.exchange_rate);
 
                 // P&L accounts: Revenue increases with Credit, Expense increases with Debit
                 if (['REVENUE', 'OTHER_INCOME'].includes(acc.type)) {

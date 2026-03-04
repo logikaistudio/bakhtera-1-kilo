@@ -38,21 +38,28 @@ const TrialBalance = () => {
             if (coaError) throw coaError;
 
             // 2. Fetch Journal Entries (ALL TIME for Integrity, but split by logic)
-            // Ideally we fetch Opening Balance (before start) and Movements (within range)
+            const [r1, r2] = await Promise.all([
+                supabase.from('blink_journal_entries')
+                    .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate')
+                    .not('coa_id', 'is', null)
+                    .lte('entry_date', dateRange.end),
+                supabase.from('blink_journal_entries')
+                    .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate')
+                    .is('coa_id', null)
+                    .lte('entry_date', dateRange.end)
+            ]);
 
-            // Optimization: Fetch aggregated data if possible, but for granular control we fetch entries.
-            // CAUTION: Large datasets might need pagination or backend aggregation. 
-            // For now, we fetch all relevant entries.
+            if (r1.error) throw r1.error;
+            if (r2.error) throw r2.error;
 
-            const { data: entries, error: entriesError } = await supabase
-                .from('blink_journal_entries')
-                .select('coa_id, debit, credit, entry_date')
-                .lte('entry_date', dateRange.end); // Fetch up to end date
-
-            if (entriesError) throw entriesError;
+            const combined = [...(r1.data || []), ...(r2.data || [])];
+            // deduplicate by id
+            const entries = [...new Map(combined.map(r => [r.id, r])).values()];
 
             // 3. Process Data
+            // 3. Process Data
             const accMap = {};
+            const accCodeMap = {};
 
             accounts.forEach(acc => {
                 accMap[acc.id] = {
@@ -62,14 +69,28 @@ const TrialBalance = () => {
                     creditPeriod: 0,
                     closing: 0
                 };
+                if (acc.code) accCodeMap[acc.code] = acc.id;
             });
 
+            // Conversion helper
+            const toIDR = (value, currency, exchangeRate) => {
+                if (!value) return 0;
+                if (currency && currency !== 'IDR' && exchangeRate > 1) {
+                    return value * exchangeRate;
+                }
+                return value;
+            };
+
             entries.forEach(e => {
-                const acc = accMap[e.coa_id];
+                // Match by ID first, fallback to code
+                const targetId = e.coa_id || accCodeMap[e.account_code];
+                if (!targetId) return;
+
+                const acc = accMap[targetId];
                 if (!acc) return; // Should not happen if referential integrity is good
 
-                const debit = e.debit || 0;
-                const credit = e.credit || 0;
+                const debit = toIDR(e.debit, e.currency, e.exchange_rate);
+                const credit = toIDR(e.credit, e.currency, e.exchange_rate);
 
                 if (e.entry_date < dateRange.start) {
                     // It's Opening Balance

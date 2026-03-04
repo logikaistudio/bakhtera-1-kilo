@@ -41,29 +41,51 @@ const BalanceSheet = () => {
             if (coaError) throw coaError;
 
             // 2. Fetch ALL Journal Entries up to asOfDate
-            const { data: entries, error: entriesError } = await supabase
-                .from('blink_journal_entries')
-                .select('coa_id, debit, credit, entry_date')
-                .lte('entry_date', asOfDate);
+            const [r1, r2] = await Promise.all([
+                supabase.from('blink_journal_entries')
+                    .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate')
+                    .not('coa_id', 'is', null)
+                    .lte('entry_date', asOfDate),
+                supabase.from('blink_journal_entries')
+                    .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate')
+                    .is('coa_id', null)
+                    .lte('entry_date', asOfDate)
+            ]);
 
-            if (entriesError) throw entriesError;
+            if (r1.error) throw r1.error;
+            if (r2.error) throw r2.error;
+
+            const combined = [...(r1.data || []), ...(r2.data || [])];
+            // deduplicate by id just in case
+            const entries = [...new Map(combined.map(r => [r.id, r])).values()];
 
             // 3. Calculate balances for each account
-            const accMap = {};
+            const accCodeMap = {};
 
             accounts.forEach(acc => {
-                accMap[acc.id] = {
-                    ...acc,
-                    balance: 0
-                };
+                accMap[acc.id] = { ...acc, balance: 0 };
+                if (acc.code) accCodeMap[acc.code] = acc.id;
             });
 
+            // Conversion helper
+            const toIDR = (value, currency, exchangeRate) => {
+                if (!value) return 0;
+                if (currency && currency !== 'IDR' && exchangeRate > 1) {
+                    return value * exchangeRate;
+                }
+                return value;
+            };
+
             entries.forEach(e => {
-                const acc = accMap[e.coa_id];
+                // Match by ID first, fallback to code
+                const targetId = e.coa_id || accCodeMap[e.account_code];
+                if (!targetId) return;
+
+                const acc = accMap[targetId];
                 if (!acc) return;
 
-                const debit = e.debit || 0;
-                const credit = e.credit || 0;
+                const debit = toIDR(e.debit, e.currency, e.exchange_rate);
+                const credit = toIDR(e.credit, e.currency, e.exchange_rate);
 
                 // Calculate based on normal balance
                 const isNormalCredit = ['LIABILITY', 'EQUITY', 'REVENUE'].includes(acc.type);
