@@ -110,6 +110,7 @@ const GeneralLedger = () => {
     const [showSidebar, setShowSidebar] = useState(true);
     const [accountBalances, setAccountBalances] = useState({}); // coaId → balance
     const [balancesLoading, setBalancesLoading] = useState(false);
+    const [coaSearchTerm, setCoaSearchTerm] = useState('');
 
     const today = new Date();
     const [dateRange, setDateRange] = useState({
@@ -349,12 +350,18 @@ const GeneralLedger = () => {
     // ── Group accounts for sidebar ────────────────────────────────────────────
     const groupedAccounts = useMemo(() => {
         const groups = {};
+        const term = coaSearchTerm.toLowerCase();
+
         accounts.forEach(acc => {
+            // Apply search filter if active
+            if (term && !(acc.code.toLowerCase().includes(term) || acc.name.toLowerCase().includes(term))) {
+                return;
+            }
             if (!groups[acc.type]) groups[acc.type] = [];
             groups[acc.type].push(acc);
         });
         return groups;
-    }, [accounts]);
+    }, [accounts, coaSearchTerm]);
 
     const [expandedTypes, setExpandedTypes] = useState(new Set(['ASSET', 'LIABILITY', 'REVENUE', 'EXPENSE']));
     const toggleType = (type) => setExpandedTypes(prev => {
@@ -441,15 +448,38 @@ const GeneralLedger = () => {
 
                 {/* ── Account Sidebar ── */}
                 {showSidebar && (
-                    <div className="w-64 shrink-0 glass-card rounded-lg overflow-hidden flex flex-col" style={{ maxHeight: '75vh' }}>
-                        <div className="p-3 border-b border-dark-border bg-dark-surface/60">
-                            <p className="text-xs font-semibold text-silver-light uppercase tracking-wider">Chart of Accounts</p>
-                            <p className="text-xs text-silver-dark mt-0.5">YTD Balance</p>
+                    <div className="w-72 shrink-0 glass-card rounded-lg flex flex-col border border-dark-border shadow-xl relative" style={{ height: 'auto', minHeight: '600px', maxHeight: 'calc(100vh - 12rem)' }}>
+                        <div className="p-3 border-b border-dark-border bg-dark-bg/80 backdrop-blur-md rounded-t-lg z-10 sticky top-0">
+                            <div className="flex items-center justify-between mb-2">
+                                <p className="text-xs font-semibold text-silver-light uppercase tracking-wider flex items-center gap-1.5">
+                                    <BookOpen className="w-3.5 h-3.5 text-accent-orange" /> Chart of Accounts
+                                </p>
+                                <span className="text-[10px] text-silver-dark bg-dark-surface px-1.5 py-0.5 rounded">YTD Bal</span>
+                            </div>
+                            <div className="relative mt-2 text-silver-light">
+                                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-silver-dark" />
+                                <input
+                                    type="text"
+                                    placeholder="Cari akun atau kode..."
+                                    value={coaSearchTerm}
+                                    onChange={(e) => setCoaSearchTerm(e.target.value)}
+                                    className="w-full pl-8 pr-3 py-1.5 bg-dark-surface border border-dark-border rounded text-xs focus:border-accent-blue focus:ring-1 focus:ring-accent-blue/30 smooth-transition"
+                                />
+                                {coaSearchTerm && (
+                                    <button onClick={() => setCoaSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                                        <X className="w-3 h-3 text-silver-dark hover:text-white" />
+                                    </button>
+                                )}
+                            </div>
                         </div>
-                        <div className="overflow-y-auto flex-1">
+                        <div className="overflow-y-auto flex-1 custom-scrollbar pb-2">
                             {loadingAccounts ? (
                                 <div className="flex items-center justify-center py-8">
                                     <div className="animate-spin w-5 h-5 border-2 border-accent-orange border-t-transparent rounded-full" />
+                                </div>
+                            ) : Object.keys(groupedAccounts).length === 0 ? (
+                                <div className="py-8 px-4 text-center text-sm text-silver-dark font-medium">
+                                    Tidak ada data untuk "{coaSearchTerm}"
                                 </div>
                             ) : (
                                 Object.entries(groupedAccounts).map(([type, accs]) => {
