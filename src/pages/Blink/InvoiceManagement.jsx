@@ -30,6 +30,8 @@ const InvoiceManagement = () => {
     const [showViewModal, setShowViewModal] = useState(false);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [showPrintPreview, setShowPrintPreview] = useState(false);
+    const [showAddItemModal, setShowAddItemModal] = useState(false);
+    const [addItemInvoice, setAddItemInvoice] = useState(null);
     const [previewInvoiceData, setPreviewInvoiceData] = useState(null);
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [selectedQuotation, setSelectedQuotation] = useState(null);
@@ -899,6 +901,160 @@ const InvoiceManagement = () => {
         }
     };
 
+    // ── Add Item to Existing Invoice ────────────────────────────────────────────
+    // Works for any status, including paid. After adding, status resets to draft.
+    // Also syncs changes to linked Quotation (service_items) and Shipment (selling_items).
+    const handleAddItemToInvoice = async (invoice, newItems, amendmentNote) => {
+        try {
+            const taxRate = invoice.tax_rate || 0;
+            const discountAmount = invoice.discount_amount || 0;
+
+            // Merge existing + new items
+            const existingItems = invoice.invoice_items || [];
+            const mergedItems = [...existingItems, ...newItems];
+
+            // Recalculate totals
+            const newSubtotal = mergedItems.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+            const newTaxAmount = (newSubtotal * taxRate) / 100;
+            const newTotal = newSubtotal + newTaxAmount - discountAmount;
+
+            // Outstanding = new total minus what's already been paid
+            const alreadyPaid = invoice.paid_amount || 0;
+            const newOutstanding = Math.max(0, newTotal - alreadyPaid);
+
+            // Build amendment notes
+            const timestamp = new Date().toISOString();
+            const prevNote = invoice.notes || '';
+            const amendNote = `[AMENDMENT ${timestamp.slice(0, 10)}] ${amendmentNote || 'Item(s) added by user'}. Previous total: ${invoice.total_amount}, New total: ${newTotal}.`;
+            const updatedNotes = prevNote ? `${prevNote}\n${amendNote}` : amendNote;
+
+            // ── 1. Update Invoice ──────────────────────────────────────────────
+            const { data, error } = await supabase
+                .from('blink_invoices')
+                .update({
+                    invoice_items: mergedItems,
+                    subtotal: newSubtotal,
+                    tax_amount: newTaxAmount,
+                    total_amount: newTotal,
+                    outstanding_amount: newOutstanding,
+                    status: 'draft',          // Reset to draft — requires re-approval
+                    notes: updatedNotes,
+                    updated_at: timestamp,
+                })
+                .eq('id', invoice.id)
+                .select();
+
+            if (error) throw error;
+
+            // ── 2. Update AR outstanding if it exists ──────────────────────────
+            await supabase
+                .from('blink_ar_transactions')
+                .update({
+                    original_amount: newTotal,
+                    outstanding_amount: newOutstanding,
+                    status: newOutstanding <= 0 ? 'paid' : alreadyPaid > 0 ? 'partial' : 'outstanding',
+                })
+                .eq('invoice_id', invoice.id);
+
+            // ── 3. Sync to linked Quotation (service_items + total_amount) ─────
+            // Map invoice items → quotation service_items format
+            const serviceItemsForQuotation = mergedItems.map(item => ({
+                description: item.item_name || item.description || '',
+                item_name: item.item_name || '',
+                qty: parseFloat(item.qty) || 1,
+                unit: item.unit || 'Job',
+                rate: parseFloat(item.rate) || 0,
+                amount: parseFloat(item.amount) || 0,
+                coa_id: item.coa_id || null,
+            }));
+
+            const updatedInvoice = data?.[0] || invoice;
+
+            if (updatedInvoice.quotation_id) {
+                try {
+                    const { error: qError } = await supabase
+                        .from('blink_quotations')
+                        .update({
+                            service_items: serviceItemsForQuotation,
+                            total_amount: newSubtotal, // Quotation uses subtotal (pre-tax)
+                            updated_at: timestamp,
+                        })
+                        .eq('id', updatedInvoice.quotation_id);
+
+                    if (qError) {
+                        console.warn('Quotation sync failed (non-critical):', qError.message);
+                    } else {
+                        console.log('✅ Quotation synced:', updatedInvoice.quotation_id);
+                    }
+                } catch (qErr) {
+                    console.warn('Error syncing to quotation:', qErr.message);
+                }
+            }
+
+            // ── 4. Sync to linked Shipment (selling_items) ─────────────────────
+            if (updatedInvoice.shipment_id) {
+                try {
+                    const { error: sError } = await supabase
+                        .from('blink_shipments')
+                        .update({
+                            selling_items: serviceItemsForQuotation,
+                            updated_at: timestamp,
+                        })
+                        .eq('id', updatedInvoice.shipment_id);
+
+                    if (sError) {
+                        console.warn('Shipment sync failed (non-critical):', sError.message);
+                    } else {
+                        console.log('✅ Shipment selling_items synced:', updatedInvoice.shipment_id);
+                    }
+                } catch (sErr) {
+                    console.warn('Error syncing to shipment:', sErr.message);
+                }
+            }
+
+            // ── 5. Also sync to SO if so_number is available ───────────────────
+            // SO is identified by so_number in blink_sales_orders or similar table
+            if (updatedInvoice.so_number) {
+                try {
+                    const { error: soError } = await supabase
+                        .from('blink_sales_orders')
+                        .update({
+                            order_items: serviceItemsForQuotation,
+                            total_amount: newSubtotal,
+                            updated_at: timestamp,
+                        })
+                        .eq('so_number', updatedInvoice.so_number);
+
+                    if (soError) {
+                        // Table might not exist — that's OK, log and continue
+                        console.warn('SO sync skipped:', soError.message);
+                    } else {
+                        console.log('✅ SO synced:', updatedInvoice.so_number);
+                    }
+                } catch (soErr) {
+                    console.warn('Error syncing to SO:', soErr.message);
+                }
+            }
+
+            const syncedModules = [];
+            if (updatedInvoice.quotation_id) syncedModules.push('Quotation');
+            if (updatedInvoice.shipment_id) syncedModules.push('Shipment');
+            if (updatedInvoice.so_number) syncedModules.push('SO');
+            const syncInfo = syncedModules.length > 0 ? `\n\n📋 Also synced to: ${syncedModules.join(', ')}` : '';
+
+            alert(`✅ Item(s) added successfully!\n\nNew Total: ${formatCurrency(newTotal, invoice.currency)}\nAlready Paid: ${formatCurrency(alreadyPaid, invoice.currency)}\nNew Outstanding: ${formatCurrency(newOutstanding, invoice.currency)}\n\n⚠️ Invoice status reset to Draft — please re-approve.${syncInfo}`);
+
+            await fetchInvoices();
+            setShowAddItemModal(false);
+            setAddItemInvoice(null);
+            setShowViewModal(false);
+            setSelectedInvoice(null);
+        } catch (error) {
+            console.error('Error adding item to invoice:', error);
+            alert('Failed to add item: ' + error.message);
+        }
+    };
+
 
 
     const filteredInvoices = invoices.filter(inv => {
@@ -1086,7 +1242,7 @@ const InvoiceManagement = () => {
                 )
             }
 
-            {/* View Invoice Modal - Will be implemented */}
+            {/* View Invoice Modal */}
             {
                 showViewModal && selectedInvoice && (
                     <InvoiceViewModal
@@ -1106,6 +1262,10 @@ const InvoiceManagement = () => {
                             setShowPrintPreview(true);
                         }}
                         onSubmit={() => handleSubmitInvoice(selectedInvoice)}
+                        onAddItem={() => {
+                            setAddItemInvoice(selectedInvoice);
+                            setShowAddItemModal(true);
+                        }}
                         statusConfig={statusConfig}
                     />
                 )
@@ -1142,6 +1302,21 @@ const InvoiceManagement = () => {
                             setPreviewInvoiceData(null);
                         }}
                         onPrint={() => handlePrintInvoice(previewInvoiceData)}
+                    />
+                )
+            }
+            {/* Add Item to Invoice Modal */}
+            {
+                showAddItemModal && addItemInvoice && (
+                    <AddItemModal
+                        invoice={addItemInvoice}
+                        formatCurrency={formatCurrency}
+                        revenueAccounts={revenueAccounts}
+                        onClose={() => {
+                            setShowAddItemModal(false);
+                            setAddItemInvoice(null);
+                        }}
+                        onSave={handleAddItemToInvoice}
                     />
                 )
             }
@@ -1751,7 +1926,7 @@ const InvoiceCreateModal = ({ quotations, shipments, formData, setFormData, sele
 };
 
 // Invoice View Modal Component
-const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint, onPreview, onSubmit, statusConfig }) => {
+const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint, onPreview, onSubmit, onAddItem, statusConfig }) => {
     const [payments, setPayments] = useState([]);
     const [loadingPayments, setLoadingPayments] = useState(true);
 
@@ -2045,22 +2220,35 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex gap-3 justify-end pt-4 border-t border-dark-border">
+                    <div className="flex gap-3 justify-end pt-4 border-t border-dark-border flex-wrap">
                         {invoice.outstanding_amount > 0 && (
                             <p className="text-xs text-silver-dark self-center mr-auto">
-                                💡 Pembayaran dilakukan melalui modul AR (Accounts Receivable)
+                                💡 Payment via AR (Accounts Receivable) module
                             </p>
                         )}
                         <button
                             onClick={onClose}
                             className="px-6 py-2 border border-dark-border text-silver-light rounded-lg hover:bg-dark-surface smooth-transition"
                         >
-                            Tutup
+                            Close
                         </button>
+
+                        {/* Add Item — always visible, all statuses including paid */}
+                        {onAddItem && (
+                            <button
+                                onClick={onAddItem}
+                                className="flex items-center gap-2 px-4 py-2 border border-yellow-500 text-yellow-400 rounded-lg hover:bg-yellow-500/10 smooth-transition font-semibold"
+                                title="Add new charge item to this invoice (will require re-approval)"
+                            >
+                                <Plus className="w-4 h-4" />
+                                Add Item
+                            </button>
+                        )}
+
                         {onPrint && (
                             <button
                                 onClick={onPrint}
-                                className="flex items-center gap-2 px-6 py-2 border border-blue-500 text-blue-400 rounded-lg hover:bg-blue-500/10 smooth-transition"
+                                className="flex items-center gap-2 px-5 py-2 border border-blue-500 text-blue-400 rounded-lg hover:bg-blue-500/10 smooth-transition"
                             >
                                 <div className="w-4 h-4">🖨️</div>
                                 Print
@@ -2069,7 +2257,7 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                         {onPreview && (
                             <button
                                 onClick={onPreview}
-                                className="flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg smooth-transition font-semibold"
+                                className="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg smooth-transition font-semibold"
                             >
                                 <Eye className="w-4 h-4" />
                                 Preview
@@ -2078,10 +2266,10 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                         {invoice.status === 'draft' && onSubmit && (
                             <button
                                 onClick={onSubmit}
-                                className="flex items-center gap-2 px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg smooth-transition font-semibold"
+                                className="flex items-center gap-2 px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg smooth-transition font-semibold"
                             >
                                 <CheckCircle className="w-4 h-4" />
-                                Approval
+                                Approve
                             </button>
                         )}
                     </div>
@@ -2849,6 +3037,223 @@ const ExistingInvoicesIndicator = ({ jobNumber }) => {
                 </div>
             )}
         </div>
+    );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AddItemModal — Add new charge items to an existing invoice (any status)
+// After saving: invoice resets to 'draft' and requires re-approval
+// ─────────────────────────────────────────────────────────────────────────────
+const AddItemModal = ({ invoice, formatCurrency, revenueAccounts, onClose, onSave }) => {
+    const emptyItem = () => ({ item_name: '', description: '', qty: 1, unit: 'Job', rate: 0, amount: 0, coa_id: null });
+    const [newItems, setNewItems] = useState([emptyItem()]);
+    const [amendmentNote, setAmendmentNote] = useState('');
+    const [saving, setSaving] = useState(false);
+
+    const updateItem = (idx, field, val) => {
+        setNewItems(prev => {
+            const updated = [...prev];
+            updated[idx] = { ...updated[idx], [field]: val };
+            // Auto-calc amount on rate/qty change
+            if (field === 'rate' || field === 'qty') {
+                const qty = field === 'qty' ? parseFloat(val) || 0 : parseFloat(updated[idx].qty) || 0;
+                const rate = field === 'rate' ? parseFloat(val) || 0 : parseFloat(updated[idx].rate) || 0;
+                updated[idx].amount = qty * rate;
+            }
+            return updated;
+        });
+    };
+
+    const addRow = () => setNewItems(prev => [...prev, emptyItem()]);
+    const removeRow = (idx) => setNewItems(prev => prev.filter((_, i) => i !== idx));
+
+    // Preview: recalculate totals with new items appended
+    const newItemsSubtotal = newItems.reduce((s, it) => s + (parseFloat(it.amount) || 0), 0);
+    const existingSubtotal = invoice.subtotal || 0;
+    const preview = {
+        subtotal: existingSubtotal + newItemsSubtotal,
+        tax: ((existingSubtotal + newItemsSubtotal) * (invoice.tax_rate || 0)) / 100,
+        get total() { return this.subtotal + this.tax - (invoice.discount_amount || 0); },
+        get outstanding() { return Math.max(0, this.total - (invoice.paid_amount || 0)); }
+    };
+
+    const handleSave = async () => {
+        const validItems = newItems.filter(it => it.item_name && parseFloat(it.amount) > 0);
+        if (validItems.length === 0) {
+            alert('Please fill at least one item with a name and amount > 0.');
+            return;
+        }
+        setSaving(true);
+        await onSave(invoice, validItems, amendmentNote);
+        setSaving(false);
+    };
+
+    return (
+        <Modal isOpen={true} onClose={onClose} maxWidth="max-w-4xl">
+            <div className="p-6">
+                {/* Header */}
+                <div className="flex items-start justify-between mb-5">
+                    <div>
+                        <h2 className="text-xl font-bold gradient-text flex items-center gap-2">
+                            <Plus className="w-5 h-5 text-yellow-400" />
+                            Add Items to Invoice
+                        </h2>
+                        <p className="text-silver-dark text-sm mt-1">
+                            {invoice.invoice_number} — {invoice.customer_name}
+                        </p>
+                    </div>
+                    {/* Status badge warning */}
+                    <div className="flex flex-col items-end gap-1">
+                        <span className="text-[10px] bg-yellow-500/15 border border-yellow-500/40 text-yellow-400 rounded-full px-2.5 py-0.5 font-semibold uppercase tracking-wider">
+                            ⚠️ Will reset to Draft
+                        </span>
+                        <span className="text-[10px] text-silver-dark">Current: <span className="capitalize text-silver-light">{invoice.status}</span></span>
+                    </div>
+                </div>
+
+                {/* Current invoice summary */}
+                <div className="grid grid-cols-3 gap-3 mb-5">
+                    {[
+                        { label: 'Current Total', value: formatCurrency(invoice.total_amount, invoice.currency), color: 'text-silver-light' },
+                        { label: 'Already Paid', value: formatCurrency(invoice.paid_amount || 0, invoice.currency), color: 'text-green-400' },
+                        { label: 'Outstanding', value: formatCurrency(invoice.outstanding_amount || 0, invoice.currency), color: invoice.outstanding_amount > 0 ? 'text-yellow-400' : 'text-green-400' },
+                    ].map(c => (
+                        <div key={c.label} className="glass-card p-3 rounded-lg border border-dark-border text-center">
+                            <p className="text-[10px] text-silver-dark uppercase tracking-wider">{c.label}</p>
+                            <p className={`text-sm font-bold mt-1 font-mono ${c.color}`}>{c.value}</p>
+                        </div>
+                    ))}
+                </div>
+
+                {/* New Items Table */}
+                <div className="mb-4">
+                    <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-semibold text-yellow-400">New Items to Add</h3>
+                        <button onClick={addRow}
+                            className="flex items-center gap-1 text-xs text-accent-orange border border-accent-orange/40 px-2.5 py-1 rounded hover:bg-accent-orange/10 smooth-transition">
+                            <Plus className="w-3 h-3" /> Add Row
+                        </button>
+                    </div>
+                    <div className="glass-card rounded-lg overflow-hidden border border-dark-border">
+                        <table className="w-full text-xs">
+                            <thead className="bg-dark-surface">
+                                <tr>
+                                    {['Item Name', 'Description', 'Qty', 'Unit', 'Rate', 'Amount', 'COA', ''].map((h, i) => (
+                                        <th key={i} className="px-3 py-2 text-left text-silver-dark font-semibold uppercase text-[10px]">{h}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-dark-border/30">
+                                {newItems.map((item, idx) => (
+                                    <tr key={idx} className="bg-dark-bg">
+                                        <td className="px-2 py-1.5">
+                                            <input value={item.item_name}
+                                                onChange={e => updateItem(idx, 'item_name', e.target.value)}
+                                                placeholder="e.g. Handling Fee"
+                                                className="w-full bg-dark-surface border border-dark-border rounded px-2 py-1 text-silver-light text-xs focus:border-yellow-500/60 outline-none" />
+                                        </td>
+                                        <td className="px-2 py-1.5">
+                                            <input value={item.description}
+                                                onChange={e => updateItem(idx, 'description', e.target.value)}
+                                                placeholder="Details..."
+                                                className="w-full bg-dark-surface border border-dark-border rounded px-2 py-1 text-silver-light text-xs focus:border-yellow-500/60 outline-none" />
+                                        </td>
+                                        <td className="px-2 py-1.5 w-16">
+                                            <input type="number" value={item.qty} min="0"
+                                                onChange={e => updateItem(idx, 'qty', e.target.value)}
+                                                className="w-full bg-dark-surface border border-dark-border rounded px-2 py-1 text-silver-light text-xs text-center focus:border-yellow-500/60 outline-none" />
+                                        </td>
+                                        <td className="px-2 py-1.5 w-20">
+                                            <input value={item.unit}
+                                                onChange={e => updateItem(idx, 'unit', e.target.value)}
+                                                className="w-full bg-dark-surface border border-dark-border rounded px-2 py-1 text-silver-light text-xs focus:border-yellow-500/60 outline-none" />
+                                        </td>
+                                        <td className="px-2 py-1.5 w-28">
+                                            <input type="number" value={item.rate} min="0"
+                                                onChange={e => updateItem(idx, 'rate', e.target.value)}
+                                                className="w-full bg-dark-surface border border-dark-border rounded px-2 py-1 text-silver-light text-xs text-right focus:border-yellow-500/60 outline-none" />
+                                        </td>
+                                        <td className="px-2 py-1.5 w-28 text-right font-mono text-yellow-400 font-semibold">
+                                            {(parseFloat(item.amount) || 0).toLocaleString('id-ID')}
+                                        </td>
+                                        <td className="px-2 py-1.5 w-36">
+                                            <select value={item.coa_id || ''}
+                                                onChange={e => updateItem(idx, 'coa_id', e.target.value || null)}
+                                                className="w-full bg-dark-surface border border-dark-border rounded px-1.5 py-1 text-silver-light text-[10px] focus:border-yellow-500/60 outline-none">
+                                                <option value="">-- COA --</option>
+                                                {revenueAccounts.map(a => (
+                                                    <option key={a.id} value={a.id}>{a.code} {a.name}</option>
+                                                ))}
+                                            </select>
+                                        </td>
+                                        <td className="px-2 py-1.5">
+                                            {newItems.length > 1 && (
+                                                <button onClick={() => removeRow(idx)}
+                                                    className="text-red-400/60 hover:text-red-400 smooth-transition">
+                                                    <X className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {/* Amendment Note */}
+                <div className="mb-5">
+                    <label className="block text-xs text-silver-dark mb-1">Amendment Note (optional)</label>
+                    <input value={amendmentNote}
+                        onChange={e => setAmendmentNote(e.target.value)}
+                        placeholder="e.g. Additional handling charges per customer request..."
+                        className="w-full bg-dark-surface border border-dark-border rounded-lg px-3 py-2 text-silver-light text-sm focus:border-yellow-500/60 outline-none" />
+                </div>
+
+                {/* New Total Preview */}
+                {newItemsSubtotal > 0 && (
+                    <div className="mb-5 glass-card p-4 rounded-lg border border-yellow-500/30 bg-yellow-500/5">
+                        <h3 className="text-xs font-semibold text-yellow-400 mb-3 uppercase tracking-wider">New Totals Preview</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                            <div>
+                                <p className="text-[10px] text-silver-dark">New Items</p>
+                                <p className="font-mono font-bold text-yellow-400">{formatCurrency(newItemsSubtotal, invoice.currency)}</p>
+                            </div>
+                            <div>
+                                <p className="text-[10px] text-silver-dark">New Subtotal</p>
+                                <p className="font-mono font-bold text-silver-light">{formatCurrency(preview.subtotal, invoice.currency)}</p>
+                            </div>
+                            <div>
+                                <p className="text-[10px] text-silver-dark">New Total (incl. tax)</p>
+                                <p className="font-mono font-bold text-accent-orange">{formatCurrency(preview.total, invoice.currency)}</p>
+                            </div>
+                            <div>
+                                <p className="text-[10px] text-silver-dark">New Outstanding</p>
+                                <p className={`font-mono font-bold ${preview.outstanding > 0 ? 'text-yellow-400' : 'text-green-400'}`}>
+                                    {formatCurrency(preview.outstanding, invoice.currency)}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex gap-3 justify-end border-t border-dark-border pt-4">
+                    <button onClick={onClose} disabled={saving}
+                        className="px-5 py-2 border border-dark-border text-silver-light rounded-lg hover:bg-dark-surface smooth-transition">
+                        Cancel
+                    </button>
+                    <button onClick={handleSave} disabled={saving}
+                        className="flex items-center gap-2 px-6 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg smooth-transition font-semibold disabled:opacity-50">
+                        {saving ? (
+                            <><div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> Saving...</>
+                        ) : (
+                            <><Plus className="w-4 h-4" /> Save & Reset to Draft</>
+                        )}
+                    </button>
+                </div>
+            </div>
+        </Modal>
     );
 };
 
