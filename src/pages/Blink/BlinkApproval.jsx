@@ -159,16 +159,22 @@ const BlinkApproval = () => {
 
                 if (apError) throw apError;
 
-                // Create Journal Entries
-                const { data: coaData } = await supabase.from('finance_coa').select('id, code, name');
-                if (coaData && apData && apData.length > 0) {
-                    const apCoa = coaData.find(c => c.code.startsWith('210'));
-                    const expenseCoa = poData?.coa_id
-                        ? coaData.find(c => c.id === poData.coa_id)
-                        : coaData.find(c => c.code.startsWith('500'));
+                // Create Journal Entries — use ilike matching actual COA format (e.g. 2-01-001, 5-01-001)
+                const [{ data: apCOAs }, { data: expenseCOAs }] = await Promise.all([
+                    supabase.from('finance_coa').select('id, code, name').eq('type', 'LIABILITY').ilike('code', '2-%').limit(1),
+                    supabase.from('finance_coa').select('id, code, name').eq('type', 'EXPENSE').ilike('code', '5-%').limit(1),
+                ]);
+                if (apData && apData.length > 0) {
+                    let expenseCoa = expenseCOAs?.[0] || null;
+                    if (poData?.coa_id) {
+                        const { data: poCoaData } = await supabase.from('finance_coa').select('id, code, name').eq('id', poData.coa_id).single();
+                        if (poCoaData) expenseCoa = poCoaData;
+                    }
+                    const apCoa = apCOAs?.[0] || null;
 
                     const batchId = crypto.randomUUID();
-                    const entryNum = `JE-AP-${Date.now().toString().slice(-6)}`;
+                    const entryNum = `JE-PO-${Date.now().toString().slice(-6)}`;
+                    const poExchangeRate = item.amount > 0 && item.currency !== 'IDR' ? (poData?.exchange_rate || 16000) : 1;
 
                     const debitEntry = {
                         entry_number: entryNum + '-D',
@@ -177,11 +183,12 @@ const BlinkApproval = () => {
                         reference_type: 'ap',
                         reference_id: apData[0].id,
                         reference_number: apData[0].ap_number,
-                        account_code: expenseCoa?.code || '500-001',
+                        account_code: expenseCoa?.code || '5-01-001',
                         account_name: (expenseCoa?.name || 'Beban Operasional') + ' - PO ' + item.refNumber,
                         debit: item.amount,
                         credit: 0,
                         currency: item.currency || 'IDR',
+                        exchange_rate: poExchangeRate,
                         description: 'PO ' + item.refNumber + ' - ' + item.customerName,
                         batch_id: batchId,
                         source: 'auto',
@@ -196,11 +203,12 @@ const BlinkApproval = () => {
                         reference_type: 'ap',
                         reference_id: apData[0].id,
                         reference_number: apData[0].ap_number,
-                        account_code: apCoa?.code || '210-001',
+                        account_code: apCoa?.code || '2-01-001',
                         account_name: (apCoa?.name || 'Hutang Usaha') + ' - ' + item.customerName,
                         debit: 0,
                         credit: item.amount,
                         currency: item.currency || 'IDR',
+                        exchange_rate: poExchangeRate,
                         description: 'PO ' + item.refNumber + ' - ' + item.customerName,
                         batch_id: batchId,
                         source: 'auto',

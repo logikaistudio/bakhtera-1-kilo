@@ -180,6 +180,82 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
                 console.warn('No po_id or po_number found in AP record, cannot sync PO');
             }
 
+            // ── AUTO JOURNAL ENTRY (Client-side) ──────────────────────────
+            // Double-entry: Dr Hutang Usaha (AP berkurang) | Cr Bank/Kas (uang keluar)
+            // IMPORTANT: debit/credit store original-currency amount (ap.currency);
+            //            exchange_rate field stores IDR conversion rate at payment time.
+            try {
+                const batchId = crypto.randomUUID();
+                const ts = Date.now();
+                const jeNum = `JE-PAY-OUT-${new Date().toISOString().slice(2, 7).replace('-', '')}-${ts.toString().slice(-8)}`;
+
+                // Resolve exchange rate: use ap.exchange_rate (from PO), fallback to 16000 for USD
+                const exRate = ap.currency === 'IDR'
+                    ? 1
+                    : (ap.exchange_rate || 16000);
+
+                // Fetch COA IDs
+                const [{ data: apCOAs }, { data: bankCOAs }] = await Promise.all([
+                    supabase.from('finance_coa').select('id, code, name').eq('type', 'LIABILITY').ilike('code', '2%').limit(1),
+                    supabase.from('finance_coa').select('id, code, name').eq('type', 'ASSET').ilike('code', '1-01%').limit(1),
+                ]);
+                const apCOA = apCOAs?.[0];
+                const bankCOA = bankCOAs?.[0];
+
+                const idrNote = ap.currency !== 'IDR'
+                    ? ` (Rate: ${exRate.toLocaleString('id-ID')})`
+                    : '';
+
+                const journalEntries = [
+                    {
+                        entry_number: `${jeNum}-D`,
+                        entry_date: formData.payment_date,
+                        entry_type: 'bill_payment',
+                        reference_type: 'ap_payment',
+                        reference_id: ap.id,
+                        reference_number: paymentNumber,
+                        account_code: apCOA?.code || '2-01-001',
+                        account_name: apCOA?.name || 'Hutang Usaha',
+                        debit: parseFloat(formData.amount),
+                        credit: 0,
+                        currency: ap.currency || 'IDR',
+                        exchange_rate: exRate,
+                        description: `Payment for ${ap.po_number || ap.ap_number} to ${ap.vendor_name}${idrNote}`,
+                        batch_id: batchId,
+                        source: 'auto',
+                        coa_id: apCOA?.id || null,
+                        party_name: ap.vendor_name,
+                        party_id: ap.vendor_id?.toString() || null
+                    },
+                    {
+                        entry_number: `${jeNum}-C`,
+                        entry_date: formData.payment_date,
+                        entry_type: 'bill_payment',
+                        reference_type: 'ap_payment',
+                        reference_id: ap.id,
+                        reference_number: paymentNumber,
+                        account_code: bankCOA?.code || '1-01-101',
+                        account_name: selectedBank ? `${selectedBank.bank_name}` : (bankCOA?.name || 'Kas/Bank'),
+                        debit: 0,
+                        credit: parseFloat(formData.amount),
+                        currency: ap.currency || 'IDR',
+                        exchange_rate: exRate,
+                        description: `Payment for ${ap.po_number || ap.ap_number} to ${ap.vendor_name}${idrNote}`,
+                        batch_id: batchId,
+                        source: 'auto',
+                        coa_id: bankCOA?.id || null,
+                        party_name: ap.vendor_name,
+                        party_id: ap.vendor_id?.toString() || null
+                    }
+                ];
+
+                await supabase.from('blink_journal_entries').insert(journalEntries);
+                console.log('AP Payment journal entries created');
+            } catch (jeError) {
+                console.warn('Journal entry creation failed (non-critical):', jeError.message);
+            }
+            // ─────────────────────────────────────────────────────────────
+
             // Set success state instead of alert
             setSuccessData({
                 paymentNumber,
@@ -445,16 +521,19 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment }) => {
             const { data, error } = await supabase
                 .from('finance_coa')
                 .select('*')
-                .eq('type', 'EXPENSE')  // Expense accounts for AP
+                .eq('type', 'EXPENSE')
                 .eq('is_active', true)
-                .gte('level', 3)        // Only detail accounts (level >= 3)
-                .order('group_name', { ascending: true })
                 .order('code', { ascending: true });
 
             if (error) throw error;
             setAccounts(data || []);
         } catch (error) {
             console.error('Error fetching accounts:', error);
+            // Fallback
+            try {
+                const { data } = await supabase.from('finance_coa').select('*').eq('is_active', true).order('code');
+                setAccounts((data || []).filter(a => a.type === 'EXPENSE'));
+            } catch { }
         }
     };
 
@@ -483,13 +562,25 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment }) => {
         }
     };
 
-    const handleItemCoaChange = (index, newCoaId) => {
+    const handleItemCoaChange = async (index, newCoaId) => {
         const updatedItems = [...poItems];
         updatedItems[index] = {
             ...updatedItems[index],
             coa_id: newCoaId
         };
         setPoItems(updatedItems);
+
+        // Auto-save on change
+        if (ap.po_id) {
+            try {
+                await supabase
+                    .from('blink_purchase_orders')
+                    .update({ po_items: updatedItems })
+                    .eq('id', ap.po_id);
+            } catch (error) {
+                console.error('Error auto-saving COA assignment:', error);
+            }
+        }
     };
 
     const handleSaveChanges = async () => {
@@ -506,10 +597,10 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment }) => {
 
             if (error) throw error;
 
-            alert('Alokasi akun berhasil disimpan!');
+            alert('Account allocation saved successfully!');
         } catch (error) {
             console.error('Error updating items:', error);
-            alert('Failed to save perubahan: ' + error.message);
+            alert('Failed to save changes: ' + error.message);
         } finally {
             setSavingItems(false);
         }
@@ -890,7 +981,7 @@ const AccountsPayable = () => {
                     <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                     <input
                         type="text"
-                        placeholder="Search AP number, PO, atau vendor..."
+                        placeholder="Search AP number, PO, or vendor..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-12 pr-4 py-3 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-base"

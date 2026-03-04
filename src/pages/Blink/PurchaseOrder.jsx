@@ -36,6 +36,7 @@ const PurchaseOrder = () => {
         discount_amount: 0,
         notes: '',
         currency: 'IDR',
+        exchange_rate: 1,
         shipment_id: null,
         quotation_id: null,
         job_number: '',
@@ -241,7 +242,7 @@ const PurchaseOrder = () => {
                     status: 'draft',
                     po_items: formData.po_items,
                     currency: formData.currency,
-                    exchange_rate: formData.currency === 'USD' ? 16000 : 1, // Hardcoded for demo
+                    exchange_rate: formData.exchange_rate || 1,
                     subtotal: subtotal,
                     tax_rate: formData.tax_rate,
                     tax_amount: taxAmount,
@@ -352,21 +353,26 @@ const PurchaseOrder = () => {
 
             // 5. Create Journal Entries
             console.log('Fetching COA for Journal Entries...');
-            const { data: coaData, error: coaError } = await supabase
-                .from('finance_coa')
-                .select('id, code, name');
 
-            if (coaError) {
-                console.error('Error fetching COA, skipping journal:', coaError);
-            } else if (apData && apData.length > 0) {
-                // Find AP account (210) and Expense account (500)
-                const apCoa = coaData?.find(c => c.code.startsWith('210'));
-                const expenseCoa = po.coa_id
-                    ? coaData?.find(c => c.id === po.coa_id)
-                    : coaData?.find(c => c.code.startsWith('500'));
+            // Use ilike queries matching the actual COA code format (e.g. 2-01-001, 5-01-001)
+            const [{ data: apCOAs }, { data: expenseCOAs }] = await Promise.all([
+                supabase.from('finance_coa').select('id, code, name').eq('type', 'LIABILITY').ilike('code', '2-%').limit(1),
+                supabase.from('finance_coa').select('id, code, name').eq('type', 'EXPENSE').ilike('code', '5-%').limit(1),
+            ]);
+
+            if (apData && apData.length > 0) {
+                // Use PO-level COA if set, otherwise fallback to first expense COA
+                let expenseCoa = expenseCOAs?.[0] || null;
+                if (po.coa_id) {
+                    const { data: poCoaData } = await supabase.from('finance_coa').select('id, code, name').eq('id', po.coa_id).single();
+                    if (poCoaData) expenseCoa = poCoaData;
+                }
+                const apCoa = apCOAs?.[0] || null;
 
                 const batchId = crypto.randomUUID();
-                const entryNum = `JE-AP-${Date.now().toString().slice(-6)}`;
+                const entryNum = `JE-PO-${Date.now().toString().slice(-6)}`;
+
+                const poExchangeRate = po.exchange_rate || 1;
 
                 const debitEntry = {
                     entry_number: entryNum + '-D',
@@ -375,12 +381,13 @@ const PurchaseOrder = () => {
                     reference_type: 'ap',
                     reference_id: apData[0].id,
                     reference_number: apData[0].ap_number,
-                    account_code: expenseCoa?.code || '500-001',
+                    account_code: expenseCoa?.code || '5-01-001',
                     account_name: (expenseCoa?.name || 'Beban Operasional') + ' - PO ' + po.po_number,
                     debit: po.total_amount,
                     credit: 0,
                     currency: po.currency || 'IDR',
-                    description: 'PO ' + po.po_number + ' - ' + po.vendor_name,
+                    exchange_rate: poExchangeRate,
+                    description: 'PO ' + po.po_number + ' - ' + po.vendor_name + (po.currency !== 'IDR' ? ` (Rate: ${poExchangeRate.toLocaleString('id-ID')})` : ''),
                     batch_id: batchId,
                     source: 'auto',
                     coa_id: expenseCoa?.id || null,
@@ -394,12 +401,13 @@ const PurchaseOrder = () => {
                     reference_type: 'ap',
                     reference_id: apData[0].id,
                     reference_number: apData[0].ap_number,
-                    account_code: apCoa?.code || '210-001',
+                    account_code: apCoa?.code || '2-01-001',
                     account_name: (apCoa?.name || 'Hutang Usaha') + ' - ' + po.vendor_name,
                     debit: 0,
                     credit: po.total_amount,
                     currency: po.currency || 'IDR',
-                    description: 'PO ' + po.po_number + ' - ' + po.vendor_name,
+                    exchange_rate: poExchangeRate,
+                    description: 'PO ' + po.po_number + ' - ' + po.vendor_name + (po.currency !== 'IDR' ? ` (Rate: ${poExchangeRate.toLocaleString('id-ID')})` : ''),
                     batch_id: batchId,
                     source: 'auto',
                     coa_id: apCoa?.id || null,
@@ -1652,12 +1660,46 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                             <label className="block text-sm font-medium text-silver-light mb-2">Currency</label>
                             <select
                                 value={formData.currency}
-                                onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value }))}
+                                onChange={(e) => {
+                                    const cur = e.target.value;
+                                    setFormData(prev => ({
+                                        ...prev,
+                                        currency: cur,
+                                        exchange_rate: cur === 'IDR' ? 1 : (prev.exchange_rate > 1 ? prev.exchange_rate : 16000)
+                                    }));
+                                }}
                                 className="w-full px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
                             >
-                                <option value="IDR">IDR</option>
-                                <option value="USD">USD</option>
+                                <option value="IDR">IDR (Rupiah)</option>
+                                <option value="USD">USD (US Dollar)</option>
+                                <option value="SGD">SGD (Singapore Dollar)</option>
+                                <option value="EUR">EUR (Euro)</option>
                             </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-silver-light mb-2">
+                                Exchange Rate
+                                {formData.currency !== 'IDR' && (
+                                    <span className="ml-2 text-xs text-amber-400 font-normal">
+                                        {formData.currency} → IDR
+                                    </span>
+                                )}
+                            </label>
+                            <input
+                                type="number"
+                                value={formData.exchange_rate}
+                                onChange={(e) => setFormData(prev => ({ ...prev, exchange_rate: parseFloat(e.target.value) || 1 }))}
+                                className="w-full px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light disabled:opacity-40 disabled:cursor-not-allowed"
+                                disabled={formData.currency === 'IDR'}
+                                min="1"
+                                step="1"
+                                placeholder="e.g. 16000"
+                            />
+                            <p className="text-xs text-silver-dark mt-1">
+                                {formData.currency === 'IDR'
+                                    ? 'Not needed for IDR transactions'
+                                    : `1 ${formData.currency} = Rp ${(formData.exchange_rate || 0).toLocaleString('id-ID')}`}
+                            </p>
                         </div>
                     </div>
 
