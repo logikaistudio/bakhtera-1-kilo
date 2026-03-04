@@ -513,6 +513,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                 rate: parseNumber(item.rate) || parseNumber(item.amount) || 0,
                 amount: parseNumber(item.amount) || ((parseNumber(item.qty) || 1) * (parseNumber(item.rate) || 0)),
                 coa_id: item.coa_id || null,
+                _coa_code: item._coa_code || '',
                 vendor: item.vendor || '',
                 currency: item.currency || cogsCurrency
             }));
@@ -2084,7 +2085,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                                                 <td className="px-2 py-2 text-center text-silver-light text-xs">{index + 1}</td>
                                                                 <td className="px-2 py-2">
                                                                     <span className="text-xs font-mono text-accent-orange">
-                                                                        {item.coa_id && buyingItems[index]._coa_code ? buyingItems[index]._coa_code : '-'}
+                                                                        {item._coa_code || '-'}
                                                                     </span>
                                                                 </td>
                                                                 <td className="px-2 py-2">
