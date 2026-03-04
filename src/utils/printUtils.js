@@ -46,6 +46,14 @@ export const generateBLPrintHTML = (blData) => {
         placeIssue: blData.blIssuedPlace || blData.issuedPlace || 'JAKARTA',
         dateIssue: blData.blIssuedDate || blData.issuedDate || new Date().toLocaleDateString('en-GB'),
 
+        // NEW: Fields that were previously hardcoded
+        typeOfMove: blData.blTypeOfMove || blData.typeOfMove || 'FCL/FCL',
+        countryOfOrigin: blData.blCountryOfOrigin || blData.countryOfOrigin || 'INDONESIA',
+        freightCharges: blData.blFreightCharges || blData.freightCharges || '',
+        prepaid: blData.blPrepaid || blData.prepaid || '',
+        collect: blData.blCollect || blData.collect || '',
+        shippedOnBoardDate: blData.blShippedOnBoardDate || blData.shippedOnBoardDate || '',
+
         mode: blData.blType || 'MBL'
     };
 
@@ -276,7 +284,7 @@ export const generateBLPrintHTML = (blData) => {
                     </div>
                      <div style="flex:1; padding:4px;">
                          <span class="label">Point and Country of Origin</span>
-                         <div class="value">INDONESIA</div>
+                         <div class="value">${d.countryOfOrigin}</div>
                     </div>
                 </div>
             </div>
@@ -297,7 +305,7 @@ export const generateBLPrintHTML = (blData) => {
                 </div>
                  <div class="col" style="width: 25%;">
                     <span class="label">Type of Move</span>
-                    <div class="value">FCL/FCL</div>
+                    <div class="value">${d.typeOfMove}</div>
                 </div>
             </div>
 
@@ -378,12 +386,15 @@ export const generateBLPrintHTML = (blData) => {
             <div class="row" style="min-height: 60px;">
                  <div class="col" style="width: 25%;">
                      <span class="label">Freight & Charges</span>
+                     <div class="value">${d.freightCharges}</div>
                 </div>
                  <div class="col" style="width: 25%;">
                      <span class="label">Prepaid</span>
+                     <div class="value">${d.prepaid}</div>
                 </div>
                  <div class="col" style="width: 25%;">
                      <span class="label">Collect</span>
+                     <div class="value">${d.collect}</div>
                 </div>
                  <div class="col" style="width: 25%;">
                      <span class="label">Freight Payable At</span>
@@ -402,6 +413,7 @@ export const generateBLPrintHTML = (blData) => {
                      <br><br>
                      <div style="border-top: 1px solid #000; display: inline-block; padding-top: 2px; width: 180px;">
                         <span class="label">Shipped on Board Date</span>
+                        <div class="value">${d.shippedOnBoardDate}</div>
                      </div>
                 </div>
                  <div class="col" style="width: 50%; padding: 8px;">

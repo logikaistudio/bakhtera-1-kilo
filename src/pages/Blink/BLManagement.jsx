@@ -9,7 +9,8 @@ import {
     Download,
     Printer,
     Search,
-    User
+    User,
+    RefreshCw
 } from 'lucide-react';
 import { exportBLCertificateToExcel, exportSellingBuyingReport } from '../../utils/excelExport';
 import { printBLCertificate } from '../../utils/printUtils';
@@ -31,13 +32,15 @@ const BLManagement = () => {
     const [showConsigneePicker, setShowConsigneePicker] = useState(false);
     const [showNotifyPartyPicker, setShowNotifyPartyPicker] = useState(false);
 
-    // NEW: Quotation auto-populate support
+    // Quotation & Shipment auto-populate support
     const [quotations, setQuotations] = useState([]);
+    const [shipments, setShipments] = useState([]);
     const [selectedQuotationId, setSelectedQuotationId] = useState(null);
 
     useEffect(() => {
         fetchBLs();
-        fetchQuotations(); // NEW: Fetch quotations for auto-populate
+        fetchQuotations();
+        fetchShipments();
     }, []);
 
     // Initialize edit form when selectedBL changes
@@ -48,7 +51,7 @@ const BLManagement = () => {
                 blNumber: selectedBL.blNumber !== '-' ? selectedBL.blNumber : '',
                 blDate: selectedBL.blIssuedDate || (selectedBL.createdAt ? new Date(selectedBL.createdAt).toISOString().split('T')[0] : ''),
 
-                // NEW: Subject field
+                // Subject
                 subject: selectedBL.blSubject || '',
 
                 // Parties
@@ -69,6 +72,10 @@ const BLManagement = () => {
                 preCarriageBy: selectedBL.blPreCarriageBy || '',
                 loadingPier: selectedBL.blLoadingPier || '',
 
+                // NEW: Extra routing fields for print
+                typeOfMove: selectedBL.blTypeOfMove || 'FCL/FCL',
+                countryOfOrigin: selectedBL.blCountryOfOrigin || 'INDONESIA',
+
                 // Cargo
                 containerNumber: selectedBL.containerNumber,
                 sealNumber: selectedBL.sealNumber,
@@ -85,11 +92,16 @@ const BLManagement = () => {
                 issuedDate: selectedBL.blIssuedDate || new Date().toISOString().split('T')[0],
                 exportReferences: selectedBL.blExportReferences || '',
                 forwardingAgentRef: selectedBL.blForwardingAgentRef || '',
+
+                // NEW: Freight & charges fields
+                freightCharges: selectedBL.blFreightCharges || '',
+                prepaid: selectedBL.blPrepaid || '',
+                collect: selectedBL.blCollect || '',
+                shippedOnBoardDate: selectedBL.blShippedOnBoardDate || '',
             });
             setIsEditing(false);
             setActiveTab('header');
 
-            // NEW: Set selected quotation ID if available
             if (selectedBL.quotationId) {
                 setSelectedQuotationId(selectedBL.quotationId);
             }
@@ -99,14 +111,14 @@ const BLManagement = () => {
     const fetchBLs = async () => {
         try {
             setLoading(true);
-            const { data: shipments, error } = await supabase
+            const { data: shipmentsData, error } = await supabase
                 .from('blink_shipments')
                 .select('*')
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
 
-            const blData = (shipments || []).map(ship => ({
+            const blData = (shipmentsData || []).map(ship => ({
                 id: ship.id,
                 blType: ship.bl_type || 'MBL',
                 blNumber: ship.bl_number || ship.awb_number || '-',
@@ -126,11 +138,11 @@ const BLManagement = () => {
                 grossWeight: ship.weight,
                 measurement: ship.volume,
 
-                // NEW: Subject and Quotation Reference
+                // Subject and Quotation Reference
                 blSubject: ship.bl_subject,
                 quotationId: ship.quotation_id,
 
-                // New BL Specific Columns
+                // BL Specific Columns
                 blShipperName: ship.bl_shipper_name,
                 blShipperAddress: ship.bl_shipper_address,
                 blConsigneeName: ship.bl_consignee_name,
@@ -156,6 +168,14 @@ const BLManagement = () => {
                 blIssuedPlace: ship.bl_issued_place,
                 blIssuedDate: ship.bl_issued_date,
 
+                // NEW: Extra BL fields
+                blTypeOfMove: ship.bl_type_of_move,
+                blCountryOfOrigin: ship.bl_country_of_origin,
+                blFreightCharges: ship.bl_freight_charges,
+                blPrepaid: ship.bl_prepaid,
+                blCollect: ship.bl_collect,
+                blShippedOnBoardDate: ship.bl_shipped_on_board_date,
+
                 // Other
                 mbl: ship.mbl || '',
                 hbl: ship.hbl || '',
@@ -166,6 +186,14 @@ const BLManagement = () => {
                 serviceItems: ship.service_items || [],
                 currency: ship.currency || 'USD',
                 status: ship.bl_status || 'draft',
+
+                // Shipment data for reference
+                origin: ship.origin,
+                destination: ship.destination,
+                serviceType: ship.service_type,
+                etd: ship.etd,
+                eta: ship.eta,
+                commodity: ship.commodity,
 
                 // Financials
                 sellingTotal: ship.quoted_amount || 0,
@@ -186,7 +214,7 @@ const BLManagement = () => {
         }
     };
 
-    // NEW: Fetch quotations for auto-populate
+    // Fetch quotations for auto-populate
     const fetchQuotations = async () => {
         try {
             const { data, error } = await supabase
@@ -198,6 +226,22 @@ const BLManagement = () => {
             setQuotations(data || []);
         } catch (error) {
             console.error('❌ Error fetching quotations:', error);
+        }
+    };
+
+    // Fetch shipments for SO auto-populate
+    const fetchShipments = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('blink_shipments')
+                .select('*')
+                .not('so_number', 'is', null)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            setShipments(data || []);
+        } catch (error) {
+            console.error('❌ Error fetching shipments for SO:', error);
         }
     };
 
@@ -218,16 +262,17 @@ const BLManagement = () => {
         if (!searchTerm) return true;
         return bl.blNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             bl.jobNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            bl.consigneeName?.toLowerCase().includes(searchTerm.toLowerCase());
+            bl.consigneeName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            bl.soNumber?.toLowerCase().includes(searchTerm.toLowerCase());
     });
 
     const handleDeleteBL = async (blId) => {
-        if (!confirm('Are you sure you want to delete BL ini? Data BL akan dihapus dari shipment.')) return;
+        if (!confirm('Are you sure you want to delete this BL? Data will be cleared from the shipment.')) return;
         try {
             const { error } = await supabase.from('blink_shipments')
                 .update({ bl_number: null, bl_type: null, bl_status: null }).eq('id', blId);
             if (error) throw error;
-            alert('✅ BL berhasil dihapus');
+            alert('✅ BL deleted successfully');
             fetchBLs();
         } catch (error) {
             console.error('Error deleting BL:', error);
@@ -289,7 +334,6 @@ const BLManagement = () => {
 
     const handleUpdateBL = async () => {
         try {
-            // Find the selected quotation to save its reference data
             const selectedQuotation = selectedQuotationId
                 ? quotations.find(q => q.id === selectedQuotationId)
                 : null;
@@ -300,7 +344,7 @@ const BLManagement = () => {
                     bl_status: editForm.status,
                     bl_number: editForm.blNumber || null,
 
-                    // NEW: Subject and Quotation Reference
+                    // Subject and Quotation Reference
                     bl_subject: editForm.subject || null,
                     quotation_id: selectedQuotationId || null,
                     quotation_shipper_name: selectedQuotation?.shipper_name || null,
@@ -322,6 +366,10 @@ const BLManagement = () => {
                     bl_export_references: editForm.exportReferences,
                     bl_forwarding_agent_ref: editForm.forwardingAgentRef,
 
+                    // NEW: Extra routing/print fields
+                    bl_type_of_move: editForm.typeOfMove,
+                    bl_country_of_origin: editForm.countryOfOrigin,
+
                     // Cargo
                     bl_marks_numbers: editForm.marksNumbers,
                     bl_description_packages: editForm.descriptionPackages,
@@ -334,6 +382,16 @@ const BLManagement = () => {
                     bl_number_of_originals: editForm.numberOfOriginals,
                     bl_issued_place: editForm.issuedPlace,
                     bl_issued_date: editForm.issuedDate,
+
+                    // NEW: Freight & charge fields
+                    bl_freight_charges: editForm.freightCharges,
+                    bl_prepaid: editForm.prepaid,
+                    bl_collect: editForm.collect,
+                    bl_shipped_on_board_date: editForm.shippedOnBoardDate,
+
+                    // Also sync basic routing from form
+                    vessel_name: editForm.vessel,
+                    voyage: editForm.voyage,
                 })
                 .eq('id', selectedBL.id);
 
@@ -388,24 +446,61 @@ const BLManagement = () => {
         }
     };
 
-    // NEW: Load data from selected quotation
+    // Load data from selected quotation
     const handleLoadFromQuotation = (quotationId) => {
         const quotation = quotations.find(q => q.id === quotationId);
         if (!quotation) return;
 
         setEditForm(prev => ({
             ...prev,
-            // Auto-populate shipper
-            shipperName: quotation.shipper_name || '',
-            shipperAddress: quotation.shipper_address || '',
-            // Auto-populate consignee
-            consigneeName: quotation.consignee_name || '',
-            consigneeAddress: quotation.consignee_address || '',
-            // Auto-populate subject (if quotation has subject field)
-            subject: quotation.subject || `Quotation ${quotation.quotation_number}` || '',
+            shipperName: quotation.shipper_name || quotation.customer_name || prev.shipperName,
+            shipperAddress: quotation.shipper_address || prev.shipperAddress,
+            consigneeName: quotation.consignee_name || prev.consigneeName,
+            consigneeAddress: quotation.consignee_address || prev.consigneeAddress,
+            subject: quotation.subject || `Quotation ${quotation.quotation_number}` || prev.subject,
+            // Routing from quotation
+            portOfLoading: quotation.origin || prev.portOfLoading,
+            portOfDischarge: quotation.destination || prev.portOfDischarge,
+            placeOfReceipt: quotation.origin || prev.placeOfReceipt,
+            placeOfDelivery: quotation.destination || prev.placeOfDelivery,
+            // Cargo from quotation
+            descriptionPackages: quotation.commodity || prev.descriptionPackages,
+            grossWeight: quotation.weight ? `${quotation.weight} KGS` : prev.grossWeight,
+            measurement: quotation.volume ? `${quotation.volume} CBM` : prev.measurement,
         }));
 
         setSelectedQuotationId(quotationId);
+    };
+
+    // NEW: Load data from SO/Shipment – fills routing, vessel, cargo, container etc.
+    const handleLoadFromShipment = (shipmentId) => {
+        const ship = shipments.find(s => s.id === shipmentId);
+        if (!ship) return;
+
+        setEditForm(prev => ({
+            ...prev,
+            // Routing
+            vessel: ship.vessel_name || ship.booking?.vesselName || prev.vessel,
+            voyage: ship.voyage || ship.booking?.voyageNumber || prev.voyage,
+            portOfLoading: ship.origin || prev.portOfLoading,
+            portOfDischarge: ship.destination || prev.portOfDischarge,
+            placeOfReceipt: ship.origin || prev.placeOfReceipt,
+            placeOfDelivery: ship.destination || prev.placeOfDelivery,
+            // Container
+            containerNumber: ship.container_number || (ship.containers?.[0]?.containerNumber) || prev.containerNumber,
+            sealNumber: ship.seal_number || (ship.containers?.[0]?.sealNumber) || prev.sealNumber,
+            // Cargo
+            descriptionPackages: ship.cargo_description || ship.commodity || prev.descriptionPackages,
+            grossWeight: ship.weight ? `${ship.weight} KGS` : prev.grossWeight,
+            measurement: ship.volume ? `${ship.volume} CBM` : prev.measurement,
+            // Parties
+            shipperName: ship.shipper_name || prev.shipperName,
+            consigneeName: ship.consignee_name || ship.customer_name || ship.customer || prev.consigneeName,
+            // Subject
+            subject: ship.bl_subject || `SO ${ship.so_number}` || prev.subject,
+            // Export refs
+            exportReferences: ship.so_number ? `SO: ${ship.so_number}` : prev.exportReferences,
+        }));
     };
 
     // --- Render Helpers ---
@@ -421,7 +516,7 @@ const BLManagement = () => {
                         className="w-full px-3 py-2 bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded text-sm text-gray-900 dark:text-silver-light focus:border-accent-orange h-24 font-mono"
                         placeholder={placeholder}
                     />
-                ) : (
+                ) : type === 'select' ? null : (
                     <input
                         type={type}
                         value={editForm[key] || ''}
@@ -438,13 +533,34 @@ const BLManagement = () => {
         </div>
     );
 
+    const renderSelect = (label, key, options) => (
+        <div className="mb-4">
+            <label className="block text-xs text-gray-500 dark:text-silver-dark font-semibold uppercase mb-1">{label}</label>
+            {isEditing ? (
+                <select
+                    value={editForm[key] || ''}
+                    onChange={(e) => setEditForm({ ...editForm, [key]: e.target.value })}
+                    className="w-full px-3 py-2 bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded text-sm text-gray-900 dark:text-silver-light focus:border-accent-orange"
+                >
+                    {options.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                </select>
+            ) : (
+                <div className="text-sm text-gray-900 dark:text-silver-light font-medium p-2 bg-gray-50 dark:bg-dark-bg/50 rounded border border-transparent">
+                    {editForm[key] || '-'}
+                </div>
+            )}
+        </div>
+    );
+
     return (
         <div className="space-y-6">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold gradient-text">Document BL/AWB</h1>
-                    <p className="text-silver-dark mt-1">Daftar Dokumen BL dan AWB</p>
+                    <p className="text-silver-dark mt-1">Bill of Lading & Air Waybill Management</p>
                 </div>
                 <div className="flex gap-3">
                     <Button
@@ -483,7 +599,7 @@ const BLManagement = () => {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                 <input
                     type="text"
-                    placeholder="Search BL Number, Job Number, or Consignee..."
+                    placeholder="Search BL Number, Job Number, SO Number, or Consignee..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded-lg text-gray-900 dark:text-silver-light"
@@ -497,25 +613,28 @@ const BLManagement = () => {
                         <thead className="bg-accent-orange">
                             <tr>
                                 <th className="px-4 py-2 text-left text-[10px] font-bold text-white uppercase tracking-wider">No. AWB/BL</th>
-                                <th className="px-4 py-2 text-left text-[10px] font-bold text-white uppercase tracking-wider">Tanggal</th>
+                                <th className="px-4 py-2 text-left text-[10px] font-bold text-white uppercase tracking-wider">Date</th>
                                 <th className="px-4 py-2 text-left text-[10px] font-bold text-white uppercase tracking-wider">No. SO</th>
                                 <th className="px-4 py-2 text-left text-[10px] font-bold text-white uppercase tracking-wider">Consignee</th>
+                                <th className="px-4 py-2 text-left text-[10px] font-bold text-white uppercase tracking-wider">Route</th>
                                 <th className="px-4 py-2 text-center text-[10px] font-bold text-white uppercase tracking-wider">Type</th>
+                                <th className="px-4 py-2 text-center text-[10px] font-bold text-white uppercase tracking-wider">Status</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
                             {filteredBLs.length === 0 ? (
                                 <tr>
-                                    <td colSpan="5" className="px-4 py-8 text-center">
+                                    <td colSpan="7" className="px-4 py-8 text-center">
                                         <Ship className="w-8 h-8 text-silver-dark mx-auto mb-2" />
                                         <p className="text-xs text-silver-dark">
-                                            {searchTerm ? 'No BLs match your search' : 'Belum ada Bill of Lading'}
+                                            {searchTerm ? 'No BLs match your search' : 'No Bill of Lading yet'}
                                         </p>
                                     </td>
                                 </tr>
                             ) : (
                                 filteredBLs.map((bl) => {
                                     const TypeIcon = blTypeConfig[bl.blType]?.icon || Ship;
+                                    const stCfg = statusConfig[bl.status] || statusConfig.draft;
                                     return (
                                         <tr
                                             key={bl.id}
@@ -554,12 +673,22 @@ const BLManagement = () => {
                                                 </span>
                                             </td>
                                             <td className="px-4 py-2 text-xs">
+                                                <span className="text-silver-dark">
+                                                    {bl.portOfLoading || '-'} → {bl.portOfDischarge || '-'}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-2 text-xs">
                                                 <div className="flex items-center justify-center gap-1.5">
                                                     <TypeIcon className="w-3.5 h-3.5 text-silver-dark" />
                                                     <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${blTypeConfig[bl.blType]?.color}`}>
                                                         {bl.blType}
                                                     </span>
                                                 </div>
+                                            </td>
+                                            <td className="px-4 py-2 text-xs text-center">
+                                                <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${stCfg.color}`}>
+                                                    {stCfg.label}
+                                                </span>
                                             </td>
                                         </tr>
                                     );
@@ -583,6 +712,7 @@ const BLManagement = () => {
                                 </h2>
                                 <p className="text-xs text-gray-500 dark:text-silver-dark mt-1 font-mono">
                                     JOB: {selectedBL.jobNumber} | TYPE: {selectedBL.blType}
+                                    {selectedBL.soNumber && <> | SO: {selectedBL.soNumber}</>}
                                 </p>
                             </div>
                             <div className="flex gap-2">
@@ -613,7 +743,7 @@ const BLManagement = () => {
                                 { id: 'parties', label: '2. Parties (Shipper/Cnee)' },
                                 { id: 'routing', label: '3. Routing Info' },
                                 { id: 'cargo', label: '4. Cargo Particulars' },
-                                { id: 'footer', label: '5. Footer' }
+                                { id: 'footer', label: '5. Footer & Freight' }
                             ].map(tab => (
                                 <button
                                     key={tab.id}
@@ -634,60 +764,74 @@ const BLManagement = () => {
                             {/* TAB: Header */}
                             {activeTab === 'header' && (
                                 <div className="animate-fade-in space-y-4">
-                                    {/* NEW: Load from Quotation */}
+                                    {/* Load from Quotation */}
                                     {isEditing && (
-                                        <div className="p-3 bg-orange-50/50 dark:bg-orange-900/10 rounded-lg border border-orange-100 dark:border-orange-900/30 mb-4">
-                                            <label className="block text-xs text-orange-500 font-semibold uppercase mb-2">
-                                                🚀 Auto-Populate from Quotation
-                                            </label>
-                                            <select
-                                                value={selectedQuotationId || ''}
-                                                onChange={(e) => handleLoadFromQuotation(e.target.value)}
-                                                className="w-full px-3 py-2 bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded text-sm text-gray-900 dark:text-silver-light focus:border-accent-orange"
-                                            >
-                                                <option value="">-- Select Quotation to Load --</option>
-                                                {quotations.map(q => (
-                                                    <option key={q.id} value={q.id}>
-                                                        {q.quotation_number} - {q.shipper_name} → {q.consignee_name}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <p className="text-xs text-gray-500 dark:text-silver-dark mt-1">
-                                                Select a quotation to automatically fill shipper, consignee, and subject details
-                                            </p>
+                                        <div className="grid grid-cols-2 gap-4 mb-4">
+                                            <div className="p-3 bg-orange-50/50 dark:bg-orange-900/10 rounded-lg border border-orange-100 dark:border-orange-900/30">
+                                                <label className="block text-xs text-orange-500 font-semibold uppercase mb-2">
+                                                    🚀 Auto-Populate from Quotation
+                                                </label>
+                                                <select
+                                                    value={selectedQuotationId || ''}
+                                                    onChange={(e) => handleLoadFromQuotation(e.target.value)}
+                                                    className="w-full px-3 py-2 bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded text-sm text-gray-900 dark:text-silver-light focus:border-accent-orange"
+                                                >
+                                                    <option value="">-- Select Quotation --</option>
+                                                    {quotations.map(q => (
+                                                        <option key={q.id} value={q.id}>
+                                                            {q.quotation_number} - {q.customer_name} ({q.origin} → {q.destination})
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <p className="text-xs text-gray-500 dark:text-silver-dark mt-1">
+                                                    Fills shipper, consignee, routing, cargo
+                                                </p>
+                                            </div>
+                                            <div className="p-3 bg-blue-50/50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-900/30">
+                                                <label className="block text-xs text-blue-500 font-semibold uppercase mb-2">
+                                                    📦 Auto-Populate from SO/Shipment
+                                                </label>
+                                                <select
+                                                    onChange={(e) => handleLoadFromShipment(e.target.value)}
+                                                    className="w-full px-3 py-2 bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded text-sm text-gray-900 dark:text-silver-light focus:border-blue-500"
+                                                >
+                                                    <option value="">-- Select SO/Shipment --</option>
+                                                    {shipments.map(s => (
+                                                        <option key={s.id} value={s.id}>
+                                                            {s.so_number || s.job_number} - {s.customer_name || s.customer} ({s.origin} → {s.destination})
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <p className="text-xs text-gray-500 dark:text-silver-dark mt-1">
+                                                    Fills vessel, voyage, container, routing, cargo
+                                                </p>
+                                            </div>
                                         </div>
                                     )}
 
                                     <div className="p-3 bg-blue-50/50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-900/30 mb-4">
                                         <h3 className="text-sm font-bold text-blue-500 mb-2">Basic Information</h3>
-                                        <div className="grid grid-cols-2 gap-4">
+                                        <div className="grid grid-cols-3 gap-4">
                                             {renderInput('BL Number', 'blNumber')}
-                                            {renderInput('Status', 'status')}
+                                            {renderSelect('Status', 'status', [
+                                                { value: 'draft', label: 'Draft' },
+                                                { value: 'issued', label: 'Issued' },
+                                                { value: 'in_transit', label: 'In Transit' },
+                                                { value: 'arrived', label: 'Arrived' },
+                                                { value: 'delivered', label: 'Delivered' },
+                                            ])}
+                                            {renderSelect('BL Type', 'blType', [
+                                                { value: 'MBL', label: 'Master BL (MBL)' },
+                                                { value: 'HBL', label: 'House BL (HBL)' },
+                                            ])}
                                         </div>
                                     </div>
 
-                                    {/* NEW: Subject Field */}
-                                    <div className="mb-4">
-                                        <label className="block text-xs text-gray-500 dark:text-silver-dark font-semibold uppercase mb-1">
-                                            Subject
-                                        </label>
-                                        {isEditing ? (
-                                            <input
-                                                type="text"
-                                                value={editForm.subject || ''}
-                                                onChange={(e) => setEditForm({ ...editForm, subject: e.target.value })}
-                                                className="w-full px-3 py-2 bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded text-sm text-gray-900 dark:text-silver-light focus:border-accent-orange"
-                                                placeholder="e.g., Shipment of Electronics"
-                                            />
-                                        ) : (
-                                            <div className="px-3 py-2 bg-gray-50 dark:bg-dark-hover border border-gray-200 dark:border-dark-border rounded text-sm text-gray-900 dark:text-silver-light">
-                                                {editForm.subject || '-'}
-                                            </div>
-                                        )}
-                                    </div>
+                                    {/* Subject Field */}
+                                    {renderInput('Subject', 'subject', 'text', 'e.g. Shipment of Electronics')}
 
                                     <div className="grid grid-cols-2 gap-6">
-                                        {renderInput('Export References', 'exportReferences', 'textarea', 'e.g. Invoice No, LC No')}
+                                        {renderInput('Export References', 'exportReferences', 'textarea', 'e.g. Invoice No, LC No, SO No')}
                                         {renderInput('Forwarding Agent Ref', 'forwardingAgentRef', 'textarea', 'Local Forwarder details')}
                                     </div>
                                 </div>
@@ -799,13 +943,21 @@ const BLManagement = () => {
                             {activeTab === 'routing' && (
                                 <div className="animate-fade-in">
                                     <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-                                        {renderInput('Pre-Carriage By', 'preCarriageBy')}
+                                        {renderInput('Pre-Carriage By', 'preCarriageBy', 'text', 'e.g. TRUCK')}
                                         {renderInput('Place of Receipt', 'placeOfReceipt')}
-                                        {renderInput('Ocean Vessel / Voyage', 'vessel')}
+                                        {renderInput('Ocean Vessel', 'vessel', 'text', 'Vessel name')}
+                                        {renderInput('Voyage No.', 'voyage', 'text', 'Voyage number')}
                                         {renderInput('Port of Loading', 'portOfLoading')}
                                         {renderInput('Port of Discharge', 'portOfDischarge')}
                                         {renderInput('Place of Delivery', 'placeOfDelivery')}
                                         {renderInput('Loading Pier / Terminal', 'loadingPier')}
+                                    </div>
+                                    <div className="border-t border-gray-200 dark:border-dark-border pt-4 mt-4">
+                                        <h3 className="text-xs font-bold text-silver-dark uppercase mb-3">Print-Specific Fields</h3>
+                                        <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+                                            {renderInput('Type of Move', 'typeOfMove', 'text', 'e.g. FCL/FCL, LCL/LCL, CY/CY')}
+                                            {renderInput('Point and Country of Origin', 'countryOfOrigin', 'text', 'e.g. INDONESIA')}
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -826,22 +978,44 @@ const BLManagement = () => {
                                     </div>
                                     <div className="col-span-3">
                                         <h3 className="font-bold text-gray-500 dark:text-silver-dark text-xs uppercase mb-3 border-b border-gray-200 dark:border-dark-border pb-1">Measurements</h3>
-                                        {renderInput('Gross Weight', 'grossWeight')}
-                                        {renderInput('Measurement', 'measurement')}
+                                        {renderInput('Gross Weight', 'grossWeight', 'text', 'e.g. 18,500 KGS')}
+                                        {renderInput('Measurement', 'measurement', 'text', 'e.g. 33.20 CBM')}
                                     </div>
                                 </div>
                             )}
 
-                            {/* TAB: Footer */}
+                            {/* TAB: Footer & Freight */}
                             {activeTab === 'footer' && (
-                                <div className="animate-fade-in grid grid-cols-2 gap-6">
-                                    <div className="bg-gray-50 dark:bg-dark-bg/30 p-4 rounded-lg">
-                                        {renderInput('Freight Payable At', 'freightPayableAt')}
-                                        {renderInput('Number of Original BLs', 'numberOfOriginals')}
+                                <div className="animate-fade-in space-y-6">
+                                    {/* Freight & Charges Section */}
+                                    <div>
+                                        <h3 className="text-sm font-bold text-accent-orange mb-3">Freight & Charges</h3>
+                                        <div className="grid grid-cols-4 gap-4">
+                                            {renderInput('Freight & Charges', 'freightCharges', 'text', 'e.g. AS ARRANGED')}
+                                            {renderInput('Prepaid', 'prepaid', 'text', 'Prepaid amount/text')}
+                                            {renderInput('Collect', 'collect', 'text', 'Collect amount/text')}
+                                            {renderInput('Freight Payable At', 'freightPayableAt', 'text', 'e.g. DESTINATION')}
+                                        </div>
                                     </div>
-                                    <div className="bg-gray-50 dark:bg-dark-bg/30 p-4 rounded-lg">
-                                        {renderInput('Place of Issue', 'issuedPlace')}
-                                        {renderInput('Date of Issue', 'issuedDate', 'date')}
+
+                                    {/* Issue & Signature Section */}
+                                    <div>
+                                        <h3 className="text-sm font-bold text-accent-orange mb-3">Issuance Details</h3>
+                                        <div className="grid grid-cols-2 gap-6">
+                                            <div className="bg-gray-50 dark:bg-dark-bg/30 p-4 rounded-lg">
+                                                {renderInput('Number of Original BLs', 'numberOfOriginals')}
+                                                {renderInput('Place of Issue', 'issuedPlace')}
+                                                {renderInput('Date of Issue', 'issuedDate', 'date')}
+                                            </div>
+                                            <div className="bg-gray-50 dark:bg-dark-bg/30 p-4 rounded-lg">
+                                                {renderInput('Shipped on Board Date', 'shippedOnBoardDate', 'date')}
+                                                <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/10 rounded border border-yellow-200 dark:border-yellow-900/30">
+                                                    <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                                                        ⚠️ "Shipped on Board Date" appears at the bottom-left of the BL print. Leave blank if not yet shipped.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             )}
