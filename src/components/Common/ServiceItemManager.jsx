@@ -38,7 +38,7 @@ const ItemPicker = ({ value, onChange, accounts }) => {
                 className="w-full flex items-center justify-between gap-1 px-2 py-1.5 text-sm border border-dark-border rounded bg-dark-surface text-silver-light text-left"
             >
                 <span className="truncate">
-                    {selected ? <>{selected.code} – {selected.name}</> : <span className="text-silver-dark">Select Item...</span>}
+                    {selected ? selected.name : <span className="text-silver-dark">Select Item...</span>}
                 </span>
                 <ChevronDown className={`w-3 h-3 text-silver-dark flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
             </button>
@@ -220,7 +220,8 @@ const ServiceItemManager = ({ items = [], onChange, currency = 'USD', readOnly =
                     <table className="w-full">
                         <thead className="bg-accent-blue/10">
                             <tr className="border-b border-dark-border">
-                                <th className="text-left text-xs font-bold text-white px-2 py-2 w-64">Item</th>
+                                <th className="text-left text-xs font-bold text-white px-2 py-2 w-32">Kode</th>
+                                <th className="text-left text-xs font-bold text-white px-2 py-2 w-48">Item</th>
                                 <th className="text-left text-xs font-bold text-white px-2 py-2">Service / Description</th>
                                 <th className="text-right text-xs font-bold text-white px-2 py-2 w-20">Qty</th>
                                 <th className="text-right text-xs font-bold text-white px-2 py-2 w-32">Unit Price</th>
@@ -231,6 +232,9 @@ const ServiceItemManager = ({ items = [], onChange, currency = 'USD', readOnly =
                         <tbody className="space-y-2">
                             {serviceItems.map((item, index) => (
                                 <tr key={item.id} className={`${index > 0 ? 'border-t border-dark-border/50' : ''}`}>
+                                    <td className="py-2 px-2">
+                                        <span className="text-xs font-mono text-accent-blue">{item.itemCode || '-'}</span>
+                                    </td>
                                     <td className="py-2 px-2">
                                         {readOnly ? (
                                             /* Read-only / print: show only name */

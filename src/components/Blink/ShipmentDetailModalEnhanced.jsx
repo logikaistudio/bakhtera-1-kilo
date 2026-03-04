@@ -280,7 +280,21 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                 setSellingItems(incomingSellingItems);
             }
             if (incomingBuyingItems.length > 0) {
-                setBuyingItems(incomingBuyingItems);
+                // Enrich buying items with COA code for display in the Kode column
+                const coaIds = incomingBuyingItems.map(i => i.coa_id).filter(Boolean);
+                if (coaIds.length > 0) {
+                    supabase.from('finance_coa').select('id, code').in('id', coaIds).then(({ data: coaData }) => {
+                        const codeMap = {};
+                        (coaData || []).forEach(c => { codeMap[c.id] = c.code; });
+                        const enriched = incomingBuyingItems.map(item => ({
+                            ...item,
+                            _coa_code: item._coa_code || codeMap[item.coa_id] || ''
+                        }));
+                        setBuyingItems(enriched);
+                    });
+                } else {
+                    setBuyingItems(incomingBuyingItems);
+                }
             }
         }
     }, [shipment]);
@@ -2047,6 +2061,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                                     <thead className="bg-accent-orange">
                                                         <tr>
                                                             <th className="px-2 py-2 text-center text-xs text-white w-10 font-normal">No</th>
+                                                            <th className="px-2 py-2 text-left text-xs text-white w-28 font-normal">Kode</th>
                                                             <th className="px-2 py-2 text-left text-xs text-white min-w-[180px] font-normal">Item</th>
                                                             <th className="px-2 py-2 text-left text-xs text-white min-w-[200px] font-normal">Description</th>
                                                             <th className="px-2 py-2 text-center text-xs text-white w-20 font-normal">Qty</th>
@@ -2059,7 +2074,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                                     <tbody className="divide-y divide-dark-border">
                                                         {buyingItems.length === 0 && (
                                                             <tr>
-                                                                <td colSpan={isEditingCOGS ? 8 : 7} className="text-center py-6 text-silver-dark text-sm">
+                                                                <td colSpan={isEditingCOGS ? 9 : 8} className="text-center py-6 text-silver-dark text-sm">
                                                                     Belum ada rincian biaya aktual.
                                                                 </td>
                                                             </tr>
@@ -2068,18 +2083,24 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                                             <tr key={index} className="hover:bg-dark-surface/50 smooth-transition">
                                                                 <td className="px-2 py-2 text-center text-silver-light text-xs">{index + 1}</td>
                                                                 <td className="px-2 py-2">
+                                                                    <span className="text-xs font-mono text-accent-orange">
+                                                                        {item.coa_id && buyingItems[index]._coa_code ? buyingItems[index]._coa_code : '-'}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="px-2 py-2">
                                                                     <COAPicker
                                                                         value={item.coa_id}
-                                                                        onChange={(coaId) => {
+                                                                        onChange={(coaId, coaData) => {
                                                                             const updated = [...buyingItems];
                                                                             updated[index].coa_id = coaId;
+                                                                            updated[index]._coa_code = coaData?.code || '';
                                                                             setBuyingItems(updated);
                                                                         }}
                                                                         context="EXPENSE"
                                                                         minLevel={3}
                                                                         placeholder="Pilih Item"
                                                                         size="sm"
-                                                                        showCode={true}
+                                                                        showCode={false}
                                                                         disabled={!isEditingCOGS}
                                                                     />
                                                                 </td>
