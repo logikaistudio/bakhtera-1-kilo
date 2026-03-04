@@ -22,7 +22,10 @@ import {
     Download,
     Trash2,
     MapPinned,
-    Receipt
+    Receipt,
+    CheckCircle,
+    XCircle,
+    ShieldCheck
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import COAPicker from '../Common/COAPicker';
@@ -49,6 +52,63 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
     const [showStatusModal, setShowStatusModal] = useState(false);
     const [newStatus, setNewStatus] = useState('');
     const [statusNotes, setStatusNotes] = useState('');
+    const [currentStatus, setCurrentStatus] = useState(shipment?.status || 'pending');
+
+    // Sync currentStatus when shipment prop changes (e.g. after approval center update)
+    useEffect(() => {
+        if (shipment?.status) {
+            setCurrentStatus(shipment.status);
+        }
+    }, [shipment?.status]);
+
+    // === APPROVAL WORKFLOW (via Approval Center) ===
+    // Ops team: Submit → Approval Center → Manager Approve/Reject
+    const statusConfig = {
+        pending: { label: 'Pending', color: 'bg-gray-500/20 text-gray-400 border-gray-500/30', icon: Clock },
+        manager_approval: { label: 'Waiting Approval', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30', icon: Clock },
+        approved: { label: 'Approved', color: 'bg-green-500/20 text-green-400 border-green-500/30', icon: ShieldCheck },
+        rejected: { label: 'Rejected', color: 'bg-red-500/20 text-red-400 border-red-500/30', icon: XCircle },
+    };
+
+    // Transitions visible in shipment modal (ops team only — not approve/reject)
+    const statusTransitions = {
+        pending: [{ to: 'manager_approval', label: '📤 Submit for Approval', style: 'primary' }],
+        manager_approval: [{ to: 'pending', label: '↩ Withdraw Submission', style: 'secondary' }],
+        approved: [{ to: 'pending', label: '↩ Revert', style: 'secondary' }],
+        rejected: [{ to: 'pending', label: '↩ Reset to Pending', style: 'secondary' }],
+    };
+
+    const handleStatusChange = async (toStatus) => {
+        const msgs = {
+            manager_approval: 'Submit shipment ini ke Approval Center untuk disetujui Manager?',
+            pending: 'Kembalikan ke status Pending?',
+        };
+        if (!window.confirm(msgs[toStatus] || `Ubah status ke ${toStatus}?`)) return;
+        try {
+            const updateData = {
+                status: toStatus,
+                updated_at: new Date().toISOString(),
+            };
+            if (toStatus === 'approved') updateData.approved_at = new Date().toISOString();
+            const { error } = await supabase
+                .from('blink_shipments')
+                .update(updateData)
+                .eq('id', shipment.id);
+            if (error) throw error;
+            setCurrentStatus(toStatus);
+            onUpdate({ ...shipment, status: toStatus });
+            if (toStatus === 'manager_approval') {
+                alert('✅ Shipment berhasil disubmit! Manager dapat melihat dan menyetujui di Approval Center.');
+            }
+        } catch (err) {
+            alert('Failed to update status: ' + err.message);
+        }
+    };
+
+    // Progress: pending → manager_approval → approved
+    const statusSteps = ['pending', 'manager_approval', 'approved'];
+
+
 
     // Container management
     const [showContainerModal, setShowContainerModal] = useState(false);
@@ -95,13 +155,18 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
 
     // Booking management
     const [bookingData, setBookingData] = useState(shipment?.booking || {
-        vesselName: shipment?.vessel_name || '',
+        vesselName: shipment?.vessel_name || shipment?.vessel || '',
         voyageNumber: shipment?.voyage || '',
-        portOfLoading: shipment?.origin || '',
-        portOfDischarge: shipment?.destination || '',
+        portOfLoading: shipment?.port_of_loading || shipment?.origin || '',
+        portOfDischarge: shipment?.port_of_discharge || shipment?.destination || '',
         etd: '',
         eta: ''
     });
+
+    // Shipping mode (CY/CY, CY/CF, etc.)
+    const [shippingMode, setShippingMode] = useState(
+        shipment?.shipping_mode || ''
+    );
 
     // Dates management  
     const [dates, setDates] = useState({
@@ -303,16 +368,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
 
     if (!shipment) return null;
 
-    const statusConfig = {
-        pending: { label: 'Pending', color: 'bg-yellow-500/20 text-yellow-400' },
-        confirmed: { label: 'Confirmed', color: 'bg-blue-500/20 text-blue-400' },
-        booked: { label: 'Booked', color: 'bg-indigo-500/20 text-indigo-400' },
-        in_transit: { label: 'In Transit', color: 'bg-purple-500/20 text-purple-400' },
-        arrived: { label: 'Arrived', color: 'bg-green-500/20 text-green-400' },
-        customs_clearance: { label: 'Customs Clearance', color: 'bg-orange-500/20 text-orange-400' },
-        delivered: { label: 'Delivered', color: 'bg-emerald-500/20 text-emerald-400' },
-        completed: { label: 'Completed', color: 'bg-teal-500/20 text-teal-400' }
-    };
+
 
     const containerTypes = ['20ft', '40ft', '40ft HC', '45ft HC'];
 
@@ -860,7 +916,6 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
         try {
             // Helper to safely handle UUID fields
             const safeUUID = (value) => {
-                // Return null for falsy values, "undefined" string, empty string, or invalid UUIDs
                 if (!value ||
                     value === 'undefined' ||
                     value === 'null' ||
@@ -869,13 +924,21 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                     String(value).toLowerCase() === 'undefined') {
                     return null;
                 }
-                // Additional check: ensure it looks like a valid UUID format
                 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
                 if (!uuidPattern.test(value)) {
                     console.warn(`Invalid UUID format detected: "${value}", returning null`);
                     return null;
                 }
                 return value;
+            };
+
+            // Helper to safely handle numeric fields - convert empty strings to null
+            const safeNumber = (value) => {
+                if (value === '' || value === null || value === undefined || value === 'undefined') {
+                    return null;
+                }
+                const parsed = parseFloat(String(value).replace(/,/g, ''));
+                return isNaN(parsed) ? null : parsed;
             };
 
             const { error } = await supabase
@@ -885,29 +948,38 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                     origin: editedShipment.origin,
                     destination: editedShipment.destination,
                     cargo_type: editedShipment.cargoType,
-                    weight: editedShipment.weight,
-                    volume: editedShipment.volume,
+                    weight: safeNumber(editedShipment.weight),
+                    volume: safeNumber(editedShipment.volume),
+                    gross_weight: safeNumber(editedShipment.gross_weight ?? editedShipment.grossWeight),
+                    net_weight: safeNumber(editedShipment.net_weight ?? editedShipment.netWeight),
+                    packages: editedShipment.packages || null,
+                    shipping_mode: shippingMode || null,
                     commodity: editedShipment.commodity,
-                    dimensions: editedShipment.dimensions,
-                    hbl: editedShipment.hbl,
-                    mbl: editedShipment.mbl,
-                    hawb: editedShipment.hawb,
-                    mawb: editedShipment.mawb,
-                    voyage: editedShipment.voyage,
-                    flight_number: editedShipment.flight_number,
-                    bl_number: editedShipment.bl_number,
-                    awb_number: editedShipment.awb_number,
+                    dimensions: editedShipment.dimensions || null,
+                    hbl: editedShipment.hbl || null,
+                    mbl: editedShipment.mbl || null,
+                    hawb: editedShipment.hawb || null,
+                    mawb: editedShipment.mawb || null,
+                    voyage: bookingData.voyageNumber || null,
+                    flight_number: editedShipment.flight_number || null,
+                    bl_number: editedShipment.bl_number || null,
+                    awb_number: editedShipment.awb_number || null,
                     bl_date: dates.blDate || null,
-                    // Ensure root columns for critical data are updated
-                    vessel_name: bookingData.vesselName || editedShipment.vessel || null,
+                    // Vessel/Voyage: only from bookingData (single source of truth)
+                    vessel_name: bookingData.vesselName || null,
+                    port_of_loading: bookingData.portOfLoading || null,
+                    port_of_discharge: bookingData.portOfDischarge || null,
                     container_number: containers.length > 0 ? containers[0].containerNumber : (editedShipment.containerNumber || null),
-                    shipper_name: editedShipment.shipper_name,
-                    shipper: editedShipment.shipper,
+                    shipper_name: editedShipment.shipper_name || null,
+                    shipper: editedShipment.shipper || null,
                     // Container array (JSONB)
                     containers: containers,
                     // UUID fields - validate before sending
                     customer_id: safeUUID(editedShipment.customerId),
                     quotation_id: safeUUID(editedShipment.quotationId),
+                    // Numeric fields - safely convert
+                    quoted_amount: safeNumber(editedShipment.quotedAmount),
+                    measure: safeNumber(editedShipment.measure),
                     // Booking & Dates fields - convert empty strings to null
                     etd: dates.etd || null,
                     eta: dates.eta || null,
@@ -1109,7 +1181,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                     >
                                         Edit
                                     </Button>
-                                    {activeTab === 'cogs' && calculateTotalCOGS() > 0 && (
+                                    {activeTab === 'cogs' && calculateTotalCOGS() > 0 && currentStatus === 'approved' && (
                                         <Button
                                             size="sm"
                                             variant="outline"
@@ -1119,15 +1191,26 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                             Generate PO
                                         </Button>
                                     )}
-                                    <Button
-                                        size="sm"
-                                        variant="primary"
-                                        icon={Receipt}
-                                        onClick={handleGenerateInvoice}
-                                        title="Create Invoice from this Shipment"
-                                    >
-                                        Create Inv
-                                    </Button>
+                                    {activeTab === 'cogs' && calculateTotalCOGS() > 0 && currentStatus !== 'approved' && (
+                                        <span className="text-xs text-yellow-400 bg-yellow-500/10 border border-yellow-500/30 px-2 py-1 rounded" title="Shipment must be approved first">
+                                            🔒 Approve to unlock PO
+                                        </span>
+                                    )}
+                                    {currentStatus === 'approved' ? (
+                                        <Button
+                                            size="sm"
+                                            variant="primary"
+                                            icon={Receipt}
+                                            onClick={handleGenerateInvoice}
+                                            title="Create Invoice from this Shipment"
+                                        >
+                                            Create Inv
+                                        </Button>
+                                    ) : (
+                                        <span className="text-xs text-yellow-400 bg-yellow-500/10 border border-yellow-500/30 px-2 py-1 rounded" title="Shipment must be approved first">
+                                            🔒 Approve to invoice
+                                        </span>
+                                    )}
                                     <Button
                                         size="sm"
                                         variant="danger"
@@ -1189,12 +1272,28 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                     </Button>
                                 </>
                             )}
-                            <span className={`px-3 py-1.5 rounded-full text-sm font-medium ${shipment.status === 'delivered' ? 'bg-green-500/20 text-green-400' :
-                                shipment.status === 'in_transit' ? 'bg-blue-500/20 text-blue-400' :
-                                    'bg-yellow-500/20 text-yellow-400'
-                                }`}>
-                                {shipment.status}
-                            </span>
+                            {/* Status action buttons */}
+                            {!isEditing && (statusTransitions[currentStatus] || []).map((t) => (
+                                <Button
+                                    key={t.to}
+                                    size="sm"
+                                    variant={t.style}
+                                    onClick={() => handleStatusChange(t.to)}
+                                >
+                                    {t.label}
+                                </Button>
+                            ))}
+                            {/* Status badge */}
+                            {(() => {
+                                const cfg = statusConfig[currentStatus] || statusConfig.pending;
+                                const Icon = cfg.icon;
+                                return (
+                                    <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold border ${cfg.color}`}>
+                                        <Icon className="w-3.5 h-3.5" />
+                                        {cfg.label}
+                                    </span>
+                                );
+                            })()}
                         </div>
                     </div>
 
@@ -1359,6 +1458,48 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                                     <input type="text" value={editedShipment.dimensions || ''} onChange={(e) => setEditedShipment({ ...editedShipment, dimensions: e.target.value })} className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light" placeholder="12m x 2.4m x 2.6m" />
                                                 </div>
 
+                                                {/* GWT, Net Weight, Packages, Shipping Mode */}
+                                                <div>
+                                                    <label className="text-silver-dark text-xs">Gross Weight / GWT (kg)</label>
+                                                    <input type="number" step="0.01"
+                                                        value={editedShipment.gross_weight ?? editedShipment.weight ?? ''}
+                                                        onChange={(e) => setEditedShipment({ ...editedShipment, gross_weight: e.target.value })}
+                                                        className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light"
+                                                        placeholder="e.g. 1500" />
+                                                </div>
+                                                <div>
+                                                    <label className="text-silver-dark text-xs">Net Weight (kg)</label>
+                                                    <input type="number" step="0.01"
+                                                        value={editedShipment.net_weight ?? ''}
+                                                        onChange={(e) => setEditedShipment({ ...editedShipment, net_weight: e.target.value })}
+                                                        className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light"
+                                                        placeholder="e.g. 1400" />
+                                                </div>
+                                                <div>
+                                                    <label className="text-silver-dark text-xs">No. of Packages / Pieces</label>
+                                                    <input type="text"
+                                                        value={editedShipment.packages ?? ''}
+                                                        onChange={(e) => setEditedShipment({ ...editedShipment, packages: e.target.value })}
+                                                        className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light"
+                                                        placeholder="e.g. 10 PALLETS" />
+                                                </div>
+                                                {shipment.serviceType === 'sea' && (
+                                                    <div>
+                                                        <label className="text-silver-dark text-xs">Shipping Mode</label>
+                                                        <select
+                                                            value={shippingMode}
+                                                            onChange={(e) => setShippingMode(e.target.value)}
+                                                            className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light"
+                                                        >
+                                                            <option value="">Select mode...</option>
+                                                            <option value="CY/CY">CY/CY (Container Yard to Container Yard)</option>
+                                                            <option value="CY/CF">CY/CF (Container Yard to Container Freight)</option>
+                                                            <option value="CF/CY">CF/CY (Container Freight to Container Yard)</option>
+                                                            <option value="CF/CF">CF/CF (Container Freight to Container Freight)</option>
+                                                        </select>
+                                                    </div>
+                                                )}
+
                                                 {/* Document Fields - Dynamic Based on Service Type */}
                                                 {shipment.serviceType === 'sea' && (
                                                     <>
@@ -1377,20 +1518,6 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                                         <div>
                                                             <label className="text-silver-dark text-xs">BL Date</label>
                                                             <input type="date" value={dates.blDate || ''} onChange={(e) => setDates({ ...dates, blDate: e.target.value })} className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light" />
-                                                        </div>
-                                                        <div>
-                                                            <label className="text-silver-dark text-xs">Vessel Name</label>
-                                                            <input type="text" value={editedShipment.vessel || bookingData.vesselName || ''} onChange={(e) => {
-                                                                setEditedShipment({ ...editedShipment, vessel: e.target.value });
-                                                                setBookingData({ ...bookingData, vesselName: e.target.value });
-                                                            }} className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light" placeholder="MV Ocean Star" />
-                                                        </div>
-                                                        <div>
-                                                            <label className="text-silver-dark text-xs">Voyage Number</label>
-                                                            <input type="text" value={editedShipment.voyage || bookingData.voyageNumber || ''} onChange={(e) => {
-                                                                setEditedShipment({ ...editedShipment, voyage: e.target.value });
-                                                                setBookingData({ ...bookingData, voyageNumber: e.target.value });
-                                                            }} className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light" placeholder="V2025-001" />
                                                         </div>
                                                     </>
                                                 )}
@@ -1462,77 +1589,46 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                             </>
                                         ) : (
                                             <>
+                                                {/* Cargo key figures - view mode */}
                                                 <div className="flex justify-between">
-                                                    <span className="text-silver-dark">Weight:</span>
-                                                    <span className="text-silver-light">{shipment.weight ? `${shipment.weight} kg` : '-'}</span>
+                                                    <span className="text-silver-dark">Weight (N/W):</span>
+                                                    <span className="text-silver-light">{shipment.net_weight ? `${shipment.net_weight} kg` : (shipment.weight ? `${shipment.weight} kg` : '-')}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-silver-dark">Gross Weight (G/W):</span>
+                                                    <span className="text-silver-light font-medium">{shipment.gross_weight ? `${shipment.gross_weight} kg` : (shipment.weight ? `${shipment.weight} kg` : '-')}</span>
                                                 </div>
                                                 <div className="flex justify-between">
                                                     <span className="text-silver-dark">Volume:</span>
                                                     <span className="text-silver-light">{shipment.volume ? `${shipment.volume} CBM` : '-'}</span>
                                                 </div>
                                                 <div className="flex justify-between">
+                                                    <span className="text-silver-dark">Packages:</span>
+                                                    <span className="text-silver-light">{shipment.packages || '-'}</span>
+                                                </div>
+                                                <div className="flex justify-between">
                                                     <span className="text-silver-dark">Commodity:</span>
                                                     <span className="text-silver-light">{shipment.commodity || '-'}</span>
                                                 </div>
-                                                <div className="flex justify-between">
-                                                    <span className="text-silver-dark">Dimensions:</span>
-                                                    <span className="text-silver-light">{shipment.dimensions || '-'}</span>
-                                                </div>
-
-                                                {/* Document Fields Display - Dynamic */}
-                                                {shipment.serviceType === 'sea' && (
-                                                    <>
-                                                        {shipment.hbl && (
-                                                            <div className="flex justify-between">
-                                                                <span className="text-silver-dark">HBL:</span>
-                                                                <span className="text-silver-light">{shipment.hbl}</span>
-                                                            </div>
-                                                        )}
-                                                        {shipment.mbl && (
-                                                            <div className="flex justify-between">
-                                                                <span className="text-silver-dark">MBL:</span>
-                                                                <span className="text-silver-light">{shipment.mbl}</span>
-                                                            </div>
-                                                        )}
-                                                        {shipment.voyage && (
-                                                            <div className="flex justify-between">
-                                                                <span className="text-silver-dark">Voyage:</span>
-                                                                <span className="text-silver-light">{shipment.voyage}</span>
-                                                            </div>
-                                                        )}
-                                                    </>
-                                                )}
-
-                                                {shipment.serviceType === 'air' && (
-                                                    <>
-                                                        {shipment.hawb && (
-                                                            <div className="flex justify-between">
-                                                                <span className="text-silver-dark">HAWB:</span>
-                                                                <span className="text-silver-light">{shipment.hawb}</span>
-                                                            </div>
-                                                        )}
-                                                        {shipment.mawb && (
-                                                            <div className="flex justify-between">
-                                                                <span className="text-silver-dark">MAWB:</span>
-                                                                <span className="text-silver-light">{shipment.mawb}</span>
-                                                            </div>
-                                                        )}
-                                                        {shipment.flight_number && (
-                                                            <div className="flex justify-between">
-                                                                <span className="text-silver-dark">Flight:</span>
-                                                                <span className="text-silver-light">{shipment.flight_number}</span>
-                                                            </div>
-                                                        )}
-                                                    </>
-                                                )}
-
-                                                {(shipment.shipper_name || shipment.shipper) && (
+                                                {shipment.dimensions && (
                                                     <div className="flex justify-between">
-                                                        <span className="text-silver-dark">Shipper:</span>
-                                                        <span className="text-silver-light">{shipment.shipper_name || shipment.shipper}</span>
+                                                        <span className="text-silver-dark">Dimensions:</span>
+                                                        <span className="text-silver-light">{shipment.dimensions}</span>
                                                     </div>
                                                 )}
-
+                                                {shipment.shipping_mode && (
+                                                    <div className="flex justify-between">
+                                                        <span className="text-silver-dark">Shipping Mode:</span>
+                                                        <span className="text-blue-400 font-semibold">{shipment.shipping_mode}</span>
+                                                    </div>
+                                                )}
+                                                {/* Vessel info (read only reference from Booking tab) */}
+                                                {(bookingData.vesselName) && (
+                                                    <div className="flex justify-between">
+                                                        <span className="text-silver-dark">Vessel/Flight:</span>
+                                                        <span className="text-silver-light">{bookingData.vesselName}{bookingData.voyageNumber ? ` / ${bookingData.voyageNumber}` : ''}</span>
+                                                    </div>
+                                                )}
                                             </>
                                         )}
                                     </div>
@@ -1688,6 +1784,28 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                                 <p className="text-silver-light font-medium mt-1">{bookingData.portOfDischarge || '-'}</p>
                                             )}
                                         </div>
+                                        {/* Shipping Mode - Sea Freight only */}
+                                        {shipment.serviceType === 'sea' && (
+                                            <div className="col-span-2">
+                                                <label className="text-silver-dark text-sm">Shipping Mode</label>
+                                                {isEditing ? (
+                                                    <select
+                                                        value={shippingMode}
+                                                        onChange={(e) => setShippingMode(e.target.value)}
+                                                        className="w-full mt-1 px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
+                                                    >
+                                                        <option value="">Select shipping mode...</option>
+                                                        <option value="CY/CY">CY/CY — Container Yard to Container Yard (Door to Door)</option>
+                                                        <option value="CY/CF">CY/CF — Container Yard to Container Freight</option>
+                                                        <option value="CF/CY">CF/CY — Container Freight to Container Yard</option>
+                                                        <option value="CF/CF">CF/CF — Container Freight to Container Freight</option>
+                                                    </select>
+                                                ) : (
+                                                    <p className={`font-semibold mt-1 ${shippingMode ? 'text-blue-400' : 'text-silver-dark'
+                                                        }`}>{shippingMode || '-'}</p>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
@@ -2263,6 +2381,56 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                         </div>
                                     </>
                                 )}
+                            </div>
+                        )}
+                    </div>
+
+
+                    {/* Approval Status Bar */}
+                    <div className="mt-6 pt-4 border-t border-dark-border">
+                        <p className="text-xs text-silver-dark mb-3 font-medium uppercase tracking-wider">Approval Status</p>
+                        {currentStatus === 'rejected' ? (
+                            <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400">
+                                <XCircle className="w-4 h-4 flex-shrink-0" />
+                                <span className="text-sm font-medium">Shipment Rejected — gunakan tombol ↩ Reset di atas untuk mengembalikan ke Pending.</span>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-0">
+                                {statusSteps.map((step, idx) => {
+                                    const cfg = statusConfig[step];
+                                    const Icon = cfg.icon;
+                                    const currentIdx = statusSteps.indexOf(currentStatus) >= 0
+                                        ? statusSteps.indexOf(currentStatus) : 0;
+                                    const isDone = idx < currentIdx;
+                                    const isCurrent = idx === currentIdx;
+                                    return (
+                                        <React.Fragment key={step}>
+                                            <div className="flex flex-col items-center min-w-[80px] text-center">
+                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${isDone ? 'bg-accent-orange border-accent-orange text-white' :
+                                                    isCurrent ? 'bg-accent-orange/20 border-accent-orange text-accent-orange animate-pulse' :
+                                                        'bg-dark-surface border-dark-border text-silver-dark'
+                                                    }`}>
+                                                    <Icon className="w-4 h-4" />
+                                                </div>
+                                                <span className={`text-xs mt-1 font-medium ${isDone || isCurrent ? 'text-accent-orange' : 'text-silver-dark'
+                                                    }`}>{cfg.label}</span>
+                                                {isCurrent && step === 'pending' && (
+                                                    <span className="text-xs text-yellow-400 mt-0.5">Menunggu approval</span>
+                                                )}
+                                                {isDone && step === 'pending' && (
+                                                    <span className="text-xs text-green-400 mt-0.5">✓ Done</span>
+                                                )}
+                                                {isCurrent && step === 'approved' && (
+                                                    <span className="text-xs text-green-400 mt-0.5">PO & BL terbuka ✓</span>
+                                                )}
+                                            </div>
+                                            {idx < statusSteps.length - 1 && (
+                                                <div className={`flex-1 h-0.5 mb-7 mx-2 ${idx < currentIdx ? 'bg-accent-orange' : 'bg-dark-border'
+                                                    }`} />
+                                            )}
+                                        </React.Fragment>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>

@@ -208,8 +208,6 @@ const QuotationManagement = () => {
             total_amount: formData.totalAmount ? parseInt(formData.totalAmount.toString().replace(/\./g, '')) : 0,
             status: status,
             notes: formData.notes,
-            status: status,
-            notes: formData.notes,
             service_items: formData.serviceItems,
             terms_and_conditions: formData.termsConditions,
             incoterm: formData.incoterm,
@@ -781,7 +779,13 @@ const QuotationManagement = () => {
 
         // Save shipment to Supabase
         try {
-            const { error } = await supabase
+            // Determine BL type based on service type
+            const isAirFreight = (quotation.serviceType || '').toLowerCase() === 'air';
+            const blType = isAirFreight ? 'AWB' : 'MBL';
+            const blPrefix = isAirFreight ? 'AWB' : 'BL';
+            const blNumber = `${blPrefix}-${soNumber}`;
+
+            const { data: shipmentData, error } = await supabase
                 .from('blink_shipments')
                 .insert([{
                     job_number: newShipment.jobNumber,
@@ -794,32 +798,44 @@ const QuotationManagement = () => {
                     origin: newShipment.origin,
                     destination: newShipment.destination,
                     service_type: newShipment.serviceType,
-                    cargo_type: newShipment.cargoType, // Added cargo_type
+                    cargo_type: newShipment.cargoType,
                     weight: newShipment.weight,
                     volume: newShipment.volume,
                     commodity: newShipment.commodity,
                     quoted_amount: newShipment.quotedAmount,
-                    currency: quotation.currency || 'USD', // Currency mengikuti quotation ✅
+                    currency: quotation.currency || 'USD',
                     status: newShipment.status,
                     created_from: 'sales_order',
-                    // Fix: Carry over missing data fields
                     customer_id: quotation.customerId,
                     service_items: quotation.serviceItems || [],
                     notes: quotation.notes || '',
-                    // New fields propagation
                     gross_weight: quotation.grossWeight || null,
                     net_weight: quotation.netWeight || null,
                     measure: quotation.measure || null,
-                    // Map service items to selling items for COGS comparison
-                    selling_items: quotation.serviceItems || [] // Using serviceItems as initial selling items
-                }]);
+                    selling_items: quotation.serviceItems || [],
+                    // === AUTO-CREATE BL/AWB DRAFT ===
+                    bl_number: blNumber,
+                    bl_type: blType,
+                    bl_status: 'draft',
+                    bl_subject: `${quotation.serviceType?.toUpperCase() || 'SEA'} Freight - ${quotation.origin} to ${quotation.destination}`,
+                    bl_shipper_name: quotation.customerName || quotation.customer_name || '',
+                    bl_consignee_name: quotation.consigneeName || '',
+                    bl_place_of_receipt: quotation.origin || '',
+                    bl_place_of_delivery: quotation.destination || '',
+                    bl_description_packages: quotation.commodity || '',
+                    bl_gross_weight_text: quotation.weight ? `${quotation.weight} KGS` : '',
+                    bl_measurement_text: quotation.volume ? `${quotation.volume} CBM` : '',
+                    bl_export_references: `SO: ${soNumber}\nJOB: ${quotation.jobNumber}`,
+                }])
+                .select();
 
             if (error) throw error;
 
-            await fetchQuotations(); // Refresh quotations after status update
-            setShowViewModal(false); // Close modal after successful SO creation
+            await fetchQuotations();
+            setShowViewModal(false);
 
-            alert(`✅ Sales Order ${soNumber} created!\n\n📦 Shipment auto-created with Job Number: ${quotation.jobNumber}\n\n➡️ Navigating to Operations...`);
+            const docLabel = isAirFreight ? 'AWB' : 'BL';
+            alert(`✅ Sales Order ${soNumber} created!\n\n📦 Shipment auto-created with Job Number: ${quotation.jobNumber}\n📄 Draft ${docLabel} (${blNumber}) auto-generated\n\n➡️ Navigating to Operations...`);
 
             // Navigate to shipments page
             setTimeout(() => {

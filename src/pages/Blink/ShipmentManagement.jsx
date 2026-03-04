@@ -98,12 +98,10 @@ const ShipmentManagement = () => {
     };
 
     const statusConfig = {
-        draft: { label: 'Draft', color: 'bg-gray-500/20 text-gray-400' },
-        pending: { label: 'Pending', color: 'bg-yellow-500/20 text-yellow-400' },
-        confirmed: { label: 'Confirmed', color: 'bg-blue-500/20 text-blue-400' },
-        in_transit: { label: 'In Transit', color: 'bg-purple-500/20 text-purple-400' },
-        arrived: { label: 'Arrived', color: 'bg-green-500/20 text-green-400' },
-        delivered: { label: 'Delivered', color: 'bg-emerald-500/20 text-emerald-400' },
+        pending: { label: 'Pending', color: 'bg-gray-500/20 text-gray-400' },
+        manager_approval: { label: 'Waiting Approval', color: 'bg-yellow-500/20 text-yellow-400' },
+        approved: { label: 'Approved', color: 'bg-green-500/20 text-green-400' },
+        rejected: { label: 'Rejected', color: 'bg-red-500/20 text-red-400' },
     };
 
     // Helper function to get shipment type from quotationType or type field

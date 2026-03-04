@@ -10,7 +10,12 @@ import {
     Printer,
     Search,
     User,
-    RefreshCw
+    RefreshCw,
+    CheckCircle,
+    Clock,
+    Send,
+    ShieldCheck,
+    XCircle
 } from 'lucide-react';
 import { exportBLCertificateToExcel, exportSellingBuyingReport } from '../../utils/excelExport';
 import { printBLCertificate } from '../../utils/printUtils';
@@ -28,9 +33,7 @@ const BLManagement = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [activeTab, setActiveTab] = useState('header');
     const [editForm, setEditForm] = useState({});
-    const [showShipperPicker, setShowShipperPicker] = useState(false);
-    const [showConsigneePicker, setShowConsigneePicker] = useState(false);
-    const [showNotifyPartyPicker, setShowNotifyPartyPicker] = useState(false);
+    // Partner pickers are always shown when editing - no toggle needed
 
     // Quotation & Shipment auto-populate support
     const [quotations, setQuotations] = useState([]);
@@ -50,6 +53,12 @@ const BLManagement = () => {
                 status: selectedBL.status,
                 blNumber: selectedBL.blNumber !== '-' ? selectedBL.blNumber : '',
                 blDate: selectedBL.blIssuedDate || (selectedBL.createdAt ? new Date(selectedBL.createdAt).toISOString().split('T')[0] : ''),
+
+                // Document Numbers
+                mbl: selectedBL.mbl || '',
+                hbl: selectedBL.hbl || '',
+                mawb: selectedBL.mawb || '',
+                hawb: selectedBL.hawb || '',
 
                 // Subject
                 subject: selectedBL.blSubject || '',
@@ -235,7 +244,6 @@ const BLManagement = () => {
             const { data, error } = await supabase
                 .from('blink_shipments')
                 .select('*')
-                .not('so_number', 'is', null)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -251,11 +259,86 @@ const BLManagement = () => {
     };
 
     const statusConfig = {
-        draft: { label: 'Draft', color: 'bg-gray-500/20 text-gray-400' },
-        issued: { label: 'Issued', color: 'bg-blue-500/20 text-blue-400' },
-        in_transit: { label: 'In Transit', color: 'bg-purple-500/20 text-purple-400' },
-        arrived: { label: 'Arrived', color: 'bg-green-500/20 text-green-400' },
-        delivered: { label: 'Delivered', color: 'bg-emerald-500/20 text-emerald-400' },
+        draft: { label: 'Draft', color: 'bg-gray-500/20 text-gray-400', icon: Clock },
+        submitted: { label: 'Submitted', color: 'bg-yellow-500/20 text-yellow-400', icon: Send },
+        approved: { label: 'Approved', color: 'bg-teal-500/20 text-teal-400', icon: ShieldCheck },
+        rejected: { label: 'Rejected', color: 'bg-red-500/20 text-red-400', icon: XCircle },
+        issued: { label: 'Issued', color: 'bg-blue-500/20 text-blue-400', icon: CheckCircle },
+        in_transit: { label: 'In Transit', color: 'bg-purple-500/20 text-purple-400', icon: Ship },
+        arrived: { label: 'Arrived', color: 'bg-green-500/20 text-green-400', icon: CheckCircle },
+        delivered: { label: 'Delivered', color: 'bg-emerald-500/20 text-emerald-400', icon: CheckCircle },
+    };
+
+    // Status transition rules: which statuses can transition to which
+    const statusTransitions = {
+        draft: [
+            { to: 'submitted', label: 'Submit for Approval', icon: Send, color: 'bg-yellow-500 hover:bg-yellow-600 text-white' }
+        ],
+        submitted: [
+            { to: 'approved', label: 'Approve', icon: ShieldCheck, color: 'bg-teal-500 hover:bg-teal-600 text-white' },
+            { to: 'rejected', label: 'Reject', icon: XCircle, color: 'bg-red-500 hover:bg-red-600 text-white' },
+            { to: 'draft', label: 'Return to Draft', icon: RefreshCw, color: 'bg-gray-500 hover:bg-gray-600 text-white' }
+        ],
+        approved: [
+            { to: 'issued', label: 'Issue Document', icon: CheckCircle, color: 'bg-blue-500 hover:bg-blue-600 text-white' }
+        ],
+        rejected: [
+            { to: 'draft', label: 'Revise (Back to Draft)', icon: RefreshCw, color: 'bg-gray-500 hover:bg-gray-600 text-white' }
+        ],
+        issued: [
+            { to: 'in_transit', label: 'Mark In Transit', icon: Ship, color: 'bg-purple-500 hover:bg-purple-600 text-white' }
+        ],
+        in_transit: [
+            { to: 'arrived', label: 'Mark Arrived', icon: CheckCircle, color: 'bg-green-500 hover:bg-green-600 text-white' }
+        ],
+        arrived: [
+            { to: 'delivered', label: 'Mark Delivered', icon: CheckCircle, color: 'bg-emerald-500 hover:bg-emerald-600 text-white' }
+        ],
+        delivered: []
+    };
+
+    // Handle status change with confirmation
+    const handleStatusChange = async (newStatus) => {
+        const statusLabel = statusConfig[newStatus]?.label || newStatus;
+        const confirmMsg = newStatus === 'approved'
+            ? `Are you sure you want to APPROVE this BL/AWB document?`
+            : newStatus === 'rejected'
+                ? `Are you sure you want to REJECT this BL/AWB? The document will need revision.`
+                : `Change status to "${statusLabel}"?`;
+
+        if (!confirm(confirmMsg)) return;
+
+        try {
+            const updateData = {
+                bl_status: newStatus,
+            };
+
+            // Record approval metadata
+            if (newStatus === 'approved') {
+                updateData.bl_approved_at = new Date().toISOString();
+                updateData.bl_approved_by = 'Current User'; // TODO: get from auth context
+            }
+            if (newStatus === 'issued') {
+                updateData.bl_issued_date = new Date().toISOString().split('T')[0];
+            }
+
+            const { error } = await supabase
+                .from('blink_shipments')
+                .update(updateData)
+                .eq('id', selectedBL.id);
+
+            if (error) throw error;
+
+            alert(`✅ Status changed to: ${statusLabel}`);
+            // Refresh data
+            await fetchBLs();
+            // Update local state
+            setSelectedBL(prev => ({ ...prev, status: newStatus }));
+            setEditForm(prev => ({ ...prev, status: newStatus }));
+        } catch (error) {
+            console.error('Error changing status:', error);
+            alert('❌ Failed to change status: ' + error.message);
+        }
     };
 
     const filteredBLs = bls.filter(bl => {
@@ -392,6 +475,12 @@ const BLManagement = () => {
                     // Also sync basic routing from form
                     vessel_name: editForm.vessel,
                     voyage: editForm.voyage,
+
+                    // Document numbers
+                    mbl: editForm.mbl || null,
+                    hbl: editForm.hbl || null,
+                    mawb: editForm.mawb || null,
+                    hawb: editForm.hawb || null,
                 })
                 .eq('id', selectedBL.id);
 
@@ -413,10 +502,8 @@ const BLManagement = () => {
             setEditForm(prev => ({
                 ...prev,
                 shipperName: partner.partner_name,
-                shipperAddress: `${partner.address_line1 || ''}\n${partner.address_line2 || ''}\n${partner.city || ''}, ${partner.country || ''}\nTel: ${partner.phone || ''}`
-                    .replace(/\n+/g, '\n').trim()
+                shipperAddress: [partner.address_line1, partner.address_line2, `${partner.city || ''}, ${partner.country || ''}`, partner.phone ? `Tel: ${partner.phone}` : ''].filter(Boolean).join('\n').trim()
             }));
-            setShowShipperPicker(false);
         }
     };
 
@@ -426,10 +513,8 @@ const BLManagement = () => {
             setEditForm(prev => ({
                 ...prev,
                 consigneeName: partner.partner_name,
-                consigneeAddress: `${partner.address_line1 || ''}\n${partner.address_line2 || ''}\n${partner.city || ''}, ${partner.country || ''}\nTel: ${partner.phone || ''}`
-                    .replace(/\n+/g, '\n').trim()
+                consigneeAddress: [partner.address_line1, partner.address_line2, `${partner.city || ''}, ${partner.country || ''}`, partner.phone ? `Tel: ${partner.phone}` : ''].filter(Boolean).join('\n').trim()
             }));
-            setShowConsigneePicker(false);
         }
     };
 
@@ -439,10 +524,8 @@ const BLManagement = () => {
             setEditForm(prev => ({
                 ...prev,
                 notifyPartyName: partner.partner_name,
-                notifyPartyAddress: `${partner.address_line1 || ''}\n${partner.address_line2 || ''}\n${partner.city || ''}, ${partner.country || ''}\nTel: ${partner.phone || ''}`
-                    .replace(/\n+/g, '\n').trim()
+                notifyPartyAddress: [partner.address_line1, partner.address_line2, `${partner.city || ''}, ${partner.country || ''}`, partner.phone ? `Tel: ${partner.phone}` : ''].filter(Boolean).join('\n').trim()
             }));
-            setShowNotifyPartyPicker(false);
         }
     };
 
@@ -472,35 +555,115 @@ const BLManagement = () => {
         setSelectedQuotationId(quotationId);
     };
 
-    // NEW: Load data from SO/Shipment – fills routing, vessel, cargo, container etc.
+    // ENHANCED: Load ALL data from SO/Shipment – comprehensive field mapping
     const handleLoadFromShipment = (shipmentId) => {
         const ship = shipments.find(s => s.id === shipmentId);
         if (!ship) return;
 
+        // Extract booking data (JSONB field)
+        const booking = ship.booking || {};
+
+        // Build container marks/numbers from container array
+        const containersArr = ship.containers || [];
+        const firstContainer = containersArr[0] || {};
+        const allContainerNumbers = containersArr.map(c => c.containerNumber).filter(Boolean).join('\n');
+        const allSealNumbers = containersArr.map(c => c.sealNumber).filter(Boolean).join('\n');
+
+        // Map cargo_type to TypeOfMove
+        const cargoTypeMap = {
+            'FCL': 'FCL/FCL',
+            'LCL': 'LCL/LCL',
+            'General': 'CY/CY',
+            'Bulk': 'CY/CY',
+        };
+        const typeOfMove = cargoTypeMap[ship.cargo_type] || ship.cargo_type || 'FCL/FCL';
+
+        // Build marks text from containers
+        const marksText = containersArr.length > 0
+            ? containersArr.map(c => `${c.containerNumber || 'N/M'}`).join('\n')
+            : (ship.container_number || 'N/M');
+
+        // Build total packages text
+        const totalContainers = containersArr.length || 1;
+        const containerTypes = containersArr.map(c => c.containerType || '').filter(Boolean);
+        const uniqueTypes = [...new Set(containerTypes)];
+        const packagesText = totalContainers === 1
+            ? 'SAY: ONE CONTAINER ONLY'
+            : `SAY: ${numberToWords(totalContainers).toUpperCase()} CONTAINERS${uniqueTypes.length > 0 ? ` (${uniqueTypes.join(', ')})` : ''} ONLY`;
+
+        // Build export references
+        const exportRefs = [
+            ship.so_number ? `SO: ${ship.so_number}` : '',
+            ship.job_number ? `JOB: ${ship.job_number}` : '',
+        ].filter(Boolean).join('\n');
+
         setEditForm(prev => ({
             ...prev,
-            // Routing
-            vessel: ship.vessel_name || ship.booking?.vesselName || prev.vessel,
-            voyage: ship.voyage || ship.booking?.voyageNumber || prev.voyage,
-            portOfLoading: ship.origin || prev.portOfLoading,
-            portOfDischarge: ship.destination || prev.portOfDischarge,
-            placeOfReceipt: ship.origin || prev.placeOfReceipt,
-            placeOfDelivery: ship.destination || prev.placeOfDelivery,
-            // Container
-            containerNumber: ship.container_number || (ship.containers?.[0]?.containerNumber) || prev.containerNumber,
-            sealNumber: ship.seal_number || (ship.containers?.[0]?.sealNumber) || prev.sealNumber,
-            // Cargo
+            // === ROUTING ===
+            vessel: ship.vessel_name || booking.vesselName || prev.vessel,
+            voyage: ship.voyage || booking.voyageNumber || prev.voyage,
+            portOfLoading: ship.origin || booking.portOfLoading || prev.portOfLoading,
+            portOfDischarge: ship.destination || booking.portOfDischarge || prev.portOfDischarge,
+            placeOfReceipt: ship.origin || booking.portOfLoading || prev.placeOfReceipt,
+            placeOfDelivery: ship.destination || booking.portOfDischarge || prev.placeOfDelivery,
+
+            // === CONTAINER & CARGO ===
+            containerNumber: ship.container_number || allContainerNumbers || firstContainer.containerNumber || prev.containerNumber,
+            sealNumber: ship.seal_number || allSealNumbers || firstContainer.sealNumber || prev.sealNumber,
+            marksNumbers: marksText || prev.marksNumbers,
             descriptionPackages: ship.cargo_description || ship.commodity || prev.descriptionPackages,
-            grossWeight: ship.weight ? `${ship.weight} KGS` : prev.grossWeight,
-            measurement: ship.volume ? `${ship.volume} CBM` : prev.measurement,
-            // Parties
-            shipperName: ship.shipper_name || prev.shipperName,
+            grossWeight: ship.gross_weight
+                ? `${ship.gross_weight} KGS`
+                : (ship.weight ? `${ship.weight} KGS` : prev.grossWeight),
+            measurement: ship.measure
+                ? `${ship.measure} CBM`
+                : (ship.volume || ship.cbm ? `${ship.volume || ship.cbm} CBM` : prev.measurement),
+            totalPackages: packagesText || prev.totalPackages,
+
+            // === TYPE OF MOVE ===
+            typeOfMove: typeOfMove || prev.typeOfMove,
+
+            // === PARTIES ===
+            shipperName: ship.shipper_name || ship.shipper || prev.shipperName,
             consigneeName: ship.consignee_name || ship.customer_name || ship.customer || prev.consigneeName,
-            // Subject
-            subject: ship.bl_subject || `SO ${ship.so_number}` || prev.subject,
-            // Export refs
-            exportReferences: ship.so_number ? `SO: ${ship.so_number}` : prev.exportReferences,
+
+            // === DOCUMENT NUMBERS ===
+            mbl: ship.mbl || prev.mbl,
+            hbl: ship.hbl || prev.hbl,
+            mawb: ship.mawb || prev.mawb,
+            hawb: ship.hawb || prev.hawb,
+            blNumber: ship.bl_number || ship.awb_number || prev.blNumber,
+
+            // === SUBJECT & EXPORT REFS ===
+            subject: ship.bl_subject || (ship.so_number ? `SO ${ship.so_number}` : '') || prev.subject,
+            exportReferences: exportRefs || prev.exportReferences,
+
+            // === DATES ===
+            shippedOnBoardDate: ship.etd || ship.actual_departure || prev.shippedOnBoardDate,
         }));
+
+        // Show feedback
+        const filledFields = [];
+        if (ship.vessel_name || booking.vesselName) filledFields.push('Vessel');
+        if (ship.voyage || booking.voyageNumber) filledFields.push('Voyage');
+        if (ship.origin) filledFields.push('POL');
+        if (ship.destination) filledFields.push('POD');
+        if (ship.container_number || containersArr.length > 0) filledFields.push(`Container(${containersArr.length || 1})`);
+        if (ship.shipper_name || ship.shipper) filledFields.push('Shipper');
+        if (ship.consignee_name || ship.customer) filledFields.push('Consignee');
+        if (ship.commodity) filledFields.push('Cargo');
+        if (ship.mbl || ship.hbl || ship.mawb || ship.hawb) filledFields.push('Doc Numbers');
+
+        if (filledFields.length > 0) {
+            console.log(`✅ Loaded from SO/Shipment: ${filledFields.join(', ')}`);
+        }
+    };
+
+    // Helper: number to words (for packages text)
+    const numberToWords = (num) => {
+        const words = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+            'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty'];
+        return words[num] || String(num);
     };
 
     // --- Render Helpers ---
@@ -710,12 +873,33 @@ const BLManagement = () => {
                                     <Ship className="w-5 h-5 text-accent-orange" />
                                     Document Editor (BL/AWB)
                                 </h2>
-                                <p className="text-xs text-gray-500 dark:text-silver-dark mt-1 font-mono">
-                                    JOB: {selectedBL.jobNumber} | TYPE: {selectedBL.blType}
-                                    {selectedBL.soNumber && <> | SO: {selectedBL.soNumber}</>}
-                                </p>
+                                <div className="flex items-center gap-3 mt-1">
+                                    <p className="text-xs text-gray-500 dark:text-silver-dark font-mono">
+                                        JOB: {selectedBL.jobNumber} | TYPE: {selectedBL.blType}
+                                        {selectedBL.soNumber && <> | SO: {selectedBL.soNumber}</>}
+                                    </p>
+                                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusConfig[editForm.status || selectedBL.status]?.color || 'bg-gray-500/20 text-gray-400'}`}>
+                                        {(() => { const IconComp = statusConfig[editForm.status || selectedBL.status]?.icon; return IconComp ? <IconComp className="w-3 h-3" /> : null; })()}
+                                        {statusConfig[editForm.status || selectedBL.status]?.label || editForm.status || selectedBL.status}
+                                    </span>
+                                </div>
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 items-center">
+                                {/* Status Action Buttons */}
+                                {!isEditing && (statusTransitions[editForm.status || selectedBL.status] || []).map(transition => (
+                                    <button
+                                        key={transition.to}
+                                        onClick={() => handleStatusChange(transition.to)}
+                                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${transition.color}`}
+                                    >
+                                        <transition.icon className="w-3.5 h-3.5" />
+                                        {transition.label}
+                                    </button>
+                                ))}
+                                {/* Divider */}
+                                {!isEditing && (statusTransitions[editForm.status || selectedBL.status] || []).length > 0 && (
+                                    <div className="w-px h-6 bg-gray-300 dark:bg-dark-border mx-1" />
+                                )}
                                 {isEditing ? (
                                     <>
                                         <Button size="sm" onClick={handleUpdateBL}>Save Changes</Button>
@@ -803,7 +987,7 @@ const BLManagement = () => {
                                                     ))}
                                                 </select>
                                                 <p className="text-xs text-gray-500 dark:text-silver-dark mt-1">
-                                                    Fills vessel, voyage, container, routing, cargo
+                                                    Fills vessel, voyage, routing, container, seal, cargo, marks, shipper, consignee, doc numbers, dates
                                                 </p>
                                             </div>
                                         </div>
@@ -814,16 +998,30 @@ const BLManagement = () => {
                                         <div className="grid grid-cols-3 gap-4">
                                             {renderInput('BL Number', 'blNumber')}
                                             {renderSelect('Status', 'status', [
-                                                { value: 'draft', label: 'Draft' },
-                                                { value: 'issued', label: 'Issued' },
-                                                { value: 'in_transit', label: 'In Transit' },
-                                                { value: 'arrived', label: 'Arrived' },
-                                                { value: 'delivered', label: 'Delivered' },
+                                                { value: 'draft', label: '📝 Draft' },
+                                                { value: 'submitted', label: '📤 Submitted' },
+                                                { value: 'approved', label: '✅ Approved' },
+                                                { value: 'rejected', label: '❌ Rejected' },
+                                                { value: 'issued', label: '📄 Issued' },
+                                                { value: 'in_transit', label: '🚢 In Transit' },
+                                                { value: 'arrived', label: '📍 Arrived' },
+                                                { value: 'delivered', label: '✔️ Delivered' },
                                             ])}
                                             {renderSelect('BL Type', 'blType', [
                                                 { value: 'MBL', label: 'Master BL (MBL)' },
                                                 { value: 'HBL', label: 'House BL (HBL)' },
                                             ])}
+                                        </div>
+                                    </div>
+
+                                    {/* Document Numbers */}
+                                    <div className="p-3 bg-green-50/50 dark:bg-green-900/10 rounded-lg border border-green-100 dark:border-green-900/30 mb-4">
+                                        <h3 className="text-sm font-bold text-green-500 mb-2">Document Numbers</h3>
+                                        <div className="grid grid-cols-4 gap-4">
+                                            {renderInput('MBL No.', 'mbl', 'text', 'Master B/L Number')}
+                                            {renderInput('HBL No.', 'hbl', 'text', 'House B/L Number')}
+                                            {renderInput('MAWB No.', 'mawb', 'text', 'Master AWB Number')}
+                                            {renderInput('HAWB No.', 'hawb', 'text', 'House AWB Number')}
                                         </div>
                                     </div>
 
@@ -840,100 +1038,76 @@ const BLManagement = () => {
                             {/* TAB: Parties */}
                             {activeTab === 'parties' && (
                                 <div className="animate-fade-in grid grid-cols-3 gap-6 h-full">
+                                    {/* SHIPPER */}
                                     <div className="col-span-1 border-r border-dashed border-gray-200 dark:border-dark-border pr-6">
-                                        <div className="flex items-center justify-between mb-4">
-                                            <div className="flex items-center gap-2 text-purple-500 font-bold uppercase text-xs tracking-wider">
-                                                <span>Shipper / Exporter</span>
-                                            </div>
-                                            {isEditing && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setShowShipperPicker(!showShipperPicker)}
-                                                    className="text-xs px-2 py-1 bg-purple-500/20 text-purple-400 rounded hover:bg-purple-500/30 transition-colors"
-                                                >
-                                                    📋 Load from Partner
-                                                </button>
-                                            )}
+                                        <div className="flex items-center gap-2 text-purple-500 font-bold uppercase text-xs tracking-wider mb-3">
+                                            <User className="w-3.5 h-3.5" />
+                                            <span>Shipper / Exporter</span>
                                         </div>
-                                        {isEditing && showShipperPicker && (
+                                        {isEditing && (
                                             <div className="mb-3">
+                                                <label className="block text-xs text-gray-400 mb-1">Select from Business Partners</label>
                                                 <PartnerPicker
                                                     value={""}
                                                     onChange={() => { }}
                                                     onPartnerLoad={handleLoadShipper}
                                                     roleFilter="all"
-                                                    placeholder="Select shipper..."
+                                                    placeholder="🔍 Search & select shipper..."
                                                     size="sm"
                                                 />
                                             </div>
                                         )}
                                         <div className="space-y-4">
                                             {renderInput('Name', 'shipperName')}
-                                            {renderInput('Address (Full Text)', 'shipperAddress', 'textarea', 'Complete address including country and phone')}
+                                            {renderInput('Address', 'shipperAddress', 'textarea', 'Full address with country & phone')}
                                         </div>
                                     </div>
+                                    {/* CONSIGNEE */}
                                     <div className="col-span-1 border-r border-dashed border-gray-200 dark:border-dark-border pr-6">
-                                        <div className="flex items-center justify-between mb-4">
-                                            <div className="flex items-center gap-2 text-pink-500 font-bold uppercase text-xs tracking-wider">
-                                                <span>Consignee</span>
-                                            </div>
-                                            {isEditing && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setShowConsigneePicker(!showConsigneePicker)}
-                                                    className="text-xs px-2 py-1 bg-pink-500/20 text-pink-400 rounded hover:bg-pink-500/30 transition-colors"
-                                                >
-                                                    📋 Load from Partner
-                                                </button>
-                                            )}
+                                        <div className="flex items-center gap-2 text-pink-500 font-bold uppercase text-xs tracking-wider mb-3">
+                                            <User className="w-3.5 h-3.5" />
+                                            <span>Consignee</span>
                                         </div>
-                                        {isEditing && showConsigneePicker && (
+                                        {isEditing && (
                                             <div className="mb-3">
+                                                <label className="block text-xs text-gray-400 mb-1">Select from Business Partners</label>
                                                 <PartnerPicker
                                                     value={""}
                                                     onChange={() => { }}
                                                     onPartnerLoad={handleLoadConsignee}
                                                     roleFilter="all"
-                                                    placeholder="Select consignee..."
+                                                    placeholder="🔍 Search & select consignee..."
                                                     size="sm"
                                                 />
                                             </div>
                                         )}
                                         <div className="space-y-4">
                                             {renderInput('Name', 'consigneeName')}
-                                            {renderInput('Address (Full Text)', 'consigneeAddress', 'textarea', 'Complete address including country and phone')}
+                                            {renderInput('Address', 'consigneeAddress', 'textarea', 'Full address with country & phone')}
                                         </div>
                                     </div>
+                                    {/* NOTIFY PARTY */}
                                     <div className="col-span-1">
-                                        <div className="flex items-center justify-between mb-4">
-                                            <div className="flex items-center gap-2 text-orange-500 font-bold uppercase text-xs tracking-wider">
-                                                <span>Notify Party</span>
-                                            </div>
-                                            {isEditing && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setShowNotifyPartyPicker(!showNotifyPartyPicker)}
-                                                    className="text-xs px-2 py-1 bg-orange-500/20 text-orange-400 rounded hover:bg-orange-500/30 transition-colors"
-                                                >
-                                                    📋 Load from Partner
-                                                </button>
-                                            )}
+                                        <div className="flex items-center gap-2 text-orange-500 font-bold uppercase text-xs tracking-wider mb-3">
+                                            <User className="w-3.5 h-3.5" />
+                                            <span>Notify Party</span>
                                         </div>
-                                        {isEditing && showNotifyPartyPicker && (
+                                        {isEditing && (
                                             <div className="mb-3">
+                                                <label className="block text-xs text-gray-400 mb-1">Select from Business Partners</label>
                                                 <PartnerPicker
                                                     value={""}
                                                     onChange={() => { }}
                                                     onPartnerLoad={handleLoadNotifyParty}
                                                     roleFilter="all"
-                                                    placeholder="Select notify party..."
+                                                    placeholder="🔍 Search & select notify party..."
                                                     size="sm"
                                                 />
                                             </div>
                                         )}
                                         <div className="space-y-4">
                                             {renderInput('Name', 'notifyPartyName')}
-                                            {renderInput('Address (Full Text)', 'notifyPartyAddress', 'textarea', 'Usually SAME AS CONSIGNEE')}
+                                            {renderInput('Address', 'notifyPartyAddress', 'textarea', 'Usually SAME AS CONSIGNEE')}
                                         </div>
                                     </div>
                                 </div>
@@ -1021,27 +1195,63 @@ const BLManagement = () => {
                             )}
                         </div>
 
-                        {/* Modal Footer */}
-                        <div className="flex items-center justify-between p-4 border-t border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-surface shrink-0">
-                            <span className="text-xs text-gray-400 italic">
-                                * Use "Save Changes" to commit edits to database before printing.
-                            </span>
-                            <div className="flex gap-3">
-                                <Button
-                                    variant="secondary"
-                                    icon={Printer}
-                                    onClick={() => handlePrintBL(selectedBL)}
-                                >
-                                    Print Preview
-                                </Button>
-                                <Button
-                                    onClick={() => {
-                                        setShowEditModal(false);
-                                        setSelectedBL(null);
-                                    }}
-                                >
-                                    Close
-                                </Button>
+                        {/* Modal Footer with Status Flow */}
+                        <div className="border-t border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-surface shrink-0">
+                            {/* Status Flow Bar */}
+                            <div className="px-4 pt-3 pb-1">
+                                <div className="flex items-center gap-1 overflow-x-auto">
+                                    {['draft', 'submitted', 'approved', 'issued', 'in_transit', 'arrived', 'delivered'].map((step, idx, arr) => {
+                                        const stepConfig = statusConfig[step];
+                                        const currentStatus = editForm.status || selectedBL.status;
+                                        const stepOrder = arr.indexOf(step);
+                                        const currentOrder = arr.indexOf(currentStatus);
+                                        const isActive = step === currentStatus;
+                                        const isPast = currentStatus !== 'rejected' && stepOrder < currentOrder;
+                                        const isRejected = currentStatus === 'rejected' && step === 'rejected';
+                                        return (
+                                            <React.Fragment key={step}>
+                                                <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold whitespace-nowrap transition-all ${isActive || isRejected
+                                                        ? stepConfig.color + ' ring-2 ring-offset-1 ring-current'
+                                                        : isPast
+                                                            ? 'bg-green-500/20 text-green-400'
+                                                            : 'bg-gray-200/50 dark:bg-dark-bg/50 text-gray-400 dark:text-silver-dark'
+                                                    }`}>
+                                                    {isPast ? <CheckCircle className="w-3 h-3" /> : (() => { const IC = stepConfig.icon; return IC ? <IC className="w-3 h-3" /> : null; })()}
+                                                    {stepConfig.label}
+                                                </div>
+                                                {idx < arr.length - 1 && (
+                                                    <div className={`w-4 h-0.5 ${isPast ? 'bg-green-400' : 'bg-gray-300 dark:bg-dark-border'}`} />
+                                                )}
+                                            </React.Fragment>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                            {/* Action Bar */}
+                            <div className="flex items-center justify-between px-4 py-3">
+                                <span className="text-xs text-gray-400 italic">
+                                    {isEditing
+                                        ? '* Save changes first, then use status buttons to transition.'
+                                        : '* Use status action buttons above to change document status.'
+                                    }
+                                </span>
+                                <div className="flex gap-3">
+                                    <Button
+                                        variant="secondary"
+                                        icon={Printer}
+                                        onClick={() => handlePrintBL(selectedBL)}
+                                    >
+                                        Print Preview
+                                    </Button>
+                                    <Button
+                                        onClick={() => {
+                                            setShowEditModal(false);
+                                            setSelectedBL(null);
+                                        }}
+                                    >
+                                        Close
+                                    </Button>
+                                </div>
                             </div>
                         </div>
                     </div>

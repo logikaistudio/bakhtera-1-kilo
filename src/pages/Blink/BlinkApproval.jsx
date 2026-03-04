@@ -46,6 +46,14 @@ const BlinkApproval = () => {
                 .order('created_at', { ascending: false });
             if (poErr) console.error('Error fetching POs:', poErr);
 
+            // Fetch pending Shipments
+            const { data: shipments, error: shErr } = await supabase
+                .from('blink_shipments')
+                .select('*')
+                .eq('status', 'manager_approval')
+                .order('created_at', { ascending: false });
+            if (shErr) console.error('Error fetching shipments:', shErr);
+
             const mappedQuotations = (quotations || []).map(q => ({
                 id: q.id,
                 type: 'quotation',
@@ -91,7 +99,29 @@ const BlinkApproval = () => {
                 shipment_id: po.shipment_id,
             }));
 
-            setSubmissions([...mappedPOs, ...mappedQuotations]);
+            const mappedShipments = (shipments || []).map(s => ({
+                id: s.id,
+                type: 'shipment',
+                typeLabel: 'Shipment',
+                refNumber: s.job_number || s.so_number || '-',
+                customerName: s.customer || '-',
+                submittedBy: s.sales_person || 'Operations',
+                serviceType: s.service_type || s.serviceType || 'sea',
+                origin: s.origin || '-',
+                destination: s.destination || '-',
+                amount: s.quoted_amount || 0,
+                currency: s.currency || 'USD',
+                status: s.status,
+                createdAt: s.created_at,
+                updatedAt: s.updated_at,
+                notes: s.notes || '',
+                rejectionReason: s.rejection_reason || '',
+                serviceItems: [],
+                commodity: s.commodity || '',
+                cargoType: s.cargo_type || '',
+            }));
+
+            setSubmissions([...mappedShipments, ...mappedPOs, ...mappedQuotations]);
         } catch (error) {
             console.error('Error fetching submissions:', error);
         } finally {
@@ -99,12 +129,25 @@ const BlinkApproval = () => {
         }
     };
 
+
     const handleApprove = async (item) => {
         if (!isApprover) return;
         try {
             setProcessing(true);
 
-            if (item.type === 'po') {
+            if (item.type === 'shipment') {
+                // Approve Shipment → unlock PO & Invoice
+                const { error } = await supabase
+                    .from('blink_shipments')
+                    .update({
+                        status: 'approved',
+                        approved_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq('id', item.id);
+                if (error) throw error;
+
+            } else if (item.type === 'po') {
                 // Approve Purchase Order
                 const { error } = await supabase
                     .from('blink_purchase_orders')
@@ -246,7 +289,22 @@ const BlinkApproval = () => {
         try {
             setProcessing(true);
 
-            if (item.type === 'po') {
+            if (item.type === 'shipment') {
+                const { error } = await supabase
+                    .from('blink_shipments')
+                    .update({
+                        status: 'rejected',
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq('id', item.id);
+                if (error) throw error;
+                // Try to save rejection reason (column may not exist yet)
+                await supabase.from('blink_shipments')
+                    .update({ rejection_reason: rejectReason })
+                    .eq('id', item.id)
+                    .then(() => { }).catch(() => { });
+
+            } else if (item.type === 'po') {
                 const { error } = await supabase
                     .from('blink_purchase_orders')
                     .update({
@@ -287,7 +345,7 @@ const BlinkApproval = () => {
         converted: { label: 'SO Created', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', icon: CheckCircle },
     };
 
-    const serviceIcons = { sea: Ship, air: Plane, land: Truck, purchase: ShoppingBag };
+    const serviceIcons = { sea: Ship, air: Plane, land: Truck, purchase: ShoppingBag, shipment: Ship };
 
     const filtered = submissions;
     const pendingCount = submissions.length;
@@ -563,51 +621,54 @@ const BlinkApproval = () => {
                             )}
 
                             {/* Reject textarea */}
-                            {showRejectInput && isApprover && selectedItem.status === 'manager_approval' && (
-                                <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-3">
-                                    <p className="text-sm font-semibold text-red-700">Rejection Reason</p>
-                                    <textarea
-                                        rows={3}
-                                        value={rejectReason}
-                                        onChange={e => setRejectReason(e.target.value)}
-                                        placeholder="Explain reason for rejection..."
-                                        className="w-full px-3 py-2 bg-white border border-red-300 rounded-lg text-sm resize-none focus:outline-none focus:border-red-500"
-                                        style={{ color: '#111827' }}
-                                    />
-                                    <div className="flex gap-2">
-                                        <button onClick={() => setShowRejectInput(false)}
-                                            className="px-4 py-2 text-sm text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                                            Cancel
-                                        </button>
-                                        <button onClick={() => handleReject(selectedItem)} disabled={processing}
-                                            className="px-4 py-2 text-sm text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50">
-                                            {processing
-                                                ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                                : <XCircle className="w-4 h-4" />
-                                            }
-                                            Confirm Reject
-                                        </button>
+                            {showRejectInput && isApprover &&
+                                (selectedItem.status === 'manager_approval' || selectedItem.status === 'submitted') && (
+                                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-3">
+                                        <p className="text-sm font-semibold text-red-700">Rejection Reason</p>
+                                        <textarea
+                                            rows={3}
+                                            value={rejectReason}
+                                            onChange={e => setRejectReason(e.target.value)}
+                                            placeholder="Explain reason for rejection..."
+                                            className="w-full px-3 py-2 bg-white border border-red-300 rounded-lg text-sm resize-none focus:outline-none focus:border-red-500"
+                                            style={{ color: '#111827' }}
+                                        />
+                                        <div className="flex gap-2">
+                                            <button onClick={() => setShowRejectInput(false)}
+                                                className="px-4 py-2 text-sm text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                                                Cancel
+                                            </button>
+                                            <button onClick={() => handleReject(selectedItem)} disabled={processing}
+                                                className="px-4 py-2 text-sm text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50">
+                                                {processing
+                                                    ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                    : <XCircle className="w-4 h-4" />
+                                                }
+                                                Confirm Reject
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
-                            )}
+                                )}
 
                             {/* Approval action buttons */}
-                            {isApprover && selectedItem.status === 'manager_approval' && !showRejectInput && (
-                                <div className="flex gap-3 pt-2 border-t border-gray-200">
-                                    <button onClick={() => setShowRejectInput(true)}
-                                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-50 text-red-700 border border-red-200 rounded-xl hover:bg-red-100 transition-colors text-sm font-medium">
-                                        <XCircle className="w-4 h-4" /> Reject
-                                    </button>
-                                    <button onClick={() => handleApprove(selectedItem)} disabled={processing}
-                                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-50 text-green-700 border border-green-200 rounded-xl hover:bg-green-100 transition-colors text-sm font-medium disabled:opacity-50">
-                                        {processing
-                                            ? <div className="w-4 h-4 border-2 border-green-400/40 border-t-green-600 rounded-full animate-spin" />
-                                            : <CheckCircle className="w-4 h-4" />
-                                        }
-                                        Approve
-                                    </button>
-                                </div>
-                            )}
+                            {isApprover &&
+                                (selectedItem.status === 'manager_approval' || selectedItem.status === 'submitted') &&
+                                !showRejectInput && (
+                                    <div className="flex gap-3 pt-2 border-t border-gray-200">
+                                        <button onClick={() => setShowRejectInput(true)}
+                                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-50 text-red-700 border border-red-200 rounded-xl hover:bg-red-100 transition-colors text-sm font-medium">
+                                            <XCircle className="w-4 h-4" /> Reject
+                                        </button>
+                                        <button onClick={() => handleApprove(selectedItem)} disabled={processing}
+                                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-50 text-green-700 border border-green-200 rounded-xl hover:bg-green-100 transition-colors text-sm font-medium disabled:opacity-50">
+                                            {processing
+                                                ? <div className="w-4 h-4 border-2 border-green-400/40 border-t-green-600 rounded-full animate-spin" />
+                                                : <CheckCircle className="w-4 h-4" />
+                                            }
+                                            Approve
+                                        </button>
+                                    </div>
+                                )}
 
                             {/* Link to quotation/PO page */}
                             <button
