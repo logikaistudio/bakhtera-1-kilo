@@ -2062,7 +2062,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                                     <thead className="bg-accent-orange">
                                                         <tr>
                                                             <th className="px-2 py-2 text-center text-xs text-white w-10 font-normal">No</th>
-                                                            <th className="px-2 py-2 text-left text-xs text-white w-44 font-normal">Kode</th>
+                                                            <th className="px-2 py-2 text-left text-xs text-white min-w-[160px] font-normal">Kode</th>
                                                             <th className="px-2 py-2 text-left text-xs text-white min-w-[180px] font-normal">Item</th>
                                                             <th className="px-2 py-2 text-left text-xs text-white min-w-[200px] font-normal">Description</th>
                                                             <th className="px-2 py-2 text-center text-xs text-white w-20 font-normal">Qty</th>
@@ -2084,7 +2084,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                                             <tr key={index} className="hover:bg-dark-surface/50 smooth-transition">
                                                                 <td className="px-2 py-2 text-center text-silver-light text-xs">{index + 1}</td>
                                                                 <td className="px-2 py-2">
-                                                                    <span className="text-xs font-mono text-accent-orange">
+                                                                    <span className="text-xs font-mono text-accent-orange whitespace-nowrap">
                                                                         {item._coa_code || '-'}
                                                                     </span>
                                                                 </td>
