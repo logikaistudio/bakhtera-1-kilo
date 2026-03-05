@@ -35,6 +35,7 @@ export const APP_MENUS = {
             { code: 'bridge_dashboard', label: 'Dashboard Bridge', group: 'Operasional', path: '/bridge' },
             { code: 'bridge_pengajuan', label: 'Pengajuan', group: 'Operasional', path: '/bridge/pengajuan' },
             { code: 'bridge_ata_carnet', label: 'ATA Carnet', group: 'Operasional', path: '/bridge/ata-carnet' },
+            { code: 'bridge_asset_inventory', label: 'Asset Inventory', group: 'Operasional', path: '/bridge/asset-inventory' },
             { code: 'bridge_inventory', label: 'Inventaris Gudang', group: 'Operasional', path: '/bridge/inventory' },
             { code: 'bridge_outbound', label: 'Laporan Barang Keluar', group: 'Operasional', path: '/bridge/outbound-inventory' },
             { code: 'bridge_movement', label: 'Pergerakan Barang', group: 'Operasional', path: '/bridge/goods-movement' },

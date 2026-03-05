@@ -139,6 +139,7 @@ const Sidebar = () => {
         {
             type: 'category', label: '📦 Operasional', items: [
                 { path: '/bridge/ata-carnet', label: 'ATA Carnet', menuCode: 'bridge_ata_carnet' },
+                { path: '/bridge/asset-inventory', label: 'Asset Inventory', menuCode: 'bridge_asset_inventory' },
                 { path: '/bridge/pengajuan', label: 'Pengajuan', menuCode: 'bridge_pengajuan' },
                 { path: '/bridge/inventory', label: 'Inventaris Gudang', menuCode: 'bridge_inventory' },
                 { path: '/bridge/outbound-inventory', label: 'Laporan Barang Keluar', menuCode: 'bridge_outbound' },

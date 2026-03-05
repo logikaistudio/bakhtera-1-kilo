@@ -60,6 +60,7 @@ import ItemMaster from './pages/Bridge/ItemMaster';
 import HSMaster from './pages/Bridge/HSMaster';
 import PengajuanManagement from './pages/Bridge/PengajuanManagement';
 import AtaCarnet from './pages/Bridge/AtaCarnet';
+import AssetInventory from './pages/Bridge/AssetInventory';
 import BridgeFinance from './pages/Bridge/BridgeFinance';
 import GoodsMovement from './pages/Bridge/GoodsMovement';
 import WarehouseInventory from './pages/Bridge/WarehouseInventory';
@@ -172,6 +173,7 @@ function App() {
                     <Route path="/bridge/hs-master" element={<ProtectedRoute menuCode="bridge_hs_master"><HSMaster /></ProtectedRoute>} />
                     <Route path="/bridge/pengajuan" element={<ProtectedRoute menuCode="bridge_pengajuan"><PengajuanManagement /></ProtectedRoute>} />
                     <Route path="/bridge/ata-carnet" element={<ProtectedRoute menuCode="bridge_ata_carnet"><AtaCarnet /></ProtectedRoute>} />
+                    <Route path="/bridge/asset-inventory" element={<ProtectedRoute menuCode="bridge_asset_inventory"><AssetInventory /></ProtectedRoute>} />
                     <Route path="/bridge/finance/*" element={<ProtectedRoute menuCode="bridge_finance"><BridgeFinance /></ProtectedRoute>} />
                     <Route path="/bridge/goods-movement" element={<ProtectedRoute menuCode="bridge_movement"><GoodsMovement /></ProtectedRoute>} />
                     <Route path="/bridge/inventory" element={<ProtectedRoute menuCode="bridge_inventory"><WarehouseInventory /></ProtectedRoute>} />
