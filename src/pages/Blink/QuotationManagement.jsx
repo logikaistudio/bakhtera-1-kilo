@@ -14,8 +14,10 @@ import {
     CheckCircle, Clock, XCircle, Send, ArrowRight, TrendingUp, Users, Eye, Edit,
     Plus, Check, Filter, Download, Search, Trash, Circle
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 const QuotationManagement = () => {
+    const { canCreate, canEdit, canDelete, canView, canApprove } = useAuth();
     const navigate = useNavigate();
     const { customers, companySettings } = useData();
     const [showModal, setShowModal] = useState(false);
@@ -173,6 +175,10 @@ const QuotationManagement = () => {
 
     const handleSubmit = async (e, status = 'draft') => {
         e.preventDefault();
+        if (!canCreate('blink_quotations')) {
+            alert('Anda tidak memiliki hak akses untuk membuat Quotation.');
+            return;
+        }
 
         // Generate Job Number using centralized generator - Format: BLKYYMM-XXXX
         const jobNumber = await generateQuotationNumber();
@@ -247,6 +253,10 @@ const QuotationManagement = () => {
 
 
     const handleManagerReject = async (quotationId, reason) => {
+        if (!canApprove('blink_quotations')) {
+            alert('Anda tidak memiliki hak akses untuk menolak Quotation.');
+            return;
+        }
         const rejectionReason = prompt('Reject reason (optional):');
         try {
             const { error } = await supabase
@@ -270,6 +280,10 @@ const QuotationManagement = () => {
 
     // Handle edit quotation
     const handleEditQuotation = () => {
+        if (!canEdit('blink_quotations')) {
+            alert('Anda tidak memiliki hak akses untuk mengedit Quotation.');
+            return;
+        }
         setEditedQuotation({ ...viewingQuotation });
         setIsEditingQuotation(true);
     };
@@ -378,6 +392,10 @@ const QuotationManagement = () => {
 
     // Delete quotation
     const handleDeleteQuotation = async (quotationId) => {
+        if (!canDelete('blink_quotations')) {
+            alert('Anda tidak memiliki hak akses untuk menghapus Quotation.');
+            return;
+        }
         try {
             // First, get quotation details to show what will be deleted
             const quotation = quotations.find(q => q.id === quotationId);
@@ -479,6 +497,10 @@ const QuotationManagement = () => {
 
     // Request revision from customer
     const handleRequestRevision = async (quotationId) => {
+        if (!canEdit('blink_quotations')) {
+            alert('Anda tidak memiliki hak akses untuk meminta revisi.');
+            return;
+        }
         const reason = prompt('Revision reason from customer:');
         if (!reason || reason.trim() === '') {
             alert('Revision reason is required');
@@ -507,6 +529,10 @@ const QuotationManagement = () => {
 
     // Create revision (new version) of quotation
     const handleCreateRevision = async (quotationId) => {
+        if (!canCreate('blink_quotations')) {
+            alert('Anda tidak memiliki hak akses untuk membuat revisi Quotation.');
+            return;
+        }
         try {
             const parentQuotation = quotations.find(q => q.id === quotationId);
             if (!parentQuotation) {
@@ -576,6 +602,10 @@ const QuotationManagement = () => {
 
     // Update quotation status
     const handleUpdateStatus = async (quotationId, newStatus) => {
+        if (!canApprove('blink_quotations')) {
+            alert('Anda tidak memiliki hak akses untuk mengubah status (Approve) Quotation.');
+            return;
+        }
         try {
             const { error } = await supabase
                 .from('blink_quotations')
@@ -735,6 +765,10 @@ const QuotationManagement = () => {
 
     // Create SO from approved quotation
     const handleCreateSO = async (quotation) => { // Added async
+        if (!canCreate('blink_shipments') || !canEdit('blink_quotations')) {
+            alert('Anda tidak memiliki izin (Create Shipment / Edit Quotation) untuk mengubah ke Sales Order.');
+            return;
+        }
         console.log('🔵 Create SO clicked for quotation:', quotation.id);
         // Generate SO Number using centralized generator - Format: BLKYYMM-SO-XXXX
         const { generateSONumber } = await import('../../utils/documentNumbers');
@@ -871,9 +905,11 @@ const QuotationManagement = () => {
                     <h1 className="text-3xl font-bold gradient-text">Operations Quotation</h1>
                     <p className="text-silver-dark mt-1">Manage operational quotations</p>
                 </div>
-                <Button onClick={() => setShowModal(true)} icon={Plus}>
-                    New Quotation
-                </Button>
+                {canCreate('blink_quotations') && (
+                    <Button onClick={() => setShowModal(true)} icon={Plus}>
+                        New Quotation
+                    </Button>
+                )}
             </div>
 
             {/* Search Bar */}
@@ -1494,17 +1530,21 @@ const QuotationManagement = () => {
 
                                 {!isEditingQuotation && (
                                     <>
-                                        <Button size="sm" variant="secondary" icon={Edit} onClick={handleEditQuotation}>
-                                            Edit
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="danger"
-                                            icon={Trash}
-                                            onClick={() => handleDeleteQuotation(viewingQuotation.id)}
-                                        >
-                                            Delete
-                                        </Button>
+                                        {canEdit('blink_quotations') && (
+                                            <Button size="sm" variant="secondary" icon={Edit} onClick={handleEditQuotation}>
+                                                Edit
+                                            </Button>
+                                        )}
+                                        {canDelete('blink_quotations') && (
+                                            <Button
+                                                size="sm"
+                                                variant="danger"
+                                                icon={Trash}
+                                                onClick={() => handleDeleteQuotation(viewingQuotation.id)}
+                                            >
+                                                Delete
+                                            </Button>
+                                        )}
                                     </>
                                 )}
                                 {isEditingQuotation && (
@@ -1841,12 +1881,16 @@ const QuotationManagement = () => {
                                 {/* Draft Actions */}
                                 {viewingQuotation.status === 'draft' && !isEditingQuotation && (
                                     <>
-                                        <Button onClick={() => handleUpdateStatus(viewingQuotation.id, 'manager_approval')}>
-                                            Submit for Manager Approval
-                                        </Button>
-                                        <Button variant="secondary" onClick={handleEditQuotation} icon={Edit}>
-                                            Edit
-                                        </Button>
+                                        {canEdit('blink_quotations') && (
+                                            <>
+                                                <Button onClick={() => handleUpdateStatus(viewingQuotation.id, 'manager_approval')}>
+                                                    Submit for Manager Approval
+                                                </Button>
+                                                <Button variant="secondary" onClick={handleEditQuotation} icon={Edit}>
+                                                    Edit
+                                                </Button>
+                                            </>
+                                        )}
                                     </>
                                 )}
 
@@ -1862,7 +1906,7 @@ const QuotationManagement = () => {
                                 )}
 
                                 {/* Manager Approval */}
-                                {viewingQuotation.status === 'manager_approval' && (
+                                {viewingQuotation.status === 'manager_approval' && canApprove('blink_quotations') && (
                                     <>
                                         <Button
                                             onClick={() => {
@@ -1887,14 +1931,14 @@ const QuotationManagement = () => {
 
 
                                 {/* Create Revision (for revision_requested status) */}
-                                {viewingQuotation.status === 'revision_requested' && (
+                                {viewingQuotation.status === 'revision_requested' && canCreate('blink_quotations') && (
                                     <Button onClick={() => handleCreateRevision(viewingQuotation.id)} className="bg-blue-500/20 hover:bg-blue-500/30 text-blue-400">
                                         📝 Create Revision
                                     </Button>
                                 )}
 
                                 {/* Create SO */}
-                                {viewingQuotation.status === 'approved' && !viewingQuotation.is_superseded && (
+                                {viewingQuotation.status === 'approved' && !viewingQuotation.is_superseded && canCreate('blink_shipments') && canEdit('blink_quotations') && (
                                     <Button onClick={() => handleCreateSO(viewingQuotation)}>
                                         Create Sales Order
                                     </Button>

@@ -4,8 +4,10 @@ import Modal from '../../components/Common/Modal';
 import Button from '../../components/Common/Button';
 import { Plus, Building, MapPin, CreditCard, Upload, X, Image as ImageIcon, Trash2, Phone, Mail, FileText } from 'lucide-react';
 import { validateAndConvertImage } from '../../utils/validateImage';
+import { useAuth } from '../../context/AuthContext';
 
 const BlinkCompanySettings = () => {
+    const { canEdit, canCreate, canDelete } = useAuth();
     const {
         companySettings, // Blink Settings (default)
         bankAccounts, // Blink Bank Accounts (default)
@@ -59,6 +61,10 @@ const BlinkCompanySettings = () => {
 
     // Handle company info save
     const handleSaveCompanyInfo = async () => {
+        if (!canEdit('blink_settings')) {
+            alert('Anda tidak memiliki hak akses untuk mengubah pengaturan perusahaan.');
+            return;
+        }
         setIsSaving(true);
         try {
             console.log(`💾 Saving ${MODULE} company info...`);
@@ -87,6 +93,10 @@ const BlinkCompanySettings = () => {
 
     // Handle logo upload
     const handleLogoUpload = async (e) => {
+        if (!canEdit('blink_settings')) {
+            alert('Anda tidak memiliki hak akses untuk mengubah logo perusahaan.');
+            return;
+        }
         const file = e.target.files[0];
         if (!file) return;
 
@@ -112,6 +122,10 @@ const BlinkCompanySettings = () => {
 
     // Bank Account Handlers
     const handleAddBank = () => {
+        if (!canCreate('blink_settings')) {
+            alert('Anda tidak memiliki hak akses untuk menambah rekening bank.');
+            return;
+        }
         setEditingBank(null);
         setBankFormData({
             bank_name: '',
@@ -125,6 +139,10 @@ const BlinkCompanySettings = () => {
     };
 
     const handleEditBank = (bank) => {
+        if (!canEdit('blink_settings')) {
+            alert('Anda tidak memiliki hak akses untuk mengubah rekening bank.');
+            return;
+        }
         setEditingBank(bank);
         setBankFormData({
             bank_name: bank.bank_name,
@@ -138,6 +156,10 @@ const BlinkCompanySettings = () => {
     };
 
     const handleDeleteBank = async (id) => {
+        if (!canDelete('blink_settings')) {
+            alert('Anda tidak memiliki hak akses untuk menghapus rekening bank.');
+            return;
+        }
         if (window.confirm('Hapus rekening ini?')) {
             try {
                 await deleteBankAccount(id, MODULE);
@@ -242,9 +264,11 @@ const BlinkCompanySettings = () => {
                         </div>
 
                         <div className="mt-6 flex justify-end">
-                            <Button onClick={handleSaveCompanyInfo} disabled={isSaving}>
-                                {isSaving ? 'Menyimpan...' : 'Simpan Perubahan'}
-                            </Button>
+                            {canEdit('blink_settings') && (
+                                <Button onClick={handleSaveCompanyInfo} disabled={isSaving}>
+                                    {isSaving ? 'Menyimpan...' : 'Simpan Perubahan'}
+                                </Button>
+                            )}
                         </div>
                     </div>
 
@@ -255,9 +279,11 @@ const BlinkCompanySettings = () => {
                                 <CreditCard className="h-5 w-5 text-gray-500" />
                                 Rekening Bank
                             </h2>
-                            <Button size="sm" onClick={handleAddBank} Icon={Plus}>
-                                Tambah Rekening
-                            </Button>
+                            {canCreate('blink_settings') && (
+                                <Button size="sm" onClick={handleAddBank} Icon={Plus}>
+                                    Tambah Rekening
+                                </Button>
+                            )}
                         </div>
 
                         <div className="space-y-3">
@@ -273,18 +299,22 @@ const BlinkCompanySettings = () => {
                                             {bank.branch && <div className="text-xs text-gray-500">Cabang: {bank.branch}</div>}
                                         </div>
                                         <div className="flex gap-2">
-                                            <button
-                                                onClick={() => handleEditBank(bank)}
-                                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
-                                            >
-                                                Edit
-                                            </button>
-                                            <button
-                                                onClick={() => handleDeleteBank(bank.id)}
-                                                className="p-1.5 text-red-600 hover:bg-red-50 rounded"
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </button>
+                                            {canEdit('blink_settings') && (
+                                                <button
+                                                    onClick={() => handleEditBank(bank)}
+                                                    className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
+                                                >
+                                                    Edit
+                                                </button>
+                                            )}
+                                            {canDelete('blink_settings') && (
+                                                <button
+                                                    onClick={() => handleDeleteBank(bank.id)}
+                                                    className="p-1.5 text-red-600 hover:bg-red-50 rounded"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 ))
@@ -332,8 +362,17 @@ const BlinkCompanySettings = () => {
                                 disabled={isUploading}
                             />
                             <label
-                                htmlFor="logo-upload"
-                                className="cursor-pointer bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50 flex items-center gap-2 shadow-sm"
+                                htmlFor={canEdit('blink_settings') ? "logo-upload" : ""}
+                                className={`bg-white border text-gray-700 px-4 py-2 rounded-md flex items-center gap-2 shadow-sm ${canEdit('blink_settings')
+                                        ? 'cursor-pointer hover:bg-gray-50 border-gray-300'
+                                        : 'cursor-not-allowed border-gray-100 opacity-50 bg-gray-50'
+                                    }`}
+                                onClick={(e) => {
+                                    if (!canEdit('blink_settings')) {
+                                        e.preventDefault();
+                                        alert('Anda tidak memiliki hak akses untuk mengubah logo.');
+                                    }
+                                }}
                             >
                                 <Upload className="h-4 w-4" />
                                 {logoUrl ? 'Ganti Logo' : 'Upload Logo'}

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { printReport, fmtDatePrint } from '../../utils/printPDF';
 import { useData } from '../../context/DataContext';
+import { useAuth } from '../../context/AuthContext';
 
 // ─── Source badge config ─────────────────────────────────────────────────────
 const SOURCE_CONFIG = {
@@ -78,6 +79,7 @@ const fmtIDR = (value) => {
 const GeneralJournal = () => {
     const navigate = useNavigate();
     const { companySettings } = useData();
+    const { canCreate, canDelete } = useAuth();
 
     const [entries, setEntries] = useState([]);
     const [accounts, setAccounts] = useState([]);
@@ -241,6 +243,10 @@ const GeneralJournal = () => {
     };
 
     const saveEntry = async () => {
+        if (!canCreate('blink_journal')) {
+            alert('Anda tidak memiliki hak akses untuk membuat entri jurnal manual.');
+            return;
+        }
         if (!isBalanced()) { alert('Journal entry must balance! Total Debit must equal Total Credit.'); return; }
         if (!newEntry.description) { alert('Description is required.'); return; }
         try {
@@ -285,6 +291,10 @@ const GeneralJournal = () => {
 
     // ── Delete ──────────────────────────────────────────────────────────────────
     const deleteEntry = async (batchId) => {
+        if (!canDelete('blink_journal')) {
+            alert('Anda tidak memiliki hak akses untuk menghapus entri jurnal manual.');
+            return;
+        }
         if (!confirm('Delete this journal entry? This cannot be undone.')) return;
         try {
             const { error } = await supabase.from('blink_journal_entries').delete().eq('batch_id', batchId);
@@ -437,7 +447,9 @@ const GeneralJournal = () => {
                         className="flex items-center gap-2 px-3 py-2 bg-dark-surface text-red-400 hover:bg-dark-card border border-dark-border rounded-lg smooth-transition text-xs disabled:opacity-40">
                         <Printer className="w-4 h-4" /> Print PDF
                     </button>
-                    <Button icon={Plus} onClick={() => setShowNewEntryModal(true)}>Manual Entry</Button>
+                    {canCreate('blink_journal') && (
+                        <Button icon={Plus} onClick={() => setShowNewEntryModal(true)}>Manual Entry</Button>
+                    )}
                 </div>
             </div>
 
@@ -684,7 +696,7 @@ const GeneralJournal = () => {
                                     </button>
                                 )}
                                 {/* Delete (manual only) */}
-                                {selectedGroup.source === 'manual' && (
+                                {selectedGroup.source === 'manual' && canDelete('blink_journal') && (
                                     <button
                                         onClick={() => deleteEntry(selectedGroup.batch_id)}
                                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 rounded-lg border border-red-500/30 smooth-transition"

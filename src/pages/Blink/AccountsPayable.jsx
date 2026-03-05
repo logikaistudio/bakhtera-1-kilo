@@ -7,6 +7,7 @@ import {
     Search, Download, FileText, Calendar, CheckCircle, Eye, X,
     Building, CreditCard, Banknote, History
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 // AP Payment Record Modal Component
 const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
@@ -480,7 +481,7 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
 };
 
 // AP Detail Modal Component
-const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment }) => {
+const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment, canEditAP }) => {
     const [paymentHistory, setPaymentHistory] = useState([]);
     const [loadingHistory, setLoadingHistory] = useState(true);
     const [accounts, setAccounts] = useState([]); // COA list
@@ -563,6 +564,10 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment }) => {
     };
 
     const handleItemCoaChange = async (index, newCoaId) => {
+        if (!canEditAP) {
+            alert('Anda tidak memiliki hak akses untuk mengubah akun beban.');
+            return;
+        }
         const updatedItems = [...poItems];
         updatedItems[index] = {
             ...updatedItems[index],
@@ -784,7 +789,7 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment }) => {
                     <Button variant="secondary" onClick={onClose}>
                         Close
                     </Button>
-                    {ap.outstanding_amount > 0 && (
+                    {ap.outstanding_amount > 0 && canEditAP && (
                         <Button icon={DollarSign} onClick={onRecordPayment}>
                             Record Payment
                         </Button>
@@ -796,6 +801,7 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment }) => {
 };
 
 const AccountsPayable = () => {
+    const { canEdit, canCreate, canDelete } = useAuth();
     const [apTransactions, setAPTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all');
@@ -1085,6 +1091,7 @@ const AccountsPayable = () => {
                         setSelectedAP(null);
                     }}
                     onRecordPayment={() => handleRecordPayment(selectedAP)}
+                    canEditAP={canEdit('blink_ap')}
                 />
             )}
 

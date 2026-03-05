@@ -5,8 +5,10 @@ import SellingBuyingDetailModal from '../../components/Blink/SellingBuyingDetail
 import { Ship, Plus, MapPin, Filter, Search, Download, X, ShoppingCart, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 
 const ShipmentManagement = () => {
+    const { canCreate, canEdit, canDelete, canView, canApprove, canAccess } = useAuth();
     const [filter, setFilter] = useState('all');
     const [shipments, setShipments] = useState([]);
     const [selectedShipment, setSelectedShipment] = useState(null);
@@ -182,6 +184,10 @@ const ShipmentManagement = () => {
 
     const handleGeneratePOFromList = async (ship, e) => {
         e.stopPropagation();
+        if (!canCreate('blink_purchase_order')) {
+            alert('Anda tidak memiliki hak akses untuk membuat PO.');
+            return;
+        }
         try {
             // Gather buying items from the shipment
             const buyingItems = ship.buyingItems || ship.buying_items || [];
@@ -297,6 +303,10 @@ const ShipmentManagement = () => {
 
     // Handle update shipment
     const handleUpdateShipment = async (updatedShipment) => {
+        if (!canEdit('blink_shipments')) {
+            alert('Anda tidak memiliki hak akses untuk mengedit shipment ini.');
+            return;
+        }
         try {
             // Helper to safely handle UUID fields
             const safeUUID = (value) => {
@@ -618,6 +628,8 @@ const ShipmentManagement = () => {
                 shipment={selectedShipment}
                 onUpdate={handleUpdateShipment}
                 onViewAnalysis={handleViewAnalysis}
+                canEditShipment={canEdit('blink_shipments')}
+                canCreatePO={canCreate('blink_purchase_order')}
             />
 
             {/* Selling Buying Analysis Modal */}

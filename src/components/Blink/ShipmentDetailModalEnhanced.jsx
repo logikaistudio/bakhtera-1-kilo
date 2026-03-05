@@ -30,7 +30,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import COAPicker from '../Common/COAPicker';
 
-const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onViewAnalysis }) => {
+const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onViewAnalysis, canEditShipment = true, canCreatePO = true }) => {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('details');
     const [isEditing, setIsEditing] = useState(false);
@@ -1167,21 +1167,23 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                         <div className="flex gap-2 items-center">
                             {((!isEditing && activeTab !== 'cogs') || (activeTab === 'cogs' && !isEditingCOGS)) && (
                                 <>
-                                    <Button
-                                        size="sm"
-                                        variant="secondary"
-                                        icon={Edit}
-                                        onClick={() => {
-                                            if (activeTab === 'cogs') {
-                                                setIsEditingCOGS(true);
-                                            } else {
-                                                setIsEditing(true);
-                                            }
-                                        }}
-                                    >
-                                        Edit
-                                    </Button>
-                                    {activeTab === 'cogs' && calculateTotalCOGS() > 0 && currentStatus === 'approved' && (
+                                    {canEditShipment && (
+                                        <Button
+                                            size="sm"
+                                            variant="secondary"
+                                            icon={Edit}
+                                            onClick={() => {
+                                                if (activeTab === 'cogs') {
+                                                    setIsEditingCOGS(true);
+                                                } else {
+                                                    setIsEditing(true);
+                                                }
+                                            }}
+                                        >
+                                            Edit
+                                        </Button>
+                                    )}
+                                    {canCreatePO && activeTab === 'cogs' && calculateTotalCOGS() > 0 && currentStatus === 'approved' && (
                                         <Button
                                             size="sm"
                                             variant="outline"

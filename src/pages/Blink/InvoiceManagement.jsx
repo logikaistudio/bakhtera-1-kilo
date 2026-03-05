@@ -12,11 +12,13 @@ import {
     Plus, Send, AlertCircle, Download, Eye, Edit, Trash, Receipt,
     TrendingUp, AlertTriangle, Search, Filter, X, Package, Circle
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import InvoiceProfitSummary from '../../components/Blink/InvoiceProfitSummary';
 
 
 const InvoiceManagement = () => {
     const navigate = useNavigate();
+    const { canCreate, canEdit, canDelete, canApprove } = useAuth();
     const { companySettings, bankAccounts } = useData();
     const [invoices, setInvoices] = useState([]);
     const [quotations, setQuotations] = useState([]);
@@ -864,6 +866,10 @@ const InvoiceManagement = () => {
     };
 
     const handleSubmitInvoice = async (invoice) => {
+        if (!canApprove('blink_invoices')) {
+            alert('Anda tidak memiliki hak akses untuk approve invoice.');
+            return;
+        }
         if (!confirm(`Approve invoice ${invoice.invoice_number}? Invoice akan masuk hitungan AR.`)) return;
 
         try {
@@ -905,6 +911,10 @@ const InvoiceManagement = () => {
     // Works for any status, including paid. After adding, status resets to draft.
     // Also syncs changes to linked Quotation (service_items) and Shipment (selling_items).
     const handleAddItemToInvoice = async (invoice, newItems, amendmentNote) => {
+        if (!canEdit('blink_invoices')) {
+            alert('Anda tidak memiliki hak akses untuk memanipulasi (Edit) invoice.');
+            return;
+        }
         try {
             const taxRate = invoice.tax_rate || 0;
             const discountAmount = invoice.discount_amount || 0;
@@ -1080,9 +1090,11 @@ const InvoiceManagement = () => {
                     <h1 className="text-3xl font-bold gradient-text">Invoice Management</h1>
                     <p className="text-silver-dark mt-1">Kelola invoice dan tracking pembayaran</p>
                 </div>
-                <Button onClick={() => setShowCreateModal(true)} icon={Plus}>
-                    Buat Invoice Baru
-                </Button>
+                {canCreate('blink_invoices') && (
+                    <Button onClick={() => setShowCreateModal(true)} icon={Plus}>
+                        Buat Invoice Baru
+                    </Button>
+                )}
             </div>
 
             {/* Summary Cards - Compact */}
@@ -1267,6 +1279,8 @@ const InvoiceManagement = () => {
                             setShowAddItemModal(true);
                         }}
                         statusConfig={statusConfig}
+                        canEditInvoice={canEdit('blink_invoices')}
+                        canApproveInvoice={canApprove('blink_invoices')}
                     />
                 )
             }
@@ -1926,7 +1940,7 @@ const InvoiceCreateModal = ({ quotations, shipments, formData, setFormData, sele
 };
 
 // Invoice View Modal Component
-const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint, onPreview, onSubmit, onAddItem, statusConfig }) => {
+const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint, onPreview, onSubmit, onAddItem, statusConfig, canEditInvoice, canApproveInvoice }) => {
     const [payments, setPayments] = useState([]);
     const [loadingPayments, setLoadingPayments] = useState(true);
 
@@ -2234,7 +2248,7 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                         </button>
 
                         {/* Add Item — always visible, all statuses including paid */}
-                        {onAddItem && (
+                        {onAddItem && canEditInvoice && (
                             <button
                                 onClick={onAddItem}
                                 className="flex items-center gap-2 px-4 py-2 border border-yellow-500 text-yellow-400 rounded-lg hover:bg-yellow-500/10 smooth-transition font-semibold"
@@ -2263,7 +2277,7 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                                 Preview
                             </button>
                         )}
-                        {invoice.status === 'draft' && onSubmit && (
+                        {invoice.status === 'draft' && onSubmit && canApproveInvoice && (
                             <button
                                 onClick={onSubmit}
                                 className="flex items-center gap-2 px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg smooth-transition font-semibold"

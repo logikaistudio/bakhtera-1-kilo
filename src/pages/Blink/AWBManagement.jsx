@@ -13,8 +13,10 @@ import {
     User
 } from 'lucide-react';
 import { printBLCertificate } from '../../utils/printUtils'; // We can reuse print logic or create printAWBUtils later
+import { useAuth } from '../../context/AuthContext';
 
 const AWBManagement = () => {
+    const { canEdit } = useAuth();
     const [awbs, setAwbs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -142,6 +144,10 @@ const AWBManagement = () => {
     };
 
     const handleUpdateAWB = async () => {
+        if (!canEdit('blink_awb')) {
+            alert('Anda tidak memiliki hak akses untuk memanipulasi (Edit) AWB.');
+            return;
+        }
         try {
             // Mapping back AWB fields to the generic BL columns in DB
             const { error } = await supabase
@@ -327,7 +333,9 @@ const AWBManagement = () => {
                                         <Button size="sm" variant="secondary" onClick={() => setIsEditing(false)}>Cancel</Button>
                                     </>
                                 ) : (
-                                    <Button size="sm" variant="secondary" onClick={() => setIsEditing(true)}>Edit Document</Button>
+                                    canEdit('blink_awb') && (
+                                        <Button size="sm" variant="secondary" onClick={() => setIsEditing(true)}>Edit Document</Button>
+                                    )
                                 )}
                                 <button onClick={() => setShowEditModal(false)} className="mx-2 text-gray-400 hover:text-white">✕</button>
                             </div>

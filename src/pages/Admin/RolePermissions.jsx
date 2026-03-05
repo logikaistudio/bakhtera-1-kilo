@@ -321,7 +321,7 @@ const RolePermissions = () => {
         if (!trimmed) return;
         const id = trimmed.toLowerCase().replace(/\s+/g, '_');
         if (roles.find(r => r.id === id)) {
-            setNotification({ type: 'error', message: 'Role dengan nama tersebut sudah ada.' });
+            alert('Role dengan nama tersebut sudah ada.');
             return;
         }
         const newRole = { id, label: trimmed, color: 'gray' };
@@ -515,7 +515,7 @@ const RolePermissions = () => {
             <div style={{ background: '#ffffff', borderRadius: 16, border: '1px solid #e5e7eb', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
 
                 {/* Role Tabs */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0 16px', paddingTop: 12, overflowX: 'auto', borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, padding: '12px 16px 8px 16px', borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
                     {roles.map(role => (
                         <div key={role.id} className="relative flex-shrink-0 group">
                             {editingRoleId === role.id ? (

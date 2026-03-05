@@ -93,6 +93,8 @@ export const APP_MENUS = {
             { code: 'blink_routes', label: 'Master Routes', group: 'Master Data', path: '/blink/master/routes' },
             { code: 'blink_partners', label: 'Business Partners', group: 'Master Data', path: '/blink/master/partners' },
             { code: 'blink_settings', label: 'Module Settings', group: 'Master Data', path: '/blink/master/settings' },
+            // ─── Approval ───
+            { code: 'blink_approval', label: 'Approval Center', group: 'Approval', path: '/blink/approvals' },
         ],
     },
 

@@ -9,8 +9,10 @@ import {
     FileText, Plus, Search, Filter, Eye, Download, CheckCircle,
     XCircle, Clock, Package, DollarSign, TrendingUp, AlertCircle, X, Edit, Save, History, AlertTriangle, Trash2
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 const PurchaseOrder = () => {
+    const { canCreate, canEdit, canDelete, canView, canApprove } = useAuth();
     const { companySettings, businessPartners } = useData();
     const [pos, setPOs] = useState([]);
     const [vendors, setVendors] = useState([]);
@@ -210,6 +212,10 @@ const PurchaseOrder = () => {
 
     const handleCreatePO = async (e) => {
         e.preventDefault();
+        if (!canCreate('blink_purchase_order')) {
+            alert('Anda tidak memiliki hak akses untuk membuat PO.');
+            return;
+        }
         console.log('Starting PO Creation... (Form Data):', formData);
         console.log('Vendor ID present?:', formData.vendor_id);
 
@@ -276,6 +282,10 @@ const PurchaseOrder = () => {
     };
 
     const handleApprovePO = async (po) => {
+        if (!canApprove('blink_purchase_order')) {
+            alert('Anda tidak memiliki hak akses untuk mengubah status (Approve) PO.');
+            return;
+        }
         if (!confirm(`Approve PO ${po.po_number}? This will create an AP entry.`)) return;
 
         try {
@@ -367,6 +377,10 @@ const PurchaseOrder = () => {
     };
 
     const handleSubmitPO = async (po) => {
+        if (!canEdit('blink_purchase_order')) {
+            alert('Anda tidak memiliki hak akses untuk memanipulasi (Submit) PO.');
+            return;
+        }
         if (!confirm(`Submit PO ${po.po_number} for manager approval?`)) return;
 
         try {
@@ -388,6 +402,10 @@ const PurchaseOrder = () => {
     };
 
     const handleDeletePO = async (po) => {
+        if (!canDelete('blink_purchase_order')) {
+            alert('Anda tidak memiliki hak akses untuk menghapus PO.');
+            return;
+        }
         // Don't allow delete if there's already payment
         if (po.paid_amount && po.paid_amount > 0) {
             alert('PO tidak dapat dihapus karena sudah ada pembayaran tercatat.');
@@ -1134,9 +1152,11 @@ const PurchaseOrder = () => {
                     <h1 className="text-3xl font-bold gradient-text">Purchase Orders</h1>
                     <p className="text-silver-dark mt-1">Kelola pembelian dari vendor</p>
                 </div>
-                <Button onClick={() => setShowCreateModal(true)} icon={Plus}>
-                    Buat PO Baru
-                </Button>
+                {canCreate('blink_purchase_order') && (
+                    <Button onClick={() => setShowCreateModal(true)} icon={Plus}>
+                        Buat PO Baru
+                    </Button>
+                )}
             </div>
 
 
@@ -2099,7 +2119,7 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                         </Button>
 
                         {/* Edit Button - Only for draft, locked during pending/approved with payment */}
-                        {po.status === 'draft' && (!po.paid_amount || po.paid_amount <= 0) && (
+                        {po.status === 'draft' && (!po.paid_amount || po.paid_amount <= 0) && canEdit('blink_purchase_order') && (
                             <Button
                                 onClick={onEdit}
                                 icon={Edit}
@@ -2110,7 +2130,7 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                         )}
 
                         {/* Submit Button - Only for draft */}
-                        {po.status === 'draft' && (
+                        {po.status === 'draft' && canEdit('blink_purchase_order') && (
                             <Button
                                 onClick={onSubmit}
                                 icon={CheckCircle}
@@ -2127,19 +2147,21 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                                     <Clock className="w-4 h-4" />
                                     Menunggu Approval Center
                                 </span>
-                                <Button
-                                    onClick={onApprove}
-                                    icon={CheckCircle}
-                                    variant="primary"
-                                    className="!bg-green-600 hover:!bg-green-700 !border-transparent text-white"
-                                >
-                                    Approve PO
-                                </Button>
+                                {canApprove('blink_purchase_order') && (
+                                    <Button
+                                        onClick={onApprove}
+                                        icon={CheckCircle}
+                                        variant="primary"
+                                        className="!bg-green-600 hover:!bg-green-700 !border-transparent text-white"
+                                    >
+                                        Approve PO
+                                    </Button>
+                                )}
                             </>
                         )}
 
                         {/* Delete Button - Only if no payment */}
-                        {(!po.paid_amount || po.paid_amount <= 0) && (
+                        {(!po.paid_amount || po.paid_amount <= 0) && canDelete('blink_purchase_order') && (
                             <Button
                                 onClick={onDelete}
                                 icon={Trash2}

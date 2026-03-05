@@ -19,9 +19,10 @@ import {
 } from 'lucide-react';
 import { exportBLCertificateToExcel, exportSellingBuyingReport } from '../../utils/excelExport';
 import { printBLCertificate } from '../../utils/printUtils';
-
+import { useAuth } from '../../context/AuthContext';
 
 const BLManagement = () => {
+    const { canEdit, canDelete, canApprove } = useAuth();
     const [bls, setBls] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -306,6 +307,10 @@ const BLManagement = () => {
                 ? `Are you sure you want to REJECT this BL/AWB? The document will need revision.`
                 : `Change status to "${statusLabel}"?`;
 
+        if (!canApprove('blink_bl')) {
+            alert('Anda tidak memiliki hak akses untuk mengubah status BL/AWB.');
+            return;
+        }
         if (!confirm(confirmMsg)) return;
 
         try {
@@ -350,6 +355,10 @@ const BLManagement = () => {
     });
 
     const handleDeleteBL = async (blId) => {
+        if (!canDelete('blink_bl')) {
+            alert('Anda tidak memiliki hak akses untuk menghapus BL/AWB.');
+            return;
+        }
         if (!confirm('Are you sure you want to delete this BL? Data will be cleared from the shipment.')) return;
         try {
             const { error } = await supabase.from('blink_shipments')
@@ -416,6 +425,10 @@ const BLManagement = () => {
     }
 
     const handleUpdateBL = async () => {
+        if (!canEdit('blink_bl')) {
+            alert('Anda tidak memiliki hak akses untuk memanipulasi (Edit) BL/AWB.');
+            return;
+        }
         try {
             const selectedQuotation = selectedQuotationId
                 ? quotations.find(q => q.id === selectedQuotationId)
@@ -906,7 +919,9 @@ const BLManagement = () => {
                                         <Button size="sm" variant="secondary" onClick={() => setIsEditing(false)}>Cancel Edit</Button>
                                     </>
                                 ) : (
-                                    <Button size="sm" variant="secondary" onClick={() => setIsEditing(true)}>Edit Document</Button>
+                                    canEdit('blink_bl') && (
+                                        <Button size="sm" variant="secondary" onClick={() => setIsEditing(true)}>Edit Document</Button>
+                                    )
                                 )}
                                 <button
                                     onClick={() => {
@@ -1211,10 +1226,10 @@ const BLManagement = () => {
                                         return (
                                             <React.Fragment key={step}>
                                                 <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold whitespace-nowrap transition-all ${isActive || isRejected
-                                                        ? stepConfig.color + ' ring-2 ring-offset-1 ring-current'
-                                                        : isPast
-                                                            ? 'bg-green-500/20 text-green-400'
-                                                            : 'bg-gray-200/50 dark:bg-dark-bg/50 text-gray-400 dark:text-silver-dark'
+                                                    ? stepConfig.color + ' ring-2 ring-offset-1 ring-current'
+                                                    : isPast
+                                                        ? 'bg-green-500/20 text-green-400'
+                                                        : 'bg-gray-200/50 dark:bg-dark-bg/50 text-gray-400 dark:text-silver-dark'
                                                     }`}>
                                                     {isPast ? <CheckCircle className="w-3 h-3" /> : (() => { const IC = stepConfig.icon; return IC ? <IC className="w-3 h-3" /> : null; })()}
                                                     {stepConfig.label}

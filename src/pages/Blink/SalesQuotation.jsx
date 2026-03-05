@@ -15,8 +15,10 @@ import {
     CheckCircle, Clock, XCircle, Send, ArrowRight, TrendingUp, Users, Eye, Edit,
     Plus, Check, Filter, Download, Search, Trash, Circle
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 const SalesQuotation = () => {
+    const { canCreate, canEdit, canDelete, canApprove } = useAuth();
     const navigate = useNavigate();
     const { customers, companySettings } = useData();
     const [showModal, setShowModal] = useState(false);
@@ -174,6 +176,10 @@ const SalesQuotation = () => {
 
     const handleSubmit = async (e, status = 'draft') => {
         e.preventDefault();
+        if (!canCreate('blink_sales')) {
+            alert('Anda tidak memiliki hak akses untuk membuat quotation.');
+            return;
+        }
 
         // Generate Job Number using centralized generator - Format: SQT-BLKYYMM-XXXX
         const jobNumber = await generateSalesQuotationNumber();
@@ -248,6 +254,10 @@ const SalesQuotation = () => {
 
 
     const handleManagerReject = async (quotationId, reason) => {
+        if (!canApprove('blink_sales')) {
+            alert('Anda tidak memiliki hak akses untuk me-reject quotation.');
+            return;
+        }
         const rejectionReason = prompt('Reject reason (optional):');
         try {
             const { error } = await supabase
@@ -276,6 +286,10 @@ const SalesQuotation = () => {
     };
 
     const handleSaveEditedQuotation = async () => {
+        if (!canEdit('blink_sales')) {
+            alert('Anda tidak memiliki hak akses untuk menyimpan perubahan quotation.');
+            return;
+        }
         try {
             // Calculate total from service items if available
             const total = editedQuotation.serviceItems?.reduce((sum, item) =>
@@ -379,6 +393,10 @@ const SalesQuotation = () => {
 
     // Delete quotation
     const handleDeleteQuotation = async (quotationId) => {
+        if (!canDelete('blink_sales')) {
+            alert('Anda tidak memiliki hak akses untuk menghapus quotation.');
+            return;
+        }
         try {
             // First, get quotation details to show what will be deleted
             const quotation = quotations.find(q => q.id === quotationId);
@@ -736,6 +754,10 @@ const SalesQuotation = () => {
 
     // Create SO from approved quotation
     const handleCreateSO = async (quotation) => { // Added async
+        if (!canApprove('blink_sales')) {
+            alert('Anda tidak memiliki hak akses untuk Approve & Create SO.');
+            return;
+        }
         console.log('🔵 Create SO clicked for quotation:', quotation.id);
         // Generate SO Number using centralized generator - Format: BLKYYMM-SO-XXXX
         const { generateSONumber } = await import('../../utils/documentNumbers');
@@ -872,9 +894,11 @@ const SalesQuotation = () => {
                     <h1 className="text-3xl font-bold gradient-text">Sales Quotation</h1>
                     <p className="text-silver-dark mt-1">Manage quotations untuk customer</p>
                 </div>
-                <Button onClick={() => setShowModal(true)} icon={Plus}>
-                    New Quotation
-                </Button>
+                {canCreate('blink_sales') && (
+                    <Button onClick={() => setShowModal(true)} icon={Plus}>
+                        New Quotation
+                    </Button>
+                )}
             </div>
 
             {/* Search Bar */}

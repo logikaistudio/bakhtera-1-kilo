@@ -7,8 +7,10 @@ import {
     Search, Download, FileText, Calendar, X, CheckCircle, AlertCircle,
     Building, CreditCard, Banknote, History, Receipt, Package, MapPin
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 const AccountsReceivable = () => {
+    const { canEdit, canCreate, canDelete } = useAuth();
     const [arTransactions, setARTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -312,6 +314,7 @@ const AccountsReceivable = () => {
                     onClose={() => setShowEditModal(false)}
                     onRecordPayment={() => setShowPaymentModal(true)}
                     formatCurrency={formatCurrency}
+                    canEditAR={canEdit('blink_ar')}
                 />
             )}
 
@@ -333,7 +336,7 @@ const AccountsReceivable = () => {
 };
 
 // AR Detail Modal Component — mirrors AP Detail Modal format
-const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency }) => {
+const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency, canEditAR }) => {
     const [accounts, setAccounts] = useState([]);
     const [invoiceItems, setInvoiceItems] = useState([]);
     const [invoiceFull, setInvoiceFull] = useState(null);
@@ -405,6 +408,10 @@ const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency }) => {
     };
 
     const handleItemCoaChange = async (index, newCoaId) => {
+        if (!canEditAR) {
+            alert('Anda tidak memiliki hak akses untuk mengubah akun pendapatan.');
+            return;
+        }
         const updatedItems = [...invoiceItems];
         updatedItems[index] = { ...updatedItems[index], coa_id: newCoaId };
         setInvoiceItems(updatedItems);
@@ -639,7 +646,7 @@ const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency }) => {
                     <Button variant="secondary" onClick={onClose}>
                         Close
                     </Button>
-                    {ar.outstanding_amount > 0 && (
+                    {ar.outstanding_amount > 0 && canEditAR && (
                         <Button icon={DollarSign} onClick={onRecordPayment}>
                             Record Payment
                         </Button>
