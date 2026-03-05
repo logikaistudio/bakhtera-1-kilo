@@ -1070,9 +1070,9 @@ const InvoiceManagement = () => {
     const filteredInvoices = invoices.filter(inv => {
         const matchesFilter = filter === 'all' || inv.status === filter;
         const matchesSearch = !searchTerm ||
-            inv.invoice_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            inv.job_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            inv.customer_name.toLowerCase().includes(searchTerm.toLowerCase());
+            inv.invoice_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            inv.job_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            inv.customer_name?.toLowerCase().includes(searchTerm.toLowerCase());
         return matchesFilter && matchesSearch;
     });
 

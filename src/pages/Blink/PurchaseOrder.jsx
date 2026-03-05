@@ -1133,8 +1133,8 @@ const PurchaseOrder = () => {
     const filteredPOs = pos.filter(po => {
         const matchesFilter = filter === 'all' || po.status === filter;
         const matchesSearch = !searchTerm ||
-            po.po_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            po.vendor_name.toLowerCase().includes(searchTerm.toLowerCase());
+            po.po_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            po.vendor_name?.toLowerCase().includes(searchTerm.toLowerCase());
         return matchesFilter && matchesSearch;
     });
 

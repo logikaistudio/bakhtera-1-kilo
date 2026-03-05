@@ -124,9 +124,9 @@ const AccountsReceivable = () => {
 
     const filteredAR = arTransactions.filter(ar => {
         const matchesSearch = !searchTerm ||
-            ar.ar_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            ar.invoice_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            ar.customer_name.toLowerCase().includes(searchTerm.toLowerCase());
+            ar.ar_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            ar.invoice_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            ar.customer_name?.toLowerCase().includes(searchTerm.toLowerCase());
         return matchesSearch;
     });
 
