@@ -288,18 +288,81 @@ const InvoiceManagement = () => {
                     rate: shipment.quoted_amount || 0,
                     amount: shipment.quoted_amount || 0
                 }],
-                // Extract COGS from shipment buying_items
-                cogs_items: shipment.buying_items && Array.isArray(shipment.buying_items)
-                    ? shipment.buying_items.map(item => ({
-                        description: item.description || item.name || 'Cost Item',
-                        qty: item.quantity || item.qty || 1,
-                        unit: item.unit || 'Job',
-                        rate: item.unitPrice || item.rate || item.price || 0,
-                        amount: item.total || item.amount || 0,
-                        vendor: item.vendor || item.supplier || '',
-                        currency: item.currency || shipment.currency || 'IDR'
-                    }))
-                    : [],
+                // Extract COGS from shipment buying_items and old cogs JSON
+                cogs_items: (() => {
+                    const extractedItems = [];
+                    // 1. From Buying Items
+                    if (shipment.buying_items && Array.isArray(shipment.buying_items)) {
+                        shipment.buying_items.forEach(item => {
+                            extractedItems.push({
+                                description: item.description || item.name || 'Cost Item',
+                                qty: item.quantity || item.qty || 1,
+                                unit: item.unit || 'Job',
+                                rate: item.unitPrice || item.rate || item.price || 0,
+                                amount: item.total || item.amount || 0,
+                                vendor: item.vendor || item.supplier || '',
+                                currency: item.currency || shipment.currency || 'IDR'
+                            });
+                        });
+                    }
+
+                    // 2. From Old COGS Box Format (cogs Object)
+                    if (shipment.cogs && typeof shipment.cogs === 'object') {
+                        const cogsCurrency = shipment.cogsCurrency || shipment.cogs_currency || shipment.currency || 'IDR';
+
+                        const parseVal = (val) => {
+                            const parsed = parseFloat(String(val || 0).replace(/,/g, ''));
+                            return isNaN(parsed) ? 0 : parsed;
+                        };
+
+                        const predefinedFields = [
+                            { key: 'oceanFreight', label: 'Ocean Freight' },
+                            { key: 'airFreight', label: 'Air Freight' },
+                            { key: 'trucking', label: 'Trucking' },
+                            { key: 'thc', label: 'THC' },
+                            { key: 'documentation', label: 'Documentation' },
+                            { key: 'customs', label: 'Customs Clearance' },
+                            { key: 'insurance', label: 'Insurance' },
+                            { key: 'demurrage', label: 'Demurrage' },
+                            { key: 'other', label: shipment.cogs.otherDescription || 'Other Charges' }
+                        ];
+
+                        predefinedFields.forEach(field => {
+                            const amount = parseVal(shipment.cogs[field.key]);
+                            if (amount > 0) {
+                                extractedItems.push({
+                                    description: field.label,
+                                    qty: 1,
+                                    unit: 'Job',
+                                    rate: amount,
+                                    amount: amount,
+                                    vendor: '',
+                                    currency: cogsCurrency
+                                });
+                            }
+                        });
+
+                        // 3. Additional costs inside old COGS JSON
+                        if (shipment.cogs.additionalCosts && Array.isArray(shipment.cogs.additionalCosts)) {
+                            shipment.cogs.additionalCosts.forEach(add => {
+                                const amount = parseVal(add.amount);
+                                if (amount > 0 && add.description) {
+                                    extractedItems.push({
+                                        description: add.description,
+                                        qty: 1,
+                                        unit: 'Job',
+                                        rate: amount,
+                                        amount: amount,
+                                        vendor: '',
+                                        currency: cogsCurrency
+                                    });
+                                }
+                            });
+                        }
+                    }
+
+                    return extractedItems;
+                })(),
                 // Pre-fill fields from shipment
                 consignor: shipment.shipper_name || '',
                 consignee: shipment.consignee_name || shipment.customer || '',
