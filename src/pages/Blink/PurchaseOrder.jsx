@@ -1293,6 +1293,9 @@ const PurchaseOrder = () => {
                     <POViewModal
                         po={selectedPO}
                         formatCurrency={formatCurrency}
+                        canEditPO={canEdit('blink_purchase_order')}
+                        canApprovePO={canApprove('blink_purchase_order')}
+                        canDeletePO={canDelete('blink_purchase_order')}
                         onClose={() => {
                             setShowViewModal(false);
                             setSelectedPO(null);
@@ -1910,7 +1913,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
 };
 
 // PO View Modal Component
-const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove, onPrint, onPrintPreview, onDelete, statusConfig }) => {
+const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove, onPrint, onPrintPreview, onDelete, statusConfig, canEditPO, canApprovePO, canDeletePO }) => {
     const config = statusConfig[po.status];
     const StatusIcon = config?.icon || FileText;
 
@@ -2119,7 +2122,7 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                         </Button>
 
                         {/* Edit Button - Only for draft, locked during pending/approved with payment */}
-                        {po.status === 'draft' && (!po.paid_amount || po.paid_amount <= 0) && canEdit('blink_purchase_order') && (
+                        {po.status === 'draft' && (!po.paid_amount || po.paid_amount <= 0) && canEditPO && (
                             <Button
                                 onClick={onEdit}
                                 icon={Edit}
@@ -2130,7 +2133,7 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                         )}
 
                         {/* Submit Button - Only for draft */}
-                        {po.status === 'draft' && canEdit('blink_purchase_order') && (
+                        {po.status === 'draft' && canEditPO && (
                             <Button
                                 onClick={onSubmit}
                                 icon={CheckCircle}
@@ -2147,7 +2150,7 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                                     <Clock className="w-4 h-4" />
                                     Menunggu Approval Center
                                 </span>
-                                {canApprove('blink_purchase_order') && (
+                                {canApprovePO && (
                                     <Button
                                         onClick={onApprove}
                                         icon={CheckCircle}
@@ -2161,7 +2164,7 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                         )}
 
                         {/* Delete Button - Only if no payment */}
-                        {(!po.paid_amount || po.paid_amount <= 0) && canDelete('blink_purchase_order') && (
+                        {(!po.paid_amount || po.paid_amount <= 0) && canDeletePO && (
                             <Button
                                 onClick={onDelete}
                                 icon={Trash2}
