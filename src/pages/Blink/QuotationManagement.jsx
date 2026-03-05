@@ -107,7 +107,7 @@ const QuotationManagement = () => {
                 quotationNumber: q.quotation_number || q.quotationNumber,
                 customerName: q.customer_name || q.customerName || '',
                 customerCompany: q.customer_company || q.customerCompany || '',
-                customerId: q.customer_id || q.customerId,
+                customerId: q.partner_id || null,
                 customerAddress: q.customer_address || q.customerAddress || '',
                 salesPerson: q.sales_person || q.salesPerson || '',
                 quotationType: q.quotation_type || q.quotationType || 'RG',
@@ -193,7 +193,7 @@ const QuotationManagement = () => {
             customer_name: formData.customerName,
             customer_company: formData.customerCompany,
             partner_id: formData.partnerId || null, // Link to business partner
-            customer_id: null, // Legacy column (deprecated)
+
             customer_address: formData.customerAddress,
             sales_person: formData.salesPerson,
             quotation_type: formData.quotationType,
@@ -545,7 +545,7 @@ const QuotationManagement = () => {
             const revisedQuotation = {
                 job_number: parentQuotation.jobNumber,
                 quotation_number: parentQuotation.quotationNumber,
-                customer_id: parentQuotation.customerId,
+
                 customer_name: parentQuotation.customerName,
                 customer_company: parentQuotation.customerCompany,
                 customer_address: parentQuotation.customerAddress,
@@ -840,7 +840,7 @@ const QuotationManagement = () => {
                     currency: quotation.currency || 'USD',
                     status: newShipment.status,
                     created_from: 'sales_order',
-                    customer_id: quotation.customerId,
+
                     service_items: quotation.serviceItems || [],
                     notes: quotation.notes || '',
                     gross_weight: quotation.grossWeight || null,
