@@ -50,9 +50,8 @@ const QuotationManagement = () => {
         measure: '',
         commodity: '',
         currency: 'USD',
+        exchange_rate: 16000,
         totalAmount: '',
-        validityDays: 30,
-        notes: '',
         validityDays: 30,
         notes: '',
         incoterm: '',
@@ -121,10 +120,9 @@ const QuotationManagement = () => {
                 createdAt: q.created_at || q.createdAt,
                 updatedAt: q.updated_at || q.updatedAt,
                 currency: q.currency || 'USD',
+                exchange_rate: q.exchange_rate || (q.currency === 'USD' ? 16000 : 1),
                 status: q.status || 'draft',
                 grossWeight: q.gross_weight || q.grossWeight,
-                netWeight: q.net_weight || q.netWeight,
-                netWeight: q.net_weight || q.netWeight,
                 netWeight: q.net_weight || q.netWeight,
                 measure: q.measure || q.measure,
                 incoterm: q.incoterm,
@@ -211,6 +209,7 @@ const QuotationManagement = () => {
             measure: formData.measure ? parseFloat(formData.measure) : null,
             commodity: formData.commodity,
             currency: formData.currency,
+            exchange_rate: formData.currency === 'IDR' ? 1 : (formData.exchange_rate || 16000),
             total_amount: formData.totalAmount ? parseInt(formData.totalAmount.toString().replace(/\./g, '')) : 0,
             status: status,
             notes: formData.notes,
@@ -557,9 +556,9 @@ const QuotationManagement = () => {
                 service_type: parentQuotation.serviceType,
                 cargo_type: parentQuotation.cargoType,
                 weight: parentQuotation.weight,
-                volume: parentQuotation.volume,
                 commodity: parentQuotation.commodity,
                 currency: parentQuotation.currency,
+                exchange_rate: parentQuotation.currency === 'IDR' ? 1 : (parentQuotation.exchange_rate || 16000),
                 total_amount: parentQuotation.totalAmount,
                 validity_days: parentQuotation.validityDays || 30,
                 notes: parentQuotation.notes,
@@ -823,6 +822,7 @@ const QuotationManagement = () => {
                     commodity: newShipment.commodity,
                     quoted_amount: newShipment.quotedAmount,
                     currency: quotation.currency || 'USD',
+                    exchange_rate: quotation.currency === 'IDR' ? 1 : (quotation.exchange_rate || 16000),
                     status: newShipment.status,
                     created_from: 'sales_order',
 
@@ -1409,20 +1409,42 @@ const QuotationManagement = () => {
                         </div>
                     </div>
 
-                    {/* Currency, Amount & Validity */}
-                    <div className="grid grid-cols-3 gap-4">
+                    {/* Currency, Kurs & Amount & Validity */}
+                    <div className="grid grid-cols-4 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Currency
                             </label>
                             <select
                                 value={formData.currency}
-                                onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                                onChange={(e) => {
+                                    const newCurrency = e.target.value;
+                                    setFormData(prev => ({
+                                        ...prev,
+                                        currency: newCurrency,
+                                        exchange_rate: newCurrency === 'IDR' ? 1 : (prev.exchange_rate || 16000)
+                                    }));
+                                }}
                                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                             >
                                 <option value="USD">USD</option>
                                 <option value="IDR">IDR</option>
                             </select>
+                        </div>
+                        <div>
+                            <label className="block text-[11px] font-semibold text-gray-700 mb-1">
+                                Kurs Rate (USD to IDR)
+                            </label>
+                            <input
+                                type="number"
+                                value={formData.exchange_rate}
+                                onChange={(e) => setFormData(prev => ({ ...prev, exchange_rate: parseFloat(e.target.value) || 1 }))}
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
+                                disabled={formData.currency === 'IDR'}
+                                min="1"
+                                step="0.01"
+                                placeholder="e.g., 16000"
+                            />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">

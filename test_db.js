@@ -1,15 +1,33 @@
-import { createClient } from '@supabase/supabase-js'
-import dotenv from 'dotenv'
-dotenv.config()
+import { createClient } from '@supabase/supabase-js';
+import fs from 'fs';
+import path from 'path';
 
-const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY)
+// read .env
+const envPath = path.resolve('.env');
+const envFile = fs.readFileSync(envPath, 'utf8');
+const env = {};
+envFile.split('\n').forEach(line => {
+  const [key, ...value] = line.split('=');
+  if (key && value) {
+    env[key.trim()] = value.join('=').trim().replace(/^['"]|['"]$/g, '');
+  }
+});
 
-async function test() {
-  const { data: menus } = await supabase.from('menu_registry').select('*').like('menu_code', 'blink%')
-  console.log("Registered Menus:", menus?.length, menus?.map(m => m.menu_code).join(', '))
+const supabaseUrl = env['VITE_SUPABASE_URL'];
+const supabaseKey = env['VITE_SUPABASE_ANON_KEY'];
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-  const { data: rolePerms } = await supabase.from('role_permissions').select('*').eq('role_id', 'blinkadmin')
-  console.log("Role Perms:", rolePerms?.length, rolePerms?.map(rp => rp.menu_code).join(', '))
+async function run() {
+  const { data, error } = await supabase.rpc('execute_sql', { 
+    sql_string: `
+      ALTER TABLE public.blink_quotations ADD COLUMN IF NOT EXISTS exchange_rate numeric DEFAULT 1;
+      ALTER TABLE public.blink_sales_quotations ADD COLUMN IF NOT EXISTS exchange_rate numeric DEFAULT 1;
+    `
+  });
+  console.log('Migration Result:', data || error);
+
+  // Test
+  const { data: test, error: tErr } = await supabase.from('blink_quotations').select('exchange_rate').limit(1);
+  console.log('Select test:', test, tErr);
 }
-
-test()
+run();
