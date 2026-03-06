@@ -1919,13 +1919,6 @@ const SalesQuotation = () => {
                                     </Button>
                                 )}
 
-                                {/* Create SO */}
-                                {viewingQuotation.status === 'approved' && !viewingQuotation.is_superseded && (
-                                    <Button onClick={() => handleCreateSO(viewingQuotation)}>
-                                        Create Sales Order
-                                    </Button>
-                                )}
-
                                 {/* Warning for superseded quotations */}
                                 {viewingQuotation.is_superseded && (
                                     <div className="text-orange-400 text-sm flex items-center gap-2">

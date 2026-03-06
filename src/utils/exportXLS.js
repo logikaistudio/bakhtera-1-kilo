@@ -42,7 +42,7 @@ export const exportToXLS = (data, fileName, headerRows, columns) => {
         normal: { font: { sz: 10, name: 'Arial' }, alignment: { horizontal: "left" } },
         tableHeader: {
             font: { bold: true, color: { rgb: "FFFFFF" }, name: 'Arial', sz: 10 },
-            fill: { fgColor: { rgb: "0077BE" } }, // Blue like in screenshot
+            fill: { patternType: "solid", fgColor: { rgb: "0077BE" } }, // Blue like in screenshot
             alignment: { horizontal: "center", vertical: "center" },
             border: {
                 top: { style: "thin", color: { rgb: "000000" } },
@@ -150,7 +150,7 @@ export const exportToXLS = (data, fileName, headerRows, columns) => {
             ws[cellRef].s = {
                 font: { bold: true, sz: 10, name: 'Arial', color: { rgb: "000000" } },
                 alignment: { horizontal: cIdx === 0 ? "left" : "center", vertical: "center" },
-                fill: { fgColor: { rgb: "FFD700" } }, // Gold highlight for visibility
+                fill: { patternType: "solid", fgColor: { rgb: "FFD700" } }, // Gold highlight for visibility
                 border: {
                     top: { style: "medium", color: { rgb: "000000" } },
                     bottom: { style: "medium", color: { rgb: "000000" } },
@@ -164,7 +164,24 @@ export const exportToXLS = (data, fileName, headerRows, columns) => {
     // Set Column Widths
     ws['!cols'] = columns.map(c => ({ wch: c.width || 15 }));
 
-    // Append Sheet and Save
+    // Append Sheet
     XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
-    XLSX.writeFile(wb, `${fileName}.xlsx`);
+
+    // Save file using Blob to ensure browser compatibility
+    try {
+        const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `${fileName}.xlsx`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+    } catch (error) {
+        console.error("Error saving excel file:", error);
+        // Fallback
+        XLSX.writeFile(wb, `${fileName}.xlsx`);
+    }
 };

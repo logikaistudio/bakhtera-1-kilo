@@ -56,11 +56,14 @@ const Sidebar = () => {
         const fetchBlinkPending = async () => {
             try {
                 const { supabase } = await import('../../lib/supabase');
-                const { count } = await supabase
-                    .from('blink_quotations')
-                    .select('id', { count: 'exact', head: true })
-                    .eq('status', 'manager_approval');
-                setBlinkPendingCount(count || 0);
+                const [qRes, sRes, iRes, pRes] = await Promise.all([
+                    supabase.from('blink_quotations').select('id', { count: 'exact', head: true }).eq('status', 'manager_approval'),
+                    supabase.from('blink_shipments').select('id', { count: 'exact', head: true }).eq('status', 'manager_approval'),
+                    supabase.from('blink_invoices').select('id', { count: 'exact', head: true }).eq('status', 'manager_approval'),
+                    supabase.from('blink_purchase_orders').select('id', { count: 'exact', head: true }).in('status', ['submitted', 'manager_approval'])
+                ]);
+                const totalCount = (qRes.count || 0) + (sRes.count || 0) + (iRes.count || 0) + (pRes.count || 0);
+                setBlinkPendingCount(totalCount);
             } catch (e) { /* silent */ }
         };
         fetchBlinkPending();

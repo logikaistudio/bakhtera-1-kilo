@@ -59,7 +59,7 @@ const ShipmentManagement = () => {
                 quotationId: s.quotation_id || s.quotationId,
                 customerId: s.customer_id || s.customerId,
                 salesPerson: s.sales_person || s.salesPerson,
-                quotationType: s.quotation_type || s.quotationType,
+                quotationType: s.quotation_type || s.quotationType || null,
                 quotationDate: s.quotation_date || s.quotationDate,
                 serviceType: s.service_type || s.serviceType,
                 cargoType: s.cargo_type || s.cargoType,
@@ -73,7 +73,7 @@ const ShipmentManagement = () => {
                 createdAt: s.created_at || s.createdAt,
                 updatedAt: s.updated_at || s.updatedAt,
                 createdFrom: s.created_from || s.createdFrom,
-                currency: s.currency || 'USD', // Add currency mapping
+                currency: s.currency || 'USD',
                 // New document fields
                 mawb: s.mawb || null,
                 hawb: s.hawb || null,
@@ -86,6 +86,13 @@ const ShipmentManagement = () => {
                 sellingItems: s.selling_items || s.sellingItems || [],
                 buyingItems: s.buying_items || s.buyingItems || []
             }));
+
+            // Sort by created_at descending (newest first) - client-side guarantee
+            mapped.sort((a, b) => {
+                const dateA = new Date(a.createdAt || a.created_at || 0);
+                const dateB = new Date(b.createdAt || b.created_at || 0);
+                return dateB - dateA;
+            });
 
             console.log(`✅ Mapped ${mapped.length} shipments`);
             console.log('Mapped sample:', mapped?.[0]);
@@ -104,71 +111,84 @@ const ShipmentManagement = () => {
         manager_approval: { label: 'Waiting Approval', color: 'bg-yellow-500/20 text-yellow-400' },
         approved: { label: 'Approved', color: 'bg-green-500/20 text-green-400' },
         rejected: { label: 'Rejected', color: 'bg-red-500/20 text-red-400' },
+        confirmed: { label: 'Confirmed', color: 'bg-blue-500/20 text-blue-400' },
+        booked: { label: 'Booked', color: 'bg-indigo-500/20 text-indigo-400' },
+        in_transit: { label: 'In Transit', color: 'bg-purple-500/20 text-purple-400' },
+        arrived: { label: 'Arrived', color: 'bg-teal-500/20 text-teal-400' },
+        customs_clearance: { label: 'Customs', color: 'bg-orange-500/20 text-orange-400' },
+        delivered: { label: 'Delivered', color: 'bg-cyan-500/20 text-cyan-400' },
+        completed: { label: 'Completed', color: 'bg-emerald-500/20 text-emerald-400' },
     };
 
     // Helper function to get shipment type from quotationType or type field
     const getShipmentType = (shipment) => {
         // If has quotationType (from SO conversion), map it
-        if (shipment.quotationType) {
-            return shipment.quotationType === 'RG' ? 'regular' : 'non-regular';
+        const qt = shipment.quotationType || shipment.quotation_type;
+        if (qt) {
+            if (qt === 'RG') return 'regular';
+            if (qt === 'NR' || qt === 'non-regular' || qt === 'Non-Regular') return 'non-regular';
+            if (qt === 'urgent' || qt === 'Urgent') return 'urgent';
+            return 'non-regular'; // Default for unknown quotationType
         }
         // Otherwise use existing type field (backward compatibility)
-        return shipment.type || 'regular';
+        const t = shipment.type || '';
+        if (t === 'regular') return 'regular';
+        if (t === 'non-regular') return 'non-regular';
+        if (t === 'urgent') return 'urgent';
+        return 'regular'; // Default fallback
     };
 
     // Filter shipments berdasarkan type, status, service, and search
     const filteredShipments = shipments.filter(s => {
-        // Type filter
+        // Type filter (folder tab)
         if (filter !== 'all' && getShipmentType(s) !== filter) return false;
 
         // Status filter
         if (statusFilter !== 'all' && s.status !== statusFilter) return false;
 
         // Service filter
-        if (serviceFilter !== 'all' && s.serviceType !== serviceFilter) return false;
+        if (serviceFilter !== 'all' && (s.serviceType || '').toLowerCase() !== serviceFilter.toLowerCase()) return false;
 
-        // Search filter
+        // Search filter - must be checked LAST, does not short-circuit other filters
         if (searchQuery) {
             const query = searchQuery.toLowerCase();
-            return (
-                s.jobNumber?.toLowerCase().includes(query) ||
-                s.customer?.toLowerCase().includes(query) ||
-                s.origin?.toLowerCase().includes(query) ||
-                s.destination?.toLowerCase().includes(query) ||
-                s.soNumber?.toLowerCase().includes(query)
+            const matchesSearch = (
+                (s.jobNumber || '').toLowerCase().includes(query) ||
+                (s.soNumber || '').toLowerCase().includes(query) ||
+                (s.customer || '').toLowerCase().includes(query) ||
+                (s.origin || '').toLowerCase().includes(query) ||
+                (s.destination || '').toLowerCase().includes(query)
             );
+            if (!matchesSearch) return false;
         }
 
         return true;
     });
 
+
+
     // Export to Excel
     const handleExportToExcel = () => {
-        // Simplified export - create CSV
-        const headers = ['Job Number', 'SO Number', 'Customer', 'Origin', 'Destination', 'Service Type', 'Status', 'Created Date'];
-        const rows = filteredShipments.map(s => [
-            s.jobNumber,
-            s.soNumber || '-',
-            s.customer,
-            s.origin,
-            s.destination,
-            s.serviceType,
-            s.status,
-            s.createdAt || '-'
-        ]);
+        import('../../utils/exportXLS').then(({ exportToXLS }) => {
+            const headerRows = [
+                { value: 'SHIPMENT MANAGEMENT REPORT', style: 'title' },
+                { value: `Report Date: ${new Date().toLocaleDateString('id-ID')}`, style: 'normal' },
+                ''
+            ];
 
-        const csvContent = [
-            headers.join(','),
-            ...rows.map(row => row.join(','))
-        ].join('\n');
+            const xlsColumns = [
+                { header: 'No', key: 'no', width: 5, align: 'center' },
+                { header: 'Job Number', key: 'jobNumber', width: 20 },
+                { header: 'SO Number', key: 'soNumber', width: 20 },
+                { header: 'Customer', key: 'customer', width: 25 },
+                { header: 'Route', render: (item) => `${item.origin || '-'} -> ${item.destination || '-'}`, width: 30 },
+                { header: 'Service Type', key: 'serviceType', width: 15 },
+                { header: 'Status', key: 'status', width: 15 },
+                { header: 'Created Date', key: 'createdAt', width: 15 }
+            ];
 
-        const blob = new Blob([csvContent], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `shipments_${new Date().toISOString().split('T')[0]}.csv`;
-        a.click();
-        window.URL.revokeObjectURL(url);
+            exportToXLS(filteredShipments, `Shipments_Report_${new Date().toISOString().split('T')[0]}`, headerRows, xlsColumns);
+        }).catch(err => console.error("Failed to load export utility", err));
     };
 
     // Handle view shipment detail
@@ -302,97 +322,104 @@ const ShipmentManagement = () => {
     };
 
     // Handle update shipment
-    const handleUpdateShipment = async (updatedShipment) => {
+    const handleUpdateShipment = async (updatedShipment, skipDbUpdate = false) => {
         if (!canEdit('blink_shipments')) {
             alert('Anda tidak memiliki hak akses untuk mengedit shipment ini.');
             return;
         }
         try {
-            // Helper to safely handle UUID fields
-            const safeUUID = (value) => {
-                // Return null for falsy values, "undefined" string, empty string, or invalid UUIDs
-                if (!value ||
-                    value === 'undefined' ||
-                    value === 'null' ||
-                    value === '' ||
-                    value === 'NULL' ||
-                    String(value).toLowerCase() === 'undefined') {
-                    return null;
+            // Only update DB if skipDbUpdate is false
+            if (!skipDbUpdate) {
+                // Helper to safely handle UUID fields
+                const safeUUID = (value) => {
+                    // Return null for falsy values, "undefined" string, empty string, or invalid UUIDs
+                    if (!value ||
+                        value === 'undefined' ||
+                        value === 'null' ||
+                        value === '' ||
+                        value === 'NULL' ||
+                        String(value).toLowerCase() === 'undefined') {
+                        return null;
+                    }
+                    // Additional check: ensure it looks like a valid UUID format
+                    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                    if (!uuidPattern.test(value)) {
+                        console.warn(`Invalid UUID format detected: "${value}", returning null`);
+                        return null;
+                    }
+                    return value;
+                };
+
+                // Map to database format
+                // Only include buying/selling items if they are explicitly provided (not undefined)
+                const dbFormat = {
+                    job_number: updatedShipment.jobNumber,
+                    so_number: updatedShipment.soNumber,
+                    customer: updatedShipment.customer,
+                    origin: updatedShipment.origin,
+                    destination: updatedShipment.destination,
+                    service_type: updatedShipment.serviceType,
+                    quoted_amount: updatedShipment.quotedAmount,
+                    cogs: updatedShipment.cogs,
+                    cogs_currency: updatedShipment.cogsCurrency,
+                    exchange_rate: updatedShipment.exchangeRate,
+                    status: updatedShipment.status,
+                    // UUID fields - validate before sending
+                    customer_id: safeUUID(updatedShipment.customerId),
+                    quotation_id: safeUUID(updatedShipment.quotationId),
+                    // Shipping details
+                    weight: updatedShipment.weight || null,
+                    cbm: updatedShipment.cbm || updatedShipment.volume || null,
+                    dimensions: updatedShipment.dimensions || null,
+                    container_type: updatedShipment.container_type || null,
+                    bl_number: updatedShipment.bl_number || null,
+                    awb_number: updatedShipment.awb_number || null,
+                    voyage: updatedShipment.voyage || null,
+                    flight_number: updatedShipment.flight_number || null,
+                    shipper_name: updatedShipment.shipper_name || updatedShipment.shipper || null,
+                    shipper: updatedShipment.shipper_name || updatedShipment.shipper || null,
+                    // Date fields - convert empty strings to null
+                    delivery_date: updatedShipment.deliveryDate || null,
+                    eta: updatedShipment.eta || null,
+                    etd: updatedShipment.etd || null,
+                    // New document fields removed to avoid schema cache issues
+                };
+
+                // Only update buying/selling items if they are explicitly passed
+                // This prevents overwriting data with empty arrays when saving other fields
+                if (updatedShipment.sellingItems !== undefined) {
+                    dbFormat.selling_items = updatedShipment.sellingItems;
                 }
-                // Additional check: ensure it looks like a valid UUID format
-                const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-                if (!uuidPattern.test(value)) {
-                    console.warn(`Invalid UUID format detected: "${value}", returning null`);
-                    return null;
+                if (updatedShipment.buyingItems !== undefined) {
+                    dbFormat.buying_items = updatedShipment.buyingItems;
                 }
-                return value;
-            };
 
-            // Map to database format
-            // Only include buying/selling items if they are explicitly provided (not undefined)
-            const dbFormat = {
-                job_number: updatedShipment.jobNumber,
-                so_number: updatedShipment.soNumber,
-                customer: updatedShipment.customer,
-                origin: updatedShipment.origin,
-                destination: updatedShipment.destination,
-                service_type: updatedShipment.serviceType,
-                quoted_amount: updatedShipment.quotedAmount,
-                cogs: updatedShipment.cogs,
-                cogs_currency: updatedShipment.cogsCurrency,
-                exchange_rate: updatedShipment.exchangeRate,
-                status: updatedShipment.status,
-                // UUID fields - validate before sending
-                customer_id: safeUUID(updatedShipment.customerId),
-                quotation_id: safeUUID(updatedShipment.quotationId),
-                // Shipping details
-                weight: updatedShipment.weight || null,
-                cbm: updatedShipment.cbm || updatedShipment.volume || null,
-                dimensions: updatedShipment.dimensions || null,
-                container_type: updatedShipment.container_type || null,
-                bl_number: updatedShipment.bl_number || null,
-                awb_number: updatedShipment.awb_number || null,
-                voyage: updatedShipment.voyage || null,
-                flight_number: updatedShipment.flight_number || null,
-                shipper_name: updatedShipment.shipper_name || updatedShipment.shipper || null,
-                shipper: updatedShipment.shipper_name || updatedShipment.shipper || null,
-                // Date fields - convert empty strings to null
-                delivery_date: updatedShipment.deliveryDate || null,
-                eta: updatedShipment.eta || null,
-                etd: updatedShipment.etd || null,
-                // New document fields
-                mawb: updatedShipment.mawb || null,
-                hawb: updatedShipment.hawb || null,
-                hbl: updatedShipment.hbl || null,
-                mbl: updatedShipment.mbl || null,
-                consignee_name: updatedShipment.consignee_name || null,
-                bl_date: updatedShipment.blDate || null,
-                vessel_name: updatedShipment.vessel_name || null,
-                container_number: updatedShipment.container_number || null,
-            };
+                const { error } = await supabase
+                    .from('blink_shipments')
+                    .update(dbFormat)
+                    .eq('id', updatedShipment.id);
 
-            // Only update buying/selling items if they are explicitly passed
-            // This prevents overwriting data with empty arrays when saving other fields
-            if (updatedShipment.sellingItems !== undefined) {
-                dbFormat.selling_items = updatedShipment.sellingItems;
-            }
-            if (updatedShipment.buyingItems !== undefined) {
-                dbFormat.buying_items = updatedShipment.buyingItems;
+                if (error) throw error;
             }
 
-            const { error } = await supabase
-                .from('blink_shipments')
-                .update(dbFormat)
-                .eq('id', updatedShipment.id);
-
-            if (error) throw error;
+            // Optimistically update the list without waiting for fetch
+            setShipments(prev => prev.map(s => s.id === updatedShipment.id ? { ...s, ...updatedShipment } : s));
 
             // Refresh list - after refresh, update selectedShipment with fresh DB data
-            await fetchShipments();
+            // To prevent stale reads from overriding immediately, add a small delay before fetching
+            setTimeout(() => {
+                fetchShipments().then(() => {
+                    // Update the selected shipment again just in case there are merged values
+                    setSelectedShipment(prev => ({
+                        ...(prev || {}),
+                        ...updatedShipment,
+                        sellingItems: updatedShipment.sellingItems ?? prev?.sellingItems ?? [],
+                        buyingItems: updatedShipment.buyingItems ?? prev?.buyingItems ?? []
+                    }));
+                });
+            }, 500);
 
-            // After refresh, get a fresh copy of the shipment from the updated list
-            // This ensures buying_items / selling_items are always from the latest DB state
-            // We merge with updatedShipment to keep any unsaved in-memory changes
+            // Immediate update for modal
             setSelectedShipment(prev => ({
                 ...(prev || {}),
                 ...updatedShipment,

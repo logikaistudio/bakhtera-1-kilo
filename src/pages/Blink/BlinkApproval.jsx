@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import {
     CheckCircle, XCircle, Clock, Bell, Eye,
     FileText, User, Calendar, ChevronRight,
-    RefreshCw, AlertCircle, Check, X, Ship, Plane, Truck, ShoppingBag
+    RefreshCw, AlertCircle, Check, X, Ship, Plane, Truck, ShoppingBag, Receipt
 } from 'lucide-react';
 
 const BlinkApproval = () => {
@@ -53,6 +53,14 @@ const BlinkApproval = () => {
                 .eq('status', 'manager_approval')
                 .order('created_at', { ascending: false });
             if (shErr) console.error('Error fetching shipments:', shErr);
+
+            // Fetch pending Invoices
+            const { data: invoices, error: invErr } = await supabase
+                .from('blink_invoices')
+                .select('*')
+                .eq('status', 'manager_approval')
+                .order('created_at', { ascending: false });
+            if (invErr) console.error('Error fetching invoices:', invErr);
 
             const mappedQuotations = (quotations || []).map(q => ({
                 id: q.id,
@@ -121,7 +129,29 @@ const BlinkApproval = () => {
                 cargoType: s.cargo_type || '',
             }));
 
-            setSubmissions([...mappedShipments, ...mappedPOs, ...mappedQuotations]);
+            const mappedInvoices = (invoices || []).map(inv => ({
+                id: inv.id,
+                type: 'invoice',
+                typeLabel: 'Invoice',
+                refNumber: inv.invoice_number,
+                customerName: inv.customer_name || '-',
+                submittedBy: inv.sales_person || '-',
+                serviceType: 'invoice',
+                origin: inv.job_number || '-',
+                destination: inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString('id-ID') : '-',
+                amount: inv.total_amount || 0,
+                currency: inv.currency || inv.billing_currency || 'IDR',
+                status: inv.status,
+                createdAt: inv.created_at,
+                updatedAt: inv.updated_at,
+                notes: inv.notes || '',
+                rejectionReason: inv.rejection_reason || '',
+                serviceItems: inv.invoice_items || [],
+                commodity: '',
+                cargoType: '',
+            }));
+
+            setSubmissions([...mappedShipments, ...mappedPOs, ...mappedQuotations, ...mappedInvoices]);
         } catch (error) {
             console.error('Error fetching submissions:', error);
         } finally {
@@ -263,13 +293,86 @@ const BlinkApproval = () => {
                     if (journalError) console.error('Error creating journal entries:', journalError);
                 }
 
-            } else {
-                // Approve Quotation
+            } else if (item.type === 'invoice') {
                 const { error } = await supabase
-                    .from('blink_quotations')
-                    .update({ status: 'approved', updated_at: new Date().toISOString() })
+                    .from('blink_invoices')
+                    .update({
+                        status: 'unpaid',
+                        updated_at: new Date().toISOString()
+                    })
                     .eq('id', item.id);
                 if (error) throw error;
+            } else {
+                // Approve Quotation → Auto-create SO & Shipment
+                // Fetch full quotation data first
+                const { data: quotationData, error: fetchErr } = await supabase
+                    .from('blink_quotations')
+                    .select('*')
+                    .eq('id', item.id)
+                    .single();
+                if (fetchErr) throw fetchErr;
+
+                // Generate SO Number
+                const { generateSONumber } = await import('../../utils/documentNumbers');
+                const jobNumber = quotationData.job_number || quotationData.quotation_number;
+                const soNumber = generateSONumber(jobNumber);
+
+                // Update quotation status to 'converted' (since it automatically becomes an SO step)
+                // BUT we do this AFTER the insert succeeds!
+
+                // Determine BL type based on service type
+                const isAirFreight = (quotationData.service_type || '').toLowerCase() === 'air';
+                const blPrefix = isAirFreight ? 'AWB' : 'BL';
+                const blNumber = `${blPrefix}-${soNumber}`;
+
+                // Auto-create Shipment (minimal fields to avoid schema cache issues)
+                const coreData = {
+                    job_number: quotationData.job_number,
+                    so_number: soNumber,
+                    quotation_id: quotationData.id,
+                    customer: quotationData.customer_name || '',
+                    sales_person: quotationData.sales_person || '',
+                    quotation_type: quotationData.quotation_type || 'RG',
+                    quotation_date: quotationData.quotation_date,
+                    origin: quotationData.origin,
+                    destination: quotationData.destination,
+                    service_type: quotationData.service_type,
+                    cargo_type: quotationData.cargo_type,
+                    weight: quotationData.weight,
+                    volume: quotationData.volume,
+                    commodity: quotationData.commodity,
+                    quoted_amount: quotationData.total_amount || 0,
+                    currency: quotationData.currency || 'USD',
+                    status: 'pending',
+                    created_from: 'sales_order',
+                    service_items: quotationData.service_items || [],
+                    selling_items: quotationData.service_items || [],
+                    notes: quotationData.notes || '',
+                    gross_weight: quotationData.gross_weight || null,
+                    net_weight: quotationData.net_weight || null,
+                    measure: quotationData.measure || null,
+                };
+
+                const { error: shipErr } = await supabase
+                    .from('blink_shipments')
+                    .insert([coreData]);
+
+                if (shipErr) throw shipErr;
+
+                // Mark quotation as converted
+                const { error: updateErr } = await supabase
+                    .from('blink_quotations')
+                    .update({ status: 'converted', updated_at: new Date().toISOString() })
+                    .eq('id', item.id);
+                if (updateErr) console.error('Warning: Error updating quotation status to converted:', updateErr);
+
+                await fetchSubmissions();
+                setShowDetailModal(false);
+                setSelectedItem(null);
+
+                alert(`✅ Quotation ${item.refNumber} disetujui!\n\n📦 Sales Order ${soNumber} berhasil dibuat dan dikirim ke halaman SO Management.`);
+                setTimeout(() => navigate('/blink/shipments'), 1000);
+                return; // skip the generic alert below
             }
 
             await fetchSubmissions();
@@ -314,6 +417,16 @@ const BlinkApproval = () => {
                     })
                     .eq('id', item.id);
                 if (error) throw error;
+            } else if (item.type === 'invoice') {
+                const { error } = await supabase
+                    .from('blink_invoices')
+                    .update({
+                        status: 'draft',
+                        rejection_reason: rejectReason,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', item.id);
+                if (error) throw error;
             } else {
                 const { error } = await supabase
                     .from('blink_quotations')
@@ -345,7 +458,7 @@ const BlinkApproval = () => {
         converted: { label: 'SO Created', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', icon: CheckCircle },
     };
 
-    const serviceIcons = { sea: Ship, air: Plane, land: Truck, purchase: ShoppingBag, shipment: Ship };
+    const serviceIcons = { sea: Ship, air: Plane, land: Truck, purchase: ShoppingBag, shipment: Ship, invoice: Receipt };
 
     const filtered = submissions;
     const pendingCount = submissions.length;
@@ -675,6 +788,8 @@ const BlinkApproval = () => {
                                 onClick={() => {
                                     if (selectedItem?.type === 'po') {
                                         navigate('/blink/finance/purchase-orders');
+                                    } else if (selectedItem?.type === 'invoice') {
+                                        navigate('/blink/finance/invoices');
                                     } else {
                                         navigate('/blink/operations/quotations');
                                     }
@@ -683,7 +798,7 @@ const BlinkApproval = () => {
                                 className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-gray-700 transition-colors"
                             >
                                 <Eye className="w-4 h-4" />
-                                View in {selectedItem?.type === 'po' ? 'Purchase Orders' : 'Quotation'} Page
+                                View in {selectedItem?.type === 'po' ? 'Purchase Orders' : selectedItem?.type === 'invoice' ? 'Invoices' : 'Quotation'} Page
                                 <ChevronRight className="w-4 h-4" />
                             </button>
                         </div>

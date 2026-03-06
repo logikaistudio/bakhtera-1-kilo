@@ -130,6 +130,50 @@ const AccountsReceivable = () => {
         return matchesSearch;
     });
 
+    const handleExportXLS = () => {
+        import('../../utils/exportXLS').then(({ exportToXLS }) => {
+            const headerRows = [
+                { value: 'ACCOUNTS RECEIVABLE REPORT', style: 'title' },
+                { value: `Report Date: ${new Date().toLocaleDateString('id-ID')}`, style: 'normal' },
+                ''
+            ];
+
+            const xlsColumns = [
+                { header: 'No', key: 'no', width: 5, align: 'center' },
+                { header: 'AR Number', key: 'ar_number', width: 20 },
+                { header: 'Invoice #', key: 'invoice_number', width: 20 },
+                { header: 'Customer', key: 'customer_name', width: 25 },
+                { header: 'Date', key: 'transaction_date', width: 15 },
+                { header: 'Due Date', key: 'due_date', width: 15 },
+                {
+                    header: 'Original Amount',
+                    key: 'original_amount',
+                    width: 20,
+                    align: 'right',
+                    render: (item) => `${item.currency || 'USD'} ${(item.original_amount || 0).toLocaleString('id-ID')}`
+                },
+                {
+                    header: 'Paid Amount',
+                    key: 'paid_amount',
+                    width: 20,
+                    align: 'right',
+                    render: (item) => `${item.currency || 'USD'} ${(item.paid_amount || 0).toLocaleString('id-ID')}`
+                },
+                {
+                    header: 'Outstanding Amount',
+                    key: 'outstanding_amount',
+                    width: 20,
+                    align: 'right',
+                    render: (item) => `${item.currency || 'USD'} ${(item.outstanding_amount || 0).toLocaleString('id-ID')}`
+                },
+                { header: 'Aging Bucket', key: 'aging_bucket', width: 15 },
+                { header: 'Status', key: 'status', width: 15 }
+            ];
+
+            exportToXLS(filteredAR, `AR_Report_${new Date().toISOString().split('T')[0]}`, headerRows, xlsColumns);
+        }).catch(err => console.error("Failed to load export utility", err));
+    };
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -138,7 +182,7 @@ const AccountsReceivable = () => {
                     <h1 className="text-3xl font-bold gradient-text">Accounts Receivable (AR)</h1>
                     <p className="text-silver-dark mt-1">Manage customer receivables</p>
                 </div>
-                <Button icon={Download}>Export to Excel</Button>
+                <Button onClick={handleExportXLS} icon={Download}>Export to Excel</Button>
             </div>
 
 

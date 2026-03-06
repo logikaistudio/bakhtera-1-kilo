@@ -61,6 +61,9 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
         }
     }, [shipment?.status]);
 
+    const [confirmAction, setConfirmAction] = useState(null);
+    const [successMsg, setSuccessMsg] = useState('');
+
     // === APPROVAL WORKFLOW (via Approval Center) ===
     // Ops team: Submit → Approval Center → Manager Approve/Reject
     const statusConfig = {
@@ -78,12 +81,21 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
         rejected: [{ to: 'pending', label: '↩ Reset to Pending', style: 'secondary' }],
     };
 
-    const handleStatusChange = async (toStatus) => {
+    const handleStatusChangeRequest = (toStatus) => {
         const msgs = {
-            manager_approval: 'Submit shipment ini ke Approval Center untuk disetujui Manager?',
-            pending: 'Kembalikan ke status Pending?',
+            manager_approval: 'Submit this shipment to the Approval Center for Manager approval?',
+            pending: 'Revert status to Pending?',
         };
-        if (!window.confirm(msgs[toStatus] || `Ubah status ke ${toStatus}?`)) return;
+        setConfirmAction({
+            toStatus,
+            message: msgs[toStatus] || `Change status to ${toStatus}?`
+        });
+    };
+
+    const handleConfirmStatusChange = async () => {
+        if (!confirmAction) return;
+        const { toStatus } = confirmAction;
+        setConfirmAction(null);
         try {
             const updateData = {
                 status: toStatus,
@@ -96,9 +108,11 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                 .eq('id', shipment.id);
             if (error) throw error;
             setCurrentStatus(toStatus);
-            onUpdate({ ...shipment, status: toStatus });
+            onUpdate({ ...shipment, status: toStatus }, true); // skipDbUpdate = true
             if (toStatus === 'manager_approval') {
-                alert('✅ Shipment berhasil disubmit! Manager dapat melihat dan menyetujui di Approval Center.');
+                setSuccessMsg('✅ Shipment successfully submitted! Managers can review and approve it in the Approval Center.');
+                // Auto dismiss after 3 seconds if not closed manually
+                setTimeout(() => setSuccessMsg(''), 3000);
             }
         } catch (err) {
             alert('Failed to update status: ' + err.message);
@@ -611,7 +625,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                 buyingItems: parsedBuyingItems
             };
 
-            onUpdate(updatedShipment);
+            onUpdate(updatedShipment, true); // skipDbUpdate = true
 
             // Exit edit mode and show success
             setIsEditingCOGS(false);
@@ -701,7 +715,20 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                 }
             ]
         };
-        onUpdate(updatedShipment);
+        // Ensure manual status update is persisted without crashing on other fields
+        // Since we didn't save it directly here, we let the parent do a full save, 
+        // OR we just save it directly. It's safer to save it directly here and bypass parent save.
+        supabase.from('blink_shipments').update({
+            status: newStatus,
+            status_history: updatedShipment.statusHistory
+        }).eq('id', shipment.id).then(({ error }) => {
+            if (error) {
+                alert('Failed to update status');
+                return;
+            }
+            onUpdate(updatedShipment, true);
+        });
+
         setShowStatusModal(false);
         setStatusNotes('');
         setNewStatus('');
@@ -727,7 +754,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
 
             if (error) throw error;
 
-            onUpdate({ ...shipment, containers: updatedContainers });
+            onUpdate({ ...shipment, containers: updatedContainers }, true);
             setNewContainer({ containerNumber: '', containerType: '20ft', sealNumber: '', vgm: '' });
             setShowContainerModal(false);
             alert('✅ Container added successfully!');
@@ -737,16 +764,45 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
         }
     };
 
-    const handleDeleteContainer = (containerId) => {
+    const handleDeleteContainer = async (containerId) => {
         const updatedContainers = containers.filter(c => c.id !== containerId);
         setContainers(updatedContainers);
-        onUpdate({ ...shipment, containers: updatedContainers });
+
+        try {
+            const { error } = await supabase
+                .from('blink_shipments')
+                .update({ containers: updatedContainers })
+                .eq('id', shipment.id);
+            if (error) throw error;
+            onUpdate({ ...shipment, containers: updatedContainers }, true);
+        } catch (error) {
+            console.error('Error deleting container:', error);
+            alert('Failed to delete container');
+        }
     };
 
     const handleGenerateInvoice = async () => {
-        if (!confirm('Create Invoice for this shipment? This will create a new draft Invoice.')) return;
-
         try {
+            // Check if an invoice already exists for this job number
+            const { data: existingInvoices, error: checkError } = await supabase
+                .from('blink_invoices')
+                .select('*')
+                .eq('shipment_id', shipment.id)
+                .neq('status', 'cancelled')
+                .order('created_at', { ascending: false })
+                .limit(1);
+
+            if (checkError) throw checkError;
+
+            const existingInvoice = existingInvoices && existingInvoices.length > 0 ? existingInvoices[0] : null;
+
+            if (existingInvoice) {
+                if (!confirm(`An invoice (${existingInvoice.invoice_number}) already exists for this shipment. Do you want to update it with the latest items and COGS?`)) {
+                    return;
+                }
+            } else {
+                if (!confirm('Create Invoice for this shipment? This will create a new draft Invoice.')) return;
+            }
             // 1. Generate Invoice Number
             const { generateInvoiceNumber } = await import('../../utils/documentNumbers');
             const invoiceNumber = await generateInvoiceNumber(shipment.jobNumber || shipment.soNumber);
@@ -762,11 +818,13 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
             if (sourceItems.length > 0) {
                 invoiceItems = sourceItems.map(item => {
                     const qty = parseFloat(item.qty || item.quantity || 1);
-                    const rate = parseFloat(item.selling_rate || item.sellingRate || item.rate || item.price || 0);
-                    const amount = parseFloat(item.total || item.amount || item.sellingTotal || (qty * rate) || 0);
+                    const initRate = parseFloat(item.selling_rate || item.sellingRate || item.rate || item.unitPrice || item.price || 0);
+                    const amount = parseFloat(item.total || item.amount || item.sellingTotal || (qty * initRate) || 0);
+                    const rate = initRate || (qty > 0 ? amount / qty : 0);
                     subtotal += amount;
                     return {
-                        description: item.name || item.description || item.item_code || 'Service',
+                        item_name: item.name || item.item_name || item.item_code || item.description || 'Service',
+                        description: item.description || item.name || 'Service',
                         qty,
                         unit: item.unit || 'Job',
                         rate,
@@ -789,7 +847,72 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
             const taxAmount = subtotal * (taxRate / 100);
             const totalAmount = subtotal + taxAmount;
 
-            // 3. Create Invoice Object
+            // Prepare COGS Items from buyingItems
+            const cogsItems = (buyingItems || []).map(item => {
+                const qty = parseFloat(item.quantity || item.qty || 1);
+                // "amount" is used heavily for cost so let's check it first
+                const amount = parseFloat(item.total || item.amount || 0) || 0;
+                // rate could be derived if not explicitly set
+                const rate = parseFloat(item.unitPrice || item.rate || item.price || 0) || (qty > 0 ? amount / qty : 0);
+
+                return {
+                    description: item.description || item.name || item.item_code || 'Cost Item',
+                    qty: qty,
+                    unit: item.unit || 'Job',
+                    rate: rate,
+                    amount: amount,
+                    currency: item.currency || shipment.currency || 'IDR',
+                    vendor: item.vendor || item.supplier || ''
+                };
+            });
+
+            const cogsSubtotal = cogsItems.reduce((sum, item) => sum + (item.amount || 0), 0);
+            const grossProfit = subtotal - cogsSubtotal;
+            const profitMargin = subtotal > 0 ? (grossProfit / subtotal) * 100 : 0;
+
+            if (existingInvoice) {
+                // Update existing invoice instead of creating a new one
+                const { data: updatedData, error: updateError } = await supabase
+                    .from('blink_invoices')
+                    .update({
+                        invoice_items: invoiceItems,
+                        subtotal: subtotal,
+                        tax_amount: taxAmount,
+                        total_amount: totalAmount,
+                        outstanding_amount: totalAmount,
+                        cogs_items: cogsItems,
+                        cogs_subtotal: cogsSubtotal,
+                        gross_profit: grossProfit,
+                        profit_margin: profitMargin,
+                        consignor: shipment.shipper_name || '',
+                        consignee: shipment.consignee_name || shipment.customer || '',
+                        vessel_name: shipment.vessel_name || shipment.vessel || '',
+                        voyage_number: shipment.voyage_number || shipment.voyage || '',
+                        ocean_bl: shipment.mbl_number || shipment.mbl || shipment.bl_awb_number || '',
+                        house_bl: shipment.hbl_number || shipment.hbl || '',
+                        etd: shipment.etd || null,
+                        eta: shipment.eta || null,
+                        containers: shipment.container_number || shipment.container_type || (Array.isArray(shipment.containers) ? shipment.containers.map(c => c.containerNumber).join(', ') : shipment.containers) || '',
+                        goods_description: shipment.commodity || '',
+                        chargeable_weight: parseFloat(shipment.chargeable_weight || shipment.weight) || 0,
+                        packages: shipment.packages || '',
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', existingInvoice.id)
+                    .select();
+
+                if (updateError) throw updateError;
+                if (!updatedData || updatedData.length === 0) {
+                    throw new Error('Update command completed but 0 rows were modified. Possible database rejection or RLS block.');
+                }
+
+                alert(`✅ Invoice ${existingInvoice.invoice_number} updated successfully with latest data!`);
+                onClose();
+                navigate('/blink/finance/invoices');
+                return;
+            }
+
+            // 3. Create Invoice Object (if not existing)
             const newInvoice = {
                 invoice_number: invoiceNumber,
                 invoice_date: new Date().toISOString().split('T')[0],
@@ -812,7 +935,22 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                 outstanding_amount: totalAmount,
                 status: 'draft',
                 invoice_items: invoiceItems,
-                cogs_items: [],
+                cogs_items: cogsItems,
+                cogs_subtotal: cogsSubtotal,
+                gross_profit: grossProfit,
+                profit_margin: profitMargin,
+                consignor: shipment.shipper_name || '',
+                consignee: shipment.consignee_name || shipment.customer || '',
+                vessel_name: shipment.vessel_name || shipment.vessel || '',
+                voyage_number: shipment.voyage_number || shipment.voyage || '',
+                ocean_bl: shipment.mbl_number || shipment.mbl || shipment.bl_awb_number || '',
+                house_bl: shipment.hbl_number || shipment.hbl || '',
+                etd: shipment.etd || null,
+                eta: shipment.eta || null,
+                containers: shipment.container_number || shipment.container_type || (Array.isArray(shipment.containers) ? shipment.containers.map(c => c.containerNumber).join(', ') : shipment.containers) || '',
+                goods_description: shipment.commodity || '',
+                chargeable_weight: parseFloat(shipment.chargeable_weight || shipment.weight) || 0,
+                packages: shipment.packages || '',
                 notes: `Generated from Shipment: ${shipment.jobNumber}`
             };
 
@@ -851,7 +989,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
             trackingUpdates: updatedTracking,
             status: newTracking.status // Update shipment status
         };
-        onUpdate(updatedShipment);
+        onUpdate(updatedShipment, true); // skipDbUpdate = true
 
         setNewTracking({
             location: '',
@@ -869,7 +1007,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
             ...dates,
             voyage: bookingData.voyageNumber
         };
-        onUpdate(updatedShipment);
+        onUpdate(updatedShipment, true); // skipDbUpdate = true
         alert('Booking details and dates saved!');
     };
 
@@ -998,7 +1136,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                 booking: bookingData,
                 ...dates
             };
-            onUpdate(updatedShipment);
+            onUpdate(updatedShipment, true); // skipDbUpdate = true
             setIsEditing(false);
             alert('✅ Shipment details updated successfully!');
         } catch (error) {
@@ -1060,7 +1198,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
 
                     if (error) throw error;
 
-                    onUpdate({ ...shipment, documents: updatedDocuments });
+                    onUpdate({ ...shipment, documents: updatedDocuments }, true);
                 };
                 reader.readAsDataURL(file);
             } catch (error) {
@@ -1088,7 +1226,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
 
             if (error) throw error;
 
-            onUpdate({ ...shipment, documents: updatedDocuments });
+            onUpdate({ ...shipment, documents: updatedDocuments }, true);
             alert('✅ Dokumen berhasil dihapus');
         } catch (error) {
             console.error('Error deleting document:', error);
@@ -1280,7 +1418,11 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                     key={t.to}
                                     size="sm"
                                     variant={t.style}
-                                    onClick={() => handleStatusChange(t.to)}
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        handleStatusChangeRequest(t.to);
+                                    }}
                                 >
                                     {t.label}
                                 </Button>
@@ -2182,14 +2324,14 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                                     <thead className="bg-accent-orange">
                                                         <tr>
                                                             <th className="px-2 py-2 text-center text-xs text-white w-10 font-normal">No</th>
-                                                            <th className="px-2 py-2 text-left text-xs text-white min-w-[160px] font-normal">Kode</th>
-                                                            <th className="px-2 py-2 text-left text-xs text-white min-w-[180px] font-normal">Item</th>
-                                                            <th className="px-2 py-2 text-left text-xs text-white min-w-[200px] font-normal">Description</th>
-                                                            <th className="px-2 py-2 text-center text-xs text-white w-20 font-normal">Qty</th>
-                                                            <th className="px-2 py-2 text-center text-xs text-white w-24 font-normal">Unit</th>
-                                                            <th className="px-2 py-2 text-right text-xs text-white min-w-[120px] font-normal">Price</th>
-                                                            <th className="px-2 py-2 text-right text-xs text-white min-w-[120px] font-normal">Total</th>
-                                                            {isEditingCOGS && <th className="px-2 py-2 text-center text-xs text-white w-10 font-normal">Aksi</th>}
+                                                            <th className="px-2 py-2 text-left text-xs text-white min-w-[120px] font-normal">Kode</th>
+                                                            <th className="px-2 py-2 text-left text-xs text-white min-w-[260px] font-normal">Item</th>
+                                                            <th className="px-2 py-2 text-left text-xs text-white min-w-[280px] font-normal">Description</th>
+                                                            <th className="px-2 py-2 text-center text-xs text-white min-w-[110px] font-normal">Qty</th>
+                                                            <th className="px-2 py-2 text-center text-xs text-white min-w-[110px] font-normal">Unit</th>
+                                                            <th className="px-2 py-2 text-right text-xs text-white min-w-[150px] font-normal">Price</th>
+                                                            <th className="px-2 py-2 text-right text-xs text-white min-w-[150px] font-normal">Total</th>
+                                                            {isEditingCOGS && <th className="px-2 py-2 text-center text-xs text-white min-w-[60px] font-normal">Aksi</th>}
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-dark-border">
@@ -2611,6 +2753,27 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                         >
                             Generate PO
                         </Button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Status Confirmation Modal */}
+            <Modal isOpen={!!confirmAction} onClose={() => setConfirmAction(null)} title="Konfirmasi" size="small">
+                <div className="space-y-4 text-silver-light">
+                    <p className="text-lg">{confirmAction?.message}</p>
+                    <div className="flex justify-end gap-2 mt-6">
+                        <Button variant="secondary" onClick={() => setConfirmAction(null)}>Batal</Button>
+                        <Button variant="primary" onClick={handleConfirmStatusChange}>Ya, Lanjutkan</Button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Success Message Modal */}
+            <Modal isOpen={!!successMsg} onClose={() => setSuccessMsg('')} title="Berhasil" size="small">
+                <div className="space-y-4 text-center">
+                    <p className="text-lg text-emerald-400 font-semibold mt-4">{successMsg}</p>
+                    <div className="flex justify-center mt-6">
+                        <Button variant="primary" onClick={() => setSuccessMsg('')}>Tutup</Button>
                     </div>
                 </div>
             </Modal>

@@ -394,7 +394,7 @@ const PurchaseOrder = () => {
             if (error) throw error;
 
             await fetchPOs();
-            alert('✅ PO berhasil disubmit!\nCek Approval Center untuk proses persetujuan.');
+            alert('✅ PO successfully submitted!\nCheck Approval Center for the approval process.');
         } catch (error) {
             console.error('Error submitting PO:', error);
             alert('Failed to submit PO: ' + error.message);
@@ -1144,6 +1144,35 @@ const PurchaseOrder = () => {
     const pendingApproval = pos.filter(p => p.status === 'submitted').length;
     const approvedPOs = pos.filter(p => p.status === 'approved').length;
 
+    const handleExportXLS = () => {
+        import('../../utils/exportXLS').then(({ exportToXLS }) => {
+            const headerRows = [
+                { value: 'PURCHASE ORDERS REPORT', style: 'title' },
+                { value: `Report Date: ${new Date().toLocaleDateString('id-ID')}`, style: 'normal' },
+                ''
+            ];
+
+            const xlsColumns = [
+                { header: 'No', key: 'no', width: 5, align: 'center' },
+                { header: 'PO Number', key: 'po_number', width: 20 },
+                { header: 'Vendor', key: 'vendor_name', width: 25 },
+                { header: 'PO Date', key: 'po_date', width: 15 },
+                { header: 'Delivery Date', key: 'delivery_date', width: 15 },
+                { header: 'Payment Terms', key: 'payment_terms', width: 15 },
+                {
+                    header: 'Amount',
+                    key: 'total_amount',
+                    width: 20,
+                    align: 'right',
+                    render: (item) => `${item.currency || 'IDR'} ${(item.total_amount || 0).toLocaleString('id-ID')}`
+                },
+                { header: 'Status', key: 'status', width: 15 }
+            ];
+
+            exportToXLS(filteredPOs, `PO_Report_${new Date().toISOString().split('T')[0]}`, headerRows, xlsColumns);
+        }).catch(err => console.error("Failed to load export utility", err));
+    };
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -1152,14 +1181,17 @@ const PurchaseOrder = () => {
                     <h1 className="text-3xl font-bold gradient-text">Purchase Orders</h1>
                     <p className="text-silver-dark mt-1">Kelola pembelian dari vendor</p>
                 </div>
-                {canCreate('blink_purchase_order') && (
-                    <Button onClick={() => setShowCreateModal(true)} icon={Plus}>
-                        Buat PO Baru
+                <div className="flex gap-2">
+                    <Button onClick={handleExportXLS} icon={Download} variant="secondary">
+                        Export to Excel
                     </Button>
-                )}
+                    {canCreate('blink_purchase_order') && (
+                        <Button onClick={() => setShowCreateModal(true)} icon={Plus}>
+                            Buat PO Baru
+                        </Button>
+                    )}
+                </div>
             </div>
-
-
 
             {/* Search - Full Width */}
             <div className="w-full">
@@ -1935,7 +1967,7 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                         <Clock className="w-6 h-6 text-yellow-400 flex-shrink-0" />
                         <div>
                             <p className="text-yellow-300 font-semibold text-sm">Menunggu Persetujuan Manager</p>
-                            <p className="text-yellow-400/70 text-xs mt-0.5">PO ini sedang dalam proses review. Persetujuan dilakukan melalui menu <span className="font-bold">Approval Center</span>. PO tidak dapat diubah saat ini.</p>
+                            <p className="text-yellow-400/70 text-xs mt-0.5">This PO is currently under review. Approval is managed via the <span className="font-bold">Approval Center</span> menu. The PO cannot be modified at this time.</p>
                         </div>
                     </div>
                 )}
@@ -2148,7 +2180,7 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                             <>
                                 <span className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-yellow-500/10 text-yellow-400 text-sm border border-yellow-500/30">
                                     <Clock className="w-4 h-4" />
-                                    Menunggu Approval Center
+                                    Waiting for Approval Center
                                 </span>
                                 {canApprovePO && (
                                     <Button

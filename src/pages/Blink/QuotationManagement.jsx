@@ -176,7 +176,7 @@ const QuotationManagement = () => {
     const handleSubmit = async (e, status = 'draft') => {
         e.preventDefault();
         if (!canCreate('blink_quotations')) {
-            alert('Anda tidak memiliki hak akses untuk membuat Quotation.');
+            alert('You do not have permission to create Quotation.');
             return;
         }
 
@@ -254,7 +254,7 @@ const QuotationManagement = () => {
 
     const handleManagerReject = async (quotationId, reason) => {
         if (!canApprove('blink_quotations')) {
-            alert('Anda tidak memiliki hak akses untuk menolak Quotation.');
+            alert('You do not have permission to reject Quotation.');
             return;
         }
         const rejectionReason = prompt('Reject reason (optional):');
@@ -281,7 +281,7 @@ const QuotationManagement = () => {
     // Handle edit quotation
     const handleEditQuotation = () => {
         if (!canEdit('blink_quotations')) {
-            alert('Anda tidak memiliki hak akses untuk mengedit Quotation.');
+            alert('You do not have permission to edit Quotation.');
             return;
         }
         setEditedQuotation({ ...viewingQuotation });
@@ -393,7 +393,7 @@ const QuotationManagement = () => {
     // Delete quotation
     const handleDeleteQuotation = async (quotationId) => {
         if (!canDelete('blink_quotations')) {
-            alert('Anda tidak memiliki hak akses untuk menghapus Quotation.');
+            alert('You do not have permission to delete Quotation.');
             return;
         }
         try {
@@ -530,7 +530,7 @@ const QuotationManagement = () => {
     // Create revision (new version) of quotation
     const handleCreateRevision = async (quotationId) => {
         if (!canCreate('blink_quotations')) {
-            alert('Anda tidak memiliki hak akses untuk membuat revisi Quotation.');
+            alert('You do not have permission to create Quotation revision.');
             return;
         }
         try {
@@ -603,7 +603,7 @@ const QuotationManagement = () => {
     // Update quotation status
     const handleUpdateStatus = async (quotationId, newStatus) => {
         if (!canApprove('blink_quotations')) {
-            alert('Anda tidak memiliki hak akses untuk mengubah status (Approve) Quotation.');
+            alert('You do not have permission to change Quotation status (Approve).');
             return;
         }
         try {
@@ -766,7 +766,7 @@ const QuotationManagement = () => {
     // Create SO from approved quotation
     const handleCreateSO = async (quotation) => { // Added async
         if (!canCreate('blink_shipments') || !canEdit('blink_quotations')) {
-            alert('Anda tidak memiliki izin (Create Shipment / Edit Quotation) untuk mengubah ke Sales Order.');
+            alert('You do not have permission (Create Shipment / Edit Quotation) to convert to Sales Order.');
             return;
         }
         console.log('🔵 Create SO clicked for quotation:', quotation.id);
@@ -774,21 +774,6 @@ const QuotationManagement = () => {
         const { generateSONumber } = await import('../../utils/documentNumbers');
         const soNumber = generateSONumber(quotation.jobNumber || quotation.quotationNumber);
         console.log('📝 Generated SO Number:', soNumber);
-
-        // Update quotation status to converted via Supabase
-        try {
-            console.log('⏳ Updating quotation status to converted...');
-            const { error: updateError } = await supabase
-                .from('blink_quotations')
-                .update({ status: 'converted' })
-                .eq('id', quotation.id);
-
-            if (updateError) throw updateError;
-        } catch (error) {
-            console.error('Error updating quotation status to converted:', error);
-            alert('Failed to update quotation status to converted: ' + error.message);
-            return; // Stop execution if status update fails
-        }
 
         // Auto-create Shipment in Operations
         const newShipment = {
@@ -811,7 +796,7 @@ const QuotationManagement = () => {
             createdFrom: 'sales_order'
         };
 
-        // Save shipment to Supabase
+        // Save shipment to Supabase FIRST, then update quotation status on success
         try {
             // Determine BL type based on service type
             const isAirFreight = (quotation.serviceType || '').toLowerCase() === 'air';
@@ -865,6 +850,13 @@ const QuotationManagement = () => {
 
             if (error) throw error;
 
+            // ✅ Only update quotation status AFTER shipment is successfully created
+            const { error: updateError } = await supabase
+                .from('blink_quotations')
+                .update({ status: 'converted', updated_at: new Date().toISOString() })
+                .eq('id', quotation.id);
+            if (updateError) console.error('Warning: status update failed after SO creation:', updateError);
+
             await fetchQuotations();
             setShowViewModal(false);
 
@@ -878,7 +870,7 @@ const QuotationManagement = () => {
 
         } catch (error) {
             console.error('Error creating shipment:', error);
-            alert('SO created but shipment failed: ' + error.message);
+            alert('Failed to create SO: ' + error.message);
         }
     };
 
@@ -897,6 +889,36 @@ const QuotationManagement = () => {
     // Only show active customers
     const activeCustomers = customers.filter(c => c.status === 'active');
 
+    const handleExportXLS = () => {
+        import('../../utils/exportXLS').then(({ exportToXLS }) => {
+            const headerRows = [
+                { value: companySettings?.company_name || 'PT Bakhtera Satu Indonesia', style: 'company' },
+                { value: 'QUOTATION REPORT', style: 'title' },
+                { value: `Report Date: ${new Date().toLocaleDateString('id-ID')}`, style: 'normal' },
+                '' // Empty row for gap
+            ];
+
+            const xlsColumns = [
+                { header: 'No', key: 'no', width: 5, align: 'center' },
+                { header: 'Job Number', key: 'jobNumber', width: 20 },
+                { header: 'Customer', key: 'customerName', width: 25 },
+                { header: 'Route', render: (item) => `${item.origin || '-'} -> ${item.destination || '-'}`, width: 30 },
+                { header: 'Service', key: 'serviceType', width: 15 },
+                {
+                    header: 'Amount',
+                    key: 'totalAmount',
+                    width: 20,
+                    align: 'right',
+                    render: (item) => `${item.currency || 'USD'} ${item.totalAmount?.toLocaleString('id-ID') || 0}`
+                },
+                { header: 'Valid Until', key: 'validUntil', width: 15 },
+                { header: 'Status', key: 'status', width: 15 }
+            ];
+
+            exportToXLS(filteredQuotations, 'Quotation_Report', headerRows, xlsColumns);
+        }).catch(err => console.error("Failed to load export utility", err));
+    };
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -905,11 +927,16 @@ const QuotationManagement = () => {
                     <h1 className="text-3xl font-bold gradient-text">Operations Quotation</h1>
                     <p className="text-silver-dark mt-1">Manage operational quotations</p>
                 </div>
-                {canCreate('blink_quotations') && (
-                    <Button onClick={() => setShowModal(true)} icon={Plus}>
-                        New Quotation
+                <div className="flex items-center gap-3">
+                    <Button onClick={handleExportXLS} variant="secondary" icon={Download}>
+                        Export XLS
                     </Button>
-                )}
+                    {canCreate('blink_quotations') && (
+                        <Button onClick={() => setShowModal(true)} icon={Plus}>
+                            New Quotation
+                        </Button>
+                    )}
+                </div>
             </div>
 
             {/* Search Bar */}
@@ -1934,13 +1961,6 @@ const QuotationManagement = () => {
                                 {viewingQuotation.status === 'revision_requested' && canCreate('blink_quotations') && (
                                     <Button onClick={() => handleCreateRevision(viewingQuotation.id)} className="bg-blue-500/20 hover:bg-blue-500/30 text-blue-400">
                                         📝 Create Revision
-                                    </Button>
-                                )}
-
-                                {/* Create SO */}
-                                {viewingQuotation.status === 'approved' && !viewingQuotation.is_superseded && canCreate('blink_shipments') && canEdit('blink_quotations') && (
-                                    <Button onClick={() => handleCreateSO(viewingQuotation)}>
-                                        Create Sales Order
                                     </Button>
                                 )}
 

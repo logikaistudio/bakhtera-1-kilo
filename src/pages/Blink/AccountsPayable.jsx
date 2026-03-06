@@ -891,6 +891,50 @@ const AccountsPayable = () => {
         return matchesFilter && matchesSearch;
     });
 
+    const handleExportXLS = () => {
+        import('../../utils/exportXLS').then(({ exportToXLS }) => {
+            const headerRows = [
+                { value: 'ACCOUNTS PAYABLE REPORT', style: 'title' },
+                { value: `Report Date: ${new Date().toLocaleDateString('id-ID')}`, style: 'normal' },
+                ''
+            ];
+
+            const xlsColumns = [
+                { header: 'No', key: 'no', width: 5, align: 'center' },
+                { header: 'AP Number', key: 'ap_number', width: 20 },
+                { header: 'PO Number', key: 'po_number', width: 20 },
+                { header: 'Vendor', key: 'vendor_name', width: 25 },
+                { header: 'Bill Date', key: 'bill_date', width: 15 },
+                { header: 'Due Date', key: 'due_date', width: 15 },
+                {
+                    header: 'Original Amount',
+                    key: 'original_amount',
+                    width: 20,
+                    align: 'right',
+                    render: (item) => `${item.currency || 'IDR'} ${(item.original_amount || 0).toLocaleString('id-ID')}`
+                },
+                {
+                    header: 'Paid Amount',
+                    key: 'paid_amount',
+                    width: 20,
+                    align: 'right',
+                    render: (item) => `${item.currency || 'IDR'} ${(item.paid_amount || 0).toLocaleString('id-ID')}`
+                },
+                {
+                    header: 'Outstanding Amount',
+                    key: 'outstanding_amount',
+                    width: 20,
+                    align: 'right',
+                    render: (item) => `${item.currency || 'IDR'} ${(item.outstanding_amount || 0).toLocaleString('id-ID')}`
+                },
+                { header: 'Aging Bucket', key: 'aging_bucket', width: 15 },
+                { header: 'Status', key: 'status', width: 15 }
+            ];
+
+            exportToXLS(filteredAP, `AP_Report_${new Date().toISOString().split('T')[0]}`, headerRows, xlsColumns);
+        }).catch(err => console.error("Failed to load export utility", err));
+    };
+
     const handleRowClick = (ap) => {
         setSelectedAP(ap);
         setShowDetailModal(true);
@@ -917,7 +961,7 @@ const AccountsPayable = () => {
                     <h1 className="text-3xl font-bold gradient-text">Accounts Payable (AP)</h1>
                     <p className="text-silver-dark mt-1">Manage vendor payables</p>
                 </div>
-                <Button icon={Download}>Export to Excel</Button>
+                <Button onClick={handleExportXLS} icon={Download}>Export to Excel</Button>
             </div>
 
             {/* Summary Cards - Compact */}

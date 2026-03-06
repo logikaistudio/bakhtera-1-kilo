@@ -10,7 +10,7 @@ import COAPicker from '../../components/Common/COAPicker';
 import {
     FileText, DollarSign, Calendar, User, Clock, CheckCircle, XCircle,
     Plus, Send, AlertCircle, Download, Eye, Edit, Trash, Receipt,
-    TrendingUp, AlertTriangle, Search, Filter, X, Package, Circle
+    TrendingUp, AlertTriangle, Search, Filter, X, Package, Circle, PlaySquare
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import InvoiceProfitSummary from '../../components/Blink/InvoiceProfitSummary';
@@ -40,6 +40,8 @@ const InvoiceManagement = () => {
     const [selectedShipment, setSelectedShipment] = useState(null);
     const [referenceType, setReferenceType] = useState('quotation'); // 'quotation' or 'so'
     const [revenueAccounts, setRevenueAccounts] = useState([]);
+    const [confirmSubmitAction, setConfirmSubmitAction] = useState(null);
+    const [successSubmitMsg, setSuccessSubmitMsg] = useState('');
 
     // Form state for creating invoice
     const [formData, setFormData] = useState({
@@ -528,7 +530,7 @@ const InvoiceManagement = () => {
                 total_amount: total,
                 paid_amount: 0,
                 outstanding_amount: total,
-                status: 'draft',
+                status: 'unpaid',
                 // COGS and Profit fields
                 cogs_items: formData.cogs_items || [],
                 cogs_subtotal: cogsSubtotal,
@@ -559,6 +561,70 @@ const InvoiceManagement = () => {
                 .select();
 
             if (error) throw error;
+
+            const insertedInvoice = data[0];
+
+            // Auto Journal Entry for AR & Revenue
+            try {
+                const batchId = crypto.randomUUID();
+                const entryNum = `JE-INV-${new Date().toISOString().slice(2, 7).replace('-', '')}-${Date.now().toString().slice(-6)}`;
+                const billDate = insertedInvoice.invoice_date || new Date().toISOString().split('T')[0];
+
+                const [{ data: arCoas }, { data: revCoas }] = await Promise.all([
+                    supabase.from('finance_coa').select('id, code, name').eq('type', 'ASSET').ilike('name', '%receivable%').limit(1),
+                    supabase.from('finance_coa').select('id, code, name').eq('type', 'REVENUE').ilike('name', '%freight%').limit(1)
+                ]);
+                const arCoa = arCoas?.[0] || { code: '1-01-400-0-1-00', name: 'ACCOUNT RECEIVABLE', id: null };
+                const revCoa = revCoas?.[0] || { code: '4-01-301-0-1-00', name: 'OCEAN FREIGHT', id: null };
+
+                const idrNote = insertedInvoice.currency !== 'IDR' ? ` (Rate: ${insertedInvoice.exchange_rate || 16000})` : '';
+                const exRate = insertedInvoice.exchange_rate || 16000;
+
+                const debitEntry = {
+                    entry_number: entryNum + '-D',
+                    entry_date: billDate,
+                    entry_type: 'invoice',
+                    reference_type: 'ar',
+                    reference_id: insertedInvoice.id,
+                    reference_number: insertedInvoice.invoice_number,
+                    account_code: arCoa.code,
+                    account_name: `${arCoa.name} - ${insertedInvoice.customer_name}`,
+                    debit: insertedInvoice.total_amount,
+                    credit: 0,
+                    currency: insertedInvoice.currency || 'IDR',
+                    exchange_rate: exRate,
+                    description: 'Invoice ' + insertedInvoice.invoice_number + ' - ' + insertedInvoice.customer_name + idrNote,
+                    batch_id: batchId,
+                    source: 'auto',
+                    coa_id: arCoa.id,
+                    party_name: insertedInvoice.customer_name
+                };
+
+                const creditEntry = {
+                    entry_number: entryNum + '-C',
+                    entry_date: billDate,
+                    entry_type: 'invoice',
+                    reference_type: 'ar',
+                    reference_id: insertedInvoice.id,
+                    reference_number: insertedInvoice.invoice_number,
+                    account_code: revCoa.code,
+                    account_name: `${revCoa.name} - ${insertedInvoice.customer_name}`,
+                    debit: 0,
+                    credit: insertedInvoice.total_amount,
+                    currency: insertedInvoice.currency || 'IDR',
+                    exchange_rate: exRate,
+                    description: 'Invoice ' + insertedInvoice.invoice_number + ' - ' + insertedInvoice.customer_name + idrNote,
+                    batch_id: batchId,
+                    source: 'auto',
+                    coa_id: revCoa.id,
+                    party_name: insertedInvoice.customer_name
+                };
+
+                const { error: journalError } = await supabase.from('blink_journal_entries').insert([debitEntry, creditEntry]);
+                if (journalError) console.error('Error creating journal entries for invoice:', journalError);
+            } catch (jeError) {
+                console.warn('Journal entry creation failed:', jeError.message);
+            }
 
             await fetchInvoices();
             setShowCreateModal(false);
@@ -929,18 +995,24 @@ const InvoiceManagement = () => {
     };
 
     const handleSubmitInvoice = async (invoice) => {
-        if (!canApprove('blink_invoices')) {
-            alert('Anda tidak memiliki hak akses untuk approve invoice.');
+        if (!canCreate('blink_invoices') && !canEdit('blink_invoices')) {
+            alert('You do not have permission to submit invoices.');
             return;
         }
-        if (!confirm(`Approve invoice ${invoice.invoice_number}? Invoice akan masuk hitungan AR.`)) return;
+        setConfirmSubmitAction(invoice);
+    };
+
+    const confirmAndProcessSubmit = async () => {
+        if (!confirmSubmitAction) return;
+        const invoice = confirmSubmitAction;
+        setConfirmSubmitAction(null);
 
         try {
-            console.log('Approving invoice:', invoice.invoice_number, 'ID:', invoice.id, 'Current status:', invoice.status);
+            console.log('Submitting invoice for approval:', invoice.invoice_number, 'ID:', invoice.id, 'Current status:', invoice.status);
 
             const { data, error } = await supabase
                 .from('blink_invoices')
-                .update({ status: 'unpaid' })
+                .update({ status: 'manager_approval', updated_at: new Date().toISOString() })
                 .eq('id', invoice.id)
                 .select();
 
@@ -956,17 +1028,17 @@ const InvoiceManagement = () => {
 
             console.log('Invoice status updated successfully:', data);
 
+            // Refetch or update local state
+            await fetchInvoices();
+            if (showViewModal && selectedInvoice?.id === invoice.id) {
+                setSelectedInvoice({ ...selectedInvoice, status: 'manager_approval' });
+            }
 
-            // ── Journal entries auto-created by Supabase trigger ────────────
-            // Migration 066: trigger_journal_from_blink_invoice
-            // Dr Piutang Usaha / Cr Revenue (per invoice item with COA linkage)
-            // ────────────────────────────────────────────────────────────────
-
-            alert('Invoice approved! Invoice sekarang masuk hitungan AR.');
-            window.location.reload(); // Force refresh to update UI
+            setSuccessSubmitMsg('✅ Invoice successfully submitted! Managers can review and approve it in the Approval Center.');
+            setTimeout(() => setSuccessSubmitMsg(''), 3000);
         } catch (error) {
-            console.error('Error approving invoice:', error);
-            alert('Failed to approve invoice: ' + error.message);
+            console.error('Error submitting invoice:', error);
+            alert('Failed to submit invoice: ' + error.message);
         }
     };
 
@@ -1145,6 +1217,127 @@ const InvoiceManagement = () => {
     const totalOutstanding = invoices.reduce((sum, inv) => sum + (inv.outstanding_amount || 0), 0);
     const overdueCount = invoices.filter(inv => inv.status === 'overdue').length;
 
+    const handleExportXLS = () => {
+        import('../../utils/exportXLS').then(({ exportToXLS }) => {
+            const headerRows = [
+                { value: companySettings?.company_name || 'PT Bakhtera Satu Indonesia', style: 'company' },
+                { value: 'INVOICE REPORT', style: 'title' },
+                { value: `Report Date: ${new Date().toLocaleDateString('id-ID')}`, style: 'normal' },
+                ''
+            ];
+
+            const xlsColumns = [
+                { header: 'No', key: 'no', width: 5, align: 'center' },
+                { header: 'Invoice #', key: 'invoice_number', width: 20 },
+                { header: 'Job Number', key: 'job_number', width: 20 },
+                { header: 'Customer', key: 'customer_name', width: 25 },
+                { header: 'Date', key: 'invoice_date', width: 15 },
+                { header: 'Due Date', key: 'due_date', width: 15 },
+                {
+                    header: 'Amount',
+                    key: 'total_amount',
+                    width: 20,
+                    align: 'right',
+                    render: (item) => `${item.currency || 'USD'} ${(item.total_amount || 0).toLocaleString('id-ID')}`
+                },
+                {
+                    header: 'Outstanding',
+                    key: 'outstanding_amount',
+                    width: 20,
+                    align: 'right',
+                    render: (item) => `${item.currency || 'USD'} ${(item.outstanding_amount || 0).toLocaleString('id-ID')}`
+                },
+                { header: 'Status', key: 'status', width: 15 }
+            ];
+
+            exportToXLS(filteredInvoices, `Invoice_Report_${new Date().toISOString().split('T')[0]}`, headerRows, xlsColumns);
+        }).catch(err => console.error("Failed to load export utility", err));
+    };
+
+    // --- Dev Temp Migration ---
+    const [isMigrating, setIsMigrating] = useState(false);
+    const runMigration = async () => {
+        if (!confirm('Run auto-journal migration for historical invoices?')) return;
+        setIsMigrating(true);
+        try {
+            const { data: allInvoices, error: invError } = await supabase
+                .from('blink_invoices')
+                .select('*')
+                .neq('status', 'draft')
+                .neq('status', 'cancelled');
+            if (invError) throw invError;
+
+            const { data: currentJournals, error: jeError } = await supabase
+                .from('blink_journal_entries')
+                .select('reference_id')
+                .eq('reference_type', 'ar');
+            if (jeError) throw jeError;
+
+            const existingIds = new Set(currentJournals.map(je => je.reference_id));
+            const toMigrate = allInvoices
+                .filter(inv => !existingIds.has(inv.id))
+                .sort((a, b) => new Date(b.created_at || b.invoice_date) - new Date(a.created_at || a.invoice_date))
+                .slice(0, 2);
+
+            if (toMigrate.length === 0) {
+                alert('All invoices already migrated!');
+                setIsMigrating(false);
+                return;
+            }
+
+            const [{ data: arCoas }, { data: revCoas }] = await Promise.all([
+                supabase.from('finance_coa').select('id, code, name').eq('type', 'ASSET').ilike('name', '%receivable%').limit(1),
+                supabase.from('finance_coa').select('id, code, name').eq('type', 'REVENUE').ilike('name', '%freight%').limit(1)
+            ]);
+            const arCoa = arCoas?.[0] || { code: '1-01-400-0-1-00', name: 'ACCOUNT RECEIVABLE', id: null };
+            const revCoa = revCoas?.[0] || { code: '4-01-301-0-1-00', name: 'OCEAN FREIGHT', id: null };
+
+            let entriesToInsert = [];
+            for (const inv of toMigrate) {
+                // Generate a simple UUID fallback since crypto might not be available in browser
+                const batchId = '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, c =>
+                    (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+                );
+                const dStr = new Date().toISOString().slice(2, 7).replace('-', '');
+                const entryNum = `JE-MIG-${dStr}-${Math.floor(Math.random() * 100000).toString().padStart(6, '0')}`;
+                const billDate = inv.invoice_date || new Date().toISOString().split('T')[0];
+                const exRate = inv.exchange_rate || 16000;
+
+                entriesToInsert.push({
+                    entry_number: entryNum + '-D', entry_date: billDate, entry_type: 'invoice', reference_type: 'ar',
+                    reference_id: inv.id, reference_number: inv.invoice_number, account_code: arCoa.code,
+                    account_name: `${arCoa.name} - ${inv.customer_name}`, debit: inv.total_amount, credit: 0,
+                    currency: inv.currency || 'IDR', exchange_rate: exRate, description: `Invoice ${inv.invoice_number}`,
+                    batch_id: batchId, source: 'auto', coa_id: arCoa.id, party_name: inv.customer_name
+                });
+                entriesToInsert.push({
+                    entry_number: entryNum + '-C', entry_date: billDate, entry_type: 'invoice', reference_type: 'ar',
+                    reference_id: inv.id, reference_number: inv.invoice_number, account_code: revCoa.code,
+                    account_name: `${revCoa.name} - ${inv.customer_name}`, debit: 0, credit: inv.total_amount,
+                    currency: inv.currency || 'IDR', exchange_rate: exRate, description: `Invoice ${inv.invoice_number}`,
+                    batch_id: batchId, source: 'auto', coa_id: revCoa.id, party_name: inv.customer_name
+                });
+            }
+
+            if (entriesToInsert.length > 0) {
+                // Insert in batches of 500
+                const CHUNK_SIZE = 500;
+                for (let i = 0; i < entriesToInsert.length; i += CHUNK_SIZE) {
+                    const chunk = entriesToInsert.slice(i, i + CHUNK_SIZE);
+                    const { error: iErr } = await supabase.from('blink_journal_entries').insert(chunk);
+                    if (iErr) throw iErr;
+                }
+                alert(`Successfully migrated ${toMigrate.length} invoices!`);
+                await fetchInvoices();
+            }
+        } catch (error) {
+            console.error(error);
+            alert('Migration failed: ' + error.message);
+        } finally {
+            setIsMigrating(false);
+        }
+    };
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -1153,11 +1346,24 @@ const InvoiceManagement = () => {
                     <h1 className="text-3xl font-bold gradient-text">Invoice Management</h1>
                     <p className="text-silver-dark mt-1">Kelola invoice dan tracking pembayaran</p>
                 </div>
-                {canCreate('blink_invoices') && (
-                    <Button onClick={() => setShowCreateModal(true)} icon={Plus}>
-                        Buat Invoice Baru
+                <div className="flex items-center gap-3">
+                    <Button
+                        onClick={runMigration}
+                        icon={PlaySquare}
+                        variant="secondary"
+                        disabled={isMigrating}
+                    >
+                        {isMigrating ? 'Migrating...' : 'Migrate Past Invoices'}
                     </Button>
-                )}
+                    <Button onClick={handleExportXLS} variant="secondary" icon={Download}>
+                        Export XLS
+                    </Button>
+                    {canCreate('blink_invoices') && (
+                        <Button onClick={() => setShowCreateModal(true)} icon={Plus}>
+                            Buat Invoice Baru
+                        </Button>
+                    )}
+                </div>
             </div>
 
             {/* Summary Cards - Compact */}
@@ -1343,7 +1549,7 @@ const InvoiceManagement = () => {
                         }}
                         statusConfig={statusConfig}
                         canEditInvoice={canEdit('blink_invoices')}
-                        canApproveInvoice={canApprove('blink_invoices')}
+                        canSubmitInvoice={canCreate('blink_invoices') || canEdit('blink_invoices')}
                     />
                 )
             }
@@ -1397,6 +1603,27 @@ const InvoiceManagement = () => {
                     />
                 )
             }
+
+            {/* Status Confirmation Modal */}
+            <Modal isOpen={!!confirmSubmitAction} onClose={() => setConfirmSubmitAction(null)} title="Confirmation" size="small">
+                <div className="space-y-4 text-silver-light">
+                    <p className="text-lg">Submit invoice {confirmSubmitAction?.invoice_number} to the Approval Center for Manager approval?</p>
+                    <div className="flex justify-end gap-2 mt-6">
+                        <Button variant="secondary" onClick={() => setConfirmSubmitAction(null)}>Cancel</Button>
+                        <Button variant="primary" onClick={confirmAndProcessSubmit}>Yes, Continue</Button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Success Message Modal */}
+            <Modal isOpen={!!successSubmitMsg} onClose={() => setSuccessSubmitMsg('')} title="Success" size="small">
+                <div className="space-y-4 text-center">
+                    <p className="text-lg text-emerald-400 font-semibold mt-4">{successSubmitMsg}</p>
+                    <div className="flex justify-center mt-6">
+                        <Button variant="primary" onClick={() => setSuccessSubmitMsg('')}>Close</Button>
+                    </div>
+                </div>
+            </Modal>
         </div >
     );
 };
@@ -2003,7 +2230,7 @@ const InvoiceCreateModal = ({ quotations, shipments, formData, setFormData, sele
 };
 
 // Invoice View Modal Component
-const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint, onPreview, onSubmit, onAddItem, statusConfig, canEditInvoice, canApproveInvoice }) => {
+const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint, onPreview, onSubmit, onAddItem, statusConfig, canEditInvoice, canSubmitInvoice }) => {
     const [payments, setPayments] = useState([]);
     const [loadingPayments, setLoadingPayments] = useState(true);
 
@@ -2340,13 +2567,13 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                                 Preview
                             </button>
                         )}
-                        {invoice.status === 'draft' && onSubmit && canApproveInvoice && (
+                        {invoice.status === 'draft' && onSubmit && canSubmitInvoice && (
                             <button
                                 onClick={onSubmit}
-                                className="flex items-center gap-2 px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg smooth-transition font-semibold"
+                                className="flex items-center gap-2 px-5 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg smooth-transition font-semibold"
                             >
-                                <CheckCircle className="w-4 h-4" />
-                                Approve
+                                <Send className="w-4 h-4" />
+                                Submit for Approval
                             </button>
                         )}
                     </div>

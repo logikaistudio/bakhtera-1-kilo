@@ -2,16 +2,14 @@ import { createClient } from '@supabase/supabase-js'
 import dotenv from 'dotenv'
 dotenv.config()
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL
-const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
+const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY)
 
 async function test() {
-  const { data, error } = await supabase.from('company_settings').select('*')
-  console.log('company_settings:', { data, error })
+  const { data: menus } = await supabase.from('menu_registry').select('*').like('menu_code', 'blink%')
+  console.log("Registered Menus:", menus?.length, menus?.map(m => m.menu_code).join(', '))
 
-  const { data: d2, error: e2 } = await supabase.from('approval_requests').select('*')
-  console.log('approval_requests:', { data: d2, error: e2 })
+  const { data: rolePerms } = await supabase.from('role_permissions').select('*').eq('role_id', 'blinkadmin')
+  console.log("Role Perms:", rolePerms?.length, rolePerms?.map(rp => rp.menu_code).join(', '))
 }
+
 test()
