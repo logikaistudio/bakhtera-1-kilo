@@ -246,6 +246,7 @@ const Sidebar = () => {
                 { path: '/blink/operations/quotations', label: 'Quotation', menuCode: 'blink_quotations' },
                 { path: '/blink/shipments', label: 'Shipment Management', menuCode: 'blink_shipments' },
                 { path: '/blink/operations/bl', label: 'BL/AWB Documents', menuCode: 'blink_bl' },
+                { path: '/blink/approvals', label: 'Approval Center', menuCode: 'blink_approval', showBadge: true },
             ]
         },
 
@@ -282,15 +283,7 @@ const Sidebar = () => {
             type: 'category', label: '⚙️ Master Data', items: [
                 { path: '/blink/master/coa', label: 'COA Master', menuCode: 'blink_coa' },
                 { path: '/blink/master/partners', label: 'Business Partners', menuCode: 'blink_partners' },
-                { path: '/blink/master/routes', label: 'Master Routes', menuCode: 'blink_routes' },
                 { path: '/blink/master/settings', label: 'Module Settings', menuCode: 'blink_settings' },
-            ]
-        },
-
-        // Approval Category
-        {
-            type: 'category', label: '🔔 Approval', items: [
-                { path: '/blink/approvals', label: 'Approval Center', menuCode: 'blink_approval', showBadge: true },
             ]
         },
     ];

@@ -77,6 +77,7 @@ export const APP_MENUS = {
             { code: 'blink_bl', label: 'Document BL/AWB', group: 'Operations', path: '/blink/operations/bl' },
             { code: 'blink_tracking', label: 'Tracking & Monitoring', group: 'Operations', path: '/blink/operations/tracking' },
             { code: 'blink_awb', label: 'AWB Management', group: 'Operations', path: '/blink/operations/awb' },
+            { code: 'blink_approval', label: 'Approval Center', group: 'Operations', path: '/blink/approvals' },
             // ─── Profit & Costing ───
             { code: 'blink_selling_buying', label: 'Selling vs Buying Analysis', group: 'Profit & Costing', path: '/blink/finance/selling-buying' },
             // ─── Finance ───
@@ -91,11 +92,8 @@ export const APP_MENUS = {
             { code: 'blink_balance_sheet', label: 'Neraca', group: 'Finance', path: '/blink/finance/balance-sheet' },
             // ─── Master Data ───
             { code: 'blink_coa', label: 'COA Master', group: 'Master Data', path: '/blink/master/coa' },
-            { code: 'blink_routes', label: 'Master Routes', group: 'Master Data', path: '/blink/master/routes' },
             { code: 'blink_partners', label: 'Business Partners', group: 'Master Data', path: '/blink/master/partners' },
             { code: 'blink_settings', label: 'Module Settings', group: 'Master Data', path: '/blink/master/settings' },
-            // ─── Approval ───
-            { code: 'blink_approval', label: 'Approval Center', group: 'Approval', path: '/blink/approvals' },
         ],
     },
 
