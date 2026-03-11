@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { createInvoiceJournal, createCOGSJournal, getAllCOA, resolveARAccount, resolveRevenueAccount } from '../../utils/journalHelper';
+import { createInvoiceJournal, createCOGSJournal, getAllCOA, resolveARAccount, resolveRevenueAccount, generateUUID } from '../../utils/journalHelper';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useData } from '../../context/DataContext';
@@ -1264,10 +1264,7 @@ const InvoiceManagement = () => {
 
             let entriesToInsert = [];
             for (const inv of toMigrate) {
-                // Generate a simple UUID fallback since crypto might not be available in browser
-                const batchId = '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, c =>
-                    (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
-                );
+                const batchId = generateUUID();
                 const dStr = new Date().toISOString().slice(2, 7).replace('-', '');
                 const entryNum = `JE-MIG-${dStr}-${Math.floor(Math.random() * 100000).toString().padStart(6, '0')}`;
                 const billDate = inv.invoice_date || new Date().toISOString().split('T')[0];
