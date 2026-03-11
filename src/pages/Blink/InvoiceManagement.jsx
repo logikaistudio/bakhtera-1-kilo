@@ -1256,45 +1256,30 @@ const InvoiceManagement = () => {
                 return;
             }
 
+            let migratedCount = 0;
             const coaList = await getAllCOA();
-            const [arCoa, revCoa] = await Promise.all([
-                resolveARAccount(coaList),
-                resolveRevenueAccount(coaList)
-            ]);
 
-            let entriesToInsert = [];
             for (const inv of toMigrate) {
-                const batchId = generateUUID();
-                const dStr = new Date().toISOString().slice(2, 7).replace('-', '');
-                const entryNum = `JE-MIG-${dStr}-${Math.floor(Math.random() * 100000).toString().padStart(6, '0')}`;
-                const billDate = inv.invoice_date || new Date().toISOString().split('T')[0];
-                const exRate = inv.exchange_rate || 16000;
-
-                entriesToInsert.push({
-                    entry_number: entryNum + '-D', entry_date: billDate, entry_type: 'invoice', reference_type: 'ar',
-                    reference_id: inv.id, reference_number: inv.invoice_number, account_code: arCoa.code,
-                    account_name: `${arCoa.name} - ${inv.customer_name}`, debit: inv.total_amount, credit: 0,
-                    currency: inv.currency || 'IDR', exchange_rate: exRate, description: `Invoice ${inv.invoice_number}`,
-                    batch_id: batchId, source: 'auto', coa_id: arCoa.id, party_name: inv.customer_name
-                });
-                entriesToInsert.push({
-                    entry_number: entryNum + '-C', entry_date: billDate, entry_type: 'invoice', reference_type: 'ar',
-                    reference_id: inv.id, reference_number: inv.invoice_number, account_code: revCoa.code,
-                    account_name: `${revCoa.name} - ${inv.customer_name}`, debit: 0, credit: inv.total_amount,
-                    currency: inv.currency || 'IDR', exchange_rate: exRate, description: `Invoice ${inv.invoice_number}`,
-                    batch_id: batchId, source: 'auto', coa_id: revCoa.id, party_name: inv.customer_name
-                });
+                try {
+                    // Create detailed AR + Revenue journal
+                    await createInvoiceJournal({ invoice: inv, coaList });
+                    
+                    // Create detailed COGS + Inventory journal if applicable
+                    if (inv.cogs_subtotal > 0) {
+                        await createCOGSJournal({ 
+                            invoice: inv, 
+                            cogsAmount: inv.cogs_subtotal, 
+                            coaList 
+                        });
+                    }
+                    migratedCount++;
+                } catch (err) {
+                    console.error(`Failed to migrate invoice ${inv.invoice_number}:`, err);
+                }
             }
 
-            if (entriesToInsert.length > 0) {
-                // Insert in batches of 500
-                const CHUNK_SIZE = 500;
-                for (let i = 0; i < entriesToInsert.length; i += CHUNK_SIZE) {
-                    const chunk = entriesToInsert.slice(i, i + CHUNK_SIZE);
-                    const { error: iErr } = await supabase.from('blink_journal_entries').insert(chunk);
-                    if (iErr) throw iErr;
-                }
-                alert(`Successfully migrated ${toMigrate.length} invoices!`);
+            if (migratedCount > 0) {
+                alert(`Successfully migrated ${migratedCount} invoices with detailed items!`);
                 await fetchInvoices();
             }
         } catch (error) {
