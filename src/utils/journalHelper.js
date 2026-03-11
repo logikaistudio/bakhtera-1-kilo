@@ -78,6 +78,7 @@ export async function resolveCOA({ codes = [], prefixes = [], type, nameHint, co
         // Sort candidates from longest to shortest name to avoid matching generic short words first
         typeCandidates.sort((a, b) => (b.name?.length || 0) - (a.name?.length || 0));
         
+        // Find best match by direct inclusion
         let bestMatch = null;
         for (const can of typeCandidates) {
             if (can.name) {
@@ -95,6 +96,49 @@ export async function resolveCOA({ codes = [], prefixes = [], type, nameHint, co
                 }
             }
         }
+        if (bestMatch) return bestMatch;
+
+        // Fallback to Fuzzy / Typo matching (e.g., "Hanling" -> "Handling")
+        function levenshtein(s1, s2) {
+            if (!s1 || !s2) return 99;
+            if (s1.length === 0) return s2.length;
+            if (s2.length === 0) return s1.length;
+            let v0 = new Array(s2.length + 1).fill(0).map((_, i) => i);
+            let v1 = new Array(s2.length + 1).fill(0);
+            for (let i = 0; i < s1.length; i++) {
+                v1[0] = i + 1;
+                for (let j = 0; j < s2.length; j++) {
+                    let cost = (s1[i] === s2[j]) ? 0 : 1;
+                    v1[j + 1] = Math.min(v1[j] + 1, v0[j + 1] + 1, v0[j] + cost);
+                }
+                for (let j = 0; j < v0.length; j++) v0[j] = v1[j];
+            }
+            return v1[s2.length];
+        }
+
+        const hintWords = hint.split(/\s+/).filter(w => w.length >= 4); // only check typos for words >= 4 chars
+        let bestDistance = Infinity;
+
+        for (const can of typeCandidates) {
+            if (!can.name) continue;
+            const canName = can.name.toLowerCase().trim();
+            const canWords = canName.split(/\s+|\//).map(w => w.trim()).filter(w => w.length >= 4);
+
+            for (const hw of hintWords) {
+                for (const cw of canWords) {
+                    const dist = levenshtein(hw, cw);
+                    const maxLen = Math.max(hw.length, cw.length);
+                    // Match if 1 error max or 2 errors on very long words, ignoring exact length mismatch
+                    if (dist <= 2 && dist < maxLen / 2) {
+                        if (dist < bestDistance) {
+                            bestDistance = dist;
+                            bestMatch = can;
+                        }
+                    }
+                }
+            }
+        }
+
         if (bestMatch) return bestMatch;
     }
 
