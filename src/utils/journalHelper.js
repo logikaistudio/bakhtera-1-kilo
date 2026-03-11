@@ -75,13 +75,24 @@ export async function resolveCOA({ codes = [], prefixes = [], type, nameHint, co
         const hint = nameHint.toLowerCase().trim();
         // Check active accounts of exactly this type
         const typeCandidates = list.filter(c => c.type === type && c.is_active !== false);
+        // Sort candidates from longest to shortest name to avoid matching generic short words first
+        typeCandidates.sort((a, b) => (b.name?.length || 0) - (a.name?.length || 0));
         
-        // Find best match by name
         let bestMatch = null;
         for (const can of typeCandidates) {
-            if (can.name && can.name.toLowerCase().includes(hint)) {
-                bestMatch = can;
-                break; // Take the first one that includes the hint
+            if (can.name) {
+                const canName = can.name.toLowerCase().trim();
+                // Bidirectional check (at least 3 characters to avoid meaningless short matches):
+                // 1. Does the COA Name contain the Invoice Description (e.g. "Handling" -> "Handling Charges")
+                // 2. Does the Invoice Description contain the COA Name (e.g. "Ocean freight jkt vietnam" -> "Ocean Freight")
+                // Also handles slashes (e.g. "Trucking / Darat" -> "Trucking")
+                const parts = canName.split('/').map(p => p.trim());
+                const isMatch = parts.some(p => p.length >= 3 && (p.includes(hint) || hint.includes(p)));
+                
+                if (hint.length >= 3 && canName.length >= 3 && isMatch) {
+                    bestMatch = can;
+                    break; // Take the first best matching
+                }
             }
         }
         if (bestMatch) return bestMatch;
