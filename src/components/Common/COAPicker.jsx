@@ -77,6 +77,15 @@ const COAPicker = ({
                     flagField: null,
                     flagValue: null
                 };
+            case 'COGS':
+                return {
+                    // Include ALL possible types so kepala-5 accounts are never excluded by type filter
+                    types: ['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE', 'COGS', 'COST', 'DIRECT_COST', 'OTHER_INCOME', 'OTHER_EXPENSE'],
+                    flagField: null,
+                    flagValue: null,
+                    codePrefix: '5',
+                    skipTypeFilter: true  // when codePrefix covers the filter, skip type filtering
+                };
             case 'ASSET':
                 return {
                     types: ['ASSET'],
@@ -110,13 +119,22 @@ const COAPicker = ({
                     .from('finance_coa')
                     .select('*')
                     .eq('is_active', true)
-                    .in('type', config.types)
                     .gte('level', minLevel)
                     .order('code', { ascending: true });
+
+                // Apply type filter only when NOT using codePrefix as primary filter
+                if (!config.skipTypeFilter) {
+                    query = query.in('type', config.types);
+                }
 
                 // Apply additional flag filter if specified
                 if (config.flagField && config.flagValue !== null) {
                     query = query.eq(config.flagField, config.flagValue);
+                }
+
+                // Apply code prefix filter if specified (e.g. '5' for kepala 5 COGS accounts)
+                if (config.codePrefix) {
+                    query = query.like('code', `${config.codePrefix}%`);
                 }
 
                 const { data, error } = await query;
@@ -263,8 +281,8 @@ const COAPicker = ({
 
             {/* Dropdown Panel - Light Theme for Better Visibility */}
             {isOpen && (
-                <div className="absolute z-50 mt-1 bg-white border border-gray-300 rounded-lg shadow-2xl 
-                    max-h-80 overflow-hidden animate-fadeIn flex flex-col" style={{ minWidth: '380px', width: 'max-content', maxWidth: '450px' }}>
+                <div className="absolute z-[9999] mt-1 bg-white border border-gray-300 rounded-lg shadow-2xl 
+                    max-h-80 overflow-hidden animate-fadeIn flex flex-col" style={{ minWidth: '400px', width: 'max-content', maxWidth: '600px' }}>
 
                     {/* Search Input & Controls */}
                     <div className="p-3 border-b border-gray-200 bg-gray-50 flex gap-2 flex-shrink-0">

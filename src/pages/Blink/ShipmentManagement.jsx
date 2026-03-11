@@ -51,6 +51,8 @@ const ShipmentManagement = () => {
             console.log(`📦 Fetched ${data?.length || 0} shipments from DB`);
             console.log('Raw data sample:', data?.[0]);
 
+            // Returns mapped data so callers can pick individual records
+
             // Map snake_case to camelCase
             const mapped = (data || []).map(s => ({
                 ...s,
@@ -74,15 +76,39 @@ const ShipmentManagement = () => {
                 updatedAt: s.updated_at || s.updatedAt,
                 createdFrom: s.created_from || s.createdFrom,
                 currency: s.currency || 'USD',
-                // New document fields
+                // Document / BL / AWB fields
                 mawb: s.mawb || null,
                 hawb: s.hawb || null,
                 hbl: s.hbl || null,
                 mbl: s.mbl || null,
+                bl_number: s.bl_number || null,
+                awb_number: s.awb_number || null,
+                bl_date: s.bl_date || null,
+                blDate: s.bl_date || null,
+                // Shipment detail fields
                 consignee_name: s.consignee_name || null,
                 shipperName: s.shipper_name || s.shipper || null,
                 shipper: s.shipper || s.shipper_name || null,
-                // Add items mapping
+                shipper_name: s.shipper_name || null,
+                grossWeight: s.gross_weight || s.grossWeight || null,
+                gross_weight: s.gross_weight || null,
+                netWeight: s.net_weight || s.netWeight || null,
+                net_weight: s.net_weight || null,
+                packages: s.packages || null,
+                measure: s.measure || null,
+                shippingMode: s.shipping_mode || s.shippingMode || null,
+                shipping_mode: s.shipping_mode || null,
+                // Booking / vessel / port
+                vessel_name: s.vessel_name || null,
+                voyage: s.voyage || null,
+                flight_number: s.flight_number || null,
+                port_of_loading: s.port_of_loading || null,
+                port_of_discharge: s.port_of_discharge || null,
+                // Containers
+                containers: s.containers || [],
+                // Documents
+                documents: s.documents || [],
+                // Items mapping
                 sellingItems: s.selling_items || s.sellingItems || [],
                 buyingItems: s.buying_items || s.buyingItems || []
             }));
@@ -98,9 +124,11 @@ const ShipmentManagement = () => {
             console.log('Mapped sample:', mapped?.[0]);
 
             setShipments(mapped);
+            return mapped; // Allow callers to get fresh data
         } catch (error) {
             console.error('❌ Error fetching shipments:', error);
             setShipments([]);
+            return [];
         } finally {
             setLoading(false);
         }
@@ -402,30 +430,35 @@ const ShipmentManagement = () => {
                 if (error) throw error;
             }
 
-            // Optimistically update the list without waiting for fetch
+            // Optimistically update the list without waiting for fetch  
             setShipments(prev => prev.map(s => s.id === updatedShipment.id ? { ...s, ...updatedShipment } : s));
 
-            // Refresh list - after refresh, update selectedShipment with fresh DB data
-            // To prevent stale reads from overriding immediately, add a small delay before fetching
-            setTimeout(() => {
-                fetchShipments().then(() => {
-                    // Update the selected shipment again just in case there are merged values
-                    setSelectedShipment(prev => ({
-                        ...(prev || {}),
-                        ...updatedShipment,
-                        sellingItems: updatedShipment.sellingItems ?? prev?.sellingItems ?? [],
-                        buyingItems: updatedShipment.buyingItems ?? prev?.buyingItems ?? []
-                    }));
-                });
-            }, 500);
-
-            // Immediate update for modal
+            // Immediate update for modal so user sees changes right away
             setSelectedShipment(prev => ({
                 ...(prev || {}),
                 ...updatedShipment,
                 sellingItems: updatedShipment.sellingItems ?? prev?.sellingItems ?? [],
                 buyingItems: updatedShipment.buyingItems ?? prev?.buyingItems ?? []
             }));
+
+            // Refresh from DB then sync selectedShipment with fully-mapped fresh data
+            // Use returned mapped array to find the correct record by ID directly
+            setTimeout(async () => {
+                const freshList = await fetchShipments();
+                const freshRecord = freshList.find(s => s.id === updatedShipment.id);
+                if (freshRecord) {
+                    setSelectedShipment(prev => ({
+                        ...freshRecord,
+                        // Preserve items arrays in case the fresh DB record has empty arrays
+                        sellingItems: (freshRecord.sellingItems?.length > 0)
+                            ? freshRecord.sellingItems
+                            : (prev?.sellingItems || []),
+                        buyingItems: (freshRecord.buyingItems?.length > 0)
+                            ? freshRecord.buyingItems
+                            : (prev?.buyingItems || [])
+                    }));
+                }
+            }, 800);
         } catch (error) {
             console.error('Error updating shipment:', error);
             alert('Failed to update shipment: ' + error.message);

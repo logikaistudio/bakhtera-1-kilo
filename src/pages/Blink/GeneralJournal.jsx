@@ -175,10 +175,17 @@ const GeneralJournal = () => {
         filteredEntries.forEach(entry => {
             const key = entry.batch_id || entry.entry_number || entry.id;
             if (!groups[key]) {
+                // For display: strip -Lxx line suffix for manual entries to show clean base number
+                // e.g. "JE-2603-0001-L01" → "JE-2603-0001"
+                // For non-manual (AP/AR/Invoice), entry_number is already meaningful per-group
+                const displayNumber = entry.source === 'manual' && entry.reference_number
+                    ? entry.reference_number
+                    : entry.entry_number?.replace(/-L\d+$/i, '') || entry.entry_number;
+
                 groups[key] = {
                     key,
                     date: entry.entry_date,
-                    entry_number: entry.entry_number,
+                    entry_number: displayNumber,
                     description: entry.description,
                     reference_type: entry.reference_type,
                     reference_number: entry.reference_number,
@@ -242,6 +249,42 @@ const GeneralJournal = () => {
         return Math.abs(d - c) < 0.01 && d > 0;
     };
 
+    const generateEntryNumber = async () => {
+        const now = new Date();
+        const yy = String(now.getFullYear()).slice(2);
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const prefix = `JE-${yy}${mm}-`;
+
+        try {
+            // Find the highest existing base sequence number for this month
+            // Strip line suffixes (-L01 etc) before comparing
+            const { data } = await supabase
+                .from('blink_journal_entries')
+                .select('entry_number')
+                .like('entry_number', `${prefix}%`)
+                .order('entry_number', { ascending: false })
+                .limit(20); // fetch a few to safely find the highest base seq
+
+            let seq = 1;
+            if (data && data.length > 0) {
+                // Strip -Lxx suffix if present and parse base seq
+                const seqNums = data.map(row => {
+                    const base = row.entry_number.replace(/-L\d+$/i, ''); // remove -L01 etc
+                    const parts = base.split('-');
+                    return parseInt(parts[parts.length - 1], 10);
+                }).filter(n => !isNaN(n));
+
+                if (seqNums.length > 0) {
+                    seq = Math.max(...seqNums) + 1;
+                }
+            }
+            return `${prefix}${String(seq).padStart(4, '0')}`;
+        } catch {
+            // Fallback: use full timestamp + random to avoid collision
+            return `${prefix}${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 100)}`;
+        }
+    };
+
     const saveEntry = async () => {
         if (!canCreate('blink_journal')) {
             alert('Anda tidak memiliki hak akses untuk membuat entri jurnal manual.');
@@ -251,28 +294,40 @@ const GeneralJournal = () => {
         if (!newEntry.description) { alert('Description is required.'); return; }
         try {
             setSaving(true);
-            const now = new Date();
-            const entryNumber = `JE-${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, '0')}-${Date.now().toString().slice(-4)}`;
+            // Base entry number for this journal batch (e.g. JE-2603-0001)
+            const baseEntryNumber = await generateEntryNumber();
             const batchId = crypto.randomUUID();
-            const rows = newEntry.lines
-                .filter(l => l.coa_id && (l.debit > 0 || l.credit > 0))
-                .map(line => ({
-                    entry_number: entryNumber,
-                    entry_date: newEntry.entry_date,
-                    entry_type: 'adjustment',
-                    account_code: line.account_code,
-                    account_name: line.account_name,
-                    coa_id: line.coa_id,
-                    debit: line.debit || 0,
-                    credit: line.credit || 0,
-                    description: newEntry.description,
-                    batch_id: batchId,
-                    source: 'manual',
-                    currency: 'IDR'
-                }));
+
+            const validLines = newEntry.lines.filter(l => l.coa_id && (l.debit > 0 || l.credit > 0));
+
+            // Each line gets a UNIQUE entry_number with line index suffix
+            // e.g. JE-2603-0001-L01, JE-2603-0001-L02, ...
+            // batch_id groups all lines together for viewing and deletion
+            const rows = validLines.map((line, idx) => ({
+                entry_number: `${baseEntryNumber}-L${String(idx + 1).padStart(2, '0')}`,
+                entry_date: newEntry.entry_date,
+                entry_type: 'adjustment',
+                account_code: line.account_code,
+                account_name: line.account_name,
+                coa_id: line.coa_id,
+                debit: line.debit || 0,
+                credit: line.credit || 0,
+                description: newEntry.description,
+                batch_id: batchId,
+                source: 'manual',
+                currency: 'IDR',
+                // Store the base number for easy display/search
+                reference_number: baseEntryNumber,
+            }));
+
+            if (rows.length === 0) {
+                alert('Please fill in at least one valid journal line with an account and amount.');
+                return;
+            }
+
             const { error } = await supabase.from('blink_journal_entries').insert(rows);
             if (error) throw error;
-            alert('Journal entry saved successfully!');
+            alert(`✅ Journal entry ${baseEntryNumber} saved successfully!`);
             setShowNewEntryModal(false);
             setNewEntry({
                 entry_date: new Date().toISOString().split('T')[0], description: '', lines: [

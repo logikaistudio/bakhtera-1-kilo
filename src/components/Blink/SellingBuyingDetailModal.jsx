@@ -28,7 +28,34 @@ const SellingBuyingDetailModal = ({ isOpen, onClose, shipment }) => {
         };
 
         // Process Selling Items
-        const sellingItems = shipment.sellingItems || shipment.service_items || [];
+        const rawSellingItems = shipment.sellingItems || shipment.service_items || [];
+        const sellingItems = [];
+        // Flatten grouped items if necessary
+        rawSellingItems.forEach(itemOrGroup => {
+            if (itemOrGroup.items && Array.isArray(itemOrGroup.items)) {
+                // It's a group
+                const groupRate = itemOrGroup.groupExchangeRate || shipment.exchangeRate || shipment.exchange_rate || 16000;
+                const targetCurr = shipment.currency || 'USD';
+
+                itemOrGroup.items.forEach(child => {
+                    let amt = parseFloat(child.amount) || 0;
+                    const childCurr = child.currency || 'USD';
+                    if (childCurr !== targetCurr) {
+                        if (targetCurr === 'IDR' && childCurr === 'USD') amt = amt * groupRate;
+                        else if (targetCurr === 'USD' && childCurr === 'IDR') amt = amt / groupRate;
+                    }
+
+                    sellingItems.push({
+                        ...child,
+                        name: child.description || child.name || child.itemCode,
+                        amount: amt
+                    });
+                });
+            } else {
+                sellingItems.push(itemOrGroup);
+            }
+        });
+
         sellingItems.forEach(item => {
             const cat = categorizeSellingItem(item);
             const amount = parseFloat(item.total || item.amount || 0);

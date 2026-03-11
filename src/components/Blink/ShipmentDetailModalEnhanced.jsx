@@ -1130,13 +1130,30 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
 
             if (error) throw error;
 
-            // Update parent component with all data
+            // Update parent component with ALL saved data for correct optimistic update
             const updatedShipment = {
                 ...editedShipment,
+                // Booking data
                 booking: bookingData,
-                ...dates
+                vessel_name: bookingData.vesselName || null,
+                voyage: bookingData.voyageNumber || null,
+                port_of_loading: bookingData.portOfLoading || null,
+                port_of_discharge: bookingData.portOfDischarge || null,
+                // Dates
+                ...dates,
+                etd: dates.etd || null,
+                eta: dates.eta || null,
+                actual_departure: dates.actualDeparture || null,
+                actual_arrival: dates.actualArrival || null,
+                delivery_date: dates.deliveryDate || null,
+                bl_date: dates.blDate || null,
+                blDate: dates.blDate || null,
+                // Shipping mode & containers
+                shippingMode: shippingMode || null,
+                shipping_mode: shippingMode || null,
+                containers: containers,
             };
-            onUpdate(updatedShipment, true); // skipDbUpdate = true
+            onUpdate(updatedShipment, true); // skipDbUpdate = true (already saved above)
             setIsEditing(false);
             alert('✅ Shipment details updated successfully!');
         } catch (error) {
@@ -1451,7 +1468,8 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                     onClick={() => {
                                         setActiveTab(tab.id);
                                         setIsEditing(false);
-                                        setIsEditingCOGS(false);
+                                        // Auto-activate COGS edit mode when switching to COGS tab
+                                        setIsEditingCOGS(tab.id === 'cogs');
                                     }}
                                     className={`flex items-center gap-2 px-4 py-2 border-b-2 smooth-transition ${activeTab === tab.id
                                         ? 'border-accent-orange text-accent-orange'
@@ -2363,11 +2381,11 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                                                             updated[index]._coa_code = coaData?.code || '';
                                                                             setBuyingItems(updated);
                                                                         }}
-                                                                        context="EXPENSE"
-                                                                        minLevel={3}
-                                                                        placeholder="Pilih Item"
+                                                                        context="COGS"
+                                                                        minLevel={1}
+                                                                        placeholder="Pilih Akun"
                                                                         size="sm"
-                                                                        showCode={false}
+                                                                        showCode={true}
                                                                         disabled={!isEditingCOGS}
                                                                     />
                                                                 </td>
