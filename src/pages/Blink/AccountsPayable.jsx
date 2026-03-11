@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { createAPPaymentJournal, getAllCOA } from '../../utils/journalHelper';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
 import {
@@ -181,81 +182,23 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
                 console.warn('No po_id or po_number found in AP record, cannot sync PO');
             }
 
-            // ── AUTO JOURNAL ENTRY (Client-side) ──────────────────────────
-            // Double-entry: Dr Hutang Usaha (AP berkurang) | Cr Bank/Kas (uang keluar)
-            // IMPORTANT: debit/credit store original-currency amount (ap.currency);
-            //            exchange_rate field stores IDR conversion rate at payment time.
+            // ── AUTO JOURNAL ENTRY ──────────────────────────────────────────────────────────────────
+            // Dr Hutang Usaha / Cr Kas-Bank
             try {
-                const batchId = crypto.randomUUID();
-                const ts = Date.now();
-                const jeNum = `JE-PAY-OUT-${new Date().toISOString().slice(2, 7).replace('-', '')}-${ts.toString().slice(-8)}`;
-
-                // Resolve exchange rate: use ap.exchange_rate (from PO), fallback to 16000 for USD
-                const exRate = ap.currency === 'IDR'
-                    ? 1
-                    : (ap.exchange_rate || 16000);
-
-                // Fetch COA IDs
-                const [{ data: apCOAs }, { data: bankCOAs }] = await Promise.all([
-                    supabase.from('finance_coa').select('id, code, name').eq('type', 'LIABILITY').ilike('code', '2%').limit(1),
-                    supabase.from('finance_coa').select('id, code, name').eq('type', 'ASSET').ilike('code', '1-01%').limit(1),
-                ]);
-                const apCOA = apCOAs?.[0];
-                const bankCOA = bankCOAs?.[0];
-
-                const idrNote = ap.currency !== 'IDR'
-                    ? ` (Rate: ${exRate.toLocaleString('id-ID')})`
-                    : '';
-
-                const journalEntries = [
-                    {
-                        entry_number: `${jeNum}-D`,
-                        entry_date: formData.payment_date,
-                        entry_type: 'bill_payment',
-                        reference_type: 'ap_payment',
-                        reference_id: ap.id,
-                        reference_number: paymentNumber,
-                        account_code: apCOA?.code || '2-01-001',
-                        account_name: apCOA?.name || 'Hutang Usaha',
-                        debit: parseFloat(formData.amount),
-                        credit: 0,
-                        currency: ap.currency || 'IDR',
-                        exchange_rate: exRate,
-                        description: `Payment for ${ap.po_number || ap.ap_number} to ${ap.vendor_name}${idrNote}`,
-                        batch_id: batchId,
-                        source: 'auto',
-                        coa_id: apCOA?.id || null,
-                        party_name: ap.vendor_name,
-                        party_id: ap.vendor_id?.toString() || null
-                    },
-                    {
-                        entry_number: `${jeNum}-C`,
-                        entry_date: formData.payment_date,
-                        entry_type: 'bill_payment',
-                        reference_type: 'ap_payment',
-                        reference_id: ap.id,
-                        reference_number: paymentNumber,
-                        account_code: bankCOA?.code || '1-01-101',
-                        account_name: selectedBank ? `${selectedBank.bank_name}` : (bankCOA?.name || 'Kas/Bank'),
-                        debit: 0,
-                        credit: parseFloat(formData.amount),
-                        currency: ap.currency || 'IDR',
-                        exchange_rate: exRate,
-                        description: `Payment for ${ap.po_number || ap.ap_number} to ${ap.vendor_name}${idrNote}`,
-                        batch_id: batchId,
-                        source: 'auto',
-                        coa_id: bankCOA?.id || null,
-                        party_name: ap.vendor_name,
-                        party_id: ap.vendor_id?.toString() || null
-                    }
-                ];
-
-                await supabase.from('blink_journal_entries').insert(journalEntries);
+                const coaList = await getAllCOA();
+                await createAPPaymentJournal({
+                    ap,
+                    paymentAmount: parseFloat(formData.amount),
+                    paymentDate: formData.payment_date,
+                    paymentNumber,
+                    selectedBank,
+                    coaList
+                });
                 console.log('AP Payment journal entries created');
             } catch (jeError) {
-                console.warn('Journal entry creation failed (non-critical):', jeError.message);
+                console.warn('[AP] Journal entry creation failed (non-critical):', jeError.message);
             }
-            // ─────────────────────────────────────────────────────────────
+            // ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
             // Set success state instead of alert
             setSuccessData({

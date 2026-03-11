@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useData } from '../../context/DataContext';
 import { generatePONumber } from '../../utils/documentNumbers';
+import { createPOApprovalJournal, getAllCOA } from '../../utils/journalHelper';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
 import COAPicker from '../../components/Common/COAPicker';
@@ -134,10 +135,18 @@ const PurchaseOrder = () => {
         try {
             const { data, error } = await supabase
                 .from('blink_shipments')
-                .select('*')
+                .select('id, customer, customer_id, origin, destination, job_number, so_number, cogs, cogs_currency, buying_items, service_type, status')
                 .order('created_at', { ascending: false });
             if (error) throw error;
-            setShipments(data || []);
+            // Normalize field keys
+            const mapped = (data || []).map(s => ({
+                ...s,
+                customer_name: s.customer || s.customer_name || '',
+                job_number: s.job_number || s.so_number || '',
+                cogsCurrency: s.cogs_currency || 'IDR',
+                buyingItems: s.buying_items || []
+            }));
+            setShipments(mapped);
         } catch (error) {
             console.error('Error fetching shipments:', error);
         }
@@ -362,10 +371,17 @@ const PurchaseOrder = () => {
             console.log('AP entry created successfully:', apData);
 
 
-            // ── Journal entries auto-created by Supabase trigger ────────────
-            // Migration 066: trigger_journal_from_blink_po
-            // Dr Expense (per PO item with COA linkage) / Cr Hutang Usaha (AP)
-            // ────────────────────────────────────────────────────────────────
+            // ── Create Journal Entries: Dr Expense/COGS per item | Cr Hutang Usaha ─
+            try {
+                const coaList = await getAllCOA();
+                // include the full po object with all items
+                const fullPO = { ...po, total_amount: po.total_amount };
+                await createPOApprovalJournal({ po: fullPO, coaList });
+                console.log('[PO] Journal entries created for', po.po_number);
+            } catch (jeErr) {
+                console.warn('[PO] Journal entry creation failed (non-critical):', jeErr.message);
+            }
+            // ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
             await fetchPOs();
@@ -1416,9 +1432,13 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
             return;
         }
 
-        const [type, id] = val.split('|');
+        // Use '||' as separator to avoid conflicts with IDs/names that contain '|'
+        const sepIdx = val.indexOf('||');
+        if (sepIdx === -1) return;
+        const type = val.slice(0, sepIdx).trim();
+        const id = val.slice(sepIdx + 2).trim();
         if (type === 'shipment') {
-            const ship = shipments.find(s => s.id === id);
+            const ship = shipments.find(s => String(s.id).trim() === id);
 
             // Auto-populate po_items from shipment's buying_items and cogs
             let autoItems = [];
@@ -1459,17 +1479,20 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                 });
             }
 
+            if (!ship) {
+                console.warn('[PO] Shipment not found for id:', id, 'available:', shipments.map(s => s.id));
+            }
             setFormData(prev => ({
                 ...prev,
                 shipment_id: id,
                 quotation_id: null,
-                job_number: ship?.job_number || '',
+                job_number: ship?.job_number || ship?.so_number || '',
                 currency: ship?.cogs_currency || ship?.cogsCurrency || prev.currency,
                 // Only replace items if we found actual COGS data
                 po_items: autoItems.length > 0 ? autoItems : prev.po_items
             }));
         } else if (type === 'quotation') {
-            const quot = quotations.find(q => q.id === id);
+            const quot = quotations.find(q => String(q.id).trim() === id);
             setFormData(prev => ({
                 ...prev,
                 shipment_id: null,
@@ -1479,24 +1502,11 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
         }
     };
 
-    // Prepare options
-    const allocationOptions = [
-        ...shipments.map(s => ({
-            value: `shipment | ${s.id} `,
-            label: `Shipment: ${s.origin} -> ${s.destination} (${s.customer_name})`,
-            type: 'Shipment'
-        })),
-        ...quotations.map(q => ({
-            value: `quotation | ${q.id} `,
-            label: `Quote: ${q.quotation_number} - ${q.customer?.name || 'Customer'} `,
-            type: 'Quotation'
-        }))
-    ];
-
+    // Use '||' as value separator (safe — UUID/IDs don't contain '||')
     const currentAllocationValue = formData.shipment_id
-        ? `shipment | ${formData.shipment_id} `
+        ? `shipment||${formData.shipment_id}`
         : formData.quotation_id
-            ? `quotation | ${formData.quotation_id} `
+            ? `quotation||${formData.quotation_id}`
             : '';
 
     return (
@@ -1558,23 +1568,27 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                     className="w-full px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
                                 >
                                     <option value="">-- Tidak Ada Alokasi (Biaya Umum/Overhead) --</option>
-                                    <optgroup label="Shipments">
-                                        {shipments.map(s => (
-                                            <option key={s.id} value={`shipment | ${s.id} `}>
-                                                {s.customer_name ? `[${s.customer_name}]` : ''}
-                                                {s.origin} → {s.destination}
-                                                {s.job_number ? ` (#${s.job_number})` : ''}
-                                            </option>
-                                        ))}
-                                    </optgroup>
-                                    <optgroup label="Quotations">
-                                        {quotations.map(q => (
-                                            <option key={q.id} value={`quotation | ${q.id} `}>
-                                                {q.quotation_number} - {q.customer?.name || 'Unknown'}
-                                                ({q.origin} → {q.destination})
-                                            </option>
-                                        ))}
-                                    </optgroup>
+                                    {shipments.length > 0 && (
+                                        <optgroup label={`Shipments (${shipments.length})`}>
+                                            {shipments.map(s => (
+                                                <option key={s.id} value={`shipment||${s.id}`}>
+                                                    {s.customer_name ? `[${s.customer_name}] ` : ''}
+                                                    {s.origin || '-'} → {s.destination || '-'}
+                                                    {s.job_number ? ` • #${s.job_number}` : ''}
+                                                </option>
+                                            ))}
+                                        </optgroup>
+                                    )}
+                                    {quotations.length > 0 && (
+                                        <optgroup label={`Quotations (${quotations.length})`}>
+                                            {quotations.map(q => (
+                                                <option key={q.id} value={`quotation||${q.id}`}>
+                                                    {q.quotation_number} - {q.customer_name || q.customer?.name || 'Customer'}
+                                                    {q.origin && q.destination ? ` (${q.origin} → ${q.destination})` : ''}
+                                                </option>
+                                            ))}
+                                        </optgroup>
+                                    )}
                                 </select>
                                 {(formData.job_number) && (
                                     <p className="mt-2 text-xs text-green-400">

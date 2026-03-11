@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createInvoiceJournal, createCOGSJournal, getAllCOA } from '../../utils/journalHelper';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useData } from '../../context/DataContext';
@@ -567,67 +568,23 @@ const InvoiceManagement = () => {
 
             const insertedInvoice = data[0];
 
-            // Auto Journal Entry for AR & Revenue
+            // ── Auto Journal Entries (Invoice AR + Revenue + COGS) ─────────
             try {
-                const batchId = crypto.randomUUID();
-                const entryNum = `JE-INV-${new Date().toISOString().slice(2, 7).replace('-', '')}-${Date.now().toString().slice(-6)}`;
-                const billDate = insertedInvoice.invoice_date || new Date().toISOString().split('T')[0];
-
-                const [{ data: arCoas }, { data: revCoas }] = await Promise.all([
-                    supabase.from('finance_coa').select('id, code, name').eq('type', 'ASSET').ilike('name', '%receivable%').limit(1),
-                    supabase.from('finance_coa').select('id, code, name').eq('type', 'REVENUE').ilike('name', '%freight%').limit(1)
-                ]);
-                const arCoa = arCoas?.[0] || { code: '1-01-400-0-1-00', name: 'ACCOUNT RECEIVABLE', id: null };
-                const revCoa = revCoas?.[0] || { code: '4-01-301-0-1-00', name: 'OCEAN FREIGHT', id: null };
-
-                const idrNote = insertedInvoice.currency !== 'IDR' ? ` (Rate: ${insertedInvoice.exchange_rate || 16000})` : '';
-                const exRate = insertedInvoice.exchange_rate || 16000;
-
-                const debitEntry = {
-                    entry_number: entryNum + '-D',
-                    entry_date: billDate,
-                    entry_type: 'invoice',
-                    reference_type: 'ar',
-                    reference_id: insertedInvoice.id,
-                    reference_number: insertedInvoice.invoice_number,
-                    account_code: arCoa.code,
-                    account_name: `${arCoa.name} - ${insertedInvoice.customer_name}`,
-                    debit: insertedInvoice.total_amount,
-                    credit: 0,
-                    currency: insertedInvoice.currency || 'IDR',
-                    exchange_rate: exRate,
-                    description: 'Invoice ' + insertedInvoice.invoice_number + ' - ' + insertedInvoice.customer_name + idrNote,
-                    batch_id: batchId,
-                    source: 'auto',
-                    coa_id: arCoa.id,
-                    party_name: insertedInvoice.customer_name
-                };
-
-                const creditEntry = {
-                    entry_number: entryNum + '-C',
-                    entry_date: billDate,
-                    entry_type: 'invoice',
-                    reference_type: 'ar',
-                    reference_id: insertedInvoice.id,
-                    reference_number: insertedInvoice.invoice_number,
-                    account_code: revCoa.code,
-                    account_name: `${revCoa.name} - ${insertedInvoice.customer_name}`,
-                    debit: 0,
-                    credit: insertedInvoice.total_amount,
-                    currency: insertedInvoice.currency || 'IDR',
-                    exchange_rate: exRate,
-                    description: 'Invoice ' + insertedInvoice.invoice_number + ' - ' + insertedInvoice.customer_name + idrNote,
-                    batch_id: batchId,
-                    source: 'auto',
-                    coa_id: revCoa.id,
-                    party_name: insertedInvoice.customer_name
-                };
-
-                const { error: journalError } = await supabase.from('blink_journal_entries').insert([debitEntry, creditEntry]);
-                if (journalError) console.error('Error creating journal entries for invoice:', journalError);
+                const coaList = await getAllCOA();
+                // 1. Dr Piutang Usaha / Cr Pendapatan (AR + Revenue)
+                await createInvoiceJournal({ invoice: insertedInvoice, coaList });
+                // 2. Dr HPP / Cr Biaya Langsung (COGS recognition — only if cogs_subtotal > 0)
+                if (insertedInvoice.cogs_subtotal > 0) {
+                    await createCOGSJournal({
+                        invoice: insertedInvoice,
+                        cogsAmount: insertedInvoice.cogs_subtotal,
+                        coaList
+                    });
+                }
             } catch (jeError) {
-                console.warn('Journal entry creation failed:', jeError.message);
+                console.warn('[Invoice] Journal entry creation failed (non-critical):', jeError.message);
             }
+            // ───────────────────────────────────────────────────────────────
 
             await fetchInvoices();
             setShowCreateModal(false);

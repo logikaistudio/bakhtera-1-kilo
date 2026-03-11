@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { createARPaymentJournal, getAllCOA } from '../../utils/journalHelper';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
 import {
@@ -804,80 +805,22 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
                 throw new Error('Invoice update failed - no data returned. Check RLS policies.');
             }
 
-            // ── AUTO JOURNAL ENTRY (Client-side) ──────────────────────────
-            // Double-entry: Dr Bank/Kas | Cr Piutang Usaha
-            // IMPORTANT: debit/credit store original-currency amount;
-            //            exchange_rate field stores the IDR rate at payment time.
+            // ── AUTO JOURNAL ENTRY (Client-side) ───────────────────────────────
+            // Dr Kas/Bank / Cr Piutang Usaha
             try {
-                const batchId = crypto.randomUUID();
-                const ts = Date.now();
-                const jeNum = `JE-PAY-IN-${new Date().toISOString().slice(2, 7).replace('-', '')}-${ts.toString().slice(-8)}`;
-
-                // Resolve exchange rate: use invoice.exchange_rate, fallback to 1 for IDR
-                const exRate = invoice.currency === 'IDR'
-                    ? 1
-                    : (invoice.exchange_rate || 16000);  // use stored rate, or default 16000
-
-                // Fetch COA IDs
-                const [{ data: bankCOAs }, { data: arCOAs }] = await Promise.all([
-                    supabase.from('finance_coa').select('id, code, name').eq('type', 'ASSET').ilike('code', '1-01%').limit(3),
-                    supabase.from('finance_coa').select('id, code, name').eq('type', 'ASSET').ilike('code', '1-03%').limit(1),
-                ]);
-                const bankCOA = bankCOAs?.[0];
-                const arCOA = arCOAs?.[0];
-
-                const idrNote = invoice.currency !== 'IDR'
-                    ? ` (Rate: ${exRate.toLocaleString('id-ID')})`
-                    : '';
-
-                const journalEntries = [
-                    {
-                        entry_number: `${jeNum}-D`,
-                        entry_date: formData.payment_date,
-                        entry_type: 'payment',
-                        reference_type: 'ar_payment',
-                        reference_id: invoiceResult[0]?.id || invoice.id,
-                        reference_number: paymentNumber,
-                        account_code: bankCOA?.code || '1-01-101',
-                        account_name: selectedBank ? `${selectedBank.bank_name}` : (bankCOA?.name || 'Kas/Bank'),
-                        debit: parseFloat(formData.amount),
-                        credit: 0,
-                        currency: invoice.currency || 'IDR',
-                        exchange_rate: exRate,
-                        description: `Payment received for ${invoice.invoice_number} from ${invoice.customer_name}${idrNote}`,
-                        batch_id: batchId,
-                        source: 'auto',
-                        coa_id: bankCOA?.id || null,
-                        party_name: invoice.customer_name,
-                        party_id: invoice.customer_id?.toString() || null
-                    },
-                    {
-                        entry_number: `${jeNum}-C`,
-                        entry_date: formData.payment_date,
-                        entry_type: 'payment',
-                        reference_type: 'ar_payment',
-                        reference_id: invoiceResult[0]?.id || invoice.id,
-                        reference_number: paymentNumber,
-                        account_code: arCOA?.code || '1-03-001',
-                        account_name: arCOA?.name || 'Piutang Usaha',
-                        debit: 0,
-                        credit: parseFloat(formData.amount),
-                        currency: invoice.currency || 'IDR',
-                        exchange_rate: exRate,
-                        description: `Payment received for ${invoice.invoice_number} from ${invoice.customer_name}${idrNote}`,
-                        batch_id: batchId,
-                        source: 'auto',
-                        coa_id: arCOA?.id || null,
-                        party_name: invoice.customer_name,
-                        party_id: invoice.customer_id?.toString() || null
-                    }
-                ];
-
-                await supabase.from('blink_journal_entries').insert(journalEntries);
+                const coaList = await getAllCOA();
+                await createARPaymentJournal({
+                    invoice,
+                    paymentAmount: parseFloat(formData.amount),
+                    paymentDate: formData.payment_date,
+                    paymentNumber,
+                    selectedBank,
+                    coaList
+                });
             } catch (jeError) {
-                console.warn('Journal entry creation failed (non-critical):', jeError.message);
+                console.warn('[AR] Journal entry creation failed (non-critical):', jeError.message);
             }
-            // ─────────────────────────────────────────────────────────────
+            // ───────────────────────────────────────────────────────────────
 
             setSuccessData({
                 paymentNumber,
