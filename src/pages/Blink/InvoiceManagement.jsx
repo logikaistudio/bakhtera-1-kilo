@@ -1305,7 +1305,7 @@ const InvoiceManagement = () => {
                         variant="secondary"
                         disabled={isMigrating}
                     >
-                        {isMigrating ? 'Migrating...' : 'Migrate Past Invoices'}
+                        {isMigrating ? 'Migrating...' : 'Migrate Auto Journal'}
                     </Button>
                     <Button onClick={handleExportXLS} variant="secondary" icon={Download}>
                         Export XLS
