@@ -1,0 +1,1 @@
+ALTER TABLE blink_company_bank_accounts ADD COLUMN IF NOT EXISTS branch TEXT; ALTER TABLE bridge_company_bank_accounts ADD COLUMN IF NOT EXISTS branch TEXT; ALTER TABLE big_company_bank_accounts ADD COLUMN IF NOT EXISTS branch TEXT; ALTER TABLE company_bank_accounts ADD COLUMN IF NOT EXISTS branch TEXT; NOTIFY pgrst, 'reload schema';

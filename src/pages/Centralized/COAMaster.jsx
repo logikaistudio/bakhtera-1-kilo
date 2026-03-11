@@ -38,7 +38,7 @@ const COAMaster = () => {
         is_active: true
     });
 
-    const accountTypes = ['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'];
+    const accountTypes = ['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE', 'COST', 'COGS', 'DIRECT_COST', 'OTHER_INCOME', 'OTHER_EXPENSE'];
     const jobTypes = [
         { value: '', label: 'All / General' },
         { value: 'FREIGHT', label: 'Freight' },
@@ -138,9 +138,10 @@ const COAMaster = () => {
                 };
 
                 // Helper to map Group/Type to valid database type
-                const mapToType = (groupStr) => {
+                const mapToType = (groupStr, nameStr = '') => {
                     if (!groupStr) return 'ASSET';
                     const g = String(groupStr).toUpperCase().trim();
+                    const n = String(nameStr).toUpperCase().trim();
 
                     // ASSET - check for "Asset" or "Assets" using prefix
                     if (g.includes('ASSET') || g.includes('ASET') || g.includes('HARTA') ||
@@ -164,18 +165,31 @@ const COAMaster = () => {
                         return 'EQUITY';
                     }
 
+                    // OTHER INCOME
+                    if (g.includes('OTHER INCOME') || g.includes('PENDAPATAN LAIN') || g.includes('NON OPERATING INCOME') || g.includes('PENDAPATAN LUAR USAHA')) {
+                        return 'OTHER_INCOME';
+                    }
+
                     // REVENUE - check for income-related keywords
-                    // "Operational Income" should go here, not EXPENSE
                     if (g.includes('REVENUE') || g.includes('INCOME') || g.includes('PENDAPATAN') ||
                         g.includes('PENJUALAN') || g.includes('SALES') || g.includes('PENGHASILAN')) {
                         return 'REVENUE';
                     }
 
+                    // COGS / COST
+                    if (g === 'COST' || g.includes('COGS') || n.includes('COGS') || g.includes('HPP') || g.includes('HARGA POKOK') || g.includes('COST OF GOODS') || g.includes('COST OF SALES') || g.includes('DIRECT COST') || g.includes('BIAYA LANGSUNG')) {
+                        return 'COST';
+                    }
+
+                    // OTHER EXPENSE
+                    if (g.includes('OTHER EXPENSE') || g.includes('BEBAN LAIN') || g.includes('NON OPERATIONAL') || g.includes('NON OPERATING EXPENSE') || g.includes('BIAYA LAIN')) {
+                        return 'OTHER_EXPENSE';
+                    }
+
                     // EXPENSE - only if not matched by REVENUE above
                     if (g.includes('EXPENSE') || g.includes('BEBAN') || g.includes('BIAYA') ||
-                        g.includes('COST') || g.includes('HPP') || g.includes('COGS') ||
-                        g.includes('OPERATIONAL') || g.includes('OPERATING') || g.includes('OVERHEAD') ||
-                        g.includes('NON OPERATIONAL') || g.includes('ADMIN') || g.includes('GENERAL') ||
+                        g.includes('COST') || g.includes('OPERATIONAL') || g.includes('OPERATING') || g.includes('OVERHEAD') ||
+                        g.includes('ADMIN') || g.includes('GENERAL') ||
                         g.includes('DEPRECIATION') || g.includes('AMORTIZATION')) {
                         return 'EXPENSE';
                     }
@@ -213,12 +227,13 @@ const COAMaster = () => {
                     }
 
                     // Determine the main type:
-                    const VALID_TYPES = ['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'];
+                    const VALID_TYPES = ['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE', 'COST', 'COGS', 'DIRECT_COST', 'OTHER_INCOME', 'OTHER_EXPENSE'];
                     let mappedType = 'ASSET'; // default
+                    
                     if (rawType && VALID_TYPES.includes(String(rawType).toUpperCase().trim())) {
                         mappedType = String(rawType).toUpperCase().trim();
                     } else if (rawType) {
-                        mappedType = mapToType(rawType);
+                        mappedType = mapToType(rawType, rawName);
                     }
 
                     const defaultPL = mappedType === 'REVENUE' || mappedType === 'EXPENSE';
@@ -332,11 +347,72 @@ const COAMaster = () => {
                 if (error) throw error;
                 alert(`✅ REPLACE Import Berhasil!\n\n📊 Statistik Import:\n• Data dibaca dari Excel: ${importStats.totalRows}\n• Data valid: ${importStats.validRows}\n• Data dilewati: ${importStats.skippedRows}\n• Data berhasil diupload: ${pendingImportData.length}`);
 
+            } else if (importMode === 'SMART_REPLACE') {
+                // Detect unique prefixes from imported codes (e.g. '5-', '4-')
+                const prefixes = [...new Set(
+                    pendingImportData.map(row => row.code.match(/^(\d+)-/)?.[1]).filter(Boolean)
+                )].map(p => `${p}-`);
+
+                if (prefixes.length === 0) {
+                    alert('Tidak dapat mendeteksi prefix kode dari data Excel. Pastikan kode diawali dengan angka (misal 5-xxx).');
+                    return;
+                }
+
+                if (!confirm(`⚠️ SMART REPLACE akan:\n1. Menghapus data lama dengan awalan kode: ${prefixes.join(', ')}\n   (Akun yang sudah terintegrasi akan dilewati / tidak bisa dihapus)\n2. Memasukkan ${pendingImportData.length} data baru dari Excel\n\nLanjutkan?`)) return;
+
+                setLoading(true);
+
+                // Fetch all existing accounts with matching prefixes
+                let deletedCount = 0;
+                let skippedLinked = 0;
+
+                for (const prefix of prefixes) {
+                    const { data: oldAccounts } = await supabase
+                        .from('finance_coa')
+                        .select('id, code')
+                        .like('code', `${prefix}%`);
+
+                    if (!oldAccounts || oldAccounts.length === 0) continue;
+
+                    // Try to delete each one individually — skip those with FK constraints
+                    for (const acc of oldAccounts) {
+                        const { error: delErr } = await supabase
+                            .from('finance_coa')
+                            .delete()
+                            .eq('id', acc.id);
+
+                        if (delErr) {
+                            // Linked to existing data — skip
+                            console.warn(`[SMART REPLACE] Skipped (linked): ${acc.code}`);
+                            skippedLinked++;
+                        } else {
+                            deletedCount++;
+                        }
+                    }
+                }
+
+                // Now upsert new data
+                const dedupMap = new Map();
+                pendingImportData.forEach(row => dedupMap.set(row.code, row));
+                const dedupedData = Array.from(dedupMap.values());
+
+                const CHUNK_SIZE = 50;
+                let totalUpserted = 0;
+                for (let i = 0; i < dedupedData.length; i += CHUNK_SIZE) {
+                    const chunk = dedupedData.slice(i, i + CHUNK_SIZE);
+                    const { error } = await supabase
+                        .from('finance_coa')
+                        .upsert(chunk, { onConflict: 'code' });
+                    if (error) throw error;
+                    totalUpserted += chunk.length;
+                }
+
+                alert(`✅ SMART REPLACE Berhasil!\n\n📊 Statistik:\n• Prefix yang diproses: ${prefixes.join(', ')}\n• Data lama dihapus: ${deletedCount}\n• Data lama dilewati (terintegrasi): ${skippedLinked}\n• Data baru berhasil diimport: ${totalUpserted}`);
+
             } else {
                 setLoading(true);
 
                 // Deduplicate by code (keep last occurrence)
-                // Fixes: "ON CONFLICT DO UPDATE command cannot affect row a second time"
                 const dedupMap = new Map();
                 pendingImportData.forEach(row => dedupMap.set(row.code, row));
                 const dedupedData = Array.from(dedupMap.values());
@@ -412,7 +488,7 @@ const COAMaster = () => {
                 "Code": "",
                 "Name": "--- PANDUAN KOLOM ---",
                 "Master Code": "",
-                "Type": "ASSET / LIABILITY / EQUITY / REVENUE / EXPENSE",
+                "Type": "ASSET / LIABILITY / EQUITY / REVENUE / EXPENSE / COGS / OTHER_INCOME / OTHER_EXPENSE",
                 "Job Type": "FREIGHT / CUSTOMS / WAREHOUSE / GENERAL / (kosong = semua)",
                 "Level": "1-9",
                 "Trial Balance": "TRUE / FALSE",
@@ -435,6 +511,40 @@ const COAMaster = () => {
         const wb = utils.book_new();
         utils.book_append_sheet(wb, ws, "Template");
         XLSX.writeFile(wb, "Template_COA_Import.xlsx");
+    };
+
+    const handleExportExcel = () => {
+        if (accounts.length === 0) {
+            alert('No data to export.');
+            return;
+        }
+
+        const data = accounts.map(acc => ({
+            "Code": acc.code,
+            "Name": acc.name,
+            "Master Code": acc.parent_code || "",
+            "Type": acc.type,
+            "Job Type": acc.job_type || "",
+            "Level": acc.level || 1,
+            "Trial Balance": acc.is_trial_balance ? "TRUE" : "FALSE",
+            "Profit & Loss": acc.is_profit_loss ? "TRUE" : "FALSE",
+            "Balance Sheet": acc.is_balance_sheet ? "TRUE" : "FALSE",
+            "AR": acc.is_ar ? "TRUE" : "FALSE",
+            "AP": acc.is_ap ? "TRUE" : "FALSE",
+            "Cashflow": acc.is_cashflow ? "TRUE" : "FALSE",
+            "Description": acc.description || ""
+        }));
+
+        const ws = utils.json_to_sheet(data);
+        ws['!cols'] = [
+            { wch: 22 }, { wch: 35 }, { wch: 22 }, { wch: 15 }, { wch: 15 },
+            { wch: 8 }, { wch: 15 }, { wch: 15 }, { wch: 15 },
+            { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 30 }
+        ];
+
+        const wb = utils.book_new();
+        utils.book_append_sheet(wb, ws, "COA Master Data");
+        XLSX.writeFile(wb, "Export_COA_Master.xlsx");
     };
 
     const handleSave = async (e) => {
@@ -639,6 +749,13 @@ const COAMaster = () => {
                         </button>
                     )}
                     <button
+                        onClick={handleExportExcel}
+                        className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20 rounded-md hover:bg-green-500/20 transition-colors"
+                    >
+                        <FileText className="w-3 h-3" />
+                        Export
+                    </button>
+                    <button
                         onClick={handleDownloadTemplate}
                         className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-md hover:bg-blue-500/20 transition-colors"
                     >
@@ -749,8 +866,9 @@ const COAMaster = () => {
                                                 ${acc.type === 'ASSET' ? 'bg-blue-500/20 text-blue-400' :
                                                     acc.type === 'LIABILITY' ? 'bg-orange-500/20 text-orange-400' :
                                                         acc.type === 'EQUITY' ? 'bg-purple-500/20 text-purple-400' :
-                                                            acc.type === 'REVENUE' ? 'bg-green-500/20 text-green-400' :
-                                                                'bg-red-500/20 text-red-400'
+                                                            ['REVENUE', 'OTHER_INCOME'].includes(acc.type) ? 'bg-green-500/20 text-green-400' :
+                                                                ['COST', 'COGS', 'DIRECT_COST'].includes(acc.type) ? 'bg-yellow-500/20 text-yellow-400' :
+                                                                    'bg-red-500/20 text-red-400'
                                                 }`}>
                                                 {acc.type}
                                             </span>
@@ -853,6 +971,21 @@ const COAMaster = () => {
                                 </div>
                             </label>
 
+                            <label className={`flex items-start p-3 rounded-lg border cursor-pointer transition-colors ${importMode === 'SMART_REPLACE' ? 'bg-yellow-500/10 border-yellow-500/50' : 'bg-dark-surface border-dark-border hover:border-gray-500'}`}>
+                                <input
+                                    type="radio"
+                                    name="importMode"
+                                    value="SMART_REPLACE"
+                                    checked={importMode === 'SMART_REPLACE'}
+                                    onChange={(e) => setImportMode(e.target.value)}
+                                    className="mt-0.5 mr-3"
+                                />
+                                <div>
+                                    <span className="block text-sm font-semibold text-yellow-400">⚡ Smart Replace by Prefix (Recommended)</span>
+                                    <span className="block text-[11px] text-silver-dark mt-0.5">Hapus data lama berdasarkan awalan kode (misal <strong>5-</strong>), lalu masukkan data baru. Akun yang terintegrasi dilewati otomatis.</span>
+                                </div>
+                            </label>
+
                             <label className={`flex items-start p-3 rounded-lg border cursor-pointer transition-colors ${importMode === 'REPLACE' ? 'bg-red-500/10 border-red-500/50' : 'bg-dark-surface border-dark-border hover:border-gray-500'}`}>
                                 <input
                                     type="radio"
@@ -876,8 +1009,8 @@ const COAMaster = () => {
                             >
                                 Cancel
                             </button>
-                            <Button onClick={executeImport} className={`py-1.5 text-xs ${importMode === 'REPLACE' ? 'bg-red-500 hover:bg-red-600' : ''}`}>
-                                {importMode === 'REPLACE' ? 'Replace & Import' : 'Import Data'}
+                            <Button onClick={executeImport} className={`py-1.5 text-xs ${importMode === 'REPLACE' ? 'bg-red-500 hover:bg-red-600' : importMode === 'SMART_REPLACE' ? 'bg-yellow-500 hover:bg-yellow-600 text-black' : ''}`}>
+                                {importMode === 'REPLACE' ? 'Replace & Import' : importMode === 'SMART_REPLACE' ? '⚡ Smart Replace & Import' : 'Import Data'}
                             </Button>
                         </div>
                     </div>

@@ -220,13 +220,13 @@ const ServiceItemManager = ({ items = [], onChange, currency = 'USD', readOnly =
                     <table className="w-full">
                         <thead className="bg-accent-blue/10">
                             <tr className="border-b border-dark-border">
-                                <th className="text-left text-xs font-bold text-white px-2 py-2 w-48">Kode</th>
-                                <th className="text-left text-xs font-bold text-white px-2 py-2 w-48">Item</th>
-                                <th className="text-left text-xs font-bold text-white px-2 py-2">Service / Description</th>
-                                <th className="text-right text-xs font-bold text-white px-2 py-2 w-20">Qty</th>
-                                <th className="text-right text-xs font-bold text-white px-2 py-2 w-32">Unit Price</th>
-                                <th className="text-right text-xs font-bold text-white px-2 py-2 w-32">Amount</th>
-                                {!readOnly && <th className="w-12 px-2 py-2"></th>}
+                                <th className="text-left text-xs font-bold text-white px-2 py-2 min-w-48">Kode</th>
+                                <th className="text-left text-xs font-bold text-white px-2 py-2 min-w-[250px]">Item</th>
+                                <th className="text-left text-xs font-bold text-white px-2 py-2 min-w-[350px]">Service / Description</th>
+                                <th className="text-right text-xs font-bold text-white px-2 py-2 min-w-[104px]">Qty</th>
+                                <th className="text-right text-xs font-bold text-white px-2 py-2 min-w-[166px]">Unit Price</th>
+                                <th className="text-right text-xs font-bold text-white px-2 py-2 min-w-32">Amount</th>
+                                {!readOnly && <th className="min-w-[48px] px-2 py-2"></th>}
                             </tr>
                         </thead>
                         <tbody className="space-y-2">

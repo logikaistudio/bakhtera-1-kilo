@@ -52,6 +52,7 @@ const InvoiceManagement = () => {
         due_date: '',
         billing_currency: 'IDR',
         exchange_rate: 1,
+        payment_bank_id: '',  // Selected bank account for payment
         invoice_items: [
             { item_name: 'Freight', description: 'Ocean Freight', qty: 1, unit: 'Job', rate: 0, amount: 0, coa_id: null }
         ],
@@ -531,6 +532,8 @@ const InvoiceManagement = () => {
                 paid_amount: 0,
                 outstanding_amount: total,
                 status: 'unpaid',
+                // Selected payment bank account
+                payment_bank_id: formData.payment_bank_id || null,
                 // COGS and Profit fields
                 cogs_items: formData.cogs_items || [],
                 cogs_subtotal: cogsSubtotal,
@@ -646,6 +649,7 @@ const InvoiceManagement = () => {
             due_date: '',
             billing_currency: 'IDR',
             exchange_rate: 1,
+            payment_bank_id: '',
             invoice_items: [
                 { item_name: 'Freight', description: 'Ocean Freight', qty: 1, unit: 'Job', rate: 0, amount: 0, coa_id: null }
             ],
@@ -953,19 +957,29 @@ const InvoiceManagement = () => {
                                 <div class="bank-box">
                                     <b style="font-size: 11px;">PAYMENT DETAILS:</b><br><br>
                                     Please transfer to:<br>
-                                    ${bankAccounts && bankAccounts.length > 0 ? bankAccounts.map(bank => `
-                                        <div style="margin-bottom: 8px;">
-                                            <b>${bank.bank_name} (${bank.currency || invoice.currency})</b><br>
-                                            A/C No: ${bank.account_number}<br>
-                                            A/N: ${bank.account_holder}<br>
-                                            Branch: ${bank.branch || '-'}
-                                        </div>
-                                    `).join('') : `
-                                        <b>BANK CENTRAL ASIA (BCA)</b><br>
-                                        A/C No: 000-000-000<br>
-                                        A/N: PT. BAKHTERA FREIGHT WORLDWIDE<br>
-                                        Branch: KCU JAKARTA
-                                    `}
+                                    ${(() => {
+                                        // Show only selected bank if set, otherwise show all banks
+                                        const selectedBank = invoice.payment_bank_id
+                                            ? (bankAccounts || []).find(b => b.id === invoice.payment_bank_id)
+                                            : null;
+                                        const banksToShow = selectedBank 
+                                            ? [selectedBank] 
+                                            : (bankAccounts || []).filter(b => b.currency === invoice.currency || (!b.currency && invoice.currency === 'IDR'));
+                                        return banksToShow.length > 0 ? banksToShow.map(bank => `
+                                            <div style="margin-bottom: 8px;">
+                                                <b>${bank.bank_name} (${bank.currency || invoice.currency})</b><br>
+                                                A/C No: ${bank.account_number}<br>
+                                                A/N: ${bank.account_holder}<br>
+                                                ${bank.branch ? `Branch: ${bank.branch}<br>` : ''}
+                                                ${bank.swift_code ? `SWIFT: ${bank.swift_code}` : ''}
+                                            </div>
+                                        `).join('') : `
+                                            <b>BANK CENTRAL ASIA (BCA)</b><br>
+                                            A/C No: 000-000-000<br>
+                                            A/N: PT. BAKHTERA FREIGHT WORLDWIDE<br>
+                                            Branch: KCU JAKARTA
+                                        `;
+                                    })()}
                                 </div>
                                 
                                 <div style="margin-top: 10px; font-style: italic;">
@@ -1515,6 +1529,7 @@ const InvoiceManagement = () => {
                         calculateTotals={calculateTotals}
                         handleCreateInvoice={handleCreateInvoice}
                         formatCurrency={formatCurrency}
+                        bankAccounts={bankAccounts}
                         onClose={() => {
                             setShowCreateModal(false);
                             resetForm();
@@ -1529,6 +1544,11 @@ const InvoiceManagement = () => {
                     <InvoiceViewModal
                         invoice={selectedInvoice}
                         formatCurrency={formatCurrency}
+                        bankAccounts={bankAccounts}
+                        onInvoiceUpdate={(updatedInvoice) => {
+                            setSelectedInvoice(updatedInvoice);
+                            setInvoices(prev => prev.map(inv => inv.id === updatedInvoice.id ? updatedInvoice : inv));
+                        }}
                         onClose={() => {
                             setShowViewModal(false);
                             setSelectedInvoice(null);
@@ -1632,7 +1652,7 @@ const InvoiceManagement = () => {
 const InvoiceCreateModal = ({ quotations, shipments, formData, setFormData, selectedQuotation, selectedShipment,
     referenceType, setReferenceType, handleQuotationSelect, handleShipmentSelect, handlePaymentTermsChange,
     addInvoiceItem, removeInvoiceItem, updateInvoiceItem, calculateTotals,
-    handleCreateInvoice, formatCurrency, onClose }) => {
+    handleCreateInvoice, formatCurrency, onClose, bankAccounts }) => {
 
     const { subtotal, taxAmount, total, cogsSubtotal, grossProfit, profitMargin } = calculateTotals();
 
@@ -1959,6 +1979,51 @@ const InvoiceCreateModal = ({ quotations, shipments, formData, setFormData, sele
                         </div>
                     </div>
 
+                    {/* Payment Bank Account Selection */}
+                    {bankAccounts && bankAccounts.length > 0 && (
+                        <div className="glass-card p-3 rounded-lg border border-blue-500/20">
+                            <h3 className="text-xs font-semibold text-blue-400 mb-2 flex items-center gap-2">
+                                🏦 Rekening Bank Penerima Pembayaran
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
+                                <div>
+                                    <label className="block text-[11px] font-semibold text-silver-light mb-1">
+                                        Pilih Rekening Bank <span className="text-silver-dark font-normal">(opsional)</span>
+                                    </label>
+                                    <select
+                                        value={formData.payment_bank_id || ''}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, payment_bank_id: e.target.value }))}
+                                        className="w-full px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm"
+                                    >
+                                        <option value="">-- Tampilkan semua rekening --</option>
+                                        {bankAccounts.map(bank => (
+                                            <option key={bank.id} value={bank.id}>
+                                                {bank.bank_name} ({bank.currency || 'IDR'}) – {bank.account_number}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <p className="text-[10px] text-silver-dark mt-1">
+                                        Jika dipilih, hanya rekening ini yang tampil di cetak invoice
+                                    </p>
+                                </div>
+
+                                {/* Preview rekening yang dipilih */}
+                                {formData.payment_bank_id && (() => {
+                                    const selected = bankAccounts.find(b => b.id === formData.payment_bank_id);
+                                    return selected ? (
+                                        <div className="p-2.5 rounded-lg bg-blue-500/10 border border-blue-500/30 text-[11px] space-y-0.5">
+                                            <div className="font-bold text-blue-300">{selected.bank_name} ({selected.currency || 'IDR'})</div>
+                                            <div className="text-silver-light">No. Rekening: <span className="font-mono">{selected.account_number}</span></div>
+                                            <div className="text-silver-light">A/N: {selected.account_holder}</div>
+                                            {selected.branch && <div className="text-silver-dark">Cabang: {selected.branch}</div>}
+                                            {selected.swift_code && <div className="text-silver-dark">SWIFT: {selected.swift_code}</div>}
+                                        </div>
+                                    ) : null;
+                                })()}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Invoice Items */}
                     <div className="glass-card p-4 rounded-lg">
                         <div className="flex items-center justify-between mb-4">
@@ -2230,9 +2295,29 @@ const InvoiceCreateModal = ({ quotations, shipments, formData, setFormData, sele
 };
 
 // Invoice View Modal Component
-const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint, onPreview, onSubmit, onAddItem, statusConfig, canEditInvoice, canSubmitInvoice }) => {
+const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint, onPreview, onSubmit, onAddItem, statusConfig, canEditInvoice, canSubmitInvoice, bankAccounts, onInvoiceUpdate }) => {
     const [payments, setPayments] = useState([]);
     const [loadingPayments, setLoadingPayments] = useState(true);
+    const [selectedBankId, setSelectedBankId] = useState(invoice.payment_bank_id || '');
+    const [savingBank, setSavingBank] = useState(false);
+
+    const handleBankChange = async (bankId) => {
+        setSelectedBankId(bankId);
+        setSavingBank(true);
+        try {
+            const { error } = await supabase
+                .from('blink_invoices')
+                .update({ payment_bank_id: bankId || null })
+                .eq('id', invoice.id);
+            if (error) throw error;
+            if (onInvoiceUpdate) onInvoiceUpdate({ ...invoice, payment_bank_id: bankId || null });
+        } catch (err) {
+            console.error('Error updating payment bank:', err);
+            alert('Gagal menyimpan rekening: ' + err.message);
+        } finally {
+            setSavingBank(false);
+        }
+    };
 
     useEffect(() => {
         fetchPayments();
@@ -2522,6 +2607,50 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                             </div>
                         )}
                     </div>
+
+                    {/* Payment Bank Account */}
+                    {bankAccounts && bankAccounts.length > 0 && (
+                        <div className="glass-card p-4 rounded-lg border border-blue-500/20">
+                            <div className="flex items-center justify-between mb-3">
+                                <h3 className="text-sm font-semibold text-blue-400 flex items-center gap-2">
+                                    🏦 Rekening Bank Pembayaran
+                                </h3>
+                                {savingBank && <span className="text-xs text-silver-dark animate-pulse">Menyimpan...</span>}
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
+                                <div>
+                                    <select
+                                        value={selectedBankId}
+                                        onChange={(e) => handleBankChange(e.target.value)}
+                                        className="w-full px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm"
+                                        disabled={savingBank}
+                                    >
+                                        <option value="">-- Tampilkan semua rekening --</option>
+                                        {bankAccounts.map(bank => (
+                                            <option key={bank.id} value={bank.id}>
+                                                {bank.bank_name} ({bank.currency || 'IDR'}) – {bank.account_number}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <p className="text-[10px] text-silver-dark mt-1">
+                                        Pilihan rekening yang tampil di cetak invoice
+                                    </p>
+                                </div>
+                                {selectedBankId && (() => {
+                                    const sel = bankAccounts.find(b => b.id === selectedBankId);
+                                    return sel ? (
+                                        <div className="p-2.5 rounded-lg bg-blue-500/10 border border-blue-500/30 text-xs space-y-0.5">
+                                            <div className="font-bold text-blue-300">{sel.bank_name} ({sel.currency || 'IDR'})</div>
+                                            <div className="text-silver-light">No. Rek: <span className="font-mono">{sel.account_number}</span></div>
+                                            <div className="text-silver-light">A/N: {sel.account_holder}</div>
+                                            {sel.branch && <div className="text-silver-dark">Cabang: {sel.branch}</div>}
+                                            {sel.swift_code && <div className="text-silver-dark">SWIFT: {sel.swift_code}</div>}
+                                        </div>
+                                    ) : null;
+                                })()}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Action Buttons */}
                     <div className="flex gap-3 justify-end pt-4 border-t border-dark-border flex-wrap">
@@ -3199,21 +3328,30 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                                 <div style={{ border: '1px solid #999', background: '#fcfcfc', padding: '10px', marginTop: '8px', borderRadius: '4px' }}>
                                     <b style={{ fontSize: '11px' }}>PAYMENT DETAILS:</b><br /><br />
                                     Please transfer to:<br />
-                                    {bankAccounts && bankAccounts.length > 0 ? bankAccounts.map((bank, index) => (
-                                        <div key={index} style={{ marginBottom: '8px' }}>
-                                            <b>{bank.bank_name} ({bank.currency || invoice.currency})</b><br />
-                                            A/C No: {bank.account_number}<br />
-                                            A/N: {bank.account_holder}<br />
-                                            Branch: {bank.branch || '-'}<br />
-                                        </div>
-                                    )) : (
-                                        <>
-                                            <b>BANK CENTRAL ASIA (BCA)</b><br />
-                                            A/C No: 000-000-000<br />
-                                            A/N: PT. BAKHTERA FREIGHT WORLDWIDE<br />
-                                            Branch: KCU JAKARTA
-                                        </>
-                                    )}
+                                    {(() => {
+                                        const selectedBank = invoice.payment_bank_id
+                                            ? (bankAccounts || []).find(b => b.id === invoice.payment_bank_id)
+                                            : null;
+                                        const banksToShow = selectedBank 
+                                            ? [selectedBank] 
+                                            : (bankAccounts || []).filter(b => b.currency === printCurrency || (!b.currency && printCurrency === 'IDR'));
+                                        return banksToShow.length > 0 ? banksToShow.map((bank, index) => (
+                                            <div key={index} style={{ marginBottom: '8px' }}>
+                                                <b>{bank.bank_name} ({bank.currency || invoice.currency})</b><br />
+                                                A/C No: {bank.account_number}<br />
+                                                A/N: {bank.account_holder}<br />
+                                                {bank.branch && <>Branch: {bank.branch}<br /></>}
+                                                {bank.swift_code && <>SWIFT: {bank.swift_code}</>}
+                                            </div>
+                                        )) : (
+                                            <>
+                                                <b>BANK CENTRAL ASIA (BCA)</b><br />
+                                                A/C No: 000-000-000<br />
+                                                A/N: PT. BAKHTERA FREIGHT WORLDWIDE<br />
+                                                Branch: KCU JAKARTA
+                                            </>
+                                        );
+                                    })()}
                                 </div>
 
                                 <div style={{ marginTop: '10px', fontStyle: 'italic' }}>

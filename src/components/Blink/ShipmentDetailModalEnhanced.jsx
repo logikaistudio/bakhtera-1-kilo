@@ -68,27 +68,27 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
     // Ops team: Submit → Approval Center → Manager Approve/Reject
     const statusConfig = {
         pending: { label: 'Pending', color: 'bg-gray-500/20 text-gray-400 border-gray-500/30', icon: Clock },
-        manager_approval: { label: 'Waiting Approval', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30', icon: Clock },
-        approved: { label: 'Approved', color: 'bg-green-500/20 text-green-400 border-green-500/30', icon: ShieldCheck },
-        rejected: { label: 'Rejected', color: 'bg-red-500/20 text-red-400 border-red-500/30', icon: XCircle },
+        manager_approval: { label: 'Menunggu Persetujuan', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30', icon: Clock },
+        approved: { label: 'Disetujui', color: 'bg-green-500/20 text-green-400 border-green-500/30', icon: ShieldCheck },
+        rejected: { label: 'Ditolak', color: 'bg-red-500/20 text-red-400 border-red-500/30', icon: XCircle },
     };
 
     // Transitions visible in shipment modal (ops team only — not approve/reject)
     const statusTransitions = {
-        pending: [{ to: 'manager_approval', label: '📤 Submit for Approval', style: 'primary' }],
-        manager_approval: [{ to: 'pending', label: '↩ Withdraw Submission', style: 'secondary' }],
-        approved: [{ to: 'pending', label: '↩ Revert', style: 'secondary' }],
-        rejected: [{ to: 'pending', label: '↩ Reset to Pending', style: 'secondary' }],
+        pending: [{ to: 'manager_approval', label: '📤 Ajukan Persetujuan', style: 'primary' }],
+        manager_approval: [{ to: 'pending', label: '↩ Batal Ajukan', style: 'secondary' }],
+        approved: [{ to: 'pending', label: '↩ Batalkan Persetujuan', style: 'secondary' }],
+        rejected: [{ to: 'pending', label: '↩ Kembalikan ke Pending', style: 'secondary' }],
     };
 
     const handleStatusChangeRequest = (toStatus) => {
         const msgs = {
-            manager_approval: 'Submit this shipment to the Approval Center for Manager approval?',
-            pending: 'Revert status to Pending?',
+            manager_approval: 'Kirim shipment ini ke Approval Center untuk persetujuan Manager?',
+            pending: 'Kembalikan status ke Pending?',
         };
         setConfirmAction({
             toStatus,
-            message: msgs[toStatus] || `Change status to ${toStatus}?`
+            message: msgs[toStatus] || `Ubah status ke ${toStatus}?`
         });
     };
 
@@ -110,12 +110,12 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
             setCurrentStatus(toStatus);
             onUpdate({ ...shipment, status: toStatus }, true); // skipDbUpdate = true
             if (toStatus === 'manager_approval') {
-                setSuccessMsg('✅ Shipment successfully submitted! Managers can review and approve it in the Approval Center.');
+                setSuccessMsg('✅ Shipment berhasil dikirim! Manager dapat meninjau dan menyetujuinya di Approval Center.');
                 // Auto dismiss after 3 seconds if not closed manually
                 setTimeout(() => setSuccessMsg(''), 3000);
             }
         } catch (err) {
-            alert('Failed to update status: ' + err.message);
+            alert('Gagal memperbarui status: ' + err.message);
         }
     };
 
@@ -1413,7 +1413,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                 </>
                             )}
                             {/* Status action buttons */}
-                            {!isEditing && (statusTransitions[currentStatus] || []).map((t) => (
+                            {!isEditing && !isEditingCOGS && (statusTransitions[currentStatus] || []).map((t) => (
                                 <Button
                                     key={t.to}
                                     size="sm"
@@ -1448,7 +1448,11 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                             return (
                                 <button
                                     key={tab.id}
-                                    onClick={() => setActiveTab(tab.id)}
+                                    onClick={() => {
+                                        setActiveTab(tab.id);
+                                        setIsEditing(false);
+                                        setIsEditingCOGS(false);
+                                    }}
                                     className={`flex items-center gap-2 px-4 py-2 border-b-2 smooth-transition ${activeTab === tab.id
                                         ? 'border-accent-orange text-accent-orange'
                                         : 'border-transparent text-silver-dark hover:text-silver-light'

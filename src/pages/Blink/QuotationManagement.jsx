@@ -17,7 +17,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 
 const QuotationManagement = () => {
-    const { canCreate, canEdit, canDelete, canView, canApprove } = useAuth();
+    const { canCreate, canEdit, canDelete, canView, canApprove, isAdmin } = useAuth();
     const navigate = useNavigate();
     const { customers, companySettings } = useData();
     const [showModal, setShowModal] = useState(false);
@@ -29,6 +29,7 @@ const QuotationManagement = () => {
     const [quotations, setQuotations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showPrintPreview, setShowPrintPreview] = useState(false);
+    const [selectedIds, setSelectedIds] = useState([]);
 
     // Form state
     const [formData, setFormData] = useState({
@@ -319,6 +320,8 @@ const QuotationManagement = () => {
                     measure: editedQuotation.measure ? parseFloat(editedQuotation.measure) : null,
 
                     // Pricing
+                    currency: editedQuotation.currency,
+                    exchange_rate: editedQuotation.currency === 'IDR' ? 1 : (editedQuotation.exchange_rate || 16000),
                     total_amount: total,
                     service_items: editedQuotation.serviceItems || [],
 
@@ -389,108 +392,102 @@ const QuotationManagement = () => {
         setShowViewModal(true);
     };
 
-    // Delete quotation
-    const handleDeleteQuotation = async (quotationId) => {
-        if (!canDelete('blink_quotations')) {
-            alert('You do not have permission to delete Quotation.');
+    // Delete quotation (Cascading delete to all financial records)
+    const handleForceCascadeDelete = async (quotationIds) => {
+        if (!isAdmin()) {
+            alert('Akses Ditolak: Fitur force delete hanya untuk Admin/Superadmin.');
             return;
         }
+
+        const confirmMsg = quotationIds.length === 1 
+            ? 'PERINGATAN KRITIS: Anda akan menghapus pengajuan ini BERSERTA SEMUA DATA TERKAIT (Shipment, Invoice, PO, AR, AP, Payment, Jurnal).\n\nTindakan ini PERMANEN dan tidak dapat dibatalkan! Lanjutkan?'
+            : `PERINGATAN KRITIS: Anda akan menghapus ${quotationIds.length} pengajuan BERSERTA SEMUA DATA TERKAIT.\n\nTindakan ini PERMANEN dan tidak dapat dibatalkan! Lanjutkan?`;
+            
+        if (!window.confirm(confirmMsg)) return;
+
         try {
-            // First, get quotation details to show what will be deleted
-            const quotation = quotations.find(q => q.id === quotationId);
+            setLoading(true);
 
-            // Fetch related data counts
-            const { data: relatedShipments } = await supabase
-                .from('blink_shipments')
-                .select('*')
-                .eq('quotation_id', quotationId);
+            // Step 1: Find all related shipments
+            const { data: shipments } = await supabase.from('blink_shipments').select('id').in('quotation_id', quotationIds);
+            const shipmentIds = (shipments || []).map(s => s.id);
 
-            const { data: relatedInvoices } = await supabase
-                .from('blink_invoices')
-                .select('*')
-                .eq('quotation_id', quotationId);
+            // Step 2: Find all related invoices (AR)
+            const { data: invoices } = await supabase.from('blink_invoices').select('id').in('quotation_id', quotationIds);
+            const invoiceIds = (invoices || []).map(i => i.id);
 
-            // Build confirmation message
-            let confirmMessage = `Are you sure you want to delete quotation ${quotation?.jobNumber || 'this'}?\n\n`;
-            confirmMessage += `Data that will be deleted:\n`;
-            confirmMessage += `- 1 Quotation\n`;
+            // Step 3: Find all related POs (AP)
+            const { data: pos } = await supabase.from('blink_purchase_orders').select('id').in('quotation_id', quotationIds);
+            const poIds = (pos || []).map(p => p.id);
 
-            if (relatedShipments && relatedShipments.length > 0) {
-                confirmMessage += `- ${relatedShipments.length} Shipment(s)\n`;
+            // Fetch ARs associated with Invoices
+            let arIds = [];
+            if (invoiceIds.length > 0) {
+                const { data: ars } = await supabase.from('blink_ar_transactions').select('id').in('invoice_id', invoiceIds);
+                arIds = (ars || []).map(a => a.id);
             }
 
-            if (relatedInvoices && relatedInvoices.length > 0) {
-                confirmMessage += `- ${relatedInvoices.length} Invoice(s)\n`;
+            // Fetch APs associated with POs
+            let apIds = [];
+            if (poIds.length > 0) {
+                const { data: aps } = await supabase.from('blink_ap_transactions').select('id').in('po_id', poIds);
+                apIds = (aps || []).map(a => a.id);
             }
 
-            confirmMessage += `\n⚠️ This action cannot be undone!`;
-
-            if (!confirm(confirmMessage)) {
-                return;
+            // Fetch Payments linked to any of the above
+            let paymentRefKeys = [];
+            if (invoiceIds.length > 0) paymentRefKeys.push(...invoiceIds);
+            if (poIds.length > 0) paymentRefKeys.push(...poIds);
+            if (arIds.length > 0) paymentRefKeys.push(...arIds);
+            if (apIds.length > 0) paymentRefKeys.push(...apIds);
+            
+            let paymentIds = [];
+            if (paymentRefKeys.length > 0) {
+                const { data: payments } = await supabase.from('blink_payments').select('id').in('reference_id', paymentRefKeys);
+                paymentIds = (payments || []).map(p => p.id);
             }
 
-            // Extra confirmation for converted quotations
-            if (quotation?.status === 'converted' && (relatedShipments?.length > 0 || relatedInvoices?.length > 0)) {
-                if (!confirm('This Quotation is already converted to SO with active shipment/invoice. Are you sure you want to continue?')) {
-                    return;
-                }
+            // Reference IDs for journal entries
+            const journalRefIds = [...quotationIds, ...shipmentIds, ...invoiceIds, ...poIds, ...arIds, ...apIds, ...paymentIds];
+
+            // DO CASCADE EXECUTIONS (Bottom-Up)
+            
+            if (journalRefIds.length > 0) {
+                console.log(`Deleting ${journalRefIds.length} journals...`);
+                await supabase.from('blink_journal_entries').delete().in('reference_id', journalRefIds);
             }
 
-            console.log('🗑️ Starting cascade delete for quotation:', quotationId);
-
-            // Step 1: Delete related invoices
-            if (relatedInvoices && relatedInvoices.length > 0) {
-                console.log(`Deleting ${relatedInvoices.length} related invoice(s)...`);
-                const { error: invoiceError } = await supabase
-                    .from('blink_invoices')
-                    .delete()
-                    .eq('quotation_id', quotationId);
-
-                if (invoiceError) {
-                    throw new Error(`Failed to delete invoices: ${invoiceError.message}`);
-                }
-                console.log('✅ Invoices deleted');
+            if (paymentIds.length > 0) {
+                console.log(`Deleting ${paymentIds.length} payments...`);
+                await supabase.from('blink_payments').delete().in('id', paymentIds);
             }
 
-            // Step 2: Delete related shipments
-            if (relatedShipments && relatedShipments.length > 0) {
-                console.log(`Deleting ${relatedShipments.length} related shipment(s)...`);
-                const { error: shipmentError } = await supabase
-                    .from('blink_shipments')
-                    .delete()
-                    .eq('quotation_id', quotationId);
+            if (arIds.length > 0) await supabase.from('blink_ar_transactions').delete().in('id', arIds);
+            if (apIds.length > 0) await supabase.from('blink_ap_transactions').delete().in('id', apIds);
 
-                if (shipmentError) {
-                    throw new Error(`Failed to delete shipments: ${shipmentError.message}`);
-                }
-                console.log('✅ Shipments deleted');
+            if (invoiceIds.length > 0) await supabase.from('blink_invoices').delete().in('id', invoiceIds);
+            if (poIds.length > 0) await supabase.from('blink_purchase_orders').delete().in('id', poIds);
+
+            if (shipmentIds.length > 0) {
+                // Delete BLs explicitly to avoid constraint error
+                await supabase.from('blink_bl_documents').delete().in('shipment_id', shipmentIds);
+                await supabase.from('blink_shipments').delete().in('id', shipmentIds);
             }
 
-            // Step 3: Delete the quotation itself
-            console.log('Deleting quotation...');
-            const { error: quotationError } = await supabase
-                .from('blink_quotations')
-                .delete()
-                .eq('id', quotationId);
+            // Delete Quotation(s)
+            console.log(`Deleting ${quotationIds.length} quotations...`);
+            const { error: delErr } = await supabase.from('blink_quotations').delete().in('id', quotationIds);
+            if (delErr) throw delErr;
 
-            if (quotationError) throw quotationError;
-
-            console.log('✅ Quotation deleted successfully');
-
-            // Refresh quotations list
-            await fetchQuotations();
-
-            // Success message with details
-            let successMsg = '✅ Successfully deleted:\n';
-            successMsg += `- 1 Quotation\n`;
-            if (relatedShipments?.length > 0) successMsg += `- ${relatedShipments.length} Shipment(s)\n`;
-            if (relatedInvoices?.length > 0) successMsg += `- ${relatedInvoices.length} Invoice(s)\n`;
-
-            alert(successMsg);
+            alert('✅ Sukses! Data Pengajuan dan SEMUA transaksi terkait (Shipments, Invoices, PO, AR, AP, Payments, Jurnal) berhasil dihapus bersih.');
+            setSelectedIds([]);
             setShowViewModal(false);
+            await fetchQuotations();
         } catch (error) {
-            console.error('❌ Error deleting quotation:', error);
-            alert('❌ Failed to delete quotation: ' + error.message);
+            console.error('Cascade Delete Error:', error);
+            alert('❌ Gagal menghapus data: ' + error.message);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -928,6 +925,11 @@ const QuotationManagement = () => {
                     <p className="text-silver-dark mt-1">Manage operational quotations</p>
                 </div>
                 <div className="flex items-center gap-3">
+                    {isAdmin() && selectedIds.length > 0 && (
+                        <Button variant="danger" icon={Trash} onClick={() => handleForceCascadeDelete(selectedIds)}>
+                            Delete Selected ({selectedIds.length})
+                        </Button>
+                    )}
                     <Button onClick={handleExportXLS} variant="secondary" icon={Download}>
                         Export XLS
                     </Button>
@@ -993,6 +995,19 @@ const QuotationManagement = () => {
                     <table className="w-full">
                         <thead className="bg-accent-orange">
                             <tr>
+                                {isAdmin() && (
+                                    <th className="px-4 py-3 text-left w-10">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={filteredQuotations.length > 0 && selectedIds.length === filteredQuotations.length}
+                                            onChange={(e) => {
+                                                if (e.target.checked) setSelectedIds(filteredQuotations.map(q => q.id));
+                                                else setSelectedIds([]);
+                                            }}
+                                            className="rounded border-white/30 bg-transparent text-white cursor-pointer"
+                                        />
+                                    </th>
+                                )}
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">Job Number</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">Customer</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">Route</th>
@@ -1005,7 +1020,7 @@ const QuotationManagement = () => {
                         <tbody className="divide-y divide-dark-border">
                             {filteredQuotations.length === 0 ? (
                                 <tr>
-                                    <td colSpan="7" className="px-4 py-12 text-center">
+                                    <td colSpan={isAdmin() ? "8" : "7"} className="px-4 py-12 text-center">
                                         <FileText className="w-12 h-12 text-silver-dark mx-auto mb-3" />
                                         <p className="text-silver-dark">
                                             {searchTerm
@@ -1023,8 +1038,21 @@ const QuotationManagement = () => {
                                         <tr
                                             key={quote.id}
                                             onClick={() => handleViewQuotation(quote)}
-                                            className="hover:bg-dark-surface smooth-transition cursor-pointer"
+                                            className={`hover:bg-dark-surface smooth-transition cursor-pointer ${selectedIds.includes(quote.id) ? 'bg-blue-500/10' : ''}`}
                                         >
+                                            {isAdmin() && (
+                                                <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                                    <input 
+                                                        type="checkbox"
+                                                        checked={selectedIds.includes(quote.id)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) setSelectedIds([...selectedIds, quote.id]);
+                                                            else setSelectedIds(selectedIds.filter(id => id !== quote.id));
+                                                        }}
+                                                        className="rounded border-dark-border cursor-pointer bg-dark-card"
+                                                    />
+                                                </td>
+                                            )}
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-2">
                                                     <span className="font-medium text-accent-orange">{quote.jobNumber}</span>
@@ -1584,14 +1612,14 @@ const QuotationManagement = () => {
                                                 Edit
                                             </Button>
                                         )}
-                                        {canDelete('blink_quotations') && (
+                                        {isAdmin() && canDelete('blink_quotations') && (
                                             <Button
                                                 size="sm"
                                                 variant="danger"
                                                 icon={Trash}
-                                                onClick={() => handleDeleteQuotation(viewingQuotation.id)}
+                                                onClick={() => handleForceCascadeDelete([viewingQuotation.id])}
                                             >
-                                                Delete
+                                                Force Delete
                                             </Button>
                                         )}
                                     </>
@@ -1871,23 +1899,70 @@ const QuotationManagement = () => {
                         </div>
 
                         <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-                            <p className="text-sm text-gray-500 mb-1">Estimated Amount</p>
-                            <div className="text-2xl font-bold text-orange-600">
-                                {viewingQuotation.currency === 'IDR' ? 'Rp ' : '$'}
-                                {(isEditingQuotation
-                                    ? (editedQuotation?.totalAmount || 0)
-                                    : (viewingQuotation.totalAmount || viewingQuotation.total_amount || 0)
-                                ).toLocaleString('id-ID')}
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <p className="text-sm text-gray-500 mb-1">Estimated Amount</p>
+                                    <div className="text-2xl font-bold text-orange-600">
+                                        {(isEditingQuotation ? editedQuotation?.currency : viewingQuotation.currency) === 'IDR' ? 'Rp ' : '$'}
+                                        {(isEditingQuotation
+                                            ? (editedQuotation?.totalAmount || 0)
+                                            : (viewingQuotation.totalAmount || viewingQuotation.total_amount || 0)
+                                        ).toLocaleString('id-ID')}
+                                    </div>
+                                    {isEditingQuotation && (
+                                        <input
+                                            type="number"
+                                            value={editedQuotation?.totalAmount || 0}
+                                            onChange={(e) => setEditedQuotation({ ...editedQuotation, totalAmount: parseFloat(e.target.value) || 0 })}
+                                            className="mt-2 w-full px-3 py-2 bg-white border border-gray-300 rounded text-gray-900 text-sm"
+                                            placeholder="Enter amount"
+                                        />
+                                    )}
+                                </div>
+                                <div className="text-right">
+                                    {isEditingQuotation ? (
+                                        <div className="flex flex-col gap-2 items-end">
+                                            <div className="flex items-center gap-2">
+                                                <label className="text-xs text-gray-500 font-medium">Currency</label>
+                                                <select
+                                                    value={editedQuotation?.currency || 'IDR'}
+                                                    onChange={(e) => {
+                                                        const newCurrency = e.target.value;
+                                                        setEditedQuotation(prev => ({
+                                                            ...prev,
+                                                            currency: newCurrency,
+                                                            exchange_rate: newCurrency === 'IDR' ? 1 : (prev.exchange_rate || 16000)
+                                                        }));
+                                                    }}
+                                                    className="px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                                >
+                                                    <option value="IDR">IDR</option>
+                                                    <option value="USD">USD</option>
+                                                </select>
+                                            </div>
+                                            {editedQuotation?.currency === 'USD' && (
+                                                <div className="flex items-center gap-2">
+                                                    <label className="text-xs text-gray-500 font-medium whitespace-nowrap">Kurs Rate</label>
+                                                    <input
+                                                        type="number"
+                                                        value={editedQuotation?.exchange_rate || ''}
+                                                        onChange={(e) => setEditedQuotation({ ...editedQuotation, exchange_rate: parseFloat(e.target.value) || 1 })}
+                                                        className="w-24 px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                                        placeholder="e.g., 16000"
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="text-sm text-gray-600 bg-white/50 px-3 py-2 rounded-lg border border-orange-100/50 inline-block text-left">
+                                            <p className="flex justify-between gap-4"><span>Currency:</span> <span className="font-semibold text-gray-900">{viewingQuotation.currency || 'IDR'}</span></p>
+                                            {(viewingQuotation.currency === 'USD' || viewingQuotation.exchange_rate > 1) && (
+                                                <p className="flex justify-between gap-4 mt-1"><span>Rate:</span> <span className="font-semibold text-gray-900">Rp {(viewingQuotation.exchange_rate || viewingQuotation.exchangeRate || 16000).toLocaleString('id-ID')}</span></p>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                            {isEditingQuotation && (
-                                <input
-                                    type="number"
-                                    value={editedQuotation?.totalAmount || 0}
-                                    onChange={(e) => setEditedQuotation({ ...editedQuotation, totalAmount: parseFloat(e.target.value) || 0 })}
-                                    className="mt-2 w-full px-3 py-2 bg-white border border-gray-300 rounded text-gray-900 text-sm"
-                                    placeholder="Enter amount"
-                                />
-                            )}
                         </div>
 
                         {/* Cost Breakdown */}
@@ -1900,7 +1975,7 @@ const QuotationManagement = () => {
                                             setEditedQuotation({ ...editedQuotation, serviceItems: items });
                                         }
                                     }}
-                                    currency={viewingQuotation.currency}
+                                    currency={isEditingQuotation ? (editedQuotation?.currency || 'IDR') : viewingQuotation.currency}
                                     readOnly={!isEditingQuotation}
                                 />
                             </div>
