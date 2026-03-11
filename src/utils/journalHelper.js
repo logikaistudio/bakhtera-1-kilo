@@ -70,33 +70,37 @@ export async function resolveCOA({ codes = [], prefixes = [], type, nameHint, co
         if (found) return found;
     }
 
-    // 2. Code prefix match (active accounts only)
+    // 2. Type + name ilike (Best Text Match)
+    if (type && nameHint) {
+        const hint = nameHint.toLowerCase().trim();
+        // Check active accounts of exactly this type
+        const typeCandidates = list.filter(c => c.type === type && c.is_active !== false);
+        
+        // Find best match by name
+        let bestMatch = null;
+        for (const can of typeCandidates) {
+            if (can.name && can.name.toLowerCase().includes(hint)) {
+                bestMatch = can;
+                break; // Take the first one that includes the hint
+            }
+        }
+        if (bestMatch) return bestMatch;
+    }
+
+    // 3. Code prefix match (Fallback to general group account if name not matched)
     for (const prefix of prefixes) {
         const candidates = list.filter(c => c.code?.startsWith(prefix) && c.is_active !== false);
-        // Prefer the most specific (deepest) level — least dashes
         if (candidates.length > 0) {
             candidates.sort((a, b) => {
                 if (type) {
-                    // Prefer matching type
                     const aMatch = a.type === type ? 0 : 1;
                     const bMatch = b.type === type ? 0 : 1;
                     if (aMatch !== bMatch) return aMatch - bMatch;
                 }
                 return a.code.localeCompare(b.code);
             });
-            return candidates[0];
+            return candidates[0]; // Returns first account in that group (e.g., 4-01-100)
         }
-    }
-
-    // 3. Type + name ilike fallback
-    if (type && nameHint) {
-        const hint = nameHint.toLowerCase();
-        const found = list.find(c =>
-            c.type === type &&
-            c.name?.toLowerCase().includes(hint) &&
-            c.is_active !== false
-        );
-        if (found) return found;
     }
 
     // 4. Type only fallback (first active account of that type)
