@@ -249,40 +249,121 @@ export async function insertJournalEntries(rows) {
  */
 export async function createInvoiceJournal({ invoice, coaList: providedCOA }) {
     const coaList = providedCOA || await getAllCOA();
-    const [arCOA, revCOA] = await Promise.all([
+    const [arCOA, defaultRevCOA] = await Promise.all([
         resolveARAccount(coaList),
         resolveRevenueAccount(coaList)
     ]);
+
+    // Resolve Optional Tax/Discount Accounts
+    let taxCOA = null, discountCOA = null;
+    if (invoice.tax_amount > 0) {
+        taxCOA = await resolveCOA({ coaList, prefixes: ['2'], type: 'LIABILITY', nameHint: 'pajak' }) || 
+                 await resolveCOA({ coaList, prefixes: ['2'], type: 'LIABILITY' });
+    }
+    if (invoice.discount_amount > 0) {
+        discountCOA = await resolveCOA({ coaList, prefixes: ['4', '5'], nameHint: 'diskon' }) || defaultRevCOA; 
+    }
+
     const batchId = generateUUID();
     const jeNum = await generateJENumber('INV');
     const exRate = invoice.currency !== 'IDR' ? (invoice.exchange_rate || 16000) : 1;
     const note = invoice.currency !== 'IDR' ? ` (Rate: ${exRate.toLocaleString('id-ID')})` : '';
     const desc = `Invoice ${invoice.invoice_number} - ${invoice.customer_name}${note}`;
 
-    return insertJournalEntries([
-        buildJERow({
-            entryNumber: jeNum, suffix: '-D',
+    const rows = [];
+
+    // 1. Debit AR (Total amount to be paid)
+    rows.push(buildJERow({
+        entryNumber: jeNum, suffix: '-D',
+        date: invoice.invoice_date,
+        entryType: 'invoice', refType: 'ar',
+        refId: invoice.id, refNumber: invoice.invoice_number,
+        coa: arCOA,
+        debit: invoice.total_amount, credit: 0,
+        currency: invoice.currency, exchangeRate: exRate,
+        description: desc, batchId, source: 'auto',
+        partyName: invoice.customer_name, partyId: invoice.customer_id
+    }));
+
+    // 2. Debit Discount (if any)
+    if (invoice.discount_amount > 0) {
+        rows.push(buildJERow({
+            entryNumber: jeNum, suffix: '-D-DISC',
             date: invoice.invoice_date,
             entryType: 'invoice', refType: 'ar',
             refId: invoice.id, refNumber: invoice.invoice_number,
-            coa: arCOA,
-            debit: invoice.total_amount, credit: 0,
+            coa: discountCOA,
+            debit: invoice.discount_amount, credit: 0,
             currency: invoice.currency, exchangeRate: exRate,
-            description: desc, batchId, source: 'auto',
+            description: `Discount - ${desc}`, batchId, source: 'auto',
             partyName: invoice.customer_name, partyId: invoice.customer_id
-        }),
-        buildJERow({
-            entryNumber: jeNum, suffix: '-C',
+        }));
+    }
+
+    // 3. Credit Revenue (Detailed per item)
+    const items = Array.isArray(invoice.invoice_items) ? invoice.invoice_items : [];
+    if (items.length > 0) {
+        let itemIdx = 0;
+        for (const item of items) {
+            const amount = parseFloat(item.amount) || 0;
+            if (amount <= 0) continue;
+            itemIdx++;
+
+            let itemCOA = null;
+            if (item.coa_id) itemCOA = coaList.find(c => c.id === item.coa_id) || null;
+            if (!itemCOA) {
+                itemCOA = await resolveCOA({
+                    coaList,
+                    prefixes: ['4'],
+                    type: 'REVENUE',
+                    nameHint: item.description || item.item_name
+                }) || defaultRevCOA;
+            }
+
+            rows.push(buildJERow({
+                entryNumber: jeNum, suffix: `-C${String(itemIdx).padStart(2, '0')}`,
+                date: invoice.invoice_date,
+                entryType: 'invoice', refType: 'ar',
+                refId: invoice.id, refNumber: invoice.invoice_number,
+                coa: itemCOA,
+                debit: 0, credit: amount,
+                currency: invoice.currency, exchangeRate: exRate,
+                description: `${item.description || item.item_name || 'Income'} - ${desc}`, 
+                batchId, source: 'auto',
+                partyName: invoice.customer_name, partyId: invoice.customer_id
+            }));
+        }
+    } else {
+        // Fallback Revenue (if no items recorded)
+        rows.push(buildJERow({
+            entryNumber: jeNum, suffix: '-C01',
             date: invoice.invoice_date,
             entryType: 'invoice', refType: 'ar',
             refId: invoice.id, refNumber: invoice.invoice_number,
-            coa: revCOA,
-            debit: 0, credit: invoice.total_amount,
+            coa: defaultRevCOA,
+            debit: 0, credit: invoice.subtotal || invoice.total_amount,
             currency: invoice.currency, exchangeRate: exRate,
             description: desc, batchId, source: 'auto',
             partyName: invoice.customer_name, partyId: invoice.customer_id
-        })
-    ]);
+        }));
+    }
+
+    // 4. Credit Tax (if any)
+    if (invoice.tax_amount > 0) {
+        rows.push(buildJERow({
+            entryNumber: jeNum, suffix: '-C-TAX',
+            date: invoice.invoice_date,
+            entryType: 'invoice', refType: 'ar',
+            refId: invoice.id, refNumber: invoice.invoice_number,
+            coa: taxCOA,
+            debit: 0, credit: invoice.tax_amount,
+            currency: invoice.currency, exchangeRate: exRate,
+            description: `Tax/VAT - ${desc}`, batchId, source: 'auto',
+            partyName: invoice.customer_name, partyId: invoice.customer_id
+        }));
+    }
+
+    return insertJournalEntries(rows);
 }
 
 /**
@@ -338,43 +419,80 @@ export async function createARPaymentJournal({
 export async function createCOGSJournal({ invoice, cogsAmount, coaList: providedCOA }) {
     if (!cogsAmount || cogsAmount <= 0) return { success: true, skipped: true };
     const coaList = providedCOA || await getAllCOA();
-    const cogsCOA = await resolveCOGSAccount(coaList);
-    // For COGS credit side, use the first COGS/EXPENSE account  
-    const costCOA = await resolveCOA({
+    const defaultCOGS = await resolveCOGSAccount(coaList);
+    const defaultCost = await resolveCOA({
         coaList,
         prefixes: ['5-02', '5'],
         type: 'COGS',
         nameHint: 'biaya'
-    }) || cogsCOA;
+    }) || defaultCOGS;
 
     const batchId = generateUUID();
     const jeNum = await generateJENumber('COGS');
     const exRate = invoice.currency !== 'IDR' ? (invoice.exchange_rate || 16000) : 1;
+    const desc = `COGS - ${invoice.invoice_number} - ${invoice.customer_name}`;
 
-    return insertJournalEntries([
-        buildJERow({
-            entryNumber: jeNum, suffix: '-D',
+    const rows = [];
+    const items = Array.isArray(invoice.cogs_items) ? invoice.cogs_items : [];
+
+    // 1. Debit COGS (Detailed per item)
+    if (items.length > 0) {
+        let itemIdx = 0;
+        for (const item of items) {
+            const amount = parseFloat(item.amount) || 0;
+            if (amount <= 0) continue;
+            itemIdx++;
+
+            let itemCOA = null;
+            if (item.coa_id) itemCOA = coaList.find(c => c.id === item.coa_id) || null;
+            if (!itemCOA) {
+                itemCOA = await resolveCOA({
+                    coaList,
+                    prefixes: ['5', '6'],
+                    type: 'COGS',
+                    nameHint: item.description || item.item_name
+                }) || defaultCOGS;
+            }
+
+            rows.push(buildJERow({
+                entryNumber: jeNum, suffix: `-D${String(itemIdx).padStart(2, '0')}`,
+                date: invoice.invoice_date,
+                entryType: 'cogs', refType: 'invoice',
+                refId: invoice.id, refNumber: invoice.invoice_number,
+                coa: itemCOA,
+                debit: amount, credit: 0,
+                currency: invoice.currency, exchangeRate: exRate,
+                description: `${item.description || item.item_name || 'HPP'} - ${desc}`,
+                batchId
+            }));
+        }
+    } else {
+        // Fallback Debit COGS (lump sum)
+        rows.push(buildJERow({
+            entryNumber: jeNum, suffix: '-D01',
             date: invoice.invoice_date,
             entryType: 'cogs', refType: 'invoice',
             refId: invoice.id, refNumber: invoice.invoice_number,
-            coa: cogsCOA,
+            coa: defaultCOGS,
             debit: cogsAmount, credit: 0,
             currency: invoice.currency, exchangeRate: exRate,
-            description: `COGS - ${invoice.invoice_number} - ${invoice.customer_name}`,
-            batchId
-        }),
-        buildJERow({
-            entryNumber: jeNum, suffix: '-C',
-            date: invoice.invoice_date,
-            entryType: 'cogs', refType: 'invoice',
-            refId: invoice.id, refNumber: invoice.invoice_number,
-            coa: costCOA,
-            debit: 0, credit: cogsAmount,
-            currency: invoice.currency, exchangeRate: exRate,
-            description: `COGS - ${invoice.invoice_number} - ${invoice.customer_name}`,
-            batchId
-        })
-    ]);
+            description: desc, batchId
+        }));
+    }
+
+    // 2. Credit Cost/Inventory (Lump Sum)
+    rows.push(buildJERow({
+        entryNumber: jeNum, suffix: '-C',
+        date: invoice.invoice_date,
+        entryType: 'cogs', refType: 'invoice',
+        refId: invoice.id, refNumber: invoice.invoice_number,
+        coa: defaultCost,
+        debit: 0, credit: cogsAmount,
+        currency: invoice.currency, exchangeRate: exRate,
+        description: desc, batchId
+    }));
+
+    return insertJournalEntries(rows);
 }
 
 /**
