@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { createInvoiceJournal, createCOGSJournal, getAllCOA } from '../../utils/journalHelper';
+import { createInvoiceJournal, createCOGSJournal, getAllCOA, resolveARAccount, resolveRevenueAccount } from '../../utils/journalHelper';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useData } from '../../context/DataContext';
@@ -525,6 +525,7 @@ const InvoiceManagement = () => {
                 cargo_details: formData.cargo_details || null,
                 invoice_items: formData.invoice_items,
                 currency: formData.billing_currency || 'IDR',
+                exchange_rate: formData.billing_currency !== 'IDR' ? (formData.exchange_rate || 16000) : 1,
                 subtotal: subtotal,
                 tax_rate: formData.tax_rate,
                 tax_amount: taxAmount,
@@ -1247,8 +1248,7 @@ const InvoiceManagement = () => {
             const existingIds = new Set(currentJournals.map(je => je.reference_id));
             const toMigrate = allInvoices
                 .filter(inv => !existingIds.has(inv.id))
-                .sort((a, b) => new Date(b.created_at || b.invoice_date) - new Date(a.created_at || a.invoice_date))
-                .slice(0, 2);
+                .sort((a, b) => new Date(a.invoice_date) - new Date(b.invoice_date));
 
             if (toMigrate.length === 0) {
                 alert('All invoices already migrated!');
@@ -1256,12 +1256,11 @@ const InvoiceManagement = () => {
                 return;
             }
 
-            const [{ data: arCoas }, { data: revCoas }] = await Promise.all([
-                supabase.from('finance_coa').select('id, code, name').eq('type', 'ASSET').ilike('name', '%receivable%').limit(1),
-                supabase.from('finance_coa').select('id, code, name').eq('type', 'REVENUE').ilike('name', '%freight%').limit(1)
+            const coaList = await getAllCOA();
+            const [arCoa, revCoa] = await Promise.all([
+                resolveARAccount(coaList),
+                resolveRevenueAccount(coaList)
             ]);
-            const arCoa = arCoas?.[0] || { code: '1-01-400-0-1-00', name: 'ACCOUNT RECEIVABLE', id: null };
-            const revCoa = revCoas?.[0] || { code: '4-01-301-0-1-00', name: 'OCEAN FREIGHT', id: null };
 
             let entriesToInsert = [];
             for (const inv of toMigrate) {

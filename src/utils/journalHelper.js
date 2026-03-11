@@ -22,6 +22,17 @@ let _coaCache = null;
 let _coaCacheTime = 0;
 const COA_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
+// ── Utility: Safe UUID ────────────────────────────────────────────────────────
+export function generateUUID() {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID();
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
 export async function getAllCOA() {
     const now = Date.now();
     if (_coaCache && now - _coaCacheTime < COA_CACHE_TTL) return _coaCache;
@@ -242,7 +253,7 @@ export async function createInvoiceJournal({ invoice, coaList: providedCOA }) {
         resolveARAccount(coaList),
         resolveRevenueAccount(coaList)
     ]);
-    const batchId = crypto.randomUUID();
+    const batchId = generateUUID();
     const jeNum = await generateJENumber('INV');
     const exRate = invoice.currency !== 'IDR' ? (invoice.exchange_rate || 16000) : 1;
     const note = invoice.currency !== 'IDR' ? ` (Rate: ${exRate.toLocaleString('id-ID')})` : '';
@@ -286,7 +297,7 @@ export async function createARPaymentJournal({
         resolveBankAccount(coaList),
         resolveARAccount(coaList)
     ]);
-    const batchId = crypto.randomUUID();
+    const batchId = generateUUID();
     const jeNum = await generateJENumber('PAY-IN');
     const exRate = invoice.currency !== 'IDR' ? (invoice.exchange_rate || 16000) : 1;
     const note = invoice.currency !== 'IDR' ? ` (Rate: ${exRate.toLocaleString('id-ID')})` : '';
@@ -336,7 +347,7 @@ export async function createCOGSJournal({ invoice, cogsAmount, coaList: provided
         nameHint: 'biaya'
     }) || cogsCOA;
 
-    const batchId = crypto.randomUUID();
+    const batchId = generateUUID();
     const jeNum = await generateJENumber('COGS');
     const exRate = invoice.currency !== 'IDR' ? (invoice.exchange_rate || 16000) : 1;
 
@@ -378,7 +389,7 @@ export async function createAPPaymentJournal({
         resolveAPAccount(coaList),
         resolveBankAccount(coaList)
     ]);
-    const batchId = crypto.randomUUID();
+    const batchId = generateUUID();
     const jeNum = await generateJENumber('PAY-OUT');
     const exRate = ap.currency !== 'IDR' ? (ap.exchange_rate || 16000) : 1;
     const note = ap.currency !== 'IDR' ? ` (Rate: ${exRate.toLocaleString('id-ID')})` : '';
@@ -418,7 +429,7 @@ export async function createAPPaymentJournal({
 export async function createPOApprovalJournal({ po, coaList: providedCOA }) {
     const coaList = providedCOA || await getAllCOA();
     const [apCOA] = await Promise.all([resolveAPAccount(coaList)]);
-    const batchId = crypto.randomUUID();
+    const batchId = generateUUID();
     const jeNum = await generateJENumber('PO');
     const exRate = po.currency !== 'IDR' ? (po.exchange_rate || 16000) : 1;
     const desc = `PO Approved: ${po.po_number} - ${po.vendor_name}`;
