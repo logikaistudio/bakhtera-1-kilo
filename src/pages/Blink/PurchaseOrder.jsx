@@ -34,7 +34,7 @@ const PurchaseOrder = () => {
         po_date: new Date().toISOString().split('T')[0],
         delivery_date: '',
         payment_terms: 'NET 30',
-        po_items: [{ description: '', qty: 1, unit: 'Unit', unit_price: 0, amount: 0, coa_id: null }],
+        po_items: [{ description: '', qty: 1, unit: 'Unit', unit_price: 0, amount: 0, tax_rate: 0, tax_amount: 0, coa_id: null }],
         tax_rate: 11.00,
         discount_amount: 0,
         notes: '',
@@ -184,7 +184,7 @@ const PurchaseOrder = () => {
     const addPOItem = () => {
         setFormData(prev => ({
             ...prev,
-            po_items: [...prev.po_items, { description: '', qty: 1, unit: 'Unit', unit_price: 0, amount: 0, coa_id: null }]
+            po_items: [...prev.po_items, { description: '', qty: 1, unit: 'Unit', unit_price: 0, amount: 0, tax_rate: 0, tax_amount: 0, coa_id: null }]
         }));
     };
 
@@ -207,13 +207,30 @@ const PurchaseOrder = () => {
                 items[index].amount = items[index].qty * items[index].unit_price;
             }
 
+            // Auto-calculate tax_amount from tax_rate percentage
+            if (field === 'qty' || field === 'unit_price' || field === 'tax_rate') {
+                const rate = field === 'tax_rate' ? value : (items[index].tax_rate || 0);
+                items[index].tax_amount = items[index].amount * (rate / 100);
+            }
+
             return { ...prev, po_items: items };
+        });
+    };
+
+    const handleGlobalTaxChange = (newRate) => {
+        setFormData(prev => {
+            const items = prev.po_items.map(item => ({
+                ...item,
+                tax_rate: newRate,
+                tax_amount: (item.amount || 0) * (newRate / 100)
+            }));
+            return { ...prev, tax_rate: newRate, po_items: items };
         });
     };
 
     const calculateTotals = () => {
         const subtotal = formData.po_items.reduce((sum, item) => sum + (item.amount || 0), 0);
-        const taxAmount = (subtotal * formData.tax_rate) / 100;
+        const taxAmount = formData.po_items.reduce((sum, item) => sum + (Number(item.tax_amount) || 0), 0);
         const total = subtotal + taxAmount - (formData.discount_amount || 0);
 
         return { subtotal, taxAmount, total };
@@ -868,7 +885,7 @@ const PurchaseOrder = () => {
                                     <td class="value">${formatCurrency(po.subtotal || 0, po.currency)}</td>
                                 </tr>
                                 <tr>
-                                    <td class="label">Tax (${po.tax_rate || 0}%)</td>
+                                    <td class="label">Tax${po.tax_amount > 0 && po.tax_rate > 0 ? ` (${po.tax_rate}%)` : ''}</td>
                                     <td class="colon">:</td>
                                     <td class="value">${formatCurrency(po.tax_amount || 0, po.currency)}</td>
                                 </tr>
@@ -977,13 +994,29 @@ const PurchaseOrder = () => {
             matchedVendorId = byName ? byName.id : '';
         }
 
+            // Maintain backward compatibility for older POs
+            const inheritedTaxRate = po.tax_rate || 0;
+            const itemsWithTax = (po.po_items && po.po_items.length > 0 ? po.po_items : [{ item_name: '', description: '', qty: 1, unit: 'Job', unit_price: 0, amount: 0, coa_id: null }])
+                .map(it => {
+                    const itAmount = parseFloat(it.amount) || 0;
+                    const itTaxAmount = typeof it.tax_amount !== 'undefined' ? Number(it.tax_amount) : (itAmount * inheritedTaxRate / 100);
+                    // Derive tax_rate from stored tax_amount if tax_rate not yet persisted
+                    const itTaxRate = typeof it.tax_rate !== 'undefined'
+                        ? Number(it.tax_rate)
+                        : (itAmount > 0 ? Math.round((itTaxAmount / itAmount) * 10000) / 100 : inheritedTaxRate);
+                    return {
+                        ...it,
+                        tax_amount: itTaxAmount,
+                        tax_rate: itTaxRate
+                    };
+                });
         setFormData({
             vendor_id: matchedVendorId,
             po_date: po.po_date,
             delivery_date: po.delivery_date || '',
             payment_terms: po.payment_terms || 'NET 30',
-            po_items: po.po_items && po.po_items.length > 0 ? po.po_items : [{ item_name: '', description: '', qty: 1, unit: 'Job', unit_price: 0, amount: 0, coa_id: null }],
-            tax_rate: po.tax_rate || 11.00,
+            po_items: itemsWithTax,
+            tax_rate: po.tax_rate || 0,
             discount_amount: po.discount_amount || 0,
             notes: po.notes || '',
             currency: po.currency || 'IDR',
@@ -1122,7 +1155,7 @@ const PurchaseOrder = () => {
             po_date: new Date().toISOString().split('T')[0],
             delivery_date: '',
             payment_terms: 'NET 30',
-            po_items: [{ description: '', qty: 1, unit: 'Unit', unit_price: 0, amount: 0 }],
+            po_items: [{ description: '', qty: 1, unit: 'Unit', unit_price: 0, amount: 0, tax_rate: 0, tax_amount: 0 }],
             tax_rate: 11.00,
             discount_amount: 0,
             notes: '',
@@ -1233,6 +1266,7 @@ const PurchaseOrder = () => {
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Vendor</th>
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">PO Date</th>
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Delivery Date</th>
+                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">Tax</th>
                                 <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">Amount</th>
                                 <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap">Status</th>
                                 <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap">Actions</th>
@@ -1241,7 +1275,7 @@ const PurchaseOrder = () => {
                         <tbody className="divide-y divide-dark-border">
                             {filteredPOs.length === 0 ? (
                                 <tr>
-                                    <td colSpan="6" className="px-3 py-8 text-center">
+                                    <td colSpan="8" className="px-3 py-8 text-center">
                                         <FileText className="w-10 h-10 text-silver-dark mx-auto mb-2" />
                                         <p className="text-silver-dark text-sm">
                                             {filter === 'all'
@@ -1282,7 +1316,10 @@ const PurchaseOrder = () => {
                                                 </span>
                                             </td>
                                             <td className="px-3 py-2 text-right whitespace-nowrap">
-                                                <span className="font-semibold text-silver-light">{formatCurrency(po.total_amount, po.currency)}</span>
+                                                <span className="text-silver-dark">{formatCurrency(po.tax_amount || 0, po.currency)}</span>
+                                            </td>
+                                            <td className="px-3 py-2 text-right whitespace-nowrap">
+                                                <span className="font-semibold text-silver-light">{formatCurrency(po.subtotal ?? po.total_amount, po.currency)}</span>
                                             </td>
                                             <td className="px-3 py-2 text-center whitespace-nowrap">
                                                 <div className={`inline - flex items - center gap - 1 px - 2 py - 0.5 rounded - full text - xs font - medium ${config?.color} `}>
@@ -1324,6 +1361,7 @@ const PurchaseOrder = () => {
                         addPOItem={addPOItem}
                         removePOItem={removePOItem}
                         updatePOItem={updatePOItem}
+                        handleGlobalTaxChange={handleGlobalTaxChange}
                         calculateTotals={calculateTotals}
                         handleSubmit={isEditing ? handleUpdatePO : handleCreatePO}
                         formatCurrency={formatCurrency}
@@ -1369,14 +1407,13 @@ const PurchaseOrder = () => {
 };
 
 const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, setFormData, handleVendorSelect, addPOItem, removePOItem,
-    updatePOItem, calculateTotals, handleSubmit, formatCurrency, onClose }) => {
+    updatePOItem, calculateTotals, handleSubmit, formatCurrency, onClose, handleGlobalTaxChange }) => {
 
     const [vendorSearch, setVendorSearch] = useState('');
     const [showVendorDropdown, setShowVendorDropdown] = useState(false);
     const [coaList, setCoaList] = useState([]);
     const [coaSearchMap, setCoaSearchMap] = useState({});   // { [itemIndex]: searchTerm }
     const [coaDropdownMap, setCoaDropdownMap] = useState({}); // { [itemIndex]: boolean open }
-    const [paymentMode, setPaymentMode] = useState('30'); // '30','60','90','manual'
 
     // Fetch COA on mount
     useEffect(() => {
@@ -1386,22 +1423,6 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
         };
         fetchCOA();
     }, []);
-
-    // Sync paymentMode from existing formData on edit
-    useEffect(() => {
-        if (formData.payment_terms === 'NET 30' || formData.payment_terms === '30 Days') setPaymentMode('30');
-        else if (formData.payment_terms === 'NET 60' || formData.payment_terms === '60 Days') setPaymentMode('60');
-        else if (formData.payment_terms === 'NET 90' || formData.payment_terms === '90 Days') setPaymentMode('90');
-        else if (formData.payment_terms) setPaymentMode('manual');
-    }, []);
-
-    const handlePaymentModeChange = (mode) => {
-        setPaymentMode(mode);
-        if (mode === '30') setFormData(prev => ({ ...prev, payment_terms: '30 Days (NET 30)' }));
-        else if (mode === '60') setFormData(prev => ({ ...prev, payment_terms: '60 Days (NET 60)' }));
-        else if (mode === '90') setFormData(prev => ({ ...prev, payment_terms: '90 Days (NET 90)' }));
-        // manual: user types in payment_terms directly
-    };
 
     const filteredVendors = vendors.filter(v =>
         v.partner_name?.toLowerCase().includes(vendorSearch.toLowerCase()) ||
@@ -1449,7 +1470,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
             const addIfPresent = (label, value) => {
                 const val2 = parseFloat(String(value || '').replace(/,/g, ''));
                 if (val2 && val2 > 0) {
-                    autoItems.push({ item_name: label, description: `${label} - ${ship.job_number || ''} `, qty: 1, unit: 'Job', unit_price: val2, amount: val2, coa_id: null });
+                    autoItems.push({ item_name: label, description: `${label} - ${ship.job_number || ''} `, qty: 1, unit: 'Job', unit_price: val2, amount: val2, tax_amount: 0, coa_id: null });
                 }
             };
             addIfPresent('Ocean Freight', cogs.oceanFreight);
@@ -1474,7 +1495,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                     const v = parseFloat(String(item.amount || 0).replace(/,/g, ''));
                     if (v && v > 0) {
                         const coaName = coaMap[item.coa_id]?.name || item.description || 'Item';
-                        autoItems.push({ item_name: coaName, description: item.description || coaName, qty: parseFloat(item.qty) || 1, unit: item.unit || 'Job', unit_price: parseFloat(item.rate) || v, amount: v, coa_id: item.coa_id || null });
+                        autoItems.push({ item_name: coaName, description: item.description || coaName, qty: parseFloat(item.qty) || 1, unit: item.unit || 'Job', unit_price: parseFloat(item.rate) || v, amount: v, tax_amount: typeof item.tax_amount !== 'undefined' ? Number(item.tax_amount) : 0, coa_id: item.coa_id || null });
                     }
                 });
             }
@@ -1730,31 +1751,28 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                         <div>
                             <label className="block text-sm font-medium text-silver-light mb-2">Payment Terms</label>
                             <select
-                                value={formData.payment_terms || ''}
+                                value={
+                                    ['30 Days (NET 30)', '60 Days (NET 60)', '90 Days (NET 90)', 'Cash on Delivery'].includes(formData.payment_terms)
+                                        ? formData.payment_terms
+                                        : 'manual'
+                                }
                                 onChange={e => {
                                     const val = e.target.value;
-                                    setFormData(prev => ({ ...prev, payment_terms: val }));
-                                    if (val === 'manual') {
-                                        setPaymentMode('manual');
-                                        setFormData(prev => ({ ...prev, payment_terms: '' }));
-                                    } else {
-                                        setPaymentMode(val);
-                                    }
+                                    setFormData(prev => ({ ...prev, payment_terms: val === 'manual' ? '' : val }));
                                 }}
                                 className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm focus:outline-none focus:border-accent-orange"
                             >
-                                <option value="">-- Pilih Termin Pembayaran --</option>
                                 <option value="30 Days (NET 30)">30 Hari (NET 30)</option>
                                 <option value="60 Days (NET 60)">60 Hari (NET 60)</option>
                                 <option value="90 Days (NET 90)">90 Hari (NET 90)</option>
                                 <option value="Cash on Delivery">Cash on Delivery (COD)</option>
                                 <option value="manual">Manual / Lainnya</option>
                             </select>
-                            {(formData.payment_terms === 'manual' || paymentMode === 'manual') && (
+                            {(!['30 Days (NET 30)', '60 Days (NET 60)', '90 Days (NET 90)', 'Cash on Delivery'].includes(formData.payment_terms)) && (
                                 <input
                                     type="text"
                                     placeholder="Contoh: NET 45, Cash Before Delivery..."
-                                    value={formData.payment_terms === 'manual' ? '' : formData.payment_terms}
+                                    value={formData.payment_terms}
                                     onChange={e => setFormData(prev => ({ ...prev, payment_terms: e.target.value }))}
                                     className="mt-2 w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm focus:outline-none focus:border-accent-orange"
                                 />
@@ -1773,7 +1791,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
 
                         {/* Header Row */}
                         <div className="grid grid-cols-12 gap-2 mb-2 px-3">
-                            <div className="col-span-3">
+                            <div className="col-span-2">
                                 <label className="text-xs font-semibold text-silver-dark uppercase">Item</label>
                             </div>
                             <div className="col-span-3">
@@ -1785,6 +1803,9 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                             <div className="col-span-2">
                                 <label className="text-xs font-semibold text-silver-dark uppercase">Harga</label>
                             </div>
+                            <div className="col-span-1">
+                                <label className="text-xs font-semibold text-silver-dark uppercase">Pajak %</label>
+                            </div>
                             <div className="col-span-2">
                                 <label className="text-xs font-semibold text-silver-dark uppercase">Total</label>
                             </div>
@@ -1794,7 +1815,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                         <div className="space-y-3">
                             {formData.po_items.map((item, index) => (
                                 <div key={index} className="grid grid-cols-12 gap-2 items-start glass-card p-3 rounded-lg">
-                                    <div className="col-span-3">
+                                    <div className="col-span-2">
                                         {/* COA dropdown for item_name */}
                                         <div className="relative">
                                             <div
@@ -1802,7 +1823,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                                 onClick={() => setCoaDropdownMap(prev => ({ ...prev, [index]: !prev[index] }))}
                                             >
                                                 <span className={item.item_name ? 'text-blue-600 font-medium' : 'text-gray-400 text-xs'}>
-                                                    {item.item_name || 'Pilih Akun COA...'}
+                                                    {item.item_name || 'COA...'}
                                                 </span>
                                                 <span className="text-gray-400 text-xs">▼</span>
                                             </div>
@@ -1878,6 +1899,26 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                             required
                                         />
                                     </div>
+                                    <div className="col-span-1">
+                                        <div className="flex items-center gap-1">
+                                            <input
+                                                type="number"
+                                                placeholder="0"
+                                                value={item.tax_rate ?? ''}
+                                                onChange={(e) => updatePOItem(index, 'tax_rate', parseFloat(e.target.value) || 0)}
+                                                className="w-full px-2 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm text-right"
+                                                min="0"
+                                                max="100"
+                                                step="0.01"
+                                            />
+                                            <span className="text-silver-dark text-xs">%</span>
+                                        </div>
+                                        {item.tax_amount > 0 && (
+                                            <div className="text-[10px] text-silver-dark mt-0.5 text-right">
+                                                = {formatCurrency(item.tax_amount, formData.currency)}
+                                            </div>
+                                        )}
+                                    </div>
                                     <div className="col-span-2">
                                         <div className="px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm font-semibold">
                                             {formatCurrency(item.amount, formData.currency)}
@@ -1905,20 +1946,8 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                             <span>Subtotal:</span>
                             <span className="font-semibold">{formatCurrency(subtotal, formData.currency)}</span>
                         </div>
-                        <div className="flex justify-between items-center text-silver-dark">
-                            <div className="flex items-center gap-2">
-                                <span>VAT/Tax:</span>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    step="0.01"
-                                    value={formData.tax_rate}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, tax_rate: parseFloat(e.target.value) || 0 }))}
-                                    className="w-16 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm text-center"
-                                />
-                                <span className="text-xs">%</span>
-                            </div>
+                        <div className="flex justify-between text-silver-dark">
+                            <span>Tax (from items):</span>
                             <span className="font-semibold">{formatCurrency(taxAmount, formData.currency)}</span>
                         </div>
                         <div className="flex justify-between text-xl font-bold text-silver-light">
@@ -2067,7 +2096,7 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                             <span className="font-semibold">{formatCurrency(po.subtotal, po.currency)}</span>
                         </div>
                         <div className="flex justify-between text-silver-dark">
-                            <span>Tax ({po.tax_rate}%):</span>
+                            <span>Tax{po.tax_amount > 0 && po.tax_rate > 0 ? ` (${po.tax_rate}%)` : ''}:</span>
                             <span className="font-semibold">{formatCurrency(po.tax_amount, po.currency)}</span>
                         </div>
                         <div className="flex justify-between text-xl font-bold text-silver-light">
@@ -2147,32 +2176,32 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                     )}
 
                     {/* Actions */}
-                    <div className="flex gap-3 justify-end border-t border-dark-border pt-4">
+                    <div className="flex flex-wrap gap-2 justify-end border-t border-dark-border pt-4">
                         {/* Print Button - Always visible */}
                         <Button
                             onClick={onPrint}
-                            icon={Download}
                             variant="secondary"
+                            size="sm"
                         >
-                            🖨️ Print PO
+                            Print PO
                         </Button>
 
                         {/* Print Preview Button - opens and auto-triggers print dialog */}
                         <Button
                             onClick={onPrintPreview}
-                            icon={Download}
                             variant="secondary"
+                            size="sm"
                             className="!border-green-500/50 !text-green-400 hover:!bg-green-500/10"
                         >
-                            🔍 Print Preview
+                            Print Preview
                         </Button>
 
                         {/* Edit Button - Only for draft, locked during pending/approved with payment */}
                         {po.status === 'draft' && (!po.paid_amount || po.paid_amount <= 0) && canEditPO && (
                             <Button
                                 onClick={onEdit}
-                                icon={Edit}
                                 variant="secondary"
+                                size="sm"
                             >
                                 Edit PO
                             </Button>
@@ -2182,8 +2211,8 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                         {po.status === 'draft' && canEditPO && (
                             <Button
                                 onClick={onSubmit}
-                                icon={CheckCircle}
                                 variant="primary"
+                                size="sm"
                             >
                                 Submit for Approval
                             </Button>
@@ -2192,15 +2221,14 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                         {/* Approve Button */}
                         {(po.status === 'submitted' || po.status === 'manager_approval') && (
                             <>
-                                <span className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-yellow-500/10 text-yellow-400 text-sm border border-yellow-500/30">
-                                    <Clock className="w-4 h-4" />
+                                <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-yellow-500/10 text-yellow-400 text-xs border border-yellow-500/30">
                                     Waiting for Approval Center
                                 </span>
                                 {canApprovePO && (
                                     <Button
                                         onClick={onApprove}
-                                        icon={CheckCircle}
                                         variant="primary"
+                                        size="sm"
                                         className="!bg-green-600 hover:!bg-green-700 !border-transparent text-white"
                                     >
                                         Approve PO
@@ -2213,8 +2241,8 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                         {(!po.paid_amount || po.paid_amount <= 0) && canDeletePO && (
                             <Button
                                 onClick={onDelete}
-                                icon={Trash2}
                                 variant="secondary"
+                                size="sm"
                                 className="!border-red-500/50 !text-red-400 hover:!bg-red-500/10"
                             >
                                 Hapus PO
@@ -2223,7 +2251,7 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
 
                         <button
                             onClick={onClose}
-                            className="px-6 py-2 border border-dark-border text-silver-light rounded-lg hover:bg-dark-surface smooth-transition"
+                            className="px-4 py-1.5 border border-dark-border text-sm text-silver-light rounded-lg hover:bg-dark-surface smooth-transition"
                         >
                             Tutup
                         </button>

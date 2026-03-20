@@ -17,7 +17,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 
 const QuotationManagement = () => {
-    const { canCreate, canEdit, canDelete, canView, canApprove, isAdmin } = useAuth();
+    const { user, canCreate, canEdit, canDelete, canView, canApprove, isAdmin } = useAuth();
     const navigate = useNavigate();
     const { customers, companySettings } = useData();
     const [showModal, setShowModal] = useState(false);
@@ -37,7 +37,7 @@ const QuotationManagement = () => {
         customerName: '',
         customerCompany: '',
         customerAddress: '',
-        salesPerson: '',
+        salesPerson: user?.full_name || user?.username || 'Unknown User',
         quotationType: 'RG', // Regular by default
         quotationDate: new Date().toISOString().split('T')[0], // Today's date
         origin: '',
@@ -806,29 +806,40 @@ const QuotationManagement = () => {
                     job_number: newShipment.jobNumber,
                     so_number: newShipment.soNumber,
                     quotation_id: quotation.id,
+                    // Customer info
                     customer: newShipment.customer,
+                    customer_id: quotation.customerId || null,
                     sales_person: newShipment.salesPerson,
                     quotation_type: newShipment.quotationType,
                     quotation_date: newShipment.quotationDate,
+                    // Route & service
                     origin: newShipment.origin,
                     destination: newShipment.destination,
                     service_type: newShipment.serviceType,
                     cargo_type: newShipment.cargoType,
+                    // Cargo details - full set from quotation
                     weight: newShipment.weight,
                     volume: newShipment.volume,
                     commodity: newShipment.commodity,
+                    gross_weight: quotation.grossWeight || null,
+                    net_weight: quotation.netWeight || null,
+                    measure: quotation.measure || null,
+                    packages: quotation.quantity && quotation.packageType
+                        ? `${quotation.quantity} ${quotation.packageType}`
+                        : (quotation.packageType || null),
+                    // Trade terms
+                    incoterm: quotation.incoterm || null,
+                    payment_terms: quotation.paymentTerms || null,
+                    // Pricing
                     quoted_amount: newShipment.quotedAmount,
                     currency: quotation.currency || 'USD',
                     exchange_rate: quotation.currency === 'IDR' ? 1 : (quotation.exchange_rate || 16000),
                     status: newShipment.status,
                     created_from: 'sales_order',
-
+                    // Cost breakdown
                     service_items: quotation.serviceItems || [],
-                    notes: quotation.notes || '',
-                    gross_weight: quotation.grossWeight || null,
-                    net_weight: quotation.netWeight || null,
-                    measure: quotation.measure || null,
                     selling_items: quotation.serviceItems || [],
+                    notes: quotation.notes || '',
                     // === AUTO-CREATE BL/AWB DRAFT ===
                     bl_number: blNumber,
                     bl_type: blType,
@@ -839,7 +850,7 @@ const QuotationManagement = () => {
                     bl_place_of_receipt: quotation.origin || '',
                     bl_place_of_delivery: quotation.destination || '',
                     bl_description_packages: quotation.commodity || '',
-                    bl_gross_weight_text: quotation.weight ? `${quotation.weight} KGS` : '',
+                    bl_gross_weight_text: quotation.grossWeight ? `${quotation.grossWeight} KGS` : (quotation.weight ? `${quotation.weight} KGS` : ''),
                     bl_measurement_text: quotation.volume ? `${quotation.volume} CBM` : '',
                     bl_export_references: `SO: ${soNumber}\nJOB: ${quotation.jobNumber}`,
                 }])
@@ -1178,18 +1189,9 @@ const QuotationManagement = () => {
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                             Person in Charge <span className="text-red-400">*</span>
                         </label>
-                        <select
-                            required
-                            value={formData.salesPerson}
-                            onChange={(e) => setFormData({ ...formData, salesPerson: e.target.value })}
-                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
-                        >
-                            <option value="">Select Person in Charge...</option>
-                            <option value="Operations">Operations</option>
-                            <option value="John Doe">John Doe</option>
-                            <option value="Jane Smith">Jane Smith</option>
-                            <option value="Bob Johnson">Bob Johnson</option>
-                        </select>
+                        <div className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-600 font-medium cursor-not-allowed">
+                            {formData.salesPerson || user?.full_name || user?.username || 'Account Executive'}
+                        </div>
                     </div>
 
                     {/* Quotation Type & Date */}
@@ -1685,13 +1687,9 @@ const QuotationManagement = () => {
                             </div>
                             <div>
                                 <p className="text-xs text-gray-500 font-medium mb-1">Person in Charge</p>
-                                <input
-                                    type="text"
-                                    value={isEditingQuotation ? (editedQuotation?.salesPerson || '') : (viewingQuotation.salesPerson || '')}
-                                    onChange={(e) => setEditedQuotation({ ...editedQuotation, salesPerson: e.target.value })}
-                                    disabled={!isEditingQuotation}
-                                    className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm disabled:bg-gray-100/50"
-                                />
+                                <div className="w-full px-2 py-1 bg-gray-100 border border-gray-300 rounded text-gray-700 text-sm cursor-not-allowed min-h-[28px]">
+                                    {isEditingQuotation ? (editedQuotation?.salesPerson || '') : (viewingQuotation.salesPerson || '')}
+                                </div>
                             </div>
                             <div>
                                 <p className="text-xs text-gray-500 font-medium mb-1">Quotation Type</p>

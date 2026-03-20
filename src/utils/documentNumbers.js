@@ -229,7 +229,8 @@ export const generatePONumber = async () => {
  */
 export const generateAPNumber = () => {
     const yymm = getYYMM();
-    return `AP-${yymm}-${String(Date.now()).slice(-6)}`;
+    const uniqueStr = `${String(Date.now()).slice(-6)}${Math.floor(Math.random() * 100).toString().padStart(2, '0')}`;
+    return `AP-${yymm}-${uniqueStr}`;
 };
 
 /**
@@ -239,7 +240,8 @@ export const generateAPNumber = () => {
  */
 export const generateARNumber = () => {
     const yymm = getYYMM();
-    return `AR-${yymm}-${String(Date.now()).slice(-6)}`;
+    const uniqueStr = `${String(Date.now()).slice(-6)}${Math.floor(Math.random() * 100).toString().padStart(2, '0')}`;
+    return `AR-${yymm}-${uniqueStr}`;
 };
 
 /**
@@ -251,5 +253,6 @@ export const generateARNumber = () => {
 export const generatePaymentNumber = (type = 'in') => {
     const yymm = getYYMM();
     const suffix = type === 'out' ? 'OUT' : 'IN';
-    return `PAY-${suffix}-${yymm}-${String(Date.now()).slice(-6)}`;
+    const uniqueStr = `${String(Date.now()).slice(-6)}${Math.floor(Math.random() * 100).toString().padStart(2, '0')}`;
+    return `PAY-${suffix}-${yymm}-${uniqueStr}`;
 };

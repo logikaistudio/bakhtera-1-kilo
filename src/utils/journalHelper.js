@@ -191,15 +191,51 @@ export async function resolveRevenueAccount(coaList) {
     }) || { code: '4-01-001', name: 'Pendapatan Jasa', id: null, type: 'REVENUE' };
 }
 
-/** Kas / Bank — ASSET, code 1-01 */
-export async function resolveBankAccount(coaList) {
+/**
+ * Kas / Bank — ASSET, code 1-01
+ *
+ * Priority resolution order:
+ *  1. If selectedBank is provided AND it has coa_id → use that exact COA (100% accurate)
+ *  2. If selectedBank has coa_code → match by exact code in COA list
+ *  3. If selectedBank has bank_name → fuzzy search in COA list by name
+ *  4. Generic fallback: first ASSET account with code starting 1-01
+ *
+ * @param {Object[]} coaList       Pre-fetched COA list
+ * @param {Object}   [selectedBank] The bank account object chosen by user in AR/AP form
+ */
+export async function resolveBankAccount(coaList, selectedBank = null) {
+    // Strategy 1: Direct COA ID from bank mapping (most accurate)
+    if (selectedBank?.coa_id) {
+        const exact = coaList.find(c => c.id === selectedBank.coa_id && c.is_active !== false);
+        if (exact) return exact;
+    }
+
+    // Strategy 2: Exact COA code stored on the bank record
+    if (selectedBank?.coa_code) {
+        const byCode = coaList.find(c => c.code === selectedBank.coa_code && c.is_active !== false);
+        if (byCode) return byCode;
+    }
+
+    // Strategy 3: Search by bank name in COA names (e.g. 'BCA' → 'Bank BCA IDR')
+    if (selectedBank?.bank_name) {
+        const hint = selectedBank.bank_name.toLowerCase().trim();
+        const byName = coaList.find(c =>
+            c.is_active !== false &&
+            c.type === 'ASSET' &&
+            c.code?.startsWith('1-0') &&
+            c.name?.toLowerCase().includes(hint)
+        );
+        if (byName) return byName;
+    }
+
+    // Strategy 4: Fuzzy generic fallback (no bank pre-selected)
     return resolveCOA({
         coaList,
         codes: ['1-01-101', '1-01-001', '1-01-100'],
         prefixes: ['1-01', '1-02'],
         type: 'ASSET',
         nameHint: 'bank'
-    }) || { code: '1-01-101', name: 'Bank BCA', id: null, type: 'ASSET' };
+    }) || { code: '1-01-101', name: 'Kas/Bank', id: null, type: 'ASSET' };
 }
 
 /** Hutang Usaha (AP) — LIABILITY, code 2 */
@@ -234,6 +270,7 @@ export async function generateJENumber(prefix = 'TXN') {
     const now = new Date();
     const yymm = `${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, '0')}`;
     const jePrefix = `JE-${prefix}-${yymm}-`;
+    const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
     try {
         const { data } = await supabase
             .from('blink_journal_entries')
@@ -242,10 +279,11 @@ export async function generateJENumber(prefix = 'TXN') {
             .order('entry_number', { ascending: false })
             .limit(1);
         const last = data?.[0]?.entry_number;
+        // The lastSeq part stops at the first dash since we split by '-' 
         const lastSeq = last ? parseInt(last.replace(jePrefix, '').split('-')[0]) || 0 : 0;
-        return `${jePrefix}${String(lastSeq + 1).padStart(4, '0')}`;
+        return `${jePrefix}${String(lastSeq + 1).padStart(4, '0')}-${randomStr}`;
     } catch {
-        return `${jePrefix}${Date.now().toString().slice(-6)}`;
+        return `${jePrefix}${Date.now().toString().slice(-6)}-${randomStr}`;
     }
 }
 
@@ -433,15 +471,19 @@ export async function createARPaymentJournal({
     invoice, paymentAmount, paymentDate, paymentNumber, selectedBank, coaList: providedCOA
 }) {
     const coaList = providedCOA || await getAllCOA();
+    // Pass selectedBank so resolveBankAccount uses the exact COA linked to the chosen account
     const [bankCOA, arCOA] = await Promise.all([
-        resolveBankAccount(coaList),
+        resolveBankAccount(coaList, selectedBank),
         resolveARAccount(coaList)
     ]);
     const batchId = generateUUID();
     const jeNum = await generateJENumber('PAY-IN');
     const exRate = invoice.currency !== 'IDR' ? (invoice.exchange_rate || 16000) : 1;
     const note = invoice.currency !== 'IDR' ? ` (Rate: ${exRate.toLocaleString('id-ID')})` : '';
-    const desc = `Payment received for ${invoice.invoice_number} from ${invoice.customer_name}${note}`;
+    const bankLabel = selectedBank
+        ? `${selectedBank.bank_name} ${selectedBank.account_number ? '- ' + selectedBank.account_number : ''}`
+        : 'Kas/Bank';
+    const desc = `Payment ${bankLabel} for ${invoice.invoice_number} - ${invoice.customer_name}${note}`;
 
     return insertJournalEntries([
         buildJERow({
@@ -450,7 +492,8 @@ export async function createARPaymentJournal({
             entryType: 'payment', refType: 'ar_payment',
             refId: invoice.id, refNumber: paymentNumber,
             coa: bankCOA,
-            accountNameFallback: selectedBank ? selectedBank.bank_name : 'Kas/Bank',
+            accountCodeFallback: selectedBank?.coa_code || '1-01-001',
+            accountNameFallback: bankLabel,
             debit: paymentAmount, credit: 0,
             currency: invoice.currency, exchangeRate: exRate,
             description: desc, batchId,
@@ -562,15 +605,19 @@ export async function createAPPaymentJournal({
     ap, paymentAmount, paymentDate, paymentNumber, selectedBank, coaList: providedCOA
 }) {
     const coaList = providedCOA || await getAllCOA();
+    // Pass selectedBank so resolveBankAccount uses the exact COA linked to the chosen account
     const [apCOA, bankCOA] = await Promise.all([
         resolveAPAccount(coaList),
-        resolveBankAccount(coaList)
+        resolveBankAccount(coaList, selectedBank)
     ]);
     const batchId = generateUUID();
     const jeNum = await generateJENumber('PAY-OUT');
     const exRate = ap.currency !== 'IDR' ? (ap.exchange_rate || 16000) : 1;
     const note = ap.currency !== 'IDR' ? ` (Rate: ${exRate.toLocaleString('id-ID')})` : '';
-    const desc = `Payment for ${ap.po_number || ap.ap_number} to ${ap.vendor_name}${note}`;
+    const bankLabel = selectedBank
+        ? `${selectedBank.bank_name} ${selectedBank.account_number ? '- ' + selectedBank.account_number : ''}`
+        : 'Kas/Bank';
+    const desc = `Payment via ${bankLabel} for ${ap.po_number || ap.ap_number} to ${ap.vendor_name}${note}`;
 
     return insertJournalEntries([
         buildJERow({
@@ -590,7 +637,8 @@ export async function createAPPaymentJournal({
             entryType: 'bill_payment', refType: 'ap_payment',
             refId: ap.id, refNumber: paymentNumber,
             coa: bankCOA,
-            accountNameFallback: selectedBank ? selectedBank.bank_name : 'Kas/Bank',
+            accountCodeFallback: selectedBank?.coa_code || '1-01-001',
+            accountNameFallback: bankLabel,
             debit: 0, credit: paymentAmount,
             currency: ap.currency, exchangeRate: exRate,
             description: desc, batchId,

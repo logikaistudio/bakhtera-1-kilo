@@ -7,6 +7,8 @@ import {
     FileText, User, Calendar, ChevronRight,
     RefreshCw, AlertCircle, Check, X, Ship, Plane, Truck, ShoppingBag, Receipt
 } from 'lucide-react';
+import { createPOApprovalJournal, createInvoiceJournal, getAllCOA } from '../../utils/journalHelper';
+import { generateAPNumber, generateARNumber } from '../../utils/documentNumbers';
 
 const BlinkApproval = () => {
     const navigate = useNavigate();
@@ -205,9 +207,7 @@ const BlinkApproval = () => {
                 dueDate.setDate(dueDate.getDate() + daysToAdd);
                 const dueDateStr = dueDate.toISOString().split('T')[0];
 
-                const year = today.getFullYear();
-                const timestamp = Date.now().toString().slice(-6);
-                const apNumber = `AP-${year}-${timestamp}`;
+                const apNumber = generateAPNumber();
 
                 const apEntry = {
                     ap_number: apNumber,
@@ -232,68 +232,17 @@ const BlinkApproval = () => {
 
                 if (apError) throw apError;
 
-                // Create Journal Entries — use ilike matching actual COA format (e.g. 2-01-001, 5-01-001)
-                const [{ data: apCOAs }, { data: expenseCOAs }] = await Promise.all([
-                    supabase.from('finance_coa').select('id, code, name').eq('type', 'LIABILITY').ilike('code', '2-%').limit(1),
-                    supabase.from('finance_coa').select('id, code, name').eq('type', 'EXPENSE').ilike('code', '5-%').limit(1),
-                ]);
-                if (apData && apData.length > 0) {
-                    let expenseCoa = expenseCOAs?.[0] || null;
-                    if (poData?.coa_id) {
-                        const { data: poCoaData } = await supabase.from('finance_coa').select('id, code, name').eq('id', poData.coa_id).single();
-                        if (poCoaData) expenseCoa = poCoaData;
-                    }
-                    const apCoa = apCOAs?.[0] || null;
-
-                    const batchId = crypto.randomUUID();
-                    const entryNum = `JE-PO-${Date.now().toString().slice(-6)}`;
-                    const poExchangeRate = item.amount > 0 && item.currency !== 'IDR' ? (poData?.exchange_rate || 16000) : 1;
-
-                    const debitEntry = {
-                        entry_number: entryNum + '-D',
-                        entry_date: billDate,
-                        entry_type: 'po',
-                        reference_type: 'ap',
-                        reference_id: apData[0].id,
-                        reference_number: apData[0].ap_number,
-                        account_code: expenseCoa?.code || '5-01-001',
-                        account_name: (expenseCoa?.name || 'Beban Operasional') + ' - PO ' + item.refNumber,
-                        debit: item.amount,
-                        credit: 0,
-                        currency: item.currency || 'IDR',
-                        exchange_rate: poExchangeRate,
-                        description: 'PO ' + item.refNumber + ' - ' + item.customerName,
-                        batch_id: batchId,
-                        source: 'auto',
-                        coa_id: expenseCoa?.id || null,
-                        party_name: item.customerName
-                    };
-
-                    const creditEntry = {
-                        entry_number: entryNum + '-C',
-                        entry_date: billDate,
-                        entry_type: 'po',
-                        reference_type: 'ap',
-                        reference_id: apData[0].id,
-                        reference_number: apData[0].ap_number,
-                        account_code: apCoa?.code || '2-01-001',
-                        account_name: (apCoa?.name || 'Hutang Usaha') + ' - ' + item.customerName,
-                        debit: 0,
-                        credit: item.amount,
-                        currency: item.currency || 'IDR',
-                        exchange_rate: poExchangeRate,
-                        description: 'PO ' + item.refNumber + ' - ' + item.customerName,
-                        batch_id: batchId,
-                        source: 'auto',
-                        coa_id: apCoa?.id || null,
-                        party_name: item.customerName
-                    };
-
-                    const { error: journalError } = await supabase.from('blink_journal_entries').insert([debitEntry, creditEntry]);
-                    if (journalError) console.error('Error creating journal entries:', journalError);
+                // Create Journal Entries - using the robust journalHelper.js
+                try {
+                    const coaList = await getAllCOA();
+                    const fullPO = { ...poData, total_amount: poData.total_amount }; 
+                    await createPOApprovalJournal({ po: fullPO, coaList });
+                } catch (jeErr) {
+                    console.warn('[Approval] Journal entry creation failed:', jeErr.message);
                 }
 
             } else if (item.type === 'invoice') {
+                // 1. Approve invoice
                 const { error } = await supabase
                     .from('blink_invoices')
                     .update({
@@ -302,6 +251,52 @@ const BlinkApproval = () => {
                     })
                     .eq('id', item.id);
                 if (error) throw error;
+
+                // 2. Fetch full invoice data for journal creation
+                const { data: invData, error: invFetchErr } = await supabase
+                    .from('blink_invoices')
+                    .select('*')
+                    .eq('id', item.id)
+                    .single();
+                if (invFetchErr) throw invFetchErr;
+
+                const today = new Date();
+                const billDate = today.toISOString().split('T')[0];
+
+                // 3. Auto-create AR (Piutang Usaha) transaction
+                const arNumber = generateARNumber();
+
+                const arEntry = {
+                    ar_number: arNumber,
+                    invoice_id: item.id,
+                    invoice_number: item.refNumber,
+                    customer_id: invData?.customer_id || null,
+                    customer_name: item.customerName,
+                    transaction_date: billDate,        // schema column is transaction_date
+                    due_date: invData?.due_date || billDate,
+                    original_amount: item.amount,
+                    paid_amount: 0,
+                    outstanding_amount: item.amount,
+                    currency: item.currency || 'IDR',
+                    status: 'outstanding',
+                    notes: `Auto-created from Invoice approval: ${item.refNumber}`
+                };
+
+                // Try to insert AR transaction (table may be blink_ar_transactions or similar)
+                const { data: arData, error: arError } = await supabase
+                    .from('blink_ar_transactions')
+                    .insert([arEntry])
+                    .select();
+
+                if (arError) console.warn('AR transaction creation warning (non-fatal):', arError.message);
+
+                // 4. Auto-create Journal Entries: Debit AR, Credit Revenue
+                try {
+                    const coaList = await getAllCOA();
+                    await createInvoiceJournal({ invoice: invData, coaList });
+                } catch (jeErr) {
+                    console.warn('[Approval] Invoice Journal creation failed:', jeErr.message);
+                }
             } else {
                 // Approve Quotation → Auto-create SO & Shipment
                 // Fetch full quotation data first
@@ -343,6 +338,7 @@ const BlinkApproval = () => {
                     commodity: quotationData.commodity,
                     quoted_amount: quotationData.total_amount || 0,
                     currency: quotationData.currency || 'USD',
+                    exchange_rate: quotationData.exchange_rate || null,
                     status: 'pending',
                     created_from: 'sales_order',
                     service_items: quotationData.service_items || [],
@@ -351,6 +347,12 @@ const BlinkApproval = () => {
                     gross_weight: quotationData.gross_weight || null,
                     net_weight: quotationData.net_weight || null,
                     measure: quotationData.measure || null,
+                    packages: quotationData.quantity && quotationData.package_type
+                        ? `${quotationData.quantity} ${quotationData.package_type}`
+                        : (quotationData.package_type || null),
+                    incoterm: quotationData.incoterm || null,
+                    payment_terms: quotationData.payment_terms || null,
+                    customer_id: quotationData.customer_id || null,
                 };
 
                 const { error: shipErr } = await supabase

@@ -108,6 +108,10 @@ const ShipmentManagement = () => {
                 containers: s.containers || [],
                 // Documents
                 documents: s.documents || [],
+                // Trade & transport terms
+                incoterm: s.incoterm || null,
+                paymentTerms: s.payment_terms || s.paymentTerms || null,
+                payment_terms: s.payment_terms || null,
                 // Items mapping
                 sellingItems: s.selling_items || s.sellingItems || [],
                 buyingItems: s.buying_items || s.buyingItems || []
@@ -379,39 +383,70 @@ const ShipmentManagement = () => {
                 };
 
                 // Map to database format
-                // Only include buying/selling items if they are explicitly provided (not undefined)
-                const dbFormat = {
-                    job_number: updatedShipment.jobNumber,
-                    so_number: updatedShipment.soNumber,
-                    customer: updatedShipment.customer,
-                    origin: updatedShipment.origin,
-                    destination: updatedShipment.destination,
-                    service_type: updatedShipment.serviceType,
-                    quoted_amount: updatedShipment.quotedAmount,
-                    cogs: updatedShipment.cogs,
-                    cogs_currency: updatedShipment.cogsCurrency,
-                    exchange_rate: updatedShipment.exchangeRate,
-                    status: updatedShipment.status,
-                    // UUID fields - validate before sending
-                    customer_id: safeUUID(updatedShipment.customerId),
-                    quotation_id: safeUUID(updatedShipment.quotationId),
-                    // Shipping details
-                    weight: updatedShipment.weight || null,
-                    cbm: updatedShipment.cbm || updatedShipment.volume || null,
-                    dimensions: updatedShipment.dimensions || null,
-                    container_type: updatedShipment.container_type || null,
-                    bl_number: updatedShipment.bl_number || null,
-                    awb_number: updatedShipment.awb_number || null,
-                    voyage: updatedShipment.voyage || null,
-                    flight_number: updatedShipment.flight_number || null,
-                    shipper_name: updatedShipment.shipper_name || updatedShipment.shipper || null,
-                    shipper: updatedShipment.shipper_name || updatedShipment.shipper || null,
-                    // Date fields - convert empty strings to null
-                    delivery_date: updatedShipment.deliveryDate || null,
-                    eta: updatedShipment.eta || null,
-                    etd: updatedShipment.etd || null,
-                    // New document fields removed to avoid schema cache issues
+                // dynamically to prevent wiping unprovided fields
+                const dbFormat = {};
+
+                const fieldMappings = {
+                    jobNumber: 'job_number',
+                    soNumber: 'so_number',
+                    customer: 'customer',
+                    origin: 'origin',
+                    destination: 'destination',
+                    serviceType: 'service_type',
+                    quotedAmount: 'quoted_amount',
+                    cogs: 'cogs',
+                    cogsCurrency: 'cogs_currency',
+                    exchangeRate: 'exchange_rate',
+                    status: 'status',
+                    weight: 'weight',
+                    cbm: 'cbm',
+                    volume: 'cbm', // map volume to cbm if explicitly passed
+                    dimensions: 'dimensions',
+                    container_type: 'container_type',
+                    bl_number: 'bl_number',
+                    awb_number: 'awb_number',
+                    voyage: 'voyage',
+                    flight_number: 'flight_number',
+                    shipper_name: 'shipper_name',
+                    shipper: 'shipper_name', // fallback
+                    deliveryDate: 'delivery_date',
+                    eta: 'eta',
+                    etd: 'etd',
+                    shipping_mode: 'shipping_mode',
+                    packages: 'packages',
+                    gross_weight: 'gross_weight',
+                    net_weight: 'net_weight',
+                    mbl: 'mbl',
+                    hbl: 'hbl',
+                    mawb: 'mawb',
+                    hawb: 'hawb',
+                    incoterm: 'incoterm',
+                    paymentTerms: 'payment_terms',
+                    payment_terms: 'payment_terms',
+                    measure: 'measure',
+                    commodity: 'commodity',
+                    notes: 'notes',
                 };
+
+                for (const [key, dbKey] of Object.entries(fieldMappings)) {
+                    if (updatedShipment[key] !== undefined) {
+                        if (updatedShipment[key] === '' && ['deliveryDate', 'eta', 'etd'].includes(key)) {
+                            dbFormat[dbKey] = null;
+                        } else {
+                            if (dbFormat[dbKey] === undefined) {
+                                dbFormat[dbKey] = updatedShipment[key];
+                            }
+                        }
+                    }
+                }
+
+                // UUID fields - validate before sending
+                if (updatedShipment.customerId !== undefined) {
+                    dbFormat.customer_id = safeUUID(updatedShipment.customerId);
+                }
+                if (updatedShipment.quotationId !== undefined) {
+                    dbFormat.quotation_id = safeUUID(updatedShipment.quotationId);
+                }
 
                 // Only update buying/selling items if they are explicitly passed
                 // This prevents overwriting data with empty arrays when saving other fields
@@ -614,10 +649,10 @@ const ShipmentManagement = () => {
                 <div className="glass-card rounded-lg p-12 text-center">
                     <Ship className="w-16 h-16 text-silver-dark mx-auto mb-4" />
                     <h3 className="text-xl font-semibold text-silver-light mb-2">
-                        Belum Ada Shipment
+                        No Shipments Found
                     </h3>
                     <p className="text-silver-dark mb-4">
-                        Shipment dibuat otomatis dari Sales Order yang sudah confirmed
+                        Shipments are automatically created from confirmed Sales Orders
                     </p>
                     <p className="text-sm text-silver-dark">
                         Flow: Quotation → Sales Order → <span className="text-accent-orange font-semibold">Create Shipment</span>

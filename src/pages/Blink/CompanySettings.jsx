@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabase';
 import { useData } from '../../context/DataContext';
 import Modal from '../../components/Common/Modal';
 import Button from '../../components/Common/Button';
-import { Plus, Building, MapPin, CreditCard, Upload, X, Image as ImageIcon, Trash2, Phone, Mail, FileText } from 'lucide-react';
+import { Plus, Building, MapPin, CreditCard, Upload, X, Image as ImageIcon, Trash2, Phone, Mail, FileText, Link2 } from 'lucide-react';
 import { validateAndConvertImage } from '../../utils/validateImage';
 import { useAuth } from '../../context/AuthContext';
 
@@ -43,8 +44,13 @@ const BlinkCompanySettings = () => {
         account_holder: '',
         branch: '',
         swift_code: '',
-        currency: 'IDR'
+        currency: 'IDR',
+        coa_id: '',
+        coa_code: '',
+        coa_name: ''
     });
+    const [coaAssetList, setCoaAssetList] = useState([]);
+    const [loadingCOA, setLoadingCOA] = useState(false);
 
     // Load company settings on mount
     useEffect(() => {
@@ -58,6 +64,27 @@ const BlinkCompanySettings = () => {
             setLogoUrl(companySettings.logo_url || '');
         }
     }, [companySettings]);
+
+    // Fetch ASSET COA accounts (code starts with 1) for bank mapping
+    useEffect(() => {
+        const fetchCOAAssets = async () => {
+            setLoadingCOA(true);
+            try {
+                const { data } = await supabase
+                    .from('finance_coa')
+                    .select('id, code, name, type')
+                    .eq('type', 'ASSET')
+                    .order('code', { ascending: true });
+                // Filter for Kas/Bank group (code starts with 1-0)
+                setCoaAssetList((data || []).filter(c => c.code?.startsWith('1-0') || c.code?.startsWith('1-1')));
+            } catch (e) {
+                console.warn('Could not load COA assets:', e.message);
+            } finally {
+                setLoadingCOA(false);
+            }
+        };
+        fetchCOAAssets();
+    }, []);
 
     // Handle company info save
     const handleSaveCompanyInfo = async () => {
@@ -133,7 +160,10 @@ const BlinkCompanySettings = () => {
             account_holder: '',
             branch: '',
             swift_code: '',
-            currency: 'IDR'
+            currency: 'IDR',
+            coa_id: '',
+            coa_code: '',
+            coa_name: ''
         });
         setIsBankModalOpen(true);
     };
@@ -150,7 +180,10 @@ const BlinkCompanySettings = () => {
             account_holder: bank.account_holder,
             branch: bank.branch || '',
             swift_code: bank.swift_code || '',
-            currency: bank.currency || 'IDR'
+            currency: bank.currency || 'IDR',
+            coa_id: bank.coa_id || '',
+            coa_code: bank.coa_code || '',
+            coa_name: bank.coa_name || ''
         });
         setIsBankModalOpen(true);
     };
@@ -172,14 +205,21 @@ const BlinkCompanySettings = () => {
 
     const handleBankSubmit = async (e) => {
         e.preventDefault();
+        // Enrich with COA denormalized fields from selected COA
+        const selectedCOA = coaAssetList.find(c => c.id === bankFormData.coa_id);
+        const enrichedData = {
+            ...bankFormData,
+            coa_id: bankFormData.coa_id || null,
+            coa_code: selectedCOA?.code || bankFormData.coa_code || null,
+            coa_name: selectedCOA?.name || bankFormData.coa_name || null,
+        };
         try {
             if (editingBank) {
-                await updateBankAccount(editingBank.id, bankFormData, MODULE);
+                await updateBankAccount(editingBank.id, enrichedData, MODULE);
             } else {
-                await addBankAccount(bankFormData, MODULE);
+                await addBankAccount(enrichedData, MODULE);
             }
             setIsBankModalOpen(false);
-            // alert('Rekening berhasil disimpan'); // Optional feedback
         } catch (error) {
             alert('Failed to save rekening: ' + error.message);
         }
@@ -297,6 +337,14 @@ const BlinkCompanySettings = () => {
                                             <div className="text-blue-600 font-mono tracking-wide">{bank.account_number}</div>
                                             <div className="text-sm text-gray-600">a/n {bank.account_holder}</div>
                                             {bank.branch && <div className="text-xs text-gray-500">Cabang: {bank.branch}</div>}
+                                            {bank.coa_code ? (
+                                                <div className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                                                    <Link2 className="h-3 w-3" />
+                                                    COA: {bank.coa_code} — {bank.coa_name}
+                                                </div>
+                                            ) : (
+                                                <div className="text-xs text-orange-500 mt-1">⚠️ COA belum ditautkan — journal tidak akan akurat</div>
+                                            )}
                                         </div>
                                         <div className="flex gap-2">
                                             {canEdit('blink_settings') && (
@@ -458,6 +506,52 @@ const BlinkCompanySettings = () => {
                             placeholder="BMRIIDJA"
                             className="w-full px-3 py-2 border rounded-md"
                         />
+                    </div>
+
+                    {/* COA Mapping — REQUIRED for accurate journal entries */}
+                    <div className="border border-orange-200 rounded-lg p-3 bg-orange-50">
+                        <label className="block text-sm font-semibold mb-1 text-orange-800 flex items-center gap-1">
+                            <Link2 className="h-4 w-4" />
+                            Akun Buku Besar (COA) <span className="text-red-500">*</span>
+                        </label>
+                        <p className="text-xs text-orange-600 mb-2">
+                            Pilih akun Kas/Bank yang sesuai di Chart of Accounts.
+                            Ini menentukan ke mana jurnal pembukuan akan dicatat saat terjadi transaksi AR/AP.
+                        </p>
+                        {loadingCOA ? (
+                            <div className="text-xs text-gray-500">Memuat daftar COA...</div>
+                        ) : (
+                            <select
+                                value={bankFormData.coa_id}
+                                onChange={(e) => {
+                                    const selected = coaAssetList.find(c => c.id === e.target.value);
+                                    setBankFormData({
+                                        ...bankFormData,
+                                        coa_id: e.target.value,
+                                        coa_code: selected?.code || '',
+                                        coa_name: selected?.name || ''
+                                    });
+                                }}
+                                className="w-full px-3 py-2 border border-orange-300 rounded-md bg-white text-sm focus:ring-orange-400 focus:border-orange-400"
+                            >
+                                <option value="">— Pilih Akun COA Kas/Bank —</option>
+                                {coaAssetList.map(c => (
+                                    <option key={c.id} value={c.id}>
+                                        {c.code} — {c.name}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
+                        {bankFormData.coa_id && (
+                            <p className="text-xs text-green-600 mt-1 font-medium">
+                                ✅ Terhubung ke: {bankFormData.coa_code} — {bankFormData.coa_name}
+                            </p>
+                        )}
+                        {!bankFormData.coa_id && (
+                            <p className="text-xs text-red-500 mt-1">
+                                ⚠️ Wajib diisi agar jurnal pembukuan akurat.
+                            </p>
+                        )}
                     </div>
 
                     <div className="flex gap-3 justify-end mt-6">

@@ -727,8 +727,17 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
             const { data: d1 } = await supabase.from('company_bank_accounts').select('*').order('display_order', { ascending: true });
             if (d1 && d1.length > 0) {
                 setBankAccounts(d1);
-                const def = d1.find(a => a.currency === invoice.currency) || d1[0];
-                if (def) setFormData(prev => ({ ...prev, received_in_account: def.id }));
+                // Priority 1: match the bank account stored in the invoice
+                const invoiceBankId = invoice.payment_bank_account_id;
+                if (invoiceBankId) {
+                    const match = d1.find(a => a.id === invoiceBankId);
+                    if (match) { setFormData(prev => ({ ...prev, received_in_account: match.id })); return; }
+                }
+                // Priority 2: match same currency as invoice
+                const currencyMatch = d1.find(a => a.currency === invoice.currency);
+                if (currencyMatch) { setFormData(prev => ({ ...prev, received_in_account: currencyMatch.id })); return; }
+                // Priority 3: first account
+                setFormData(prev => ({ ...prev, received_in_account: d1[0].id }));
                 return;
             }
             // fallback to old bank_accounts table
@@ -909,6 +918,18 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
                     </div>
                 </div>
 
+                {/* ── Bank account printed on Invoice ── */}
+                {invoice.payment_bank_account && (
+                    <div className="flex items-start gap-2 px-3 py-2 mb-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                        <CreditCard className="w-4 h-4 text-blue-400 mt-0.5 shrink-0" />
+                        <div className="text-xs">
+                            <p className="text-blue-300 font-semibold mb-0.5">Rekening yang tercetak di Invoice:</p>
+                            <p className="text-blue-200 font-mono">{invoice.payment_bank_account}</p>
+                            <p className="text-blue-400 mt-0.5">Pastikan pembayaran diterima di rekening ini.</p>
+                        </div>
+                    </div>
+                )}
+
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -975,25 +996,41 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
                         </div>
                     </div>
 
-                    {/* Received in Account */}
+                    {/* Received in Account — with invoice bank account validation */}
                     <div>
                         <label className="block text-sm font-medium text-silver-dark mb-2">
                             <CreditCard className="w-4 h-4 inline mr-1" />
-                            Received in Account
+                            No. Rekening Penerimaan <span className="text-red-400">*</span>
                         </label>
                         {bankAccounts.length > 0 ? (
-                            <select
-                                value={formData.received_in_account}
-                                onChange={(e) => setFormData(prev => ({ ...prev, received_in_account: e.target.value }))}
-                                className="w-full"
-                            >
-                                <option value="">-- Select Bank Account --</option>
-                                {bankAccounts.map(account => (
-                                    <option key={account.id} value={account.id}>
-                                        {account.bank_name} - {account.account_number} ({account.account_holder || account.currency})
-                                    </option>
-                                ))}
-                            </select>
+                            <>
+                                <select
+                                    value={formData.received_in_account}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, received_in_account: e.target.value }))}
+                                    className="w-full"
+                                    required
+                                >
+                                    <option value="">-- Select Bank Account --</option>
+                                    {bankAccounts.map(account => (
+                                        <option key={account.id} value={account.id}>
+                                            {account.bank_name} — {account.account_number} ({account.account_holder || account.currency})
+                                        </option>
+                                    ))}
+                                </select>
+                                {/* Show selected bank detail */}
+                                {formData.received_in_account && (() => {
+                                    const sel = bankAccounts.find(b => b.id === formData.received_in_account);
+                                    const invoiceBankId = invoice.payment_bank_account_id;
+                                    const mismatch = invoiceBankId && sel && sel.id !== invoiceBankId;
+                                    return sel ? (
+                                        <div className={`mt-1.5 px-3 py-2 rounded-lg text-xs border ${mismatch ? 'bg-yellow-500/10 border-yellow-500/40 text-yellow-300' : 'bg-green-500/10 border-green-500/30 text-green-300'}`}>
+                                            {mismatch && <p className="font-semibold mb-0.5">⚠️ Berbeda dari rekening di Invoice!</p>}
+                                            <p>🏦 {sel.bank_name} | <span className="font-mono">{sel.account_number}</span></p>
+                                            {sel.account_holder && <p>a/n {sel.account_holder}</p>}
+                                        </div>
+                                    ) : null;
+                                })()}
+                            </>
                         ) : (
                             <p className="text-sm text-silver-dark italic">
                                 No bank accounts configured. Go to Company Settings to add accounts.

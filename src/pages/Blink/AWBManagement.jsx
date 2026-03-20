@@ -59,7 +59,7 @@ const AWBManagement = () => {
                 descriptionGoods: selectedAWB.blDescriptionPackages || selectedAWB.cargoDescription,
                 grossWeight: selectedAWB.blGrossWeightText || (selectedAWB.grossWeight ? `${selectedAWB.grossWeight} KGS` : ''),
                 chargeableWeight: selectedAWB.chargeableWeight || (selectedAWB.grossWeight ? `${selectedAWB.grossWeight} KGS` : ''), // Usually calc based on vol
-                pieces: selectedAWB.blTotalPackagesText || 'AS PER ATTACHED LIST',
+                pieces: selectedAWB.blTotalPackagesText || selectedAWB.packages || 'AS PER ATTACHED LIST',
 
                 // Footer
                 executedAt: selectedAWB.blIssuedPlace || 'JAKARTA, INDONESIA',
@@ -113,6 +113,7 @@ const AWBManagement = () => {
                 cargoDescription: ship.cargo_description || ship.commodity || '',
                 grossWeight: ship.weight,
                 volume: ship.volume,
+                packages: ship.packages || null,
 
                 // Document Specific (Editable Overrides)
                 blShipperName: ship.bl_shipper_name,

@@ -43,6 +43,8 @@ const InvoiceManagement = () => {
     const [revenueAccounts, setRevenueAccounts] = useState([]);
     const [confirmSubmitAction, setConfirmSubmitAction] = useState(null);
     const [successSubmitMsg, setSuccessSubmitMsg] = useState('');
+    const [isEditingInvoice, setIsEditingInvoice] = useState(false);
+    const [editInvoiceId, setEditInvoiceId] = useState(null);
 
     // Form state for creating invoice
     const [formData, setFormData] = useState({
@@ -55,7 +57,7 @@ const InvoiceManagement = () => {
         exchange_rate: 1,
         payment_bank_id: '',  // Selected bank account for payment
         invoice_items: [
-            { item_name: 'Freight', description: 'Ocean Freight', qty: 1, unit: 'Job', rate: 0, amount: 0, coa_id: null }
+            { item_name: 'Freight', description: 'Ocean Freight', qty: 1, unit: 'Job', rate: 0, amount: 0, tax_rate: 0, tax_amount: 0, coa_id: null }
         ],
         cogs_items: [],  // COGS items from shipment buying_items
         tax_rate: 11.00,
@@ -229,6 +231,8 @@ const InvoiceManagement = () => {
                         rate: parseFloat(item.unitPrice) || parseFloat(item.price) || parseFloat(item.rate) || 0,
                         amount: parseFloat(item.amount) || parseFloat(item.total) ||
                             ((parseFloat(item.quantity) || 1) * (parseFloat(item.unitPrice) || parseFloat(item.price) || parseFloat(item.rate) || 0)),
+                        tax_amount: typeof item.tax_amount !== 'undefined' ? Number(item.tax_amount) : 0,
+                        tax_rate: typeof item.tax_rate !== 'undefined' ? Number(item.tax_rate) : 0,
                         currency: item.currency || quotation.currency || 'IDR'
                     }))
                     : [{
@@ -238,6 +242,8 @@ const InvoiceManagement = () => {
                         unit: 'Job',
                         rate: quotation.totalAmount || quotation.total_amount || 0,
                         amount: quotation.totalAmount || quotation.total_amount || 0,
+                        tax_amount: 0,
+                        tax_rate: 0,
                         currency: quotation.currency || 'IDR'
                     }],
                 // Pre-fill fields from quotation where possible
@@ -290,7 +296,8 @@ const InvoiceManagement = () => {
                     qty: 1,
                     unit: 'Shipment',
                     rate: shipment.quoted_amount || 0,
-                    amount: shipment.quoted_amount || 0
+                    amount: shipment.quoted_amount || 0,
+                    tax_amount: 0
                 }],
                 // Extract COGS from shipment buying_items and old cogs JSON
                 cogs_items: (() => {
@@ -404,7 +411,7 @@ const InvoiceManagement = () => {
             ...prev,
             invoice_items: [
                 ...prev.invoice_items,
-                { item_name: '', description: '', qty: 1, unit: 'Job', rate: 0, amount: 0, currency: prev.billing_currency || 'IDR' }
+                { item_name: '', description: '', qty: 1, unit: 'Job', rate: 0, amount: 0, tax_rate: 0, tax_amount: 0, currency: prev.billing_currency || 'IDR' }
             ]
         }));
     };
@@ -428,6 +435,12 @@ const InvoiceManagement = () => {
                 items[index].amount = items[index].qty * items[index].rate;
             }
 
+            // Auto-calculate tax_amount from tax_rate percentage
+            if (field === 'qty' || field === 'rate' || field === 'tax_rate') {
+                const rate = field === 'tax_rate' ? value : (items[index].tax_rate || 0);
+                items[index].tax_amount = items[index].amount * (rate / 100);
+            }
+
             return { ...prev, invoice_items: items };
         });
     };
@@ -443,7 +456,16 @@ const InvoiceManagement = () => {
             }
             return sum + itemVal;
         }, 0);
-        const taxAmount = (subtotal * formData.tax_rate) / 100;
+        // User wants per-item tax accumulation
+        const taxAmount = formData.invoice_items.reduce((sum, item) => {
+            let itemTax = Number(item.tax_amount) || 0;
+            const itemCurr = item.currency || formData.billing_currency;
+            if (itemCurr !== formData.billing_currency) {
+                if (formData.billing_currency === 'IDR' && itemCurr !== 'IDR') itemTax *= (formData.exchange_rate || 16000);
+                else if (formData.billing_currency !== 'IDR' && itemCurr === 'IDR') itemTax /= (formData.exchange_rate || 16000);
+            }
+            return sum + itemTax;
+        }, 0);
         const total = subtotal + taxAmount - (formData.discount_amount || 0);
 
         // Calculate COGS
@@ -525,7 +547,6 @@ const InvoiceManagement = () => {
                 cargo_details: formData.cargo_details || null,
                 invoice_items: formData.invoice_items,
                 currency: formData.billing_currency || 'IDR',
-                exchange_rate: formData.billing_currency !== 'IDR' ? (formData.exchange_rate || 16000) : 1,
                 subtotal: subtotal,
                 tax_rate: formData.tax_rate,
                 tax_amount: taxAmount,
@@ -598,6 +619,142 @@ const InvoiceManagement = () => {
         }
     };
 
+    const handleEditInvoice = (invoice) => {
+        // Attempt to find original reference
+        const q = quotations.find(qt => qt.id === invoice.quotation_id);
+        const s = shipments.find(sh => sh.id === invoice.quotation_id); // In legacy some SOs are saved as quotation_id
+
+        if (q) {
+            setSelectedQuotation(q);
+            setReferenceType('quotation');
+        } else if (s) {
+            setSelectedShipment(s);
+            setReferenceType('so');
+        } else {
+            setSelectedQuotation(null);
+            setSelectedShipment(null);
+        }
+
+        // Migrate tax logic for older invoices
+        const migratedItems = (invoice.invoice_items || []).map(it => {
+            const amount = parseFloat(it.amount) || 0;
+            const taxAmount = typeof it.tax_amount !== 'undefined' ? Number(it.tax_amount) : (amount * (invoice.tax_rate || 0) / 100);
+            const taxRate = typeof it.tax_rate !== 'undefined' ? Number(it.tax_rate) : (amount > 0 ? (taxAmount / amount) * 100 : (invoice.tax_rate || 0));
+            return {
+                ...it,
+                tax_amount: taxAmount,
+                tax_rate: taxRate
+            };
+        });
+
+        setFormData({
+            quotation_id: invoice.quotation_id || '',
+            job_number: invoice.job_number || '',
+            payment_terms: invoice.payment_terms || 'NET 30',
+            invoice_date: invoice.invoice_date || new Date().toISOString().split('T')[0],
+            due_date: invoice.due_date || '',
+            billing_currency: invoice.currency || 'IDR',
+            exchange_rate: invoice.exchange_rate || 1,
+            payment_bank_id: invoice.payment_bank_id || '',
+            invoice_items: migratedItems,
+            cogs_items: invoice.cogs_items || [],
+            tax_rate: invoice.tax_rate || 0,
+            discount_amount: invoice.discount_amount || 0,
+            customer_notes: invoice.customer_notes || '',
+            notes: invoice.notes || '',
+            consignor: invoice.consignor || '',
+            consignee: invoice.consignee || '',
+            order_reference: invoice.order_reference || '',
+            goods_description: invoice.goods_description || '',
+            import_broker: invoice.import_broker || '',
+            chargeable_weight: invoice.chargeable_weight || '',
+            packages: invoice.packages || '',
+            vessel_name: invoice.vessel_name || '',
+            voyage_number: invoice.voyage_number || '',
+            ocean_bl: invoice.ocean_bl || '',
+            house_bl: invoice.house_bl || '',
+            etd: invoice.etd || '',
+            eta: invoice.eta || '',
+            origin: invoice.origin || '',
+            destination: invoice.destination || '',
+            customer_id: invoice.customer_id || '',
+            customer_name: invoice.customer_name || '',
+            customer_company: invoice.customer_company || '',
+            customer_address: invoice.customer_address || '',
+            service_type: invoice.service_type || ''
+        });
+        
+        setIsEditingInvoice(true);
+        setEditInvoiceId(invoice.id);
+        setShowCreateModal(true);
+        setShowViewModal(false);
+    };
+
+    const handleUpdateInvoice = async (e) => {
+        e.preventDefault();
+        
+        try {
+            const { subtotal, taxAmount, total, cogsSubtotal, grossProfit, profitMargin } = calculateTotals();
+            
+            const currentInvoice = invoices.find(inv => inv.id === editInvoiceId);
+            if (currentInvoice && currentInvoice.paid_amount > 0) {
+                alert('Invoice tidak dapat diedit karena sudah terdapat pembayaran tercatat.');
+                return;
+            }
+
+            const updates = {
+                job_number: formData.job_number || '',
+                payment_terms: formData.payment_terms,
+                invoice_date: formData.invoice_date,
+                due_date: formData.due_date,
+                currency: formData.billing_currency,
+                payment_bank_id: formData.payment_bank_id || null,
+                invoice_items: formData.invoice_items,
+                cogs_items: formData.cogs_items || [],
+                tax_rate: formData.tax_rate || 0,
+                discount_amount: formData.discount_amount || 0,
+                customer_notes: formData.customer_notes || '',
+                notes: formData.notes || '',
+                subtotal: subtotal,
+                tax_amount: taxAmount,
+                total_amount: total,
+                cogs_subtotal: cogsSubtotal,
+                gross_profit: grossProfit,
+                profit_margin: profitMargin,
+                outstanding_amount: total, // since paid_amount is 0
+                consignor: formData.consignor || '',
+                consignee: formData.consignee || '',
+                order_reference: formData.order_reference || '',
+                goods_description: formData.goods_description || '',
+                import_broker: formData.import_broker || '',
+                chargeable_weight: typeof formData.chargeable_weight === 'number' ? formData.chargeable_weight : parseFloat(formData.chargeable_weight) || 0,
+                packages: formData.packages || '',
+                vessel_name: formData.vessel_name || '',
+                voyage_number: formData.voyage_number || '',
+                ocean_bl: formData.ocean_bl || '',
+                house_bl: formData.house_bl || '',
+                etd: formData.etd || null,
+                eta: formData.eta || null,
+                updated_at: new Date().toISOString()
+            };
+
+            const { error } = await supabase
+                .from('blink_invoices')
+                .update(updates)
+                .eq('id', editInvoiceId);
+
+            if (error) throw error;
+            
+            await fetchInvoices();
+            setShowCreateModal(false);
+            resetForm();
+            alert('Invoice updated successfully!');
+        } catch (error) {
+            console.error('Error updating invoice:', error);
+            alert('Failed to update invoice: ' + error.message);
+        }
+    };
+
     const resetForm = () => {
         setFormData({
             quotation_id: '',
@@ -609,7 +766,7 @@ const InvoiceManagement = () => {
             exchange_rate: 1,
             payment_bank_id: '',
             invoice_items: [
-                { item_name: 'Freight', description: 'Ocean Freight', qty: 1, unit: 'Job', rate: 0, amount: 0, coa_id: null }
+                { item_name: 'Freight', description: 'Ocean Freight', qty: 1, unit: 'Job', rate: 0, amount: 0, tax_amount: 0, coa_id: null }
             ],
             tax_rate: 11.00,
             discount_amount: 0,
@@ -633,6 +790,8 @@ const InvoiceManagement = () => {
         setSelectedQuotation(null);
         setSelectedShipment(null);
         setReferenceType('quotation');
+        setIsEditingInvoice(false);
+        setEditInvoiceId(null);
     };
 
     const formatCurrency = (value, currency = 'IDR') => {
@@ -658,7 +817,7 @@ const InvoiceManagement = () => {
                     <td style="vertical-align: top; text-transform: capitalize;">${String(item.description || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
                     <td style="text-align: center; vertical-align: top;">${invoice.currency}</td>
                     <td style="text-align: right; vertical-align: top;">${formatCurrency(item.amount || 0, invoice.currency).replace('Rp ', '').replace('$', '')}</td>
-                    <td style="text-align: right; vertical-align: top;">${formatCurrency((item.amount || 0) * (invoice.tax_rate || 0) / 100, invoice.currency).replace('Rp ', '').replace('$', '')}</td>
+                    <td style="text-align: right; vertical-align: top;">${formatCurrency(typeof item.tax_amount !== 'undefined' ? Number(item.tax_amount) : ((item.amount || 0) * (invoice.tax_rate || 0) / 100), invoice.currency).replace('Rp ', '').replace('$', '')}</td>
                 </tr>
             `).join('') || '<tr><td colspan="4" style="text-align: center; padding: 10px;">No items</td></tr>';
 
@@ -899,7 +1058,7 @@ const InvoiceManagement = () => {
                                     <span>${formatCurrency(invoice.subtotal || 0, invoice.currency)}</span>
                                 </div>
                                 <div class="totals-row border-bottom">
-                                    <span>TAX Total (${invoice.tax_rate}%)</span>
+                                    <span>TAX Total${invoice.tax_amount > 0 && invoice.tax_rate > 0 ? ` (${invoice.tax_rate}%)` : ''}</span>
                                     <span>${formatCurrency(invoice.tax_amount || 0, invoice.currency)}</span>
                                 </div>
                                  <div class="totals-row grand-total">
@@ -1028,11 +1187,37 @@ const InvoiceManagement = () => {
 
             // Merge existing + new items
             const existingItems = invoice.invoice_items || [];
-            const mergedItems = [...existingItems, ...newItems];
+            // Map legacy items to have tax_amount
+            const processedExisting = existingItems.map(it => ({
+                ...it,
+                tax_amount: typeof it.tax_amount !== 'undefined' ? Number(it.tax_amount) : ((parseFloat(it.amount) || 0) * taxRate / 100)
+            }));
+            const processedNew = newItems.map(it => ({
+                ...it,
+                tax_amount: typeof it.tax_amount !== 'undefined' ? Number(it.tax_amount) : ((parseFloat(it.amount) || 0) * taxRate / 100)
+            }));
+
+            const mergedItems = [...processedExisting, ...processedNew];
 
             // Recalculate totals
-            const newSubtotal = mergedItems.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-            const newTaxAmount = (newSubtotal * taxRate) / 100;
+            const newSubtotal = mergedItems.reduce((sum, item) => {
+                let itemVal = parseFloat(item.amount) || 0;
+                const itemCurr = item.currency || invoice.currency;
+                if (itemCurr !== invoice.currency) {
+                    if (invoice.currency === 'IDR' && itemCurr !== 'IDR') itemVal *= (invoice.exchange_rate || 16000);
+                    else if (invoice.currency !== 'IDR' && itemCurr === 'IDR') itemVal /= (invoice.exchange_rate || 16000);
+                }
+                return sum + itemVal;
+            }, 0);
+            const newTaxAmount = mergedItems.reduce((sum, item) => {
+                let itemTax = Number(item.tax_amount) || 0;
+                const itemCurr = item.currency || invoice.currency;
+                if (itemCurr !== invoice.currency) {
+                    if (invoice.currency === 'IDR' && itemCurr !== 'IDR') itemTax *= (invoice.exchange_rate || 16000);
+                    else if (invoice.currency !== 'IDR' && itemCurr === 'IDR') itemTax /= (invoice.exchange_rate || 16000);
+                }
+                return sum + itemTax;
+            }, 0);
             const newTotal = newSubtotal + newTaxAmount - discountAmount;
 
             // Outstanding = new total minus what's already been paid
@@ -1378,6 +1563,7 @@ const InvoiceManagement = () => {
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Customer</th>
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Date</th>
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Due Date</th>
+                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">Tax</th>
                                 <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">Amount</th>
                                 <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">Outstanding</th>
                             </tr>
@@ -1385,7 +1571,7 @@ const InvoiceManagement = () => {
                         <tbody className="divide-y divide-dark-border">
                             {filteredInvoices.length === 0 ? (
                                 <tr>
-                                    <td colSpan="7" className="px-3 py-8 text-center">
+                                    <td colSpan="8" className="px-3 py-8 text-center">
                                         <FileText className="w-10 h-10 text-silver-dark mx-auto mb-2" />
                                         <p className="text-silver-dark text-sm">
                                             {filter === 'all'
@@ -1430,7 +1616,10 @@ const InvoiceManagement = () => {
                                                 </span>
                                             </td>
                                             <td className="px-3 py-2 text-right whitespace-nowrap">
-                                                <span className="font-semibold text-silver-light">{formatCurrency(invoice.total_amount, invoice.currency)}</span>
+                                                <span className="text-silver-dark">{formatCurrency(invoice.tax_amount || 0, invoice.currency)}</span>
+                                            </td>
+                                            <td className="px-3 py-2 text-right whitespace-nowrap">
+                                                <span className="font-semibold text-silver-light">{formatCurrency(invoice.subtotal ?? invoice.total_amount, invoice.currency)}</span>
                                             </td>
                                             <td className="px-3 py-2 text-right whitespace-nowrap">
                                                 <span className={`font-semibold ${invoice.outstanding_amount > 0 ? 'text-yellow-400' : 'text-green-400'}`}>
@@ -1450,6 +1639,7 @@ const InvoiceManagement = () => {
             {
                 showCreateModal && (
                     <InvoiceCreateModal
+                        isEditing={isEditingInvoice}
                         quotations={quotations}
                         shipments={shipments}
                         formData={formData}
@@ -1465,7 +1655,7 @@ const InvoiceManagement = () => {
                         removeInvoiceItem={removeInvoiceItem}
                         updateInvoiceItem={updateInvoiceItem}
                         calculateTotals={calculateTotals}
-                        handleCreateInvoice={handleCreateInvoice}
+                        handleCreateInvoice={isEditingInvoice ? handleUpdateInvoice : handleCreateInvoice}
                         formatCurrency={formatCurrency}
                         bankAccounts={bankAccounts}
                         onClose={() => {
@@ -1508,6 +1698,7 @@ const InvoiceManagement = () => {
                         statusConfig={statusConfig}
                         canEditInvoice={canEdit('blink_invoices')}
                         canSubmitInvoice={canCreate('blink_invoices') || canEdit('blink_invoices')}
+                        onEdit={() => handleEditInvoice(selectedInvoice)}
                     />
                 )
             }
@@ -1587,7 +1778,7 @@ const InvoiceManagement = () => {
 };
 
 // Invoice Create Modal Component  
-const InvoiceCreateModal = ({ quotations, shipments, formData, setFormData, selectedQuotation, selectedShipment,
+const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFormData, selectedQuotation, selectedShipment,
     referenceType, setReferenceType, handleQuotationSelect, handleShipmentSelect, handlePaymentTermsChange,
     addInvoiceItem, removeInvoiceItem, updateInvoiceItem, calculateTotals,
     handleCreateInvoice, formatCurrency, onClose, bankAccounts }) => {
@@ -1626,31 +1817,45 @@ const InvoiceCreateModal = ({ quotations, shipments, formData, setFormData, sele
     };
 
     return (
-        <Modal isOpen={true} onClose={onClose} maxWidth="max-w-[90vw]">
-            <div className="p-3">
-                <h2 className="text-lg font-bold gradient-text mb-3">Buat Invoice Baru</h2>
-
-                <form onSubmit={handleCreateInvoice} className="space-y-3">
-                    {/* Blended Reference Selection */}
-                    <div className="glass-card p-2.5 rounded-lg">
-                        <label className="block text-[11px] font-semibold text-silver-light mb-1.5">
-                            Referensi (Quotation / SO) <span className="text-red-400">*</span>
-                        </label>
-                        <select
-                            value={formData.quotation_id || formData.shipment_id || ''}
-                            onChange={handleReferenceSelect}
-                            className="w-full px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded text-silver-light text-[11px]"
-                            required
-                        >
-                            <option value="">-- Pilih Quotation atau Sales Order --</option>
-                            {blendedReferences.map(ref => (
-                                <option key={`${ref.type}-${ref.id}`} value={ref.id}>
-                                    {ref.label}
-                                </option>
-                            ))}
-                        </select>
-
+        <Modal isOpen={true} onClose={onClose} maxWidth="max-w-5xl">
+            <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                    <div>
+                        <h2 className="text-2xl font-bold gradient-text">
+                            {isEditing ? 'Edit Invoice' : 'Create New Invoice'}
+                        </h2>
+                        <p className="text-silver-dark text-sm mt-1">
+                            {isEditing ? 'Make changes to the invoice details' : 'Draft a new invoice from Quotation or SO'}
+                        </p>
                     </div>
+                    <button onClick={onClose} className="p-2 hover:bg-dark-surface rounded-full smooth-transition text-silver-dark hover:text-silver-light">
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+
+                <form onSubmit={handleCreateInvoice} className="space-y-6">
+                    {/* Reference Selection */}
+                    {!isEditing && (
+                        <div className="glass-card p-4 rounded-lg">
+                            <label className="block text-[11px] font-semibold text-silver-light mb-1.5">
+                                Referensi (Quotation / SO) <span className="text-red-400">*</span>
+                            </label>
+                            <select
+                                value={formData.quotation_id || formData.shipment_id || ''}
+                                onChange={handleReferenceSelect}
+                                className="w-full px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded text-silver-light text-[11px]"
+                                required
+                            >
+                                <option value="">-- Pilih Quotation atau Sales Order --</option>
+                                {blendedReferences.map(ref => (
+                                    <option key={`${ref.type}-${ref.id}`} value={ref.id}>
+                                        {ref.label}
+                                    </option>
+                                ))}
+                            </select>
+
+                        </div>
+                    )}
 
                     {/* Existing Invoices Indicator */}
                     {selectedQuotation && (
@@ -1987,6 +2192,8 @@ const InvoiceCreateModal = ({ quotations, shipments, formData, setFormData, sele
                                         <th className="px-2 py-2 text-center text-xs text-white w-24 font-normal">Unit</th>
                                         <th className="px-2 py-2 text-center text-xs text-white w-16 font-normal">Curr</th>
                                         <th className="px-2 py-2 text-right text-xs text-white min-w-[140px] font-normal">Price</th>
+                                        <th className="px-2 py-2 text-right text-xs text-white min-w-[80px] font-normal">Tax %</th>
+                                        <th className="px-2 py-2 text-right text-xs text-white min-w-[100px] font-normal">Tax Amt</th>
                                         <th className="px-2 py-2 text-right text-xs text-white min-w-[100px] font-normal">Total</th>
                                         <th className="px-2 py-2 text-center text-xs text-white w-10 font-normal">Action</th>
                                     </tr>
@@ -2059,6 +2266,24 @@ const InvoiceCreateModal = ({ quotations, shipments, formData, setFormData, sele
                                                     required
                                                 />
                                             </td>
+                                            <td className="px-2 py-2">
+                                                <div className="flex items-center gap-1">
+                                                    <input
+                                                        type="number"
+                                                        value={item.tax_rate ?? ''}
+                                                        onChange={(e) => updateInvoiceItem(index, 'tax_rate', parseFloat(e.target.value) || 0)}
+                                                        className="w-14 px-1 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm text-right"
+                                                        min="0"
+                                                        max="100"
+                                                        step="0.01"
+                                                        placeholder="0"
+                                                    />
+                                                    <span className="text-silver-dark text-xs">%</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-2 py-2 text-right">
+                                                <span className="text-silver-dark text-sm">{formatCurrency(item.tax_amount || 0, item.currency || formData.billing_currency)}</span>
+                                            </td>
                                             <td className="px-2 py-2 text-right">
                                                 <span className="text-silver-light text-sm">{formatCurrency(item.amount, item.currency || formData.billing_currency)}</span>
                                             </td>
@@ -2082,18 +2307,8 @@ const InvoiceCreateModal = ({ quotations, shipments, formData, setFormData, sele
                     {/* Tax & Discount */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-[11px] font-semibold text-silver-light mb-1">
-                                Tax Rate (%)
-                            </label>
-                            <input
-                                type="number"
-                                value={formData.tax_rate}
-                                onChange={(e) => setFormData(prev => ({ ...prev, tax_rate: parseFloat(e.target.value) || 0 }))}
-                                className="w-full px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
-                                min="0"
-                                max="100"
-                                step="0.01"
-                            />
+                            {/* Tax Rate is now derived from items, hiding this input */}
+                            {/* Hidden since tax is calculated per item */}
                         </div>
 
                         <div>
@@ -2120,7 +2335,7 @@ const InvoiceCreateModal = ({ quotations, shipments, formData, setFormData, sele
                                 <span className="text-silver-light font-medium">{formatCurrency(subtotal, formData.currency)}</span>
                             </div>
                             <div className="flex justify-between text-sm">
-                                <span className="text-silver-dark">Tax ({formData.tax_rate}%):</span>
+                                <span className="text-silver-dark">Tax (from items):</span>
                                 <span className="text-silver-light font-medium">{formatCurrency(taxAmount, formData.currency)}</span>
                             </div>
                             {formData.discount_amount > 0 && (
@@ -2223,7 +2438,7 @@ const InvoiceCreateModal = ({ quotations, shipments, formData, setFormData, sele
                             type="submit"
                             className="px-6 py-2 bg-accent-orange hover:bg-accent-orange/80 text-white rounded-lg smooth-transition font-semibold"
                         >
-                            Buat Invoice
+                            {isEditing ? 'Update Invoice' : 'Buat Invoice'}
                         </button>
                     </div>
                 </form>
@@ -2233,7 +2448,7 @@ const InvoiceCreateModal = ({ quotations, shipments, formData, setFormData, sele
 };
 
 // Invoice View Modal Component
-const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint, onPreview, onSubmit, onAddItem, statusConfig, canEditInvoice, canSubmitInvoice, bankAccounts, onInvoiceUpdate }) => {
+const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint, onPreview, onSubmit, onAddItem, statusConfig, canEditInvoice, canSubmitInvoice, bankAccounts, onInvoiceUpdate, onEdit }) => {
     const [payments, setPayments] = useState([]);
     const [loadingPayments, setLoadingPayments] = useState(true);
     const [selectedBankId, setSelectedBankId] = useState(invoice.payment_bank_id || '');
@@ -2270,7 +2485,6 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                 .eq('reference_type', 'invoice')
                 .eq('reference_id', invoice.id)
                 .order('payment_date', { ascending: false });
-
             if (error) {
                 console.error('Error fetching payments:', error);
                 setPayments([]);
@@ -2440,6 +2654,7 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                                         <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-center w-20">Qty</th>
                                         <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-center w-24">Unit</th>
                                         <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right w-32">Rate</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right w-32">Tax</th>
                                         <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right w-32 rounded-tr-lg">Amount</th>
                                     </tr>
                                 </thead>
@@ -2451,6 +2666,7 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                                             <td className="px-4 py-3 text-center text-silver-light align-top">{item.qty}</td>
                                             <td className="px-4 py-3 text-center text-silver-dark align-top">{item.unit}</td>
                                             <td className="px-4 py-3 text-right text-silver-light align-top">{(parseFloat(item.rate) || 0).toLocaleString('id-ID')}</td>
+                                            <td className="px-4 py-3 text-right text-silver-light align-top">{formatCurrency(item.tax_amount || 0, invoice.currency)}</td>
                                             <td className="px-4 py-3 text-right text-silver-light font-medium align-top">{formatCurrency(item.amount, invoice.currency)}</td>
                                         </tr>
                                     ))}
@@ -2478,7 +2694,7 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                                     <span className="text-silver-light">{formatCurrency(invoice.subtotal, invoice.currency)}</span>
                                 </div>
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-silver-dark">Tax ({invoice.tax_rate}%):</span>
+                                    <span className="text-silver-dark">Tax (from items):</span>
                                     <span className="text-silver-light">{formatCurrency(invoice.tax_amount, invoice.currency)}</span>
                                 </div>
                                 {invoice.discount_amount > 0 && (
@@ -2613,6 +2829,17 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                             >
                                 <Plus className="w-4 h-4" />
                                 Add Item
+                            </button>
+                        )}
+
+                        {canEditInvoice && onEdit && (!invoice.paid_amount || invoice.paid_amount <= 0) && (
+                            <button
+                                onClick={onEdit}
+                                className="flex items-center gap-2 px-5 py-2 border border-blue-500 text-blue-400 rounded-lg hover:bg-blue-500/10 smooth-transition"
+                                title="Edit invoice details and amounts"
+                            >
+                                <div className="w-4 h-4">✏️</div>
+                                Edit
                             </button>
                         )}
 
@@ -3250,7 +3477,7 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                                     <span>{formatCurrency(splitSubtotal, printCurrency)}</span>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', fontWeight: 'bold', fontSize: '11px', borderBottom: '1px solid #ccc' }}>
-                                    <span>TAX Total ({invoice.tax_rate}%)</span>
+                                    <span>TAX Total{invoice.tax_amount > 0 && invoice.tax_rate > 0 ? ` (${invoice.tax_rate}%)` : ''}</span>
                                     <span>{formatCurrency(splitTax, printCurrency)}</span>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', fontWeight: 'bold', fontSize: '13px', background: '#333', color: 'white' }}>
@@ -3425,7 +3652,7 @@ const ExistingInvoicesIndicator = ({ jobNumber }) => {
 // After saving: invoice resets to 'draft' and requires re-approval
 // ─────────────────────────────────────────────────────────────────────────────
 const AddItemModal = ({ invoice, formatCurrency, revenueAccounts, onClose, onSave }) => {
-    const emptyItem = () => ({ item_name: '', description: '', qty: 1, unit: 'Job', rate: 0, amount: 0, coa_id: null });
+    const emptyItem = () => ({ item_name: '', description: '', qty: 1, unit: 'Job', rate: 0, amount: 0, tax_amount: 0, coa_id: null });
     const [newItems, setNewItems] = useState([emptyItem()]);
     const [amendmentNote, setAmendmentNote] = useState('');
     const [saving, setSaving] = useState(false);
@@ -3449,10 +3676,12 @@ const AddItemModal = ({ invoice, formatCurrency, revenueAccounts, onClose, onSav
 
     // Preview: recalculate totals with new items appended
     const newItemsSubtotal = newItems.reduce((s, it) => s + (parseFloat(it.amount) || 0), 0);
+    const newItemsTax = newItems.reduce((s, it) => s + (parseFloat(it.tax_amount) || 0), 0);
     const existingSubtotal = invoice.subtotal || 0;
+    const existingTax = invoice.tax_amount || 0;
     const preview = {
         subtotal: existingSubtotal + newItemsSubtotal,
-        tax: ((existingSubtotal + newItemsSubtotal) * (invoice.tax_rate || 0)) / 100,
+        tax: existingTax + newItemsTax,
         get total() { return this.subtotal + this.tax - (invoice.discount_amount || 0); },
         get outstanding() { return Math.max(0, this.total - (invoice.paid_amount || 0)); }
     };
@@ -3518,7 +3747,7 @@ const AddItemModal = ({ invoice, formatCurrency, revenueAccounts, onClose, onSav
                         <table className="w-full text-xs">
                             <thead className="bg-dark-surface">
                                 <tr>
-                                    {['Item Name', 'Description', 'Qty', 'Unit', 'Rate', 'Amount', 'COA', ''].map((h, i) => (
+                                    {['Item Name', 'Description', 'Qty', 'Unit', 'Rate', 'Tax', 'Amount', 'COA', ''].map((h, i) => (
                                         <th key={i} className="px-3 py-2 text-left text-silver-dark font-semibold uppercase text-[10px]">{h}</th>
                                     ))}
                                 </tr>
@@ -3552,6 +3781,11 @@ const AddItemModal = ({ invoice, formatCurrency, revenueAccounts, onClose, onSav
                                             <input type="number" value={item.rate} min="0"
                                                 onChange={e => updateItem(idx, 'rate', e.target.value)}
                                                 className="w-full bg-dark-surface border border-dark-border rounded px-2 py-1 text-silver-light text-xs text-right focus:border-yellow-500/60 outline-none" />
+                                        </td>
+                                        <td className="px-2 py-1.5 w-28">
+                                            <input type="number" value={item.tax_amount} min="0"
+                                                onChange={e => updateItem(idx, 'tax_amount', e.target.value)}
+                                                className="w-full bg-dark-surface border border-dark-border rounded px-2 py-1 text-silver-light text-xs text-right focus:border-yellow-500/60 outline-none" placeholder="Pajak" />
                                         </td>
                                         <td className="px-2 py-1.5 w-28 text-right font-mono text-yellow-400 font-semibold">
                                             {(parseFloat(item.amount) || 0).toLocaleString('id-ID')}

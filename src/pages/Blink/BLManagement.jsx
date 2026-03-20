@@ -434,67 +434,60 @@ const BLManagement = () => {
                 ? quotations.find(q => q.id === selectedQuotationId)
                 : null;
 
+            // Helper to clean date strings
+            const cleanDate = (dateStr) => {
+                if (!dateStr || dateStr === '') return null;
+                // If it's already YYYY-MM-DD, return it. Otherwise attempt to normalize or return null
+                const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+                if (dateRegex.test(dateStr)) return dateStr;
+                return null; // Fallback to null for invalid dates to prevent Postgres error
+            };
+
+            const updateData = {
+                bl_status: editForm.status || 'draft',
+                bl_number: editForm.blNumber || null,
+                bl_subject: editForm.subject || null,
+                quotation_id: selectedQuotationId || null,
+                quotation_shipper_name: selectedQuotation?.shipper_name || null,
+                quotation_consignee_name: selectedQuotation?.consignee_name || null,
+                bl_shipper_name: editForm.shipperName || null,
+                bl_shipper_address: editForm.shipperAddress || null,
+                bl_consignee_name: editForm.consigneeName || null,
+                bl_consignee_address: editForm.consigneeAddress || null,
+                bl_notify_party_name: editForm.notifyPartyName || null,
+                bl_notify_party_address: editForm.notifyPartyAddress || null,
+                bl_place_of_receipt: editForm.placeOfReceipt || null,
+                bl_place_of_delivery: editForm.placeOfDelivery || null,
+                bl_pre_carriage_by: editForm.preCarriageBy || null,
+                bl_loading_pier: editForm.loadingPier || null,
+                bl_export_references: editForm.exportReferences || null,
+                bl_forwarding_agent_ref: editForm.forwardingAgentRef || null,
+                bl_type_of_move: editForm.typeOfMove || null,
+                bl_country_of_origin: editForm.countryOfOrigin || null,
+                bl_marks_numbers: editForm.marksNumbers || null,
+                bl_description_packages: editForm.descriptionPackages || null,
+                bl_gross_weight_text: editForm.grossWeight || null,
+                bl_measurement_text: editForm.measurement || null,
+                bl_total_packages_text: editForm.totalPackages || null,
+                bl_freight_payable_at: editForm.freightPayableAt || null,
+                bl_number_of_originals: editForm.numberOfOriginals || null,
+                bl_issued_place: editForm.issuedPlace || null,
+                bl_issued_date: cleanDate(editForm.issuedDate),
+                bl_freight_charges: editForm.freightCharges || null,
+                bl_prepaid: editForm.prepaid || null,
+                bl_collect: editForm.collect || null,
+                bl_shipped_on_board_date: editForm.shippedOnBoardDate || null,
+                vessel_name: editForm.vessel || null,
+                voyage: editForm.voyage || null,
+                mbl: editForm.mbl || null,
+                hbl: editForm.hbl || null,
+                mawb: editForm.mawb || null,
+                hawb: editForm.hawb || null,
+            };
+
             const { error } = await supabase
                 .from('blink_shipments')
-                .update({
-                    bl_status: editForm.status,
-                    bl_number: editForm.blNumber || null,
-
-                    // Subject and Quotation Reference
-                    bl_subject: editForm.subject || null,
-                    quotation_id: selectedQuotationId || null,
-                    quotation_shipper_name: selectedQuotation?.shipper_name || null,
-                    quotation_consignee_name: selectedQuotation?.consignee_name || null,
-
-                    // Parties
-                    bl_shipper_name: editForm.shipperName,
-                    bl_shipper_address: editForm.shipperAddress,
-                    bl_consignee_name: editForm.consigneeName,
-                    bl_consignee_address: editForm.consigneeAddress,
-                    bl_notify_party_name: editForm.notifyPartyName,
-                    bl_notify_party_address: editForm.notifyPartyAddress,
-
-                    // Routing
-                    bl_place_of_receipt: editForm.placeOfReceipt,
-                    bl_place_of_delivery: editForm.placeOfDelivery,
-                    bl_pre_carriage_by: editForm.preCarriageBy,
-                    bl_loading_pier: editForm.loadingPier,
-                    bl_export_references: editForm.exportReferences,
-                    bl_forwarding_agent_ref: editForm.forwardingAgentRef,
-
-                    // NEW: Extra routing/print fields
-                    bl_type_of_move: editForm.typeOfMove,
-                    bl_country_of_origin: editForm.countryOfOrigin,
-
-                    // Cargo
-                    bl_marks_numbers: editForm.marksNumbers,
-                    bl_description_packages: editForm.descriptionPackages,
-                    bl_gross_weight_text: editForm.grossWeight,
-                    bl_measurement_text: editForm.measurement,
-                    bl_total_packages_text: editForm.totalPackages,
-
-                    // Footer
-                    bl_freight_payable_at: editForm.freightPayableAt,
-                    bl_number_of_originals: editForm.numberOfOriginals,
-                    bl_issued_place: editForm.issuedPlace,
-                    bl_issued_date: editForm.issuedDate,
-
-                    // NEW: Freight & charge fields
-                    bl_freight_charges: editForm.freightCharges,
-                    bl_prepaid: editForm.prepaid,
-                    bl_collect: editForm.collect,
-                    bl_shipped_on_board_date: editForm.shippedOnBoardDate,
-
-                    // Also sync basic routing from form
-                    vessel_name: editForm.vessel,
-                    voyage: editForm.voyage,
-
-                    // Document numbers
-                    mbl: editForm.mbl || null,
-                    hbl: editForm.hbl || null,
-                    mawb: editForm.mawb || null,
-                    hawb: editForm.hawb || null,
-                })
+                .update(updateData)
                 .eq('id', selectedBL.id);
 
             if (error) throw error;
@@ -505,7 +498,7 @@ const BLManagement = () => {
             setShowEditModal(false);
         } catch (error) {
             console.error('Error updating document:', error);
-            alert('❌ Failed to update document');
+            alert(`❌ Failed to update document: ${error.message || 'Unknown error'}`);
         }
     };
 
@@ -631,7 +624,7 @@ const BLManagement = () => {
             measurement: ship.measure
                 ? `${ship.measure} CBM`
                 : (ship.volume || ship.cbm ? `${ship.volume || ship.cbm} CBM` : prev.measurement),
-            totalPackages: packagesText || prev.totalPackages,
+            totalPackages: ship.packages || packagesText || prev.totalPackages,
 
             // === TYPE OF MOVE ===
             typeOfMove: typeOfMove || prev.typeOfMove,

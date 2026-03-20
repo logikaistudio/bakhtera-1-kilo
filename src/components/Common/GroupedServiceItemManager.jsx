@@ -26,7 +26,7 @@ const ItemPicker = ({ value, onChange, accounts, readOnly }) => {
     });
 
     if (readOnly) {
-        return <div className="text-sm text-silver-light truncate">{selected?.name || '-'}</div>;
+        return <div className="text-sm text-gray-800 truncate px-2 py-1.5 bg-gray-50 border border-gray-100 rounded-md">{selected?.name || '-'}</div>;
     }
 
     return (
@@ -34,50 +34,50 @@ const ItemPicker = ({ value, onChange, accounts, readOnly }) => {
             <button
                 type="button"
                 onClick={() => { setIsOpen(!isOpen); setSearch(''); }}
-                className="w-full flex items-center justify-between gap-1 px-2 py-1.5 text-sm border border-dark-border rounded bg-dark-surface text-silver-light text-left"
+                className={`w-full flex items-center justify-between gap-1 px-3 py-2 text-sm border bg-white text-gray-800 border-gray-200 hover:border-blue-400 focus:ring-2 focus:ring-blue-100 rounded-md text-left transition-all shadow-sm ${isOpen ? 'border-blue-400 ring-2 ring-blue-100' : ''}`}
             >
                 <span className="truncate">
-                    {selected ? selected.name : <span className="text-silver-dark">Select COA...</span>}
+                    {selected ? selected.name : <span className="text-gray-400">Select COA...</span>}
                 </span>
-                <ChevronDown className={`w-3 h-3 text-silver-dark flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {isOpen && (
-                <div className="absolute z-50 mt-1 left-0 border border-gray-300 rounded-lg shadow-2xl overflow-hidden flex flex-col" style={{ minWidth: '320px', maxHeight: '260px', backgroundColor: '#ffffff' }}>
-                    <div className="p-2 border-b border-gray-200 flex-shrink-0 bg-gray-50">
+                <div className="absolute z-50 mt-1 left-0 right-0 border border-gray-200 rounded-lg shadow-xl overflow-hidden flex flex-col bg-white" style={{ minWidth: '320px', maxHeight: '280px' }}>
+                    <div className="p-2 border-b border-gray-100 flex-shrink-0 bg-gray-50">
                         <div className="relative">
-                            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                             <input
                                 type="text"
-                                placeholder="Search kode atau nama..."
+                                placeholder="Search code or name..."
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 autoFocus
-                                className="w-full pl-7 pr-3 py-1.5 text-xs border border-gray-300 rounded outline-none text-gray-800"
+                                className="w-full pl-8 pr-3 py-2 text-sm border border-gray-300 rounded-md outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 text-gray-800 transition-all bg-white"
                             />
                         </div>
                     </div>
-                    <div className="overflow-y-auto flex-1">
+                    <div className="overflow-y-auto flex-1 p-1">
                         <button
                             type="button"
                             onClick={() => { onChange(''); setIsOpen(false); }}
-                            className="w-full px-3 py-1.5 text-left text-xs border-b border-gray-100 text-gray-400 hover:bg-gray-100"
+                            className="w-full px-3 py-2 text-left text-sm text-gray-500 hover:bg-gray-50 rounded-md mb-1 transition-colors border border-transparent hover:border-gray-200"
                         >
-                            — Clear selection —
+                            <span className="italic">— Clear selection —</span>
                         </button>
                         {filtered.length === 0 ? (
-                            <div className="p-4 text-center text-xs text-gray-400">Tidak ditemukan</div>
+                            <div className="p-4 text-center text-sm text-gray-500">No matching COA found</div>
                         ) : (
                             filtered.map(acc => (
                                 <button
                                     key={acc.id}
                                     type="button"
                                     onClick={() => { onChange(acc.code); setIsOpen(false); }}
-                                    className={`w-full px-3 py-2 text-left border-b border-gray-50 last:border-0 hover:bg-blue-50 ${acc.code === value ? 'bg-blue-50' : ''}`}
+                                    className={`w-full px-3 py-2 text-left rounded-md mb-0.5 transition-colors ${acc.code === value ? 'bg-blue-50 border border-blue-100' : 'hover:bg-gray-50 border border-transparent'}`}
                                 >
-                                    <div className="flex items-baseline gap-2">
-                                        <span className="font-mono text-[10px] text-blue-600 font-semibold flex-shrink-0">{acc.code}</span>
-                                        <span className="text-xs text-gray-800 leading-tight">{acc.name}</span>
+                                    <div className="flex flex-col gap-0.5">
+                                        <span className="font-mono text-[11px] text-blue-600 font-semibold">{acc.code}</span>
+                                        <span className="text-sm text-gray-800 leading-tight">{acc.name}</span>
                                     </div>
                                 </button>
                             ))
@@ -253,37 +253,46 @@ const GroupedServiceItemManager = ({
 
     const formatNumber = (num, decimals = 0) => {
         if (num === null || num === undefined) return '';
-        // Return string with requested decimals and id-ID formatting
         if (decimals > 0) {
-             return parseFloat(num).toLocaleString('id-ID', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+             return parseFloat(num).toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
         }
-        return parseInt(num).toLocaleString('id-ID');
+        return parseInt(num).toLocaleString('en-US');
     };
 
     const { totalIdr, totalUsd } = calculateGrandTotals();
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium text-silver">
-                    Quotation Details (Grouped)
-                </label>
-                <div className="flex gap-2">
-                    <div className="bg-dark-surface px-3 py-1.5 rounded border border-dark-border text-xs text-silver-light">
-                        Kurs: <span className="font-bold text-accent-orange ml-1">Rp {formatNumber(exchangeRate)} / USD</span>
+            <div className="flex items-end justify-between border-b border-gray-200 pb-4">
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-900">Quotation Items</h2>
+                    <p className="text-sm text-gray-500 mt-1">Group and manage your service items and costs</p>
+                </div>
+                <div className="flex gap-3">
+                    <div className="bg-white px-4 py-2 rounded-lg border border-gray-200 shadow-sm flex items-center gap-2">
+                        <span className="text-sm text-gray-500">Global Rate:</span>
+                        <span className="text-sm font-bold text-blue-600">Rp {formatNumber(exchangeRate)} / USD</span>
                     </div>
                     {!readOnly && (
-                        <Button type="button" onClick={addGroup} icon={Plus} variant="secondary" size="sm">
-                            Add Group
-                        </Button>
+                        <button
+                            type="button" 
+                            onClick={addGroup}
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm rounded-lg transition-colors shadow-sm focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                        >
+                            <Plus className="w-4 h-4" />
+                            <span>Add Group</span>
+                        </button>
                     )}
                 </div>
             </div>
 
             {groups.length === 0 && !readOnly && (
-                <div className="text-center py-8 border-2 border-dashed border-dark-border rounded-lg">
-                    <p className="text-sm text-silver-dark">No item groups added yet.</p>
-                    <p className="text-xs text-silver-dark mt-1">Click "Add Group" to begin creating structure.</p>
+                <div className="text-center py-12 border-2 border-dashed border-gray-300 bg-gray-50 rounded-xl">
+                    <div className="bg-white w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm border border-gray-200">
+                        <Plus className="w-6 h-6 text-gray-400" />
+                    </div>
+                    <p className="text-base font-medium text-gray-700">No item groups added yet</p>
+                    <p className="text-sm text-gray-500 mt-1">Click "Add Group" to structure your quotation items.</p>
                 </div>
             )}
 
@@ -305,77 +314,94 @@ const GroupedServiceItemManager = ({
                 });
 
                 return (
-                    <div key={group.id} className="border border-dark-border rounded-lg overflow-hidden bg-dark-card shadow-sm">
+                    <div key={group.id} className="border border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden flex flex-col">
                         {/* Group Header */}
-                        <div className="bg-dark-surface px-4 py-3 flex items-center justify-between border-b border-dark-border">
+                        <div className="bg-gray-50 px-4 py-3 flex items-center justify-between border-b border-gray-200">
                             <div className="flex items-center gap-3 flex-1">
-                                <GripVertical className="w-4 h-4 text-silver-dark cursor-grab" />
+                                <GripVertical className="w-5 h-5 text-gray-400 cursor-grab hover:text-gray-600 transition-colors" />
                                 {readOnly ? (
-                                    <h3 className="font-semibold text-silver-light">{group.groupName}</h3>
+                                    <h3 className="font-bold text-gray-800 text-lg">{group.groupName}</h3>
                                 ) : (
                                     <input 
                                         type="text" 
                                         value={group.groupName} 
                                         onChange={(e) => updateGroupName(group.id, e.target.value)}
-                                        className="bg-transparent border-b border-gray-600 focus:border-accent-orange text-silver-light font-semibold outline-none px-1 w-1/2"
-                                        placeholder="Group Name (e.g. A. Handling Import)"
+                                        className="bg-white border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-md text-gray-900 font-semibold outline-none px-3 py-1.5 w-1/2 md:w-1/3 transition-all shadow-sm"
+                                        placeholder="Group Name (e.g., A. Handling Import)"
                                     />
                                 )}
                             </div>
-                            <div className="flex items-center gap-3">
+                            <div className="flex flex-wrap items-center gap-4 justify-end">
                                 {readOnly ? (
-                                    <div className="text-xs text-silver-dark mr-2 border-r border-dark-border pr-2">
-                                        Rate: Rp {formatNumber(currentGroupRate)}
+                                    <div className="text-sm text-gray-500">
+                                        Rate: <span className="font-medium text-gray-800">Rp {formatNumber(currentGroupRate)}</span>
                                     </div>
                                 ) : (
-                                    <div className="flex items-center gap-2 mr-2 border-r border-dark-border pr-2">
-                                        <label className="text-xs text-silver-dark">Rate:</label>
-                                        <input
-                                            type="number"
-                                            value={group.groupExchangeRate || ''}
-                                            onChange={(e) => updateGroupExchangeRate(group.id, e.target.value)}
-                                            placeholder={formatNumber(exchangeRate)}
-                                            className="w-20 px-1.5 py-1 bg-transparent border-b border-gray-600 focus:border-accent-orange text-silver-light outline-none text-xs text-right"
-                                        />
+                                    <div className="flex items-center gap-2">
+                                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Rate:</label>
+                                        <div className="relative">
+                                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">Rp</span>
+                                            <input
+                                                type="number"
+                                                value={group.groupExchangeRate || ''}
+                                                onChange={(e) => updateGroupExchangeRate(group.id, e.target.value)}
+                                                placeholder={formatNumber(exchangeRate)}
+                                                className="w-28 pl-8 pr-3 py-1.5 bg-white border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-md text-gray-900 outline-none text-sm font-medium transition-all shadow-sm"
+                                            />
+                                        </div>
                                     </div>
                                 )}
-                                <div className="text-xs text-silver">
-                                    Sub IDR: <span className="font-semibold text-silver-light">{formatNumber(groupTotalIdr)}</span> | 
-                                    Sub USD: <span className="font-semibold text-silver-light ml-1">{formatNumber(groupTotalUsd, 2)}</span>
+                                <div className="hidden sm:flex items-center gap-3 px-3 py-1.5 bg-white border border-gray-200 rounded-md shadow-sm">
+                                    <div className="text-xs text-gray-500">
+                                        Sub (IDR): <span className="font-bold text-green-600 text-sm">{formatNumber(groupTotalIdr)}</span>
+                                    </div>
+                                    <div className="w-px h-4 bg-gray-300"></div>
+                                    <div className="text-xs text-gray-500">
+                                        Sub (USD): <span className="font-bold text-blue-600 text-sm">{formatNumber(groupTotalUsd, 2)}</span>
+                                    </div>
                                 </div>
                                 {!readOnly && (
-                                    <>
-                                        <Button type="button" onClick={() => addItemToGroup(group.id)} icon={Plus} size="sm" variant="secondary" className="h-8">
-                                            Item
-                                        </Button>
-                                        <button onClick={() => deleteGroup(group.id)} className="p-1.5 text-red-400 hover:bg-red-500/20 rounded">
+                                    <div className="flex items-center gap-2">
+                                        <button 
+                                            type="button" 
+                                            onClick={() => addItemToGroup(group.id)} 
+                                            className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 hover:text-blue-600 text-sm font-medium rounded-md transition-colors shadow-sm flex items-center gap-1.5"
+                                        >
+                                            <Plus className="w-3.5 h-3.5" /> Item
+                                        </button>
+                                        <button 
+                                            type="button"
+                                            onClick={() => deleteGroup(group.id)} 
+                                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-all border border-transparent hover:border-red-100"
+                                            title="Delete Group"
+                                        >
                                             <Trash2 className="w-4 h-4" />
                                         </button>
-                                    </>
+                                    </div>
                                 )}
                             </div>
                         </div>
 
-                        {/* Items Table within Group */}
-                        {group.items && group.items.length > 0 ? (
-                            <div className="overflow-x-auto">
-                                <table className="w-full">
-                                    <thead className="bg-[#1a1f2e]">
-                                        <tr>
-                                            <th className="text-left text-[11px] font-semibold text-silver px-3 py-2 w-[220px]">COA</th>
-                                            <th className="text-left text-[11px] font-semibold text-silver px-3 py-2">Description</th>
-                                            <th className="text-right text-[11px] font-semibold text-silver px-3 py-2 w-20">Qty</th>
-                                            <th className="text-center text-[11px] font-semibold text-silver px-3 py-2 w-20">Unit</th>
-                                            <th className="text-center text-[11px] font-semibold text-silver px-3 py-2 w-24">Currency</th>
-                                            <th className="text-right text-[11px] font-semibold text-silver px-3 py-2 w-32">Rate/Price</th>
-                                            <th className="text-right text-[11px] font-semibold text-silver px-3 py-2 w-32">Amount (IDR)</th>
-                                            <th className="text-right text-[11px] font-semibold text-silver px-3 py-2 w-32">Amount (USD)</th>
-                                            {!readOnly && <th className="px-3 py-2 w-10"></th>}
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-dark-border/50">
+                        {/* Items Sub-table using modern Grid */}
+                        <div className="p-4 bg-white flex-1">
+                            {group.items && group.items.length > 0 ? (
+                                <div className="space-y-3">
+                                    {/* Grid Header */}
+                                    <div className="hidden lg:grid grid-cols-[1.5fr_2fr_0.5fr_0.5fr_0.5fr_1fr_1fr_1fr_min-content] gap-3 px-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                                        <div>COA Account</div>
+                                        <div>Description</div>
+                                        <div className="text-right">Qty</div>
+                                        <div className="text-center">Unit</div>
+                                        <div className="text-center">Curr</div>
+                                        <div className="text-right">Rate/Price</div>
+                                        <div className="text-right">Amount (IDR)</div>
+                                        <div className="text-right">Amount (USD)</div>
+                                        {!readOnly && <div className="w-8"></div>}
+                                    </div>
+                                    
+                                    {/* Grid Body */}
+                                    <div className="space-y-2.5">
                                         {group.items.map((item) => {
-                                            // Calculate equivalent
                                             const amt = parseFloat(item.amount) || 0;
                                             let idrEq = 0;
                                             let usdEq = 0;
@@ -388,118 +414,166 @@ const GroupedServiceItemManager = ({
                                             }
 
                                             return (
-                                                <tr key={item.id} className="hover:bg-dark-surface/50 transition-colors">
-                                                    <td className="px-3 py-2">
+                                                <div key={item.id} className="grid grid-cols-1 lg:grid-cols-[1.5fr_2fr_0.5fr_0.5fr_0.5fr_1fr_1fr_1fr_min-content] gap-3 items-center p-3 lg:p-2 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-md transition-all group/row relative">
+                                                    
+                                                    {/* Mobile Labels (Hidden on Desktop) */}
+                                                    <div className="lg:hidden text-xs font-bold text-gray-400 uppercase mb-1">Item Details</div>
+
+                                                    <div className="min-w-0">
                                                         <ItemPicker 
                                                             value={item.itemCode || ''} 
                                                             onChange={(code) => updateItem(group.id, item.id, 'itemCode', code)} 
                                                             accounts={accounts} 
                                                             readOnly={readOnly}
                                                         />
-                                                    </td>
-                                                    <td className="px-3 py-2">
+                                                    </div>
+                                                    <div className="min-w-0">
                                                         <textarea
                                                             value={item.description}
                                                             onChange={(e) => updateItem(group.id, item.id, 'description', e.target.value)}
-                                                            placeholder="Description"
-                                                            className="w-full px-2 py-1 text-xs bg-dark-bg border border-dark-border rounded text-silver-light resize-y min-h-[32px]"
+                                                            placeholder="Item description..."
+                                                            className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all resize-y min-h-[38px] text-gray-800 shadow-sm placeholder-gray-400"
                                                             readOnly={readOnly}
                                                             rows={1}
                                                         />
-                                                    </td>
-                                                    <td className="px-3 py-2">
-                                                        <input
-                                                            type="number"
-                                                            min="0"
-                                                            step="0.01"
-                                                            value={item.quantity}
-                                                            onChange={(e) => updateItem(group.id, item.id, 'quantity', e.target.value)}
-                                                            className="w-full px-2 py-1 text-xs bg-dark-bg border border-dark-border rounded text-silver-light text-right"
-                                                            readOnly={readOnly}
-                                                        />
-                                                    </td>
-                                                    <td className="px-3 py-2">
-                                                        <input
-                                                            type="text"
-                                                            value={item.unit}
-                                                            onChange={(e) => updateItem(group.id, item.id, 'unit', e.target.value)}
-                                                            placeholder="Unit"
-                                                            className="w-full px-2 py-1 text-xs bg-dark-bg border border-dark-border rounded text-silver-light text-center"
-                                                            readOnly={readOnly}
-                                                        />
-                                                    </td>
-                                                    <td className="px-3 py-2">
-                                                        {readOnly ? (
-                                                            <div className="text-xs text-center text-silver-light">{item.currency}</div>
-                                                        ) : (
-                                                            <select
-                                                                value={item.currency}
-                                                                onChange={(e) => updateItem(group.id, item.id, 'currency', e.target.value)}
-                                                                className="w-full px-1 py-1 text-xs bg-dark-bg border border-dark-border rounded text-silver-light"
-                                                            >
-                                                                <option value="IDR">IDR</option>
-                                                                <option value="USD">USD</option>
-                                                            </select>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-3 py-2">
+                                                    </div>
+                                                    
+                                                    {/* Row 2 on Mobile */}
+                                                    <div className="grid grid-cols-3 lg:contents gap-3">
+                                                        <div>
+                                                            <div className="lg:hidden text-[10px] font-semibold text-gray-400 uppercase mb-1">Qty</div>
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                step="0.01"
+                                                                value={item.quantity}
+                                                                onChange={(e) => updateItem(group.id, item.id, 'quantity', e.target.value)}
+                                                                className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all text-right text-gray-800 shadow-sm"
+                                                                readOnly={readOnly}
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <div className="lg:hidden text-[10px] font-semibold text-gray-400 uppercase mb-1">Unit</div>
+                                                            <input
+                                                                type="text"
+                                                                value={item.unit}
+                                                                onChange={(e) => updateItem(group.id, item.id, 'unit', e.target.value)}
+                                                                placeholder="Unit"
+                                                                className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all text-center text-gray-800 shadow-sm placeholder-gray-400"
+                                                                readOnly={readOnly}
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <div className="lg:hidden text-[10px] font-semibold text-gray-400 uppercase mb-1">Curr</div>
+                                                            {readOnly ? (
+                                                                <div className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-md text-center text-gray-800">{item.currency}</div>
+                                                            ) : (
+                                                                <select
+                                                                    value={item.currency}
+                                                                    onChange={(e) => updateItem(group.id, item.id, 'currency', e.target.value)}
+                                                                    className="w-full px-2 py-2 text-sm bg-white border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all text-gray-800 shadow-sm font-medium"
+                                                                >
+                                                                    <option value="IDR">IDR</option>
+                                                                    <option value="USD">USD</option>
+                                                                </select>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    <div>
+                                                        <div className="lg:hidden text-[10px] font-semibold text-gray-400 uppercase mb-1 mt-2">Rate / Price</div>
                                                         <input
                                                             type="text"
                                                             value={item.unitPrice ? (item.currency==='IDR'? formatNumber(item.unitPrice) : item.unitPrice) : ''}
-                                                            onChange={(e) => {
-                                                                // Allow raw string input. updateItem will clean it depending on currency logic if needed, 
-                                                                // but simpler: just treat it as generic text that gets parsed on change.
-                                                                updateItem(group.id, item.id, 'unitPrice', e.target.value);
-                                                            }}
+                                                            onChange={(e) => updateItem(group.id, item.id, 'unitPrice', e.target.value)}
                                                             placeholder="0"
-                                                            className="w-full px-2 py-1 text-xs bg-dark-bg border border-dark-border rounded text-silver-light text-right font-mono"
+                                                            className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all text-right font-mono text-gray-800 shadow-sm"
                                                             readOnly={readOnly}
                                                         />
-                                                    </td>
-                                                    <td className="px-3 py-2 text-right">
-                                                        <div className={`text-xs font-mono font-medium ${item.currency === 'IDR' ? 'text-green-400' : 'text-silver-dark'}`}>
+                                                    </div>
+
+                                                    <div className="flex justify-between lg:block items-center bg-gray-50 lg:bg-transparent p-2 lg:p-0 rounded border border-gray-100 lg:border-none mt-2 lg:mt-0">
+                                                        <div className="lg:hidden text-xs font-semibold text-gray-500">Amount (IDR)</div>
+                                                        <div className="text-right text-sm font-mono font-bold text-green-600">
                                                             {idrEq > 0 ? formatNumber(idrEq) : '-'}
                                                         </div>
-                                                    </td>
-                                                    <td className="px-3 py-2 text-right">
-                                                        <div className={`text-xs font-mono font-medium ${item.currency === 'USD' ? 'text-blue-400' : 'text-silver-dark'}`}>
+                                                    </div>
+
+                                                    <div className="flex justify-between lg:block items-center bg-gray-50 lg:bg-transparent p-2 lg:p-0 rounded border border-gray-100 lg:border-none">
+                                                        <div className="lg:hidden text-xs font-semibold text-gray-500">Amount (USD)</div>
+                                                        <div className="text-right text-sm font-mono font-bold text-blue-600">
                                                             {usdEq > 0 ? formatNumber(usdEq, 2) : '-'}
                                                         </div>
-                                                    </td>
+                                                    </div>
+
                                                     {!readOnly && (
-                                                        <td className="px-3 py-2 text-center">
-                                                            <button onClick={() => deleteItem(group.id, item.id)} className="text-red-400 hover:text-red-300 transition-colors">
-                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                        <div className="absolute top-2 right-2 lg:static lg:text-center opacity-100 lg:opacity-0 group-hover/row:opacity-100 transition-opacity">
+                                                            <button 
+                                                                type="button"
+                                                                onClick={() => deleteItem(group.id, item.id)} 
+                                                                className="p-1.5 text-red-400 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors border border-transparent hover:border-red-200"
+                                                                title="Delete Item"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
                                                             </button>
-                                                        </td>
+                                                        </div>
                                                     )}
-                                                </tr>
+                                                </div>
                                             );
                                         })}
-                                    </tbody>
-                                </table>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="py-8 text-center bg-gray-50/50 rounded-xl border border-dashed border-gray-200">
+                                    <p className="text-sm text-gray-500 font-medium italic">This group is currently empty.</p>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => addItemToGroup(group.id)} 
+                                        className="mt-2 text-sm text-blue-600 hover:text-blue-800 font-semibold underline-offset-2 hover:underline"
+                                    >
+                                        Add your first item
+                                    </button>
+                                </div>
+                            )}
+                            
+                            {/* Mobile Group Totals (Visible only on mobile) */}
+                            <div className="sm:hidden mt-4 pt-4 border-t border-gray-100 grid grid-cols-2 gap-3">
+                                <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                    <div className="text-[10px] font-bold text-gray-500 uppercase mb-1">Sub Total (IDR)</div>
+                                    <div className="text-sm font-bold text-green-600">{formatNumber(groupTotalIdr)}</div>
+                                </div>
+                                <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                    <div className="text-[10px] font-bold text-gray-500 uppercase mb-1">Sub Total (USD)</div>
+                                    <div className="text-sm font-bold text-blue-600">{formatNumber(groupTotalUsd, 2)}</div>
+                                </div>
                             </div>
-                        ) : (
-                            <div className="px-4 py-3 text-xs text-silver-dark italic bg-dark-bg/50 text-center">
-                                No items in this group.
-                            </div>
-                        )}
+                        </div>
                     </div>
                 );
             })}
 
             {/* Grand Total */}
             {groups.length > 0 && (
-                <div className="bg-dark-card border border-dark-border rounded-lg p-4 mt-6 flex flex-col md:flex-row items-center justify-between shadow-lg">
-                    <div className="text-sm font-semibold text-silver">GRAND TOTAL ESTIMATION</div>
-                    <div className="flex gap-8 mt-3 md:mt-0">
-                        <div className="text-right">
-                            <div className="text-xs text-silver-dark mb-1">Total IDR Equivalent</div>
-                            <div className="text-xl font-bold text-green-400">Rp {formatNumber(totalIdr)}</div>
+                <div className="glass-card bg-gradient-to-br from-white to-blue-50/30 border-t-4 border-t-blue-500 rounded-xl p-6 mt-8 flex flex-col md:flex-row items-center justify-between shadow-xl">
+                    <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 text-xl font-bold border border-blue-200 shadow-sm">
+                            Σ
                         </div>
+                        <div>
+                            <div className="text-lg font-bold text-gray-900 uppercase tracking-wider">Grand Total</div>
+                            <div className="text-xs text-gray-500 font-medium mt-0.5">Estimated quotation value</div>
+                        </div>
+                    </div>
+                    
+                    <div className="flex gap-8 mt-5 md:mt-0 w-full md:w-auto justify-between md:justify-end bg-white md:bg-transparent p-4 md:p-0 rounded-xl border md:border-none border-gray-100 shadow-sm md:shadow-none">
+                        <div className="text-left md:text-right">
+                            <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Total (IDR)</div>
+                            <div className="text-2xl font-black text-green-600">Rp {formatNumber(totalIdr)}</div>
+                        </div>
+                        <div className="w-px bg-gray-200 hidden md:block"></div>
                         <div className="text-right">
-                            <div className="text-xs text-silver-dark mb-1">Total USD Equivalent</div>
-                            <div className="text-xl font-bold text-blue-400">$ {(totalUsd).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                            <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Total (USD)</div>
+                            <div className="text-2xl font-black text-blue-600">$ {formatNumber(totalUsd, 2)}</div>
                         </div>
                     </div>
                 </div>

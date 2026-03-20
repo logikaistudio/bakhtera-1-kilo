@@ -37,12 +37,15 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
     const [isEditingCOGS, setIsEditingCOGS] = useState(false);
     const [editedShipment, setEditedShipment] = useState(shipment || {});
 
-    // PO Generation state
+    // PO Generation state — Multi-vendor support
     const [showPOVendorModal, setShowPOVendorModal] = useState(false);
     const [poVendors, setPOVendors] = useState([]);
-    const [selectedPOVendorId, setSelectedPOVendorId] = useState('');
     const [pendingPOItems, setPendingPOItems] = useState([]);
     const [pendingPOTotal, setPendingPOTotal] = useState(0);
+    // Multi-vendor assignment: { itemIdx: vendorId }
+    const [poItemVendorMap, setPoItemVendorMap] = useState({});
+    // Legacy single-vendor (still used as fallback)
+    const [selectedPOVendorId, setSelectedPOVendorId] = useState('');
 
     // Auto-population state
     const [vendors, setVendors] = useState([]);
@@ -61,6 +64,27 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
         }
     }, [shipment?.status]);
 
+    const [linkedDocs, setLinkedDocs] = useState({ hasPO: false, hasInvoice: false });
+
+    // Check linked docs
+    useEffect(() => {
+        const checkLinked = async () => {
+            if (!shipment?.id) return;
+            try {
+                const { count: poCount } = await supabase.from('blink_purchase_orders').select('*', { count: 'exact', head: true }).eq('shipment_id', shipment.id);
+                const { count: invCount } = await supabase.from('blink_invoices').select('*', { count: 'exact', head: true }).eq('shipment_id', shipment.id);
+                
+                setLinkedDocs({
+                    hasPO: poCount > 0,
+                    hasInvoice: invCount > 0
+                });
+            } catch (err) {
+                console.error("Error checking linked docs", err);
+            }
+        };
+        checkLinked();
+    }, [shipment?.id]);
+
     const [confirmAction, setConfirmAction] = useState(null);
     const [successMsg, setSuccessMsg] = useState('');
 
@@ -68,27 +92,27 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
     // Ops team: Submit → Approval Center → Manager Approve/Reject
     const statusConfig = {
         pending: { label: 'Pending', color: 'bg-gray-500/20 text-gray-400 border-gray-500/30', icon: Clock },
-        manager_approval: { label: 'Menunggu Persetujuan', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30', icon: Clock },
-        approved: { label: 'Disetujui', color: 'bg-green-500/20 text-green-400 border-green-500/30', icon: ShieldCheck },
-        rejected: { label: 'Ditolak', color: 'bg-red-500/20 text-red-400 border-red-500/30', icon: XCircle },
+        manager_approval: { label: 'Awaiting Approval', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30', icon: Clock },
+        approved: { label: 'Approved', color: 'bg-green-500/20 text-green-400 border-green-500/30', icon: ShieldCheck },
+        rejected: { label: 'Rejected', color: 'bg-red-500/20 text-red-400 border-red-500/30', icon: XCircle },
     };
 
     // Transitions visible in shipment modal (ops team only — not approve/reject)
     const statusTransitions = {
-        pending: [{ to: 'manager_approval', label: '📤 Ajukan Persetujuan', style: 'primary' }],
-        manager_approval: [{ to: 'pending', label: '↩ Batal Ajukan', style: 'secondary' }],
-        approved: [{ to: 'pending', label: '↩ Batalkan Persetujuan', style: 'secondary' }],
-        rejected: [{ to: 'pending', label: '↩ Kembalikan ke Pending', style: 'secondary' }],
+        pending: [{ to: 'manager_approval', label: '📤 Submit for Approval', style: 'primary' }],
+        manager_approval: [{ to: 'pending', label: '↩ Cancel Submission', style: 'secondary' }],
+        approved: [{ to: 'pending', label: '↩ Cancel Approval', style: 'secondary' }],
+        rejected: [{ to: 'pending', label: '↩ Return to Pending', style: 'secondary' }],
     };
 
     const handleStatusChangeRequest = (toStatus) => {
         const msgs = {
-            manager_approval: 'Kirim shipment ini ke Approval Center untuk persetujuan Manager?',
-            pending: 'Kembalikan status ke Pending?',
+            manager_approval: 'Submit this shipment to Approval Center for Manager approval?',
+            pending: 'Return status to Pending?',
         };
         setConfirmAction({
             toStatus,
-            message: msgs[toStatus] || `Ubah status ke ${toStatus}?`
+            message: msgs[toStatus] || `Change status to ${toStatus}?`
         });
     };
 
@@ -248,17 +272,32 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                         setSellingItems(quotation.service_items || quotation.serviceItems || []);
                     }
 
-                    // Only populate if fields are empty
+                    // Merge quotation fields into editedShipment — only fill if field is currently empty/null
                     setEditedShipment(prev => ({
                         ...prev,
                         customer: prev.customer || quotation.customer_name || '',
                         salesPerson: prev.salesPerson || quotation.sales_person || '',
                         origin: prev.origin || quotation.origin || '',
                         destination: prev.destination || quotation.destination || '',
+                        serviceType: prev.serviceType || quotation.service_type || '',
+                        cargoType: prev.cargoType || quotation.cargo_type || '',
                         weight: prev.weight || quotation.weight || '',
                         volume: prev.volume || quotation.volume || '',
+                        gross_weight: prev.gross_weight || prev.grossWeight || quotation.gross_weight || '',
+                        net_weight: prev.net_weight || prev.netWeight || quotation.net_weight || '',
+                        measure: prev.measure || quotation.measure || '',
                         commodity: prev.commodity || quotation.commodity || '',
-                        customerId: prev.customerId || quotation.customer_id || ''
+                        packages: prev.packages ||
+                            (quotation.quantity && quotation.package_type
+                                ? `${quotation.quantity} ${quotation.package_type}`
+                                : (quotation.package_type || '')),
+                        incoterm: prev.incoterm || quotation.incoterm || '',
+                        paymentTerms: prev.paymentTerms || quotation.payment_terms || '',
+                        notes: prev.notes || quotation.notes || '',
+                        customerId: prev.customerId || quotation.customer_id || '',
+                        quotedAmount: prev.quotedAmount || quotation.total_amount || '',
+                        currency: prev.currency || quotation.currency || 'USD',
+                        exchangeRate: prev.exchangeRate || quotation.exchange_rate || '',
                     }));
                 }
             } catch (error) {
@@ -316,7 +355,33 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
     // Sync editedShipment state when shipment prop changes
     useEffect(() => {
         if (shipment) {
-            setEditedShipment(shipment);
+            // Normalize all DB fields so editedShipment is always consistent
+            const normalizedShipment = {
+                ...shipment,
+                // Normalize camelCase / snake_case duplicates for cargo fields
+                gross_weight: shipment.gross_weight ?? shipment.grossWeight ?? null,
+                grossWeight: shipment.gross_weight ?? shipment.grossWeight ?? null,
+                net_weight: shipment.net_weight ?? shipment.netWeight ?? null,
+                netWeight: shipment.net_weight ?? shipment.netWeight ?? null,
+                packages: shipment.packages ?? null,
+                measure: shipment.measure ?? null,
+                incoterm: shipment.incoterm ?? null,
+                paymentTerms: shipment.payment_terms ?? shipment.paymentTerms ?? null,
+                shipping_mode: shipment.shipping_mode ?? shipment.shippingMode ?? null,
+                shippingMode: shipment.shipping_mode ?? shipment.shippingMode ?? null,
+                // Document fields
+                hbl: shipment.hbl ?? null,
+                mbl: shipment.mbl ?? null,
+                hawb: shipment.hawb ?? null,
+                mawb: shipment.mawb ?? null,
+                bl_number: shipment.bl_number ?? null,
+                awb_number: shipment.awb_number ?? null,
+                flight_number: shipment.flight_number ?? null,
+                voyage: shipment.voyage ?? null,
+                shipper_name: shipment.shipper_name ?? shipment.shipper ?? null,
+            };
+            setEditedShipment(normalizedShipment);
+            setShippingMode(normalizedShipment.shipping_mode || '');
             // Also sync containers, dates, COGS, and booking data
             setContainers(shipment.containers || []);
             setDates({
@@ -325,7 +390,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                 actualDeparture: shipment.actualDeparture || '',
                 actualArrival: shipment.actualArrival || '',
                 deliveryDate: shipment.deliveryDate || '',
-                blDate: shipment.blDate || ''
+                blDate: shipment.blDate || shipment.bl_date || ''
             });
             setCogsData(shipment.cogs || {
                 oceanFreight: '',
@@ -346,10 +411,10 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
             setBookingData(shipment.booking || {
                 vesselName: shipment.vessel_name || '',
                 voyageNumber: shipment.voyage || '',
-                portOfLoading: shipment.origin || '',
-                portOfDischarge: shipment.destination || '',
-                etd: '',
-                eta: ''
+                portOfLoading: shipment.port_of_loading || shipment.origin || '',
+                portOfDischarge: shipment.port_of_discharge || shipment.destination || '',
+                etd: shipment.etd || '',
+                eta: shipment.eta || ''
             });
             setDocuments(shipment.documents || []);
             // Sync selling and buying items — only update if incoming has data, or if local is empty
@@ -410,7 +475,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
 
     const handleGeneratePO = async () => {
         try {
-            // 1. Gather Items - only from buyingItems (actual costs with COA)
+            // 1. Gather Items — from COGS legacy fields + buyingItems
             const poItemsRaw = [];
 
             // Legacy COGS fields
@@ -467,9 +532,20 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                 }
             });
 
+            // If no cost items found, create a default item from shipment quoted amount
             if (poItemsRaw.length === 0) {
-                alert('No COGS/Actual Costs found to generate PO items.');
-                return;
+                const defaultAmount = parseFloat(String(shipment.quotedAmount || shipment.quoted_amount || 0).replace(/,/g, ''));
+                const jobNum = shipment.job_number || shipment.jobNumber || '-';
+                const serviceLabel = (shipment.serviceType || shipment.service_type || 'Freight').replace(/^\w/, c => c.toUpperCase());
+                poItemsRaw.push({
+                    item_name: `${serviceLabel} Services`,
+                    description: `Freight services for Job ${jobNum} - ${shipment.origin || ''} to ${shipment.destination || ''}`,
+                    qty: 1,
+                    unit: 'Job',
+                    unit_price: defaultAmount || 0,
+                    amount: defaultAmount || 0,
+                    coa_id: null
+                });
             }
 
             // 2. Fetch vendors from blink_business_partners
@@ -481,10 +557,13 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                 const val = p.is_vendor;
                 return val === true || val === 'true' || val === 1 || val === 't' || val === '1' || val === 'Y' || val === 'y' || String(val).toLowerCase() === 'true';
             });
-            console.log('Raw Vendors:', vendorDataRaw);
-            console.log('Filtered Vendors:', vendorData);
 
-            const totalAmount = poItemsRaw.reduce((sum, i) => sum + i.amount, 0);
+            const totalAmount = poItemsRaw.reduce((sum, i) => sum + (i.amount || 0), 0);
+
+            // Initialize vendor map — all items start unassigned
+            const initMap = {};
+            poItemsRaw.forEach((_, idx) => { initMap[idx] = ''; });
+            setPoItemVendorMap(initMap);
 
             // Store pending items and show vendor selection modal
             setPendingPOItems(poItemsRaw);
@@ -501,48 +580,107 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
 
     const handleConfirmGeneratePO = async () => {
         try {
-            if (!selectedPOVendorId) {
-                alert('Please select a vendor first.');
+            // Check: all items must be assigned to a vendor OR a default vendor is selected
+            const assignedMap = { ...poItemVendorMap };
+            const hasAnyAssigned = Object.values(assignedMap).some(v => v !== '');
+            const defaultVendorId = selectedPOVendorId;
+
+            if (!hasAnyAssigned && !defaultVendorId) {
+                alert('Please assign at least one vendor to the items, or select a default vendor for all items.');
                 return;
             }
 
-            const vendor = poVendors.find(v => v.id === selectedPOVendorId);
+            // Fill unassigned items with default vendor if provided
+            if (defaultVendorId) {
+                Object.keys(assignedMap).forEach(idx => {
+                    if (!assignedMap[idx]) assignedMap[idx] = defaultVendorId;
+                });
+            }
+
+            // Check any remaining unassigned
+            const unassigned = Object.values(assignedMap).filter(v => !v).length;
+            if (unassigned > 0) {
+                alert(`${unassigned} item(s) are not assigned to a vendor. Please assign all items or select a default vendor.`);
+                return;
+            }
+
+            // Group items by vendor
+            const vendorGroups = {};
+            pendingPOItems.forEach((item, idx) => {
+                const vid = assignedMap[idx];
+                if (!vendorGroups[vid]) vendorGroups[vid] = [];
+                vendorGroups[vid].push(item);
+            });
+
             const { generatePONumber } = await import('../../utils/documentNumbers');
-            const poNumber = await generatePONumber();
+            const basePONumber = await generatePONumber();
+            const vendorIds = Object.keys(vendorGroups);
+            const suffixes = vendorIds.length === 1 ? [''] : vendorIds.map((_, i) => String.fromCharCode(65 + i)); // A, B, C...
 
-            const newPO = {
-                po_number: poNumber,
-                vendor_id: vendor.id,
-                vendor_name: vendor.partner_name,
-                vendor_email: vendor.email || '',
-                vendor_phone: vendor.phone || '',
-                vendor_address: vendor.address || '',
-                po_date: new Date().toISOString().split('T')[0],
-                delivery_date: null,
-                payment_terms: 'NET 30',
-                po_items: pendingPOItems,
-                currency: cogsCurrency || 'IDR',
-                exchange_rate: parseFloat(exchangeRate) || 1,
-                subtotal: pendingPOTotal,
-                tax_rate: 0,
-                tax_amount: 0,
-                discount_amount: 0,
-                total_amount: pendingPOTotal,
-                status: 'draft',
-                shipment_id: shipment.id || null,
-                job_number: shipment.job_number || shipment.jobNumber || null,
-                notes: `Generated from Shipment Job: ${shipment.job_number || shipment.jobNumber}`
-            };
+            const createdPOs = [];
+            let hasError = false;
 
-            const { error } = await supabase
-                .from('blink_purchase_orders')
-                .insert([newPO])
-                .select();
+            for (let i = 0; i < vendorIds.length; i++) {
+                const vid = vendorIds[i];
+                const vendor = poVendors.find(v => v.id === vid);
+                if (!vendor) continue;
 
-            if (error) throw error;
+                const items = vendorGroups[vid];
+                const total = items.reduce((sum, it) => sum + (it.amount || 0), 0);
+                const poNumber = vendorIds.length === 1
+                    ? basePONumber
+                    : `${basePONumber}-${suffixes[i]}`;
+
+                const newPO = {
+                    po_number: poNumber,
+                    vendor_id: vendor.id,
+                    vendor_name: vendor.partner_name,
+                    vendor_email: vendor.email || '',
+                    vendor_phone: vendor.phone || '',
+                    vendor_address: vendor.address || '',
+                    po_date: new Date().toISOString().split('T')[0],
+                    delivery_date: null,
+                    payment_terms: 'NET 30',
+                    po_items: items,
+                    currency: cogsCurrency || 'IDR',
+                    exchange_rate: parseFloat(exchangeRate) || 1,
+                    subtotal: total,
+                    tax_rate: 0,
+                    tax_amount: 0,
+                    discount_amount: 0,
+                    total_amount: total,
+                    // Submit directly to Approval Center for journal recording
+                    status: 'manager_approval',
+                    shipment_id: shipment.id || null,
+                    quotation_id: shipment.quotation_id || shipment.quotationId || null,
+                    job_number: shipment.job_number || shipment.jobNumber || null,
+                    notes: `Generated from SO: ${shipment.so_number || shipment.soNumber || shipment.job_number || shipment.jobNumber} — Vendor: ${vendor.partner_name}`
+                };
+
+                const { error } = await supabase
+                    .from('blink_purchase_orders')
+                    .insert([newPO]);
+
+                if (error) {
+                    console.error(`Error creating PO for vendor ${vendor.partner_name}:`, error);
+                    hasError = true;
+                } else {
+                    createdPOs.push({ poNumber, vendorName: vendor.partner_name, total });
+                }
+            }
 
             setShowPOVendorModal(false);
-            alert(`✅ Purchase Order ${poNumber} generated successfully!`);
+
+            if (createdPOs.length > 0) {
+                const summary = createdPOs.map(p => `• ${p.poNumber} — ${p.vendorName} (${cogsCurrency || 'IDR'} ${p.total.toLocaleString('id-ID')})`).join('\n');
+                alert(
+                    `✅ ${createdPOs.length} Purchase Order berhasil dibuat dan dikirim ke Approval Center!\n\n${summary}\n\n📋 Setelah disetujui Manager, AP (Hutang) dan Jurnal akan otomatis tercatat di Laporan Keuangan.` +
+                    (hasError ? '\n\n⚠️ Sebagian PO gagal dibuat, periksa console untuk detail.' : '')
+                );
+            } else {
+                alert('❌ Semua PO gagal dibuat. Periksa console untuk detail.');
+            }
+
             onClose();
             navigate('/blink/finance/purchase-orders');
         } catch (error) {
@@ -912,7 +1050,19 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                 return;
             }
 
-            // 3. Create Invoice Object (if not existing)
+            // 3. Fetch default company bank account to embed in Invoice
+            const { data: bankAcctsData } = await supabase
+                .from('company_bank_accounts')
+                .select('id, bank_name, account_number, account_holder, currency')
+                .order('display_order', { ascending: true });
+            const bankAccts = bankAcctsData || [];
+            // Pick account matching invoice currency, or first
+            const defaultBank = bankAccts.find(b => b.currency === (shipment.currency || 'IDR')) || bankAccts[0] || null;
+            const paymentBankText = defaultBank
+                ? `${defaultBank.bank_name} | ${defaultBank.account_number}${defaultBank.account_holder ? ` a/n ${defaultBank.account_holder}` : ''}`
+                : null;
+
+            // 4. Create Invoice Object (if not existing)
             const newInvoice = {
                 invoice_number: invoiceNumber,
                 invoice_date: new Date().toISOString().split('T')[0],
@@ -933,7 +1083,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                 tax_amount: taxAmount,
                 total_amount: totalAmount,
                 outstanding_amount: totalAmount,
-                status: 'draft',
+                status: 'manager_approval',  // Goes straight to Approval Center for journal recording
                 invoice_items: invoiceItems,
                 cogs_items: cogsItems,
                 cogs_subtotal: cogsSubtotal,
@@ -951,6 +1101,11 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                 goods_description: shipment.commodity || '',
                 chargeable_weight: parseFloat(shipment.chargeable_weight || shipment.weight) || 0,
                 packages: shipment.packages || '',
+                // sales_person is not in blink_invoices schema
+                // Bank account for payment — used by AR module to validate received payment account
+                payment_bank_id: defaultBank?.id || null,
+                bank_account_id: defaultBank?.id || null,
+                bank_details: paymentBankText,
                 notes: `Generated from Shipment: ${shipment.jobNumber}`
             };
 
@@ -961,7 +1116,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
 
             if (error) throw error;
 
-            alert(`✅ Invoice ${invoiceNumber} created successfully with ${invoiceItems.length} line item(s)!`);
+            alert(`✅ Invoice ${invoiceNumber} dibuat dan dikirim ke Approval Center!\n\n📋 Invoice menunggu persetujuan Manager.\nSetelah disetujui, Piutang (AR) dan Jurnal akan otomatis tercatat di Laporan Keuangan.`);
             onClose();
             navigate('/blink/finance/invoices');
         } catch (error) {
@@ -1118,6 +1273,12 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                     // Numeric fields - safely convert
                     quoted_amount: safeNumber(editedShipment.quotedAmount),
                     measure: safeNumber(editedShipment.measure),
+                    // Trade terms
+                    incoterm: editedShipment.incoterm || null,
+                    payment_terms: editedShipment.paymentTerms || editedShipment.payment_terms || null,
+                    // Sales info
+                    sales_person: editedShipment.salesPerson || null,
+                    notes: editedShipment.notes || null,
                     // Booking & Dates fields - convert empty strings to null
                     etd: dates.etd || null,
                     eta: dates.eta || null,
@@ -1152,6 +1313,10 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                 shippingMode: shippingMode || null,
                 shipping_mode: shippingMode || null,
                 containers: containers,
+                // Trade terms
+                incoterm: editedShipment.incoterm || null,
+                paymentTerms: editedShipment.paymentTerms || null,
+                payment_terms: editedShipment.paymentTerms || null,
             };
             onUpdate(updatedShipment, true); // skipDbUpdate = true (already saved above)
             setIsEditing(false);
@@ -1338,31 +1503,45 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                             Edit
                                         </Button>
                                     )}
-                                    {canCreatePO && activeTab === 'cogs' && calculateTotalCOGS() > 0 && currentStatus === 'approved' && (
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={handleGeneratePO}
-                                            title="Generate a Purchase Order from actual costs"
-                                        >
-                                            Generate PO
-                                        </Button>
+                                    {/* Generate PO — visible from all tabs when approved */}
+                                    {canCreatePO && currentStatus === 'approved' && (
+                                        linkedDocs.hasPO ? (
+                                            <span className="text-xs text-green-500 bg-green-500/10 border border-green-500/30 px-3 py-1.5 rounded font-medium inline-flex items-center gap-1 cursor-default">
+                                                <CheckCircle className="w-3.5 h-3.5" /> PO Created
+                                            </span>
+                                        ) : (
+                                            <Button
+                                                size="sm"
+                                                variant="primary"
+                                                icon={FileText}
+                                                onClick={handleGeneratePO}
+                                                title="Generate a Purchase Order from actual costs"
+                                            >
+                                                Generate PO
+                                            </Button>
+                                        )
                                     )}
-                                    {activeTab === 'cogs' && calculateTotalCOGS() > 0 && currentStatus !== 'approved' && (
+                                    {canCreatePO && currentStatus !== 'approved' && (
                                         <span className="text-xs text-yellow-400 bg-yellow-500/10 border border-yellow-500/30 px-2 py-1 rounded" title="Shipment must be approved first">
                                             🔒 Approve to unlock PO
                                         </span>
                                     )}
                                     {currentStatus === 'approved' ? (
-                                        <Button
-                                            size="sm"
-                                            variant="primary"
-                                            icon={Receipt}
-                                            onClick={handleGenerateInvoice}
-                                            title="Create Invoice from this Shipment"
-                                        >
-                                            Create Inv
-                                        </Button>
+                                        linkedDocs.hasInvoice ? (
+                                            <span className="text-xs text-green-500 bg-green-500/10 border border-green-500/30 px-3 py-1.5 rounded font-medium inline-flex items-center gap-1 cursor-default">
+                                                <CheckCircle className="w-3.5 h-3.5" /> Inv Created
+                                            </span>
+                                        ) : (
+                                            <Button
+                                                size="sm"
+                                                variant="primary"
+                                                icon={Receipt}
+                                                onClick={handleGenerateInvoice}
+                                                title="Create Invoice from this Shipment"
+                                            >
+                                                Create Inv
+                                            </Button>
+                                        )
                                     ) : (
                                         <span className="text-xs text-yellow-400 bg-yellow-500/10 border border-yellow-500/30 px-2 py-1 rounded" title="Shipment must be approved first">
                                             🔒 Approve to invoice
@@ -1509,9 +1688,29 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                                     <label className="text-silver-dark text-xs">Sales Person</label>
                                                     <input
                                                         type="text"
-                                                        value={editedShipment.salesPerson}
+                                                        value={editedShipment.salesPerson || ''}
                                                         onChange={(e) => setEditedShipment({ ...editedShipment, salesPerson: e.target.value })}
                                                         className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-silver-dark text-xs">Incoterm</label>
+                                                    <input
+                                                        type="text"
+                                                        value={editedShipment.incoterm || ''}
+                                                        onChange={(e) => setEditedShipment({ ...editedShipment, incoterm: e.target.value })}
+                                                        className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light"
+                                                        placeholder="e.g. FOB, CIF, EXW"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-silver-dark text-xs">Payment Terms</label>
+                                                    <input
+                                                        type="text"
+                                                        value={editedShipment.paymentTerms || editedShipment.payment_terms || ''}
+                                                        onChange={(e) => setEditedShipment({ ...editedShipment, paymentTerms: e.target.value })}
+                                                        className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light"
+                                                        placeholder="e.g. Net 30 Days"
                                                     />
                                                 </div>
                                             </>
@@ -1525,6 +1724,18 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                                     <span className="text-silver-dark">Sales Person:</span>
                                                     <span className="text-silver-light">{shipment.salesPerson || '-'}</span>
                                                 </div>
+                                                {(shipment.incoterm) && (
+                                                    <div className="flex justify-between">
+                                                        <span className="text-silver-dark">Incoterm:</span>
+                                                        <span className="text-accent-orange font-semibold">{shipment.incoterm}</span>
+                                                    </div>
+                                                )}
+                                                {(shipment.paymentTerms || shipment.payment_terms) && (
+                                                    <div className="flex justify-between">
+                                                        <span className="text-silver-dark">Payment Terms:</span>
+                                                        <span className="text-silver-light">{shipment.paymentTerms || shipment.payment_terms}</span>
+                                                    </div>
+                                                )}
                                             </>
                                         )}
                                         <div className="flex justify-between">
@@ -2684,96 +2895,156 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                 </div>
             </Modal >
 
-            {/* Generate PO - Vendor Selector Modal */}
+            {/* Generate PO - Multi-Vendor Selector Modal */}
             <Modal
                 isOpen={showPOVendorModal}
                 onClose={() => setShowPOVendorModal(false)}
                 title="Generate Purchase Order"
-                size="medium"
+                size="large"
             >
                 <div className="space-y-5">
-                    {/* PO Items Preview */}
-                    <div>
-                        <p className="text-sm font-medium text-silver mb-3">
-                            PO Items Preview ({pendingPOItems.length} items)
+                    {/* Info Banner */}
+                    <div className="flex items-start gap-2 px-3 py-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                        <span className="text-blue-400 text-sm mt-0.5">ℹ️</span>
+                        <p className="text-xs text-blue-300">
+                            Assign setiap item ke vendor yang sesuai. Item dengan vendor sama akan digabung dalam satu PO.
+                            Jika semua item ke vendor yang sama, pilih <b>Default Vendor</b> saja.
                         </p>
-                        <div className="max-h-52 overflow-y-auto rounded-lg border border-dark-border">
-                            <table className="w-full text-xs">
-                                <thead className="bg-dark-surface sticky top-0">
+                    </div>
+
+                    {/* Default Vendor (applies to all unassigned items) */}
+                    <div>
+                        <label className="block text-sm font-medium text-silver mb-2">
+                            Default Vendor <span className="text-silver-dark text-xs">(untuk item yang tidak di-assign secara spesifik)</span>
+                        </label>
+                        {poVendors.length === 0 ? (
+                            <div className="px-3 py-3 bg-yellow-50 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/30 rounded-lg text-yellow-600 dark:text-yellow-400 text-sm">
+                                ⚠️ No vendor mitra found. Add vendors in Blink Master Data → Business Partners.
+                            </div>
+                        ) : (
+                            <select
+                                value={selectedPOVendorId}
+                                onChange={e => setSelectedPOVendorId(e.target.value)}
+                                className="w-full px-3 py-2.5 bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded-lg text-gray-900 dark:text-silver-light text-sm focus:ring-2 focus:ring-accent-orange/20 focus:border-accent-orange outline-none transition-all shadow-sm"
+                            >
+                                <option value="">— Pilih Default Vendor (opsional) —</option>
+                                {poVendors.map(v => (
+                                    <option key={v.id} value={v.id}>
+                                        {v.partner_name}{v.partner_code ? ` (${v.partner_code})` : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
+                    </div>
+
+                    {/* Per-Item Vendor Assignment Table */}
+                    <div>
+                        <p className="text-sm font-medium text-gray-700 dark:text-silver mb-2 hidden">
+                            Assign Vendor Per Item ({pendingPOItems.length} items)
+                        </p>
+                        <div className="rounded-xl border border-gray-200 dark:border-dark-border overflow-hidden bg-white dark:bg-dark-card shadow-sm">
+                            <table className="w-full text-sm">
+                                <thead className="bg-gray-50 dark:bg-dark-surface border-b border-gray-200 dark:border-dark-border">
                                     <tr>
-                                        <th className="px-3 py-2 text-left text-silver-dark">Item</th>
-                                        <th className="px-3 py-2 text-left text-silver-dark">Description</th>
-                                        <th className="px-3 py-2 text-center text-silver-dark">Qty</th>
-                                        <th className="px-3 py-2 text-right text-silver-dark">Amount</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-silver-dark uppercase tracking-wider">Item</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-silver-dark uppercase tracking-wider">Description</th>
+                                        <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-silver-dark uppercase tracking-wider">Qty</th>
+                                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 dark:text-silver-dark uppercase tracking-wider">Amount</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-silver-dark uppercase tracking-wider min-w-[200px]">Vendor <span className="text-red-500">*</span></th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-dark-border">
-                                    {pendingPOItems.map((item, idx) => (
-                                        <tr key={idx} className="hover:bg-dark-surface/50">
-                                            <td className="px-3 py-2 text-blue-300 font-medium">{item.item_name}</td>
-                                            <td className="px-3 py-2 text-silver-light">{item.description}</td>
-                                            <td className="px-3 py-2 text-center text-silver-dark">{item.qty}</td>
-                                            <td className="px-3 py-2 text-right text-green-400 font-mono">
-                                                {item.amount.toLocaleString('id-ID')}
-                                            </td>
-                                        </tr>
-                                    ))}
+                                <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
+                                    {pendingPOItems.map((item, idx) => {
+                                        const assignedVid = poItemVendorMap[idx] || '';
+                                        const assignedVendor = poVendors.find(v => v.id === assignedVid);
+                                        const effectiveVid = assignedVid || selectedPOVendorId;
+                                        const effectiveVendor = poVendors.find(v => v.id === effectiveVid);
+                                        return (
+                                            <tr key={idx} className={`hover:bg-gray-50 dark:hover:bg-dark-surface/50 transition-colors ${effectiveVid ? 'bg-green-50/30 dark:bg-green-500/5' : 'bg-orange-50/50 dark:bg-yellow-500/5'}`}>
+                                                <td className="px-4 py-3 text-gray-900 dark:text-blue-300 font-medium">{item.item_name}</td>
+                                                <td className="px-4 py-3 text-gray-600 dark:text-silver-light">{item.description}</td>
+                                                <td className="px-4 py-3 text-center text-gray-500 dark:text-silver-dark">{item.qty}</td>
+                                                <td className="px-4 py-3 text-right text-gray-900 dark:text-green-400 font-mono font-medium">
+                                                    {(item.amount || 0).toLocaleString('id-ID')}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <select
+                                                        value={assignedVid}
+                                                        onChange={e => setPoItemVendorMap(prev => ({ ...prev, [idx]: e.target.value }))}
+                                                        className="w-full px-3 py-1.5 bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded-md text-gray-900 dark:text-silver-light text-sm focus:ring-2 focus:ring-accent-orange/20 focus:border-accent-orange outline-none shadow-sm transition-all"
+                                                    >
+                                                        <option value="">— Default —</option>
+                                                        {poVendors.map(v => (
+                                                            <option key={v.id} value={v.id}>{v.partner_name}</option>
+                                                        ))}
+                                                    </select>
+                                                    {effectiveVendor && (
+                                                        <p className="text-xs text-green-600 dark:text-green-400 mt-1.5 font-medium flex items-center gap-1">
+                                                            <span className="text-gray-400 dark:text-gray-500">→</span> {effectiveVendor.partner_name}
+                                                        </p>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
-                                <tfoot className="bg-dark-card border-t border-accent-orange/50">
+                                <tfoot className="bg-gray-50 dark:bg-dark-card border-t border-gray-200 dark:border-accent-orange/50">
                                     <tr>
-                                        <td colSpan="3" className="px-3 py-2 text-right font-bold text-silver-light text-xs">TOTAL</td>
-                                        <td className="px-3 py-2 text-right font-bold text-accent-orange text-sm font-mono">
+                                        <td colSpan="3" className="px-4 py-3 text-right font-bold text-gray-500 dark:text-silver-light text-xs tracking-wider">TOTAL</td>
+                                        <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-accent-orange text-base font-mono">
                                             {cogsCurrency} {pendingPOTotal.toLocaleString('id-ID')}
                                         </td>
+                                        <td />
                                     </tr>
                                 </tfoot>
                             </table>
                         </div>
                     </div>
 
-                    {/* Vendor Selection */}
-                    <div>
-                        <label className="block text-sm font-medium text-silver mb-2">
-                            Select Vendor (Blink Mitra) <span className="text-red-400">*</span>
-                        </label>
-                        {poVendors.length === 0 ? (
-                            <div className="px-3 py-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-yellow-400 text-sm">
-                                ⚠️ No vendor mitra found. Please add vendors in Blink Master Data → Business Partners and check the "Vendor" role.
-                            </div>
-                        ) : (
-                            <div className="space-y-1 max-h-52 overflow-y-auto rounded-lg border border-dark-border">
-                                {poVendors.map(v => (
-                                    <button
-                                        type="button"
-                                        key={v.id}
-                                        onClick={() => setSelectedPOVendorId(v.id)}
-                                        className={`w-full text-left px-4 py-3 transition-colors flex items-center justify-between ${selectedPOVendorId === v.id
-                                            ? 'bg-accent-orange/30 border-l-4 border-accent-orange text-accent-orange'
-                                            : 'bg-dark-surface hover:bg-dark-card text-silver-light'
-                                            }`}
-                                    >
-                                        <div>
-                                            <span className="font-medium">{v.partner_name}</span>
-                                            {v.partner_code && <span className="ml-2 text-xs text-silver-dark">({v.partner_code})</span>}
+                    {/* PO Grouping Preview */}
+                    {poVendors.length > 0 && (() => {
+                        // Live preview of groups
+                        const previewMap = { ...poItemVendorMap };
+                        if (selectedPOVendorId) {
+                            Object.keys(previewMap).forEach(k => { if (!previewMap[k]) previewMap[k] = selectedPOVendorId; });
+                        }
+                        const groups = {};
+                        pendingPOItems.forEach((item, idx) => {
+                            const vid = previewMap[idx];
+                            if (!vid) return;
+                            const vname = poVendors.find(v => v.id === vid)?.partner_name || vid;
+                            if (!groups[vname]) groups[vname] = { count: 0, total: 0 };
+                            groups[vname].count++;
+                            groups[vname].total += item.amount || 0;
+                        });
+                        const vendorCount = Object.keys(groups).length;
+                        if (vendorCount === 0) return null;
+                        return (
+                            <div className="bg-dark-surface rounded-lg p-3 border border-dark-border">
+                                <p className="text-xs font-semibold text-silver-dark mb-2">
+                                    📦 Preview: {vendorCount} PO akan dibuat
+                                </p>
+                                <div className="space-y-1">
+                                    {Object.entries(groups).map(([vname, { count, total }], i) => (
+                                        <div key={vname} className="flex items-center justify-between text-xs">
+                                            <span className="text-silver-light">
+                                                <span className="font-mono text-accent-orange mr-1">{vendorCount > 1 ? `PO-xxx-${String.fromCharCode(65 + i)}` : 'PO-xxx'}</span>
+                                                → {vname} ({count} item)
+                                            </span>
+                                            <span className="text-green-400 font-mono">{cogsCurrency} {total.toLocaleString('id-ID')}</span>
                                         </div>
-                                        {selectedPOVendorId === v.id && (
-                                            <span className="text-accent-orange text-sm">✓ Selected</span>
-                                        )}
-                                    </button>
-                                ))}
+                                    ))}
+                                </div>
                             </div>
-                        )}
-                    </div>
+                        );
+                    })()}
 
-                    <div className="flex justify-end gap-2 pt-2">
+                    <div className="flex justify-end gap-2 pt-2 border-t border-dark-border">
                         <Button variant="secondary" onClick={() => setShowPOVendorModal(false)}>
                             Cancel
                         </Button>
-                        <Button
-                            onClick={handleConfirmGeneratePO}
-                            disabled={!selectedPOVendorId}
-                        >
-                            Generate PO
+                        <Button onClick={handleConfirmGeneratePO}>
+                            Generate PO(s)
                         </Button>
                     </div>
                 </div>

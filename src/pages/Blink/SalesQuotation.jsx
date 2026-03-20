@@ -18,7 +18,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 
 const SalesQuotation = () => {
-    const { canCreate, canEdit, canDelete, canApprove } = useAuth();
+    const { user, canCreate, canEdit, canDelete, canApprove } = useAuth();
     const navigate = useNavigate();
     const { customers, companySettings } = useData();
     const [showModal, setShowModal] = useState(false);
@@ -37,7 +37,7 @@ const SalesQuotation = () => {
         customerName: '',
         customerCompany: '',
         customerAddress: '',
-        salesPerson: '',
+        salesPerson: user?.full_name || user?.username || 'Unknown User',
         quotationType: 'RG', // Regular by default
         quotationDate: new Date().toISOString().split('T')[0], // Today's date
         origin: '',
@@ -919,6 +919,7 @@ const SalesQuotation = () => {
                     gross_weight: quotation.grossWeight || null,
                     net_weight: quotation.netWeight || null,
                     measure: quotation.measure || null,
+                    packages: quotation.quantity && quotation.packageType ? `${quotation.quantity} ${quotation.packageType}` : (quotation.packageType || null),
                     selling_items: quotation.serviceItems || [],
                     // === AUTO-CREATE BL/AWB DRAFT ===
                     bl_number: blNumber,
@@ -1193,18 +1194,9 @@ const SalesQuotation = () => {
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                             Person in Charge <span className="text-red-400">*</span>
                         </label>
-                        <select
-                            required
-                            value={formData.salesPerson}
-                            onChange={(e) => setFormData({ ...formData, salesPerson: e.target.value })}
-                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
-                        >
-                            <option value="">Select Person in Charge...</option>
-                            <option value="Operations">Operations</option>
-                            <option value="John Doe">John Doe</option>
-                            <option value="Jane Smith">Jane Smith</option>
-                            <option value="Bob Johnson">Bob Johnson</option>
-                        </select>
+                        <div className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-600 font-medium cursor-not-allowed">
+                            {formData.salesPerson || user?.full_name || user?.username || 'Account Executive'}
+                        </div>
                     </div>
 
                     {/* Quotation Type & Date */}
@@ -1714,13 +1706,9 @@ const SalesQuotation = () => {
                             </div>
                             <div>
                                 <p className="text-xs text-gray-500 font-medium mb-1">Person in Charge</p>
-                                <input
-                                    type="text"
-                                    value={isEditingQuotation ? (editedQuotation?.salesPerson || '') : (viewingQuotation.salesPerson || '')}
-                                    onChange={(e) => setEditedQuotation({ ...editedQuotation, salesPerson: e.target.value })}
-                                    disabled={!isEditingQuotation}
-                                    className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm disabled:bg-gray-100/50"
-                                />
+                                <div className="w-full px-2 py-1 bg-gray-100 border border-gray-300 rounded text-gray-700 text-sm cursor-not-allowed min-h-[28px]">
+                                    {isEditingQuotation ? (editedQuotation?.salesPerson || '') : (viewingQuotation.salesPerson || '')}
+                                </div>
                             </div>
                             <div>
                                 <p className="text-xs text-gray-500 font-medium mb-1">Quotation Type</p>
