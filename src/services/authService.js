@@ -157,7 +157,15 @@ export const validateSession = async (sessionToken) => {
 
 /**
  * Get user permissions based on user level and menu permissions.
- * Priority: user_menu_permissions (user-specific) overrides role_permissions (role-level).
+ * 
+ * Permission Resolution Order:
+ *   1. role_permissions  → primary authority (from "Manajemen Role & Akses" UI)
+ *   2. user_menu_permissions → NOT USED (legacy, disabled to avoid conflicts)
+ * 
+ * Previously user_menu_permissions would override role_permissions, causing
+ * stale per-user data to deny access even though the role grants it.
+ * Now the system relies solely on role_permissions for non-admin users.
+ * 
  * @param {string} userId - User ID
  * @param {string} userLevel - User level / role_id
  * @returns {Promise<object>} - Permissions object
@@ -184,14 +192,16 @@ export const getUserPermissions = async (userId, userLevel) => {
                 };
             });
 
+            console.debug(`[Auth] ${userLevel}: full access to ${menus?.length || 0} menus`);
             return permissions;
         }
 
         const isViewOnly = userLevel === 'view_only';
         const permissions = {};
 
-        // Step 1: Load role-level permissions from role_permissions table.
-        // This is what the Role Manager UI (Admin → Manajemen Role & Akses) configures.
+        // Load role-level permissions from role_permissions table.
+        // This is the SOLE source of truth for menu access.
+        // Configured via Admin → Manajemen Role & Akses.
         const { data: rolePerms } = await supabase
             .from('role_permissions')
             .select('*')
@@ -210,25 +220,14 @@ export const getUserPermissions = async (userId, userLevel) => {
             };
         });
 
-        // Step 2: Apply user-specific overrides from user_menu_permissions.
-        // These take priority over role-level permissions for the same menu_code.
-        const { data: userPermissions } = await supabase
-            .from('user_menu_permissions')
-            .select('*')
-            .eq('user_id', userId);
+        // NOTE: user_menu_permissions is intentionally NOT loaded here anymore.
+        // The old approach allowed stale per-user overrides to block access that
+        // the role had granted. Now all access is controlled via role_permissions.
+        // If per-user overrides are needed in the future, implement a proper
+        // sync mechanism that keeps user_menu_permissions in sync with role changes.
 
-        userPermissions?.forEach(perm => {
-            permissions[perm.menu_code] = {
-                can_access: perm.can_access,
-                can_view: perm.can_view,
-                can_create: isViewOnly ? false : perm.can_create,
-                can_edit: isViewOnly ? false : perm.can_edit,
-                can_delete: isViewOnly ? false : perm.can_delete,
-                can_approve: isViewOnly ? false : perm.can_approve,
-                requires_approval_for_edit: perm.requires_approval_for_edit ?? false,
-                requires_approval_for_delete: perm.requires_approval_for_delete ?? false
-            };
-        });
+        const accessibleCount = Object.values(permissions).filter(p => p.can_access).length;
+        console.debug(`[Auth] User role "${userLevel}": ${rolePerms?.length || 0} role entries, ${accessibleCount} accessible menus`);
 
         return permissions;
 

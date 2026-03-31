@@ -26,11 +26,11 @@ export const checkPermission = async (userId, userLevel, menuCode, permission, p
             return permissions[menuCode][`can_${permission}`] || false;
         }
 
-        // Load permission from database
+        // Load permission from role_permissions (sole source of truth)
         const { data, error } = await supabase
-            .from('user_menu_permissions')
+            .from('role_permissions')
             .select(`can_${permission}`)
-            .eq('user_id', userId)
+            .eq('role_id', userLevel)
             .eq('menu_code', menuCode)
             .single();
 
@@ -46,8 +46,9 @@ export const checkPermission = async (userId, userLevel, menuCode, permission, p
 
 /**
  * Get all permissions for a user
+ * Uses role_permissions as the sole source of truth (matching authService).
  * @param {string} userId - User ID
- * @param {string} userLevel - User level
+ * @param {string} userLevel - User level / role_id
  * @returns {Promise<object>} - Permissions object keyed by menu_code
  */
 export const getUserPermissions = async (userId, userLevel) => {
@@ -75,38 +76,27 @@ export const getUserPermissions = async (userId, userLevel) => {
             return permissions;
         }
 
-        // Get user-specific permissions
-        const { data: userPerms } = await supabase
-            .from('user_menu_permissions')
-            .select('*')
-            .eq('user_id', userId);
-
+        const isViewOnly = userLevel === 'view_only';
         const permissions = {};
-        userPerms?.forEach(perm => {
-            // View only users can only view
-            if (userLevel === 'view_only') {
-                permissions[perm.menu_code] = {
-                    can_access: perm.can_access,
-                    can_view: perm.can_view,
-                    can_create: false,
-                    can_edit: false,
-                    can_delete: false,
-                    can_approve: false,
-                    requires_approval_for_edit: false,
-                    requires_approval_for_delete: false
-                };
-            } else {
-                permissions[perm.menu_code] = {
-                    can_access: perm.can_access,
-                    can_view: perm.can_view,
-                    can_create: perm.can_create,
-                    can_edit: perm.can_edit,
-                    can_delete: perm.can_delete,
-                    can_approve: perm.can_approve,
-                    requires_approval_for_edit: perm.requires_approval_for_edit,
-                    requires_approval_for_delete: perm.requires_approval_for_delete
-                };
-            }
+
+        // Load role-level permissions from role_permissions table.
+        // This is the SOLE source of truth, configured via Admin → Manajemen Role & Akses.
+        const { data: rolePerms } = await supabase
+            .from('role_permissions')
+            .select('*')
+            .eq('role_id', userLevel);
+
+        rolePerms?.forEach(perm => {
+            permissions[perm.menu_code] = {
+                can_access: perm.can_access,
+                can_view: perm.can_view,
+                can_create: isViewOnly ? false : perm.can_create,
+                can_edit: isViewOnly ? false : perm.can_edit,
+                can_delete: isViewOnly ? false : perm.can_delete,
+                can_approve: isViewOnly ? false : perm.can_approve,
+                requires_approval_for_edit: perm.requires_approval_for_edit ?? false,
+                requires_approval_for_delete: perm.requires_approval_for_delete ?? false
+            };
         });
 
         return permissions;
