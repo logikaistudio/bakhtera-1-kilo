@@ -127,13 +127,32 @@ const GroupedServiceItemManager = ({
 
     const fetchAccounts = async () => {
         try {
+            // Map legacy coaType to new bridge COA master account_group
+            let groupName = 'Revenue';
+            if (coaType === 'COST' || coaType === 'EXPENSE') {
+                groupName = 'Expense';
+            } else if (coaType === 'ASSET') {
+                groupName = 'Asset';
+            } else if (coaType === 'LIABILITY') {
+                groupName = 'Liability';
+            } else if (coaType === 'EQUITY') {
+                groupName = 'Equity';
+            } else if (coaType) {
+                 // Try to match exact if passed
+                 // Default to Revenue if none matches exactly
+            }
+
             const { data, error } = await supabase
-                .from('finance_coa')
+                .from('code_of_accounts')
                 .select('*')
-                .eq('type', coaType)
+                .eq('account_group', groupName)
+                .eq('is_active', true)
                 .order('code');
+                
             if (!error && data) {
                 setAccounts(data);
+            } else if (error) {
+                console.error('Error fetching COA from code_of_accounts:', error);
             }
         } catch (error) {
             console.error('Error fetching COA:', error);

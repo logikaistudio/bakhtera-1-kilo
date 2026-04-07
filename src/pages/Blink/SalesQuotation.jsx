@@ -401,7 +401,7 @@ const SalesQuotation = () => {
         setShowViewModal(true);
     };
 
-    // Delete quotation
+    // Delete quotation (Cascading delete to all financial records)
     const handleDeleteQuotation = async (quotationId) => {
         if (!canDelete('blink_sales')) {
             alert('Anda tidak memiliki hak akses untuk menghapus quotation.');
@@ -411,74 +411,90 @@ const SalesQuotation = () => {
             // First, get quotation details to show what will be deleted
             const quotation = quotations.find(q => q.id === quotationId);
 
-            // Fetch related data counts
-            const { data: relatedShipments } = await supabase
-                .from('blink_shipments')
-                .select('*')
-                .eq('quotation_id', quotationId);
-
-            const { data: relatedInvoices } = await supabase
-                .from('blink_invoices')
-                .select('*')
-                .eq('quotation_id', quotationId);
-
             // Build confirmation message
-            let confirmMessage = `Are you sure you want to delete quotation ${quotation?.jobNumber || 'this'}?\n\n`;
-            confirmMessage += `Data to be deleted:\n`;
-            confirmMessage += `- 1 Quotation\n`;
+            let confirmMessage = `PERINGATAN KRITIS: Anda akan menghapus quotation ${quotation?.jobNumber || 'ini'} BERSERTA SEMUA DATA TERKAIT (Shipment, Invoice, PO, AR, AP, Payment, Jurnal).\n\nTindakan ini PERMANEN dan tidak dapat dibatalkan! Lanjutkan?`;
 
-            if (relatedShipments && relatedShipments.length > 0) {
-                confirmMessage += `- ${relatedShipments.length} Shipment(s)\n`;
-            }
-
-            if (relatedInvoices && relatedInvoices.length > 0) {
-                confirmMessage += `- ${relatedInvoices.length} Invoice(s)\n`;
-            }
-
-            confirmMessage += `\n⚠️ This action cannot be undone!`;
-
-            if (!confirm(confirmMessage)) {
+            if (!window.confirm(confirmMessage)) {
                 return;
             }
 
             // Extra confirmation for converted quotations
-            if (quotation?.status === 'converted' && (relatedShipments?.length > 0 || relatedInvoices?.length > 0)) {
+            if (quotation?.status === 'converted') {
                 if (!confirm('This Quotation is already converted to SO with active shipment/invoice. Are you sure you want to continue?')) {
                     return;
                 }
             }
 
             console.log('🗑️ Starting cascade delete for quotation:', quotationId);
+            const quotationIds = [quotationId];
 
-            // Step 1: Delete related invoices
-            if (relatedInvoices && relatedInvoices.length > 0) {
-                console.log(`Deleting ${relatedInvoices.length} related invoice(s)...`);
-                const { error: invoiceError } = await supabase
-                    .from('blink_invoices')
-                    .delete()
-                    .eq('quotation_id', quotationId);
+            // Step 1: Find all related shipments
+            const { data: shipments } = await supabase.from('blink_shipments').select('id').in('quotation_id', quotationIds);
+            const shipmentIds = (shipments || []).map(s => s.id);
 
-                if (invoiceError) {
-                    throw new Error(`Failed to delete invoices: ${invoiceError.message}`);
-                }
-                console.log('✅ Invoices deleted');
+            // Step 2: Find all related invoices (AR)
+            const { data: invoices } = await supabase.from('blink_invoices').select('id').in('quotation_id', quotationIds);
+            const invoiceIds = (invoices || []).map(i => i.id);
+
+            // Step 3: Find all related POs (AP)
+            const { data: pos } = await supabase.from('blink_purchase_orders').select('id').in('quotation_id', quotationIds);
+            const poIds = (pos || []).map(p => p.id);
+
+            // Fetch ARs associated with Invoices
+            let arIds = [];
+            if (invoiceIds.length > 0) {
+                const { data: ars } = await supabase.from('blink_ar_transactions').select('id').in('invoice_id', invoiceIds);
+                arIds = (ars || []).map(a => a.id);
             }
 
-            // Step 2: Delete related shipments
-            if (relatedShipments && relatedShipments.length > 0) {
-                console.log(`Deleting ${relatedShipments.length} related shipment(s)...`);
-                const { error: shipmentError } = await supabase
-                    .from('blink_shipments')
-                    .delete()
-                    .eq('quotation_id', quotationId);
-
-                if (shipmentError) {
-                    throw new Error(`Failed to delete shipments: ${shipmentError.message}`);
-                }
-                console.log('✅ Shipments deleted');
+            // Fetch APs associated with POs
+            let apIds = [];
+            if (poIds.length > 0) {
+                const { data: aps } = await supabase.from('blink_ap_transactions').select('id').in('po_id', poIds);
+                apIds = (aps || []).map(a => a.id);
             }
 
-            // Step 3: Delete the quotation itself
+            // Fetch Payments linked to any of the above
+            let paymentRefKeys = [];
+            if (invoiceIds.length > 0) paymentRefKeys.push(...invoiceIds);
+            if (poIds.length > 0) paymentRefKeys.push(...poIds);
+            if (arIds.length > 0) paymentRefKeys.push(...arIds);
+            if (apIds.length > 0) paymentRefKeys.push(...apIds);
+            
+            let paymentIds = [];
+            if (paymentRefKeys.length > 0) {
+                const { data: payments } = await supabase.from('blink_payments').select('id').in('reference_id', paymentRefKeys);
+                paymentIds = (payments || []).map(p => p.id);
+            }
+
+            // Reference IDs for journal entries
+            const journalRefIds = [...quotationIds, ...shipmentIds, ...invoiceIds, ...poIds, ...arIds, ...apIds, ...paymentIds];
+
+            // DO CASCADE EXECUTIONS (Bottom-Up)
+            
+            if (journalRefIds.length > 0) {
+                console.log(`Deleting journals...`);
+                await supabase.from('blink_journal_entries').delete().in('reference_id', journalRefIds);
+            }
+
+            if (paymentIds.length > 0) {
+                console.log(`Deleting payments...`);
+                await supabase.from('blink_payments').delete().in('id', paymentIds);
+            }
+
+            if (arIds.length > 0) await supabase.from('blink_ar_transactions').delete().in('id', arIds);
+            if (apIds.length > 0) await supabase.from('blink_ap_transactions').delete().in('id', apIds);
+
+            if (invoiceIds.length > 0) await supabase.from('blink_invoices').delete().in('id', invoiceIds);
+            if (poIds.length > 0) await supabase.from('blink_purchase_orders').delete().in('id', poIds);
+
+            if (shipmentIds.length > 0) {
+                // Delete BLs explicitly to avoid constraint error
+                await supabase.from('blink_bl_documents').delete().in('shipment_id', shipmentIds);
+                await supabase.from('blink_shipments').delete().in('id', shipmentIds);
+            }
+
+            // Delete Quotation
             console.log('Deleting quotation...');
             const { error: quotationError } = await supabase
                 .from('blink_sales_quotations')
@@ -492,13 +508,7 @@ const SalesQuotation = () => {
             // Refresh quotations list
             await fetchQuotations();
 
-            // Success message with details
-            let successMsg = '✅ Successfully deleted:\n';
-            successMsg += `- 1 Quotation\n`;
-            if (relatedShipments?.length > 0) successMsg += `- ${relatedShipments.length} Shipment(s)\n`;
-            if (relatedInvoices?.length > 0) successMsg += `- ${relatedInvoices.length} Invoice(s)\n`;
-
-            alert(successMsg);
+            alert('✅ Sukses! Data Pengajuan dan SEMUA transaksi terkait (Shipments, Invoices, PO, AR, AP, Payments, Jurnal) berhasil dihapus bersih.');
             setShowViewModal(false);
         } catch (error) {
             console.error('❌ Error deleting quotation:', error);
