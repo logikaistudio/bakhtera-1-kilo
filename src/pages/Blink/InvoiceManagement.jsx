@@ -289,16 +289,29 @@ const InvoiceManagement = () => {
                     volume: shipment.volume,
                     commodity: shipment.commodity
                 },
-                // Initialize with quoted amount as single line item
-                invoice_items: [{
-                    item_name: (shipment.service_type || 'Freight').toUpperCase(),
-                    description: `${(shipment.service_type || 'Freight').toUpperCase()} - ${shipment.origin} to ${shipment.destination}`,
-                    qty: 1,
-                    unit: 'Shipment',
-                    rate: shipment.quoted_amount || 0,
-                    amount: shipment.quoted_amount || 0,
-                    tax_amount: 0
-                }],
+                // Initialize with items from shipment selling items, or fallback to single line
+                invoice_items: shipment.selling_items && shipment.selling_items.length > 0
+                    ? shipment.selling_items.map(item => ({
+                        item_name: revenueAccounts.find(acc => acc.code === item.itemCode)?.name || item.itemCode || item.name || item.service_name || 'Item',
+                        description: item.description || item.name || '',
+                        qty: parseFloat(item.quantity) || parseFloat(item.qty) || 1,
+                        unit: item.unit || 'Job',
+                        rate: parseFloat(item.unitPrice) || parseFloat(item.price) || parseFloat(item.rate) || 0,
+                        amount: parseFloat(item.amount) || parseFloat(item.total) || 
+                            ((parseFloat(item.quantity) || 1) * (parseFloat(item.unitPrice) || parseFloat(item.price) || parseFloat(item.rate) || 0)),
+                        tax_amount: typeof item.tax_amount !== 'undefined' ? Number(item.tax_amount) : 0,
+                        tax_rate: typeof item.tax_rate !== 'undefined' ? Number(item.tax_rate) : 0,
+                        currency: item.currency || shipment.currency || 'IDR'
+                    }))
+                    : [{
+                        item_name: (shipment.service_type || 'Freight').toUpperCase(),
+                        description: `${(shipment.service_type || 'Freight').toUpperCase()} - ${shipment.origin} to ${shipment.destination}`,
+                        qty: 1,
+                        unit: 'Shipment',
+                        rate: shipment.quoted_amount || 0,
+                        amount: shipment.quoted_amount || 0,
+                        tax_amount: 0
+                    }],
                 // Extract COGS from shipment buying_items and old cogs JSON
                 cogs_items: (() => {
                     const extractedItems = [];
@@ -814,12 +827,16 @@ const InvoiceManagement = () => {
             // Generate items rows
             const itemsRows = invoice.invoice_items?.map((item, index) => `
                 <tr>
-                    <td style="vertical-align: top; text-transform: capitalize;">${String(item.description || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
-                    <td style="text-align: center; vertical-align: top;">${invoice.currency}</td>
-                    <td style="text-align: right; vertical-align: top;">${formatCurrency(item.amount || 0, invoice.currency).replace('Rp ', '').replace('$', '')}</td>
-                    <td style="text-align: right; vertical-align: top;">${formatCurrency(typeof item.tax_amount !== 'undefined' ? Number(item.tax_amount) : ((item.amount || 0) * (invoice.tax_rate || 0) / 100), invoice.currency).replace('Rp ', '').replace('$', '')}</td>
+                    <td style="text-align: center; vertical-align: top; border-bottom: 1px solid #ccc; border-right: 1px solid #ccc; padding: 4px 8px;">${index + 1}</td>
+                    <td style="vertical-align: top; text-transform: capitalize; border-bottom: 1px solid #ccc; border-right: 1px solid #ccc; padding: 4px 8px;">
+                        ${item.item_name ? `<b>${item.item_name}</b><br/>` : ''}<span style="color: #444;">${String(item.description || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>
+                    </td>
+                    <td style="text-align: center; vertical-align: top; border-bottom: 1px solid #ccc; border-right: 1px solid #ccc; padding: 4px 8px;">${item.qty || 1} ${item.unit || ''}</td>
+                    <td style="text-align: right; vertical-align: top; border-bottom: 1px solid #ccc; border-right: 1px solid #ccc; padding: 4px 8px;">${formatCurrency(item.rate || item.amount || 0, invoice.currency).replace('Rp ', '').replace('$', '')}</td>
+                    <td style="text-align: right; vertical-align: top; border-bottom: 1px solid #ccc; border-right: 1px solid #ccc; padding: 4px 8px;">${formatCurrency(typeof item.tax_amount !== 'undefined' ? Number(item.tax_amount) : ((item.amount || 0) * (invoice.tax_rate || 0) / 100), invoice.currency).replace('Rp ', '').replace('$', '')}</td>
+                    <td style="text-align: right; vertical-align: top; border-bottom: 1px solid #ccc; padding: 4px 8px; padding-right: 10px;">${formatCurrency(item.amount || 0, invoice.currency).replace('Rp ', '').replace('$', '')}</td>
                 </tr>
-            `).join('') || '<tr><td colspan="4" style="text-align: center; padding: 10px;">No items</td></tr>';
+            `).join('') || '<tr><td colspan="6" style="text-align: center; padding: 10px;">No items</td></tr>';
 
             const printContent = `
                 <!DOCTYPE html>
@@ -1036,14 +1053,16 @@ const InvoiceManagement = () => {
                         </div>
 
                         <!-- Charges -->
-                        <div style="margin-bottom: 2px; font-weight: bold; font-size: 11px;">CHARGES BREAKDOWN</div>
+                        <div style="margin-bottom: 2px; font-weight: bold; font-size: 11px; margin-top: 10px;">CHARGES BREAKDOWN</div>
                         <table class="charges-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 50%; text-align: left; padding-left: 10px;">DESCRIPTION</th>
-                                    <th style="width: 10%; text-align: center;">CURR</th>
-                                    <th style="width: 20%; text-align: right; padding-right: 10px;">AMOUNT</th>
-                                    <th style="width: 20%; text-align: right; padding-right: 10px;">TAX</th>
+                                    <th style="width: 5%; text-align: center;">NO</th>
+                                    <th style="width: 35%; text-align: left; padding-left: 10px;">DESCRIPTION</th>
+                                    <th style="width: 10%; text-align: center;">QTY</th>
+                                    <th style="width: 15%; text-align: right;">UNIT PRICE</th>
+                                    <th style="width: 15%; text-align: right;">TAX</th>
+                                    <th style="width: 20%; text-align: right; padding-right: 10px;">TOTAL</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -3428,14 +3447,16 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                         </div>
 
                         {/* Charges Table */}
-                        <div style={{ marginBottom: '2px', fontWeight: 'bold', fontSize: '11px' }}>CHARGES BREAKDOWN</div>
+                        <div style={{ marginBottom: '2px', fontWeight: 'bold', fontSize: '11px', marginTop: '10px' }}>CHARGES BREAKDOWN</div>
                         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '5px', border: '1px solid #000' }}>
                             <thead>
-                                <tr>
-                                    <th style={{ background: '#e0e0e0', borderBottom: '1px solid #000', padding: '6px 8px', textAlign: 'left', fontWeight: 'bold', fontSize: '11px', width: '50%', paddingLeft: '10px' }}>DESCRIPTION</th>
-                                    <th style={{ background: '#e0e0e0', borderBottom: '1px solid #000', padding: '6px 8px', textAlign: 'center', fontWeight: 'bold', fontSize: '11px', width: '10%' }}>CURR</th>
-                                    <th style={{ background: '#e0e0e0', borderBottom: '1px solid #000', padding: '6px 8px', textAlign: 'right', fontWeight: 'bold', fontSize: '11px', width: '20%', paddingRight: '10px' }}>AMOUNT</th>
-                                    <th style={{ background: '#e0e0e0', borderBottom: '1px solid #000', padding: '6px 8px', textAlign: 'right', fontWeight: 'bold', fontSize: '11px', width: '20%', paddingRight: '10px' }}>TAX</th>
+                                <tr style={{ background: '#e0e0e0' }}>
+                                    <th style={{ borderBottom: '1px solid #000', borderRight: '1px solid #ccc', padding: '6px 8px', textAlign: 'center', fontWeight: 'bold', fontSize: '11px', width: '5%' }}>NO</th>
+                                    <th style={{ borderBottom: '1px solid #000', borderRight: '1px solid #ccc', padding: '6px 8px', textAlign: 'left', fontWeight: 'bold', fontSize: '11px', width: '35%', paddingLeft: '10px' }}>DESCRIPTION</th>
+                                    <th style={{ borderBottom: '1px solid #000', borderRight: '1px solid #ccc', padding: '6px 8px', textAlign: 'center', fontWeight: 'bold', fontSize: '11px', width: '10%' }}>QTY</th>
+                                    <th style={{ borderBottom: '1px solid #000', borderRight: '1px solid #ccc', padding: '6px 8px', textAlign: 'right', fontWeight: 'bold', fontSize: '11px', width: '15%' }}>UNIT PRICE</th>
+                                    <th style={{ borderBottom: '1px solid #000', borderRight: '1px solid #ccc', padding: '6px 8px', textAlign: 'right', fontWeight: 'bold', fontSize: '11px', width: '15%' }}>TAX</th>
+                                    <th style={{ borderBottom: '1px solid #000', padding: '6px 8px', textAlign: 'right', fontWeight: 'bold', fontSize: '11px', width: '20%', paddingRight: '10px' }}>TOTAL ({printCurrency})</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -3445,15 +3466,24 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                                         const calcTax = calcAmount * (invoice.tax_rate || 0) / 100;
                                         return (
                                             <tr key={index}>
-                                                <td style={{ borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textTransform: 'capitalize' }}>
-                                                    {item.item_name ? <b>{item.item_name}</b> : null} {item.item_name ? '- ' : ''}{item.description}
-                                                    <div style={{ fontSize: '9px', color: '#555', marginTop: '2px' }}>
-                                                        {item.splitQty} {item.unit} x {formatCurrency(item.splitRate, printCurrency).replace('Rp ', '').replace('$', '')}
-                                                    </div>
+                                                <td style={{ borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textAlign: 'center' }}>
+                                                    {index + 1}
                                                 </td>
-                                                <td style={{ borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textAlign: 'center' }}>{printCurrency}</td>
-                                                <td style={{ borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textAlign: 'right' }}>{formatCurrency(calcAmount, printCurrency).replace('Rp ', '').replace('$', '')}</td>
-                                                <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textAlign: 'right' }}>{formatCurrency(calcTax, printCurrency).replace('Rp ', '').replace('$', '')}</td>
+                                                <td style={{ borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textTransform: 'capitalize' }}>
+                                                    {item.item_name ? <b>{item.item_name}</b> : null} {item.item_name ? '<br/>' : ''}<span style={{color: '#444'}}>{item.description}</span>
+                                                </td>
+                                                <td style={{ borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textAlign: 'center' }}>
+                                                    {item.splitQty} {item.unit}
+                                                </td>
+                                                <td style={{ borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textAlign: 'right' }}>
+                                                    {formatCurrency(item.splitRate, printCurrency).replace('Rp ', '').replace('$', '')}
+                                                </td>
+                                                <td style={{ borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textAlign: 'right' }}>
+                                                    {formatCurrency(calcTax, printCurrency).replace('Rp ', '').replace('$', '')}
+                                                </td>
+                                                <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textAlign: 'right', paddingRight: '10px' }}>
+                                                    {formatCurrency(calcAmount, printCurrency).replace('Rp ', '').replace('$', '')}
+                                                </td>
                                             </tr>
                                         );
                                     })

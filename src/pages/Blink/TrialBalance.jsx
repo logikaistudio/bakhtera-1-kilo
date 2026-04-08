@@ -159,6 +159,10 @@ const TrialBalance = () => {
         }
     };
 
+    const handleAccountClick = (accountId) => {
+        navigate('/blink/finance/general-ledger', { state: { preSelectedAccount: accountId } });
+    };
+
     const formatCurrency = (val) => {
         if (!val && val !== 0) return '-';
         return val.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
