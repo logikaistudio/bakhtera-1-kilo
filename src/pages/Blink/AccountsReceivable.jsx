@@ -55,7 +55,7 @@ const AccountsReceivable = () => {
             const { data: invoices, error: invoicesError } = await supabase
                 .from('blink_invoices')
                 .select('*')
-                .not('status', 'in', '("cancelled","draft","manager_approval")')
+                .not('status', 'in', '("cancelled","draft","manager_approval","waiting_approval","pending_approval")')
                 .order('invoice_date', { ascending: false });
 
             console.log('AR Query Result:', invoices?.length || 0, 'invoices found');
@@ -63,8 +63,10 @@ const AccountsReceivable = () => {
 
             if (invoicesError) throw invoicesError;
 
-            // Transform invoice data to AR format
-            const arData = (invoices || []).map(inv => ({
+            // Transform invoice data to AR format and double-check status
+            const arData = (invoices || [])
+                .filter(inv => !['draft', 'manager_approval', 'cancelled', 'waiting_approval'].includes(inv.status))
+                .map(inv => ({
                 id: inv.id,
                 ar_number: inv.invoice_number,
                 invoice_number: inv.invoice_number,
