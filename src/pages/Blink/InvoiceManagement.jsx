@@ -88,7 +88,8 @@ const InvoiceManagement = () => {
         paid: { label: 'Paid', color: 'bg-green-500/20 text-green-400', icon: CheckCircle },
         overdue: { label: 'Overdue', color: 'bg-red-500/20 text-red-400', icon: AlertCircle },
         cancelled: { label: 'Cancelled', color: 'bg-gray-500/20 text-gray-400', icon: XCircle },
-        unpaid: { label: 'Unpaid', color: 'bg-orange-500/20 text-orange-400', icon: Clock }
+        unpaid: { label: 'Unpaid', color: 'bg-orange-500/20 text-orange-400', icon: Clock },
+        manager_approval: { label: 'Manager Approval', color: 'bg-yellow-500/20 text-yellow-400', icon: Clock }
     };
 
     useEffect(() => {
@@ -174,6 +175,7 @@ const InvoiceManagement = () => {
             const { data, error } = await supabase
                 .from('blink_shipments')
                 .select('*')
+                .eq('status', 'approved')
                 .order('created_at', { ascending: false });
 
             if (error) {
@@ -458,6 +460,17 @@ const InvoiceManagement = () => {
         });
     };
 
+    const handleGlobalTaxRateChange = (rate) => {
+        setFormData(prev => ({
+            ...prev,
+            tax_rate: rate,
+            invoice_items: prev.invoice_items.map(item => {
+                const amount = item.amount || 0;
+                const taxAmount = amount * (rate / 100);
+                return { ...item, tax_rate: rate, tax_amount: taxAmount };
+            })
+        }));
+    };
     const calculateTotals = () => {
         const subtotal = formData.invoice_items.reduce((sum, item) => {
             let itemVal = item.amount || 0;
@@ -567,7 +580,7 @@ const InvoiceManagement = () => {
                 total_amount: total,
                 paid_amount: 0,
                 outstanding_amount: total,
-                status: 'unpaid',
+                status: 'draft',
                 // Selected payment bank account
                 payment_bank_id: formData.payment_bank_id || null,
                 // COGS and Profit fields
@@ -1797,9 +1810,7 @@ const InvoiceManagement = () => {
 };
 
 // Invoice Create Modal Component  
-const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFormData, selectedQuotation, selectedShipment,
-    referenceType, setReferenceType, handleQuotationSelect, handleShipmentSelect, handlePaymentTermsChange,
-    addInvoiceItem, removeInvoiceItem, updateInvoiceItem, calculateTotals,
+    addInvoiceItem, removeInvoiceItem, updateInvoiceItem, calculateTotals, handleGlobalTaxRateChange,
     handleCreateInvoice, formatCurrency, onClose, bankAccounts }) => {
 
     const { subtotal, taxAmount, total, cogsSubtotal, grossProfit, profitMargin } = calculateTotals();
@@ -2326,8 +2337,22 @@ const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFor
                     {/* Tax & Discount */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            {/* Tax Rate is now derived from items, hiding this input */}
-                            {/* Hidden since tax is calculated per item */}
+                            <label className="block text-[11px] font-semibold text-silver-light mb-1">
+                                Global Tax Rate (%)
+                            </label>
+                            <input
+                                type="number"
+                                value={formData.tax_rate}
+                                onChange={(e) => handleGlobalTaxRateChange(parseFloat(e.target.value) || 0)}
+                                className="w-full px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
+                                min="0"
+                                max="100"
+                                step="0.01"
+                                placeholder="e.g., 11"
+                            />
+                            <p className="text-[10px] text-silver-dark mt-1">
+                                Mengubah ini akan mengupdate semua item di atas
+                            </p>
                         </div>
 
                         <div>
@@ -3189,11 +3214,22 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
         });
     };
 
+    const [printTaxRate, setPrintTaxRate] = useState(invoice.tax_rate || 0);
+
     const isSplit = splitItems.some(item => !item.isSelected || item.splitQty !== (item.qty || 1) || item.splitRate !== (item.rate || 0));
 
     // Calculate split totals
     const splitSubtotal = splitItems.reduce((sum, item) => sum + (item.isSelected ? (item.splitQty * item.splitRate) : 0), 0);
-    const splitTax = splitSubtotal * (invoice.tax_rate || 0) / 100;
+    
+    // Improved tax calculation: sum of item taxes if possible, otherwise use global rate
+    const splitTax = splitItems.reduce((sum, item) => {
+        if (!item.isSelected) return sum;
+        const amount = item.splitQty * item.splitRate;
+        // If item has its own tax_rate, use it. Otherwise fallback to the printTaxRate
+        const taxRate = typeof item.tax_rate !== 'undefined' ? item.tax_rate : printTaxRate;
+        return sum + (amount * taxRate / 100);
+    }, 0);
+    
     const splitTotal = splitSubtotal + splitTax - (invoice.discount_amount || 0);
 
     const handleCurrencyFilter = (curr) => {
@@ -3240,6 +3276,17 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                                 value={splitLabel}
                                 onChange={(e) => setSplitLabel(e.target.value)}
                                 className="bg-dark-surface border border-dark-border text-silver-light px-2 py-1 rounded text-sm w-32 ml-1"
+                            />
+                        </div>
+
+                        <div className="flex items-center gap-2 bg-dark-bg p-2 rounded-lg border border-dark-border">
+                            <label className="text-xs text-silver-light font-medium whitespace-nowrap">Tax Rate (%):</label>
+                            <input
+                                type="number"
+                                step="0.01"
+                                value={printTaxRate}
+                                onChange={(e) => setPrintTaxRate(parseFloat(e.target.value) || 0)}
+                                className="bg-dark-surface border border-dark-border text-silver-light px-2 py-1 rounded text-sm w-20 ml-1 shadow-none"
                             />
                         </div>
 
@@ -3463,7 +3510,8 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                                 {splitItems.filter(item => item.isSelected).length > 0 ? (
                                     splitItems.filter(item => item.isSelected).map((item, index) => {
                                         const calcAmount = item.splitQty * item.splitRate;
-                                        const calcTax = calcAmount * (invoice.tax_rate || 0) / 100;
+                                        const taxRate = typeof item.tax_rate !== 'undefined' ? item.tax_rate : printTaxRate;
+                                        const calcTax = calcAmount * taxRate / 100;
                                         return (
                                             <tr key={index}>
                                                 <td style={{ borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textAlign: 'center' }}>
@@ -3507,7 +3555,7 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                                     <span>{formatCurrency(splitSubtotal, printCurrency)}</span>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', fontWeight: 'bold', fontSize: '11px', borderBottom: '1px solid #ccc' }}>
-                                    <span>TAX Total{invoice.tax_amount > 0 && invoice.tax_rate > 0 ? ` (${invoice.tax_rate}%)` : ''}</span>
+                                    <span>TAX Total{splitTax > 0 ? ` (${printTaxRate}%)` : ''}</span>
                                     <span>{formatCurrency(splitTax, printCurrency)}</span>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', fontWeight: 'bold', fontSize: '13px', background: '#333', color: 'white' }}>

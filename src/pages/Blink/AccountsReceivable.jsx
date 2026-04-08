@@ -55,8 +55,7 @@ const AccountsReceivable = () => {
             const { data: invoices, error: invoicesError } = await supabase
                 .from('blink_invoices')
                 .select('*')
-                .neq('status', 'cancelled')
-                .neq('status', 'draft')
+                .not('status', 'in', '("cancelled","draft","manager_approval")')
                 .order('invoice_date', { ascending: false });
 
             console.log('AR Query Result:', invoices?.length || 0, 'invoices found');

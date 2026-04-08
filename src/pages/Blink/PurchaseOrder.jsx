@@ -136,6 +136,7 @@ const PurchaseOrder = () => {
             const { data, error } = await supabase
                 .from('blink_shipments')
                 .select('id, customer, customer_id, origin, destination, job_number, so_number, cogs, cogs_currency, buying_items, service_type, status')
+                .eq('status', 'approved')
                 .order('created_at', { ascending: false });
             if (error) throw error;
             // Normalize field keys

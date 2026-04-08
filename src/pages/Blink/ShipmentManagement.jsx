@@ -240,6 +240,12 @@ const ShipmentManagement = () => {
             alert('Anda tidak memiliki hak akses untuk membuat PO.');
             return;
         }
+
+        // --- ENFORCE APPROVAL ---
+        if (ship.status !== 'approved') {
+            alert('Purchase Order hanya dapat dibuat untuk Shipment yang sudah di-Approve oleh Manager.');
+            return;
+        }
         try {
             // Gather buying items from the shipment
             const buyingItems = ship.buyingItems || ship.buying_items || [];
