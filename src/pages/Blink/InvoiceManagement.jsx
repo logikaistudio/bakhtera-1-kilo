@@ -1392,19 +1392,28 @@ const InvoiceManagement = () => {
 
 
     const filteredInvoices = invoices.filter(inv => {
-        const matchesFilter = filter === 'all' || inv.status === filter;
         const matchesSearch = !searchTerm ||
             inv.invoice_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             inv.job_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             inv.customer_name?.toLowerCase().includes(searchTerm.toLowerCase());
-        return matchesFilter && matchesSearch;
+
+        if (!matchesSearch) return false;
+
+        // Default: hide draft and manager_approval unless explicitly filtered
+        if (filter === 'all') {
+            return !['draft', 'manager_approval', 'cancelled'].includes(inv.status);
+        }
+
+        // Status filter
+        if (filter === 'unpaid') return inv.status === 'unpaid' || inv.status === 'partially_paid';
+        return inv.status === filter;
     });
 
-    // Calculate summary stats
-    const totalRevenue = invoices.reduce((sum, inv) =>
-        inv.status !== 'cancelled' ? sum + (inv.total_amount || 0) : sum, 0);
-    const totalOutstanding = invoices.reduce((sum, inv) => sum + (inv.outstanding_amount || 0), 0);
-    const overdueCount = invoices.filter(inv => inv.status === 'overdue').length;
+    // Calculate summary stats excluding draft, manager_approval and cancelled
+    const activeInvoices = invoices.filter(inv => !['draft', 'manager_approval', 'cancelled'].includes(inv.status));
+    const totalRevenue = activeInvoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
+    const totalOutstanding = activeInvoices.reduce((sum, inv) => sum + (inv.outstanding_amount || 0), 0);
+    const overdueCount = activeInvoices.filter(inv => inv.status === 'overdue').length;
 
     const handleExportXLS = () => {
         import('../../utils/exportXLS').then(({ exportToXLS }) => {
@@ -1542,7 +1551,7 @@ const InvoiceManagement = () => {
                         <p className="text-xs text-silver-dark">Total Invoices</p>
                         <FileText className="w-4 h-4 text-blue-400" />
                     </div>
-                    <p className="text-xl font-bold text-silver-light">{invoices.length}</p>
+                    <p className="text-xl font-bold text-silver-light">{activeInvoices.length}</p>
                 </div>
 
                 <div className="glass-card p-4 rounded-lg">
@@ -1598,69 +1607,66 @@ const InvoiceManagement = () => {
                                 <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">Tax</th>
                                 <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">Amount</th>
                                 <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">Outstanding</th>
+                                <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap">Status</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
                             {filteredInvoices.length === 0 ? (
                                 <tr>
-                                    <td colSpan="8" className="px-3 py-8 text-center">
-                                        <FileText className="w-10 h-10 text-silver-dark mx-auto mb-2" />
-                                        <p className="text-silver-dark text-sm">
+                                    <td colSpan="9" className="px-3 py-8 text-center text-silver-dark">
+                                        <FileText className="w-10 h-10 text-silver-dark mx-auto mb-2 opacity-50" />
+                                        <p className="text-sm">
                                             {filter === 'all'
-                                                ? 'Belum ada invoice. Klik "Buat Invoice Baru" untuk memulai.'
-                                                : `Tidak ada invoice dengan status "${statusConfig[filter]?.label}"`
-                                            }
+                                                ? 'Belum ada invoice yang diproses.'
+                                                : `Tidak ada invoice dengan status "${statusConfig[filter]?.label || filter}"`}
                                         </p>
                                     </td>
                                 </tr>
                             ) : (
-                                filteredInvoices.map((invoice) => {
-                                    const config = statusConfig[invoice.status];
-                                    const StatusIcon = config?.icon || FileText;
-                                    const daysOverdue = invoice.status === 'overdue'
-                                        ? Math.floor((new Date() - new Date(invoice.due_date)) / (1000 * 60 * 60 * 24))
-                                        : 0;
-
-                                    return (
-                                        <tr
-                                            key={invoice.id}
-                                            className="hover:bg-dark-surface smooth-transition cursor-pointer"
-                                            onClick={() => {
-                                                setSelectedInvoice(invoice);
-                                                setShowViewModal(true);
-                                            }}
-                                        >
-                                            <td className="px-3 py-2 whitespace-nowrap">
-                                                <span className="font-medium text-accent-orange">{invoice.invoice_number}</span>
-                                            </td>
-                                            <td className="px-3 py-2 whitespace-nowrap">
-                                                <span className="text-silver-light">{invoice.job_number}</span>
-                                            </td>
-                                            <td className="px-3 py-2 whitespace-nowrap">
-                                                <span className="text-silver-light">{invoice.customer_name}</span>
-                                            </td>
-                                            <td className="px-3 py-2 whitespace-nowrap">
-                                                <span className="text-silver-dark">{invoice.invoice_date}</span>
-                                            </td>
-                                            <td className="px-3 py-2 whitespace-nowrap">
-                                                <span className={`${invoice.status === 'overdue' ? 'text-red-400 font-semibold' : 'text-silver-dark'}`}>
-                                                    {invoice.due_date}
-                                                </span>
-                                            </td>
-                                            <td className="px-3 py-2 text-right whitespace-nowrap">
-                                                <span className="text-silver-dark">{formatCurrency(invoice.tax_amount || 0, invoice.currency)}</span>
-                                            </td>
-                                            <td className="px-3 py-2 text-right whitespace-nowrap">
-                                                <span className="font-semibold text-silver-light">{formatCurrency(invoice.subtotal ?? invoice.total_amount, invoice.currency)}</span>
-                                            </td>
-                                            <td className="px-3 py-2 text-right whitespace-nowrap">
-                                                <span className={`font-semibold ${invoice.outstanding_amount > 0 ? 'text-yellow-400' : 'text-green-400'}`}>
-                                                    {formatCurrency(invoice.outstanding_amount, invoice.currency)}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    );
-                                })
+                                filteredInvoices.map((invoice) => (
+                                    <tr
+                                        key={invoice.id}
+                                        className="hover:bg-dark-surface smooth-transition cursor-pointer"
+                                        onClick={() => {
+                                            setSelectedInvoice(invoice);
+                                            setShowViewModal(true);
+                                        }}
+                                    >
+                                        <td className="px-3 py-2 whitespace-nowrap">
+                                            <span className="font-medium text-accent-orange">{invoice.invoice_number}</span>
+                                        </td>
+                                        <td className="px-3 py-2 whitespace-nowrap">
+                                            <span className="text-silver-light">{invoice.job_number}</span>
+                                        </td>
+                                        <td className="px-3 py-2 whitespace-nowrap">
+                                            <span className="text-silver-light">{invoice.customer_name}</span>
+                                        </td>
+                                        <td className="px-3 py-2 whitespace-nowrap">
+                                            <span className="text-silver-dark">{invoice.invoice_date}</span>
+                                        </td>
+                                        <td className="px-3 py-2 whitespace-nowrap">
+                                            <span className={`${invoice.status === 'overdue' ? 'text-red-400 font-semibold' : 'text-silver-dark'}`}>
+                                                {invoice.due_date}
+                                            </span>
+                                        </td>
+                                        <td className="px-3 py-2 text-right whitespace-nowrap">
+                                            <span className="text-silver-dark">{formatCurrency(invoice.tax_amount || 0, invoice.currency)}</span>
+                                        </td>
+                                        <td className="px-3 py-2 text-right whitespace-nowrap">
+                                            <span className="font-semibold text-silver-light">{formatCurrency(invoice.subtotal ?? invoice.total_amount, invoice.currency)}</span>
+                                        </td>
+                                        <td className="px-3 py-2 text-right whitespace-nowrap">
+                                            <span className={`font-semibold ${invoice.outstanding_amount > 0 ? 'text-yellow-400' : 'text-green-400'}`}>
+                                                {formatCurrency(invoice.outstanding_amount, invoice.currency)}
+                                            </span>
+                                        </td>
+                                        <td className="px-3 py-2 text-center whitespace-nowrap">
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${statusConfig[invoice.status]?.color || 'bg-gray-500/20 text-gray-400'}`}>
+                                                {statusConfig[invoice.status]?.label || invoice.status}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))
                             )}
                         </tbody>
                     </table>

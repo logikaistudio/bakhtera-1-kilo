@@ -76,6 +76,7 @@ const SalesQuotation = () => {
         approved: { label: 'Approved', color: 'bg-green-500/20 text-green-400', icon: Check },
         rejected: { label: 'Rejected', color: 'bg-red-500/20 text-red-400', icon: X },
         converted: { label: 'SO Created', color: 'bg-emerald-500/20 text-emerald-400', icon: Check },
+        cancelled: { label: 'Cancelled', color: 'bg-red-500/20 text-red-400', icon: XCircle },
     };
 
     const serviceTypeIcons = {
@@ -402,6 +403,51 @@ const SalesQuotation = () => {
     };
 
     // Delete quotation (Cascading delete to all financial records)
+    // Handle cancel quotation (Cascading)
+    const handleCancelQuotation = async (quotationId) => {
+        if (!window.confirm('PERINGATAN: Membatalkan quotation ini akan otomatis membatalkan seluruh Shipment, Invoice, dan PO terkait. Lanjutkan?')) {
+            return;
+        }
+
+        try {
+            setLoading(true);
+
+            // 1. Find all related shipments to cancel them first
+            const { data: shipments } = await supabase
+                .from('blink_shipments')
+                .select('id')
+                .eq('quotation_id', quotationId);
+            
+            const shipmentIds = (shipments || []).map(s => s.id);
+
+            // 2. Cancel Quotation
+            await supabase.from('blink_sales_quotations').update({ status: 'cancelled' }).eq('id', quotationId);
+
+            // 3. Cancel Shipments
+            if (shipmentIds.length > 0) {
+                await supabase.from('blink_shipments').update({ status: 'cancelled' }).in('id', shipmentIds);
+                
+                // 4. Cancel Invoices linked to these shipments
+                await supabase.from('blink_invoices').update({ status: 'cancelled' }).in('shipment_id', shipmentIds);
+                
+                // 5. Cancel POs linked to these shipments
+                await supabase.from('blink_purchase_orders').update({ status: 'cancelled' }).in('shipment_id', shipmentIds);
+            }
+
+            // Also cancel invoices directly linked to quotation if any
+            await supabase.from('blink_invoices').update({ status: 'cancelled' }).eq('quotation_id', quotationId);
+            await supabase.from('blink_purchase_orders').update({ status: 'cancelled' }).eq('quotation_id', quotationId);
+
+            alert('Quotation dan seluruh alur terkait berhasil dibatalkan.');
+            fetchQuotations();
+        } catch (error) {
+            console.error('Error cancelling quotation:', error);
+            alert('Gagal membatalkan quotation: ' + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleDeleteQuotation = async (quotationId) => {
         if (!canDelete('blink_sales')) {
             alert('Anda tidak memiliki hak akses untuk menghapus quotation.');
@@ -1643,6 +1689,15 @@ const SalesQuotation = () => {
                                     <>
                                         <Button size="sm" variant="secondary" icon={Edit} onClick={handleEditQuotation}>
                                             Edit
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="danger"
+                                            icon={XCircle}
+                                            onClick={() => handleCancelQuotation(viewingQuotation.id)}
+                                            title="Batalkan quotation dan seluruh alur shipment/invoice terkait"
+                                        >
+                                            Batal
                                         </Button>
                                         <Button
                                             size="sm"

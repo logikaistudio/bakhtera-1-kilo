@@ -30,7 +30,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import COAPicker from '../Common/COAPicker';
 
-const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onViewAnalysis, canEditShipment = true, canCreatePO = true }) => {
+const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCancel, onViewAnalysis, canEditShipment = true, canCreatePO = true }) => {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('details');
     const [isEditing, setIsEditing] = useState(false);
@@ -1546,6 +1546,17 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onVi
                                         <span className="text-xs text-yellow-400 bg-yellow-500/10 border border-yellow-500/30 px-2 py-1 rounded" title="Shipment must be approved first">
                                             🔒 Approve to invoice
                                         </span>
+                                    )}
+                                    {canEditShipment && currentStatus !== 'cancelled' && (
+                                        <Button
+                                            size="sm"
+                                            variant="danger"
+                                            icon={XCircle}
+                                            onClick={() => onCancel(shipment.id)}
+                                            title="Batalkan shipment dan seluruh alur keuangan terkait"
+                                        >
+                                            Batal Shipment
+                                        </Button>
                                     )}
                                     <Button
                                         size="sm"

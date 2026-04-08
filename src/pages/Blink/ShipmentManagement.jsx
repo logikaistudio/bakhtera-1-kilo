@@ -150,6 +150,7 @@ const ShipmentManagement = () => {
         customs_clearance: { label: 'Customs', color: 'bg-orange-500/20 text-orange-400' },
         delivered: { label: 'Delivered', color: 'bg-cyan-500/20 text-cyan-400' },
         completed: { label: 'Completed', color: 'bg-emerald-500/20 text-emerald-400' },
+        cancelled: { label: 'Cancelled', color: 'bg-red-500/20 text-red-400' },
     };
 
     // Helper function to get shipment type from quotationType or type field
@@ -506,6 +507,45 @@ const ShipmentManagement = () => {
         }
     };
 
+    const handleCancelShipment = async (shipmentId) => {
+        if (!window.confirm('PERINGATAN: Membatalkan shipment ini akan otomatis membatalkan seluruh Invoice dan PO terkait. Lanjutkan?')) {
+            return;
+        }
+
+        try {
+            setLoading(true);
+            
+            // 1. Cancel Shipment
+            const { error: shErr } = await supabase
+                .from('blink_shipments')
+                .update({ status: 'cancelled' })
+                .eq('id', shipmentId);
+            if (shErr) throw shErr;
+
+            // 2. Cancel Invoices
+            const { error: invErr } = await supabase
+                .from('blink_invoices')
+                .update({ status: 'cancelled' })
+                .eq('shipment_id', shipmentId);
+            if (invErr) console.warn('Note: No invoices to cancel or error:', invErr);
+
+            // 3. Cancel POs
+            const { error: poErr } = await supabase
+                .from('blink_purchase_orders')
+                .update({ status: 'cancelled' })
+                .eq('shipment_id', shipmentId);
+            if (poErr) console.warn('Note: No POs to cancel or error:', poErr);
+
+            alert('Shipment dan seluruh alur terkait berhasil dibatalkan.');
+            fetchShipments();
+        } catch (error) {
+            console.error('Error cancelling shipment:', error);
+            alert('Gagal membatalkan shipment: ' + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -570,6 +610,7 @@ const ShipmentManagement = () => {
                                 <option value="customs_clearance">Customs Clearance</option>
                                 <option value="delivered">Delivered</option>
                                 <option value="completed">Completed</option>
+                                <option value="cancelled">Cancelled</option>
                             </select>
                         </div>
                         <div>
@@ -728,6 +769,7 @@ const ShipmentManagement = () => {
                 }}
                 shipment={selectedShipment}
                 onUpdate={handleUpdateShipment}
+                onCancel={handleCancelShipment}
                 onViewAnalysis={handleViewAnalysis}
                 canEditShipment={canEdit('blink_shipments')}
                 canCreatePO={canCreate('blink_purchase_order')}
