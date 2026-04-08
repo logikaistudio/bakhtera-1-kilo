@@ -1810,6 +1810,8 @@ const InvoiceManagement = () => {
 };
 
 // Invoice Create Modal Component  
+const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFormData, selectedQuotation, selectedShipment,
+    referenceType, setReferenceType, handleQuotationSelect, handleShipmentSelect, handlePaymentTermsChange,
     addInvoiceItem, removeInvoiceItem, updateInvoiceItem, calculateTotals, handleGlobalTaxRateChange,
     handleCreateInvoice, formatCurrency, onClose, bankAccounts }) => {
 
