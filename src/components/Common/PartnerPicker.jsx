@@ -109,11 +109,13 @@ const PartnerPicker = ({
 
     const getRoleBadges = (partner) => {
         const roles = [];
-        if (partner.is_customer) roles.push('C');
-        if (partner.is_vendor) roles.push('V');
-        if (partner.is_agent) roles.push('A');
-        if (partner.is_transporter) roles.push('T');
-        return roles.join('+');
+        if (partner.is_customer) roles.push('Cust');
+        if (partner.is_vendor) roles.push('Vend');
+        if (partner.is_agent) roles.push('Agent');
+        if (partner.is_consignee) roles.push('Consignee');
+        if (partner.is_shipper) roles.push('Shipper');
+        if (partner.is_transporter) roles.push('Transp');
+        return roles.join(', ');
     };
 
     return (
@@ -222,7 +224,7 @@ const PartnerPicker = ({
                         ${theme === 'light' ? 'border-gray-200' : 'border-dark-border bg-dark-surface/50 text-silver-dark'}`}
                         style={theme === 'light' ? { backgroundColor: '#f9fafb', color: '#6b7280' } : {}}
                     >
-                        <p>Tip: C=Customer, V=Vendor, A=Agent, T=Transporter</p>
+                        <p>Tip: Cust=Customer, Vend=Vendor, Agent=Agent, Consignee=Consignee, Shipper=Shipper, Transp=Transporter</p>
                     </div>
                 </div>
             )}

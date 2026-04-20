@@ -2735,6 +2735,8 @@ export const DataProvider = ({ children }) => {
 
     // Company Settings operations
     const fetchCompanySettings = async () => {
+        let retrievedSettings = null;
+
         try {
             console.log('🔄 Fetching company settings...');
             // Fetch company settings - use limit(1) instead of single() to avoid error
@@ -2751,6 +2753,7 @@ export const DataProvider = ({ children }) => {
                     console.warn('Warning: Could not fetch company settings:', settingsError.message);
                 } else if (settingsData && settingsData.length > 0) {
                     console.log('✅ Company settings loaded:', settingsData[0]);
+                    retrievedSettings = settingsData[0];
                     setCompanySettings(settingsData[0]);
                 } else {
                     console.log('ℹ️ No company settings found');
@@ -2777,6 +2780,8 @@ export const DataProvider = ({ children }) => {
         } catch (error) {
             console.warn('Error in fetchCompanySettings (non-critical):', error);
         }
+
+        return retrievedSettings;
     };
 
     const updateCompanySettings = async (settings) => {
@@ -2819,7 +2824,9 @@ export const DataProvider = ({ children }) => {
                     company_fax: settings.company_fax || null,
                     company_email: settings.company_email || null,
                     company_npwp: settings.company_npwp || null,
-                    logo_url: settings.logo_url || null
+                    logo_url: settings.logo_url || null,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
                 };
 
                 const { data, error } = await supabase
@@ -2877,20 +2884,35 @@ export const DataProvider = ({ children }) => {
 
     const addBankAccount = async (bankAccount) => {
         try {
-            if (!companySettings?.id) {
+            let currentCompanySettings = companySettings;
+
+            if (!currentCompanySettings?.id) {
+                currentCompanySettings = await fetchCompanySettings();
+            }
+
+            if (!currentCompanySettings?.id) {
                 throw new Error('Company settings not found. Please save company information first.');
             }
 
-            const newBankAccount = {
-                ...bankAccount,
-                company_settings_id: companySettings.id,
+            const normalizedBankAccount = {
+                bank_name: bankAccount.bank_name || null,
+                bank_code: bankAccount.bank_code || null,
+                account_number: bankAccount.account_number || null,
+                account_holder: bankAccount.account_holder || null,
+                branch_name: bankAccount.branch || bankAccount.branch_name || null,
+                currency: bankAccount.currency || 'IDR',
+                swift_code: bankAccount.swift_code || null,
+                company_settings_id: currentCompanySettings.id,
                 display_order: bankAccounts.length + 1,
+                coa_id: bankAccount.coa_id || null,
+                coa_code: bankAccount.coa_code || null,
+                coa_name: bankAccount.coa_name || null,
                 created_at: new Date().toISOString()
             };
 
             const { data, error } = await supabase
                 .from('company_bank_accounts')
-                .insert([newBankAccount])
+                .insert([normalizedBankAccount])
                 .select()
                 .single();
 
@@ -2905,18 +2927,29 @@ export const DataProvider = ({ children }) => {
 
     const updateBankAccount = async (id, updatedBankAccount) => {
         try {
+            const normalizedUpdate = {
+                bank_name: updatedBankAccount.bank_name || null,
+                bank_code: updatedBankAccount.bank_code || null,
+                account_number: updatedBankAccount.account_number || null,
+                account_holder: updatedBankAccount.account_holder || null,
+                branch_name: updatedBankAccount.branch || updatedBankAccount.branch_name || null,
+                currency: updatedBankAccount.currency || 'IDR',
+                swift_code: updatedBankAccount.swift_code || null,
+                coa_id: updatedBankAccount.coa_id || null,
+                coa_code: updatedBankAccount.coa_code || null,
+                coa_name: updatedBankAccount.coa_name || null,
+                updated_at: new Date().toISOString()
+            };
+
             const { error } = await supabase
                 .from('company_bank_accounts')
-                .update({
-                    ...updatedBankAccount,
-                    updated_at: new Date().toISOString()
-                })
+                .update(normalizedUpdate)
                 .eq('id', id);
 
             if (error) throw error;
 
             setBankAccounts(prev =>
-                prev.map(bank => bank.id === id ? { ...bank, ...updatedBankAccount } : bank)
+                prev.map(bank => bank.id === id ? { ...bank, ...normalizedUpdate } : bank)
             );
         } catch (error) {
             console.error('Error updating bank account:', error);

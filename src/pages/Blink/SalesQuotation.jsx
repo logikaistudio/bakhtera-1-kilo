@@ -62,6 +62,7 @@ const SalesQuotation = () => {
         customerEmail: '',
         customerPhone: '',
         serviceItems: [],
+        costItems: [],
         termsConditions: `1. All rates are subject to change without prior notice.
 2. Payment terms: Net 30 Days.
 3. Subject to space and equipment availability.
@@ -70,7 +71,7 @@ const SalesQuotation = () => {
 
     const statusConfig = {
         draft: { label: 'Draft', color: 'bg-gray-500/20 text-gray-400', icon: FileText },
-        manager_approval: { label: 'Manager Approval', color: 'bg-yellow-500/20 text-yellow-400', icon: Clock },
+        manager_approval: { label: 'Waiting Manager', color: 'bg-yellow-500/20 text-yellow-400', icon: Clock },
         sent: { label: 'Sent', color: 'bg-purple-500/20 text-purple-400', icon: Send },
         revision_requested: { label: 'Revision Requested', color: 'bg-orange-500/20 text-orange-400', icon: Edit },
         approved: { label: 'Approved', color: 'bg-green-500/20 text-green-400', icon: Check },
@@ -117,6 +118,7 @@ const SalesQuotation = () => {
                 cargoType: q.cargo_type || q.cargoType,
                 totalAmount: q.total_amount || q.totalAmount || 0,
                 serviceItems: q.service_items || q.serviceItems || [],
+                costItems: q.cost_items || q.costItems || [],
                 rejectionReason: q.rejection_reason || q.rejectionReason,
                 createdAt: q.created_at || q.createdAt,
                 updatedAt: q.updated_at || q.updatedAt,
@@ -215,6 +217,7 @@ const SalesQuotation = () => {
             status: status,
             notes: formData.notes,
             service_items: formData.serviceItems,
+            cost_items: formData.costItems,
             terms_and_conditions: formData.termsConditions,
             incoterm: formData.incoterm,
             payment_terms: formData.paymentTerms,
@@ -238,6 +241,7 @@ const SalesQuotation = () => {
 
             setShowModal(false);
             resetForm();
+            window.dispatchEvent(new Event('blink_approval_updated'));
 
             const message = status === 'draft'
                 ? `Job Number ${jobNumber} saved as draft!`
@@ -333,6 +337,7 @@ const SalesQuotation = () => {
                     // Pricing
                     total_amount: total,
                     service_items: editedQuotation.serviceItems || [],
+                    cost_items: editedQuotation.costItems || [],
 
                     // Additional details
                     incoterm: editedQuotation.incoterm,
@@ -389,6 +394,7 @@ const SalesQuotation = () => {
             validityDays: 30,
             notes: '',
             serviceItems: [],
+            costItems: [],
             termsConditions: `1. All rates are subject to change without prior notice.
 2. Payment terms: Net 30 Days.
 3. Subject to space and equipment availability.
@@ -624,6 +630,7 @@ const SalesQuotation = () => {
                 validity_days: parentQuotation.validityDays || 30,
                 notes: parentQuotation.notes,
                 service_items: parentQuotation.serviceItems,
+                cost_items: parentQuotation.costItems,
                 revision_number: nextRevisionNumber,
                 parent_quotation_id: parentQuotation.parent_quotation_id || parentQuotation.id,
                 revision_reason: parentQuotation.revision_reason,
@@ -977,6 +984,7 @@ const SalesQuotation = () => {
                     measure: quotation.measure || null,
                     packages: quotation.quantity && quotation.packageType ? `${quotation.quantity} ${quotation.packageType}` : (quotation.packageType || null),
                     selling_items: quotation.serviceItems || [],
+                    buying_items: quotation.costItems || [],
                     // === AUTO-CREATE BL/AWB DRAFT ===
                     bl_number: blNumber,
                     bl_type: blType,
@@ -1597,6 +1605,18 @@ const SalesQuotation = () => {
                         coaType="REVENUE"
                     />
 
+                    {/* Cost Breakdown */}
+                    <div className="mt-8 border-t border-gray-200 pt-8">
+                        <GroupedServiceItemManager
+                            items={formData.costItems}
+                            onChange={(newGroups) => {
+                                setFormData(prev => ({ ...prev, costItems: newGroups }));
+                            }}
+                            exchangeRate={formData.exchange_rate}
+                            coaType="COST"
+                        />
+                    </div>
+
                     {/* Notes */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -2031,7 +2051,22 @@ const SalesQuotation = () => {
                                 />
                             </div>
 
-                        {/* Terms & Conditions (View/Edit) */}
+                            {/* Cost Breakdown */}
+                            <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                <h4 className="text-sm font-semibold text-gray-700 mb-4">Cost Breakdown (Estimated)</h4>
+                                <GroupedServiceItemManager
+                                    items={isEditingQuotation ? (editedQuotation?.costItems || []) : viewingQuotation.costItems}
+                                    onChange={(newGroups) => {
+                                        if (isEditingQuotation) {
+                                            setEditedQuotation(prev => ({ ...prev, costItems: newGroups }));
+                                        }
+                                    }}
+                                    exchangeRate={isEditingQuotation ? editedQuotation?.exchange_rate : viewingQuotation.exchange_rate}
+                                    readOnly={!isEditingQuotation}
+                                    coaType="COST"
+                                />
+                            </div>
+
                         {/* Terms & Conditions (View/Edit) */}
                         <div className="p-4 bg-white rounded-lg border border-gray-200">
                             <h5 className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Terms & Conditions</h5>

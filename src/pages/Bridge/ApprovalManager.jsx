@@ -3,6 +3,21 @@ import { CheckCircle, XCircle, Clock, Search, FileText, Edit, Trash2, Eye, X, Us
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 
+/**
+ * ✅ BRIDGE APPROVAL MANAGER
+ * ──────────────────────────────────────────────
+ * This component handles BRIDGE MODULE approvals ONLY.
+ * Completely isolated from Blink (Sales/Operations) approvals.
+ * 
+ * Data Source: approval_requests table (module = 'bridge')
+ * Approval Types: Warehouse mutations, inventory operations
+ * 
+ * Blink Approvals are handled separately in:
+ * - BlinkApproval.jsx (uses blink_approval_history table)
+ *   - blink_sales: Quotations, Invoices
+ *   - blink_operations: Shipments, Purchase Orders
+ */
+
 const ApprovalManager = () => {
     const { pendingApprovals = [], approveRequest, rejectRequest } = useData();
     const { canEdit, canApprove, user } = useAuth();
@@ -14,8 +29,14 @@ const ApprovalManager = () => {
     const [showRejectModal, setShowRejectModal] = useState(false);
     const [rejectReason, setRejectReason] = useState('');
 
+    // ✅ ISOLATION: Filter ONLY Bridge approvals (exclude Blink)
+    const bridgeApprovals = pendingApprovals.filter(req => {
+        const moduleLower = (req.module || '').toLowerCase();
+        return moduleLower === 'bridge' || !req.module;  // Include bridge module or legacy (no module field)
+    });
+
     // Filter approvals
-    const filteredApprovals = pendingApprovals.filter(req => {
+    const filteredApprovals = bridgeApprovals.filter(req => {
         const matchesSearch =
             req.entityName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             req.requestedBy?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -29,9 +50,9 @@ const ApprovalManager = () => {
     });
 
     // Stats
-    const pendingCount = pendingApprovals.filter(r => r.status === 'pending').length;
-    const approvedCount = pendingApprovals.filter(r => r.status === 'approved').length;
-    const rejectedCount = pendingApprovals.filter(r => r.status === 'rejected').length;
+    const pendingCount = bridgeApprovals.filter(r => r.status === 'pending').length;
+    const approvedCount = bridgeApprovals.filter(r => r.status === 'approved').length;
+    const rejectedCount = bridgeApprovals.filter(r => r.status === 'rejected').length;
 
     // Handle approve
     const handleApprove = (requestId) => {

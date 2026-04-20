@@ -63,6 +63,7 @@ const TrialBalance = () => {
             // 3. Process Data
             const accMap = {};
             const accCodeMap = {};
+            const accNameMap = {};
 
             accounts.forEach(acc => {
                 accMap[acc.id] = {
@@ -73,6 +74,7 @@ const TrialBalance = () => {
                     closing: 0
                 };
                 if (acc.code) accCodeMap[acc.code] = acc.id;
+                if (acc.name) accNameMap[acc.name.toLowerCase().trim()] = acc.id;
             });
 
             // Conversion helper
@@ -86,11 +88,28 @@ const TrialBalance = () => {
 
             entries.forEach(e => {
                 // Match by ID first, fallback to code
-                const targetId = e.coa_id || accCodeMap[e.account_code];
-                if (!targetId) return;
+                let targetId = e.coa_id || accCodeMap[e.account_code];
+                if (!targetId && e.account_name) {
+                    targetId = accNameMap[e.account_name.toLowerCase().trim()];
+                }
+                if (!targetId) {
+                    targetId = `unclassified_${e.account_code || 'unknown'}`;
+                    if (!accMap[targetId]) {
+                        accMap[targetId] = {
+                            id: targetId,
+                            code: e.account_code || 'UNMAPPED',
+                            name: (e.account_name || 'Unknown Account') + ' (Unmapped)',
+                            type: 'ASSET', // default assumptions
+                            opening: 0,
+                            debitPeriod: 0,
+                            creditPeriod: 0,
+                            closing: 0
+                        };
+                    }
+                }
 
                 const acc = accMap[targetId];
-                if (!acc) return; // Should not happen if referential integrity is good
+                if (!acc) return; // Should not happen now
 
                 const debit = toIDR(e.debit, e.currency, e.exchange_rate);
                 const credit = toIDR(e.credit, e.currency, e.exchange_rate);

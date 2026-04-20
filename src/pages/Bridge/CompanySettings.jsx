@@ -112,6 +112,10 @@ const BridgeCompanySettings = () => {
 
     // Bank Account Handlers
     const handleAddBank = () => {
+        if (!bridgeSettings?.id) {
+            alert('Simpan informasi perusahaan terlebih dahulu sebelum menambahkan rekening bank.');
+            return;
+        }
         setEditingBank(null);
         setBankFormData({
             bank_name: '',
@@ -270,8 +274,8 @@ const BridgeCompanySettings = () => {
                                 size="sm"
                                 onClick={handleAddBank}
                                 Icon={Plus}
-                                disabled={bridgeBankAccounts && bridgeBankAccounts.length >= 4}
-                                title={bridgeBankAccounts && bridgeBankAccounts.length >= 4 ? "Maksimal 4 rekening bank" : ""}
+                                disabled={!bridgeSettings?.id || (bridgeBankAccounts && bridgeBankAccounts.length >= 4)}
+                                title={!bridgeSettings?.id ? "Simpan informasi perusahaan terlebih dahulu" : bridgeBankAccounts && bridgeBankAccounts.length >= 4 ? "Maksimal 4 rekening bank" : ""}
                             >
                                 Tambah Rekening
                             </Button>

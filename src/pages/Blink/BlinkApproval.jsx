@@ -10,10 +10,98 @@ import {
 import { createPOApprovalJournal, createInvoiceJournal, getAllCOA } from '../../utils/journalHelper';
 import { generateAPNumber, generateARNumber } from '../../utils/documentNumbers';
 
+/**
+ * ✅ BLINK APPROVAL CENTER
+ * ──────────────────────────────────────────────
+ * This component handles BLINK MODULE approvals ONLY.
+ * Completely isolated from Bridge approvals.
+ * 
+ * Two separate approval flows within Blink:
+ * 
+ * 1️⃣ SALES APPROVALS (blink_sales):
+ *    - Quotations → Shipments
+ *    - Invoices
+ *    Data Source: blink_approval_history table (module = 'blink_sales')
+ * 
+ * 2️⃣ OPERATIONS APPROVALS (blink_operations):
+ *    - Shipments (for BL/AWB issuance)
+ *    - Purchase Orders
+ *    Data Source: blink_approval_history table (module = 'blink_operations')
+ * 
+ * Bridge Approvals are handled separately in:
+ * - ApprovalManager.jsx (uses approval_requests table)
+ */
+
+const isMissingTableError = (error) => {
+    const message = String(error?.message || error?.details || error || '').toLowerCase();
+    return /relation .* does not exist|table .* does not exist|no such table|does not exist|could not find the table|column .* does not exist|missing column/.test(message);
+};
+
+const tryInsertTable = async (tableName, payload) => {
+    const { error } = await supabase.from(tableName).insert([payload]);
+    if (!error) return true;
+    if (isMissingTableError(error)) return false;
+    throw error;
+};
+
+const insertARTransaction = async (blinkRow, fallbackRow) => {
+    try {
+        if (await tryInsertTable('blink_ar_transactions', blinkRow)) return;
+        const { error } = await supabase.from('big_ar_transactions').insert([fallbackRow]);
+        if (error) throw error;
+    } catch (e) {
+        console.warn('AR transaction creation skipped (no valid DB table available):', e.message);
+    }
+};
+
+const insertAPTransaction = async (blinkRow, fallbackRow) => {
+    try {
+        if (await tryInsertTable('blink_ap_transactions', blinkRow)) return;
+        const { error } = await supabase.from('big_ap_transactions').insert([fallbackRow]);
+        if (error) throw error;
+    } catch (e) {
+        console.warn('AP transaction creation skipped (no valid DB table available):', e.message);
+    }
+};
+
+const recordApprovalHistory = async (item, action, reason = null, approverName = 'System') => {
+    try {
+        // Determine approval module: 'blink_sales' for quotations/invoices, 'blink_operations' for shipments/POs
+        const approvalModule = ['quotation', 'invoice'].includes(item.type) ? 'blink_sales' : 'blink_operations';
+        
+        const payload = {
+            document_number: item.refNumber || item.jobNumber || '-',
+            document_type: item.type || '-',
+            approved_at: new Date().toISOString(),
+            approver: approverName,
+            status: action, // 'approved' or 'rejected'
+            reason: reason || '',
+            module: approvalModule  // IMPORTANT: Isolate by module
+        };
+        
+        // Insert ONLY into blink_approval_history - completely isolated from Bridge approvals
+        const { data, error } = await supabase.from('blink_approval_history').insert([payload]).select();
+        
+        if (error) {
+            console.error('❌ Failed to record approval history:', error);
+            throw error;
+        }
+        
+        console.log(`✅ ${approvalModule} approval history recorded:`, data);
+        return true;
+    } catch (e) {
+        console.error('❌ Logging approval history failed:', e.message);
+        // Don't throw - let approval proceed even if history fails
+        return false;
+    }
+};
+
 const BlinkApproval = () => {
     const navigate = useNavigate();
     const { user, isSuperAdmin, isAdmin } = useAuth();
+    const [activeTab, setActiveTab] = useState('pending'); // 'pending' | 'history'
     const [submissions, setSubmissions] = useState([]);
+    const [historyLogs, setHistoryLogs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedItem, setSelectedItem] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
@@ -21,11 +109,38 @@ const BlinkApproval = () => {
     const [rejectReason, setRejectReason] = useState('');
     const [showRejectInput, setShowRejectInput] = useState(false);
 
+    const resolveShipmentStatus = (shipment = {}) => {
+        const status = String(shipment.status || '').toLowerCase();
+        const blStatus = String(shipment.bl_status || '').toLowerCase();
+        const pendingStates = ['submitted', 'manager_approval', 'pending', 'pending_approval'];
+
+        if (status === 'approved' || blStatus === 'approved') return 'approved';
+        if (status === 'rejected' || blStatus === 'rejected') return 'rejected';
+        if (pendingStates.includes(status) || pendingStates.includes(blStatus)) return 'submitted';
+        return status || blStatus || 'draft';
+    };
+
+    const isApprovalPending = (status) => ['submitted', 'manager_approval', 'pending', 'pending_approval'].includes(status);
+
     const isApprover = isSuperAdmin() || isAdmin() ||
         ['manager', 'blink_manager', 'approver'].includes(user?.user_level);
 
     useEffect(() => {
         fetchSubmissions();
+    }, []);
+
+    useEffect(() => {
+        const channel = supabase.channel('approval-submissions')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'blink_quotations' }, () => fetchSubmissions())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'blink_purchase_orders' }, () => fetchSubmissions())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'blink_invoices' }, () => fetchSubmissions())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'blink_shipments' }, () => fetchSubmissions())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'blink_approval_history' }, () => fetchSubmissions())
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, []);
 
     const fetchSubmissions = async () => {
@@ -44,7 +159,7 @@ const BlinkApproval = () => {
             const { data: purchaseOrders, error: poErr } = await supabase
                 .from('blink_purchase_orders')
                 .select('*')
-                .in('status', ['submitted', 'manager_approval'])
+                .in('status', ['submitted', 'manager_approval', 'pending', 'pending_approval'])
                 .order('created_at', { ascending: false });
             if (poErr) console.error('Error fetching POs:', poErr);
 
@@ -52,7 +167,7 @@ const BlinkApproval = () => {
             const { data: shipments, error: shErr } = await supabase
                 .from('blink_shipments')
                 .select('*')
-                .eq('status', 'manager_approval')
+                .or('bl_status.in.(submitted,manager_approval,pending,pending_approval),status.in.(submitted,manager_approval,pending,pending_approval)')
                 .order('created_at', { ascending: false });
             if (shErr) console.error('Error fetching shipments:', shErr);
 
@@ -60,7 +175,7 @@ const BlinkApproval = () => {
             const { data: invoices, error: invErr } = await supabase
                 .from('blink_invoices')
                 .select('*')
-                .eq('status', 'manager_approval')
+                .in('status', ['submitted', 'manager_approval', 'pending', 'pending_approval'])
                 .order('created_at', { ascending: false });
             if (invErr) console.error('Error fetching invoices:', invErr);
 
@@ -121,7 +236,7 @@ const BlinkApproval = () => {
                 destination: s.destination || '-',
                 amount: s.quoted_amount || 0,
                 currency: s.currency || 'USD',
-                status: s.status,
+                status: resolveShipmentStatus(s),
                 createdAt: s.created_at,
                 updatedAt: s.updated_at,
                 notes: s.notes || '',
@@ -137,23 +252,39 @@ const BlinkApproval = () => {
                 typeLabel: 'Invoice',
                 refNumber: inv.invoice_number,
                 customerName: inv.customer_name || '-',
-                submittedBy: inv.sales_person || '-',
+                submittedBy: inv.sales_person || inv.created_by || '-',
                 serviceType: 'invoice',
-                origin: inv.job_number || '-',
-                destination: inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString('id-ID') : '-',
-                amount: inv.total_amount || 0,
+                jobNumber: inv.job_number || inv.so_number || '-',
+                invoiceDate: inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString('id-ID') : '-',
+                dueDate: inv.due_date ? new Date(inv.due_date).toLocaleDateString('id-ID') : '-',
+                amount: inv.total_amount || inv.grand_total || 0,
                 currency: inv.currency || inv.billing_currency || 'IDR',
                 status: inv.status,
                 createdAt: inv.created_at,
                 updatedAt: inv.updated_at,
-                notes: inv.notes || '',
+                notes: inv.notes || inv.customer_notes || '',
                 rejectionReason: inv.rejection_reason || '',
-                serviceItems: inv.invoice_items || [],
+                serviceItems: inv.invoice_items || inv.items || [],
                 commodity: '',
                 cargoType: '',
             }));
 
             setSubmissions([...mappedShipments, ...mappedPOs, ...mappedQuotations, ...mappedInvoices]);
+
+            // Fetch History - ISOLATED for Blink only
+            const { data: historyData, error: histErr } = await supabase
+                .from('blink_approval_history')
+                .select('*')
+                .in('module', ['blink_sales', 'blink_operations'])
+                .order('approved_at', { ascending: false });
+                
+            if (histErr) {
+                console.error('❌ Error fetching approval history:', histErr);
+            } else {
+                console.log('✅ Blink approval history loaded:', historyData?.length || 0, 'records');
+                setHistoryLogs(historyData || []);
+            }
+
         } catch (error) {
             console.error('Error fetching submissions:', error);
         } finally {
@@ -173,7 +304,7 @@ const BlinkApproval = () => {
                     .from('blink_shipments')
                     .update({
                         status: 'approved',
-                        approved_at: new Date().toISOString(),
+                        bl_status: 'approved',
                         updated_at: new Date().toISOString(),
                     })
                     .eq('id', item.id);
@@ -185,8 +316,7 @@ const BlinkApproval = () => {
                     .from('blink_purchase_orders')
                     .update({
                         status: 'approved',
-                        approved_by: user?.name || user?.email || 'Manager',
-                        approved_at: new Date().toISOString()
+                        updated_at: new Date().toISOString()
                     })
                     .eq('id', item.id);
                 if (error) throw error;
@@ -209,28 +339,43 @@ const BlinkApproval = () => {
 
                 const apNumber = generateAPNumber();
 
-                const apEntry = {
+                const blinkAPRow = {
                     ap_number: apNumber,
-                    po_id: item.id,
-                    po_number: item.refNumber,
-                    vendor_id: item.vendor_id || null,
-                    vendor_name: item.customerName,
+                    po_id: poData.id,
+                    po_number: poData.po_number,
+                    vendor_id: poData.vendor_id,
+                    vendor_name: poData.vendor_name,
                     bill_date: billDate,
                     due_date: dueDateStr,
-                    original_amount: item.amount,
+                    original_amount: poData.total_amount || item.amount,
                     paid_amount: 0,
-                    outstanding_amount: item.amount,
-                    currency: item.currency || 'IDR',
+                    outstanding_amount: poData.total_amount || item.amount,
+                    currency: poData.currency || 'IDR',
                     status: 'outstanding',
-                    notes: `Auto-created from PO approval: ${item.refNumber}`
+                    notes: `Auto-created from PO ${poData.po_number} (${poData.payment_terms || 'NET 30'})`
                 };
 
-                const { data: apData, error: apError } = await supabase
-                    .from('blink_ap_transactions')
-                    .insert([apEntry])
-                    .select();
+                const bigAPRow = {
+                    po_id: poData.id,
+                    po_number: poData.po_number,
+                    vendor_id: poData.vendor_id,
+                    vendor_name: poData.vendor_name,
+                    bill_date: billDate,
+                    due_date: dueDateStr,
+                    original_amount: poData.total_amount || item.amount,
+                    paid_amount: 0,
+                    outstanding_amount: poData.total_amount || item.amount,
+                    currency: poData.currency || 'IDR',
+                    status: 'outstanding',
+                    notes: `Auto-created from PO ${poData.po_number} (${poData.payment_terms || 'NET 30'})`
+                };
 
-                if (apError) throw apError;
+                try {
+                    await insertAPTransaction(blinkAPRow, bigAPRow);
+                    console.log('AP entry created successfully for PO', poData.po_number);
+                } catch (apError) {
+                    console.error('[Approval] AP creation failed:', apError.message || apError);
+                }
 
                 // Create Journal Entries - using the robust journalHelper.js
                 try {
@@ -263,32 +408,40 @@ const BlinkApproval = () => {
                 const today = new Date();
                 const billDate = today.toISOString().split('T')[0];
 
-                // 3. Auto-create AR (Piutang Usaha) transaction
-                const arNumber = generateARNumber();
-
-                const arEntry = {
-                    ar_number: arNumber,
-                    invoice_id: item.id,
-                    invoice_number: item.refNumber,
-                    customer_id: invData?.customer_id || null,
-                    customer_name: item.customerName,
-                    transaction_date: billDate,        // schema column is transaction_date
-                    due_date: invData?.due_date || billDate,
+                const blinkARRow = {
+                    invoice_id: invData.id,
+                    invoice_number: invData.invoice_number,
+                    ar_number: generateARNumber(),
+                    customer_id: invData.customer_id,
+                    customer_name: invData.customer_name,
+                    transaction_date: billDate,
+                    due_date: invData.due_date || billDate,
                     original_amount: item.amount,
                     paid_amount: 0,
                     outstanding_amount: item.amount,
-                    currency: item.currency || 'IDR',
+                    currency: invData.currency || 'IDR',
+                    exchange_rate: invData.exchange_rate || 1,
                     status: 'outstanding',
-                    notes: `Auto-created from Invoice approval: ${item.refNumber}`
+                    notes: `Auto-created from Invoice ${invData.invoice_number}`
                 };
 
-                // Try to insert AR transaction (table may be blink_ar_transactions or similar)
-                const { data: arData, error: arError } = await supabase
-                    .from('blink_ar_transactions')
-                    .insert([arEntry])
-                    .select();
+                const bigARRow = {
+                    invoice_id: invData.id,
+                    client_id: invData.customer_id || null,
+                    transaction_date: billDate,
+                    due_date: invData.due_date || billDate,
+                    original_amount: item.amount,
+                    paid_amount: 0,
+                    outstanding_amount: item.amount,
+                    status: 'outstanding'
+                };
 
-                if (arError) console.warn('AR transaction creation warning (non-fatal):', arError.message);
+                try {
+                    await insertARTransaction(blinkARRow, bigARRow);
+                    console.log('AR entry created successfully for Invoice', invData.invoice_number);
+                } catch (arError) {
+                    console.error('[Approval] AR creation failed:', arError.message || arError);
+                }
 
                 // 4. Auto-create Journal Entries: Debit AR, Credit Revenue
                 try {
@@ -326,7 +479,9 @@ const BlinkApproval = () => {
                     so_number: soNumber,
                     quotation_id: quotationData.id,
                     customer: quotationData.customer_name || '',
+                    // Use pic_ops for operations quotations; sales_person for sales quotations
                     sales_person: quotationData.sales_person || '',
+                    pic_ops: quotationData.sales_person || '',
                     quotation_type: quotationData.quotation_type || 'RG',
                     quotation_date: quotationData.quotation_date,
                     origin: quotationData.origin,
@@ -339,8 +494,10 @@ const BlinkApproval = () => {
                     quoted_amount: quotationData.total_amount || 0,
                     currency: quotationData.currency || 'USD',
                     exchange_rate: quotationData.exchange_rate || null,
+                    // 'pending' so the Ops team must still submit it to Approval Center
+                    // before Generate PO / Create Invoice buttons unlock
                     status: 'pending',
-                    created_from: 'sales_order',
+                    created_from: 'ops_order',
                     service_items: quotationData.service_items || [],
                     selling_items: quotationData.service_items || [],
                     notes: quotationData.notes || '',
@@ -368,18 +525,28 @@ const BlinkApproval = () => {
                     .eq('id', item.id);
                 if (updateErr) console.error('Warning: Error updating quotation status to converted:', updateErr);
 
-                await fetchSubmissions();
+                // Add to history
+                await recordApprovalHistory(item, 'approved', null, user?.name || user?.email || 'Manager');
+
+                setSubmissions(prev => prev.filter(i => i.id !== item.id));
                 setShowDetailModal(false);
                 setSelectedItem(null);
+                // Also fetch again just in case
+                fetchSubmissions();
 
-                alert(`✅ Quotation ${item.refNumber} disetujui!\n\n📦 Sales Order ${soNumber} berhasil dibuat dan dikirim ke halaman SO Management.`);
+                alert(`✅ Quotation ${item.refNumber} disetujui!\n\n📦 Shipment ${soNumber} berhasil dibuat.\n\n⚠️ Langkah berikutnya: Buka Shipment Management → Submit for Approval → setelah disetujui manajer, tombol Generate PO & Invoice akan terbuka.`);
                 setTimeout(() => navigate('/blink/shipments'), 1000);
                 return; // skip the generic alert below
             }
 
-            await fetchSubmissions();
+            // For other types: shipment, po, invoice
+            await recordApprovalHistory(item, 'approved', null, user?.name || user?.email || 'Manager');
+            
+            setSubmissions(prev => prev.filter(i => i.id !== item.id));
             setShowDetailModal(false);
             setSelectedItem(null);
+            fetchSubmissions();
+            
             alert(`✅ ${item.typeLabel} ${item.refNumber} berhasil disetujui!`);
         } catch (err) {
             alert('Failed to approve: ' + err.message);
@@ -399,15 +566,12 @@ const BlinkApproval = () => {
                     .from('blink_shipments')
                     .update({
                         status: 'rejected',
+                        bl_status: 'rejected',
+                        rejection_reason: rejectReason,
                         updated_at: new Date().toISOString(),
                     })
                     .eq('id', item.id);
                 if (error) throw error;
-                // Try to save rejection reason (column may not exist yet)
-                await supabase.from('blink_shipments')
-                    .update({ rejection_reason: rejectReason })
-                    .eq('id', item.id)
-                    .then(() => { }).catch(() => { });
 
             } else if (item.type === 'po') {
                 const { error } = await supabase
@@ -437,11 +601,15 @@ const BlinkApproval = () => {
                 if (error) throw error;
             }
 
-            await fetchSubmissions();
+            // Log history
+            await recordApprovalHistory(item, 'rejected', rejectReason, user?.name || user?.email || 'Manager');
+
+            setSubmissions(prev => prev.filter(i => i.id !== item.id));
             setShowDetailModal(false);
             setSelectedItem(null);
             setRejectReason('');
             setShowRejectInput(false);
+            fetchSubmissions();
         } catch (err) {
             alert('Failed to reject: ' + err.message);
         } finally {
@@ -483,29 +651,55 @@ const BlinkApproval = () => {
 
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-start justify-between">
+            {/* Header with Tabs */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                     <div className="flex items-center gap-3">
-                        <h1 style={{ color: '#111827' }} className="text-2xl font-bold">Approval Center</h1>
-                        {pendingCount > 0 && (
-                            <span className="flex items-center gap-1 px-2.5 py-1 bg-yellow-100 text-yellow-800 text-sm font-bold rounded-full border border-yellow-200">
-                                <Bell className="w-3.5 h-3.5" />
-                                {pendingCount} Pending
-                            </span>
-                        )}
+                        <h1 style={{ color: '#111827' }} className="text-2xl font-bold flex items-center gap-2">
+                            <CheckCircle className="w-6 h-6 text-blue-600" />
+                            Operation Approval Center
+                        </h1>
                     </div>
                     <p style={{ color: '#4B5563' }} className="text-sm mt-1">
-                        Manage all submissions requiring approval in the BLINK module
+                        Manage all operational document submissions in the BLINK module
                     </p>
                 </div>
-                <button
-                    onClick={fetchSubmissions}
-                    className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors"
-                >
-                    <RefreshCw className="w-4 h-4" />
-                    Refresh
-                </button>
+                <div className="flex items-center gap-3 bg-white p-1 rounded-xl shadow-sm border border-gray-100">
+                    <button
+                        onClick={() => setActiveTab('pending')}
+                        className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2
+                            ${activeTab === 'pending'
+                                ? 'bg-blue-500 text-white shadow-md'
+                                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                            }`}
+                    >
+                        <Clock className="w-4 h-4" />
+                        Pending Approvals
+                        {pendingCount > 0 && (
+                            <span className={`px-2 py-0.5 rounded-full text-xs ${activeTab === 'pending' ? 'bg-white/20' : 'bg-blue-100 text-blue-600'}`}>
+                                {pendingCount}
+                            </span>
+                        )}
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('history')}
+                        className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2
+                            ${activeTab === 'history'
+                                ? 'bg-blue-500 text-white shadow-md'
+                                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                            }`}
+                    >
+                        <FileText className="w-4 h-4" />
+                        Approval History
+                    </button>
+                    <button
+                        onClick={fetchSubmissions}
+                        className="p-2.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors border-l border-gray-100 ml-1"
+                        title="Refresh"
+                    >
+                        <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                    </button>
+                </div>
             </div>
 
 
@@ -530,19 +724,20 @@ const BlinkApproval = () => {
                         <p style={{ color: '#4B5563' }} className="text-sm">Loading data...</p>
                     </div>
                 </div>
-            ) : filtered.length === 0 ? (
-                <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50">
-                    <Bell className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                    <p style={{ color: '#4B5563' }}>No submissions</p>
-                    <p style={{ color: '#9CA3AF' }} className="text-sm mt-1">All submissions have been processed</p>
-                </div>
-            ) : (
+            ) : activeTab === 'pending' ? (
+                filtered.length === 0 ? (
+                    <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50">
+                        <Bell className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                        <p style={{ color: '#4B5563' }}>No submissions</p>
+                        <p style={{ color: '#9CA3AF' }} className="text-sm mt-1">All submissions have been processed</p>
+                    </div>
+                ) : (
                 <div className="space-y-3">
                     {filtered.map(item => {
                         const cfg = statusConfig[item.status] || statusConfig.draft;
                         const StatusIcon = cfg.icon;
                         const SvcIcon = serviceIcons[item.serviceType] || FileText;
-                        const isPending = item.status === 'manager_approval' || item.status === 'submitted';
+                        const isPending = isApprovalPending(item.status);
 
                         return (
                             <div
@@ -625,6 +820,56 @@ const BlinkApproval = () => {
                         );
                     })}
                 </div>
+                )
+            ) : (
+                /* HISTORY TAB */
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                        <h2 className="font-semibold text-gray-800">Historical Operational Approvals</h2>
+                        <div className="text-sm text-gray-500">Showing {historyLogs.length} records</div>
+                    </div>
+                    {historyLogs.length === 0 ? (
+                        <div className="p-12 text-center text-gray-500">Belum ada riwayat approval.</div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm whitespace-nowrap">
+                                <thead className="bg-gray-50 text-gray-600">
+                                    <tr>
+                                        <th className="px-6 py-4 font-semibold uppercase tracking-wider text-xs">Tanggal</th>
+                                        <th className="px-6 py-4 font-semibold uppercase tracking-wider text-xs">No Dokumen</th>
+                                        <th className="px-6 py-4 font-semibold uppercase tracking-wider text-xs">Tipe</th>
+                                        <th className="px-6 py-4 font-semibold uppercase tracking-wider text-xs">Approver</th>
+                                        <th className="px-6 py-4 font-semibold uppercase tracking-wider text-xs">Status</th>
+                                        <th className="px-6 py-4 font-semibold uppercase tracking-wider text-xs">Alasan Reject</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {historyLogs.map(log => (
+                                        <tr key={log.id} className="hover:bg-gray-50/50 transition-colors">
+                                            <td className="px-6 py-4 text-gray-600">
+                                                {new Date(log.approved_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                            </td>
+                                            <td className="px-6 py-4 font-medium text-gray-900">{log.document_number}</td>
+                                            <td className="px-6 py-4 text-gray-600 capitalize">{String(log.document_type || '-').replace('_', ' ')}</td>
+                                            <td className="px-6 py-4 text-gray-600">{log.approver}</td>
+                                            <td className="px-6 py-4">
+                                                <span className={`px-3 py-1 rounded-full font-medium text-xs border ${
+                                                    log.status === 'approved' ? statusConfig.approved.bg + ' ' + statusConfig.approved.text + ' ' + statusConfig.approved.border :
+                                                    statusConfig.rejected.bg + ' ' + statusConfig.rejected.text + ' ' + statusConfig.rejected.border
+                                                }`}>
+                                                    {log.status === 'approved' ? 'Approved' : 'Rejected'}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-gray-500 truncate max-w-[200px]" title={log.reason || '-'}>
+                                                {log.reason ? <span className="text-red-500 italic">{log.reason}</span> : '-'}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
             )}
 
             {/* ── Detail Modal ──────────────────────────────────────── */}
@@ -663,6 +908,15 @@ const BlinkApproval = () => {
                                     { label: 'Vendor', value: selectedItem.customerName },
                                     { label: 'Job Number', value: selectedItem.origin },
                                     { label: 'PO Date', value: selectedItem.destination },
+                                    { label: 'Currency', value: selectedItem.currency },
+                                    { label: 'Total Amount', value: `${selectedItem.currency} ${(selectedItem.amount || 0).toLocaleString('id-ID')}`, highlight: true },
+                                    { label: 'Submitted', value: formatDate(selectedItem.createdAt) },
+                                ] : selectedItem.type === 'invoice' ? [
+                                    { label: 'Invoice Number', value: selectedItem.refNumber },
+                                    { label: 'Customer', value: selectedItem.customerName },
+                                    { label: 'Job / SO', value: selectedItem.jobNumber },
+                                    { label: 'Invoice Date', value: selectedItem.invoiceDate },
+                                    { label: 'Due Date', value: selectedItem.dueDate },
                                     { label: 'Currency', value: selectedItem.currency },
                                     { label: 'Total Amount', value: `${selectedItem.currency} ${(selectedItem.amount || 0).toLocaleString('id-ID')}`, highlight: true },
                                     { label: 'Submitted', value: formatDate(selectedItem.createdAt) },
@@ -737,7 +991,7 @@ const BlinkApproval = () => {
 
                             {/* Reject textarea */}
                             {showRejectInput && isApprover &&
-                                (selectedItem.status === 'manager_approval' || selectedItem.status === 'submitted') && (
+                                isApprovalPending(selectedItem.status) && (
                                     <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-3">
                                         <p className="text-sm font-semibold text-red-700">Rejection Reason</p>
                                         <textarea
@@ -767,7 +1021,7 @@ const BlinkApproval = () => {
 
                             {/* Approval action buttons */}
                             {isApprover &&
-                                (selectedItem.status === 'manager_approval' || selectedItem.status === 'submitted') &&
+                                isApprovalPending(selectedItem.status) &&
                                 !showRejectInput && (
                                     <div className="flex gap-3 pt-2 border-t border-gray-200">
                                         <button onClick={() => setShowRejectInput(true)}

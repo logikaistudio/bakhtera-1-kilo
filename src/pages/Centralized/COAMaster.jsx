@@ -25,7 +25,6 @@ const COAMaster = () => {
         code: '',
         name: '',
         type: 'ASSET',
-        job_type: '',
         description: '',
         parent_code: '',
         level: 1,
@@ -38,14 +37,7 @@ const COAMaster = () => {
         is_active: true
     });
 
-    const accountTypes = ['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE', 'COST', 'COGS', 'DIRECT_COST', 'OTHER_INCOME', 'OTHER_EXPENSE'];
-    const jobTypes = [
-        { value: '', label: 'All / General' },
-        { value: 'FREIGHT', label: 'Freight' },
-        { value: 'CUSTOMS', label: 'Customs (Pabean)' },
-        { value: 'WAREHOUSE', label: 'Warehouse' },
-        { value: 'GENERAL', label: 'General' },
-    ];
+    const accountGroups = ['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE', 'COST', 'COGS', 'DIRECT_COST', 'OTHER_INCOME', 'OTHER_EXPENSE'];
 
     useEffect(() => {
         fetchAccounts();
@@ -87,16 +79,58 @@ const COAMaster = () => {
                 let data = [];
                 for (const wsname of wb.SheetNames) {
                     const ws = wb.Sheets[wsname];
-                    const sheetData = utils.sheet_to_json(ws);
-                    data = data.concat(sheetData);
+
+                    // ── Strategy 1: Read with header:1 (raw arrays) for positional mapping ──
+                    // This is immune to column name encoding issues
+                    const rawRows = utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+                    if (rawRows.length < 2) continue;
+
+                    // Detect header row (first row with content)
+                    const headerRow = rawRows[0].map(h => String(h || '').trim());
+                    console.log('[COA Import] ✅ Header row (positions A-Z):', headerRow);
+
+                    // Map column index by name (case-insensitive, strip non-alpha)
+                    const clean = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const findCol = (...names) => {
+                        for (const name of names) {
+                            const nc = clean(name);
+                            const idx = headerRow.findIndex(h => clean(h) === nc);
+                            if (idx >= 0) return idx;
+                        }
+                        // Fallback: partial match
+                        for (const name of names) {
+                            const nc = clean(name);
+                            if (nc.length < 3) continue;
+                            const idx = headerRow.findIndex(h => clean(h).includes(nc) || nc.includes(clean(h)));
+                            if (idx >= 0) return idx;
+                        }
+                        return -1;
+                    };
+
+                    const colCode   = findCol('Code', 'Kode', 'Account');
+                    const colName   = findCol('Name', 'Nama', 'Account Name');
+                    const colParent = findCol('No. Master Code', 'No Master Code', 'Master Code', 'Parent Code', 'Parent', 'Induk', 'Header');
+                    const colGroup  = findCol('Group', 'Type', 'Tipe', 'Kategori', 'Category', 'Grup');
+                    const colLevel  = findCol('Level', 'Lvl', 'Tingkat');
+
+                    console.log('[COA Import] ✅ Column positions → Code:', colCode, 'Name:', colName, 'MasterCode:', colParent, 'Group:', colGroup, 'Level:', colLevel);
+
+                    // Convert positional rows to named objects
+                    const mappedRows = rawRows.slice(1).map(row => ({
+                        Code:   colCode   >= 0 ? row[colCode]   : '',
+                        Name:   colName   >= 0 ? row[colName]   : '',
+                        'No. Master Code': colParent >= 0 ? row[colParent] : '',
+                        Group:  colGroup  >= 0 ? row[colGroup]  : '',
+                        Level:  colLevel  >= 0 ? row[colLevel]  : '',
+                    }));
+
+                    data = data.concat(mappedRows);
                 }
 
-                console.log('==================================================');
-                console.log('[COA Import] FILE LOADED:', file.name);
                 console.log('[COA Import] Total rows:', data.length);
-                console.log('[COA Import] Columns:', data.length > 0 ? Object.keys(data[0]) : []);
-                console.log('[COA Import] Sample row 1:', data[0]);
-                console.log('==================================================');
+                console.log('[COA Import] Sample Row 1:', data[0]);
+                console.log('[COA Import] Sample Row 2:', data[1]);
 
                 if (data.length === 0) {
                     alert('Excel file is empty or format is incorrect.');
@@ -201,17 +235,30 @@ const COAMaster = () => {
 
                 // Transform Data
                 const skippedRows = [];
+
+                // Debug: print ALL column names from the first row exactly as SheetJS sees them
+                if (data.length > 0) {
+                    console.log('[COA Import] ⚠️ ALL COLUMN NAMES (raw from Excel):', Object.keys(data[0]));
+                    console.log('[COA Import] ⚠️ FULL ROW 1:', JSON.stringify(data[0]));
+                }
+
                 const validData = data.map((row, idx) => {
-                    const rawCode = getVal(row, 'Code', 'Kode', 'No', 'Nomor', 'Account');
-                    const rawName = getVal(row, 'Name', 'Nama', 'Account Name');
-                    const rawParent = getVal(row, 'Master Code', 'Parent Code', 'Parent', 'Induk', 'Header');
+                    const rowKeys = Object.keys(row);
+                    
+                    // Since we pre-mapped columns positionally, these keys are exact
+                    const rawCode   = row['Code']   ? String(row['Code']).trim()   : getVal(row, 'Code', 'Kode', 'Account');
+                    const rawName   = row['Name']   ? String(row['Name']).trim()   : getVal(row, 'Name', 'Nama', 'Account Name');
+                    const rawParent = row['No. Master Code'] !== undefined && row['No. Master Code'] !== ''
+                        ? String(row['No. Master Code']).trim()
+                        : getVal(row, 'Master Code', 'Parent Code', 'Parent', 'Induk');
+                    const rawType   = row['Group']  ? String(row['Group']).trim()  : getVal(row, 'Group', 'Type', 'Tipe', 'Kategori', 'Category', 'Grup');
+                    const rawLevel  = row['Level']  ? String(row['Level']).trim()  : getVal(row, 'Level', 'Lvl', 'Tingkat');
+                    const rawDesc   = getVal(row, 'Description', 'Keterangan', 'Notes');
 
-                    // 'Type' column = ASSET/LIABILITY/EQUITY/REVENUE/EXPENSE
-                    const rawType = getVal(row, 'Type', 'Tipe', 'Kategori', 'Category', 'Group', 'Grup');
-
-                    const rawLevel = getVal(row, 'Level', 'Lvl', 'Tingkat');
-                    const rawDesc = getVal(row, 'Description', 'Keterangan', 'Notes');
-                    const rawJobType = getVal(row, 'Job Type', 'Job', 'Jenis Pekerjaan', 'JobType');
+                    if (idx === 0) {
+                        console.log('[COA Import] ✅ Row 0 parsed → code:', rawCode, 'name:', rawName, 'parent:', rawParent, 'group:', rawType, 'level:', rawLevel);
+                        console.log('[COA Import] ✅ Raw row keys:', Object.keys(row));
+                    }
 
                     // Skip empty rows
                     if (!rawCode && !rawName) return null;
@@ -247,23 +294,10 @@ const COAMaster = () => {
                     const rawAP = getVal(row, 'AP', 'Hutang', 'Payable');
                     const rawCF = getVal(row, 'Cashflow', 'CF', 'Arus Kas');
 
-                    // Map job_type to valid values, or preserve original if no specific keyword matched
-                    const mapJobType = (val) => {
-                        if (!val) return null;
-                        const v = String(val).toUpperCase().trim();
-                        if (v.includes('FREIGHT') || v.includes('ANGKUT')) return 'FREIGHT';
-                        if (v.includes('CUSTOMS') || v.includes('PABEAN')) return 'CUSTOMS';
-                        if (v.includes('WAREHOUSE') || v.includes('GUDANG')) return 'WAREHOUSE';
-                        if (v.includes('GENERAL') || v.includes('UMUM')) return 'GENERAL';
-                        // Return the raw value (e.g., 'AIR EXPORT', 'OCEAN IMPORT')
-                        return v.substring(0, 50);
-                    };
-
                     const result = {
                         code: String(rawCode).trim(),
                         name: String(rawName).trim(),
-                        type: mappedType,
-                        job_type: mapJobType(rawJobType),
+                        type: mappedType, // internally type is group
                         parent_code: rawParent ? String(rawParent).trim() : null,
                         description: rawDesc ? String(rawDesc).trim() : '',
                         level: parseInt(rawLevel) || 1,
@@ -343,9 +377,25 @@ const COAMaster = () => {
                     throw deleteError;
                 }
 
-                const { error } = await supabase.from('finance_coa').insert(pendingImportData);
-                if (error) throw error;
-                alert(`✅ REPLACE Import Berhasil!\n\n📊 Statistik Import:\n• Data dibaca dari Excel: ${importStats.totalRows}\n• Data valid: ${importStats.validRows}\n• Data dilewati: ${importStats.skippedRows}\n• Data berhasil diupload: ${pendingImportData.length}`);
+                // Deduplicate by code
+                const dedupMap = new Map();
+                pendingImportData.forEach(row => dedupMap.set(row.code, row));
+                const dedupedData = Array.from(dedupMap.values());
+                const duplicatesRemoved = pendingImportData.length - dedupedData.length;
+
+                const CHUNK_SIZE = 50;
+                let totalInserted = 0;
+                for (let i = 0; i < dedupedData.length; i += CHUNK_SIZE) {
+                    const chunk = dedupedData.slice(i, i + CHUNK_SIZE);
+                    const { error } = await supabase.from('finance_coa').insert(chunk);
+                    if (error) throw error;
+                    totalInserted += chunk.length;
+                }
+
+                const dupInfo = duplicatesRemoved > 0
+                    ? `\n• Duplikat kode dihilangkan: ${duplicatesRemoved} (diambil data terakhir)`
+                    : '';
+                alert(`✅ REPLACE Import Berhasil!\n\n📊 Statistik Import:\n• Data dibaca dari Excel: ${importStats.totalRows}\n• Data valid: ${importStats.validRows}\n• Data dilewati: ${importStats.skippedRows}${dupInfo}\n• Data berhasil diupload: ${totalInserted}`);
 
             } else if (importMode === 'SMART_REPLACE') {
                 // Detect unique prefixes from imported codes (e.g. '5-', '4-')
@@ -446,7 +496,19 @@ const COAMaster = () => {
 
         } catch (error) {
             console.error('Error executing import:', error);
-            alert('Import Failed: ' + error.message);
+            
+            // Enhanced error messaging
+            let errorMessage = error.message || 'Unknown error';
+            
+            if (errorMessage.includes('row-level security')) {
+                errorMessage = `Row-Level Security Policy Error\n\nAlasan: Kebijakan keamanan database tidak memungkinkan import.\n\nSolusi:\n1. Jalankan: node fix_coa_rls_policy.mjs\n2. Atau baca: FIX_COA_IMPORT_ERROR.md\n\nDetail: ${error.message}`;
+            } else if (errorMessage.includes('foreign key')) {
+                errorMessage = `Foreign Key Constraint Error\n\nSalah satu data referensi tidak ditemukan atau sudah dihapus.\n\nDetail: ${error.message}`;
+            } else if (errorMessage.includes('UNIQUE')) {
+                errorMessage = `Duplicate Code Error\n\nKode COA sudah ada di database.\n\nGunakan SMART REPLACE mode untuk mengganti data lama.\n\nDetail: ${error.message}`;
+            }
+            
+            alert('❌ Import Gagal\n\n' + errorMessage);
         } finally {
             setLoading(false);
         }
@@ -457,55 +519,29 @@ const COAMaster = () => {
             {
                 "Code": "1-01-100-0-1-00",
                 "Name": "Kas Besar",
-                "Master Code": "1-01-000-0-1-00",
-                "Type": "ASSET",
-                "Job Type": "FREIGHT",
-                "Level": "3",
-                "Trial Balance": "TRUE",
-                "Profit & Loss": "FALSE",
-                "Balance Sheet": "TRUE",
-                "AR": "FALSE",
-                "AP": "FALSE",
-                "Cashflow": "TRUE",
-                "Description": "Kas operasional harian"
+                "No. Master Code": "1-01-000-0-1-00",
+                "Group": "ASSET",
+                "Level": "3"
             },
             {
                 "Code": "4-01-100-0-1-00",
                 "Name": "Pendapatan Jasa Freight",
-                "Master Code": "4-01-000-0-1-00",
-                "Type": "REVENUE",
-                "Job Type": "FREIGHT",
-                "Level": "3",
-                "Trial Balance": "TRUE",
-                "Profit & Loss": "TRUE",
-                "Balance Sheet": "FALSE",
-                "AR": "FALSE",
-                "AP": "FALSE",
-                "Cashflow": "FALSE",
-                "Description": ""
+                "No. Master Code": "4-01-000-0-1-00",
+                "Group": "REVENUE",
+                "Level": "3"
             },
             {
                 "Code": "",
                 "Name": "--- PANDUAN KOLOM ---",
-                "Master Code": "",
-                "Type": "ASSET / LIABILITY / EQUITY / REVENUE / EXPENSE / COGS / OTHER_INCOME / OTHER_EXPENSE",
-                "Job Type": "FREIGHT / CUSTOMS / WAREHOUSE / GENERAL / (kosong = semua)",
-                "Level": "1-9",
-                "Trial Balance": "TRUE / FALSE",
-                "Profit & Loss": "TRUE / FALSE",
-                "Balance Sheet": "TRUE / FALSE",
-                "AR": "TRUE / FALSE",
-                "AP": "TRUE / FALSE",
-                "Cashflow": "TRUE / FALSE",
-                "Description": "Keterangan opsional"
+                "No. Master Code": "",
+                "Group": "ASSET / LIABILITY / EQUITY / REVENUE / EXPENSE",
+                "Level": "1-9"
             }
         ];
 
         const ws = utils.json_to_sheet(data);
         ws['!cols'] = [
-            { wch: 22 }, { wch: 35 }, { wch: 22 }, { wch: 12 }, { wch: 20 },
-            { wch: 8 }, { wch: 15 }, { wch: 15 }, { wch: 15 },
-            { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 30 }
+            { wch: 22 }, { wch: 35 }, { wch: 22 }, { wch: 15 }, { wch: 8 }
         ];
 
         const wb = utils.book_new();
@@ -522,24 +558,14 @@ const COAMaster = () => {
         const data = accounts.map(acc => ({
             "Code": acc.code,
             "Name": acc.name,
-            "Master Code": acc.parent_code || "",
-            "Type": acc.type,
-            "Job Type": acc.job_type || "",
-            "Level": acc.level || 1,
-            "Trial Balance": acc.is_trial_balance ? "TRUE" : "FALSE",
-            "Profit & Loss": acc.is_profit_loss ? "TRUE" : "FALSE",
-            "Balance Sheet": acc.is_balance_sheet ? "TRUE" : "FALSE",
-            "AR": acc.is_ar ? "TRUE" : "FALSE",
-            "AP": acc.is_ap ? "TRUE" : "FALSE",
-            "Cashflow": acc.is_cashflow ? "TRUE" : "FALSE",
-            "Description": acc.description || ""
+            "No. Master Code": acc.parent_code || "",
+            "Group": acc.type,
+            "Level": acc.level || 1
         }));
 
         const ws = utils.json_to_sheet(data);
         ws['!cols'] = [
-            { wch: 22 }, { wch: 35 }, { wch: 22 }, { wch: 15 }, { wch: 15 },
-            { wch: 8 }, { wch: 15 }, { wch: 15 }, { wch: 15 },
-            { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 30 }
+            { wch: 22 }, { wch: 35 }, { wch: 22 }, { wch: 15 }, { wch: 8 }
         ];
 
         const wb = utils.book_new();
@@ -554,7 +580,6 @@ const COAMaster = () => {
                 code: formData.code,
                 name: formData.name,
                 type: formData.type,
-                job_type: formData.job_type || null,
                 description: formData.description,
                 parent_code: formData.parent_code || null,
                 level: parseInt(formData.level) || 1,
@@ -803,8 +828,8 @@ const COAMaster = () => {
                     onChange={(e) => setFilterType(e.target.value)}
                     className="px-4 py-2.5 bg-dark-surface border border-dark-border rounded-lg text-sm text-silver-light min-w-[180px] focus:border-accent-blue outline-none transition-colors"
                 >
-                    <option value="ALL">All Types</option>
-                    {accountTypes.map(type => (
+                    <option value="ALL">All Groups</option>
+                    {accountGroups.map(type => (
                         <option key={type} value={type}>{type}</option>
                     ))}
                 </select>
@@ -827,9 +852,8 @@ const COAMaster = () => {
                                 </th>
                                 <th className="px-2 py-1 text-left text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">Code</th>
                                 <th className="px-2 py-1 text-left text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">Name</th>
-                                <th className="px-2 py-1 text-left text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">Type</th>
-                                <th className="px-2 py-1 text-center text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">Job Type</th>
-                                <th className="px-2 py-1 text-center text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">Master Code</th>
+                                <th className="px-2 py-1 text-left text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">Group</th>
+                                <th className="px-2 py-1 text-center text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">No. Master Code</th>
                                 <th className="px-2 py-1 text-center text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">Lvl</th>
                                 <th className="px-2 py-1 text-center text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">TB</th>
                                 <th className="px-2 py-1 text-center text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">P&L</th>
@@ -872,17 +896,6 @@ const COAMaster = () => {
                                                 }`}>
                                                 {acc.type}
                                             </span>
-                                        </td>
-                                        <td className="px-2 text-center cursor-pointer" onClick={() => handleEdit(acc)}>
-                                            {acc.job_type ? (
-                                                <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded whitespace-nowrap
-                                                    ${acc.job_type === 'FREIGHT' ? 'bg-blue-500/20 text-blue-400' :
-                                                        acc.job_type === 'CUSTOMS' ? 'bg-orange-500/20 text-orange-400' :
-                                                            acc.job_type === 'WAREHOUSE' ? 'bg-purple-500/20 text-purple-400' :
-                                                                'bg-gray-500/20 text-gray-400'}`}>
-                                                    {acc.job_type}
-                                                </span>
-                                            ) : <span className="text-[10px] text-silver-dark/50">-</span>}
                                         </td>
                                         <td className="px-2 text-[10px] text-silver-dark text-center whitespace-nowrap cursor-pointer" onClick={() => handleEdit(acc)}>{acc.parent_code || '-'}</td>
                                         <td className="px-2 text-[10px] text-silver-dark text-center cursor-pointer" onClick={() => handleEdit(acc)}>{acc.level || 1}</td>

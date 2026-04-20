@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { createInvoiceJournal, createCOGSJournal, getAllCOA, resolveARAccount, resolveRevenueAccount, generateUUID } from '../../utils/journalHelper';
+import { createInvoiceJournal, createCOGSJournal, getAllCOA, resolveARAccount, resolveRevenueAccount, generateUUID, migrateBlinkFinancialRecords } from '../../utils/journalHelper';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useData } from '../../context/DataContext';
@@ -8,6 +8,7 @@ import { getCurrencySymbol } from '../../utils/currencyFormatter';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
 import COAPicker from '../../components/Common/COAPicker';
+import { logTransaction, TRANSACTION_TYPES, MODULES, ACTIONS } from '../../services/transactionLogService';
 import {
     FileText, DollarSign, Calendar, User, Clock, CheckCircle, XCircle,
     Plus, Send, AlertCircle, Download, Eye, Edit, Trash, Receipt,
@@ -19,7 +20,7 @@ import InvoiceProfitSummary from '../../components/Blink/InvoiceProfitSummary';
 
 const InvoiceManagement = () => {
     const navigate = useNavigate();
-    const { canCreate, canEdit, canDelete, canApprove } = useAuth();
+    const { canCreate, canEdit, canDelete, canApprove, user } = useAuth();
     const { companySettings, bankAccounts } = useData();
     const [invoices, setInvoices] = useState([]);
     const [quotations, setQuotations] = useState([]);
@@ -33,6 +34,7 @@ const InvoiceManagement = () => {
     const [showViewModal, setShowViewModal] = useState(false);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [showPrintPreview, setShowPrintPreview] = useState(false);
+    const [financeMigrationRan, setFinanceMigrationRan] = useState(false);
     const [showAddItemModal, setShowAddItemModal] = useState(false);
     const [addItemInvoice, setAddItemInvoice] = useState(null);
     const [previewInvoiceData, setPreviewInvoiceData] = useState(null);
@@ -98,6 +100,25 @@ const InvoiceManagement = () => {
         fetchShipments();
         fetchRevenueAccounts();
     }, []);
+
+    useEffect(() => {
+        if (financeMigrationRan || loading || invoices.length === 0) return;
+        const runMigration = async () => {
+            setFinanceMigrationRan(true);
+            try {
+                const { migratedInvoices, migratedPOs } = await migrateBlinkFinancialRecords();
+                if ((migratedInvoices || migratedPOs) && window?.alert) {
+                    alert(`✅ Sinkronisasi Blink finansial selesai: ${migratedInvoices} invoice, ${migratedPOs} PO dimigrasi ke Blink journal.`);
+                }
+                if (migratedInvoices || migratedPOs) {
+                    await fetchInvoices();
+                }
+            } catch (err) {
+                console.warn('Finance migration failed:', err?.message || err);
+            }
+        };
+        runMigration();
+    }, [financeMigrationRan, loading, invoices]);
 
     const fetchRevenueAccounts = async () => {
         try {
@@ -223,20 +244,24 @@ const InvoiceManagement = () => {
                     volume: quotation.volume,
                     commodity: quotation.commodity
                 },
-                // Initialize with service items from quotation
                 invoice_items: quotation.service_items && quotation.service_items.length > 0
-                    ? quotation.service_items.map(item => ({
-                        item_name: revenueAccounts.find(acc => acc.code === item.itemCode)?.name || item.itemCode || item.name || item.service_name || 'Item',
-                        description: item.description || item.name || '',
-                        qty: parseFloat(item.quantity) || parseFloat(item.qty) || 1,
-                        unit: item.unit || 'Job',
-                        rate: parseFloat(item.unitPrice) || parseFloat(item.price) || parseFloat(item.rate) || 0,
-                        amount: parseFloat(item.amount) || parseFloat(item.total) ||
-                            ((parseFloat(item.quantity) || 1) * (parseFloat(item.unitPrice) || parseFloat(item.price) || parseFloat(item.rate) || 0)),
-                        tax_amount: typeof item.tax_amount !== 'undefined' ? Number(item.tax_amount) : 0,
-                        tax_rate: typeof item.tax_rate !== 'undefined' ? Number(item.tax_rate) : 0,
-                        currency: item.currency || quotation.currency || 'IDR'
-                    }))
+                    ? quotation.service_items.map(item => {
+                        const acc = revenueAccounts.find(a => a.code === item.itemCode);
+                        return {
+                            item_name: acc?.name || item.itemCode || item.name || item.service_name || 'Item',
+                            description: item.description || item.name || '',
+                            qty: parseFloat(item.quantity) || parseFloat(item.qty) || 1,
+                            unit: item.unit || 'Job',
+                            rate: parseFloat(item.unitPrice) || parseFloat(item.price) || parseFloat(item.rate) || 0,
+                            amount: parseFloat(item.amount) || parseFloat(item.total) ||
+                                ((parseFloat(item.quantity) || 1) * (parseFloat(item.unitPrice) || parseFloat(item.price) || parseFloat(item.rate) || 0)),
+                            tax_amount: typeof item.tax_amount !== 'undefined' ? Number(item.tax_amount) : 0,
+                            tax_rate: typeof item.tax_rate !== 'undefined' ? Number(item.tax_rate) : 0,
+                            currency: item.currency || quotation.currency || 'IDR',
+                            coa_id: acc?.id || item.coa_id || null,
+                            coa_code: acc?.code || item.itemCode || item.coa_code || null
+                        };
+                    })
                     : [{
                         item_name: (quotation.serviceType || quotation.service_type || 'Freight').toUpperCase(),
                         description: `${(quotation.serviceType || quotation.service_type || 'Freight').toUpperCase()} - ${quotation.origin} to ${quotation.destination}`,
@@ -291,20 +316,24 @@ const InvoiceManagement = () => {
                     volume: shipment.volume,
                     commodity: shipment.commodity
                 },
-                // Initialize with items from shipment selling items, or fallback to single line
                 invoice_items: shipment.selling_items && shipment.selling_items.length > 0
-                    ? shipment.selling_items.map(item => ({
-                        item_name: revenueAccounts.find(acc => acc.code === item.itemCode)?.name || item.itemCode || item.name || item.service_name || 'Item',
-                        description: item.description || item.name || '',
-                        qty: parseFloat(item.quantity) || parseFloat(item.qty) || 1,
-                        unit: item.unit || 'Job',
-                        rate: parseFloat(item.unitPrice) || parseFloat(item.price) || parseFloat(item.rate) || 0,
-                        amount: parseFloat(item.amount) || parseFloat(item.total) || 
-                            ((parseFloat(item.quantity) || 1) * (parseFloat(item.unitPrice) || parseFloat(item.price) || parseFloat(item.rate) || 0)),
-                        tax_amount: typeof item.tax_amount !== 'undefined' ? Number(item.tax_amount) : 0,
-                        tax_rate: typeof item.tax_rate !== 'undefined' ? Number(item.tax_rate) : 0,
-                        currency: item.currency || shipment.currency || 'IDR'
-                    }))
+                    ? shipment.selling_items.map(item => {
+                        const acc = revenueAccounts.find(a => a.code === item.itemCode);
+                        return {
+                            item_name: acc?.name || item.itemCode || item.name || item.service_name || 'Item',
+                            description: item.description || item.name || '',
+                            qty: parseFloat(item.quantity) || parseFloat(item.qty) || 1,
+                            unit: item.unit || 'Job',
+                            rate: parseFloat(item.unitPrice) || parseFloat(item.price) || parseFloat(item.rate) || 0,
+                            amount: parseFloat(item.amount) || parseFloat(item.total) || 
+                                ((parseFloat(item.quantity) || 1) * (parseFloat(item.unitPrice) || parseFloat(item.price) || parseFloat(item.rate) || 0)),
+                            tax_amount: typeof item.tax_amount !== 'undefined' ? Number(item.tax_amount) : 0,
+                            tax_rate: typeof item.tax_rate !== 'undefined' ? Number(item.tax_rate) : 0,
+                            currency: item.currency || shipment.currency || 'IDR',
+                            coa_id: acc?.id || item.coa_id || null,
+                            coa_code: acc?.code || item.itemCode || item.coa_code || null
+                        };
+                    })
                     : [{
                         item_name: (shipment.service_type || 'Freight').toUpperCase(),
                         description: `${(shipment.service_type || 'Freight').toUpperCase()} - ${shipment.origin} to ${shipment.destination}`,
@@ -426,7 +455,7 @@ const InvoiceManagement = () => {
             ...prev,
             invoice_items: [
                 ...prev.invoice_items,
-                { item_name: '', description: '', qty: 1, unit: 'Job', rate: 0, amount: 0, tax_rate: 0, tax_amount: 0, currency: prev.billing_currency || 'IDR' }
+                { item_name: '', description: '', qty: 1, unit: 'Job', rate: 0, amount: 0, tax_rate: 0, tax_amount: 0, currency: prev.billing_currency || 'IDR', coa_id: null, coa_code: null }
             ]
         }));
     };
@@ -444,6 +473,15 @@ const InvoiceManagement = () => {
         setFormData(prev => {
             const items = [...prev.invoice_items];
             items[index][field] = value;
+
+            // Auto-map COA if item_name changes
+            if (field === 'item_name') {
+                const acc = revenueAccounts.find(a => a.name === value || a.code === value);
+                if (acc) {
+                    items[index].coa_id = acc.id;
+                    items[index].coa_code = acc.code;
+                }
+            }
 
             // Auto-calculate amount
             if (field === 'qty' || field === 'rate') {
@@ -615,30 +653,32 @@ const InvoiceManagement = () => {
             if (error) throw error;
 
             const insertedInvoice = data[0];
-
-            // ── Auto Journal Entries (Invoice AR + Revenue + COGS) ─────────
-            try {
-                const coaList = await getAllCOA();
-                // 1. Dr Piutang Usaha / Cr Pendapatan (AR + Revenue)
-                await createInvoiceJournal({ invoice: insertedInvoice, coaList });
-                // 2. Dr HPP / Cr Biaya Langsung (COGS recognition — only if cogs_subtotal > 0)
-                if (insertedInvoice.cogs_subtotal > 0) {
-                    await createCOGSJournal({
-                        invoice: insertedInvoice,
-                        cogsAmount: insertedInvoice.cogs_subtotal,
-                        coaList
-                    });
-                }
-            } catch (jeError) {
-                console.warn('[Invoice] Journal entry creation failed (non-critical):', jeError.message);
-            }
-            // ───────────────────────────────────────────────────────────────
-
             await fetchInvoices();
+
+            await logTransaction({
+                transactionType: TRANSACTION_TYPES.INVOICE,
+                transactionId: insertedInvoice.id,
+                referenceNumber: insertedInvoice.invoice_number,
+                module: MODULES.FINANCE,
+                action: ACTIONS.CREATE,
+                description: `Invoice created for ${formData.customer_name || formData.customer_company} - ${formData.job_number}`,
+                amount: total,
+                currency: formData.billing_currency || 'IDR',
+                partnerId: formData.customer_id,
+                partnerName: formData.customer_name || formData.customer_company,
+                accountId: formData.account_id,
+                accountName: formData.account_name,
+                status: 'draft',
+                paymentMethod: formData.payment_method,
+                sourceAction: 'create_invoice',
+                submenuContext: 'blink_invoices',
+                user
+            });
+
             setShowCreateModal(false);
 
             resetForm();
-            alert('Invoice created successfully!');
+            alert('Invoice created successfully! Invoice will be posted to accounting after manager approval.');
         } catch (error) {
             console.error('Error creating invoice:', error);
             alert('Failed to create invoice: ' + error.message);
@@ -2531,18 +2571,32 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
     const fetchPayments = async () => {
         try {
             setLoadingPayments(true);
-            const { data, error } = await supabase
+
+            // Strategy 1: match by reference_id = invoice.id (direct match)
+            const { data: d1 } = await supabase
                 .from('blink_payments')
                 .select('*')
-                .eq('reference_type', 'invoice')
+                .or(`reference_type.eq.invoice,reference_type.eq.ar_payment,payment_type.eq.incoming`)
                 .eq('reference_id', invoice.id)
                 .order('payment_date', { ascending: false });
-            if (error) {
-                console.error('Error fetching payments:', error);
-                setPayments([]);
-                return;
-            }
-            setPayments(data || []);
+
+            // Strategy 2: match by invoice_number stored as reference_number
+            const { data: d2 } = await supabase
+                .from('blink_payments')
+                .select('*')
+                .eq('reference_number', invoice.invoice_number)
+                .order('payment_date', { ascending: false });
+
+            // Merge and deduplicate by id
+            const merged = [...(d1 || []), ...(d2 || [])];
+            const seen = new Set();
+            const unique = merged.filter(p => {
+                if (seen.has(p.id)) return false;
+                seen.add(p.id);
+                return true;
+            });
+
+            setPayments(unique);
         } catch (error) {
             console.error('Error fetching payments:', error);
             setPayments([]); // Don't break modal, just show no payments

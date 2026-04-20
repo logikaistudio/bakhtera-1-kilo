@@ -9,6 +9,7 @@ import {
     BarChart2, Filter, X, DollarSign, Layers, Tag, Printer
 } from 'lucide-react';
 import { printReport, fmtDatePrint } from '../../utils/printPDF';
+import { journalEntriesHasColumn } from '../../utils/journalHelper';
 import { useData } from '../../context/DataContext';
 
 // ─── COA Type Config ─────────────────────────────────────────────────────────
@@ -205,8 +206,9 @@ const GeneralLedger = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [sourceFilter, setSourceFilter] = useState('all');
     const [showSidebar, setShowSidebar] = useState(true);
-    const [accountBalances, setAccountBalances] = useState({}); // coaId → balance
+    const [accountBalances, setAccountBalances] = useState({}); // coaId / account_code → balance
     const [balancesLoading, setBalancesLoading] = useState(false);
+    const [journalHasCoaId, setJournalHasCoaId] = useState(null);
     const [coaSearchTerm, setCoaSearchTerm] = useState('');
 
     const today = new Date();
@@ -219,19 +221,33 @@ const GeneralLedger = () => {
     useEffect(() => { fetchAccounts(); }, []);
 
     useEffect(() => {
+        const checkColumn = async () => {
+            const hasCoaColumn = await journalEntriesHasColumn('coa_id');
+            setJournalHasCoaId(hasCoaColumn);
+        };
+        checkColumn();
+    }, []);
+
+    useEffect(() => {
         if (location.state?.preSelectedAccount) {
             setSelectedAccount(location.state.preSelectedAccount);
         }
     }, [location.state]);
 
     useEffect(() => {
+        if (journalHasCoaId === null) return;
         if (selectedAccount && dateRange.start && dateRange.end) {
             fetchLedgerData();
         } else {
             setEntries([]);
             setOpeningBalance(0);
         }
-    }, [selectedAccount, dateRange]);
+    }, [selectedAccount, dateRange, journalHasCoaId]);
+
+    useEffect(() => {
+        if (journalHasCoaId === null) return;
+        if (accounts.length > 0) fetchAccountBalances(accounts);
+    }, [accounts, journalHasCoaId]);
 
     // ── Fetch Accounts ────────────────────────────────────────────────────────
     const fetchAccounts = async () => {
@@ -251,21 +267,38 @@ const GeneralLedger = () => {
             setBalancesLoading(true);
             const yearStart = `${today.getFullYear()}-01-01`;
             const yearEnd = today.toISOString().split('T')[0];
+
+            const selectCols = journalHasCoaId
+                ? 'coa_id, account_code, debit, credit, currency, exchange_rate'
+                : 'account_code, debit, credit, currency, exchange_rate';
+
             const { data } = await supabase
                 .from('blink_journal_entries')
-                .select('coa_id, debit, credit, currency, exchange_rate')
+                .select(selectCols)
                 .gte('entry_date', yearStart)
                 .lte('entry_date', yearEnd);
 
             if (!data) return;
+
+            const codeMap = {};
+            const nameMap = {};
+            accs.forEach(acc => {
+                if (acc.code) codeMap[acc.code] = acc.id;
+                if (acc.name) nameMap[acc.name.toLowerCase().trim()] = acc.id;
+            });
+
             const bal = {};
             data.forEach(e => {
-                if (!e.coa_id) return;
-                if (!bal[e.coa_id]) bal[e.coa_id] = { d: 0, c: 0 };
-                bal[e.coa_id].d += toIDR(e.debit, e.currency, e.exchange_rate) ?? 0;
-                bal[e.coa_id].c += toIDR(e.credit, e.currency, e.exchange_rate) ?? 0;
+                let targetId = journalHasCoaId ? e.coa_id : codeMap[e.account_code];
+                if (!targetId && e.account_name) {
+                    targetId = nameMap[e.account_name.toLowerCase().trim()];
+                }
+                if (!targetId) return;
+                if (!bal[targetId]) bal[targetId] = { d: 0, c: 0 };
+                bal[targetId].d += toIDR(e.debit, e.currency, e.exchange_rate) ?? 0;
+                bal[targetId].c += toIDR(e.credit, e.currency, e.exchange_rate) ?? 0;
             });
-            // normalize to closing balance
+
             const result = {};
             accs.forEach(acc => {
                 const b = bal[acc.id] || { d: 0, c: 0 };
@@ -273,16 +306,33 @@ const GeneralLedger = () => {
                 result[acc.id] = isCredit ? (b.c - b.d) : (b.d - b.c);
             });
             setAccountBalances(result);
-        } catch (e) { console.error('Balance fetch error:', e); }
-        finally { setBalancesLoading(false); }
+        } catch (e) {
+            console.error('Balance fetch error:', e);
+        } finally {
+            setBalancesLoading(false);
+        }
     };
 
     // ── Fetch Ledger ──────────────────────────────────────────────────────────
     const fetchLedgerData = async () => {
         try {
             setLoading(true);
+            
+            if (!selectedAccount) {
+                setLoading(false);
+                return;
+            }
+
+            const isUnclassified = selectedAccount.startsWith('unclassified_');
+            const unclassifiedCode = isUnclassified ? selectedAccount.replace('unclassified_', '') : null;
+
             const acc = accounts.find(a => a.id === selectedAccount);
-            const isNormalCredit = ['LIABILITY', 'EQUITY', 'REVENUE'].includes(acc?.type);
+            if (!acc && !isUnclassified) {
+                setLoading(false);
+                return;
+            }
+            
+            const isNormalCredit = isUnclassified ? false : ['LIABILITY', 'EQUITY', 'REVENUE'].includes(acc?.type);
 
             // Opening balance: dual-match by coa_id OR account_code
             // (old entries might have code but no coa_id)
@@ -292,13 +342,17 @@ const GeneralLedger = () => {
                         .select('debit, credit, currency, exchange_rate, id')
                         .eq('coa_id', selectedAccount)
                         .lt('entry_date', dateRange.start),
-                    acc?.code ? supabase.from('blink_journal_entries')
+                    (acc?.code || isUnclassified) ? supabase.from('blink_journal_entries')
                         .select('debit, credit, currency, exchange_rate, id')
-                        .eq('account_code', acc.code)
+                        .eq('account_code', acc?.code || unclassifiedCode)
                         .is('coa_id', null)
+                        .lt('entry_date', dateRange.start) : Promise.resolve({ data: [] }),
+                    acc?.name ? supabase.from('blink_journal_entries')
+                        .select('debit, credit, currency, exchange_rate, id')
+                        .ilike('account_name', acc.name)
                         .lt('entry_date', dateRange.start) : Promise.resolve({ data: [] })
                 ]);
-                const rows = [...(results[0].data || []), ...(results[1].data || [])];
+                const rows = [...(results[0].data || []), ...(results[1].data || []), ...(results[2].data || [])];
                 // deduplicate by id
                 return [...new Map(rows.map(r => [r.id, r])).values()];
             };
@@ -310,7 +364,7 @@ const GeneralLedger = () => {
             setOpeningBalance(opening);
 
             // Current period: dual-fetch same pattern
-            const [r1, r2] = await Promise.all([
+            const [r1, r2, r3] = await Promise.all([
                 supabase.from('blink_journal_entries')
                     .select('*')
                     .eq('coa_id', selectedAccount)
@@ -318,10 +372,17 @@ const GeneralLedger = () => {
                     .lte('entry_date', dateRange.end)
                     .order('entry_date', { ascending: true })
                     .order('created_at', { ascending: true }),
-                acc?.code ? supabase.from('blink_journal_entries')
+                (acc?.code || isUnclassified) ? supabase.from('blink_journal_entries')
                     .select('*')
-                    .eq('account_code', acc.code)
+                    .eq('account_code', acc?.code || unclassifiedCode)
                     .is('coa_id', null)
+                    .gte('entry_date', dateRange.start)
+                    .lte('entry_date', dateRange.end)
+                    .order('entry_date', { ascending: true })
+                    .order('created_at', { ascending: true }) : Promise.resolve({ data: [] }),
+                acc?.name ? supabase.from('blink_journal_entries')
+                    .select('*')
+                    .ilike('account_name', acc.name)
                     .gte('entry_date', dateRange.start)
                     .lte('entry_date', dateRange.end)
                     .order('entry_date', { ascending: true })
@@ -329,7 +390,7 @@ const GeneralLedger = () => {
             ]);
 
             if (r1.error) throw r1.error;
-            const combined = [...(r1.data || []), ...(r2.data || [])];
+            const combined = [...(r1.data || []), ...(r2.data || []), ...(r3.data || [])];
             // deduplicate
             const unique = [...new Map(combined.map(r => [r.id, r])).values()];
             // sort chronologically
@@ -346,7 +407,10 @@ const GeneralLedger = () => {
     };
 
     // ── Computed ──────────────────────────────────────────────────────────────
-    const accountInfo = accounts.find(a => a.id === selectedAccount);
+    const isUnclassifiedSelected = selectedAccount && selectedAccount.startsWith('unclassified_');
+    const accountInfo = isUnclassifiedSelected 
+        ? { code: selectedAccount.replace('unclassified_', ''), name: 'Unmapped Account', type: 'ASSET' }
+        : accounts.find(a => a.id === selectedAccount);
     const isNormalCredit = ['LIABILITY', 'EQUITY', 'REVENUE'].includes(accountInfo?.type);
     const typeConfig = COA_TYPE_CONFIG[accountInfo?.type] || COA_TYPE_CONFIG.ASSET;
 

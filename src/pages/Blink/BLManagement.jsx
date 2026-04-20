@@ -195,7 +195,7 @@ const BLManagement = () => {
                 createdAt: ship.created_at,
                 serviceItems: ship.service_items || [],
                 currency: ship.currency || 'USD',
-                status: ship.bl_status || 'draft',
+                status: normalizeBLStatus(ship.bl_status || ship.status || 'draft'),
 
                 // Shipment data for reference
                 origin: ship.origin,
@@ -264,10 +264,18 @@ const BLManagement = () => {
         submitted: { label: 'Submitted', color: 'bg-yellow-500/20 text-yellow-400', icon: Send },
         approved: { label: 'Approved', color: 'bg-teal-500/20 text-teal-400', icon: ShieldCheck },
         rejected: { label: 'Rejected', color: 'bg-red-500/20 text-red-400', icon: XCircle },
-        issued: { label: 'Issued', color: 'bg-blue-500/20 text-blue-400', icon: CheckCircle },
-        in_transit: { label: 'In Transit', color: 'bg-purple-500/20 text-purple-400', icon: Ship },
-        arrived: { label: 'Arrived', color: 'bg-green-500/20 text-green-400', icon: CheckCircle },
-        delivered: { label: 'Delivered', color: 'bg-emerald-500/20 text-emerald-400', icon: CheckCircle },
+        issued: { label: 'Issued', color: 'bg-green-500/20 text-green-400', icon: CheckCircle },
+        in_transit: { label: 'In Transit', color: 'bg-blue-500/20 text-blue-400', icon: Send },
+        arrived: { label: 'Arrived', color: 'bg-orange-500/20 text-orange-400', icon: Container },
+        delivered: { label: 'Delivered', color: 'bg-teal-500/20 text-teal-400', icon: Ship },
+    };
+
+    const normalizeBLStatus = (status) => {
+        if (!status) return 'draft';
+        if (['issued', 'in_transit', 'arrived', 'delivered'].includes(status)) return 'approved';
+        if (['submitted', 'manager_approval', 'pending', 'pending_approval'].includes(status)) return 'submitted';
+        if (['approved', 'rejected', 'draft'].includes(status)) return status;
+        return status;
     };
 
     // Status transition rules: which statuses can transition to which
@@ -276,26 +284,13 @@ const BLManagement = () => {
             { to: 'submitted', label: 'Submit for Approval', icon: Send, color: 'bg-yellow-500 hover:bg-yellow-600 text-white' }
         ],
         submitted: [
-            { to: 'approved', label: 'Approve', icon: ShieldCheck, color: 'bg-teal-500 hover:bg-teal-600 text-white' },
-            { to: 'rejected', label: 'Reject', icon: XCircle, color: 'bg-red-500 hover:bg-red-600 text-white' },
-            { to: 'draft', label: 'Return to Draft', icon: RefreshCw, color: 'bg-gray-500 hover:bg-gray-600 text-white' }
+            { to: 'draft', label: 'Return to Draft', icon: RefreshCw, color: 'bg-gray-500 hover:bg-gray-600 text-white' },
+            { to: 'approved', label: 'Approve Document', icon: ShieldCheck, color: 'bg-teal-500 hover:bg-teal-600 text-white' }
         ],
-        approved: [
-            { to: 'issued', label: 'Issue Document', icon: CheckCircle, color: 'bg-blue-500 hover:bg-blue-600 text-white' }
-        ],
+        approved: [],
         rejected: [
             { to: 'draft', label: 'Revise (Back to Draft)', icon: RefreshCw, color: 'bg-gray-500 hover:bg-gray-600 text-white' }
-        ],
-        issued: [
-            { to: 'in_transit', label: 'Mark In Transit', icon: Ship, color: 'bg-purple-500 hover:bg-purple-600 text-white' }
-        ],
-        in_transit: [
-            { to: 'arrived', label: 'Mark Arrived', icon: CheckCircle, color: 'bg-green-500 hover:bg-green-600 text-white' }
-        ],
-        arrived: [
-            { to: 'delivered', label: 'Mark Delivered', icon: CheckCircle, color: 'bg-emerald-500 hover:bg-emerald-600 text-white' }
-        ],
-        delivered: []
+        ]
     };
 
     // Handle status change with confirmation
@@ -316,15 +311,12 @@ const BLManagement = () => {
         try {
             const updateData = {
                 bl_status: newStatus,
+                status: newStatus,
             };
 
             // Record approval metadata
             if (newStatus === 'approved') {
-                updateData.bl_approved_at = new Date().toISOString();
-                updateData.bl_approved_by = 'Current User'; // TODO: get from auth context
-            }
-            if (newStatus === 'issued') {
-                updateData.bl_issued_date = new Date().toISOString().split('T')[0];
+                updateData.approved_at = new Date().toISOString();
             }
 
             const { error } = await supabase
@@ -338,8 +330,8 @@ const BLManagement = () => {
             // Refresh data
             await fetchBLs();
             // Update local state
-            setSelectedBL(prev => ({ ...prev, status: newStatus }));
-            setEditForm(prev => ({ ...prev, status: newStatus }));
+            setSelectedBL(prev => ({ ...prev, status: normalizeBLStatus(newStatus), bl_status: newStatus }));
+            setEditForm(prev => ({ ...prev, status: normalizeBLStatus(newStatus) }));
         } catch (error) {
             console.error('Error changing status:', error);
             alert('❌ Failed to change status: ' + error.message);
@@ -884,9 +876,9 @@ const BLManagement = () => {
                                         JOB: {selectedBL.jobNumber} | TYPE: {selectedBL.blType}
                                         {selectedBL.soNumber && <> | SO: {selectedBL.soNumber}</>}
                                     </p>
-                                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusConfig[editForm.status || selectedBL.status]?.color || 'bg-gray-500/20 text-gray-400'}`}>
-                                        {(() => { const IconComp = statusConfig[editForm.status || selectedBL.status]?.icon; return IconComp ? <IconComp className="w-3 h-3" /> : null; })()}
-                                        {statusConfig[editForm.status || selectedBL.status]?.label || editForm.status || selectedBL.status}
+                                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusConfig[normalizeBLStatus(editForm.status || selectedBL.status)]?.color || 'bg-gray-500/20 text-gray-400'}`}>
+                                        {(() => { const IconComp = statusConfig[normalizeBLStatus(editForm.status || selectedBL.status)]?.icon; return IconComp ? <IconComp className="w-3 h-3" /> : null; })()}
+                                        {statusConfig[normalizeBLStatus(editForm.status || selectedBL.status)]?.label || normalizeBLStatus(editForm.status || selectedBL.status)}
                                     </span>
                                 </div>
                             </div>

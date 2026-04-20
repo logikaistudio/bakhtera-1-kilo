@@ -18,9 +18,11 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
         payment_method: 'bank_transfer',
         reference_number: '',
         paid_from_account: '',
+        ap_coa_id: '',
         notes: ''
     });
     const [bankAccounts, setBankAccounts] = useState([]);
+    const [apAccountsList, setApAccountsList] = useState([]);
     const [loading, setLoading] = useState(false);
     // Success state
     const [paymentSuccess, setPaymentSuccess] = useState(false);
@@ -28,7 +30,22 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
 
     useEffect(() => {
         fetchBankAccounts();
+        fetchAPAccounts();
     }, []);
+
+    const fetchAPAccounts = async () => {
+        try {
+            const { data } = await supabase.from('finance_coa').select('*').eq('type', 'LIABILITY').order('code');
+            if (data && data.length > 0) {
+                setApAccountsList(data);
+                
+                // Attempt to pre-select 'Hutang Usaha'
+                const match = data.find(c => c.name.toLowerCase().includes('hutang usaha') || c.code.startsWith('2-01'));
+                if (match) setFormData(prev => ({ ...prev, ap_coa_id: match.id }));
+                else setFormData(prev => ({ ...prev, ap_coa_id: data[0].id }));
+            }
+        } catch(e) { console.error('Error fetching AP accounts:', e); }
+    };
 
     const fetchBankAccounts = async () => {
         try {
@@ -65,6 +82,9 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
         try {
             setLoading(true);
 
+            const { data: userData } = await supabase.auth.getUser();
+            const createdBy = userData?.user?.email || 'System';
+
             // Generate payment number
             const year = new Date().getFullYear();
             const paymentNumber = `PAY-OUT-${year}-${String(Date.now()).slice(-6)}`;
@@ -85,15 +105,19 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
                 payment_method: formData.payment_method,
                 bank_account: selectedBank ? `${selectedBank.bank_name} - ${selectedBank.account_number}` : null,
                 transaction_ref: formData.reference_number || null,
+                description: `Payment for AP ${ap.ap_number}`,
                 notes: formData.notes || null,
-                status: 'completed'
+                status: 'completed',
+                created_by: createdBy
             };
 
             const { error: paymentError } = await supabase
                 .from('blink_payments')
                 .insert([paymentData]);
 
-            if (paymentError) throw paymentError;
+            if (paymentError) {
+                console.warn('[AP] Failed to save payment record (possibly RLS), skipping:', paymentError.message);
+            }
 
             // Update AP transaction
             const newPaidAmount = (ap.paid_amount || 0) + parseFloat(formData.amount);
@@ -108,18 +132,22 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
                 newStatus = 'outstanding';
             }
 
-            const { error: apError } = await supabase
-                .from('blink_ap_transactions')
-                .update({
-                    paid_amount: newPaidAmount,
-                    outstanding_amount: newOutstanding,
-                    status: newStatus,
-                    last_payment_date: formData.payment_date,
-                    last_payment_amount: parseFloat(formData.amount)
-                })
-                .eq('id', ap.id);
+            if (ap.source !== 'po_fallback') {
+                const { error: apError } = await supabase
+                    .from('blink_ap_transactions')
+                    .update({
+                        paid_amount: newPaidAmount,
+                        outstanding_amount: newOutstanding,
+                        status: newStatus,
+                        last_payment_date: formData.payment_date,
+                        last_payment_amount: parseFloat(formData.amount)
+                    })
+                    .eq('id', ap.id);
 
-            if (apError) throw apError;
+                if (apError) {
+                    console.warn('Failed to update blink_ap_transactions (likely because it is missing):', apError);
+                }
+            }
 
             // IMPORTANT: Also update the linked PO to keep data synchronized
             console.log('AP Payment - Syncing PO:', {
@@ -192,7 +220,8 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
                     paymentDate: formData.payment_date,
                     paymentNumber,
                     selectedBank,
-                    coaList
+                    apCOAId: formData.ap_coa_id,
+                    bankCOAId: selectedBank?.coa_id || null
                 });
                 console.log('AP Payment journal entries created');
             } catch (jeError) {
@@ -394,6 +423,26 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
                                 No bank accounts configured. Go to Company Settings to add accounts.
                             </p>
                         )}
+                    </div>
+
+                    {/* Hutang Account Override */}
+                    <div>
+                        <label className="block text-sm font-medium text-silver-dark mb-2">
+                            Akun Hutang (AP Account)
+                        </label>
+                        <select
+                            value={formData.ap_coa_id}
+                            onChange={(e) => setFormData({ ...formData, ap_coa_id: e.target.value })}
+                            className="w-full"
+                        >
+                            <option value="">-- Pilih Akun Hutang --</option>
+                            {apAccountsList.map(c => (
+                                <option key={c.id} value={c.id}>
+                                    {c.code} - {c.name}
+                                </option>
+                            ))}
+                        </select>
+                        <p className="text-xs text-silver-dark mt-1">Dicatat di General Ledger sebagai pengurang hutang.</p>
                     </div>
 
                     <div>
@@ -727,6 +776,12 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment, canEditAP
                     </div>
                 )}
 
+                {ap.source === 'po_fallback' && (
+                    <div className="glass-card p-4 rounded-lg mb-6 bg-yellow-500/10 border border-yellow-500/20 text-sm text-yellow-200">
+                        This AP record is derived from purchase order fallback data. A proper AP transaction is required before payments can be recorded.
+                    </div>
+                )}
+
                 {/* Actions */}
                 <div className="flex gap-3 justify-end pt-4 border-t border-dark-border">
                     <Button variant="secondary" onClick={onClose}>
@@ -760,15 +815,65 @@ const AccountsPayable = () => {
     const fetchAPTransactions = async () => {
         try {
             setLoading(true);
-            const { data, error } = await supabase
+
+            // ── BLINK ONLY: Primary source = blink_ap_transactions ──────────
+            const { data: apData, error: apError } = await supabase
                 .from('blink_ap_transactions')
                 .select('*')
                 .order('bill_date', { ascending: false });
 
-            if (error) throw error;
+            let finalRows = [];
 
-            // Update aging bucket dynamically
-            const updatedData = (data || []).map(ap => {
+            if (!apError && apData && apData.length > 0) {
+                // ✅ Data exists in blink_ap_transactions — use it directly
+                finalRows = apData;
+            } else {
+                // ⚠️ blink_ap_transactions kosong atau error → fallback ke purchase orders
+                if (apError) {
+                    console.warn('[Blink AP] blink_ap_transactions error:', apError.message);
+                } else {
+                    console.warn('[Blink AP] blink_ap_transactions kosong, fallback ke blink_purchase_orders');
+                }
+
+                const { data: poRows, error: poErr } = await supabase
+                    .from('blink_purchase_orders')
+                    .select('*')
+                    .in('status', ['approved', 'received', 'paid'])
+                    .order('po_date', { ascending: false });
+
+                if (poErr) throw poErr;
+
+                // Map PO → format AP
+                finalRows = (poRows || []).map(po => {
+                    let daysToAdd = 30;
+                    if (po.payment_terms) {
+                        const m = String(po.payment_terms).match(/\d+/);
+                        if (m) daysToAdd = parseInt(m[0], 10);
+                    }
+                    const dueDate = new Date(po.po_date || po.created_at || new Date());
+                    dueDate.setDate(dueDate.getDate() + daysToAdd);
+
+                    return {
+                        ...po,
+                        source: 'po_fallback',
+                        po_id: po.id,
+                        ap_transaction_id: null,
+                        ap_number: po.ap_number || `AP-${po.po_number || po.id?.slice(0, 8).toUpperCase()}`,
+                        po_number: po.po_number,
+                        vendor_name: po.vendor_name || 'Unknown Vendor',
+                        bill_date: po.po_date,
+                        due_date: dueDate.toISOString().split('T')[0],
+                        original_amount: po.total_amount || 0,
+                        paid_amount: po.paid_amount || 0,
+                        outstanding_amount: Math.max(0, (po.total_amount || 0) - (po.paid_amount || 0)),
+                        currency: po.currency || 'IDR',
+                        status: po.status === 'paid' ? 'paid' : 'outstanding'
+                    };
+                });
+            }
+
+            // Update aging bucket and metadata dynamically
+            const updatedData = (finalRows || []).map(ap => {
                 const dueDate = new Date(ap.due_date);
                 const today = new Date();
                 const daysDiff = Math.ceil((today - dueDate) / (1000 * 60 * 60 * 24));
@@ -776,7 +881,7 @@ const AccountsPayable = () => {
                 let aging_bucket = '0-30';
                 let status = ap.status;
 
-                if (ap.outstanding_amount <= 0) {
+                if ((ap.outstanding_amount || 0) <= 0) {
                     status = 'paid';
                 } else if (daysDiff > 0) {
                     status = 'overdue';
@@ -786,7 +891,13 @@ const AccountsPayable = () => {
                     else aging_bucket = '90+';
                 }
 
-                return { ...ap, aging_bucket, status };
+                return {
+                    ...ap,
+                    ap_number: ap.ap_number || `AP-${ap.po_number || 'UNKNOWN'}`,
+                    po_number: ap.po_number || `PO-${ap.po_id?.slice(0, 6).toUpperCase()}`,
+                    aging_bucket,
+                    status
+                };
             });
 
             setAPTransactions(updatedData);

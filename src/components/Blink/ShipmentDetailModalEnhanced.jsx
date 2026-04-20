@@ -99,6 +99,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
 
     // Transitions visible in shipment modal (ops team only — not approve/reject)
     const statusTransitions = {
+        draft: [{ to: 'manager_approval', label: '📤 Submit for Approval', style: 'primary' }],
         pending: [{ to: 'manager_approval', label: '📤 Submit for Approval', style: 'primary' }],
         manager_approval: [{ to: 'pending', label: '↩ Cancel Submission', style: 'secondary' }],
         approved: [{ to: 'pending', label: '↩ Cancel Approval', style: 'secondary' }],
@@ -239,7 +240,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
     const [buyingItems, setBuyingItems] = useState(shipment?.buyingItems || []);
 
     // Currency management for COGS
-    const [cogsCurrency, setCogsCurrency] = useState(shipment?.cogsCurrency || 'USD');
+    const [cogsCurrency, setCogsCurrency] = useState(shipment?.cogsCurrency || shipment?.currency || 'IDR');
     const [exchangeRate, setExchangeRate] = useState(shipment?.exchangeRate || '');
     const [rateDate, setRateDate] = useState(shipment?.rateDate || new Date().toISOString().split('T')[0]);
 
@@ -296,7 +297,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                         notes: prev.notes || quotation.notes || '',
                         customerId: prev.customerId || quotation.customer_id || '',
                         quotedAmount: prev.quotedAmount || quotation.total_amount || '',
-                        currency: prev.currency || quotation.currency || 'USD',
+                        currency: prev.currency || quotation.currency || 'IDR',
                         exchangeRate: prev.exchangeRate || quotation.exchange_rate || '',
                     }));
                 }
@@ -315,16 +316,17 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
         const fetchVendors = async () => {
             try {
                 const { data, error } = await supabase
-                    .from('freight_vendors')
+                    .from('blink_business_partners')
                     .select('*')
                     .eq('status', 'active')
-                    .order('name');
+                    .eq('is_vendor', true)
+                    .order('partner_name');
 
                 if (error) throw error;
                 setVendors(data || []);
-                console.log('🏢 Fetched vendors:', data?.length || 0);
+                console.log('🏢 Fetched vendor mitra:', data?.length || 0);
             } catch (error) {
-                console.error('Error fetching vendors:', error);
+                console.error('Error fetching vendor mitra:', error);
             }
         };
 
@@ -405,9 +407,13 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                 otherDescription: '',
                 additionalCosts: []
             });
-            setCogsCurrency(shipment.cogsCurrency || 'USD');
-            setExchangeRate(shipment.exchangeRate || '');
-            setRateDate(shipment.rateDate || new Date().toISOString().split('T')[0]);
+            // Smart COGS currency: use shipment.cogs_currency if it matches shipment.currency, else use shipment.currency
+            const shipmentCurrency = shipment.currency || 'IDR';
+            const savedCogsCurrency = shipment.cogsCurrency || shipment.cogs_currency;
+            const effectiveCogsCurrency = (savedCogsCurrency && savedCogsCurrency === shipmentCurrency) ? savedCogsCurrency : shipmentCurrency;
+            setCogsCurrency(effectiveCogsCurrency);
+            setExchangeRate(shipment.exchangeRate || shipment.exchange_rate || '');
+            setRateDate(shipment.rateDate || shipment.rate_date || new Date().toISOString().split('T')[0]);
             setBookingData(shipment.booking || {
                 vesselName: shipment.vessel_name || '',
                 voyageNumber: shipment.voyage || '',
@@ -627,6 +633,18 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
 
                 const items = vendorGroups[vid];
                 const total = items.reduce((sum, it) => sum + (it.amount || 0), 0);
+                
+                // Clean items to ensure JSON serializable (remove any undefined/circular refs)
+                const cleanItems = items.map(item => ({
+                    item_name: String(item.item_name || ''),
+                    description: String(item.description || ''),
+                    qty: Number(item.qty) || 1,
+                    unit: String(item.unit || 'Job'),
+                    unit_price: Number(item.unit_price) || 0,
+                    amount: Number(item.amount) || 0,
+                    coa_id: item.coa_id || null
+                }));
+                
                 const poNumber = vendorIds.length === 1
                     ? basePONumber
                     : `${basePONumber}-${suffixes[i]}`;
@@ -641,7 +659,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                     po_date: new Date().toISOString().split('T')[0],
                     delivery_date: null,
                     payment_terms: 'NET 30',
-                    po_items: items,
+                    po_items: cleanItems,
                     currency: cogsCurrency || 'IDR',
                     exchange_rate: parseFloat(exchangeRate) || 1,
                     subtotal: total,
@@ -656,6 +674,8 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                     job_number: shipment.job_number || shipment.jobNumber || null,
                     notes: `Generated from SO: ${shipment.so_number || shipment.soNumber || shipment.job_number || shipment.jobNumber} — Vendor: ${vendor.partner_name}`
                 };
+
+                console.log(`[PO Creation] Attempting to insert PO for vendor ${vendor.partner_name}:`, JSON.stringify(newPO, null, 2));
 
                 const { error } = await supabase
                     .from('blink_purchase_orders')
@@ -1058,8 +1078,13 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
             const bankAccts = bankAcctsData || [];
             // Pick account matching invoice currency, or first
             const defaultBank = bankAccts.find(b => b.currency === (shipment.currency || 'IDR')) || bankAccts[0] || null;
-            const paymentBankText = defaultBank
-                ? `${defaultBank.bank_name} | ${defaultBank.account_number}${defaultBank.account_holder ? ` a/n ${defaultBank.account_holder}` : ''}`
+            const paymentBankData = defaultBank
+                ? {
+                    bank_name: defaultBank.bank_name,
+                    account_name: defaultBank.account_holder || null,
+                    account_number: defaultBank.account_number,
+                    currency: defaultBank.currency || null,
+                }
                 : null;
 
             // 4. Create Invoice Object (if not existing)
@@ -1105,7 +1130,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                 // Bank account for payment — used by AR module to validate received payment account
                 payment_bank_id: defaultBank?.id || null,
                 bank_account_id: defaultBank?.id || null,
-                bank_details: paymentBankText,
+                bank_details: paymentBankData,
                 notes: `Generated from Shipment: ${shipment.jobNumber}`
             };
 
@@ -1606,9 +1631,9 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                     other: '',
                                                     otherDescription: ''
                                                 });
-                                                setCogsCurrency(shipment.cogsCurrency || 'USD');
-                                                setExchangeRate(shipment.exchangeRate || '');
-                                                setRateDate(shipment.rateDate || new Date().toISOString().split('T')[0]);
+                                                setCogsCurrency(shipment.cogsCurrency || shipment.currency || 'IDR');
+                                                setExchangeRate(shipment.exchangeRate || shipment.exchange_rate || '');
+                                                setRateDate(shipment.rateDate || shipment.rate_date || new Date().toISOString().split('T')[0]);
                                             } else {
                                                 setEditedShipment(shipment);
                                                 setIsEditing(false);
@@ -1696,7 +1721,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="text-silver-dark text-xs">Sales Person</label>
+                                                    <label className="text-silver-dark text-xs">PIC / Sales</label>
                                                     <input
                                                         type="text"
                                                         value={editedShipment.salesPerson || ''}
@@ -1732,8 +1757,8 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                     <span className="text-silver-light font-medium">{shipment.customer}</span>
                                                 </div>
                                                 <div className="flex justify-between">
-                                                    <span className="text-silver-dark">Sales Person:</span>
-                                                    <span className="text-silver-light">{shipment.salesPerson || '-'}</span>
+                                                    <span className="text-silver-dark">PIC / Sales:</span>
+                                                    <span className="text-silver-light">{shipment.salesPerson || shipment.pic_ops || '-'}</span>
                                                 </div>
                                                 {(shipment.incoterm) && (
                                                     <div className="flex justify-between">
@@ -1954,26 +1979,31 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                     <select
                                                         value={editedShipment.shipper_name || editedShipment.shipperName || editedShipment.shipper || ''}
                                                         onChange={(e) => {
-                                                            const selectedVendor = vendors.find(v => v.name === e.target.value);
+                                                            const selectedVendor = vendors.find(v => v.partner_name === e.target.value);
+                                                            const address = [
+                                                                selectedVendor?.address_line1,
+                                                                selectedVendor?.address_line2,
+                                                                selectedVendor?.city,
+                                                                selectedVendor?.country
+                                                            ].filter(Boolean).join(', ');
                                                             setEditedShipment({
                                                                 ...editedShipment,
                                                                 shipper_name: e.target.value,
                                                                 shipperName: e.target.value,
                                                                 shipper: e.target.value,
-                                                                shipper_address: selectedVendor?.address || ''
+                                                                shipper_address: address || selectedVendor?.address_line1 || ''
                                                             });
                                                         }}
                                                         className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light"
                                                     >
                                                         <option value="">Select Vendor...</option>
                                                         {vendors.map(v => (
-                                                            <option key={v.id} value={v.name}>
-                                                                {v.name} {v.company && `(${v.company})`}
+                                                            <option key={v.id} value={v.partner_name}>
+                                                                {v.partner_name} {v.partner_code ? `(${v.partner_code})` : ''}
                                                             </option>
                                                         ))}
                                                     </select>
                                                 </div>
-
                                             </>
                                         ) : (
                                             <>
@@ -2459,7 +2489,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                         <option value="IDR">IDR (Rp)</option>
                                                     </select>
                                                 </div>
-                                                {cogsCurrency !== (shipment?.currency || 'USD') && (
+                                                {cogsCurrency !== (shipment?.currency || 'IDR') && (
                                                     <>
                                                         <div>
                                                             <label className="text-silver-dark text-sm">Exchange Rate (USD ↔ IDR)</label>
@@ -2485,7 +2515,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                     </>
                                                 )}
                                             </div>
-                                            {cogsCurrency !== (shipment?.currency || 'USD') && exchangeRate && (
+                                            {cogsCurrency !== (shipment?.currency || 'IDR') && exchangeRate && (
                                                 <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded">
                                                     <p className="text-sm text-blue-400">
                                                         💱 1 USD = Rp {parseFloat(exchangeRate).toLocaleString('id-ID')} (as of {rateDate || 'Today'})
@@ -2513,7 +2543,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                 </div>
                                                 <div className="text-xs text-silver-dark mt-1">
                                                     {cogsCurrency}
-                                                    {cogsCurrency !== (shipment?.currency || 'USD') && exchangeRate && (
+                                                    {cogsCurrency !== (shipment?.currency || 'IDR') && exchangeRate && (
                                                         <> ≈ {shipment?.currency === 'IDR' ? 'Rp' : '$'} {(calculateTotalCOGSConverted() || 0).toLocaleString('id-ID', { minimumFractionDigits: 2 })}</>
                                                     )}
                                                 </div>

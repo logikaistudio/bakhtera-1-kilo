@@ -99,6 +99,10 @@ const CentralCompanySettings = () => {
     };
 
     const handleAddBank = () => {
+        if (!companySettings?.id) {
+            alert('Simpan informasi perusahaan terlebih dahulu sebelum menambahkan rekening bank.');
+            return;
+        }
         setEditingBank(null);
         setBankFormData({ bank_name: '', account_number: '', account_holder: '', branch: '', swift_code: '', currency: 'IDR' });
         setIsBankModalOpen(true);
@@ -215,7 +219,7 @@ const CentralCompanySettings = () => {
                                 <CreditCard className="h-5 w-5 text-gray-500" />
                                 Rekening Bank
                             </h2>
-                            <Button size="sm" onClick={handleAddBank} Icon={Plus}>Tambah Rekening</Button>
+                            <Button size="sm" disabled={!companySettings?.id} onClick={handleAddBank} Icon={Plus}>Tambah Rekening</Button>
                         </div>
                         <div className="space-y-3">
                             {bankAccounts.length === 0 ? (

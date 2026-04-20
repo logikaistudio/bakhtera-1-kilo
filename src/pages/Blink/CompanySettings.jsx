@@ -75,8 +75,8 @@ const BlinkCompanySettings = () => {
                     .select('id, code, name, type')
                     .eq('type', 'ASSET')
                     .order('code', { ascending: true });
-                // Filter for Kas/Bank group (code starts with 1-0)
-                setCoaAssetList((data || []).filter(c => c.code?.startsWith('1-0') || c.code?.startsWith('1-1')));
+                // Filter for Kas/Bank group, allow both hyphenated and plain numeric codes
+                setCoaAssetList((data || []).filter(c => /^1-?([01])/.test(c.code || '')));
             } catch (e) {
                 console.warn('Could not load COA assets:', e.message);
             } finally {
@@ -153,6 +153,10 @@ const BlinkCompanySettings = () => {
             alert('Anda tidak memiliki hak akses untuk menambah rekening bank.');
             return;
         }
+        if (!companySettings?.id) {
+            alert('Simpan informasi perusahaan terlebih dahulu sebelum menambahkan rekening bank.');
+            return;
+        }
         setEditingBank(null);
         setBankFormData({
             bank_name: '',
@@ -178,7 +182,7 @@ const BlinkCompanySettings = () => {
             bank_name: bank.bank_name,
             account_number: bank.account_number,
             account_holder: bank.account_holder,
-            branch: bank.branch || '',
+            branch: bank.branch_name || '',
             swift_code: bank.swift_code || '',
             currency: bank.currency || 'IDR',
             coa_id: bank.coa_id || '',
@@ -320,7 +324,7 @@ const BlinkCompanySettings = () => {
                                 Rekening Bank
                             </h2>
                             {canCreate('blink_settings') && (
-                                <Button size="sm" onClick={handleAddBank} Icon={Plus}>
+                                <Button size="sm" disabled={!companySettings?.id} onClick={handleAddBank} Icon={Plus}>
                                     Tambah Rekening
                                 </Button>
                             )}
@@ -336,7 +340,7 @@ const BlinkCompanySettings = () => {
                                             <div className="font-bold text-gray-800">{bank.bank_name} ({bank.currency || 'IDR'})</div>
                                             <div className="text-blue-600 font-mono tracking-wide">{bank.account_number}</div>
                                             <div className="text-sm text-gray-600">a/n {bank.account_holder}</div>
-                                            {bank.branch && <div className="text-xs text-gray-500">Cabang: {bank.branch}</div>}
+                                            {bank.branch_name && <div className="text-xs text-gray-500">Cabang: {bank.branch_name}</div>}
                                             {bank.coa_code ? (
                                                 <div className="text-xs text-green-600 mt-1 flex items-center gap-1">
                                                     <Link2 className="h-3 w-3" />

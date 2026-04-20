@@ -51,24 +51,37 @@ const Sidebar = () => {
     const pendingApprovalCount = isApprover
         ? pendingApprovals.filter(r => r.status === 'pending').length
         : 0;
-    const [blinkPendingCount, setBlinkPendingCount] = React.useState(0);
+    const [blinkOpsPendingCount, setBlinkOpsPendingCount] = React.useState(0);
+    const [blinkSalesPendingCount, setBlinkSalesPendingCount] = React.useState(0);
+    
     React.useEffect(() => {
         const fetchBlinkPending = async () => {
             try {
                 const { supabase } = await import('../../lib/supabase');
+                
+                // Fetch Operations Pending
                 const [qRes, sRes, iRes, pRes] = await Promise.all([
                     supabase.from('blink_quotations').select('id', { count: 'exact', head: true }).eq('status', 'manager_approval'),
                     supabase.from('blink_shipments').select('id', { count: 'exact', head: true }).eq('status', 'manager_approval'),
                     supabase.from('blink_invoices').select('id', { count: 'exact', head: true }).eq('status', 'manager_approval'),
                     supabase.from('blink_purchase_orders').select('id', { count: 'exact', head: true }).in('status', ['submitted', 'manager_approval'])
                 ]);
-                const totalCount = (qRes.count || 0) + (sRes.count || 0) + (iRes.count || 0) + (pRes.count || 0);
-                setBlinkPendingCount(totalCount);
+                const opsCount = (qRes.count || 0) + (sRes.count || 0) + (iRes.count || 0) + (pRes.count || 0);
+                setBlinkOpsPendingCount(opsCount);
+                
+                // Fetch Sales Pending
+                const sqRes = await supabase.from('blink_sales_quotations').select('id', { count: 'exact', head: true }).eq('status', 'manager_approval');
+                setBlinkSalesPendingCount(sqRes.data ? (sqRes.count || 0) : 0);
+                
             } catch (e) { /* silent */ }
         };
         fetchBlinkPending();
         const interval = setInterval(fetchBlinkPending, 60000); // refresh every 60s
-        return () => clearInterval(interval);
+        window.addEventListener('blink_approval_updated', fetchBlinkPending);
+        return () => {
+            clearInterval(interval);
+            window.removeEventListener('blink_approval_updated', fetchBlinkPending);
+        };
     }, []);
     const lastPathRef = React.useRef(null);
 
@@ -236,7 +249,8 @@ const Sidebar = () => {
             type: 'category', label: '📋 Sales & Marketing', items: [
                 { path: '/blink/sales-quotations', label: 'Sales Quotation', menuCode: 'blink_sales_quotations' },
                 { path: '/blink/flow-monitor', label: 'Flow Monitor', menuCode: 'blink_flow_monitor' },
-                { path: '/blink/sales-achievement', label: 'Sales Achievement', menuCode: 'blink_sales' }
+                { path: '/blink/sales-achievement', label: 'Sales Achievement', menuCode: 'blink_sales' },
+                { path: '/blink/sales-approvals', label: 'Approval Center', menuCode: 'blink_sales_approval', showBadge: true }
             ]
         },
 
@@ -817,9 +831,9 @@ const Sidebar = () => {
                                                                                                 }`}
                                                                                         >
                                                                                             <span className="flex-1">{itemObj.label}</span>
-                                                                                            {itemObj.showBadge && blinkPendingCount > 0 && (
+                                                                                            {itemObj.showBadge && (itemObj.menuCode === 'blink_sales_approval' ? blinkSalesPendingCount : blinkOpsPendingCount) > 0 && (
                                                                                                 <span className="ml-2 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-yellow-500 text-white text-[10px] font-bold px-1 animate-pulse">
-                                                                                                    {blinkPendingCount > 99 ? '99+' : blinkPendingCount}
+                                                                                                    {(itemObj.menuCode === 'blink_sales_approval' ? blinkSalesPendingCount : blinkOpsPendingCount) > 99 ? '99+' : (itemObj.menuCode === 'blink_sales_approval' ? blinkSalesPendingCount : blinkOpsPendingCount)}
                                                                                                 </span>
                                                                                             )}
                                                                                         </Link>

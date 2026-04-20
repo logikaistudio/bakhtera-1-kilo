@@ -51,38 +51,74 @@ const AccountsReceivable = () => {
         try {
             setLoading(true);
 
-            // Fetch invoices (AR source data) - exclude draft and cancelled, newest first
-            const { data: invoices, error: invoicesError } = await supabase
-                .from('blink_invoices')
+            // ── BLINK ONLY: Primary source = blink_ar_transactions ──────────
+            const { data: arRows, error: arError } = await supabase
+                .from('blink_ar_transactions')
                 .select('*')
-                .not('status', 'in', '("cancelled","draft","manager_approval","waiting_approval","pending_approval")')
-                .order('invoice_date', { ascending: false });
+                .order('transaction_date', { ascending: false });
 
-            console.log('AR Query Result:', invoices?.length || 0, 'invoices found');
-            if (invoices) console.log('Invoice statuses:', invoices.map(i => i.status));
+            let finalRows = [];
 
-            if (invoicesError) throw invoicesError;
+            if (!arError && arRows && arRows.length > 0) {
+                // ✅ Data exists in blink_ar_transactions — use it directly
+                finalRows = arRows;
+            } else {
+                // ⚠️ blink_ar_transactions kosong atau error → fallback ke blink_invoices
+                if (arError) {
+                    console.warn('[Blink AR] blink_ar_transactions error:', arError.message);
+                } else {
+                    console.warn('[Blink AR] blink_ar_transactions kosong, fallback ke blink_invoices');
+                }
 
-            // Transform invoice data to AR format and double-check status
-            const arData = (invoices || [])
-                .filter(inv => !['draft', 'manager_approval', 'cancelled', 'waiting_approval'].includes(inv.status))
-                .map(inv => ({
-                id: inv.id,
-                ar_number: inv.invoice_number,
-                invoice_number: inv.invoice_number,
-                customer_name: inv.customer_name,
-                customer_id: inv.customer_id,
-                transaction_date: inv.invoice_date,
-                due_date: inv.due_date,
-                original_amount: inv.total_amount,
-                paid_amount: inv.paid_amount || 0,
-                outstanding_amount: inv.outstanding_amount || (inv.total_amount - (inv.paid_amount || 0)),
-                aging_bucket: calculateAgingBucket(inv.due_date),
-                status: deriveStatus(inv.paid_amount || 0, inv.total_amount, inv.due_date),
-                currency: inv.currency || 'IDR',
-                exchange_rate: inv.exchange_rate || 1,  // ← carry exchange rate from invoice
-                total_amount: inv.total_amount
-            }));
+                const { data: invoiceRows, error: invoiceError } = await supabase
+                    .from('blink_invoices')
+                    .select('*')
+                    .neq('status', 'draft')
+                    .neq('status', 'cancelled')
+                    .order('invoice_date', { ascending: false });
+
+                if (invoiceError) throw invoiceError;
+
+                // Map invoice → format AR, dengan invoice_id = inv.id
+                finalRows = (invoiceRows || []).map(inv => ({
+                    id: inv.id,
+                    invoice_id: inv.id,  // ← KUNCI: invoice_id selalu = inv.id di path ini
+                    ar_number: `AR-${inv.invoice_number || inv.id.slice(0, 8).toUpperCase()}`,
+                    invoice_number: inv.invoice_number,
+                    customer_name: inv.customer_name || inv.customer_company || 'Unknown',
+                    customer_id: inv.customer_id || null,
+                    transaction_date: inv.invoice_date,
+                    due_date: inv.due_date || inv.invoice_date,
+                    original_amount: inv.total_amount || inv.subtotal || 0,
+                    paid_amount: inv.paid_amount || 0,
+                    outstanding_amount: Math.max(0, (inv.total_amount || inv.subtotal || 0) - (inv.paid_amount || 0)),
+                    currency: inv.currency || 'IDR',
+                    exchange_rate: 1,
+                    status: inv.status
+                }));
+            }
+
+            const arData = (finalRows || []).map(ar => {
+                const fallbackInvoiceNumber = ar.invoice_number || (ar.invoice_id ? `INV-${ar.invoice_id.slice(0, 6).toUpperCase()}` : `INV-${ar.id?.slice(0, 6).toUpperCase()}`);
+                return {
+                    id: ar.id,
+                    invoice_id: ar.invoice_id,
+                    ar_number: ar.ar_number || `AR-${fallbackInvoiceNumber}`,
+                    invoice_number: ar.invoice_number || fallbackInvoiceNumber,
+                    customer_name: ar.customer_name || 'Unknown',
+                    customer_id: ar.customer_id,
+                    transaction_date: ar.transaction_date,
+                    due_date: ar.due_date,
+                    original_amount: ar.original_amount || ar.total_amount || 0,
+                    paid_amount: ar.paid_amount || 0,
+                    outstanding_amount: ar.outstanding_amount || Math.max(0, (ar.original_amount || ar.total_amount || 0) - (ar.paid_amount || 0)),
+                    aging_bucket: calculateAgingBucket(ar.due_date),
+                    status: ar.status || deriveStatus(ar.paid_amount || 0, ar.original_amount || ar.total_amount || 0, ar.due_date),
+                    currency: ar.currency || 'IDR',
+                    exchange_rate: ar.exchange_rate || 1,
+                    total_amount: ar.original_amount || ar.total_amount || 0
+                };
+            });
 
             setARTransactions(arData);
         } catch (error) {
@@ -367,7 +403,7 @@ const AccountsReceivable = () => {
             {/* Payment Record Modal */}
             {showPaymentModal && selectedAR && (
                 <PaymentRecordModal
-                    invoice={selectedAR}
+                    ar={selectedAR}
                     formatCurrency={formatCurrency}
                     onClose={() => setShowPaymentModal(false)}
                     onSuccess={() => {
@@ -420,14 +456,16 @@ const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency, canEditAR
     const fetchInvoiceDetails = async () => {
         try {
             setLoadingItems(true);
+            const invoiceId = ar.invoice_id || ar.id;
             const { data, error } = await supabase
                 .from('blink_invoices')
                 .select('*')
-                .eq('id', ar.id)
-                .single();
+                .eq('id', invoiceId)
+                .limit(1);
             if (error) throw error;
-            setInvoiceFull(data);
-            const items = Array.isArray(data?.invoice_items) ? data.invoice_items : [];
+            const invoice = data?.[0] || null;
+            setInvoiceFull(invoice);
+            const items = Array.isArray(invoice?.invoice_items) ? invoice.invoice_items : [];
             setInvoiceItems(items);
         } catch (error) {
             console.error('Error fetching invoice details:', error);
@@ -439,11 +477,19 @@ const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency, canEditAR
     const fetchPaymentHistory = async () => {
         try {
             setLoadingHistory(true);
-            const { data, error } = await supabase
+            const query = supabase
                 .from('blink_payments')
                 .select('*')
-                .eq('reference_id', ar.id)
-                .order('payment_date', { ascending: false });
+                .eq('reference_type', 'invoice');
+
+            if (ar.invoice_id) {
+                query.eq('reference_id', ar.invoice_id);
+            } else {
+                query.eq('reference_id', ar.id);
+            }
+
+            query.order('payment_date', { ascending: false });
+            const { data, error } = await query;
             if (error) throw error;
             setPaymentHistory(data || []);
         } catch (error) {
@@ -704,16 +750,18 @@ const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency, canEditAR
 };
 
 // Payment Record Modal Component — AR version (mirrors APPaymentRecordModal)
-const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => {
+const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
     const [formData, setFormData] = useState({
         payment_date: new Date().toISOString().split('T')[0],
-        amount: invoice.outstanding_amount || 0,
+        amount: ar.outstanding_amount || 0,
         payment_method: 'bank_transfer',
         reference_number: '',
         received_in_account: '',
+        ar_coa_id: '',
         notes: ''
     });
     const [bankAccounts, setBankAccounts] = useState([]);
+    const [arAccountsList, setArAccountsList] = useState([]);
     const [loading, setLoading] = useState(false);
     // Success state
     const [paymentSuccess, setPaymentSuccess] = useState(false);
@@ -721,21 +769,36 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
 
     useEffect(() => {
         fetchBankAccounts();
+        fetchARAccounts();
     }, []);
+
+    const fetchARAccounts = async () => {
+        try {
+            const { data } = await supabase.from('finance_coa').select('*').eq('type', 'ASSET').order('code');
+            if (data && data.length > 0) {
+                setArAccountsList(data);
+                
+                // Attempt to pre-select 'Piutang Usaha'
+                const match = data.find(c => c.name.toLowerCase().includes('piutang') || c.code.startsWith('1-03'));
+                if (match) setFormData(prev => ({ ...prev, ar_coa_id: match.id }));
+                else setFormData(prev => ({ ...prev, ar_coa_id: data[0].id }));
+            }
+        } catch(e) { console.error('Error fetching AR accounts:', e); }
+    };
 
     const fetchBankAccounts = async () => {
         try {
             const { data: d1 } = await supabase.from('company_bank_accounts').select('*').order('display_order', { ascending: true });
             if (d1 && d1.length > 0) {
                 setBankAccounts(d1);
-                // Priority 1: match the bank account stored in the invoice
-                const invoiceBankId = invoice.payment_bank_account_id;
+                // Priority 1: match the bank account stored in the AR record
+                const invoiceBankId = ar.payment_bank_account_id || ar.payment_bank_id;
                 if (invoiceBankId) {
                     const match = d1.find(a => a.id === invoiceBankId);
                     if (match) { setFormData(prev => ({ ...prev, received_in_account: match.id })); return; }
                 }
-                // Priority 2: match same currency as invoice
-                const currencyMatch = d1.find(a => a.currency === invoice.currency);
+                // Priority 2: match same currency as AR
+                const currencyMatch = d1.find(a => a.currency === ar.currency);
                 if (currencyMatch) { setFormData(prev => ({ ...prev, received_in_account: currencyMatch.id })); return; }
                 // Priority 3: first account
                 setFormData(prev => ({ ...prev, received_in_account: d1[0].id }));
@@ -744,7 +807,7 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
             // fallback to old bank_accounts table
             const { data: d2 } = await supabase.from('bank_accounts').select('*').eq('is_active', true);
             setBankAccounts(d2 || []);
-            const defaultAccount = d2?.find(acc => acc.is_default && acc.currency === invoice.currency);
+            const defaultAccount = d2?.find(acc => acc.is_default && acc.currency === ar.currency);
             if (defaultAccount) setFormData(prev => ({ ...prev, received_in_account: defaultAccount.id }));
         } catch (error) {
             console.error('Error fetching bank accounts:', error);
@@ -759,85 +822,156 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
             return;
         }
 
-        if (formData.amount > invoice.outstanding_amount) {
-            alert(`Payment amount cannot exceed outstanding amount (${formatCurrency(invoice.outstanding_amount, invoice.currency)})`);
+        if (formData.amount > ar.outstanding_amount) {
+            alert(`Payment amount cannot exceed outstanding amount (${formatCurrency(ar.outstanding_amount, ar.currency)})`);
             return;
         }
 
         try {
             setLoading(true);
 
+            const { data: userData } = await supabase.auth.getUser();
+            const createdBy = userData?.user?.email || 'System';
+
             const year = new Date().getFullYear();
             const paymentNumber = `PMT-IN-${year}-${String(Date.now()).slice(-6)}`;
 
             const selectedBank = bankAccounts.find(b => b.id === formData.received_in_account);
 
+            // ── Resolve invoice ID ──────────────────────────────────────────
+            // ar.invoice_id = ID invoice dari blink_ar_transactions atau hasil fallback mapping
+            // ar.id         = ID AR itu sendiri (bisa dari big_ar_transactions)
+            let invoiceId = ar.invoice_id || null;
+
+            // Jika invoice_id tidak ada, cari via invoice_number di blink_invoices
+            if (!invoiceId && ar.invoice_number) {
+                const { data: invByNum } = await supabase
+                    .from('blink_invoices')
+                    .select('id')
+                    .eq('invoice_number', ar.invoice_number)
+                    .limit(1);
+                if (invByNum && invByNum.length > 0) {
+                    invoiceId = invByNum[0].id;
+                }
+            }
+
+            // Jika masih tidak ada, coba ar.id sebagai invoice id (fallback blink_invoices path)
+            if (!invoiceId) {
+                const { data: invById } = await supabase
+                    .from('blink_invoices')
+                    .select('id')
+                    .eq('id', ar.id)
+                    .limit(1);
+                if (invById && invById.length > 0) {
+                    invoiceId = ar.id;
+                }
+            }
+
+            if (!invoiceId) {
+                throw new Error(`Invoice tidak ditemukan. AR: ${ar.invoice_number || ar.id}. Silakan buka Invoice Management dan pastikan invoice sudah terbentuk.`);
+            }
+            // ───────────────────────────────────────────────────────────────
+
+            // ── Save Payment Record ─────────────────────────────────────────
             const paymentData = {
                 payment_number: paymentNumber,
                 payment_type: 'incoming',
                 payment_date: formData.payment_date,
                 reference_type: 'invoice',
-                reference_id: invoice.id,
-                reference_number: invoice.invoice_number,
+                reference_id: invoiceId,
+                reference_number: ar.invoice_number,
                 amount: parseFloat(formData.amount),
-                currency: invoice.currency,
+                currency: ar.currency,
                 payment_method: formData.payment_method,
                 bank_account: selectedBank
                     ? `${selectedBank.bank_name} - ${selectedBank.account_number}`
                     : null,
                 transaction_ref: formData.reference_number || null,
+                description: `Payment for ${ar.invoice_number}`,
                 notes: formData.notes || null,
-                status: 'completed'
+                status: 'completed',
+                created_by: createdBy
             };
 
             const { error: paymentError } = await supabase
                 .from('blink_payments')
                 .insert([paymentData]);
 
-            if (paymentError) throw paymentError;
+            if (paymentError) {
+                console.warn('[AR] Payment record insert failed:', paymentError.message, '— continuing with invoice update.');
+                // Non-fatal: payment record is supplementary
+            }
 
-            // Update invoice balances
-            const newPaidAmount = (invoice.paid_amount || 0) + parseFloat(formData.amount);
-            const newOutstanding = invoice.total_amount - newPaidAmount;
+            // ── Update Invoice Balances ─────────────────────────────────────
+            const newPaidAmount = (ar.paid_amount || 0) + parseFloat(formData.amount);
+            const newOutstanding = Math.max(0, (ar.original_amount || 0) - newPaidAmount);
 
             let newStatus = 'unpaid';
             if (newOutstanding <= 0) newStatus = 'paid';
             else if (newPaidAmount > 0) newStatus = 'partially_paid';
 
-            const { data: invoiceResult, error: invoiceError } = await supabase
+            const { error: invoiceError } = await supabase
                 .from('blink_invoices')
                 .update({ paid_amount: newPaidAmount, outstanding_amount: newOutstanding, status: newStatus })
-                .eq('id', invoice.id)
-                .select();
+                .eq('id', invoiceId);
 
             if (invoiceError) throw invoiceError;
-            if (!invoiceResult || invoiceResult.length === 0) {
-                throw new Error('Invoice update failed - no data returned. Check RLS policies.');
+
+            // ── Update AR Transaction ───────────────────────────────────────
+            const { error: arUpdateError } = await supabase
+                .from('blink_ar_transactions')
+                .update({
+                    paid_amount: newPaidAmount,
+                    outstanding_amount: newOutstanding,
+                    status: newStatus,
+                    last_payment_date: formData.payment_date,
+                    last_payment_amount: parseFloat(formData.amount),
+                    invoice_id: invoiceId // ensure backfilled
+                })
+                .eq('id', ar.id);
+
+            if (arUpdateError) {
+                console.warn('[AR] AR transaction update warning:', arUpdateError.message);
             }
 
-            // ── AUTO JOURNAL ENTRY (Client-side) ───────────────────────────────
-            // Dr Kas/Bank / Cr Piutang Usaha
+            // ── AUTO JOURNAL: Payment Only (Dr Bank / Cr Piutang) ──────────
+            // CATATAN: Invoice journal (Dr Piutang / Cr Pendapatan) dibuat oleh
+            // "Migrate Auto Journal" di Invoice Management — BUKAN di sini.
+            // Jika dibuat di sini juga, akan terjadi duplikasi pencatatan.
             try {
                 const coaList = await getAllCOA();
+
+                // Hanya buat payment journal — TIDAK membuat invoice journal
                 await createARPaymentJournal({
-                    invoice,
+                    invoice: {
+                        id: invoiceId,
+                        invoice_number: ar.invoice_number,
+                        customer_id: ar.customer_id,
+                        customer_name: ar.customer_name,
+                        currency: ar.currency,
+                        exchange_rate: ar.exchange_rate || 1
+                    },
                     paymentAmount: parseFloat(formData.amount),
                     paymentDate: formData.payment_date,
                     paymentNumber,
                     selectedBank,
+                    arCOAId: formData.ar_coa_id,
+                    bankCOAId: selectedBank?.coa_id || null,
                     coaList
                 });
+                console.log('[AR] Payment journal created for', paymentNumber);
             } catch (jeError) {
-                console.warn('[AR] Journal entry creation failed (non-critical):', jeError.message);
+                console.warn('[AR] Payment journal warning (non-critical):', jeError.message);
             }
             // ───────────────────────────────────────────────────────────────
+
 
             setSuccessData({
                 paymentNumber,
                 amountPaid: parseFloat(formData.amount),
                 newOutstanding,
                 newStatus,
-                currency: invoice.currency || 'IDR'
+                currency: ar.currency || 'IDR'
             });
             setPaymentSuccess(true);
         } catch (error) {
@@ -902,30 +1036,30 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
                     <div className="grid grid-cols-2 gap-3 text-sm">
                         <div>
                             <span className="text-silver-dark">Invoice:</span>
-                            <span className="text-silver-light font-medium ml-2">{invoice.invoice_number}</span>
+                            <span className="text-silver-light font-medium ml-2">{ar.invoice_number}</span>
                         </div>
                         <div>
                             <span className="text-silver-dark">Customer:</span>
-                            <span className="text-silver-light font-medium ml-2">{invoice.customer_name}</span>
+                            <span className="text-silver-light font-medium ml-2">{ar.customer_name}</span>
                         </div>
                         <div>
                             <span className="text-silver-dark">Total Amount:</span>
-                            <span className="text-silver-light font-medium ml-2">{formatCurrency(invoice.total_amount, invoice.currency)}</span>
+                            <span className="text-silver-light font-medium ml-2">{formatCurrency(ar.total_amount, ar.currency)}</span>
                         </div>
                         <div>
                             <span className="text-silver-dark">Outstanding:</span>
-                            <span className="text-yellow-400 font-bold ml-2">{formatCurrency(invoice.outstanding_amount, invoice.currency)}</span>
+                            <span className="text-yellow-400 font-bold ml-2">{formatCurrency(ar.outstanding_amount, ar.currency)}</span>
                         </div>
                     </div>
                 </div>
 
                 {/* ── Bank account printed on Invoice ── */}
-                {invoice.payment_bank_account && (
+                {ar.payment_bank_account && (
                     <div className="flex items-start gap-2 px-3 py-2 mb-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                         <CreditCard className="w-4 h-4 text-blue-400 mt-0.5 shrink-0" />
                         <div className="text-xs">
                             <p className="text-blue-300 font-semibold mb-0.5">Rekening yang tercetak di Invoice:</p>
-                            <p className="text-blue-200 font-mono">{invoice.payment_bank_account}</p>
+                            <p className="text-blue-200 font-mono">{ar.payment_bank_account}</p>
                             <p className="text-blue-400 mt-0.5">Pastikan pembayaran diterima di rekening ini.</p>
                         </div>
                     </div>
@@ -947,7 +1081,7 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-silver-dark mb-2">
-                                Amount ({invoice.currency}) *
+                                Amount ({ar.currency}) *
                             </label>
                             <input
                                 type="number"
@@ -955,12 +1089,12 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
                                 onChange={(e) => setFormData(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
                                 className="w-full"
                                 min="0"
-                                max={invoice.outstanding_amount}
+                                max={ar.outstanding_amount}
                                 step="0.01"
                                 required
                             />
                             <p className="text-xs text-silver-dark mt-1">
-                                Max: {formatCurrency(invoice.outstanding_amount, invoice.currency)}
+                                Max: {formatCurrency(ar.outstanding_amount, ar.currency)}
                             </p>
                         </div>
                     </div>
@@ -1021,7 +1155,7 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
                                 {/* Show selected bank detail */}
                                 {formData.received_in_account && (() => {
                                     const sel = bankAccounts.find(b => b.id === formData.received_in_account);
-                                    const invoiceBankId = invoice.payment_bank_account_id;
+                                    const invoiceBankId = ar.payment_bank_account_id;
                                     const mismatch = invoiceBankId && sel && sel.id !== invoiceBankId;
                                     return sel ? (
                                         <div className={`mt-1.5 px-3 py-2 rounded-lg text-xs border ${mismatch ? 'bg-yellow-500/10 border-yellow-500/40 text-yellow-300' : 'bg-green-500/10 border-green-500/30 text-green-300'}`}>
@@ -1037,6 +1171,26 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
                                 No bank accounts configured. Go to Company Settings to add accounts.
                             </p>
                         )}
+                    </div>
+
+                    {/* Piutang Account Override */}
+                    <div>
+                        <label className="block text-sm font-medium text-silver-dark mb-2">
+                            Akun Piutang (AR Account)
+                        </label>
+                        <select
+                            value={formData.ar_coa_id}
+                            onChange={(e) => setFormData(prev => ({...prev, ar_coa_id: e.target.value}))}
+                            className="w-full"
+                        >
+                            <option value="">-- Pilih Akun Piutang --</option>
+                            {arAccountsList.map(c => (
+                                <option key={c.id} value={c.id}>
+                                    {c.code} - {c.name}
+                                </option>
+                            ))}
+                        </select>
+                        <p className="text-xs text-silver-dark mt-1">Dicatat di General Ledger sebagai pengurang piutang.</p>
                     </div>
 
                     <div>

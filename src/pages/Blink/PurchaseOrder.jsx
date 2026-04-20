@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useData } from '../../context/DataContext';
-import { generatePONumber } from '../../utils/documentNumbers';
+import { generatePONumber, generateAPNumber } from '../../utils/documentNumbers';
 import { createPOApprovalJournal, getAllCOA } from '../../utils/journalHelper';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
@@ -12,8 +12,46 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
+const isMissingTableError = (error) => {
+    const message = String(error?.message || error?.details || error || '').toLowerCase();
+    return /relation .* does not exist|table .* does not exist|no such table|does not exist|could not find the table|column .* does not exist|missing column/.test(message);
+};
+
+const tryInsertTable = async (tableName, payload) => {
+    const { error } = await supabase.from(tableName).insert([payload]);
+    if (!error) return true;
+    if (isMissingTableError(error)) return false;
+    throw error;
+};
+
+const insertAPTransaction = async (blinkRow, fallbackRow) => {
+    try {
+        if (await tryInsertTable('blink_ap_transactions', blinkRow)) return;
+        const { error } = await supabase.from('big_ap_transactions').insert([fallbackRow]);
+        if (error) throw error;
+    } catch (e) {
+        console.warn('AP transaction creation skipped in PO (no valid DB table available):', e.message);
+    }
+};
+
+const recordApprovalHistory = async (po, action, reason = null, approverName = 'System') => {
+    try {
+        const payload = {
+            document_number: po.po_number || '-',
+            document_type: 'po',
+            approved_at: new Date().toISOString(),
+            approver: approverName,
+            status: action,
+            reason: reason
+        };
+        await tryInsertTable('blink_approval_history', payload);
+    } catch (e) {
+        console.warn('Logging approval history failed:', e);
+    }
+};
+
 const PurchaseOrder = () => {
-    const { canCreate, canEdit, canDelete, canView, canApprove } = useAuth();
+    const { user, canCreate, canEdit, canDelete, canView, canApprove } = useAuth();
     const { companySettings, businessPartners } = useData();
     const [pos, setPOs] = useState([]);
     const [vendors, setVendors] = useState([]);
@@ -109,7 +147,7 @@ const PurchaseOrder = () => {
             // (avoids boolean type mismatch issues with Supabase)
             const { data, error } = await supabase
                 .from('blink_business_partners')
-                .select('id, partner_name, partner_code, email, phone, address, is_vendor')
+                .select('id, partner_name, partner_code, email, phone, is_vendor')
                 .order('partner_name');
 
             if (error) throw error;
@@ -284,15 +322,7 @@ const PurchaseOrder = () => {
                     notes: formData.notes || '',
                     shipment_id: formData.shipment_id || null, // Allocation
                     quotation_id: formData.quotation_id || null,
-                    job_number: formData.job_number || null,
-                    coa_id: formData.coa_id || null, // Link to COA
-                    // NEW: Shipper & Consignee details
-                    shipper_id: formData.shipper_id || null,
-                    shipper_name: formData.shipper_name || '',
-                    shipper_address: formData.shipper_address || '',
-                    consignee_id: formData.consignee_id || null,
-                    consignee_name: formData.consignee_name || '',
-                    consignee_address: formData.consignee_address || ''
+                    job_number: formData.job_number || null
                 }])
                 .select();
 
@@ -322,9 +352,7 @@ const PurchaseOrder = () => {
             const { data: updatedPO, error: poError } = await supabase
                 .from('blink_purchase_orders')
                 .update({
-                    status: 'approved',
-                    approved_by: 'Current User', // TODO: Get from auth
-                    approved_at: new Date().toISOString()
+                    status: 'approved'
                 })
                 .eq('id', po.id)
                 .select();
@@ -353,12 +381,10 @@ const PurchaseOrder = () => {
             const dueDateStr = dueDate.toISOString().split('T')[0];
 
             // 3. Generate AP number
-            const year = new Date().getFullYear();
-            const timestamp = Date.now().toString().slice(-6);
-            const apNumber = `AP-${year}-${timestamp}`;
+            const apNumber = generateAPNumber();
 
             // 4. Create AP entry
-            const apEntry = {
+            const blinkAPRow = {
                 ap_number: apNumber,
                 po_id: po.id,
                 po_number: po.po_number,
@@ -374,19 +400,33 @@ const PurchaseOrder = () => {
                 notes: `Auto-created from PO ${po.po_number} (${po.payment_terms || 'NET 30'})`
             };
 
-            console.log('Creating AP entry:', apEntry);
+            const bigAPRow = {
+                po_id: po.id,
+                po_number: po.po_number,
+                vendor_id: po.vendor_id,
+                vendor_name: po.vendor_name,
+                bill_date: billDate,
+                due_date: dueDateStr,
+                original_amount: po.total_amount,
+                paid_amount: 0,
+                outstanding_amount: po.total_amount,
+                currency: po.currency || 'IDR',
+                status: 'outstanding',
+                notes: `Auto-created from PO ${po.po_number} (${po.payment_terms || 'NET 30'})`
+            };
 
-            const { data: apData, error: apError } = await supabase
-                .from('blink_ap_transactions')
-                .insert([apEntry])
-                .select();
+            console.log('Creating AP entry:', blinkAPRow);
 
-            if (apError) {
+            try {
+                await insertAPTransaction(blinkAPRow, bigAPRow);
+                console.log('AP entry created successfully');
+            } catch (apError) {
                 console.error('Error creating AP entry:', apError);
                 throw apError;
             }
 
-            console.log('AP entry created successfully:', apData);
+            // Record History
+            await recordApprovalHistory(po, 'approved', null, user?.name || user?.email || 'System');
 
 
             // ── Create Journal Entries: Dr Expense/COGS per item | Cr Hutang Usaha ─
@@ -457,12 +497,22 @@ const PurchaseOrder = () => {
                 .select('id')
                 .eq('po_id', po.id)
                 .single();
+                
+            let apIdToDelete = linkedAp?.id;
+            if (!apIdToDelete) {
+                const { data: bigLinkedAp } = await supabase
+                    .from('big_ap_transactions')
+                    .select('id')
+                    .eq('po_id', po.id)
+                    .single();
+                apIdToDelete = bigLinkedAp?.id;
+            }
 
-            if (linkedAp) {
+            if (apIdToDelete) {
                 const { error: journalError } = await supabase
                     .from('blink_journal_entries')
                     .delete()
-                    .eq('reference_id', linkedAp.id);
+                    .eq('reference_id', apIdToDelete);
 
                 if (journalError) {
                     console.warn('Could not delete linked journal entries:', journalError);
@@ -474,8 +524,13 @@ const PurchaseOrder = () => {
                 .from('blink_ap_transactions')
                 .delete()
                 .eq('po_id', po.id);
+                
+            const { error: bigApError } = await supabase
+                .from('big_ap_transactions')
+                .delete()
+                .eq('po_id', po.id);
 
-            if (apError) {
+            if (apError && bigApError) {
                 console.warn('Could not delete linked AP (may not exist):', apError);
             }
 
@@ -1055,7 +1110,11 @@ const PurchaseOrder = () => {
 
         try {
             const { subtotal, taxAmount, total } = calculateTotals();
-            const vendor = vendors.find(v => v.id === formData.vendor_id);
+            const vendor = vendors.find(v => v.id === formData.vendor_id) || {
+                id: formData.vendor_id, 
+                partner_name: formData.vendor_name || 'Unknown Vendor',
+                email: '', phone: '', address: '' 
+            };
 
             // Check if this PO was previously approved (needs re-approval after edit)
             const currentPO = pos.find(p => p.id === editId);
@@ -1090,15 +1149,7 @@ const PurchaseOrder = () => {
                 updated_at: new Date().toISOString(),
                 shipment_id: formData.shipment_id || null, // Allow updating allocation
                 quotation_id: formData.quotation_id || null,
-                job_number: formData.job_number || null,
-                coa_id: formData.coa_id || null,
-                // NEW: Shipper & Consignee details
-                shipper_id: formData.shipper_id || null,
-                shipper_name: formData.shipper_name || '',
-                shipper_address: formData.shipper_address || '',
-                consignee_id: formData.consignee_id || null,
-                consignee_name: formData.consignee_name || '',
-                consignee_address: formData.consignee_address || ''
+                job_number: formData.job_number || null
             };
 
             // If PO was approved, require re-approval and add revision info
@@ -1785,156 +1836,174 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                     <div>
                         <div className="flex items-center justify-between mb-3">
                             <label className="text-sm font-medium text-silver-light">PO Items *</label>
-                            <button type="button" onClick={addPOItem} className="text-accent-orange hover:text-accent-orange/80 text-sm flex items-center gap-1">
-                                <Plus className="w-4 h-4" /> Add Item
-                            </button>
+                            
+                            <div className="flex items-center gap-4">
+                                {/* Global Tax Input */}
+                                <div className="flex items-center gap-2 bg-dark-surface px-3 py-1.5 rounded-lg border border-dark-border">
+                                    <span className="text-xs text-silver-dark font-medium">Set All Tax %:</span>
+                                    <input
+                                        type="number"
+                                        className="w-16 px-2 py-1 bg-transparent border-b border-gray-600 text-silver-light text-sm text-center focus:outline-none focus:border-accent-orange"
+                                        placeholder="0"
+                                        min="0"
+                                        max="100"
+                                        step="0.01"
+                                        value={formData.tax_rate ?? 0}
+                                        onChange={(e) => handleGlobalTaxChange(parseFloat(e.target.value) || 0)}
+                                    />
+                                    <span className="text-xs text-silver-dark">%</span>
+                                </div>
+                                
+                                <button type="button" onClick={addPOItem} className="text-accent-orange hover:text-accent-orange/80 text-sm flex items-center gap-1">
+                                    <Plus className="w-4 h-4" /> Add Item
+                                </button>
+                            </div>
                         </div>
 
-                        {/* Header Row */}
-                        <div className="grid grid-cols-12 gap-2 mb-2 px-3">
-                            <div className="col-span-2">
-                                <label className="text-xs font-semibold text-silver-dark uppercase">Item</label>
-                            </div>
-                            <div className="col-span-3">
-                                <label className="text-xs font-semibold text-silver-dark uppercase">Description</label>
-                            </div>
-                            <div className="col-span-1">
-                                <label className="text-xs font-semibold text-silver-dark uppercase">Qty</label>
-                            </div>
-                            <div className="col-span-2">
-                                <label className="text-xs font-semibold text-silver-dark uppercase">Harga</label>
-                            </div>
-                            <div className="col-span-1">
-                                <label className="text-xs font-semibold text-silver-dark uppercase">Pajak %</label>
-                            </div>
-                            <div className="col-span-2">
-                                <label className="text-xs font-semibold text-silver-dark uppercase">Total</label>
-                            </div>
-                            <div className="col-span-1"></div>
-                        </div>
+                        {/* Header Row Removed: Replaced with labels inside each item card */}
 
-                        <div className="space-y-3">
+                        <div className="space-y-4 pt-2">
                             {formData.po_items.map((item, index) => (
-                                <div key={index} className="grid grid-cols-12 gap-2 items-start glass-card p-3 rounded-lg">
-                                    <div className="col-span-2">
-                                        {/* COA dropdown for item_name */}
-                                        <div className="relative">
-                                            <div
-                                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg cursor-pointer flex justify-between items-center text-sm shadow-sm"
-                                                onClick={() => setCoaDropdownMap(prev => ({ ...prev, [index]: !prev[index] }))}
-                                            >
-                                                <span className={item.item_name ? 'text-blue-600 font-medium' : 'text-gray-400 text-xs'}>
-                                                    {item.item_name || 'COA...'}
-                                                </span>
-                                                <span className="text-gray-400 text-xs">▼</span>
-                                            </div>
-                                            {coaDropdownMap[index] && (
-                                                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-2xl max-h-52 flex flex-col" style={{ minWidth: '260px' }}>
-                                                    <div className="p-2 border-b border-gray-100">
-                                                        <input
-                                                            type="text"
-                                                            placeholder="Cari nama / kode COA..."
-                                                            value={coaSearchMap[index] || ''}
-                                                            onChange={e => setCoaSearchMap(prev => ({ ...prev, [index]: e.target.value }))}
-                                                            className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-gray-800 text-xs focus:outline-none focus:border-orange-400"
-                                                            autoFocus
-                                                        />
-                                                    </div>
-                                                    <div className="overflow-y-auto flex-1">
-                                                        {getFilteredCOA(coaSearchMap[index]).length === 0 ? (
-                                                            <div className="px-3 py-2 text-gray-400 text-xs">Tidak ditemukan</div>
-                                                        ) : (
-                                                            getFilteredCOA(coaSearchMap[index]).map(coa => (
-                                                                <button
-                                                                    type="button"
-                                                                    key={coa.id}
-                                                                    onClick={() => {
-                                                                        updatePOItem(index, 'item_name', coa.name);
-                                                                        updatePOItem(index, 'coa_id', coa.id);
-                                                                        setCoaDropdownMap(prev => ({ ...prev, [index]: false }));
-                                                                        setCoaSearchMap(prev => ({ ...prev, [index]: '' }));
-                                                                    }}
-                                                                    className={`w - full text - left px - 3 py - 2 hover: bg - orange - 50 transition - colors text - xs border - b border - gray - 50 last: border - 0 ${item.coa_id === coa.id ? 'bg-orange-50 text-orange-600 font-semibold' : 'text-gray-700'
-                                                                        } `}
-                                                                >
-                                                                    <span className="font-mono text-gray-400 mr-1">{coa.code}</span>
-                                                                    <span className="font-medium">{coa.name}</span>
-                                                                    <span className="ml-1 text-gray-300 text-xs">({coa.type})</span>
-                                                                </button>
-                                                            ))
-                                                        )}
-                                                    </div>
+                                <div key={index} className="flex flex-col gap-3 glass-card p-4 rounded-lg relative border border-gray-700/50">
+                                    {/* Delete Item Button */}
+                                    {formData.po_items.length > 1 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => removePOItem(index)}
+                                            className="absolute top-2 right-2 p-1.5 hover:bg-red-500/20 text-red-400 rounded-md transition-colors"
+                                            title="Hapus Item"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    )}
+
+                                    {/* ROW 1: COA & Description */}
+                                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-start md:pr-8">
+                                        <div className="md:col-span-4">
+                                            <label className="text-[10px] font-semibold text-silver-dark uppercase mb-1 block">Item (COA)</label>
+                                            {/* COA dropdown for item_name */}
+                                            <div className="relative">
+                                                <div
+                                                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg cursor-pointer flex justify-between items-center text-sm shadow-sm"
+                                                    onClick={() => setCoaDropdownMap(prev => ({ ...prev, [index]: !prev[index] }))}
+                                                >
+                                                    <span className={item.item_name ? 'text-blue-600 font-medium truncate' : 'text-gray-400 text-xs'}>
+                                                        {item.item_name || 'COA...'}
+                                                    </span>
+                                                    <span className="text-gray-400 text-xs ml-1">▼</span>
                                                 </div>
-                                            )}
+                                                {coaDropdownMap[index] && (
+                                                    <div className="absolute z-50 top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-2xl max-h-52 flex flex-col w-full min-w-[260px]">
+                                                        <div className="p-2 border-b border-gray-100">
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Cari nama / kode COA..."
+                                                                value={coaSearchMap[index] || ''}
+                                                                onChange={e => setCoaSearchMap(prev => ({ ...prev, [index]: e.target.value }))}
+                                                                className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-gray-800 text-xs focus:outline-none focus:border-orange-400"
+                                                                autoFocus
+                                                            />
+                                                        </div>
+                                                        <div className="overflow-y-auto flex-1">
+                                                            {getFilteredCOA(coaSearchMap[index]).length === 0 ? (
+                                                                <div className="px-3 py-2 text-gray-400 text-xs">Tidak ditemukan</div>
+                                                            ) : (
+                                                                getFilteredCOA(coaSearchMap[index]).map(coa => (
+                                                                    <button
+                                                                        type="button"
+                                                                        key={coa.id}
+                                                                        onClick={() => {
+                                                                            updatePOItem(index, 'item_name', coa.name);
+                                                                            updatePOItem(index, 'coa_id', coa.id);
+                                                                            setCoaDropdownMap(prev => ({ ...prev, [index]: false }));
+                                                                            setCoaSearchMap(prev => ({ ...prev, [index]: '' }));
+                                                                        }}
+                                                                        className={`w-full text-left px-3 py-2 hover:bg-orange-50 transition-colors text-xs border-b border-gray-50 last:border-0 ${item.coa_id === coa.id ? 'bg-orange-50 text-orange-600 font-semibold' : 'text-gray-700'
+                                                                            } `}
+                                                                    >
+                                                                        <span className="font-mono text-gray-400 mr-2">{coa.code}</span>
+                                                                        <span className="font-medium">{coa.name}</span>
+                                                                        <span className="ml-1 text-gray-300 text-[10px]">({coa.type})</span>
+                                                                    </button>
+                                                                ))
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="md:col-span-8">
+                                            <label className="text-[10px] font-semibold text-silver-dark uppercase mb-1 block">Description</label>
+                                            <input
+                                                type="text"
+                                                placeholder="Deskripsi spesifik item"
+                                                value={item.description}
+                                                onChange={(e) => updatePOItem(index, 'description', e.target.value)}
+                                                className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm focus:border-accent-orange outline-none"
+                                                required
+                                            />
                                         </div>
                                     </div>
-                                    <div className="col-span-3">
-                                        <input
-                                            type="text"
-                                            placeholder="Deskripsi item"
-                                            value={item.description}
-                                            onChange={(e) => updatePOItem(index, 'description', e.target.value)}
-                                            className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm"
-                                            required
-                                        />
-                                    </div>
-                                    <div className="col-span-1">
-                                        <input
-                                            type="number"
-                                            placeholder="0"
-                                            value={item.qty}
-                                            onChange={(e) => updatePOItem(index, 'qty', parseFloat(e.target.value) || 0)}
-                                            className="w-full px-2 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm text-center"
-                                            min="0"
-                                            required
-                                        />
-                                    </div>
-                                    <div className="col-span-2">
-                                        <input
-                                            type="number"
-                                            placeholder="0"
-                                            value={item.unit_price}
-                                            onChange={(e) => updatePOItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
-                                            className="w-full px-2 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm"
-                                            min="0"
-                                            required
-                                        />
-                                    </div>
-                                    <div className="col-span-1">
-                                        <div className="flex items-center gap-1">
+
+                                    {/* ROW 2: Qty, Harga, Pajak, Total */}
+                                    <div className="grid grid-cols-2 md:grid-cols-12 gap-3 items-start md:pr-8">
+                                        <div className="md:col-span-2">
+                                            <label className="text-[10px] font-semibold text-silver-dark uppercase mb-1 block">Qty</label>
                                             <input
                                                 type="number"
                                                 placeholder="0"
-                                                value={item.tax_rate ?? ''}
-                                                onChange={(e) => updatePOItem(index, 'tax_rate', parseFloat(e.target.value) || 0)}
-                                                className="w-full px-2 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm text-right"
+                                                value={item.qty}
+                                                onChange={(e) => updatePOItem(index, 'qty', parseFloat(e.target.value) || 0)}
+                                                className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm text-center focus:border-accent-orange outline-none"
                                                 min="0"
-                                                max="100"
-                                                step="0.01"
+                                                required
                                             />
-                                            <span className="text-silver-dark text-xs">%</span>
                                         </div>
-                                        {item.tax_amount > 0 && (
-                                            <div className="text-[10px] text-silver-dark mt-0.5 text-right">
-                                                = {formatCurrency(item.tax_amount, formData.currency)}
+                                        <div className="md:col-span-3">
+                                            <label className="text-[10px] font-semibold text-silver-dark uppercase mb-1 block">Harga Satuan</label>
+                                            <div className="relative">
+                                                <input
+                                                    type="number"
+                                                    placeholder="0"
+                                                    value={item.unit_price}
+                                                    onChange={(e) => updatePOItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                                                    className="w-full pl-8 pr-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm focus:border-accent-orange outline-none"
+                                                    min="0"
+                                                    required
+                                                />
+                                                <span className="absolute left-3 top-2 text-silver-dark text-sm font-medium">{formData.currency === 'IDR' ? 'Rp' : formData.currency}</span>
                                             </div>
-                                        )}
-                                    </div>
-                                    <div className="col-span-2">
-                                        <div className="px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm font-semibold">
-                                            {formatCurrency(item.amount, formData.currency)}
                                         </div>
-                                    </div>
-                                    <div className="col-span-1 flex items-center justify-center">
-                                        {formData.po_items.length > 1 && (
-                                            <button
-                                                type="button"
-                                                onClick={() => removePOItem(index)}
-                                                className="p-2 hover:bg-red-500/20 text-red-400 rounded-lg"
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                        )}
+                                        <div className="md:col-span-3">
+                                            <label className="text-[10px] font-semibold text-silver-dark uppercase mb-1 block">Pajak %</label>
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="number"
+                                                    placeholder="0"
+                                                    value={item.tax_rate ?? ''}
+                                                    onChange={(e) => updatePOItem(index, 'tax_rate', parseFloat(e.target.value) || 0)}
+                                                    className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm text-center focus:border-accent-orange outline-none"
+                                                    min="0"
+                                                    max="100"
+                                                    step="0.01"
+                                                />
+                                                <span className="text-silver-dark text-xs font-bold">%</span>
+                                            </div>
+                                            {item.tax_amount > 0 && (
+                                                <div className="text-[11px] text-accent-blue font-medium mt-1">
+                                                    + {formatCurrency(item.tax_amount, formData.currency)}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="md:col-span-4">
+                                            <label className="text-[10px] font-semibold text-silver-dark uppercase mb-1 block text-right">Total (Subtotal + Pajak)</label>
+                                            <div className="px-3 py-1.5 bg-dark-surface/50 border border-dark-border rounded-lg text-sm text-right">
+                                                <div className="text-silver-dark text-[10px] leading-tight">Murni: {formatCurrency(item.amount, formData.currency)}</div>
+                                                <div className="text-silver-light font-bold text-base leading-tight">
+                                                    {formatCurrency((item.amount || 0) + (item.tax_amount || 0), formData.currency)}
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
@@ -2197,8 +2266,8 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                             Print Preview
                         </Button>
 
-                        {/* Edit Button - Only for draft, locked during pending/approved with payment */}
-                        {po.status === 'draft' && (!po.paid_amount || po.paid_amount <= 0) && canEditPO && (
+                        {/* Edit Button - Locked only if there is payment */}
+                        {(!po.paid_amount || po.paid_amount <= 0) && canEditPO && (
                             <Button
                                 onClick={onEdit}
                                 variant="secondary"
@@ -2219,23 +2288,11 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                             </Button>
                         )}
 
-                        {/* Approve Button */}
+                        {/* Approval pending note only */}
                         {(po.status === 'submitted' || po.status === 'manager_approval') && (
-                            <>
-                                <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-yellow-500/10 text-yellow-400 text-xs border border-yellow-500/30">
-                                    Waiting for Approval Center
-                                </span>
-                                {canApprovePO && (
-                                    <Button
-                                        onClick={onApprove}
-                                        variant="primary"
-                                        size="sm"
-                                        className="!bg-green-600 hover:!bg-green-700 !border-transparent text-white"
-                                    >
-                                        Approve PO
-                                    </Button>
-                                )}
-                            </>
+                            <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-yellow-500/10 text-yellow-400 text-xs border border-yellow-500/30">
+                                Waiting for Approval Center
+                            </span>
                         )}
 
                         {/* Delete Button - Only if no payment */}

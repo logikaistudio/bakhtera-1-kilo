@@ -71,7 +71,7 @@ const QuotationManagement = () => {
 
     const statusConfig = {
         draft: { label: 'Draft', color: 'bg-gray-500/20 text-gray-400', icon: FileText },
-        manager_approval: { label: 'Manager Approval', color: 'bg-yellow-500/20 text-yellow-400', icon: Clock },
+        manager_approval: { label: 'Waiting Manager', color: 'bg-yellow-500/20 text-yellow-400', icon: Clock },
         sent: { label: 'Sent', color: 'bg-purple-500/20 text-purple-400', icon: Send },
         revision_requested: { label: 'Revision Requested', color: 'bg-orange-500/20 text-orange-400', icon: Edit },
         approved: { label: 'Approved', color: 'bg-green-500/20 text-green-400', icon: Check },
@@ -233,11 +233,29 @@ const QuotationManagement = () => {
 
             if (error) throw error;
 
+            // Log submission to history if immediately submitted
+            if (status === 'manager_approval' && data && data.length > 0) {
+                const insertedQ = data[0];
+                const { error: histErr } = await supabase
+                    .from('blink_approval_history')
+                    .insert([{
+                        document_id: insertedQ.id,
+                        document_type: 'quotation',
+                        document_number: insertedQ.quotation_number || insertedQ.job_number,
+                        action: 'submitted',
+                        actor_role: 'Operations',
+                        actor_name: 'System', // Ideally from auth, but simple fallback
+                        notes: 'Created and automatically submitted for approval'
+                    }]);
+                if (histErr) console.warn('History insertion error:', histErr);
+            }
+
             // Refresh quotations list
             await fetchQuotations();
 
             setShowModal(false);
             resetForm();
+            window.dispatchEvent(new Event('blink_approval_updated'));
 
             const message = status === 'draft'
                 ? `Job Number ${jobNumber} saved as draft!`
@@ -361,7 +379,7 @@ const QuotationManagement = () => {
             customerName: '',
             customerCompany: '',
             customerAddress: '',
-            salesPerson: '',
+            salesPerson: user?.full_name || user?.username || '',
             quotationType: 'RG',
             quotationDate: new Date().toISOString().split('T')[0],
             origin: '',

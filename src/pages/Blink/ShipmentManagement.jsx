@@ -326,6 +326,17 @@ const ShipmentManagement = () => {
             const items = listPOShipment.pending_po_items;
             const totalAmount = items.reduce((sum, i) => sum + i.amount, 0);
 
+            // Clean items to ensure JSON serializable
+            const cleanItems = items.map(item => ({
+                item_name: String(item.item_name || ''),
+                description: String(item.description || ''),
+                qty: Number(item.qty) || 1,
+                unit: String(item.unit || 'Job'),
+                unit_price: Number(item.unit_price) || 0,
+                amount: Number(item.amount) || 0,
+                coa_id: item.coa_id || null
+            }));
+
             const { error } = await supabase.from('blink_purchase_orders').insert([{
                 po_number: poNumber,
                 vendor_id: vendor.id,
@@ -335,7 +346,7 @@ const ShipmentManagement = () => {
                 vendor_address: vendor.address || '',
                 po_date: new Date().toISOString().split('T')[0],
                 payment_terms: '30 Days (NET 30)',
-                po_items: items,
+                po_items: cleanItems,
                 currency: listPOShipment.cogsCurrency || listPOShipment.cogs_currency || 'IDR',
                 exchange_rate: parseFloat(listPOShipment.exchangeRate || listPOShipment.exchange_rate) || 1,
                 subtotal: totalAmount,
@@ -349,7 +360,10 @@ const ShipmentManagement = () => {
                 notes: `Generated from Shipment: ${listPOShipment.jobNumber}`
             }]);
 
-            if (error) throw error;
+            if (error) {
+                console.error('Error generating PO from list:', error);
+                throw error;
+            }
 
             setShowListPOModal(false);
             alert(`✅ Purchase Order ${poNumber} generated successfully!`);

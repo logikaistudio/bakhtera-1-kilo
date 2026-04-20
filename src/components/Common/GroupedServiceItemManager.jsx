@@ -127,32 +127,31 @@ const GroupedServiceItemManager = ({
 
     const fetchAccounts = async () => {
         try {
-            // Map legacy coaType to new bridge COA master account_group
-            let groupName = 'Revenue';
-            if (coaType === 'COST' || coaType === 'EXPENSE') {
-                groupName = 'Expense';
-            } else if (coaType === 'ASSET') {
-                groupName = 'Asset';
-            } else if (coaType === 'LIABILITY') {
-                groupName = 'Liability';
-            } else if (coaType === 'EQUITY') {
-                groupName = 'Equity';
-            } else if (coaType) {
-                 // Try to match exact if passed
-                 // Default to Revenue if none matches exactly
-            }
-
-            const { data, error } = await supabase
-                .from('code_of_accounts')
-                .select('*')
-                .eq('account_group', groupName)
+            let query = supabase
+                .from('finance_coa')
+                .select('id, code, name, type, level')
                 .eq('is_active', true)
                 .order('code');
+                
+            // Apply filtering based on coaType requested
+            if (coaType === 'COST' || coaType === 'EXPENSE' || coaType === 'COGS') {
+                query = query.in('type', ['COST', 'EXPENSE', 'COGS']);
+            } else if (coaType === 'REVENUE') {
+                query = query.in('type', ['REVENUE', 'OTHER_INCOME']);
+            } else if (coaType === 'ASSET') {
+                query = query.eq('type', 'ASSET');
+            } else if (coaType === 'LIABILITY') {
+                query = query.eq('type', 'LIABILITY');
+            } else if (coaType === 'EQUITY') {
+                query = query.eq('type', 'EQUITY');
+            }
+
+            const { data, error } = await query;
                 
             if (!error && data) {
                 setAccounts(data);
             } else if (error) {
-                console.error('Error fetching COA from code_of_accounts:', error);
+                console.error('Error fetching COA from finance_coa:', error);
             }
         } catch (error) {
             console.error('Error fetching COA:', error);

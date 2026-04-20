@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "migrate:journal-schema": "node script/migrate_journal_schema.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.89.0",

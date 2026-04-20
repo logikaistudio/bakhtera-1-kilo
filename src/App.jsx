@@ -40,6 +40,7 @@ import MasterRoutes from './pages/Blink/MasterRoutes';
 import PartnerManagement from './pages/Blink/PartnerManagement';
 import BlinkCompanySettings from './pages/Blink/CompanySettings'; // New
 import BlinkApproval from './pages/Blink/BlinkApproval';
+import SalesBlinkApproval from './pages/Blink/SalesBlinkApproval';
 
 // Blink Finance Module
 import InvoiceManagement from './pages/Blink/InvoiceManagement';
@@ -139,6 +140,7 @@ function App() {
                     <Route path="/blink/operations/quotations" element={<ProtectedRoute menuCode="blink_quotations"><QuotationManagement /></ProtectedRoute>} />
                     <Route path="/blink/flow-monitor" element={<ProtectedRoute menuCode="blink_flow_monitor"><FlowMonitor /></ProtectedRoute>} />
                     <Route path="/blink/sales-achievement" element={<ProtectedRoute menuCode="blink_sales"><SalesAchievement /></ProtectedRoute>} />
+                    <Route path="/blink/sales-approvals" element={<ProtectedRoute menuCode="blink_sales_approval"><SalesBlinkApproval /></ProtectedRoute>} />
                     <Route path="/blink/shipments" element={<ProtectedRoute menuCode="blink_shipments"><ShipmentManagement /></ProtectedRoute>} />
                     <Route path="/blink/operations/tracking" element={<ProtectedRoute menuCode="blink_tracking"><TrackingMonitoring /></ProtectedRoute>} />
                     <Route path="/blink/operations/awb" element={<ProtectedRoute menuCode="blink_awb"><AWBManagement /></ProtectedRoute>} />

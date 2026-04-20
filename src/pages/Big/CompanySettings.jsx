@@ -112,6 +112,10 @@ const BigCompanySettings = () => {
 
     // Bank Account Handlers
     const handleAddBank = () => {
+        if (!bigSettings?.id) {
+            alert('Simpan informasi perusahaan terlebih dahulu sebelum menambahkan rekening bank.');
+            return;
+        }
         setEditingBank(null);
         setBankFormData({
             bank_name: '',
@@ -266,7 +270,7 @@ const BigCompanySettings = () => {
                                 <CreditCard className="h-5 w-5 text-gray-500" />
                                 Rekening Bank
                             </h2>
-                            <Button size="sm" onClick={handleAddBank} Icon={Plus}>
+                            <Button size="sm" disabled={!bigSettings?.id} onClick={handleAddBank} Icon={Plus}>
                                 Tambah Rekening
                             </Button>
                         </div>

@@ -86,6 +86,7 @@ const GeneralJournal = () => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [sourceFilter, setSourceFilter] = useState('all');
+    const [journalTypeFilter, setJournalTypeFilter] = useState('all');
     const [expandedGroups, setExpandedGroups] = useState(new Set());
     const [dateRange, setDateRange] = useState({
         start: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
@@ -96,6 +97,7 @@ const GeneralJournal = () => {
     const [showNewEntryModal, setShowNewEntryModal] = useState(false);
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [selectedGroup, setSelectedGroup] = useState(null);
+    const [journalType, setJournalType] = useState('general'); // general, reversal, note, auto
 
     // New entry form
     const [newEntry, setNewEntry] = useState({
@@ -156,6 +158,12 @@ const GeneralJournal = () => {
                 return src === sourceFilter;
             });
         }
+        if (journalTypeFilter !== 'all') {
+            list = list.filter(e => {
+                const jt = e.journal_type || 'manual';
+                return jt === journalTypeFilter;
+            });
+        }
         if (searchTerm) {
             const t = searchTerm.toLowerCase();
             list = list.filter(e =>
@@ -168,7 +176,7 @@ const GeneralJournal = () => {
             );
         }
         return list;
-    }, [entries, searchTerm, sourceFilter]);
+    }, [entries, searchTerm, sourceFilter, journalTypeFilter]);
 
     const groupedEntries = useMemo(() => {
         const groups = {};
@@ -316,6 +324,7 @@ const GeneralJournal = () => {
                 batch_id: batchId,
                 source: 'manual',
                 currency: 'IDR',
+                journal_type: journalType, // Add journal_type field
                 // Store the base number for easy display/search
                 reference_number: baseEntryNumber,
             }));
@@ -335,6 +344,7 @@ const GeneralJournal = () => {
                     { coa_id: '', account_code: '', account_name: '', debit: 0, credit: 0 }
                 ]
             });
+            setJournalType('general'); // Reset journal type to default
             fetchEntries();
         } catch (e) {
             console.error(e);
@@ -565,6 +575,18 @@ const GeneralJournal = () => {
                 >
                     {sourceOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
+                <select
+                    value={journalTypeFilter}
+                    onChange={e => setJournalTypeFilter(e.target.value)}
+                    className="px-3 py-2.5 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm"
+                >
+                    <option value="all">All Journal Types</option>
+                    <option value="general">General Journals</option>
+                    <option value="reversing">Reversing Journals</option>
+                    <option value="note">Note Journals</option>
+                    <option value="auto">Auto Journals</option>
+                    <option value="manual">Manual Entries</option>
+                </select>
                 <div className="flex items-center gap-2 shrink-0">
                     <Calendar className="w-4 h-4 text-silver-dark" />
                     <input type="date" value={dateRange.start} onChange={e => setDateRange({ ...dateRange, start: e.target.value })}
@@ -595,6 +617,7 @@ const GeneralJournal = () => {
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase" style={{ width: '32px' }}></th>
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '100px' }}>Date</th>
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '220px' }}>Entry No.</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '120px' }}>Journal Type</th>
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '110px' }}>Account Code</th>
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '160px' }}>Account Name</th>
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '200px' }}>Description</th>
@@ -684,6 +707,17 @@ const GeneralJournal = () => {
                                                 <td className="px-3 py-2 text-silver-dark text-xs" />
                                                 <td className="px-3 py-2 text-silver-dark font-mono text-xs whitespace-nowrap">{entry.entry_number}</td>
                                                 <td className="px-3 py-2">
+                                                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                                        entry.journal_type === 'general' ? 'bg-blue-500/20 text-blue-400' :
+                                                        entry.journal_type === 'reversing' ? 'bg-orange-500/20 text-orange-400' :
+                                                        entry.journal_type === 'note' ? 'bg-purple-500/20 text-purple-400' :
+                                                        entry.journal_type === 'auto' ? 'bg-green-500/20 text-green-400' :
+                                                        'bg-gray-500/20 text-gray-400'
+                                                    }`}>
+                                                        {entry.journal_type ? entry.journal_type.charAt(0).toUpperCase() + entry.journal_type.slice(1) : 'Manual'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-3 py-2">
                                                     <span className="font-mono text-xs text-accent-blue">{entry.account_code || '-'}</span>
                                                 </td>
                                                 <td className="px-3 py-2 text-silver-light text-xs">{entry.account_name || '-'}</td>
@@ -714,7 +748,7 @@ const GeneralJournal = () => {
                         {groupedEntries.length > 0 && (
                             <tfoot className="bg-dark-surface border-t-2 border-accent-orange">
                                 <tr>
-                                    <td colSpan={7} className="px-3 py-2 text-right font-bold text-silver-light uppercase text-xs">TOTAL</td>
+                                    <td colSpan={8} className="px-3 py-2 text-right font-bold text-silver-light uppercase text-xs">TOTAL</td>
                                     <td className="px-3 py-2 text-right font-bold text-green-400 text-sm whitespace-nowrap">{fmtIDR(totals.totalDebit)}{totals.hasMixedCcy && <span className="text-xs text-amber-400 ml-1">IDR only</span>}</td>
                                     <td className="px-3 py-2 text-right font-bold text-blue-400 text-sm whitespace-nowrap">{fmtIDR(totals.totalCredit)}{totals.hasMixedCcy && <span className="text-xs text-amber-400 ml-1">IDR only</span>}</td>
                                     <td colSpan={2} />
@@ -763,9 +797,10 @@ const GeneralJournal = () => {
                         </div>
 
                         {/* Info Grid */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
                             {[
                                 { label: 'Date', value: new Date(selectedGroup.date + 'T00:00:00').toLocaleDateString('en-GB', { dateStyle: 'medium' }) },
+                                { label: 'Journal Type', value: selectedGroup.journal_type ? selectedGroup.journal_type.charAt(0).toUpperCase() + selectedGroup.journal_type.slice(1) : 'Manual' },
                                 { label: 'Source', value: getSourceBadge(selectedGroup).label },
                                 { label: 'Party', value: selectedGroup.party_name || '-' },
                                 { label: 'Ref. No.', value: selectedGroup.reference_number || '-' },
@@ -834,7 +869,18 @@ const GeneralJournal = () => {
                     <div className="p-6">
                         <h2 className="text-2xl font-bold gradient-text mb-6">New Manual Journal Entry</h2>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                            <div>
+                                <label className="block text-sm font-medium text-silver-light mb-2">Journal Type *</label>
+                                <select value={journalType}
+                                    onChange={e => setJournalType(e.target.value)}
+                                    className="w-full px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light">
+                                    <option value="general">General Journal</option>
+                                    <option value="reversing">Reversing Journal</option>
+                                    <option value="note">Note Journal</option>
+                                    <option value="auto">Auto Journal</option>
+                                </select>
+                            </div>
                             <div>
                                 <label className="block text-sm font-medium text-silver-light mb-2">Date *</label>
                                 <input type="date" value={newEntry.entry_date}
