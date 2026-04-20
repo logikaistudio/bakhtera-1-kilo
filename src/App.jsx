@@ -46,6 +46,9 @@ import SalesBlinkApproval from './pages/Blink/SalesBlinkApproval';
 import InvoiceManagement from './pages/Blink/InvoiceManagement';
 import PurchaseOrder from './pages/Blink/PurchaseOrder';
 import GeneralJournal from './pages/Blink/GeneralJournal';
+import AutoJournal from './pages/Blink/AutoJournal';
+import ReversingJournal from './pages/Blink/ReversingJournal';
+import NotedJournal from './pages/Blink/NotedJournal';
 import AccountsReceivable from './pages/Blink/AccountsReceivable';
 import AccountsPayable from './pages/Blink/AccountsPayable';
 import ProfitLoss from './pages/Blink/ProfitLoss';
@@ -153,7 +156,10 @@ function App() {
                     {/* Blink Finance Module */}
                     <Route path="/blink/finance/invoices" element={<ProtectedRoute menuCode="blink_invoices"><InvoiceManagement /></ProtectedRoute>} />
                     <Route path="/blink/finance/purchase-orders" element={<ProtectedRoute menuCode="blink_purchase_order"><PurchaseOrder /></ProtectedRoute>} />
+                    <Route path="/blink/finance/auto-journal" element={<ProtectedRoute menuCode="blink_auto_journal"><AutoJournal /></ProtectedRoute>} />
+                    <Route path="/blink/finance/reversing-journal" element={<ProtectedRoute menuCode="blink_reversing_journal"><ReversingJournal /></ProtectedRoute>} />
                     <Route path="/blink/finance/general-journal" element={<ProtectedRoute menuCode="blink_journal"><GeneralJournal /></ProtectedRoute>} />
+                    <Route path="/blink/finance/noted-journal" element={<ProtectedRoute menuCode="blink_noted_journal"><NotedJournal /></ProtectedRoute>} />
                     <Route path="/blink/finance/general-ledger" element={<ProtectedRoute menuCode="blink_ledger"><GeneralLedger /></ProtectedRoute>} />
                     <Route path="/blink/finance/trial-balance" element={<ProtectedRoute menuCode="blink_trial_balance"><TrialBalance /></ProtectedRoute>} />
                     <Route path="/blink/finance/ar" element={<ProtectedRoute menuCode="blink_ar"><AccountsReceivable /></ProtectedRoute>} />

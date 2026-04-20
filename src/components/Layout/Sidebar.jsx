@@ -282,7 +282,10 @@ const Sidebar = () => {
                 { path: '/blink/finance/ap', label: 'Account Payables (AP)', menuCode: 'blink_ap' },
                 // Subcategory: Pencatatan
                 { type: 'divider', label: '📝 Records' },
-                { path: '/blink/finance/general-journal', label: 'General Journal', menuCode: 'blink_journal' },
+                { path: '/blink/finance/auto-journal', label: 'Auto Jurnal (12 bulan)', menuCode: 'blink_auto_journal' },
+                { path: '/blink/finance/reversing-journal', label: 'Reversing Jurnal', menuCode: 'blink_reversing_journal' },
+                { path: '/blink/finance/general-journal', label: 'General Jurnal', menuCode: 'blink_journal' },
+                { path: '/blink/finance/noted-journal', label: 'Jurnal Noted (Audit)', menuCode: 'blink_noted_journal' },
                 { path: '/blink/finance/general-ledger', label: 'General Ledger', menuCode: 'blink_ledger' },
                 { path: '/blink/finance/trial-balance', label: 'Trial Balance', menuCode: 'blink_trial_balance' },
                 // Subcategory: Laporan

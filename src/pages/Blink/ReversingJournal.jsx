@@ -16,24 +16,16 @@ import { useAuth } from '../../context/AuthContext';
 
 // ─── Source badge config ─────────────────────────────────────────────────────
 const SOURCE_CONFIG = {
-    ar_payment: { label: 'AR Payment', color: 'bg-green-500/20 text-green-400 border-green-500/30' },
-    ap_payment: { label: 'AP Payment', color: 'bg-red-500/20 text-red-400 border-red-500/30' },
-    invoice: { label: 'Invoice', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
-    ar_invoice: { label: 'AR Invoice', color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' },
-    po: { label: 'Purchase Order', color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
     manual: { label: 'Manual', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
-    payment: { label: 'Payment', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
     adjustment: { label: 'Adjustment', color: 'bg-pink-500/20 text-pink-400 border-pink-500/30' },
-    auto: { label: 'Auto', color: 'bg-gray-500/20 text-gray-400 border-gray-500/30' },
 };
 
 const getSourceBadge = (entry) => {
-    const key = entry.reference_type || entry.entry_type || (entry.source === 'manual' ? 'manual' : 'auto');
-    return SOURCE_CONFIG[key] || SOURCE_CONFIG.auto;
+    const key = entry.entry_type || (entry.source === 'manual' ? 'manual' : 'adjustment');
+    return SOURCE_CONFIG[key] || SOURCE_CONFIG.manual;
 };
 
 // ─── Currency Formatter ──────────────────────────────────────────────────────
-// Format in original currency
 const fmt = (value, currency = 'IDR') => {
     if (!value || value === 0) return '-';
     const abs = Math.abs(value);
@@ -44,39 +36,32 @@ const fmt = (value, currency = 'IDR') => {
     return neg ? `(${str})` : str;
 };
 
-// Check if the exchange rate is real (meaningfully set, not just default 1 for USD)
 const hasRealRate = (currency, exchangeRate) => {
-    if (!currency || currency === 'IDR') return false; // IDR has no "real rate" concept
-    return (exchangeRate || 1) > 1; // USD entries with rate > 1 are properly converted
+    if (!currency || currency === 'IDR') return false;
+    return (exchangeRate || 1) > 1;
 };
 
-// Smart amount display: IDR equivalent if rate is set, original currency if not
 const fmtAmount = (value, currency, exchangeRate) => {
     if (!value || value === 0) return '-';
     if (hasRealRate(currency, exchangeRate)) {
-        // Proper rate stored → show IDR equivalent
         return `Rp ${Math.abs((value || 0) * exchangeRate).toLocaleString('id-ID')}`;
     }
-    // No real rate (old data or IDR entry) → show in original currency
     return fmt(value, currency);
 };
 
-// Get IDR-equivalent amount, returns original value if no real rate
 const toIDR = (value, currency, exchangeRate) => {
     if (hasRealRate(currency, exchangeRate)) return (value || 0) * exchangeRate;
     if (!currency || currency === 'IDR') return (value || 0);
-    return null; // USD with no rate → cannot determine IDR, exclude from IDR totals
+    return null;
 };
 
-// Format IDR total (skipping non-convertible entries by treating them as 0)
 const fmtIDR = (value) => {
     if (!value || value === 0) return '-';
     return `Rp ${Math.abs(value).toLocaleString('id-ID')}`;
 };
 
-
 // ─── Main Component ──────────────────────────────────────────────────────────
-const GeneralJournal = () => {
+const ReversingJournal = () => {
     const navigate = useNavigate();
     const { companySettings } = useData();
     const { canCreate, canDelete } = useAuth();
@@ -85,7 +70,6 @@ const GeneralJournal = () => {
     const [accounts, setAccounts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
-    const [sourceFilter, setSourceFilter] = useState('all');
     const [expandedGroups, setExpandedGroups] = useState(new Set());
     const [dateRange, setDateRange] = useState({
         start: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
@@ -130,7 +114,7 @@ const GeneralJournal = () => {
             let q = supabase
                 .from('blink_journal_entries')
                 .select('*')
-                .eq('journal_type', 'general')
+                .eq('journal_type', 'reversal')
                 .order('entry_date', { ascending: false })
                 .order('created_at', { ascending: false });
 
@@ -141,7 +125,7 @@ const GeneralJournal = () => {
             if (error) throw error;
             setEntries(data || []);
         } catch (e) {
-            console.error('Error fetching journal entries:', e);
+            console.error('Error fetching reversing journal entries:', e);
             setEntries([]);
         } finally {
             setLoading(false);
@@ -151,12 +135,6 @@ const GeneralJournal = () => {
     // ── Filter & Group ─────────────────────────────────────────────────────────
     const filteredEntries = useMemo(() => {
         let list = entries;
-        if (sourceFilter !== 'all') {
-            list = list.filter(e => {
-                const src = e.reference_type || e.entry_type || (e.source === 'manual' ? 'manual' : 'auto');
-                return src === sourceFilter;
-            });
-        }
         if (searchTerm) {
             const t = searchTerm.toLowerCase();
             list = list.filter(e =>
@@ -169,17 +147,14 @@ const GeneralJournal = () => {
             );
         }
         return list;
-    }, [entries, searchTerm, sourceFilter]);
+    }, [entries, searchTerm]);
 
     const groupedEntries = useMemo(() => {
         const groups = {};
         filteredEntries.forEach(entry => {
             const key = entry.batch_id || entry.entry_number || entry.id;
             if (!groups[key]) {
-                // For display: strip -Lxx line suffix for manual entries to show clean base number
-                // e.g. "JE-2603-0001-L01" → "JE-2603-0001"
-                // For non-manual (AP/AR/Invoice), entry_number is already meaningful per-group
-                const displayNumber = entry.source === 'manual' && entry.reference_number
+                const displayNumber = entry.reference_number
                     ? entry.reference_number
                     : entry.entry_number?.replace(/-L\d+$/i, '') || entry.entry_number;
 
@@ -188,11 +163,6 @@ const GeneralJournal = () => {
                     date: entry.entry_date,
                     entry_number: displayNumber,
                     description: entry.description,
-                    reference_type: entry.reference_type,
-                    reference_number: entry.reference_number,
-                    party_name: entry.party_name,
-                    source: entry.source,
-                    entry_type: entry.entry_type,
                     batch_id: entry.batch_id,
                     lines: []
                 };
@@ -203,7 +173,6 @@ const GeneralJournal = () => {
     }, [filteredEntries]);
 
     const totals = useMemo(() => {
-        // Sum IDR-convertible entries only; exclude USD entries without a real rate
         const totalDebit = filteredEntries.reduce((s, e) => {
             const v = toIDR(e.debit, e.currency, e.exchange_rate);
             return s + (v ?? 0);
@@ -212,9 +181,7 @@ const GeneralJournal = () => {
             const v = toIDR(e.credit, e.currency, e.exchange_rate);
             return s + (v ?? 0);
         }, 0);
-        // Check if any non-IDR entries without rate exist (cannot balance-check IDR vs USD)
-        const hasMixedCcy = filteredEntries.some(e => e.currency && e.currency !== 'IDR' && !hasRealRate(e.currency, e.exchange_rate));
-        return { totalDebit, totalCredit, balance: totalDebit - totalCredit, hasMixedCcy };
+        return { totalDebit, totalCredit, balance: totalDebit - totalCredit };
     }, [filteredEntries]);
 
     // ── Toggle Group ────────────────────────────────────────────────────────────
@@ -254,23 +221,20 @@ const GeneralJournal = () => {
         const now = new Date();
         const yy = String(now.getFullYear()).slice(2);
         const mm = String(now.getMonth() + 1).padStart(2, '0');
-        const prefix = `JE-${yy}${mm}-`;
+        const prefix = `RV-${yy}${mm}-`;
 
         try {
-            // Find the highest existing base sequence number for this month
-            // Strip line suffixes (-L01 etc) before comparing
             const { data } = await supabase
                 .from('blink_journal_entries')
                 .select('entry_number')
                 .like('entry_number', `${prefix}%`)
                 .order('entry_number', { ascending: false })
-                .limit(20); // fetch a few to safely find the highest base seq
+                .limit(20);
 
             let seq = 1;
             if (data && data.length > 0) {
-                // Strip -Lxx suffix if present and parse base seq
                 const seqNums = data.map(row => {
-                    const base = row.entry_number.replace(/-L\d+$/i, ''); // remove -L01 etc
+                    const base = row.entry_number.replace(/-L\d+$/i, '');
                     const parts = base.split('-');
                     return parseInt(parts[parts.length - 1], 10);
                 }).filter(n => !isNaN(n));
@@ -281,29 +245,24 @@ const GeneralJournal = () => {
             }
             return `${prefix}${String(seq).padStart(4, '0')}`;
         } catch {
-            // Fallback: use full timestamp + random to avoid collision
             return `${prefix}${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 100)}`;
         }
     };
 
     const saveEntry = async () => {
         if (!canCreate('blink_journal')) {
-            alert('Anda tidak memiliki hak akses untuk membuat entri jurnal manual.');
+            alert('Anda tidak memiliki hak akses untuk membuat entri jurnal reversal.');
             return;
         }
-        if (!isBalanced()) { alert('Journal entry must balance! Total Debit must equal Total Credit.'); return; }
+        if (!isBalanced()) { alert('Journal entry must balance!'); return; }
         if (!newEntry.description) { alert('Description is required.'); return; }
         try {
             setSaving(true);
-            // Base entry number for this journal batch (e.g. JE-2603-0001)
             const baseEntryNumber = await generateEntryNumber();
             const batchId = crypto.randomUUID();
 
             const validLines = newEntry.lines.filter(l => l.coa_id && (l.debit > 0 || l.credit > 0));
 
-            // Each line gets a UNIQUE entry_number with line index suffix
-            // e.g. JE-2603-0001-L01, JE-2603-0001-L02, ...
-            // batch_id groups all lines together for viewing and deletion
             const rows = validLines.map((line, idx) => ({
                 entry_number: `${baseEntryNumber}-L${String(idx + 1).padStart(2, '0')}`,
                 entry_date: newEntry.entry_date,
@@ -317,19 +276,18 @@ const GeneralJournal = () => {
                 batch_id: batchId,
                 source: 'manual',
                 currency: 'IDR',
-                journal_type: 'general',
-                // Store the base number for easy display/search
+                journal_type: 'reversal',
                 reference_number: baseEntryNumber,
             }));
 
             if (rows.length === 0) {
-                alert('Please fill in at least one valid journal line with an account and amount.');
+                alert('Please fill in at least one valid journal line.');
                 return;
             }
 
             const { error } = await supabase.from('blink_journal_entries').insert(rows);
             if (error) throw error;
-            alert(`✅ Journal entry ${baseEntryNumber} saved successfully!`);
+            alert(`✅ Reversing entry ${baseEntryNumber} saved successfully!`);
             setShowNewEntryModal(false);
             setNewEntry({
                 entry_date: new Date().toISOString().split('T')[0], description: '', lines: [
@@ -349,10 +307,10 @@ const GeneralJournal = () => {
     // ── Delete ──────────────────────────────────────────────────────────────────
     const deleteEntry = async (batchId) => {
         if (!canDelete('blink_journal')) {
-            alert('Anda tidak memiliki hak akses untuk menghapus entri jurnal manual.');
+            alert('Anda tidak memiliki hak akses untuk menghapus entri jurnal.');
             return;
         }
-        if (!confirm('Delete this journal entry? This cannot be undone.')) return;
+        if (!confirm('Delete this reversing entry? This cannot be undone.')) return;
         try {
             const { error } = await supabase.from('blink_journal_entries').delete().eq('batch_id', batchId);
             if (error) throw error;
@@ -365,12 +323,11 @@ const GeneralJournal = () => {
 
     // ── Export ──────────────────────────────────────────────────────────────────
     const exportCSV = () => {
-        const headers = ['Date', 'Entry No.', 'Ref No.', 'Party', 'Account Code', 'Account Name', 'Description', 'Debit', 'Credit', 'Source'];
+        const headers = ['Date', 'Entry No.', 'Account Code', 'Account Name', 'Description', 'Debit', 'Credit'];
         const rows = filteredEntries.map(e => [
-            e.entry_date, e.entry_number, e.reference_number || '', e.party_name || '',
+            e.entry_date, e.entry_number,
             e.account_code, e.account_name, e.description || '',
-            e.debit || 0, e.credit || 0,
-            e.reference_type || e.source || 'auto'
+            e.debit || 0, e.credit || 0
         ]);
         const esc = f => {
             const s = String(f ?? '');
@@ -379,33 +336,10 @@ const GeneralJournal = () => {
         const csv = [headers.join(','), ...rows.map(r => r.map(esc).join(','))].join('\n');
         const a = document.createElement('a');
         a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-        a.download = `General_Journal_${dateRange.start}_${dateRange.end}.csv`;
+        a.download = `Reversing_Journal_${dateRange.start}_${dateRange.end}.csv`;
         a.click();
     };
 
-    // ── Source options for filter ────────────────────────────────────────────────
-    const sourceOptions = [
-        { value: 'all', label: 'All Sources' },
-        { value: 'ar_payment', label: 'AR Payment' },
-        { value: 'ap_payment', label: 'AP Payment' },
-        { value: 'invoice', label: 'Invoice' },
-        { value: 'ar_invoice', label: 'AR Invoice' },
-        { value: 'po', label: 'Purchase Order' },
-        { value: 'payment', label: 'Payment' },
-        { value: 'manual', label: 'Manual' },
-        { value: 'adjustment', label: 'Adjustment' },
-    ];
-
-    // ── Navigate to source document ───────────────────────────────────────────
-    const navigateToSource = (group) => {
-        const rt = group.reference_type;
-        if (rt === 'invoice' || rt === 'ar_invoice') navigate('/blink/finance/invoices');
-        else if (rt === 'po') navigate('/blink/finance/purchase-orders');
-        else if (rt === 'ar_payment') navigate('/blink/finance/ar');
-        else if (rt === 'ap_payment') navigate('/blink/finance/ap');
-    };
-
-    // ── Export PDF ──────────────────────────────────────────────────────────────
     const exportToPDF = () => {
         const period = `${fmtDatePrint(dateRange.start)} – ${fmtDatePrint(dateRange.end)}`;
         const fmt2 = (v, cur) => {
@@ -417,7 +351,6 @@ const GeneralJournal = () => {
         };
 
         const groupsHTML = groupedEntries.map(group => {
-            const badge = getSourceBadge(group);
             const linesHTML = group.lines.map(line => `
                 <tr>
                     <td></td>
@@ -429,15 +362,14 @@ const GeneralJournal = () => {
 
             const totalDebit = group.lines.reduce((s, l) => s + (l.debit || 0), 0);
             const totalCredit = group.lines.reduce((s, l) => s + (l.credit || 0), 0);
-            const cur = group.lines[0]?.currency || 'IDR';
 
             return `
                 <tr class="row-header">
                     <td class="muted" style="white-space:nowrap">${fmtDatePrint(group.date)}</td>
                     <td class="code">${group.entry_number || ''}</td>
-                    <td><b>${group.description || '-'}</b>${group.party_name ? ` &mdash; <span style="color:#64748b">${group.party_name}</span>` : ''}</td>
-                    <td class="text-right mono green bold">${fmt2(totalDebit, cur)}</td>
-                    <td class="text-right mono bold" style="color:#1d4ed8">${fmt2(totalCredit, cur)}</td>
+                    <td><b style="color:#ea580c">🔄 REVERSAL</b> — ${group.description || '-'}</td>
+                    <td class="text-right mono green bold">${fmt2(totalDebit, 'IDR')}</td>
+                    <td class="text-right mono bold" style="color:#1d4ed8">${fmt2(totalCredit, 'IDR')}</td>
                 </tr>
                 ${linesHTML}`;
         }).join('');
@@ -462,7 +394,7 @@ const GeneralJournal = () => {
                     <tr>
                         <th style="min-width:90px">Date</th>
                         <th style="min-width:110px">Entry No.</th>
-                        <th style="min-width:250px">Description / Account</th>
+                        <th style="min-width:300px">Description / Account</th>
                         <th class="text-right" style="min-width:130px">Debit</th>
                         <th class="text-right" style="min-width:130px">Credit</th>
                     </tr>
@@ -478,11 +410,11 @@ const GeneralJournal = () => {
             </table>`;
 
         printReport({
-            reportName: 'General Journal',
+            reportName: 'Reversing Journal',
             companyInfo: companySettings,
             period,
             bodyHTML,
-            note: `Showing ${groupedEntries.length} journal entries (${filteredEntries.length} lines). ${totals.hasMixedCcy ? 'Note: some USD entries without exchange rate are excluded from IDR totals.' : ''}`
+            note: `Showing ${groupedEntries.length} reversing (correction) entries.`
         });
     };
 
@@ -492,11 +424,11 @@ const GeneralJournal = () => {
             {/* ── Header ── */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text">General Journal</h1>
-                    <p className="text-silver-dark mt-1">Double-entry transaction records from AR, AP, Invoices & PO</p>
+                    <h1 className="text-3xl font-bold gradient-text">🔄 Reversing Jurnal</h1>
+                    <p className="text-silver-dark mt-1">Perbaikan & koreksi entry journal untuk membatalkan kesalahan</p>
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                    <Button variant="secondary" icon={RefreshCw} onClick={fetchEntries}>Refresh</Button>
+                    <Button variant="secondary" onClick={fetchEntries}>Refresh</Button>
                     <button onClick={exportCSV} className="flex items-center gap-2 px-3 py-2 bg-dark-surface text-silver-light hover:bg-dark-card border border-dark-border rounded-lg smooth-transition text-xs">
                         <FileText className="w-4 h-4" /> CSV
                     </button>
@@ -505,7 +437,7 @@ const GeneralJournal = () => {
                         <Printer className="w-4 h-4" /> Print PDF
                     </button>
                     {canCreate('blink_journal') && (
-                        <Button icon={Plus} onClick={() => setShowNewEntryModal(true)}>Manual Entry</Button>
+                        <Button icon={Plus} onClick={() => setShowNewEntryModal(true)}>Reversal Baru</Button>
                     )}
                 </div>
             </div>
@@ -517,7 +449,7 @@ const GeneralJournal = () => {
                         <p className="text-xs text-silver-dark uppercase tracking-wider">Total Debit</p>
                         <ArrowUpRight className="w-4 h-4 text-green-400" />
                     </div>
-                    <p className="text-xl font-bold text-green-400">{fmtIDR(totals.totalDebit)}{totals.hasMixedCcy && <span className="text-sm text-amber-400 ml-1">(IDR)</span>}</p>
+                    <p className="text-xl font-bold text-green-400">{fmtIDR(totals.totalDebit)}</p>
                     <p className="text-xs text-silver-dark mt-1">{filteredEntries.filter(e => e.debit > 0).length} debit lines</p>
                 </div>
                 <div className="glass-card p-4 rounded-lg border-l-4 border-blue-500">
@@ -525,22 +457,22 @@ const GeneralJournal = () => {
                         <p className="text-xs text-silver-dark uppercase tracking-wider">Total Credit</p>
                         <ArrowDownLeft className="w-4 h-4 text-blue-400" />
                     </div>
-                    <p className="text-xl font-bold text-blue-400">{fmtIDR(totals.totalCredit)}{totals.hasMixedCcy && <span className="text-sm text-amber-400 ml-1">(IDR)</span>}</p>
+                    <p className="text-xl font-bold text-blue-400">{fmtIDR(totals.totalCredit)}</p>
                     <p className="text-xs text-silver-dark mt-1">{filteredEntries.filter(e => e.credit > 0).length} credit lines</p>
                 </div>
-                <div className="glass-card p-4 rounded-lg border-l-4 border-purple-500">
+                <div className="glass-card p-4 rounded-lg border-l-4 border-orange-500">
                     <div className="flex items-center justify-between mb-1">
                         <p className="text-xs text-silver-dark uppercase tracking-wider">Balance Check</p>
                         {Math.abs(totals.balance) < 1 ? <CheckCircle className="w-4 h-4 text-green-400" /> : <AlertCircle className="w-4 h-4 text-red-400" />}
                     </div>
                     <p className={`text-xl font-bold ${Math.abs(totals.balance) < 1 ? 'text-green-400' : 'text-red-400'}`}>
-                        {totals.hasMixedCcy ? 'Mixed Currencies' : (Math.abs(totals.balance) < 1 ? 'Balanced ✓' : fmt(totals.balance))}
+                        {Math.abs(totals.balance) < 1 ? 'Balanced ✓' : fmt(totals.balance)}
                     </p>
                     <p className="text-xs text-silver-dark mt-1">Debit = Credit</p>
                 </div>
                 <div className="glass-card p-4 rounded-lg border-l-4 border-accent-orange">
                     <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark uppercase tracking-wider">Total Batches</p>
+                        <p className="text-xs text-silver-dark uppercase tracking-wider">Total Entries</p>
                         <Layers className="w-4 h-4 text-accent-orange" />
                     </div>
                     <p className="text-xl font-bold text-accent-orange">{groupedEntries.length}</p>
@@ -548,25 +480,18 @@ const GeneralJournal = () => {
                 </div>
             </div>
 
-            {/* ── Filters ── */}
+            {/* ── Search ── */}
             <div className="flex flex-col md:flex-row gap-3">
                 <div className="flex-1 relative">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-silver-dark" />
                     <input
                         type="text"
-                        placeholder="Search entry number, description, account, party..."
+                        placeholder="Cari entry number, deskripsi, akun..."
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
                         className="w-full pl-11 pr-4 py-2.5 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm"
                     />
                 </div>
-                <select
-                    value={sourceFilter}
-                    onChange={e => setSourceFilter(e.target.value)}
-                    className="px-3 py-2.5 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm"
-                >
-                    {sourceOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
                 <div className="flex items-center gap-2 shrink-0">
                     <Calendar className="w-4 h-4 text-silver-dark" />
                     <input type="date" value={dateRange.start} onChange={e => setDateRange({ ...dateRange, start: e.target.value })}
@@ -577,18 +502,18 @@ const GeneralJournal = () => {
                 </div>
             </div>
 
-            {/* ── Journal Table (Grouped) ── */}
+            {/* ── Journal Table ── */}
             <div className="glass-card rounded-lg overflow-x-auto">
                 {loading ? (
                     <div className="flex items-center justify-center py-16">
                         <div className="animate-spin w-8 h-8 border-2 border-accent-orange border-t-transparent rounded-full mr-3" />
-                        <span className="text-silver-dark">Loading journal entries...</span>
+                        <span className="text-silver-dark">Loading reversing journal entries...</span>
                     </div>
                 ) : groupedEntries.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 opacity-60">
                         <BookOpen className="w-14 h-14 text-silver-dark mb-4" />
-                        <p className="text-silver-light font-medium">No journal entries found</p>
-                        <p className="text-silver-dark text-sm mt-1">Entries are auto-created when invoices, AR, and AP payments are processed</p>
+                        <p className="text-silver-light font-medium">No reversing entries found</p>
+                        <p className="text-silver-dark text-sm mt-1">Create reversing entries to correct or cancel journal entries</p>
                     </div>
                 ) : (
                     <table className="w-full min-w-max text-sm">
@@ -596,22 +521,18 @@ const GeneralJournal = () => {
                             <tr className="bg-accent-orange">
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase" style={{ width: '32px' }}></th>
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '100px' }}>Date</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '220px' }}>Entry No.</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '120px' }}>Journal Type</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '220px' }}>Entry No. (RV)</th>
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '110px' }}>Account Code</th>
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '160px' }}>Account Name</th>
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '200px' }}>Description</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '120px' }}>Party</th>
                                 <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '130px' }}>Debit</th>
                                 <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '130px' }}>Credit</th>
-                                <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '110px' }}>Source</th>
-                                <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '60px' }}>Action</th>
+                                <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '80px' }}>Action</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
                             {groupedEntries.map((group) => {
                                 const isExpanded = expandedGroups.has(group.key);
-                                // Compute group totals — only IDR-convertible lines
                                 const groupDebitIDR = group.lines.reduce((s, e) => {
                                     const v = toIDR(e.debit, e.currency, e.exchange_rate);
                                     return s + (v ?? 0);
@@ -620,32 +541,21 @@ const GeneralJournal = () => {
                                     const v = toIDR(e.credit, e.currency, e.exchange_rate);
                                     return s + (v ?? 0);
                                 }, 0);
-                                // Detect multi-currency group that has USD without real rate
-                                const currencies = [...new Set(group.lines.map(e => e.currency || 'IDR'))];
-                                const isMultiCcy = currencies.some(c => c !== 'IDR');
-                                const hasMixed = group.lines.some(e => e.currency && e.currency !== 'IDR' && !hasRealRate(e.currency, e.exchange_rate));
-                                const badge = getSourceBadge(group);
 
                                 return (
                                     <React.Fragment key={group.key}>
-                                        {/* ── Group Header Row ── */}
                                         <tr
                                             className="bg-dark-surface/60 hover:bg-dark-surface cursor-pointer smooth-transition"
                                             onClick={() => toggleGroup(group.key)}
                                         >
                                             <td className="px-3 py-2.5 text-silver-dark">
-                                                {isExpanded
-                                                    ? <ChevronDown className="w-4 h-4" />
-                                                    : <ChevronRight className="w-4 h-4" />}
+                                                {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                                             </td>
                                             <td className="px-3 py-2.5 text-silver-dark whitespace-nowrap text-xs">
                                                 {new Date(group.date + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                                             </td>
                                             <td className="px-3 py-2.5 whitespace-nowrap">
-                                                <div className="font-bold text-accent-orange">{group.entry_number}</div>
-                                                {group.reference_number && (
-                                                    <div className="font-mono text-xs text-silver-dark mt-0.5 truncate max-w-[200px]" title={group.reference_number}>↑ {group.reference_number}</div>
-                                                )}
+                                                <div className="font-bold text-accent-orange">🔄 {group.entry_number}</div>
                                             </td>
                                             <td className="px-3 py-2.5 text-silver-dark text-xs whitespace-nowrap" colSpan={2}>
                                                 <span className="italic">{group.lines.length} line{group.lines.length > 1 ? 's' : ''}</span>
@@ -653,26 +563,16 @@ const GeneralJournal = () => {
                                             <td className="px-3 py-2.5 text-silver-light text-xs" style={{ maxWidth: '200px' }}>
                                                 <div className="truncate" title={group.description}>{group.description}</div>
                                             </td>
-                                            <td className="px-3 py-2.5 text-silver-dark text-xs whitespace-nowrap">
-                                                {group.party_name || '-'}
-                                            </td>
                                             <td className="px-3 py-2.5 text-right font-semibold text-green-400 whitespace-nowrap text-xs">
-                                                {groupDebitIDR > 0
-                                                    ? <>{fmtIDR(groupDebitIDR)}{isMultiCcy && !hasMixed && <div className="text-xs text-silver-dark font-normal">≈ IDR</div>}{hasMixed && <div className="text-xs text-amber-400 font-normal">IDR + {currencies.filter(c => c !== 'IDR').join('/')}</div>}</> : <span className="text-silver-dark">-</span>}
+                                                {groupDebitIDR > 0 ? fmtIDR(groupDebitIDR) : <span className="text-silver-dark">-</span>}
                                             </td>
                                             <td className="px-3 py-2.5 text-right font-semibold text-blue-400 whitespace-nowrap text-xs">
-                                                {groupCreditIDR > 0
-                                                    ? <>{fmtIDR(groupCreditIDR)}{isMultiCcy && !hasMixed && <div className="text-xs text-silver-dark font-normal">≈ IDR</div>}{hasMixed && <div className="text-xs text-amber-400 font-normal">IDR + {currencies.filter(c => c !== 'IDR').join('/')}</div>}</> : <span className="text-silver-dark">-</span>}
-                                            </td>
-                                            <td className="px-3 py-2.5 text-center">
-                                                <span className={`px-2 py-0.5 rounded text-xs font-semibold border ${badge.color}`}>
-                                                    {badge.label}
-                                                </span>
+                                                {groupCreditIDR > 0 ? fmtIDR(groupCreditIDR) : <span className="text-silver-dark">-</span>}
                                             </td>
                                             <td className="px-3 py-2.5 text-center">
                                                 <button
                                                     onClick={ev => { ev.stopPropagation(); setSelectedGroup(group); setShowDetailModal(true); }}
-                                                    className="p-1.5 text-silver-dark hover:text-accent-blue hover:bg-blue-500/10 rounded smooth-transition"
+                                                    className="p-1.5 text-silver-dark hover:text-accent-orange hover:bg-orange-500/10 rounded smooth-transition"
                                                     title="View Detail"
                                                 >
                                                     <Eye className="w-3.5 h-3.5" />
@@ -680,44 +580,22 @@ const GeneralJournal = () => {
                                             </td>
                                         </tr>
 
-                                        {/* ── Expanded Lines ── */}
                                         {isExpanded && group.lines.map((entry, idx) => (
                                             <tr key={entry.id || idx} className="bg-dark-bg/40 border-b border-dark-border/30 hover:bg-dark-surface/20">
                                                 <td className="px-3 py-2 pl-8 text-silver-dark text-xs" />
                                                 <td className="px-3 py-2 text-silver-dark text-xs" />
                                                 <td className="px-3 py-2 text-silver-dark font-mono text-xs whitespace-nowrap">{entry.entry_number}</td>
                                                 <td className="px-3 py-2">
-                                                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                                        entry.journal_type === 'general' ? 'bg-blue-500/20 text-blue-400' :
-                                                        entry.journal_type === 'reversing' ? 'bg-orange-500/20 text-orange-400' :
-                                                        entry.journal_type === 'note' ? 'bg-purple-500/20 text-purple-400' :
-                                                        entry.journal_type === 'auto' ? 'bg-green-500/20 text-green-400' :
-                                                        'bg-gray-500/20 text-gray-400'
-                                                    }`}>
-                                                        {entry.journal_type ? entry.journal_type.charAt(0).toUpperCase() + entry.journal_type.slice(1) : 'Manual'}
-                                                    </span>
-                                                </td>
-                                                <td className="px-3 py-2">
                                                     <span className="font-mono text-xs text-accent-blue">{entry.account_code || '-'}</span>
                                                 </td>
                                                 <td className="px-3 py-2 text-silver-light text-xs">{entry.account_name || '-'}</td>
                                                 <td className="px-3 py-2 text-silver-dark text-xs max-w-[200px] truncate">{entry.description || '-'}</td>
-                                                <td className="px-3 py-2 text-silver-dark text-xs">{entry.party_name || '-'}</td>
                                                 <td className="px-3 py-2 text-right text-xs">
-                                                    {entry.debit > 0 ? (
-                                                        <span className="text-green-400 font-medium">
-                                                            {fmtAmount(entry.debit, entry.currency, entry.exchange_rate)}
-                                                        </span>
-                                                    ) : <span className="text-silver-dark">-</span>}
+                                                    {entry.debit > 0 ? <span className="text-green-400 font-medium">{fmt(entry.debit)}</span> : <span className="text-silver-dark">-</span>}
                                                 </td>
                                                 <td className="px-3 py-2 text-right text-xs">
-                                                    {entry.credit > 0 ? (
-                                                        <span className="text-blue-400 font-medium">
-                                                            {fmtAmount(entry.credit, entry.currency, entry.exchange_rate)}
-                                                        </span>
-                                                    ) : <span className="text-silver-dark">-</span>}
+                                                    {entry.credit > 0 ? <span className="text-blue-400 font-medium">{fmt(entry.credit)}</span> : <span className="text-silver-dark">-</span>}
                                                 </td>
-                                                <td />
                                                 <td />
                                             </tr>
                                         ))}
@@ -728,10 +606,10 @@ const GeneralJournal = () => {
                         {groupedEntries.length > 0 && (
                             <tfoot className="bg-dark-surface border-t-2 border-accent-orange">
                                 <tr>
-                                    <td colSpan={8} className="px-3 py-2 text-right font-bold text-silver-light uppercase text-xs">TOTAL</td>
-                                    <td className="px-3 py-2 text-right font-bold text-green-400 text-sm whitespace-nowrap">{fmtIDR(totals.totalDebit)}{totals.hasMixedCcy && <span className="text-xs text-amber-400 ml-1">IDR only</span>}</td>
-                                    <td className="px-3 py-2 text-right font-bold text-blue-400 text-sm whitespace-nowrap">{fmtIDR(totals.totalCredit)}{totals.hasMixedCcy && <span className="text-xs text-amber-400 ml-1">IDR only</span>}</td>
-                                    <td colSpan={2} />
+                                    <td colSpan={6} className="px-3 py-2 text-right font-bold text-silver-light uppercase text-xs">TOTAL</td>
+                                    <td className="px-3 py-2 text-right font-bold text-green-400 text-sm whitespace-nowrap">{fmtIDR(totals.totalDebit)}</td>
+                                    <td className="px-3 py-2 text-right font-bold text-blue-400 text-sm whitespace-nowrap">{fmtIDR(totals.totalCredit)}</td>
+                                    <td />
                                 </tr>
                             </tfoot>
                         )}
@@ -739,66 +617,30 @@ const GeneralJournal = () => {
                 )}
             </div>
 
-            {/* ══════════════════════════════════════════════════════════════════
-                DETAIL MODAL
-            ══════════════════════════════════════════════════════════════════ */}
+            {/* DETAIL MODAL */}
             {showDetailModal && selectedGroup && (
                 <Modal isOpen={true} onClose={() => setShowDetailModal(false)} maxWidth="max-w-3xl">
                     <div className="p-6">
                         <div className="flex items-start justify-between mb-6">
                             <div>
-                                <h2 className="text-2xl font-bold gradient-text">Journal Entry Detail</h2>
-                                <p className="text-silver-dark mt-1">
-                                    #{selectedGroup.entry_number}
-                                    {selectedGroup.reference_number && <span className="ml-2 text-accent-orange">• {selectedGroup.reference_number}</span>}
-                                </p>
+                                <h2 className="text-2xl font-bold gradient-text">Reversing Entry Detail</h2>
+                                <p className="text-silver-dark mt-1">🔄 #{selectedGroup.entry_number}</p>
                             </div>
-                            <div className="flex items-center gap-2">
-                                {/* Navigate to source */}
-                                {selectedGroup.reference_type && selectedGroup.reference_type !== 'adjustment' && (
-                                    <button
-                                        onClick={() => navigateToSource(selectedGroup)}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-accent-blue hover:bg-blue-500/10 rounded-lg border border-accent-blue/30 smooth-transition"
-                                    >
-                                        <ExternalLink className="w-3 h-3" />
-                                        View {selectedGroup.reference_type?.replace('_', ' ').toUpperCase()}
-                                    </button>
-                                )}
-                                {/* Delete (manual only) */}
-                                {selectedGroup.source === 'manual' && canDelete('blink_journal') && (
-                                    <button
-                                        onClick={() => deleteEntry(selectedGroup.batch_id)}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 rounded-lg border border-red-500/30 smooth-transition"
-                                    >
-                                        <Trash2 className="w-3 h-3" /> Delete
-                                    </button>
-                                )}
-                            </div>
+                            {canDelete('blink_journal') && (
+                                <button
+                                    onClick={() => deleteEntry(selectedGroup.batch_id)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 rounded-lg border border-red-500/30 smooth-transition"
+                                >
+                                    <Trash2 className="w-3 h-3" /> Delete
+                                </button>
+                            )}
                         </div>
 
-                        {/* Info Grid */}
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
-                            {[
-                                { label: 'Date', value: new Date(selectedGroup.date + 'T00:00:00').toLocaleDateString('en-GB', { dateStyle: 'medium' }) },
-                                { label: 'Journal Type', value: selectedGroup.journal_type ? selectedGroup.journal_type.charAt(0).toUpperCase() + selectedGroup.journal_type.slice(1) : 'Manual' },
-                                { label: 'Source', value: getSourceBadge(selectedGroup).label },
-                                { label: 'Party', value: selectedGroup.party_name || '-' },
-                                { label: 'Ref. No.', value: selectedGroup.reference_number || '-' },
-                            ].map(({ label, value }) => (
-                                <div key={label} className="glass-card p-3 rounded-lg">
-                                    <p className="text-xs text-silver-dark uppercase mb-1">{label}</p>
-                                    <p className="font-medium text-silver-light text-sm">{value}</p>
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* Description */}
                         <div className="mb-5 p-3 bg-dark-surface rounded-lg border border-dark-border">
-                            <p className="text-xs text-silver-dark uppercase mb-1">Description / Memo</p>
+                            <p className="text-xs text-silver-dark uppercase mb-1">Description</p>
                             <p className="text-sm text-silver-light">{selectedGroup.description || '-'}</p>
                         </div>
 
-                        {/* Transaction Lines */}
                         <div className="overflow-hidden rounded-lg border border-dark-border mb-5">
                             <table className="w-full text-sm">
                                 <thead className="bg-dark-surface">
@@ -841,13 +683,11 @@ const GeneralJournal = () => {
                 </Modal>
             )}
 
-            {/* ══════════════════════════════════════════════════════════════════
-                NEW MANUAL ENTRY MODAL
-            ══════════════════════════════════════════════════════════════════ */}
+            {/* NEW ENTRY MODAL */}
             {showNewEntryModal && (
                 <Modal isOpen={true} onClose={() => setShowNewEntryModal(false)} maxWidth="max-w-4xl">
                     <div className="p-6">
-                        <h2 className="text-2xl font-bold gradient-text mb-6">New Manual Journal Entry</h2>
+                        <h2 className="text-2xl font-bold gradient-text mb-6">Reversing Entry Baru</h2>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                             <div>
@@ -857,8 +697,8 @@ const GeneralJournal = () => {
                                     className="w-full px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light" />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-silver-light mb-2">Description *</label>
-                                <input type="text" placeholder="Transaction description..."
+                                <label className="block text-sm font-medium text-silver-light mb-2">Description (Alasan Koreksi) *</label>
+                                <input type="text" placeholder="Contoh: Koreksi invoice #12345..."
                                     value={newEntry.description}
                                     onChange={e => setNewEntry({ ...newEntry, description: e.target.value })}
                                     className="w-full px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light" />
@@ -934,20 +774,15 @@ const GeneralJournal = () => {
 
                         <div className={`p-3 rounded-lg mb-5 flex items-center gap-3 ${isBalanced() ? 'bg-green-500/10 border border-green-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
                             {isBalanced()
-                                ? <><CheckCircle className="w-5 h-5 text-green-400" /><span className="text-green-400 font-medium">Journal is Balanced ✓</span></>
-                                : <><AlertCircle className="w-5 h-5 text-red-400" /><span className="text-red-400 font-medium">
-                                    Unbalanced — Difference: {fmt(
-                                        newEntry.lines.reduce((s, l) => s + (l.debit || 0), 0) -
-                                        newEntry.lines.reduce((s, l) => s + (l.credit || 0), 0)
-                                    )}
-                                </span></>
+                                ? <><CheckCircle className="w-5 h-5 text-green-400" /><span className="text-green-400 font-medium">Balanced ✓</span></>
+                                : <><AlertCircle className="w-5 h-5 text-red-400" /><span className="text-red-400 font-medium">Unbalanced — Difference: {fmt(newEntry.lines.reduce((s, l) => s + (l.debit || 0), 0) - newEntry.lines.reduce((s, l) => s + (l.credit || 0), 0))}</span></>
                             }
                         </div>
 
                         <div className="flex justify-end gap-3">
                             <Button variant="secondary" onClick={() => setShowNewEntryModal(false)}>Cancel</Button>
                             <Button onClick={saveEntry} disabled={!isBalanced() || saving}>
-                                {saving ? 'Saving...' : 'Save Entry'}
+                                {saving ? 'Saving...' : 'Save Reversal'}
                             </Button>
                         </div>
                     </div>
@@ -957,4 +792,4 @@ const GeneralJournal = () => {
     );
 };
 
-export default GeneralJournal;
+export default ReversingJournal;
