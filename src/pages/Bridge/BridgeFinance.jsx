@@ -776,8 +776,6 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
                 customer: '',
                 bcDocument: '',
                 title: '',
-                bcDocument: '',
-                title: '',
                 items: [],
                 cogsItems: []
             });
