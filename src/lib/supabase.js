@@ -2,10 +2,19 @@ import { createClient } from '@supabase/supabase-js';
 
 // Supabase configuration
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || import.meta.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || import.meta.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabasePublishableKey = import.meta.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+const supabaseKey = supabaseAnonKey || supabasePublishableKey;
+const supabaseKeySource = import.meta.env.VITE_SUPABASE_ANON_KEY
+    ? 'VITE_SUPABASE_ANON_KEY'
+    : import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+        ? 'NEXT_PUBLIC_SUPABASE_ANON_KEY'
+        : import.meta.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+            ? 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY'
+            : 'none';
 
 // Validate environment variables
-if (!supabaseUrl || !supabaseAnonKey) {
+if (!supabaseUrl || !supabaseKey) {
     console.error('❌ Missing Supabase environment variables!');
     console.error('VITE_SUPABASE_URL:', import.meta.env.VITE_SUPABASE_URL ? '✓ Set' : '✗ Missing');
     console.error('VITE_SUPABASE_ANON_KEY:', import.meta.env.VITE_SUPABASE_ANON_KEY ? '✓ Set' : '✗ Missing');
@@ -14,8 +23,12 @@ if (!supabaseUrl || !supabaseAnonKey) {
     console.error('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:', import.meta.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ? '✓ Set' : '✗ Missing');
 }
 
+if (supabasePublishableKey && !supabaseAnonKey) {
+    console.warn('⚠️ Using publishable key fallback. For database operations, prefer anon key.');
+}
+
 // Create Supabase client
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(supabaseUrl, supabaseKey, {
     auth: {
         persistSession: true,
         autoRefreshToken: true,
@@ -56,11 +69,13 @@ export const testSupabaseConnection = async () => {
 export const getSupabaseStatus = () => {
     return {
         url: supabaseUrl,
-        configured: !!(supabaseUrl && supabaseAnonKey),
+        keySource: supabaseKeySource,
+        configured: !!(supabaseUrl && supabaseKey),
         client: supabase
     };
 };
 
 console.log('📦 Supabase client module loaded');
 console.log('🔗 Project URL:', supabaseUrl);
-console.log('🔑 API Key configured:', supabaseAnonKey ? '✓ Yes' : '✗ No');
+console.log('🔑 API Key configured:', supabaseKey ? '✓ Yes' : '✗ No');
+console.log('🧭 Supabase key source:', supabaseKeySource);
