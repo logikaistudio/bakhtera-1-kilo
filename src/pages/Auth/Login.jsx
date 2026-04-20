@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { getSupabaseStatus } from '../../lib/supabase';
 import { Eye, EyeOff, LogIn, Lock, User, AlertCircle } from 'lucide-react';
 
 const Login = () => {
@@ -11,6 +12,7 @@ const Login = () => {
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
     const { login } = useAuth();
+    const supabaseStatus = getSupabaseStatus();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -180,6 +182,25 @@ const Login = () => {
                         Lupa password? Hubungi&nbsp;
                         <span className="text-blue-500 font-medium">Super Admin</span>
                     </p>
+
+                    {/* Runtime Supabase status */}
+                    <div className="mt-6 p-4 rounded-xl border border-blue-100 bg-blue-50 text-sm text-blue-700">
+                        <div className="font-semibold mb-2">Status Supabase Runtime</div>
+                        <div className="space-y-1 text-xs">
+                            <div>
+                                <span className="font-medium">Configured:</span>{' '}
+                                {supabaseStatus.configured ? '✔️ Ya' : '⚠️ Tidak'}
+                            </div>
+                            <div>
+                                <span className="font-medium">URL source:</span>{' '}
+                                {supabaseStatus.url ? 'VITE_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_URL' : 'none'}
+                            </div>
+                            <div>
+                                <span className="font-medium">Key source:</span>{' '}
+                                {supabaseStatus.keySource}
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Bottom branding */}

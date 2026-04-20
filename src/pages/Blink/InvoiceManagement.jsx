@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { createInvoiceJournal, createCOGSJournal, getAllCOA, resolveARAccount, resolveRevenueAccount, generateUUID, migrateBlinkFinancialRecords } from '../../utils/journalHelper';
+import { createInvoiceJournal, createCOGSJournal, createARPaymentJournal, getAllCOA, resolveARAccount, resolveRevenueAccount, generateUUID, migrateBlinkFinancialRecords } from '../../utils/journalHelper';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useData } from '../../context/DataContext';
@@ -35,8 +35,8 @@ const InvoiceManagement = () => {
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [showPrintPreview, setShowPrintPreview] = useState(false);
     const [financeMigrationRan, setFinanceMigrationRan] = useState(false);
-    const [showAddItemModal, setShowAddItemModal] = useState(false);
-    const [addItemInvoice, setAddItemInvoice] = useState(null);
+    const [showReimbursementModal, setShowReimbursementModal] = useState(false);
+    const [reimbursementInvoice, setReimbursementInvoice] = useState(null);
     const [previewInvoiceData, setPreviewInvoiceData] = useState(null);
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [selectedQuotation, setSelectedQuotation] = useState(null);
@@ -1245,73 +1245,103 @@ const InvoiceManagement = () => {
         }
     };
 
-    // ── Add Item to Existing Invoice ────────────────────────────────────────────
-    // Works for any status, including paid. After adding, status resets to draft.
-    // Also syncs changes to linked Quotation (service_items) and Shipment (selling_items).
-    const handleAddItemToInvoice = async (invoice, newItems, amendmentNote) => {
+    // ── Create Reimbursement Invoice ───────────────────────────────────────────
+    // Creates separate invoice with -RB suffix linked to original invoice
+    // Blocked if original invoice has partial payments
+    const handleCreateReimbursement = async (invoice, newItems, amendmentNote) => {
         if (!canEdit('blink_invoices')) {
             alert('Anda tidak memiliki hak akses untuk memanipulasi (Edit) invoice.');
             return;
         }
+
+        // Validate: Cannot create reimbursement if invoice has partial payments
+        if (invoice.paid_amount && invoice.paid_amount > 0) {
+            alert('❌ Reimbursement tidak dapat dibuat untuk invoice dengan pembayaran sebagian.\n\nInvoice ini sudah menerima pembayaran. Hubungi finance team untuk adjustment.');
+            return;
+        }
+
         try {
             const taxRate = invoice.tax_rate || 0;
             const discountAmount = invoice.discount_amount || 0;
 
-            // Merge existing + new items
+            // Generate new reimbursement invoice number with -RB suffix
+            const baseInvoiceNumber = invoice.invoice_number;
+            const reimbursementInvoiceNumber = `${baseInvoiceNumber}-RB`;
+
+            // Calculate totals for new items
+            const newItemsSubtotal = newItems.reduce((s, it) => s + (parseFloat(it.amount) || 0), 0);
+            const newItemsTax = newItems.reduce((s, it) => s + (parseFloat(it.tax_amount) || 0), 0);
+
+            // Merge existing + new items (for original invoice notes only)
             const existingItems = invoice.invoice_items || [];
-            // Map legacy items to have tax_amount
-            const processedExisting = existingItems.map(it => ({
-                ...it,
-                tax_amount: typeof it.tax_amount !== 'undefined' ? Number(it.tax_amount) : ((parseFloat(it.amount) || 0) * taxRate / 100)
-            }));
             const processedNew = newItems.map(it => ({
                 ...it,
                 tax_amount: typeof it.tax_amount !== 'undefined' ? Number(it.tax_amount) : ((parseFloat(it.amount) || 0) * taxRate / 100)
             }));
 
-            const mergedItems = [...processedExisting, ...processedNew];
-
-            // Recalculate totals
-            const newSubtotal = mergedItems.reduce((sum, item) => {
-                let itemVal = parseFloat(item.amount) || 0;
-                const itemCurr = item.currency || invoice.currency;
-                if (itemCurr !== invoice.currency) {
-                    if (invoice.currency === 'IDR' && itemCurr !== 'IDR') itemVal *= (invoice.exchange_rate || 16000);
-                    else if (invoice.currency !== 'IDR' && itemCurr === 'IDR') itemVal /= (invoice.exchange_rate || 16000);
-                }
-                return sum + itemVal;
-            }, 0);
-            const newTaxAmount = mergedItems.reduce((sum, item) => {
-                let itemTax = Number(item.tax_amount) || 0;
-                const itemCurr = item.currency || invoice.currency;
-                if (itemCurr !== invoice.currency) {
-                    if (invoice.currency === 'IDR' && itemCurr !== 'IDR') itemTax *= (invoice.exchange_rate || 16000);
-                    else if (invoice.currency !== 'IDR' && itemCurr === 'IDR') itemTax /= (invoice.exchange_rate || 16000);
-                }
-                return sum + itemTax;
-            }, 0);
-            const newTotal = newSubtotal + newTaxAmount - discountAmount;
-
-            // Outstanding = new total minus what's already been paid
-            const alreadyPaid = invoice.paid_amount || 0;
-            const newOutstanding = Math.max(0, newTotal - alreadyPaid);
-
-            // Build amendment notes
+            // Build amendment notes for original invoice
             const timestamp = new Date().toISOString();
             const prevNote = invoice.notes || '';
-            const amendNote = `[AMENDMENT ${timestamp.slice(0, 10)}] ${amendmentNote || 'Item(s) added by user'}. Previous total: ${invoice.total_amount}, New total: ${newTotal}.`;
+            const amendNote = `[REIMBURSEMENT ${timestamp.slice(0, 10)}] ${amendmentNote || 'Reimbursement invoice created'}. See ${reimbursementInvoiceNumber} for additional charges.`;
             const updatedNotes = prevNote ? `${prevNote}\n${amendNote}` : amendNote;
 
-            // ── 1. Update Invoice ──────────────────────────────────────────────
+            // ── 1. Create NEW Reimbursement Invoice ──────────────────────────────
+            const reimbursementData = {
+                job_number: invoice.job_number || '',
+                quotation_id: invoice.quotation_id || null,
+                shipment_id: invoice.shipment_id || null,
+                so_number: invoice.so_number || null,
+                customer_id: invoice.customer_id,
+                customer_name: invoice.customer_name,
+                invoice_number: reimbursementInvoiceNumber,
+                invoice_date: new Date().toISOString().split('T')[0],
+                due_date: invoice.due_date || null,
+                currency: invoice.currency,
+                exchange_rate: invoice.exchange_rate || 1,
+                payment_terms: invoice.payment_terms || 'NET 30',
+                payment_bank_id: invoice.payment_bank_id || null,
+                invoice_items: processedNew,
+                cogs_items: [],
+                subtotal: newItemsSubtotal,
+                tax_amount: newItemsTax,
+                tax_rate: taxRate,
+                discount_amount: 0,
+                total_amount: newItemsSubtotal + newItemsTax,
+                paid_amount: 0,
+                outstanding_amount: newItemsSubtotal + newItemsTax,
+                status: 'draft',
+                is_reimbursement: true,
+                reimbursement_reference_invoice_id: invoice.id,
+                notes: amendmentNote || 'Reimbursement invoice for additional charges',
+                consignor: invoice.consignor || null,
+                consignee: invoice.consignee || null,
+                order_reference: invoice.order_reference || null,
+                goods_description: invoice.goods_description || null,
+                import_broker: invoice.import_broker || null,
+                chargeable_weight: invoice.chargeable_weight || null,
+                packages: invoice.packages || null,
+                vessel_name: invoice.vessel_name || null,
+                voyage_number: invoice.voyage_number || null,
+                ocean_bl: invoice.ocean_bl || null,
+                house_bl: invoice.house_bl || null,
+                etd: invoice.etd || null,
+                eta: invoice.eta || null,
+                containers: invoice.containers || null,
+                created_at: timestamp,
+                updated_at: timestamp,
+            };
+
+            const { data: reimb, error: reimbError } = await supabase
+                .from('blink_invoices')
+                .insert([reimbursementData])
+                .select();
+
+            if (reimbError) throw reimbError;
+
+            // ── 2. Update Original Invoice with Amendment Notes ─────────────────
             const { data, error } = await supabase
                 .from('blink_invoices')
                 .update({
-                    invoice_items: mergedItems,
-                    subtotal: newSubtotal,
-                    tax_amount: newTaxAmount,
-                    total_amount: newTotal,
-                    outstanding_amount: newOutstanding,
-                    status: 'draft',          // Reset to draft — requires re-approval
                     notes: updatedNotes,
                     updated_at: timestamp,
                 })
@@ -1320,112 +1350,16 @@ const InvoiceManagement = () => {
 
             if (error) throw error;
 
-            // ── 2. Update AR outstanding if it exists ──────────────────────────
-            await supabase
-                .from('blink_ar_transactions')
-                .update({
-                    original_amount: newTotal,
-                    outstanding_amount: newOutstanding,
-                    status: newOutstanding <= 0 ? 'paid' : alreadyPaid > 0 ? 'partial' : 'outstanding',
-                })
-                .eq('invoice_id', invoice.id);
-
-            // ── 3. Sync to linked Quotation (service_items + total_amount) ─────
-            // Map invoice items → quotation service_items format
-            const serviceItemsForQuotation = mergedItems.map(item => ({
-                description: item.item_name || item.description || '',
-                item_name: item.item_name || '',
-                qty: parseFloat(item.qty) || 1,
-                unit: item.unit || 'Job',
-                rate: parseFloat(item.rate) || 0,
-                amount: parseFloat(item.amount) || 0,
-                coa_id: item.coa_id || null,
-            }));
-
-            const updatedInvoice = data?.[0] || invoice;
-
-            if (updatedInvoice.quotation_id) {
-                try {
-                    const { error: qError } = await supabase
-                        .from('blink_quotations')
-                        .update({
-                            service_items: serviceItemsForQuotation,
-                            total_amount: newSubtotal, // Quotation uses subtotal (pre-tax)
-                            updated_at: timestamp,
-                        })
-                        .eq('id', updatedInvoice.quotation_id);
-
-                    if (qError) {
-                        console.warn('Quotation sync failed (non-critical):', qError.message);
-                    } else {
-                        console.log('✅ Quotation synced:', updatedInvoice.quotation_id);
-                    }
-                } catch (qErr) {
-                    console.warn('Error syncing to quotation:', qErr.message);
-                }
-            }
-
-            // ── 4. Sync to linked Shipment (selling_items) ─────────────────────
-            if (updatedInvoice.shipment_id) {
-                try {
-                    const { error: sError } = await supabase
-                        .from('blink_shipments')
-                        .update({
-                            selling_items: serviceItemsForQuotation,
-                            updated_at: timestamp,
-                        })
-                        .eq('id', updatedInvoice.shipment_id);
-
-                    if (sError) {
-                        console.warn('Shipment sync failed (non-critical):', sError.message);
-                    } else {
-                        console.log('✅ Shipment selling_items synced:', updatedInvoice.shipment_id);
-                    }
-                } catch (sErr) {
-                    console.warn('Error syncing to shipment:', sErr.message);
-                }
-            }
-
-            // ── 5. Also sync to SO if so_number is available ───────────────────
-            // SO is identified by so_number in blink_sales_orders or similar table
-            if (updatedInvoice.so_number) {
-                try {
-                    const { error: soError } = await supabase
-                        .from('blink_sales_orders')
-                        .update({
-                            order_items: serviceItemsForQuotation,
-                            total_amount: newSubtotal,
-                            updated_at: timestamp,
-                        })
-                        .eq('so_number', updatedInvoice.so_number);
-
-                    if (soError) {
-                        // Table might not exist — that's OK, log and continue
-                        console.warn('SO sync skipped:', soError.message);
-                    } else {
-                        console.log('✅ SO synced:', updatedInvoice.so_number);
-                    }
-                } catch (soErr) {
-                    console.warn('Error syncing to SO:', soErr.message);
-                }
-            }
-
-            const syncedModules = [];
-            if (updatedInvoice.quotation_id) syncedModules.push('Quotation');
-            if (updatedInvoice.shipment_id) syncedModules.push('Shipment');
-            if (updatedInvoice.so_number) syncedModules.push('SO');
-            const syncInfo = syncedModules.length > 0 ? `\n\n📋 Also synced to: ${syncedModules.join(', ')}` : '';
-
-            alert(`✅ Item(s) added successfully!\n\nNew Total: ${formatCurrency(newTotal, invoice.currency)}\nAlready Paid: ${formatCurrency(alreadyPaid, invoice.currency)}\nNew Outstanding: ${formatCurrency(newOutstanding, invoice.currency)}\n\n⚠️ Invoice status reset to Draft — please re-approve.${syncInfo}`);
+            alert(`✅ Reimbursement invoice berhasil dibuat!\n\nOriginal Invoice: ${invoice.invoice_number}\nReimbursement: ${reimbursementInvoiceNumber}\nAmount: ${formatCurrency(newItemsSubtotal + newItemsTax, invoice.currency)}\n\n⚠️ Reimbursement invoice dalam status Draft — silakan review dan approve.`);
 
             await fetchInvoices();
-            setShowAddItemModal(false);
-            setAddItemInvoice(null);
+            setShowReimbursementModal(false);
+            setReimbursementInvoice(null);
             setShowViewModal(false);
             setSelectedInvoice(null);
         } catch (error) {
-            console.error('Error adding item to invoice:', error);
-            alert('Failed to add item: ' + error.message);
+            console.error('Error creating reimbursement:', error);
+            alert('Failed to create reimbursement: ' + error.message);
         }
     };
 
@@ -1770,8 +1704,8 @@ const InvoiceManagement = () => {
                         }}
                         onSubmit={() => handleSubmitInvoice(selectedInvoice)}
                         onAddItem={() => {
-                            setAddItemInvoice(selectedInvoice);
-                            setShowAddItemModal(true);
+                            setReimbursementInvoice(selectedInvoice);
+                            setShowReimbursementModal(true);
                         }}
                         statusConfig={statusConfig}
                         canEditInvoice={canEdit('blink_invoices')}
@@ -1815,18 +1749,18 @@ const InvoiceManagement = () => {
                     />
                 )
             }
-            {/* Add Item to Invoice Modal */}
+            {/* Create Reimbursement Invoice Modal */}
             {
-                showAddItemModal && addItemInvoice && (
-                    <AddItemModal
-                        invoice={addItemInvoice}
+                showReimbursementModal && reimbursementInvoice && (
+                    <ReimbursementModal
+                        invoice={reimbursementInvoice}
                         formatCurrency={formatCurrency}
                         revenueAccounts={revenueAccounts}
                         onClose={() => {
-                            setShowAddItemModal(false);
-                            setAddItemInvoice(null);
+                            setShowReimbursementModal(false);
+                            setReimbursementInvoice(null);
                         }}
-                        onSave={handleAddItemToInvoice}
+                        onSave={handleCreateReimbursement}
                     />
                 )
             }
@@ -2926,15 +2860,20 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                             Close
                         </button>
 
-                        {/* Add Item — always visible, all statuses including paid */}
+                        {/* Create Reimbursement — always visible, but blocked if partial payment exists */}
                         {onAddItem && canEditInvoice && (
                             <button
                                 onClick={onAddItem}
-                                className="flex items-center gap-2 px-4 py-2 border border-yellow-500 text-yellow-400 rounded-lg hover:bg-yellow-500/10 smooth-transition font-semibold"
-                                title="Add new charge item to this invoice (will require re-approval)"
+                                disabled={invoice.paid_amount > 0}
+                                className={`flex items-center gap-2 px-4 py-2 border rounded-lg smooth-transition font-semibold ${
+                                    invoice.paid_amount > 0
+                                        ? 'border-gray-500/40 text-gray-500 cursor-not-allowed opacity-50'
+                                        : 'border-green-500 text-green-400 hover:bg-green-500/10'
+                                }`}
+                                title={invoice.paid_amount > 0 ? "Cannot create reimbursement for partially paid invoice" : "Create reimbursement invoice for additional charges"}
                             >
                                 <Plus className="w-4 h-4" />
-                                Add Item
+                                Create Reimbursement
                             </button>
                         )}
 
@@ -3088,6 +3027,18 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
                 .eq('id', invoice.id);
 
             if (invoiceError) throw invoiceError;
+
+            // CREATE PAYMENT JOURNAL ENTRY
+            try {
+                const journalResult = await createARPaymentJournal(invoice, parseFloat(formData.amount), formData.payment_date, supabase);
+                if (!journalResult.success) {
+                    console.warn('Journal creation warning:', journalResult.message);
+                } else {
+                    console.log('✅ Payment journal created:', journalResult.entryNumber);
+                }
+            } catch (journalError) {
+                console.error('Journal creation failed:', journalError);
+            }
 
             alert(`✅ Payment recorded successfully! Payment Number: ${paymentNumber}`);
             onSuccess();
@@ -3788,10 +3739,10 @@ const ExistingInvoicesIndicator = ({ jobNumber }) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// AddItemModal — Add new charge items to an existing invoice (any status)
-// After saving: invoice resets to 'draft' and requires re-approval
+// ReimbursementModal — Create new reimbursement invoice for additional charges
+// Creates separate invoice with -RB suffix linked to original invoice
 // ─────────────────────────────────────────────────────────────────────────────
-const AddItemModal = ({ invoice, formatCurrency, revenueAccounts, onClose, onSave }) => {
+const ReimbursementModal = ({ invoice, formatCurrency, revenueAccounts, onClose, onSave }) => {
     const emptyItem = () => ({ item_name: '', description: '', qty: 1, unit: 'Job', rate: 0, amount: 0, tax_amount: 0, coa_id: null });
     const [newItems, setNewItems] = useState([emptyItem()]);
     const [amendmentNote, setAmendmentNote] = useState('');
@@ -3844,42 +3795,42 @@ const AddItemModal = ({ invoice, formatCurrency, revenueAccounts, onClose, onSav
                 <div className="flex items-start justify-between mb-5">
                     <div>
                         <h2 className="text-xl font-bold gradient-text flex items-center gap-2">
-                            <Plus className="w-5 h-5 text-yellow-400" />
-                            Add Items to Invoice
+                            <Plus className="w-5 h-5 text-green-400" />
+                            Create Reimbursement Invoice
                         </h2>
                         <p className="text-silver-dark text-sm mt-1">
-                            {invoice.invoice_number} — {invoice.customer_name}
+                            Original: {invoice.invoice_number} — {invoice.customer_name}
                         </p>
                     </div>
-                    {/* Status badge warning */}
+                    {/* Status badge */}
                     <div className="flex flex-col items-end gap-1">
-                        <span className="text-[10px] bg-yellow-500/15 border border-yellow-500/40 text-yellow-400 rounded-full px-2.5 py-0.5 font-semibold uppercase tracking-wider">
-                            ⚠️ Will reset to Draft
+                        <span className="text-[10px] bg-green-500/15 border border-green-500/40 text-green-400 rounded-full px-2.5 py-0.5 font-semibold uppercase tracking-wider">
+                            ✓ New Invoice
                         </span>
-                        <span className="text-[10px] text-silver-dark">Current: <span className="capitalize text-silver-light">{invoice.status}</span></span>
+                        <span className="text-[10px] text-silver-dark">Will use: <span className="text-silver-light font-mono font-bold">{invoice.invoice_number}-RB</span></span>
                     </div>
                 </div>
 
-                {/* Current invoice summary */}
+                {/* Original invoice summary */}
                 <div className="grid grid-cols-3 gap-3 mb-5">
                     {[
-                        { label: 'Current Total', value: formatCurrency(invoice.total_amount, invoice.currency), color: 'text-silver-light' },
-                        { label: 'Already Paid', value: formatCurrency(invoice.paid_amount || 0, invoice.currency), color: 'text-green-400' },
-                        { label: 'Outstanding', value: formatCurrency(invoice.outstanding_amount || 0, invoice.currency), color: invoice.outstanding_amount > 0 ? 'text-yellow-400' : 'text-green-400' },
+                        { label: 'Original Total', value: formatCurrency(invoice.total_amount, invoice.currency), color: 'text-silver-light' },
+                        { label: 'Status', value: invoice.status, color: 'text-silver-light' },
+                        { label: 'Reimbursement Will Link To', value: invoice.invoice_number, color: 'text-blue-400 font-mono font-bold' },
                     ].map(c => (
                         <div key={c.label} className="glass-card p-3 rounded-lg border border-dark-border text-center">
                             <p className="text-[10px] text-silver-dark uppercase tracking-wider">{c.label}</p>
-                            <p className={`text-sm font-bold mt-1 font-mono ${c.color}`}>{c.value}</p>
+                            <p className={`text-sm font-bold mt-1 ${c.color}`}>{c.value}</p>
                         </div>
                     ))}
                 </div>
 
-                {/* New Items Table */}
+                {/* Reimbursement Items Table */}
                 <div className="mb-4">
                     <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-sm font-semibold text-yellow-400">New Items to Add</h3>
+                        <h3 className="text-sm font-semibold text-green-400">Reimbursement Items</h3>
                         <button onClick={addRow}
-                            className="flex items-center gap-1 text-xs text-accent-orange border border-accent-orange/40 px-2.5 py-1 rounded hover:bg-accent-orange/10 smooth-transition">
+                            className="flex items-center gap-1 text-xs text-green-400 border border-green-400/40 px-2.5 py-1 rounded hover:bg-green-400/10 smooth-transition">
                             <Plus className="w-3 h-3" /> Add Row
                         </button>
                     </div>
@@ -3955,37 +3906,35 @@ const AddItemModal = ({ invoice, formatCurrency, revenueAccounts, onClose, onSav
                     </div>
                 </div>
 
-                {/* Amendment Note */}
+                {/* Reimbursement Note */}
                 <div className="mb-5">
-                    <label className="block text-xs text-silver-dark mb-1">Amendment Note (optional)</label>
+                    <label className="block text-xs text-silver-dark mb-1">Reimbursement Note</label>
                     <input value={amendmentNote}
                         onChange={e => setAmendmentNote(e.target.value)}
                         placeholder="e.g. Additional handling charges per customer request..."
-                        className="w-full bg-dark-surface border border-dark-border rounded-lg px-3 py-2 text-silver-light text-sm focus:border-yellow-500/60 outline-none" />
+                        className="w-full bg-dark-surface border border-dark-border rounded-lg px-3 py-2 text-silver-light text-sm focus:border-green-500/60 outline-none" />
                 </div>
 
-                {/* New Total Preview */}
+                {/* Reimbursement Total Preview */}
                 {newItemsSubtotal > 0 && (
-                    <div className="mb-5 glass-card p-4 rounded-lg border border-yellow-500/30 bg-yellow-500/5">
-                        <h3 className="text-xs font-semibold text-yellow-400 mb-3 uppercase tracking-wider">New Totals Preview</h3>
+                    <div className="mb-5 glass-card p-4 rounded-lg border border-green-500/30 bg-green-500/5">
+                        <h3 className="text-xs font-semibold text-green-400 mb-3 uppercase tracking-wider">Reimbursement Invoice Summary</h3>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                             <div>
-                                <p className="text-[10px] text-silver-dark">New Items</p>
-                                <p className="font-mono font-bold text-yellow-400">{formatCurrency(newItemsSubtotal, invoice.currency)}</p>
+                                <p className="text-[10px] text-silver-dark">Reimbursement Items</p>
+                                <p className="font-mono font-bold text-green-400">{formatCurrency(newItemsSubtotal, invoice.currency)}</p>
                             </div>
                             <div>
-                                <p className="text-[10px] text-silver-dark">New Subtotal</p>
-                                <p className="font-mono font-bold text-silver-light">{formatCurrency(preview.subtotal, invoice.currency)}</p>
+                                <p className="text-[10px] text-silver-dark">Tax Amount</p>
+                                <p className="font-mono font-bold text-silver-light">{formatCurrency(preview.tax, invoice.currency)}</p>
                             </div>
                             <div>
-                                <p className="text-[10px] text-silver-dark">New Total (incl. tax)</p>
+                                <p className="text-[10px] text-silver-dark">Total (incl. tax)</p>
                                 <p className="font-mono font-bold text-accent-orange">{formatCurrency(preview.total, invoice.currency)}</p>
                             </div>
                             <div>
-                                <p className="text-[10px] text-silver-dark">New Outstanding</p>
-                                <p className={`font-mono font-bold ${preview.outstanding > 0 ? 'text-yellow-400' : 'text-green-400'}`}>
-                                    {formatCurrency(preview.outstanding, invoice.currency)}
-                                </p>
+                                <p className="text-[10px] text-silver-dark">Invoice Number</p>
+                                <p className="font-mono font-bold text-blue-400">{invoice.invoice_number}-RB</p>
                             </div>
                         </div>
                     </div>
@@ -3998,11 +3947,11 @@ const AddItemModal = ({ invoice, formatCurrency, revenueAccounts, onClose, onSav
                         Cancel
                     </button>
                     <button onClick={handleSave} disabled={saving}
-                        className="flex items-center gap-2 px-6 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg smooth-transition font-semibold disabled:opacity-50">
+                        className="flex items-center gap-2 px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg smooth-transition font-semibold disabled:opacity-50">
                         {saving ? (
-                            <><div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> Saving...</>
+                            <><div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> Creating...</>
                         ) : (
-                            <><Plus className="w-4 h-4" /> Save & Reset to Draft</>
+                            <><Plus className="w-4 h-4" /> Create Reimbursement Invoice</>
                         )}
                     </button>
                 </div>
