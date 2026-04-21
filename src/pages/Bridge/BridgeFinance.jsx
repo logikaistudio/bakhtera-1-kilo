@@ -1,53 +1,112 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { DollarSign, FileText, TrendingUp, TrendingDown, Plus, Edit, Check, X, Trash2 } from 'lucide-react';
-import { useData } from '../../context/DataContext';
+import { DollarSign, FileText, TrendingUp, TrendingDown, Plus, Edit, Check, X, Trash2, BookOpen, BarChart2 } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import Button from '../../components/Common/Button';
-import LineItemManager from '../../components/Common/LineItemManager';
-import ServiceBreakdown from '../../components/Common/ServiceBreakdown';
-import CustomCostsManager from '../../components/Common/CustomCostsManager';
-import QuotationSummary from '../../components/Common/QuotationSummary';
-import POFormModal from '../../components/Finance/POFormModal';
 import { formatCurrency } from '../../utils/currencyFormatter';
 
 const BridgeFinance = () => {
     const location = useLocation();
     const navigate = useNavigate();
-    const {
-        invoices = [],
-        purchases = [],
-        purchaseOrders = [],
-        customers = [],
-        vendors = [],
-        customsDocuments = [],
-        quotations = [],
-        addInvoice,
-        updateInvoice,
-        addPurchase,
-        updatePurchase,
-        addPurchaseOrder,
-        updatePurchaseOrder,
-        deletePurchaseOrder,
-        getApprovedPengajuan,
-        getActiveCustomers,
-        getActiveVendors
-    } = useData();
-
     const { canCreate, canEdit, canDelete } = useAuth();
     const hasCreate = canCreate('bridge_finance');
     const hasEdit = canEdit('bridge_finance');
     const hasDelete = canDelete('bridge_finance');
 
-    const [activeTab, setActiveTab] = useState('invoices');
+    // State for Bridge finance data
+    const [invoices, setInvoices] = useState([]);
+    const [pos, setPOs] = useState([]);
+    const [arTransactions, setArTransactions] = useState([]);
+    const [apTransactions, setApTransactions] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState('overview');
 
     // Sync URL with Tab
     useEffect(() => {
         const path = location.pathname;
-        if (path.includes('/bridge/finance/invoices') || path.includes('/bridge/finance/ar')) {
+        if (path.includes('/bridge/finance/overview')) {
+            setActiveTab('overview');
+        } else if (path.includes('/bridge/finance/invoices')) {
             setActiveTab('invoices');
+        } else if (path.includes('/bridge/finance/ar')) {
+            setActiveTab('ar');
         } else if (path.includes('/bridge/finance/po')) {
             setActiveTab('pos');
+        } else if (path.includes('/bridge/finance/ap')) {
+            setActiveTab('ap');
+        } else if (path.includes('/bridge/finance/reports')) {
+            setActiveTab('reports');
+        } else if (path.includes('/bridge/finance/ledger')) {
+            setActiveTab('ledger');
+        }
+    }, [location.pathname]);
+
+    // Fetch Bridge finance data
+    useEffect(() => {
+        fetchFinanceData();
+    }, []);
+
+    const fetchFinanceData = async () => {
+        try {
+            setLoading(true);
+
+            // Fetch Bridge invoices
+            const { data: invoiceData, error: invoiceError } = await supabase
+                .from('bridge_invoices')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (invoiceError) throw invoiceError;
+
+            // Fetch Bridge POs
+            const { data: poData, error: poError } = await supabase
+                .from('bridge_pos')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (poError) throw poError;
+
+            // Fetch Bridge AR transactions
+            const { data: arData, error: arError } = await supabase
+                .from('bridge_ar_transactions')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (arError) throw arError;
+
+            // Fetch Bridge AP transactions
+            const { data: apData, error: apError } = await supabase
+                .from('bridge_ap_transactions')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (apError) throw apError;
+
+            setInvoices(invoiceData || []);
+            setPOs(poData || []);
+            setArTransactions(arData || []);
+            setApTransactions(apData || []);
+        } catch (error) {
+            console.error('Error fetching Bridge finance data:', error);
+            alert('Failed to load finance data: ' + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleTabChange = (tab) => {
+        setActiveTab(tab);
+        let path = '/bridge/finance';
+        if (tab === 'overview') path += '/overview';
+        else if (tab === 'invoices') path += '/invoices';
+        else if (tab === 'ar') path += '/ar';
+        else if (tab === 'pos') path += '/po';
+        else if (tab === 'ap') path += '/ap';
+        else if (tab === 'reports') path += '/reports';
+        else if (tab === 'ledger') path += '/ledger';
+        navigate(path);
+    };
         } else if (path.includes('/bridge/finance/ap')) { // Assuming AP maps to purchases
             setActiveTab('purchases');
         }
