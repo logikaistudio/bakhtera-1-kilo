@@ -21,6 +21,16 @@ const BridgeFinance = () => {
     const [apTransactions, setApTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('overview');
+    const [showInvoiceForm, setShowInvoiceForm] = useState(false);
+    const [showPurchaseForm, setShowPurchaseForm] = useState(false);
+    const [showPOForm, setShowPOForm] = useState(false);
+    const [editingInvoice, setEditingInvoice] = useState(null);
+    const [editingPurchase, setEditingPurchase] = useState(null);
+    const [selectedInvoice, setSelectedInvoice] = useState(null);
+    const [selectedPurchase, setSelectedPurchase] = useState(null);
+
+    // Alias for convenience
+    const purchases = apTransactions;
 
     // Sync URL with Tab
     useEffect(() => {
@@ -107,26 +117,6 @@ const BridgeFinance = () => {
         else if (tab === 'ledger') path += '/ledger';
         navigate(path);
     };
-        } else if (path.includes('/bridge/finance/ap')) { // Assuming AP maps to purchases
-            setActiveTab('purchases');
-        }
-    }, [location.pathname]);
-
-    const handleTabChange = (tab) => {
-        setActiveTab(tab);
-        let path = '/bridge/finance';
-        if (tab === 'invoices') path += '/invoices';
-        else if (tab === 'pos') path += '/po';
-        else if (tab === 'purchases') path += '/ap'; // Using AP route for purchases tab logic
-        navigate(path);
-    };
-    const [showInvoiceForm, setShowInvoiceForm] = useState(false);
-    const [showPurchaseForm, setShowPurchaseForm] = useState(false);
-    const [showPOForm, setShowPOForm] = useState(false);
-    const [editingInvoice, setEditingInvoice] = useState(null);
-    const [editingPurchase, setEditingPurchase] = useState(null);
-    const [selectedInvoice, setSelectedInvoice] = useState(null);
-    const [selectedPurchase, setSelectedPurchase] = useState(null);
 
     // Calculate summary
     const totalInvoices = invoices.reduce((sum, inv) => sum + (inv.grandTotal || 0), 0);
