@@ -1373,9 +1373,9 @@ const InvoiceManagement = () => {
 
         if (!matchesSearch) return false;
 
-        // Default: hide draft and manager_approval unless explicitly filtered
+        // Default: hide cancelled unless explicitly filtered
         if (filter === 'all') {
-            return !['draft', 'manager_approval', 'cancelled'].includes(inv.status);
+            return inv.status !== 'cancelled';
         }
 
         // Status filter
