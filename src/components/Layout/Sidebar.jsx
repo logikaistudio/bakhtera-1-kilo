@@ -169,19 +169,19 @@ const Sidebar = () => {
             type: 'category', label: '💰 Finance', items: [
                 // Transaksi
                 { type: 'divider', label: '📋 Transaksi' },
-                { path: '/bridge/finance/invoices', label: 'Invoice', menuCode: 'bridge_finance' },
-                { path: '/bridge/finance/po', label: 'Purchase Order', menuCode: 'bridge_finance' },
-                { path: '/bridge/finance/ar', label: 'Account Receivable (AR)', menuCode: 'bridge_finance' },
-                { path: '/bridge/finance/ap', label: 'Account Payable (AP)', menuCode: 'bridge_finance' },
+                { path: '/bridge/finance/invoices', label: 'Invoice', menuCode: 'bridge_finance', indent: true },
+                { path: '/bridge/finance/po', label: 'Purchase Order', menuCode: 'bridge_finance', indent: true },
+                { path: '/bridge/finance/ar', label: 'Account Receivable (AR)', menuCode: 'bridge_finance', indent: true },
+                { path: '/bridge/finance/ap', label: 'Account Payable (AP)', menuCode: 'bridge_finance', indent: true },
                 // Pencatatan
                 { type: 'divider', label: '📝 Pencatatan' },
-                { path: '/bridge/finance/general-journal', label: 'General Jurnal', menuCode: 'bridge_finance' },
-                { path: '/bridge/finance/general-ledger', label: 'General Ledger', menuCode: 'bridge_finance' },
+                { path: '/bridge/finance/general-journal', label: 'General Jurnal', menuCode: 'bridge_finance', indent: true },
+                { path: '/bridge/finance/general-ledger', label: 'General Ledger', menuCode: 'bridge_finance', indent: true },
                 // Laporan
                 { type: 'divider', label: '📊 Laporan' },
-                { path: '/bridge/finance/trial-balance', label: 'Trial Balance', menuCode: 'bridge_finance' },
-                { path: '/bridge/finance/profit-loss', label: 'Profit & Loss', menuCode: 'bridge_finance' },
-                { path: '/bridge/finance/balance-sheet', label: 'Balance Sheet', menuCode: 'bridge_finance' },
+                { path: '/bridge/finance/trial-balance', label: 'Trial Balance', menuCode: 'bridge_finance', indent: true },
+                { path: '/bridge/finance/profit-loss', label: 'Profit & Loss', menuCode: 'bridge_finance', indent: true },
+                { path: '/bridge/finance/balance-sheet', label: 'Balance Sheet', menuCode: 'bridge_finance', indent: true },
             ]
         },
 
@@ -839,7 +839,7 @@ const Sidebar = () => {
                                                                                             key={itemObj.path}
                                                                                             to={itemObj.path}
                                                                                             onClick={() => isMobile && setIsOpen(false)}
-                                                                                            className={`flex items-center pl-12 pr-4 py-1.5 text-sm smooth-transition border-l-2 ml-4 ${isActive(itemObj.path)
+                                                                                            className={`flex items-center ${itemObj.indent ? 'pl-16' : 'pl-12'} pr-4 py-1.5 text-sm smooth-transition border-l-2 ml-4 ${isActive(itemObj.path)
                                                                                                 ? 'bg-white/20 text-white font-medium border-white sidebar-active-item'
                                                                                                 : 'text-silver-dark hover:text-white hover:bg-white/10 border-transparent hover:border-white/50'
                                                                                                 }`}
