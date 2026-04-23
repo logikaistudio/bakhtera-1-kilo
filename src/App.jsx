@@ -89,9 +89,16 @@ import BridgeCompanySettings from './pages/Bridge/CompanySettings'; // New
 import BigDashboard from './pages/Big/BigDashboard';
 import EventManagement from './pages/Big/Operations/EventManagement';
 import BigQuotations from './pages/Big/Sales/Quotations';
-import BigInvoices from './pages/Big/Finance/Invoices';
 import BigCosts from './pages/Big/Operations/EventCosts';
-import BigAR from './pages/Big/Finance/AccountsReceivable';
+import BigInvoices from './pages/Big/Finance/BigInvoiceManagement';
+import BigPurchaseOrder from './pages/Big/Finance/BigPurchaseOrder';
+import BigAR from './pages/Big/Finance/BigAccountsReceivable';
+import BigAP from './pages/Big/Finance/BigAccountsPayable';
+import BigGeneralJournal from './pages/Big/Finance/BigGeneralJournal';
+import BigGeneralLedger from './pages/Big/Finance/BigGeneralLedger';
+import BigTrialBalance from './pages/Big/Finance/BigTrialBalance';
+import BigProfitLoss from './pages/Big/Finance/BigProfitLoss';
+import BigBalanceSheet from './pages/Big/Finance/BigBalanceSheet';
 import BigCompanySettings from './pages/Big/CompanySettings'; // New
 
 // Pabean Module
@@ -230,11 +237,18 @@ function App() {
                     <Route path="/big/costs" element={<ProtectedRoute menuCode="big_costs"><BigCosts /></ProtectedRoute>} />
                     <Route path="/big/operations/costs" element={<ProtectedRoute menuCode="big_costs"><BigCosts /></ProtectedRoute>} />
 
-                    {/* Finance */}
-                    <Route path="/big/invoices" element={<ProtectedRoute menuCode="big_invoices"><BigInvoices /></ProtectedRoute>} />
-                    <Route path="/big/finance/invoices" element={<ProtectedRoute menuCode="big_invoices"><BigInvoices /></ProtectedRoute>} />
-                    <Route path="/big/ar" element={<ProtectedRoute menuCode="big_ar"><BigAR /></ProtectedRoute>} />
-                    <Route path="/big/finance/ar" element={<ProtectedRoute menuCode="big_ar"><BigAR /></ProtectedRoute>} />
+                    {/* Big Finance — Transaksi */}
+                    <Route path="/big/finance/invoices" element={<ProtectedRoute menuCode="big_finance"><BigInvoices /></ProtectedRoute>} />
+                    <Route path="/big/finance/po" element={<ProtectedRoute menuCode="big_finance"><BigPurchaseOrder /></ProtectedRoute>} />
+                    <Route path="/big/finance/ar" element={<ProtectedRoute menuCode="big_finance"><BigAR /></ProtectedRoute>} />
+                    <Route path="/big/finance/ap" element={<ProtectedRoute menuCode="big_finance"><BigAP /></ProtectedRoute>} />
+                    {/* Big Finance — Pencatatan */}
+                    <Route path="/big/finance/general-journal" element={<ProtectedRoute menuCode="big_finance"><BigGeneralJournal /></ProtectedRoute>} />
+                    <Route path="/big/finance/general-ledger" element={<ProtectedRoute menuCode="big_finance"><BigGeneralLedger /></ProtectedRoute>} />
+                    {/* Big Finance — Laporan */}
+                    <Route path="/big/finance/trial-balance" element={<ProtectedRoute menuCode="big_finance"><BigTrialBalance /></ProtectedRoute>} />
+                    <Route path="/big/finance/profit-loss" element={<ProtectedRoute menuCode="big_finance"><BigProfitLoss /></ProtectedRoute>} />
+                    <Route path="/big/finance/balance-sheet" element={<ProtectedRoute menuCode="big_finance"><BigBalanceSheet /></ProtectedRoute>} />
 
                     {/* Pabean Module */}
                     <Route path="/bridge/pabean" element={<ProtectedRoute menuCode="bridge_pabean"><PabeanDashboard /></ProtectedRoute>} />

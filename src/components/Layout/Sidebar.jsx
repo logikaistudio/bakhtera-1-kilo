@@ -237,8 +237,21 @@ const Sidebar = () => {
         // Finance Category
         {
             type: 'category', label: '💰 Finance', items: [
-                { path: '/big/finance/invoices', label: 'Invoice', menuCode: 'big_invoices' },
-                { path: '/big/finance/ar', label: 'Piutang (AR)', menuCode: 'big_ar' },
+                // Transaksi
+                { type: 'divider', label: '📋 Transaksi' },
+                { path: '/big/finance/invoices', label: 'Invoice', menuCode: 'big_finance', indent: true },
+                { path: '/big/finance/po', label: 'Purchase Order', menuCode: 'big_finance', indent: true },
+                { path: '/big/finance/ar', label: 'Account Receivable (AR)', menuCode: 'big_finance', indent: true },
+                { path: '/big/finance/ap', label: 'Account Payable (AP)', menuCode: 'big_finance', indent: true },
+                // Pencatatan
+                { type: 'divider', label: '📝 Pencatatan' },
+                { path: '/big/finance/general-journal', label: 'General Jurnal', menuCode: 'big_finance', indent: true },
+                { path: '/big/finance/general-ledger', label: 'General Ledger', menuCode: 'big_finance', indent: true },
+                // Laporan
+                { type: 'divider', label: '📊 Laporan' },
+                { path: '/big/finance/trial-balance', label: 'Trial Balance', menuCode: 'big_finance', indent: true },
+                { path: '/big/finance/profit-loss', label: 'Profit & Loss', menuCode: 'big_finance', indent: true },
+                { path: '/big/finance/balance-sheet', label: 'Balance Sheet', menuCode: 'big_finance', indent: true },
             ]
         },
 
