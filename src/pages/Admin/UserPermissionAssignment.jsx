@@ -67,30 +67,51 @@ const UserPermissionAssignment = () => {
     // Load roles dari tabel role_permissions + super_admin
     const loadRoles = async () => {
         try {
+            // ✅ Fixed: Use simpler query and explicit deduplication
             const { data, error } = await supabase
                 .from('role_permissions')
-                .select('role_id, role_label');
+                .select('role_id, role_label')
+                .order('role_id');
 
+            if (error) {
+                console.error('❌ loadRoles query error:', error);
+                throw error;
+            }
+
+            // ✅ Deduplicate by role_id
             const roleMap = new Map();
             roleMap.set('super_admin', 'Super Admin');
-            (data || []).forEach(d => {
-                if (!roleMap.has(d.role_id)) {
-                    roleMap.set(d.role_id, d.role_label || d.role_id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()));
-                }
+            
+            if (data && Array.isArray(data)) {
+                data.forEach(d => {
+                    if (!roleMap.has(d.role_id) && d.role_id) {
+                        const label = d.role_label?.trim() || d.role_id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                        roleMap.set(d.role_id, label);
+                    }
+                });
+            }
+
+            const rolesArray = Array.from(roleMap, ([id, label]) => ({ id, label })).sort((a, b) => {
+                if (a.id === 'super_admin') return -1;
+                if (b.id === 'super_admin') return 1;
+                return a.label.localeCompare(b.label);
             });
 
-            setRoles(Array.from(roleMap, ([id, label]) => ({ id, label })));
+            setRoles(rolesArray);
+            console.log('✅ Roles loaded in UserPermissionAssignment:', rolesArray);
         } catch (err) {
-            console.warn('loadRoles error:', err);
-            // Fallback
-            setRoles([
+            console.error('❌ loadRoles error:', err.message);
+            // ✅ Fixed: Use fallback with console warning
+            const defaultRoles = [
                 { id: 'super_admin', label: 'Super Admin' },
                 { id: 'direksi', label: 'Direksi' },
                 { id: 'chief', label: 'Chief' },
                 { id: 'manager', label: 'Manager' },
                 { id: 'staff', label: 'Staff' },
                 { id: 'viewer', label: 'Viewer' },
-            ]);
+            ];
+            setRoles(defaultRoles);
+            console.warn('⚠️  Using fallback roles due to error:', err.message);
         }
     };
 

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 import {
     Shield, Plus, Save, AlertCircle, CheckCircle2, Trash2, X, Edit2,
     ChevronDown, ChevronRight, Check, Minus, Plane, Building2, Calendar, Layers,
-    RefreshCw, Database
+    RefreshCw, Database, Info
 } from 'lucide-react';
 import { APP_MENUS } from '../../config/menuConfig';
 
@@ -67,6 +68,7 @@ const DEFAULT_ROLES = [
 ];
 
 const RolePermissions = () => {
+    const { refreshPermissions } = useAuth();
     const [roles, setRoles] = useState(DEFAULT_ROLES);
     const [permissions, setPermissions] = useState({});
     const [activeModule, setActiveModule] = useState('Bridge');
@@ -265,8 +267,9 @@ const RolePermissions = () => {
             // Reload agar tampilan di-update
             await loadPermissions();
         } catch (err) {
-            console.error('Sync error:', err);
-            setNotification({ type: 'error', message: 'Gagal sync: ' + err.message });
+            console.error('❌ Sync error:', err);
+            // ✅ Fixed: Show actual error message
+            setNotification({ type: 'error', message: `Gagal sync menu: ${err.message || 'Unknown error'}` });
         } finally {
             setSaving(false);
             setTimeout(() => setNotification(null), 5000);
@@ -306,13 +309,15 @@ const RolePermissions = () => {
                 if (error) throw error;
             }
 
-            setNotification({ type: 'success', message: `Pengaturan role berhasil disimpan! (${rows.length} entri)` });
+            setNotification({ type: 'success', message: `✅ Pengaturan role berhasil disimpan! (${rows.length} entri) — User yang sedang login perlu logout & login ulang agar perubahan berlaku.` });
+            // Refresh permissions untuk admin yang sedang login
+            await refreshPermissions();
         } catch (err) {
-            console.error('Save error:', err);
-            setNotification({ type: 'error', message: 'Gagal menyimpan: ' + err.message });
+            console.error('❌ Save error:', err);
+            setNotification({ type: 'error', message: `Gagal menyimpan pengaturan: ${err.message || 'Unknown error'}` });
         } finally {
             setSaving(false);
-            setTimeout(() => setNotification(null), 4000);
+            setTimeout(() => setNotification(null), 6000);
         }
     };
 
@@ -350,8 +355,12 @@ const RolePermissions = () => {
             if (error) throw error;
             setNotification({ type: 'success', message: `Role "${trimmed}" berhasil ditambahkan & disimpan!` });
         } catch (err) {
-            setNotification({ type: 'success', message: `Role "${trimmed}" ditambahkan (belum tersimpan ke DB — klik Simpan).` });
-            console.warn('addRole DB error:', err.message);
+            console.error('❌ addRole DB error:', err);
+            // ✅ Fixed: Show error notification with actual error message
+            setNotification({ 
+                type: 'error', 
+                message: `Gagal menyimpan role "${trimmed}": ${err.message || 'Unknown error'}` 
+            });
         }
         setTimeout(() => setNotification(null), 4000);
     };
@@ -375,8 +384,9 @@ const RolePermissions = () => {
             if (error) throw error;
             setNotification({ type: 'success', message: `Role "${roleName}" berhasil dihapus.` });
         } catch (err) {
-            console.warn('deleteRole DB error:', err.message);
-            setNotification({ type: 'success', message: `Role "${roleName}" dihapus dari tampilan.` });
+            console.error('❌ deleteRole DB error:', err);
+            // ✅ Fixed: Show error instead of success
+            setNotification({ type: 'error', message: `Gagal menghapus role: ${err.message || 'Unknown error'}` });
         }
         setTimeout(() => setNotification(null), 3000);
     };
@@ -414,8 +424,9 @@ const RolePermissions = () => {
             if (error) throw error;
             setNotification({ type: 'success', message: `Role diubah menjadi "${trimmed}"` });
         } catch (err) {
-            console.warn('editRole DB error:', err.message);
-            setNotification({ type: 'error', message: 'Gagal mengubah nama role: ' + err.message });
+            console.error('❌ editRole DB error:', err);
+            // ✅ Fixed: Show error instead of success
+            setNotification({ type: 'error', message: `Gagal mengubah nama role: ${err.message || 'Unknown error'}` });
         }
 
         cancelEditRole();

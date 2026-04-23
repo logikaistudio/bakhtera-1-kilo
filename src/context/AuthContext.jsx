@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import { login as loginService, logout as logoutService, validateSession } from '../services/authService';
+import { login as loginService, logout as logoutService, validateSession, getUserPermissions } from '../services/authService';
 
 /**
  * Auth Context
@@ -82,6 +82,21 @@ export const AuthProvider = ({ children }) => {
             localStorage.removeItem('sessionToken');
         } catch (error) {
             console.error('Logout error:', error);
+        }
+    };
+
+    /**
+     * Refresh permissions only (tanpa re-login)
+     * Dipanggil setelah admin mengubah role permissions di Role Management
+     */
+    const refreshPermissions = async () => {
+        try {
+            if (!user) return;
+            const newPerms = await getUserPermissions(user.id, user.user_level);
+            setPermissions(newPerms);
+            console.log('[Auth] Permissions refreshed for:', user.user_level);
+        } catch (error) {
+            console.error('Error refreshing permissions:', error);
         }
     };
 
@@ -216,6 +231,7 @@ export const AuthProvider = ({ children }) => {
         login,
         logout,
         refreshSession,
+        refreshPermissions,
         isAuthenticated,
         isSuperAdmin,
         isAdmin,

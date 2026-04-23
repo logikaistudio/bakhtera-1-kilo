@@ -21,6 +21,16 @@ const ROLE_COLORS = {
     viewer: { bg: '#f9fafb', text: '#6b7280', border: '#e5e7eb' },
 };
 
+// Default roles sebagai fallback — selalu tersedia
+const FALLBACK_ROLES = [
+    { id: 'super_admin', label: 'Super Admin' },
+    { id: 'direksi',     label: 'Direksi' },
+    { id: 'chief',       label: 'Chief' },
+    { id: 'manager',     label: 'Manager' },
+    { id: 'staff',       label: 'Staff' },
+    { id: 'viewer',      label: 'Viewer' },
+];
+
 const getDefaultColor = () => ({ bg: '#f0f9ff', text: '#0284c7', border: '#bae6fd' });
 
 const UserManagement = () => {
@@ -51,47 +61,57 @@ const UserManagement = () => {
     // Load roles dari tabel role_permissions + tambahkan super_admin
     const loadRoles = async () => {
         try {
-            // Query yang lebih optimal: ambil distinct role_id dan ambil role_label terbaru
             const { data, error } = await supabase
                 .from('role_permissions')
                 .select('role_id, role_label')
-                .order('role_id')
-                .order('created_at', { ascending: false });
+                .order('role_id');
 
             if (error) {
-                console.warn('Could not load roles:', error.message);
-                // Fallback ke default
-                setAvailableRoles([
-                    { id: 'super_admin', label: 'Super Admin' },
-                    { id: 'direksi', label: 'Direksi' },
-                    { id: 'chief', label: 'Chief' },
-                    { id: 'manager', label: 'Manager' },
-                    { id: 'staff', label: 'Staff' },
-                    { id: 'viewer', label: 'Viewer' },
-                ]);
+                console.warn('⚠️ loadRoles query error (using fallback):', error.message);
+                // Jika error (mis. RLS belum di-fix), gunakan fallback
+                setAvailableRoles(FALLBACK_ROLES);
                 return;
             }
 
-            // Deduplicate role_id dengan mengambil entry pertama (paling baru karena di-sort)
+            // Deduplicate by role_id — satu role bisa punya banyak menu_code
             const roleMap = new Map();
-            roleMap.set('super_admin', 'Super Admin'); // selalu ada
-            
-            (data || []).forEach(d => {
-                if (!roleMap.has(d.role_id)) {
-                    const label = d.role_label?.trim() || d.role_id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                    roleMap.set(d.role_id, label);
-                }
-            });
+
+            // Selalu masukkan default roles terlebih dulu
+            FALLBACK_ROLES.forEach(r => roleMap.set(r.id, r.label));
+
+            // Override/tambah dengan data dari DB (termasuk custom roles)
+            if (data && Array.isArray(data)) {
+                data.forEach(d => {
+                    if (d.role_id) {
+                        const label = d.role_label?.trim() ||
+                            d.role_id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                        // Hanya update label jika belum ada atau kosong
+                        if (!roleMap.has(d.role_id) || label !== d.role_id) {
+                            roleMap.set(d.role_id, label);
+                        }
+                    }
+                });
+            }
 
             const roles = Array.from(roleMap, ([id, label]) => ({ id, label })).sort((a, b) => {
-                // Sort: super_admin pertama, kemudian yang lain
                 if (a.id === 'super_admin') return -1;
                 if (b.id === 'super_admin') return 1;
+                // Urutkan default roles di atas custom roles
+                const defaultOrder = ['direksi', 'chief', 'manager', 'staff', 'viewer'];
+                const aIdx = defaultOrder.indexOf(a.id);
+                const bIdx = defaultOrder.indexOf(b.id);
+                if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+                if (aIdx !== -1) return -1;
+                if (bIdx !== -1) return 1;
                 return a.label.localeCompare(b.label);
             });
+
             setAvailableRoles(roles);
+            console.log('✅ Roles loaded:', roles.length, 'roles');
         } catch (err) {
-            console.warn('loadRoles error:', err.message);
+            console.error('❌ loadRoles error:', err.message);
+            // Selalu tampilkan fallback agar dropdown tidak pernah kosong
+            setAvailableRoles(FALLBACK_ROLES);
         }
     };
 
