@@ -167,10 +167,21 @@ const Sidebar = () => {
         // Finance Category
         {
             type: 'category', label: '💰 Finance', items: [
+                // Transaksi
+                { type: 'divider', label: '📋 Transaksi' },
                 { path: '/bridge/finance/invoices', label: 'Invoice', menuCode: 'bridge_finance' },
-                { path: '/bridge/finance/po', label: 'PO', menuCode: 'bridge_finance' },
-                { path: '/bridge/finance/ar', label: 'AR', menuCode: 'bridge_finance' },
-                { path: '/bridge/finance/ap', label: 'AP', menuCode: 'bridge_finance' },
+                { path: '/bridge/finance/po', label: 'Purchase Order', menuCode: 'bridge_finance' },
+                { path: '/bridge/finance/ar', label: 'Account Receivable (AR)', menuCode: 'bridge_finance' },
+                { path: '/bridge/finance/ap', label: 'Account Payable (AP)', menuCode: 'bridge_finance' },
+                // Pencatatan
+                { type: 'divider', label: '📝 Pencatatan' },
+                { path: '/bridge/finance/general-journal', label: 'General Jurnal', menuCode: 'bridge_finance' },
+                { path: '/bridge/finance/general-ledger', label: 'General Ledger', menuCode: 'bridge_finance' },
+                // Laporan
+                { type: 'divider', label: '📊 Laporan' },
+                { path: '/bridge/finance/trial-balance', label: 'Trial Balance', menuCode: 'bridge_finance' },
+                { path: '/bridge/finance/profit-loss', label: 'Profit & Loss', menuCode: 'bridge_finance' },
+                { path: '/bridge/finance/balance-sheet', label: 'Balance Sheet', menuCode: 'bridge_finance' },
             ]
         },
 

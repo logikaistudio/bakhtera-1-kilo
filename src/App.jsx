@@ -66,6 +66,15 @@ import PengajuanManagement from './pages/Bridge/PengajuanManagement';
 import AtaCarnet from './pages/Bridge/AtaCarnet';
 import AssetInventory from './pages/Bridge/AssetInventory';
 import BridgeFinance from './pages/Bridge/BridgeFinance';
+import BridgeInvoiceManagement from './pages/Bridge/BridgeInvoiceManagement';
+import BridgePurchaseOrder from './pages/Bridge/BridgePurchaseOrder';
+import BridgeAccountsReceivable from './pages/Bridge/BridgeAccountsReceivable';
+import BridgeAccountsPayable from './pages/Bridge/BridgeAccountsPayable';
+import BridgeGeneralJournal from './pages/Bridge/BridgeGeneralJournal';
+import BridgeGeneralLedger from './pages/Bridge/BridgeGeneralLedger';
+import BridgeTrialBalance from './pages/Bridge/BridgeTrialBalance';
+import BridgeProfitLoss from './pages/Bridge/BridgeProfitLoss';
+import BridgeBalanceSheet from './pages/Bridge/BridgeBalanceSheet';
 import GoodsMovement from './pages/Bridge/GoodsMovement';
 import WarehouseInventory from './pages/Bridge/WarehouseInventory';
 import OutboundInventory from './pages/Bridge/OutboundInventory';
@@ -182,7 +191,19 @@ function App() {
                     <Route path="/bridge/pengajuan" element={<ProtectedRoute menuCode="bridge_pengajuan"><PengajuanManagement /></ProtectedRoute>} />
                     <Route path="/bridge/ata-carnet" element={<ProtectedRoute menuCode="bridge_ata_carnet"><AtaCarnet /></ProtectedRoute>} />
                     <Route path="/bridge/asset-inventory" element={<ProtectedRoute menuCode="bridge_asset_inventory"><AssetInventory /></ProtectedRoute>} />
-                    <Route path="/bridge/finance/*" element={<ProtectedRoute menuCode="bridge_finance"><BridgeFinance /></ProtectedRoute>} />
+                    {/* Bridge Finance — Transaksi */}
+                    <Route path="/bridge/finance" element={<ProtectedRoute menuCode="bridge_finance"><BridgeFinance /></ProtectedRoute>} />
+                    <Route path="/bridge/finance/invoices" element={<ProtectedRoute menuCode="bridge_finance"><BridgeInvoiceManagement /></ProtectedRoute>} />
+                    <Route path="/bridge/finance/po" element={<ProtectedRoute menuCode="bridge_finance"><BridgePurchaseOrder /></ProtectedRoute>} />
+                    <Route path="/bridge/finance/ar" element={<ProtectedRoute menuCode="bridge_finance"><BridgeAccountsReceivable /></ProtectedRoute>} />
+                    <Route path="/bridge/finance/ap" element={<ProtectedRoute menuCode="bridge_finance"><BridgeAccountsPayable /></ProtectedRoute>} />
+                    {/* Bridge Finance — Pencatatan */}
+                    <Route path="/bridge/finance/general-journal" element={<ProtectedRoute menuCode="bridge_finance"><BridgeGeneralJournal /></ProtectedRoute>} />
+                    <Route path="/bridge/finance/general-ledger" element={<ProtectedRoute menuCode="bridge_finance"><BridgeGeneralLedger /></ProtectedRoute>} />
+                    {/* Bridge Finance — Laporan */}
+                    <Route path="/bridge/finance/trial-balance" element={<ProtectedRoute menuCode="bridge_finance"><BridgeTrialBalance /></ProtectedRoute>} />
+                    <Route path="/bridge/finance/profit-loss" element={<ProtectedRoute menuCode="bridge_finance"><BridgeProfitLoss /></ProtectedRoute>} />
+                    <Route path="/bridge/finance/balance-sheet" element={<ProtectedRoute menuCode="bridge_finance"><BridgeBalanceSheet /></ProtectedRoute>} />
                     <Route path="/bridge/goods-movement" element={<ProtectedRoute menuCode="bridge_movement"><GoodsMovement /></ProtectedRoute>} />
                     <Route path="/bridge/inventory" element={<ProtectedRoute menuCode="bridge_inventory"><WarehouseInventory /></ProtectedRoute>} />
                     <Route path="/bridge/outbound-inventory" element={<ProtectedRoute menuCode="bridge_outbound"><OutboundInventory /></ProtectedRoute>} />

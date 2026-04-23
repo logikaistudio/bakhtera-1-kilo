@@ -1,499 +1,443 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 import Button from '../../components/Common/Button';
+import Modal from '../../components/Common/Modal';
 import {
-    DollarSign, TrendingUp, TrendingDown, AlertTriangle,
-    Download, Calendar, FileText, Users, Package, X, ExternalLink, Activity, Plus, Search
+    DollarSign, TrendingUp, AlertTriangle, Clock, Search,
+    Download, CheckCircle, AlertCircle, CreditCard, History, X
 } from 'lucide-react';
 
-const BridgeAccountsReceivable = () => {
-    const [invoices, setInvoices] = useState([]);
-    const [arTransactions, setArTransactions] = useState([]);
-    const [customers, setCustomers] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [statusFilter, setStatusFilter] = useState('all');
-    const [showPaymentModal, setShowPaymentModal] = useState(false);
-    const [selectedInvoice, setSelectedInvoice] = useState(null);
-    const [paymentAmount, setPaymentAmount] = useState('');
-    const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
-    const [paymentMethod, setPaymentMethod] = useState('bank_transfer');
+const fmtIDR = (v, cur = 'IDR') => {
+    if (v == null) return '-';
+    return cur === 'USD' ? `$${Number(v).toLocaleString('id-ID')}` : `Rp ${Number(v).toLocaleString('id-ID')}`;
+};
+
+const calcAging = (dueDate) => {
+    const days = Math.floor((new Date() - new Date(dueDate)) / 86400000);
+    if (days < 0) return '0-30';
+    if (days <= 30) return '0-30';
+    if (days <= 60) return '31-60';
+    if (days <= 90) return '61-90';
+    return '90+';
+};
+
+const deriveStatus = (paid, total, due) => {
+    if (paid >= total) return 'paid';
+    if (paid > 0) return 'partial';
+    return new Date() > new Date(due) ? 'overdue' : 'current';
+};
+
+const STATUS_STYLE = {
+    paid:    'bg-green-500/20 text-green-400',
+    partial: 'bg-yellow-500/20 text-yellow-400',
+    overdue: 'bg-red-500/20 text-red-400',
+    current: 'bg-blue-500/20 text-blue-400',
+};
+
+// ─── Payment Modal ────────────────────────────────────────────────────────────
+const PaymentModal = ({ ar, onClose, onSuccess }) => {
+    const [form, setForm] = useState({
+        payment_date: new Date().toISOString().split('T')[0],
+        amount: ar.outstanding_amount || 0,
+        payment_method: 'bank_transfer',
+        reference_number: '',
+        ar_coa_id: '',
+        notes: '',
+    });
+    const [bankAccounts, setBankAccounts] = useState([]);
+    const [arAccounts, setArAccounts] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [success, setSuccess] = useState(null);
 
     useEffect(() => {
-        fetchData();
+        const load = async () => {
+            const [{ data: banks }, { data: coa }] = await Promise.all([
+                supabase.from('company_bank_accounts').select('*').order('display_order'),
+                supabase.from('bridge_coa').select('*').eq('type', 'ASSET').eq('is_active', true).order('code'),
+            ]);
+            setBankAccounts(banks || []);
+            const arCoa = (coa || []).filter(c => c.name?.toLowerCase().includes('piutang') || c.code?.startsWith('1-0'));
+            setArAccounts(arCoa.length ? arCoa : (coa || []).slice(0, 10));
+            if (banks?.length) setForm(p => ({ ...p, paid_from_account: banks[0].id }));
+            if (arCoa.length) setForm(p => ({ ...p, ar_coa_id: arCoa[0].id }));
+        };
+        load();
     }, []);
 
-    const fetchData = async () => {
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (form.amount <= 0) return alert('Jumlah pembayaran harus lebih dari 0');
+        if (form.amount > ar.outstanding_amount) return alert('Melebihi saldo outstanding');
+        setLoading(true);
         try {
-            setLoading(true);
+            const payNum = `BRG-AR-PAY-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+            const newPaid = (ar.paid_amount || 0) + parseFloat(form.amount);
+            const newOut = ar.original_amount - newPaid;
+            const newStatus = newOut <= 0 ? 'paid' : newPaid > 0 ? 'partial' : 'current';
 
-            // Fetch Bridge invoices
-            const { data: invoiceData, error: invoiceError } = await supabase
-                .from('bridge_invoices')
-                .select('*')
-                .order('created_at', { ascending: false });
+            await supabase.from('bridge_ar_transactions').update({
+                paid_amount: newPaid,
+                outstanding_amount: Math.max(0, newOut),
+                status: newStatus,
+                last_payment_date: form.payment_date,
+            }).eq('id', ar.id);
 
-            if (invoiceError) throw invoiceError;
+            await supabase.from('bridge_payments').insert([{
+                payment_number: payNum,
+                payment_type: 'incoming',
+                payment_date: form.payment_date,
+                reference_type: 'ar',
+                reference_id: ar.id,
+                reference_number: ar.ar_number,
+                amount: parseFloat(form.amount),
+                currency: ar.currency || 'IDR',
+                payment_method: form.payment_method,
+                transaction_ref: form.reference_number || null,
+                notes: form.notes || null,
+                status: 'completed',
+            }]);
 
-            // Fetch Bridge AR transactions
-            const { data: arData, error: arError } = await supabase
-                .from('bridge_ar_transactions')
-                .select('*')
-                .order('created_at', { ascending: false });
-
-            if (arError) throw arError;
-
-            // Fetch customers for reference
-            const { data: customerData, error: customerError } = await supabase
-                .from('bridge_customers')
-                .select('*')
-                .order('name', { ascending: true });
-
-            if (customerError) throw customerError;
-
-            setInvoices(invoiceData || []);
-            setArTransactions(arData || []);
-            setCustomers(customerData || []);
-        } catch (error) {
-            console.error('Error fetching AR data:', error);
-            alert('Failed to load AR data: ' + error.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const formatCurrency = (value, currency = 'IDR') => {
-        if (currency === 'USD') {
-            return '$' + value.toLocaleString('en-US', { minimumFractionDigits: 2 });
-        }
-        return 'Rp ' + value.toLocaleString('id-ID');
-    };
-
-    // Calculate AR metrics
-    const totalReceivables = invoices
-        .filter(inv => inv.status !== 'cancelled')
-        .reduce((sum, inv) => sum + (inv.grand_total || 0), 0);
-
-    const collectedAmount = invoices
-        .filter(inv => inv.status === 'paid')
-        .reduce((sum, inv) => sum + (inv.grand_total || 0), 0);
-
-    const outstandingAmount = totalReceivables - collectedAmount;
-
-    const overdueAmount = invoices
-        .filter(inv => {
-            if (inv.status === 'paid' || inv.status === 'cancelled' || !inv.due_date) return false;
-            return new Date(inv.due_date) < new Date();
-        })
-        .reduce((sum, inv) => sum + ((inv.grand_total || 0) - (inv.paid_amount || 0)), 0);
-
-    // Filter invoices based on search and status
-    const filteredInvoices = invoices.filter(invoice => {
-        const matchesSearch = searchTerm === '' ||
-            invoice.invoice_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            invoice.customer_name?.toLowerCase().includes(searchTerm.toLowerCase());
-
-        const matchesStatus = statusFilter === 'all' || invoice.status === statusFilter;
-
-        return matchesSearch && matchesStatus;
-    });
-
-    const handleRecordPayment = (invoice) => {
-        setSelectedInvoice(invoice);
-        setPaymentAmount((invoice.grand_total - (invoice.paid_amount || 0)).toString());
-        setShowPaymentModal(true);
-    };
-
-    const submitPayment = async () => {
-        if (!selectedInvoice || !paymentAmount) return;
-
-        try {
-            const paymentValue = parseFloat(paymentAmount);
-            if (paymentValue <= 0) {
-                alert('Payment amount must be greater than 0');
-                return;
+            if (ar.invoice_id) {
+                await supabase.from('bridge_invoices').update({
+                    paid_amount: newPaid,
+                    outstanding_amount: Math.max(0, newOut),
+                    status: newStatus === 'paid' ? 'paid' : newStatus === 'partial' ? 'partially_paid' : 'sent',
+                }).eq('id', ar.invoice_id);
             }
 
-            // Generate transaction number
-            const transactionNumber = `AR-${Date.now()}`;
-
-            // Create AR transaction record
-            const { data: transactionData, error: transactionError } = await supabase
-                .from('bridge_ar_transactions')
-                .insert({
-                    transaction_number: transactionNumber,
-                    invoice_number: selectedInvoice.invoice_number,
-                    customer_name: selectedInvoice.customer_name,
-                    amount: paymentValue,
-                    transaction_type: 'payment',
-                    payment_method: paymentMethod,
-                    payment_date: paymentDate,
-                    description: `Payment for invoice ${selectedInvoice.invoice_number}`,
-                    created_at: new Date().toISOString()
-                })
-                .select()
-                .single();
-
-            if (transactionError) throw transactionError;
-
-            // Update invoice paid amount and status
-            const newPaidAmount = (selectedInvoice.paid_amount || 0) + paymentValue;
-            const newStatus = newPaidAmount >= selectedInvoice.grand_total ? 'paid' : 'sent';
-
-            const { error: updateError } = await supabase
-                .from('bridge_invoices')
-                .update({
-                    paid_amount: newPaidAmount,
-                    status: newStatus,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', selectedInvoice.id);
-
-            if (updateError) throw updateError;
-
-            alert('Payment recorded successfully!');
-            setShowPaymentModal(false);
-            setSelectedInvoice(null);
-            setPaymentAmount('');
-            fetchData(); // Refresh data
-        } catch (error) {
-            console.error('Error recording payment:', error);
-            alert('Failed to record payment: ' + error.message);
-        }
+            setSuccess({ payNum, amount: parseFloat(form.amount), newOut, newStatus, currency: ar.currency });
+        } catch (err) {
+            alert('Error: ' + err.message);
+        } finally { setLoading(false); }
     };
 
-    const exportARReport = () => {
-        const csvContent = [
-            ['Bridge Accounts Receivable Report', '', '', ''],
-            ['Generated on', new Date().toLocaleDateString(), '', ''],
-            ['', '', '', ''],
-            ['Summary', '', '', ''],
-            ['Total Receivables', formatCurrency(totalReceivables), '', ''],
-            ['Collected Amount', formatCurrency(collectedAmount), '', ''],
-            ['Outstanding Amount', formatCurrency(outstandingAmount), '', ''],
-            ['Overdue Amount', formatCurrency(overdueAmount), '', ''],
-            ['', '', '', ''],
-            ['Invoice Details', '', '', ''],
-            ['Invoice #', 'Customer', 'Date', 'Amount', 'Paid', 'Outstanding', 'Due Date', 'Status']
-        ];
-
-        filteredInvoices.forEach(invoice => {
-            const paid = invoice.paid_amount || 0;
-            const outstanding = invoice.grand_total - paid;
-            csvContent.push([
-                invoice.invoice_number,
-                invoice.customer_name || '-',
-                new Date(invoice.date).toLocaleDateString(),
-                formatCurrency(invoice.grand_total),
-                formatCurrency(paid),
-                formatCurrency(outstanding),
-                invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '-',
-                invoice.status
-            ]);
-        });
-
-        const csvString = csvContent.map(row => row.join(',')).join('\n');
-        const blob = new Blob([csvString], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `bridge_ar_report_${new Date().toISOString().split('T')[0]}.csv`;
-        a.click();
-        window.URL.revokeObjectURL(url);
-    };
-
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+    if (success) return (
+        <Modal isOpen onClose={() => onSuccess()} maxWidth="max-w-lg">
+            <div className="p-8 text-center">
+                <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-green-500/20 flex items-center justify-center animate-pulse">
+                    <CheckCircle className="w-12 h-12 text-green-500" />
+                </div>
+                <h2 className="text-2xl font-bold text-green-500 mb-2">Pembayaran Berhasil!</h2>
+                <div className="glass-card p-4 rounded-lg mb-6 text-left space-y-3 bg-green-500/5 border border-green-500/20">
+                    <div className="flex justify-between text-sm">
+                        <span className="text-silver-dark">No. Pembayaran:</span>
+                        <span className="text-silver-light font-mono">{success.payNum}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                        <span className="text-silver-dark">Jumlah:</span>
+                        <span className="text-green-400 font-bold">{fmtIDR(success.amount, success.currency)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                        <span className="text-silver-dark">Sisa Tagihan:</span>
+                        <span className={`font-bold ${success.newOut <= 0 ? 'text-green-400' : 'text-yellow-400'}`}>
+                            {fmtIDR(Math.max(0, success.newOut), success.currency)}
+                        </span>
+                    </div>
+                </div>
+                <Button onClick={() => onSuccess()} className="w-full">Tutup</Button>
             </div>
-        );
-    }
+        </Modal>
+    );
+
+    return (
+        <Modal isOpen onClose={onClose} maxWidth="max-w-2xl">
+            <div className="p-6">
+                <h2 className="text-2xl font-bold gradient-text mb-6">Catat Pembayaran AR</h2>
+                <div className="glass-card p-4 rounded-lg mb-6 bg-green-500/5 border border-green-500/20">
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div><span className="text-silver-dark">AR Number:</span><span className="text-silver-light ml-2 font-medium">{ar.ar_number}</span></div>
+                        <div><span className="text-silver-dark">Customer:</span><span className="text-silver-light ml-2 font-medium">{ar.customer_name}</span></div>
+                        <div><span className="text-silver-dark">Total:</span><span className="text-silver-light ml-2">{fmtIDR(ar.original_amount, ar.currency)}</span></div>
+                        <div><span className="text-silver-dark">Outstanding:</span><span className="text-green-400 ml-2 font-bold">{fmtIDR(ar.outstanding_amount, ar.currency)}</span></div>
+                    </div>
+                </div>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-silver-dark mb-2">Tanggal Bayar *</label>
+                            <input type="date" required value={form.payment_date}
+                                onChange={e => setForm(p => ({ ...p, payment_date: e.target.value }))} className="w-full" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-silver-dark mb-2">Jumlah *</label>
+                            <input type="number" required min="0" max={ar.outstanding_amount} step="0.01"
+                                value={form.amount} onChange={e => setForm(p => ({ ...p, amount: parseFloat(e.target.value) || 0 }))}
+                                className="w-full" />
+                            <p className="text-xs text-silver-dark mt-1">Max: {fmtIDR(ar.outstanding_amount, ar.currency)}</p>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-silver-dark mb-2">Metode Bayar *</label>
+                            <select required value={form.payment_method}
+                                onChange={e => setForm(p => ({ ...p, payment_method: e.target.value }))} className="w-full">
+                                <option value="bank_transfer">Bank Transfer</option>
+                                <option value="cash">Cash</option>
+                                <option value="check">Cek / Giro</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-silver-dark mb-2">No. Referensi</label>
+                            <input type="text" value={form.reference_number}
+                                onChange={e => setForm(p => ({ ...p, reference_number: e.target.value }))}
+                                placeholder="Ref transfer / no. cek" className="w-full" />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-silver-dark mb-2">
+                            <CreditCard className="w-4 h-4 inline mr-1" />Akun Diterima (COA Bridge)
+                        </label>
+                        <select value={form.ar_coa_id} onChange={e => setForm(p => ({ ...p, ar_coa_id: e.target.value }))} className="w-full">
+                            <option value="">— Pilih COA Piutang —</option>
+                            {arAccounts.map(c => <option key={c.id} value={c.id}>{c.code} - {c.name}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-silver-dark mb-2">Catatan</label>
+                        <textarea rows={2} value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
+                            className="w-full" placeholder="Catatan opsional..." />
+                    </div>
+                    <div className="flex gap-3 justify-end pt-4 border-t border-dark-border">
+                        <Button type="button" variant="secondary" onClick={onClose}>Batal</Button>
+                        <Button type="submit" disabled={loading} icon={DollarSign}>
+                            {loading ? 'Memproses...' : 'Catat Pembayaran'}
+                        </Button>
+                    </div>
+                </form>
+            </div>
+        </Modal>
+    );
+};
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+const BridgeAccountsReceivable = () => {
+    const { canEdit } = useAuth();
+    const [arList, setArList] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedAR, setSelectedAR] = useState(null);
+    const [showPayment, setShowPayment] = useState(false);
+
+    useEffect(() => { fetchAR(); }, []);
+
+    const fetchAR = async () => {
+        setLoading(true);
+        try {
+            const { data: arRows, error } = await supabase
+                .from('bridge_ar_transactions')
+                .select('*')
+                .order('transaction_date', { ascending: false });
+
+            let rows = [];
+            if (!error && arRows?.length > 0) {
+                rows = arRows;
+            } else {
+                const { data: invRows } = await supabase
+                    .from('bridge_invoices')
+                    .select('*')
+                    .neq('status', 'draft')
+                    .neq('status', 'cancelled')
+                    .order('invoice_date', { ascending: false });
+
+                rows = (invRows || []).map(inv => ({
+                    id: inv.id,
+                    invoice_id: inv.id,
+                    ar_number: `BRG-AR-${(inv.invoice_number || inv.id.slice(0,8)).toUpperCase()}`,
+                    invoice_number: inv.invoice_number,
+                    customer_name: inv.customer_name || 'Unknown',
+                    transaction_date: inv.invoice_date,
+                    due_date: inv.due_date || inv.invoice_date,
+                    original_amount: inv.grand_total || inv.total_amount || 0,
+                    paid_amount: inv.paid_amount || 0,
+                    outstanding_amount: Math.max(0, (inv.grand_total || 0) - (inv.paid_amount || 0)),
+                    currency: inv.currency || 'IDR',
+                    status: inv.status,
+                }));
+            }
+
+            setArList(rows.map(ar => ({
+                ...ar,
+                aging_bucket: calcAging(ar.due_date),
+                status: ar.status || deriveStatus(ar.paid_amount || 0, ar.original_amount || 0, ar.due_date),
+            })));
+        } catch (err) { console.error(err); }
+        finally { setLoading(false); }
+    };
+
+    const totalAR = arList.reduce((s, a) => s + (a.original_amount || 0), 0);
+    const totalPaid = arList.reduce((s, a) => s + (a.paid_amount || 0), 0);
+    const totalOut = arList.reduce((s, a) => s + (a.outstanding_amount || 0), 0);
+    const overdueTotal = arList.filter(a => a.status === 'overdue').reduce((s, a) => s + a.outstanding_amount, 0);
+
+    const aging = {
+        '0-30': arList.filter(a => a.aging_bucket === '0-30').reduce((s, a) => s + a.outstanding_amount, 0),
+        '31-60': arList.filter(a => a.aging_bucket === '31-60').reduce((s, a) => s + a.outstanding_amount, 0),
+        '61-90': arList.filter(a => a.aging_bucket === '61-90').reduce((s, a) => s + a.outstanding_amount, 0),
+        '90+': arList.filter(a => a.aging_bucket === '90+').reduce((s, a) => s + a.outstanding_amount, 0),
+    };
+
+    const filtered = arList.filter(a =>
+        !searchTerm ||
+        a.ar_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        a.invoice_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        a.customer_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const handleExport = () => {
+        import('../../utils/exportXLS').then(({ exportToXLS }) => {
+            exportToXLS({
+                filename: `bridge_ar_${new Date().toISOString().split('T')[0]}`,
+                sheetName: 'Bridge AR',
+                columns: [
+                    { header: 'AR Number', key: 'ar_number', width: 22 },
+                    { header: 'Invoice #', key: 'invoice_number', width: 22 },
+                    { header: 'Customer', key: 'customer_name', width: 28 },
+                    { header: 'Date', key: 'transaction_date', width: 14 },
+                    { header: 'Due Date', key: 'due_date', width: 14 },
+                    { header: 'Total', key: 'original_amount', width: 20, render: r => fmtIDR(r.original_amount, r.currency) },
+                    { header: 'Paid', key: 'paid_amount', width: 20, render: r => fmtIDR(r.paid_amount, r.currency) },
+                    { header: 'Outstanding', key: 'outstanding_amount', width: 20, render: r => fmtIDR(r.outstanding_amount, r.currency) },
+                    { header: 'Aging', key: 'aging_bucket', width: 10 },
+                    { header: 'Status', key: 'status', width: 14 },
+                ],
+                data: filtered.map((r, i) => ({ ...r, no: i + 1 })),
+            });
+        }).catch(() => {
+            const csv = ['AR Number,Invoice,Customer,Date,Due Date,Total,Paid,Outstanding,Aging,Status',
+                ...filtered.map(r => `${r.ar_number},${r.invoice_number || ''},${r.customer_name},${r.transaction_date},${r.due_date || ''},${r.original_amount},${r.paid_amount || 0},${r.outstanding_amount || 0},${r.aging_bucket},${r.status}`)
+            ].join('\n');
+            const a = document.createElement('a');
+            a.href = `data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`;
+            a.download = `bridge_ar_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+        });
+    };
 
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                        <DollarSign className="h-6 w-6 text-blue-500" />
-                        Bridge Accounts Receivable
+                    <h1 className="text-3xl font-bold gradient-text flex items-center gap-2">
+                        <TrendingUp className="w-8 h-8" /> Accounts Receivable — Bridge
                     </h1>
-                    <p className="text-gray-600 dark:text-gray-400 mt-1">
-                        Manage customer invoices and payments for Bridge module
-                    </p>
+                    <p className="text-silver-dark mt-1">Monitoring piutang Bridge module</p>
                 </div>
-                <div className="flex gap-2">
-                    <Button onClick={exportARReport} variant="outline" className="flex items-center gap-2">
-                        <Download className="h-4 w-4" />
-                        Export CSV
-                    </Button>
-                    <Button onClick={fetchData} variant="outline" className="flex items-center gap-2">
-                        <Activity className="h-4 w-4" />
-                        Refresh
-                    </Button>
-                </div>
+                <Button variant="secondary" icon={Download} onClick={handleExport}>Export XLS</Button>
             </div>
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Receivables</p>
-                            <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(totalReceivables)}</p>
-                        </div>
-                        <FileText className="h-8 w-8 text-blue-500" />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                    { label: 'Total AR', value: fmtIDR(totalAR), color: 'text-blue-400' },
+                    { label: 'Terbayar', value: fmtIDR(totalPaid), color: 'text-green-400' },
+                    { label: 'Outstanding', value: fmtIDR(totalOut), color: 'text-yellow-400' },
+                    { label: 'Overdue', value: fmtIDR(overdueTotal), color: 'text-red-400' },
+                ].map(c => (
+                    <div key={c.label} className="glass-card p-5 rounded-xl">
+                        <p className="text-silver-dark text-xs uppercase tracking-wider">{c.label}</p>
+                        <p className={`text-xl font-bold mt-1 ${c.color}`}>{c.value}</p>
                     </div>
-                </div>
+                ))}
+            </div>
 
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Collected</p>
-                            <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(collectedAmount)}</p>
+            {/* Aging Analysis */}
+            <div className="glass-card p-5 rounded-xl">
+                <h3 className="text-sm font-semibold text-silver-light uppercase tracking-wider mb-4">Aging Analysis (Outstanding)</h3>
+                <div className="grid grid-cols-4 gap-4">
+                    {Object.entries(aging).map(([bucket, val]) => (
+                        <div key={bucket} className="text-center">
+                            <p className="text-xs text-silver-dark mb-1">{bucket} days</p>
+                            <p className="text-lg font-bold text-silver-light">{fmtIDR(val)}</p>
+                            <div className="w-full bg-dark-border rounded-full h-1.5 mt-2">
+                                <div className="bg-accent-orange h-1.5 rounded-full"
+                                    style={{ width: totalOut > 0 ? `${Math.min(100, (val / totalOut) * 100)}%` : '0%' }} />
+                            </div>
                         </div>
-                        <TrendingUp className="h-8 w-8 text-green-500" />
-                    </div>
-                </div>
-
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Outstanding</p>
-                            <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(outstandingAmount)}</p>
-                        </div>
-                        <AlertTriangle className="h-8 w-8 text-yellow-500" />
-                    </div>
-                </div>
-
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Overdue</p>
-                            <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(overdueAmount)}</p>
-                        </div>
-                        <AlertTriangle className="h-8 w-8 text-red-500" />
-                    </div>
+                    ))}
                 </div>
             </div>
 
-            {/* Filters */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Search
-                        </label>
-                        <div className="relative">
-                            <Search className="h-4 w-4 absolute left-3 top-3 text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder="Search by invoice # or customer..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                            />
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Status Filter
-                        </label>
-                        <select
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                        >
-                            <option value="all">All Status</option>
-                            <option value="sent">Sent</option>
-                            <option value="paid">Paid</option>
-                            <option value="overdue">Overdue</option>
-                            <option value="cancelled">Cancelled</option>
-                        </select>
-                    </div>
-
-                    <div className="flex items-end">
-                        <Button onClick={() => setSearchTerm('')} variant="outline" className="w-full">
-                            Clear Filters
-                        </Button>
-                    </div>
+            {/* Search */}
+            <div className="glass-card p-4 rounded-xl">
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-silver-dark" />
+                    <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+                        placeholder="Cari AR Number, Invoice, Customer..."
+                        className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm" />
                 </div>
             </div>
 
-            {/* Invoices Table */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                        Customer Invoices ({filteredInvoices.length})
-                    </h3>
-                </div>
-
-                <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead className="bg-gray-50 dark:bg-gray-700">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Invoice #</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Customer</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Amount</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Paid</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Outstanding</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Due Date</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                            {filteredInvoices.length === 0 ? (
+            {/* Table */}
+            <div className="glass-card rounded-xl overflow-hidden">
+                {loading ? (
+                    <div className="text-center py-16 text-silver-dark">Memuat data AR...</div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead className="bg-[#0070BB] text-white">
                                 <tr>
-                                    <td colSpan="9" className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                                        <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                                        <p>No invoices found matching your criteria.</p>
-                                    </td>
+                                    <th className="px-4 py-3 text-left">AR Number</th>
+                                    <th className="px-4 py-3 text-left">Invoice #</th>
+                                    <th className="px-4 py-3 text-left">Customer</th>
+                                    <th className="px-4 py-3 text-left">Tgl Transaksi</th>
+                                    <th className="px-4 py-3 text-left">Jatuh Tempo</th>
+                                    <th className="px-4 py-3 text-right">Total</th>
+                                    <th className="px-4 py-3 text-right">Terbayar</th>
+                                    <th className="px-4 py-3 text-right">Outstanding</th>
+                                    <th className="px-4 py-3 text-center">Aging</th>
+                                    <th className="px-4 py-3 text-center">Status</th>
+                                    <th className="px-4 py-3 text-center">Aksi</th>
                                 </tr>
-                            ) : (
-                                filteredInvoices.map((invoice) => {
-                                    const paid = invoice.paid_amount || 0;
-                                    const outstanding = invoice.grand_total - paid;
-                                    const isOverdue = invoice.due_date && new Date(invoice.due_date) < new Date() && invoice.status !== 'paid';
-
-                                    return (
-                                        <tr key={invoice.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                                                {invoice.invoice_number}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                                {invoice.customer_name || '-'}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                                {new Date(invoice.date).toLocaleDateString()}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                                {formatCurrency(invoice.grand_total)}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-400">
-                                                {formatCurrency(paid)}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                                {formatCurrency(outstanding)}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                                {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '-'}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                                    invoice.status === 'paid' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' :
-                                                    invoice.status === 'sent' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' :
-                                                    isOverdue ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' :
-                                                    'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300'
-                                                }`}>
-                                                    {isOverdue ? 'Overdue' : invoice.status}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-center">
-                                                {outstanding > 0 && (
-                                                    <Button
-                                                        onClick={() => handleRecordPayment(invoice)}
-                                                        size="sm"
-                                                        className="text-xs"
-                                                    >
-                                                        Record Payment
-                                                    </Button>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    );
-                                })
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
+                            <tbody className="divide-y divide-dark-border/40">
+                                {filtered.length === 0 ? (
+                                    <tr><td colSpan={11} className="text-center py-10 text-silver-dark italic">Tidak ada data AR</td></tr>
+                                ) : filtered.map(ar => (
+                                    <tr key={ar.id} className="hover:bg-white/5 smooth-transition">
+                                        <td className="px-4 py-3 font-mono text-accent-orange text-xs">{ar.ar_number}</td>
+                                        <td className="px-4 py-3 text-silver-dark text-xs">{ar.invoice_number || '-'}</td>
+                                        <td className="px-4 py-3 text-silver-light font-medium">{ar.customer_name}</td>
+                                        <td className="px-4 py-3 text-silver-dark">{ar.transaction_date}</td>
+                                        <td className={`px-4 py-3 ${ar.status === 'overdue' ? 'text-red-400 font-semibold' : 'text-silver-dark'}`}>
+                                            {ar.due_date || '-'}
+                                        </td>
+                                        <td className="px-4 py-3 text-right font-mono text-silver-light">{fmtIDR(ar.original_amount, ar.currency)}</td>
+                                        <td className="px-4 py-3 text-right font-mono text-green-400">{fmtIDR(ar.paid_amount || 0, ar.currency)}</td>
+                                        <td className="px-4 py-3 text-right font-mono text-yellow-400">{fmtIDR(ar.outstanding_amount || 0, ar.currency)}</td>
+                                        <td className="px-4 py-3 text-center">
+                                            <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                                ar.aging_bucket === '90+' ? 'bg-red-500/20 text-red-400' :
+                                                ar.aging_bucket === '61-90' ? 'bg-orange-500/20 text-orange-400' :
+                                                ar.aging_bucket === '31-60' ? 'bg-yellow-500/20 text-yellow-400' :
+                                                'bg-blue-500/20 text-blue-400'
+                                            }`}>{ar.aging_bucket}</span>
+                                        </td>
+                                        <td className="px-4 py-3 text-center">
+                                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${STATUS_STYLE[ar.status] || 'bg-gray-500/20 text-gray-400'}`}>
+                                                {ar.status?.toUpperCase()}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-center">
+                                            {ar.outstanding_amount > 0 && canEdit('bridge_finance') && (
+                                                <Button size="sm" variant="ghost" icon={DollarSign}
+                                                    onClick={() => { setSelectedAR(ar); setShowPayment(true); }}>
+                                                    Bayar
+                                                </Button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </div>
 
-            {/* Payment Modal */}
-            {showPaymentModal && selectedInvoice && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4">
-                        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-                            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                                Record Payment
-                            </h2>
-                            <button
-                                onClick={() => setShowPaymentModal(false)}
-                                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                            >
-                                <X className="h-6 w-6" />
-                            </button>
-                        </div>
-
-                        <div className="p-6 space-y-4">
-                            <div>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">
-                                    Invoice: <span className="font-medium">{selectedInvoice.invoice_number}</span>
-                                </p>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">
-                                    Customer: <span className="font-medium">{selectedInvoice.customer_name}</span>
-                                </p>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">
-                                    Outstanding: <span className="font-medium">{formatCurrency(selectedInvoice.grand_total - (selectedInvoice.paid_amount || 0))}</span>
-                                </p>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                    Payment Amount
-                                </label>
-                                <input
-                                    type="number"
-                                    value={paymentAmount}
-                                    onChange={(e) => setPaymentAmount(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                                    placeholder="Enter payment amount"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                    Payment Date
-                                </label>
-                                <input
-                                    type="date"
-                                    value={paymentDate}
-                                    onChange={(e) => setPaymentDate(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                    Payment Method
-                                </label>
-                                <select
-                                    value={paymentMethod}
-                                    onChange={(e) => setPaymentMethod(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                                >
-                                    <option value="bank_transfer">Bank Transfer</option>
-                                    <option value="cash">Cash</option>
-                                    <option value="check">Check</option>
-                                    <option value="credit_card">Credit Card</option>
-                                    <option value="other">Other</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div className="flex justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700">
-                            <Button onClick={() => setShowPaymentModal(false)} variant="outline">
-                                Cancel
-                            </Button>
-                            <Button onClick={submitPayment}>
-                                Record Payment
-                            </Button>
-                        </div>
-                    </div>
-                </div>
+            {showPayment && selectedAR && (
+                <PaymentModal ar={selectedAR} onClose={() => { setShowPayment(false); setSelectedAR(null); }}
+                    onSuccess={() => { setShowPayment(false); setSelectedAR(null); fetchAR(); }} />
             )}
         </div>
     );

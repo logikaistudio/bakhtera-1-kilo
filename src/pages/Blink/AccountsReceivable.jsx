@@ -777,13 +777,13 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
             const { data } = await supabase.from('finance_coa').select('*').eq('type', 'ASSET').order('code');
             if (data && data.length > 0) {
                 setArAccountsList(data);
-                
+
                 // Attempt to pre-select 'Piutang Usaha'
                 const match = data.find(c => c.name.toLowerCase().includes('piutang') || c.code.startsWith('1-03'));
                 if (match) setFormData(prev => ({ ...prev, ar_coa_id: match.id }));
                 else setFormData(prev => ({ ...prev, ar_coa_id: data[0].id }));
             }
-        } catch(e) { console.error('Error fetching AR accounts:', e); }
+        } catch (e) { console.error('Error fetching AR accounts:', e); }
     };
 
     const fetchBankAccounts = async () => {
@@ -1180,7 +1180,7 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
                         </label>
                         <select
                             value={formData.ar_coa_id}
-                            onChange={(e) => setFormData(prev => ({...prev, ar_coa_id: e.target.value}))}
+                            onChange={(e) => setFormData(prev => ({ ...prev, ar_coa_id: e.target.value }))}
                             className="w-full"
                         >
                             <option value="">-- Pilih Akun Piutang --</option>
