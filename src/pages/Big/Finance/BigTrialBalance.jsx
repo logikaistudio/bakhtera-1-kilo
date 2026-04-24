@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
-import Button from '../../components/Common/Button';
+import { supabase } from '../../../lib/supabase';
+import Button from '../../../components/Common/Button';
 import { Scale, RefreshCw, Printer, FileText } from 'lucide-react';
 
 const fmtNum = (v) => {

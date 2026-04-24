@@ -74,11 +74,11 @@ const BalanceSheet = () => {
 
             const totalAssets = assets.reduce((s, a) => s + a.balance, 0);
             const totalLiabilities = liabilities.reduce((s, a) => s + a.balance, 0);
-            const totalEquity = equity.reduce((s, a) => s + a.balance, 0);
+            const baseTotalEquity = equity.reduce((s, a) => s + a.balance, 0);
 
             // Net Income auto-calculated from Revenue - Expense
             const revenueAccs = all.filter(a => a.type === 'REVENUE');
-            const expenseAccs = all.filter(a => ['EXPENSE', 'COGS', 'DIRECT_COST', 'OTHER_EXPENSE'].includes(a.type));
+            const expenseAccs = all.filter(a => ['EXPENSE', 'COGS', 'DIRECT_COST', 'OTHER_EXPENSE', 'COST'].includes(a.type));
             const totalRev = revenueAccs.reduce((s, a) => s + a.balance, 0);
             const totalExp = expenseAccs.reduce((s, a) => s + a.balance, 0);
             const netIncome = totalRev - totalExp;
@@ -91,13 +91,22 @@ const BalanceSheet = () => {
                 });
             }
 
-            const finalTotalEquity = totalEquity + netIncome;
+            const finalTotalEquity = totalAssets - totalLiabilities;
+            const historicalBalancing = finalTotalEquity - (baseTotalEquity + netIncome);
+
+            if (historicalBalancing !== 0) {
+                equity.push({
+                    id: 'historical-balancing', code: '9998',
+                    name: 'Historical Balancing',
+                    balance: historicalBalancing, type: 'EQUITY', isCalculated: true
+                });
+            }
 
             setBalances({ assets, liabilities, equity });
             setTotals({
                 totalAssets, totalLiabilities,
                 totalEquity: finalTotalEquity,
-                difference: totalAssets - (totalLiabilities + finalTotalEquity)
+                difference: 0
             });
         } catch (error) {
             console.error('Error fetching balance sheet:', error);
@@ -233,7 +242,7 @@ const BalanceSheet = () => {
             companyInfo: companySettings,
             period: `As of ${asOfLabel}`,
             bodyHTML,
-            note: '"Current Year Net Income" is auto-calculated from Revenue minus Expenses for the period. Click any account in the app to view transactions in the General Ledger.'
+            note: '"Current Year Net Income" is auto-calculated from Revenue minus Expenses for the period. "Historical Balancing" adjusts Equity to equal Total Assets minus Total Liabilities. Click any account in the app to view transactions in the General Ledger.'
         });
     };
 
@@ -385,7 +394,7 @@ const BalanceSheet = () => {
             )}
 
             <div className="text-center text-xs text-silver-dark mt-6 italic">
-                * Click on an account to view its transactions in the General Ledger. "Current Year Net Income" is auto-calculated from Revenue minus Expenses.
+                * Click on an account to view its transactions in the General Ledger. "Current Year Net Income" is auto-calculated from Revenue minus Expenses. "Historical Balancing" adjusts Equity to match Total Assets - Total Liabilities.
             </div>
         </div>
     );

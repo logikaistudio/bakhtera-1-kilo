@@ -654,7 +654,8 @@ export async function createInvoiceJournal({ invoice, coaList: providedCOA }) {
     // Resolve Optional Tax/Discount Accounts
     let taxCOA = null, discountCOA = null;
     if (invoice.tax_amount > 0) {
-        taxCOA = await resolveCOA({ coaList, prefixes: ['2'], type: 'LIABILITY', nameHint: 'pajak' }) || 
+        taxCOA = await resolveCOA({ coaList, codes: ['2-01-406-0-1-00', '2-01-405-0-1-00'], prefixes: ['2'], type: 'LIABILITY', nameHint: 'ppn' }) || 
+                 await resolveCOA({ coaList, prefixes: ['2'], type: 'LIABILITY', nameHint: 'tax' }) ||
                  await resolveCOA({ coaList, prefixes: ['2'], type: 'LIABILITY' });
     }
     if (invoice.discount_amount > 0) {

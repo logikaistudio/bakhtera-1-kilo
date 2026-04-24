@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../../lib/supabase';
+import { supabase } from '../../../../lib/supabase';
 import {
     FileText, Plus, Search, RefreshCw, Edit, Trash2, Check, CreditCard
 } from 'lucide-react';
-import Button from '../../../components/Common/Button';
-import Modal from '../../../components/Common/Modal';
+import Button from '../../../../components/Common/Button';
+import Modal from '../../../../components/Common/Modal';
 
 const BigInvoices = () => {
     const [invoices, setInvoices] = useState([]);

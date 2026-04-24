@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../../lib/supabase';
-import Button from '../../../components/Common/Button';
-import Modal from '../../../components/Common/Modal';
+import { supabase } from '../../../../lib/supabase';
+import Button from '../../../../components/Common/Button';
+import Modal from '../../../../components/Common/Modal';
 import {
     DollarSign, TrendingUp, AlertTriangle, Clock, Users,
     Search, Download, FileText, Calendar, X, CheckCircle, AlertCircle, CreditCard

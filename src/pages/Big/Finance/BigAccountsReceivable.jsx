@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../context/AuthContext';
-import Button from '../../components/Common/Button';
-import Modal from '../../components/Common/Modal';
+import { supabase } from '../../../lib/supabase';
+import { useAuth } from '../../../context/AuthContext';
+import Button from '../../../components/Common/Button';
+import Modal from '../../../components/Common/Modal';
 import {
     DollarSign, TrendingUp, AlertTriangle, Clock, Search,
     Download, CheckCircle, AlertCircle, CreditCard, History, X
@@ -285,7 +285,7 @@ const BigAccountsReceivable = () => {
     );
 
     const handleExport = () => {
-        import('../../utils/exportXLS').then(({ exportToXLS }) => {
+        import('../../../utils/exportXLS').then(({ exportToXLS }) => {
             exportToXLS({
                 filename: `big_ar_${new Date().toISOString().split('T')[0]}`,
                 sheetName: 'Big AR',

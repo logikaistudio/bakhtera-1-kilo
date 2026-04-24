@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
-import Button from '../../components/Common/Button';
+import { supabase } from '../../../lib/supabase';
+import Button from '../../../components/Common/Button';
 import { TrendingUp, RefreshCw } from 'lucide-react';
 
 const fmtIDR = (v) => v != null ? 'Rp ' + Number(v).toLocaleString('id-ID') : 'Rp 0';
