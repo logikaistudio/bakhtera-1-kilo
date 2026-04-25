@@ -2,21 +2,52 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import {
-    Scale, TrendingUp, Shield, Calendar,
-    RefreshCw, FileSpreadsheet, FileText, CheckCircle, AlertCircle, Printer
+    Scale, Calendar,
+    RefreshCw, FileSpreadsheet, Printer
 } from 'lucide-react';
 import XLSX from 'xlsx-js-style';
 import Button from '../../components/Common/Button';
 import { printReport } from '../../utils/printPDF';
 import { useData } from '../../context/DataContext';
 
+// ── COA Group Definitions ────────────────────────────────────────────────────
+const ASSET_GROUPS = [
+    { prefix: '1-01', label: 'CURRENT ASSETS', totalLabel: 'TOTAL CURRENT ASSETS' },
+    { prefix: '1-02', label: 'FIXED ASSETS', totalLabel: 'TOTAL FIXED ASSETS' },
+    { prefix: '1-03', label: 'OTHER ASSETS', totalLabel: 'TOTAL OTHER ASSETS' },
+];
+const LIABILITY_GROUPS = [
+    { prefix: '2-01', label: 'CURRENT PAYABLE', totalLabel: 'TOTAL CURRENT PAYABLE' },
+    { prefix: '2-02', label: 'LONG TERM PAYABLE', totalLabel: 'TOTAL LONG TERM PAYABLE' },
+];
+const EQUITY_GROUPS = [
+    { prefix: '3-01', label: 'STOCKHOLDERS', totalLabel: 'TOTAL STOCKHOLDERS' },
+    { prefix: '3-02', label: 'PROFIT / LOSS', totalLabel: 'TOTAL PROFIT / LOSS' },
+];
+
+function groupAccounts(accounts, groupDefs) {
+    const grouped = groupDefs.map(g => ({
+        ...g,
+        items: accounts.filter(a => a.code && a.code.startsWith(g.prefix) && !a.isHeader),
+        total: 0
+    }));
+    // Uncategorised bucket
+    const categorised = new Set(grouped.flatMap(g => g.items.map(i => i.id)));
+    const uncategorised = accounts.filter(a => !categorised.has(a.id) && !a.isHeader);
+    if (uncategorised.length > 0) {
+        grouped.push({ prefix: '_other', label: 'OTHER', totalLabel: 'TOTAL OTHER', items: uncategorised, total: 0 });
+    }
+    grouped.forEach(g => { g.total = g.items.reduce((s, a) => s + a.balance, 0); });
+    return grouped;
+}
+
 const BalanceSheet = () => {
     const navigate = useNavigate();
     const { companySettings } = useData();
     const [asOfDate, setAsOfDate] = useState(new Date().toISOString().split('T')[0]);
     const [loading, setLoading] = useState(false);
-    const [balances, setBalances] = useState({ assets: [], liabilities: [], equity: [] });
-    const [totals, setTotals] = useState({ totalAssets: 0, totalLiabilities: 0, totalEquity: 0, difference: 0 });
+    const [reportData, setReportData] = useState(null);
+    const [totals, setTotals] = useState({ totalAssets: 0, totalLiabilities: 0, totalEquity: 0 });
 
     useEffect(() => { fetchBalanceSheet(); }, [asOfDate]);
 
@@ -42,7 +73,6 @@ const BalanceSheet = () => {
             const combined = [...(r1.data || []), ...(r2.data || [])];
             const entries = [...new Map(combined.map(r => [r.id, r])).values()];
 
-            // ✅ FIX: Initialize accMap before using it
             const accMap = {};
             const accCodeMap = {};
             accounts.forEach(acc => {
@@ -68,9 +98,11 @@ const BalanceSheet = () => {
             });
 
             const all = Object.values(accMap);
-            const assets = all.filter(a => a.type === 'ASSET' && a.balance !== 0).sort((a, b) => a.code.localeCompare(b.code));
-            const liabilities = all.filter(a => a.type === 'LIABILITY' && a.balance !== 0).sort((a, b) => a.code.localeCompare(b.code));
-            const equity = all.filter(a => a.type === 'EQUITY' && a.balance !== 0).sort((a, b) => a.code.localeCompare(b.code));
+            // Filter: only leaf-level accounts with balance, exclude header rows (level <=2 with xxx-000 pattern)
+            const isHeader = (a) => a.level <= 2 || /^\d-\d{2}-000/.test(a.code) || /^\d-00-000/.test(a.code);
+            const assets = all.filter(a => a.type === 'ASSET' && a.balance !== 0 && !isHeader(a)).sort((a, b) => a.code.localeCompare(b.code));
+            const liabilities = all.filter(a => a.type === 'LIABILITY' && a.balance !== 0 && !isHeader(a)).sort((a, b) => a.code.localeCompare(b.code));
+            const equity = all.filter(a => a.type === 'EQUITY' && a.balance !== 0 && !isHeader(a)).sort((a, b) => a.code.localeCompare(b.code));
 
             const totalAssets = assets.reduce((s, a) => s + a.balance, 0);
             const totalLiabilities = liabilities.reduce((s, a) => s + a.balance, 0);
@@ -85,8 +117,8 @@ const BalanceSheet = () => {
 
             if (netIncome !== 0) {
                 equity.push({
-                    id: 'net-income', code: '9999',
-                    name: 'Current Year Net Income',
+                    id: 'net-income', code: '3-02-900-0-1-00',
+                    name: 'LABA / RUGI PERIODE BERJALAN',
                     balance: netIncome, type: 'EQUITY', isCalculated: true
                 });
             }
@@ -94,20 +126,20 @@ const BalanceSheet = () => {
             const finalTotalEquity = totalAssets - totalLiabilities;
             const historicalBalancing = finalTotalEquity - (baseTotalEquity + netIncome);
 
-            if (historicalBalancing !== 0) {
+            if (Math.abs(historicalBalancing) > 0.5) {
                 equity.push({
-                    id: 'historical-balancing', code: '9998',
-                    name: 'Historical Balancing',
+                    id: 'historical-balancing', code: '3-02-800-0-1-00',
+                    name: 'HISTORICAL BALANCING',
                     balance: historicalBalancing, type: 'EQUITY', isCalculated: true
                 });
             }
 
-            setBalances({ assets, liabilities, equity });
-            setTotals({
-                totalAssets, totalLiabilities,
-                totalEquity: finalTotalEquity,
-                difference: 0
-            });
+            const assetGroups = groupAccounts(assets, ASSET_GROUPS);
+            const liabilityGroups = groupAccounts(liabilities, LIABILITY_GROUPS);
+            const equityGroups = groupAccounts(equity, EQUITY_GROUPS);
+
+            setReportData({ assetGroups, liabilityGroups, equityGroups, assets, liabilities, equity });
+            setTotals({ totalAssets, totalLiabilities, totalEquity: finalTotalEquity });
         } catch (error) {
             console.error('Error fetching balance sheet:', error);
         } finally {
@@ -116,43 +148,50 @@ const BalanceSheet = () => {
     };
 
     const fmtCur = (val) => {
-        if (!val && val !== 0) return '-';
-        return `Rp ${val.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+        if (val === null || val === undefined) return '-';
+        const neg = val < 0;
+        const s = `Rp. ${Math.abs(val).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        return neg ? `Rp.(${Math.abs(val).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : s;
     };
 
-    const fmtN = (val) => {
-        if (!val && val !== 0) return '-';
-        return val.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-    };
-
-    const asOfLabel = new Date(asOfDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+    const asOfLabel = new Date(asOfDate).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
 
     const handleAccountClick = (accountId) => {
-        if (accountId === 'net-income') return;
+        if (accountId === 'net-income' || accountId === 'historical-balancing') return;
         navigate('/blink/finance/general-ledger', { state: { preSelectedAccount: accountId } });
     };
 
     // ── Export Excel ────────────────────────────────────────────────────────────
     const exportToExcel = () => {
+        if (!reportData) return;
         const data = [];
-        data.push({ 'Category': 'BALANCE SHEET', 'Code': '', 'Account Name': `As of ${asOfDate}`, 'Balance': '' });
-        data.push({ 'Category': '', 'Code': '', 'Account Name': '', 'Balance': '' });
-        data.push({ 'Category': 'ASSETS', 'Code': '', 'Account Name': '', 'Balance': '' });
-        balances.assets.forEach(a => data.push({ 'Category': '', 'Code': a.code, 'Account Name': a.name, 'Balance': fmtN(a.balance) }));
-        data.push({ 'Category': '', 'Code': '', 'Account Name': 'Total Assets', 'Balance': fmtN(totals.totalAssets) });
-        data.push({ 'Category': '', 'Code': '', 'Account Name': '', 'Balance': '' });
-        data.push({ 'Category': 'LIABILITIES', 'Code': '', 'Account Name': '', 'Balance': '' });
-        balances.liabilities.forEach(a => data.push({ 'Category': '', 'Code': a.code, 'Account Name': a.name, 'Balance': fmtN(a.balance) }));
-        data.push({ 'Category': '', 'Code': '', 'Account Name': 'Total Liabilities', 'Balance': fmtN(totals.totalLiabilities) });
-        data.push({ 'Category': '', 'Code': '', 'Account Name': '', 'Balance': '' });
-        data.push({ 'Category': 'EQUITY', 'Code': '', 'Account Name': '', 'Balance': '' });
-        balances.equity.forEach(a => data.push({ 'Category': '', 'Code': a.code, 'Account Name': a.name, 'Balance': fmtN(a.balance) }));
-        data.push({ 'Category': '', 'Code': '', 'Account Name': 'Total Equity', 'Balance': fmtN(totals.totalEquity) });
-        data.push({ 'Category': '', 'Code': '', 'Account Name': '', 'Balance': '' });
-        data.push({ 'Category': 'TOTAL LIABILITIES + EQUITY', 'Code': '', 'Account Name': '', 'Balance': fmtN(totals.totalLiabilities + totals.totalEquity) });
+        data.push({ 'Account': 'BALANCE SHEET', 'Amount': `Per ${asOfLabel}` });
+        data.push({ 'Account': '', 'Amount': '' });
+
+        const addGroup = (mainLabel, groups, grandTotal, grandLabel) => {
+            data.push({ 'Account': mainLabel, 'Amount': '' });
+            data.push({ 'Account': '', 'Amount': '' });
+            groups.forEach(g => {
+                if (g.items.length === 0) return;
+                data.push({ 'Account': `  ${g.label}`, 'Amount': '' });
+                g.items.forEach(a => data.push({ 'Account': `      ${a.name}`, 'Amount': fmtCur(a.balance) }));
+                data.push({ 'Account': '', 'Amount': '' });
+                data.push({ 'Account': `            ${g.totalLabel}`, 'Amount': fmtCur(g.total) });
+                data.push({ 'Account': '', 'Amount': '' });
+            });
+            data.push({ 'Account': '', 'Amount': '' });
+            data.push({ 'Account': `            ${grandLabel}`, 'Amount': fmtCur(grandTotal) });
+            data.push({ 'Account': '', 'Amount': '' });
+        };
+
+        addGroup('ASSETS', reportData.assetGroups, totals.totalAssets, 'TOTAL ASSETS');
+        addGroup('LIABILITIES', reportData.liabilityGroups, totals.totalLiabilities, 'TOTAL LIABILITIES');
+        addGroup('EQUITY', reportData.equityGroups, totals.totalEquity, 'TOTAL EQUITY');
+        data.push({ 'Account': '', 'Amount': '' });
+        data.push({ 'Account': '            TOTAL LIABILITIES DAN EQUITY', 'Amount': fmtCur(totals.totalLiabilities + totals.totalEquity) });
 
         const ws = XLSX.utils.json_to_sheet(data);
-        ws['!cols'] = [{ wch: 25 }, { wch: 12 }, { wch: 40 }, { wch: 20 }];
+        ws['!cols'] = [{ wch: 55 }, { wch: 25 }];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Balance Sheet');
         XLSX.writeFile(wb, `BalanceSheet_${asOfDate}.xlsx`);
@@ -160,122 +199,142 @@ const BalanceSheet = () => {
 
     // ── Export PDF ──────────────────────────────────────────────────────────────
     const handleExportPDF = () => {
+        if (!reportData) return;
         const fmtAmt = (v) => {
+            if (v === null || v === undefined) return '';
             const neg = v < 0;
-            const s = `Rp ${Math.abs(v).toLocaleString('id-ID')}`;
-            return neg ? `<span style="color:#ef4444">(${s})</span>` : s;
+            const s = `Rp. ${Math.abs(v).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            return neg ? `Rp.(${Math.abs(v).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : s;
         };
 
-        const sectionRows = (items) =>
-            items.map(i => `
-            <tr>
-                <td style="padding:3px 8px;font-family:monospace;color:#64748b;width:100px">${i.code}</td>
-                <td style="padding:3px 8px">${i.name}${i.isCalculated ? ' <em style="font-size:10px;color:#94a3b8">(calculated)</em>' : ''}</td>
-                <td style="padding:3px 8px;text-align:right;font-family:monospace">${fmtAmt(i.balance)}</td>
-            </tr>`).join('');
+        const doubleUnderline = `border-top:1px solid #000;border-bottom:3px double #000;`;
 
-        const secHeader = (label, total, color) => `
-            <tr style="background:${color}10;border-top:2px solid ${color}">
-                <td colspan="2" style="padding:6px 8px;font-weight:800;font-size:12px;color:${color};letter-spacing:.06em;text-transform:uppercase">${label}</td>
-                <td style="padding:6px 8px;text-align:right;font-family:monospace;font-weight:800;color:${color}">${fmtAmt(total)}</td>
-            </tr>`;
-
-        const subtotal = (label, val) => `
-            <tr style="background:#f1f5f9;border-top:1px solid #e2e8f0">
-                <td></td>
-                <td style="padding:4px 8px;font-weight:700">${label}</td>
-                <td style="padding:4px 8px;text-align:right;font-family:monospace;font-weight:700">${fmtAmt(val)}</td>
-            </tr>`;
-
-        const balanced = Math.abs(totals.difference) < 1;
+        const renderGroup = (groups) => groups.map(g => {
+            if (g.items.length === 0) return '';
+            return `
+                <tr><td colspan="2" style="padding:8px 0 2px 32px;font-weight:700;font-size:12px">${g.label}</td></tr>
+                ${g.items.map(i => `
+                    <tr>
+                        <td style="padding:1px 0 1px 64px;font-size:11px">${i.name}${i.isCalculated ? ' <em style="font-size:9px;color:#888">(calc)</em>' : ''}</td>
+                        <td style="text-align:right;padding:1px 8px;font-size:11px;white-space:nowrap">${fmtAmt(i.balance)}</td>
+                    </tr>
+                `).join('')}
+                <tr><td></td><td style="padding:4px 0"></td></tr>
+                <tr>
+                    <td style="text-align:right;padding:2px 16px 2px 0;font-weight:800;font-size:11px">${g.totalLabel}</td>
+                    <td style="text-align:right;padding:2px 8px;font-weight:800;font-size:12px;${doubleUnderline}">${fmtAmt(g.total)}</td>
+                </tr>
+                <tr><td colspan="2" style="padding:6px 0"></td></tr>
+            `;
+        }).join('');
 
         const bodyHTML = `
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
-            <!-- LEFT: Assets -->
-            <div>
-                <table style="width:100%;border-collapse:collapse;font-size:12px">
-                    ${secHeader('Assets', totals.totalAssets, '#16a34a')}
-                    ${sectionRows(balances.assets)}
-                    ${subtotal('TOTAL ASSETS', totals.totalAssets)}
-                </table>
-            </div>
-            <!-- RIGHT: Liabilities + Equity -->
-            <div>
-                <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px">
-                    ${secHeader('Liabilities', totals.totalLiabilities, '#dc2626')}
-                    ${sectionRows(balances.liabilities)}
-                    ${subtotal('Total Liabilities', totals.totalLiabilities)}
-                </table>
-                <table style="width:100%;border-collapse:collapse;font-size:12px">
-                    ${secHeader('Equity', totals.totalEquity, '#2563eb')}
-                    ${sectionRows(balances.equity)}
-                    ${subtotal('Total Equity', totals.totalEquity)}
-                </table>
-            </div>
-        </div>
-        <!-- Accounting Equation -->
-        <div style="margin-top:24px;padding:14px;border:2px solid ${balanced ? '#16a34a' : '#dc2626'};border-radius:8px;background:${balanced ? '#f0fdf4' : '#fef2f2'}">
-            <div style="display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:800">
-                <div style="text-align:center">
-                    <div style="color:#64748b;font-size:10px;font-weight:600;text-transform:uppercase">Total Assets</div>
-                    <div style="color:#16a34a;font-family:monospace;font-size:15px">${fmtAmt(totals.totalAssets)}</div>
-                </div>
-                <div style="color:#94a3b8;font-size:20px">=</div>
-                <div style="text-align:center">
-                    <div style="color:#64748b;font-size:10px;font-weight:600;text-transform:uppercase">Total Liabilities</div>
-                    <div style="color:#dc2626;font-family:monospace;font-size:15px">${fmtAmt(totals.totalLiabilities)}</div>
-                </div>
-                <div style="color:#94a3b8;font-size:20px">+</div>
-                <div style="text-align:center">
-                    <div style="color:#64748b;font-size:10px;font-weight:600;text-transform:uppercase">Total Equity</div>
-                    <div style="color:#2563eb;font-family:monospace;font-size:15px">${fmtAmt(totals.totalEquity)}</div>
-                </div>
-                <div style="border-left:2px solid #e2e8f0;padding-left:16px;text-align:center">
-                    <div style="font-size:11px;color:${balanced ? '#16a34a' : '#dc2626'};font-weight:800">${balanced ? '✓ BALANCED' : '✗ NOT BALANCED'}</div>
-                    <div style="font-family:monospace;font-size:11px;color:#94a3b8">Diff: ${fmtAmt(totals.difference)}</div>
-                </div>
-            </div>
+        <table style="width:100%;border-collapse:collapse;font-family:'Times New Roman',Times,serif;border:2px solid #334155">
+            <!-- ASSETS -->
+            <tr><td colspan="2" style="padding:12px 16px 4px;font-weight:800;font-size:14px;border-bottom:1px solid #e2e8f0">ASSETS</td></tr>
+            ${renderGroup(reportData.assetGroups)}
+            <tr>
+                <td style="text-align:right;padding:8px 16px 4px 0;font-weight:900;font-size:13px">TOTAL ASSETS</td>
+                <td style="text-align:right;padding:8px 8px 4px;font-weight:900;font-size:13px;${doubleUnderline}">${fmtAmt(totals.totalAssets)}</td>
+            </tr>
+            <tr><td colspan="2" style="padding:16px 0;border-bottom:2px solid #334155"></td></tr>
+
+            <!-- LIABILITIES -->
+            <tr><td colspan="2" style="padding:12px 16px 4px;font-weight:800;font-size:14px;border-bottom:1px solid #e2e8f0">LIABILITIES</td></tr>
+            ${renderGroup(reportData.liabilityGroups)}
+            <tr><td colspan="2" style="padding:8px 0"></td></tr>
+
+            <!-- EQUITY -->
+            <tr><td colspan="2" style="padding:12px 16px 4px;font-weight:800;font-size:14px;border-bottom:1px solid #e2e8f0">EQUITY</td></tr>
+            ${renderGroup(reportData.equityGroups)}
+            <tr><td colspan="2" style="padding:8px 0"></td></tr>
+
+            <tr>
+                <td style="text-align:right;padding:8px 16px 4px 0;font-weight:900;font-size:13px">TOTAL LIABILITIES DAN EQUITY</td>
+                <td style="text-align:right;padding:8px 8px 4px;font-weight:900;font-size:13px;${doubleUnderline}">${fmtAmt(totals.totalLiabilities + totals.totalEquity)}</td>
+            </tr>
+            <tr><td colspan="2" style="padding:8px 0"></td></tr>
+        </table>
+        <div style="display:flex;justify-content:space-between;margin-top:32px;font-size:11px;font-family:'Times New Roman',Times,serif">
+            <div style="text-align:center;min-width:180px"><div>Approved By,</div><div style="margin-top:48px;border-top:1px solid #000;padding-top:4px">________________</div></div>
+            <div style="text-align:center;min-width:180px"><div>Created By,</div><div style="margin-top:48px;border-top:1px solid #000;padding-top:4px">________________</div></div>
         </div>`;
 
         printReport({
-            reportName: 'Balance Sheet',
+            reportName: 'BALANCE SHEET',
             companyInfo: companySettings,
-            period: `As of ${asOfLabel}`,
+            period: `Per ${asOfLabel}`,
             bodyHTML,
-            note: '"Current Year Net Income" is auto-calculated from Revenue minus Expenses for the period. "Historical Balancing" adjusts Equity to equal Total Assets minus Total Liabilities. Click any account in the app to view transactions in the General Ledger.'
+            note: ''
         });
     };
 
-    const isBalanced = Math.abs(totals.difference) < 1;
+    // ── Sub-Components ──────────────────────────────────────────────────────────
+    const DoubleUnderline = () => (
+        <div className="flex flex-col gap-[2px] mt-1 ml-auto" style={{ width: '140px' }}>
+            <div className="border-t border-silver-light/60" />
+            <div className="border-t-2 border-silver-light/60" />
+        </div>
+    );
 
     const AccountRow = ({ acc }) => (
         <div
             onClick={() => handleAccountClick(acc.id)}
-            className={`flex justify-between items-center py-2 px-4 border-b border-dark-border/30 text-sm hover:bg-dark-surface/50 smooth-transition ${acc.isCalculated ? 'cursor-default italic' : 'cursor-pointer group'}`}
+            className={`flex justify-between items-center py-[3px] pl-16 pr-4 text-sm hover:bg-dark-surface/50 smooth-transition ${acc.isCalculated ? 'cursor-default italic text-silver-dark' : 'cursor-pointer group'}`}
         >
-            <div className="flex items-center gap-3">
-                <span className={`font-mono text-accent-orange min-w-[80px] ${acc.isCalculated ? '' : 'group-hover:underline'}`}>{acc.code}</span>
-                <span className="text-silver-light">{acc.name}</span>
-            </div>
-            <span className="font-mono text-silver-light font-medium">{fmtCur(acc.balance)}</span>
+            <span className={`text-silver-light ${acc.isCalculated ? 'text-silver-dark italic' : 'group-hover:text-accent-orange'}`}>{acc.name}</span>
+            <span className="font-mono text-silver-light text-xs min-w-[160px] text-right">{fmtCur(acc.balance)}</span>
         </div>
     );
 
-    const SectionCard = ({ title, icon: Icon, data, total, colorClass }) => (
-        <div className="glass-card rounded-lg overflow-hidden">
-            <div className={`flex items-center justify-between py-3 px-4 ${colorClass} border-b border-dark-border`}>
-                <div className="flex items-center gap-2">
-                    <Icon className="w-5 h-5" />
-                    <h3 className="font-bold text-lg">{title}</h3>
-                </div>
-                <span className="font-bold text-lg font-mono">{fmtCur(total)}</span>
-            </div>
-            <div className="divide-y divide-dark-border/30">
-                {data.length === 0
-                    ? <div className="p-4 text-center text-silver-dark text-sm">No data</div>
-                    : data.map(acc => <AccountRow key={acc.id} acc={acc} />)}
+    const SubGroupHeader = ({ label }) => (
+        <div className="py-2 pl-8 pr-4">
+            <span className="text-sm font-bold text-silver-light tracking-wide">{label}</span>
+        </div>
+    );
+
+    const SubTotal = ({ label, value }) => (
+        <div className="flex justify-end items-center py-1 pr-4 mt-1">
+            <span className="text-sm font-bold text-silver-light mr-6 tracking-wide">{label}</span>
+            <div className="min-w-[160px] text-right">
+                <span className="font-mono text-sm font-bold text-silver-light">{fmtCur(value)}</span>
+                <DoubleUnderline />
             </div>
         </div>
+    );
+
+    const GrandTotal = ({ label, value }) => (
+        <div className="flex justify-end items-center py-3 pr-4 mt-2">
+            <span className="text-base font-extrabold text-white mr-6 tracking-wide">{label}</span>
+            <div className="min-w-[160px] text-right">
+                <span className="font-mono text-base font-extrabold text-white">{fmtCur(value)}</span>
+                <div className="flex flex-col gap-[2px] mt-1 ml-auto" style={{ width: '160px' }}>
+                    <div className="border-t border-white/60" />
+                    <div className="border-t-2 border-white/60" />
+                </div>
+            </div>
+        </div>
+    );
+
+    const SectionHeader = ({ label }) => (
+        <div className="py-3 pl-4 pr-4 border-b border-dark-border/40">
+            <span className="text-lg font-extrabold text-white tracking-wider">{label}</span>
+        </div>
+    );
+
+    const renderGroupedSection = (groups) => (
+        groups.map((g, i) => {
+            if (g.items.length === 0) return null;
+            return (
+                <div key={i} className="mb-2">
+                    <SubGroupHeader label={g.label} />
+                    {g.items.map(acc => <AccountRow key={acc.id} acc={acc} />)}
+                    <div className="h-2" />
+                    <SubTotal label={g.totalLabel} value={g.total} />
+                    <div className="h-4" />
+                </div>
+            );
+        })
     );
 
     return (
@@ -287,7 +346,7 @@ const BalanceSheet = () => {
                         <Scale className="w-8 h-8" />
                         Balance Sheet
                     </h1>
-                    <p className="text-silver-dark mt-1">Financial Position — As of {asOfLabel}</p>
+                    <p className="text-silver-dark mt-1">Financial Position — Per {asOfLabel}</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <Button variant="secondary" icon={RefreshCw} onClick={fetchBalanceSheet}>Refresh</Button>
@@ -302,7 +361,7 @@ const BalanceSheet = () => {
                 </div>
             </div>
 
-            {/* Date Selection & Balance Status */}
+            {/* Date Selection */}
             <div className="flex flex-col md:flex-row gap-4">
                 <div className="glass-card p-4 rounded-lg flex items-center gap-4 flex-1">
                     <Calendar className="w-5 h-5 text-accent-orange" />
@@ -324,77 +383,76 @@ const BalanceSheet = () => {
                     </div>
                 </div>
 
-                <div className={`glass-card p-4 rounded-lg flex items-center justify-between gap-6 border-l-4 ${isBalanced ? 'border-green-500' : 'border-red-500'} min-w-[280px]`}>
-                    <div>
-                        <p className="text-xs text-silver-dark uppercase tracking-wider">Accounting Equation</p>
-                        <div className="flex items-center gap-2 mt-1">
-                            {isBalanced ? (
-                                <><CheckCircle className="w-5 h-5 text-green-400" /><span className="text-lg font-bold text-green-400">BALANCED</span></>
-                            ) : (
-                                <><AlertCircle className="w-5 h-5 text-red-500" /><span className="text-lg font-bold text-red-500">NOT BALANCED</span></>
-                            )}
-                        </div>
+                {/* Summary Cards */}
+                <div className="flex gap-3">
+                    <div className="glass-card p-3 rounded-lg border-l-4 border-green-500 min-w-[180px]">
+                        <p className="text-[10px] text-silver-dark uppercase">Total Assets</p>
+                        <p className="text-lg font-bold text-green-400 font-mono">{fmtCur(totals.totalAssets)}</p>
                     </div>
-                    <div className="text-right">
-                        <p className="text-xs text-silver-dark">Difference</p>
-                        <p className={`font-mono font-bold ${isBalanced ? 'text-silver-light' : 'text-red-400'}`}>{fmtCur(totals.difference)}</p>
+                    <div className="glass-card p-3 rounded-lg border-l-4 border-red-500 min-w-[180px]">
+                        <p className="text-[10px] text-silver-dark uppercase">Total Liabilities</p>
+                        <p className="text-lg font-bold text-red-400 font-mono">{fmtCur(totals.totalLiabilities)}</p>
+                    </div>
+                    <div className="glass-card p-3 rounded-lg border-l-4 border-blue-500 min-w-[180px]">
+                        <p className="text-[10px] text-silver-dark uppercase">Total Equity</p>
+                        <p className="text-lg font-bold text-blue-400 font-mono">{fmtCur(totals.totalEquity)}</p>
                     </div>
                 </div>
             </div>
 
             {loading ? (
                 <div className="glass-card p-12 rounded-lg text-center text-silver-dark">Loading balance sheet...</div>
-            ) : (
-                <>
-                    {/* Summary Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="glass-card p-4 rounded-lg border-l-4 border-green-500">
-                            <p className="text-xs text-silver-dark uppercase">Total Assets</p>
-                            <p className="text-2xl font-bold text-green-400 font-mono">{fmtCur(totals.totalAssets)}</p>
-                        </div>
-                        <div className="glass-card p-4 rounded-lg border-l-4 border-red-500">
-                            <p className="text-xs text-silver-dark uppercase">Total Liabilities</p>
-                            <p className="text-2xl font-bold text-red-400 font-mono">{fmtCur(totals.totalLiabilities)}</p>
-                        </div>
-                        <div className="glass-card p-4 rounded-lg border-l-4 border-blue-500">
-                            <p className="text-xs text-silver-dark uppercase">Total Equity</p>
-                            <p className="text-2xl font-bold text-blue-400 font-mono">{fmtCur(totals.totalEquity)}</p>
-                        </div>
-                    </div>
+            ) : reportData ? (
+                <div className="glass-card rounded-lg overflow-hidden border border-dark-border/50">
+                    {/* ── ASSETS ── */}
+                    <SectionHeader label="ASSETS" />
+                    {renderGroupedSection(reportData.assetGroups)}
+                    <GrandTotal label="TOTAL ASSETS" value={totals.totalAssets} />
+                    <div className="border-t-2 border-dark-border/40 mx-4" />
 
-                    {/* Balance Sheet Sections */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <SectionCard title="ASSETS" icon={TrendingUp} data={balances.assets} total={totals.totalAssets} colorClass="bg-green-500/20 text-green-400" />
-                        <div className="space-y-4">
-                            <SectionCard title="LIABILITIES" icon={FileText} data={balances.liabilities} total={totals.totalLiabilities} colorClass="bg-red-500/20 text-red-400" />
-                            <SectionCard title="EQUITY" icon={Shield} data={balances.equity} total={totals.totalEquity} colorClass="bg-blue-500/20 text-blue-400" />
-                        </div>
-                    </div>
+                    {/* ── LIABILITIES ── */}
+                    <div className="mt-4" />
+                    <SectionHeader label="LIABILITIES" />
+                    {renderGroupedSection(reportData.liabilityGroups)}
+                    <GrandTotal label="TOTAL LIABILITIES" value={totals.totalLiabilities} />
+                    <div className="border-t-2 border-dark-border/40 mx-4" />
 
-                    {/* Accounting Equation Footer */}
-                    <div className={`glass-card p-4 rounded-lg border-2 ${isBalanced ? 'border-green-500/30 bg-green-500/5' : 'border-red-500/30 bg-red-500/5'}`}>
-                        <div className="flex items-center justify-between text-center">
-                            <div className="flex-1">
-                                <p className="text-xs text-silver-dark uppercase">Total Assets</p>
-                                <p className="text-xl font-bold text-green-400 font-mono">{fmtCur(totals.totalAssets)}</p>
-                            </div>
-                            <div className="text-2xl font-bold text-silver-dark">=</div>
-                            <div className="flex-1">
-                                <p className="text-xs text-silver-dark uppercase">Total Liabilities</p>
-                                <p className="text-xl font-bold text-red-400 font-mono">{fmtCur(totals.totalLiabilities)}</p>
-                            </div>
-                            <div className="text-2xl font-bold text-silver-dark">+</div>
-                            <div className="flex-1">
-                                <p className="text-xs text-silver-dark uppercase">Total Equity</p>
-                                <p className="text-xl font-bold text-blue-400 font-mono">{fmtCur(totals.totalEquity)}</p>
+                    {/* ── EQUITY ── */}
+                    <div className="mt-4" />
+                    <SectionHeader label="EQUITY" />
+                    {renderGroupedSection(reportData.equityGroups)}
+
+                    {/* Net Income line */}
+                    <div className="flex justify-between items-center py-[3px] pl-8 pr-4 text-sm mt-2">
+                        <span className="text-silver-dark italic">LABA / RUGI Per {asOfLabel}</span>
+                        <span className="font-mono text-silver-light text-xs min-w-[160px] text-right italic">{fmtCur(
+                            (() => {
+                                const niAcc = reportData.equity.find(a => a.id === 'net-income');
+                                return niAcc ? niAcc.balance : 0;
+                            })()
+                        )}</span>
+                    </div>
+                    <div className="h-4" />
+
+                    <GrandTotal label="TOTAL EQUITY" value={totals.totalEquity} />
+                    <div className="border-t-2 border-dark-border/40 mx-4" />
+
+                    {/* ── TOTAL LIABILITIES + EQUITY ── */}
+                    <div className="py-4 pr-4 mt-2 mb-2 flex justify-end items-center bg-dark-surface/30">
+                        <span className="text-base font-extrabold text-accent-orange mr-6 tracking-wide">TOTAL LIABILITIES DAN EQUITY</span>
+                        <div className="min-w-[160px] text-right">
+                            <span className="font-mono text-base font-extrabold text-accent-orange">{fmtCur(totals.totalLiabilities + totals.totalEquity)}</span>
+                            <div className="flex flex-col gap-[2px] mt-1 ml-auto" style={{ width: '160px' }}>
+                                <div className="border-t border-accent-orange/60" />
+                                <div className="border-t-2 border-accent-orange/60" />
                             </div>
                         </div>
                     </div>
-                </>
-            )}
+                </div>
+            ) : null}
 
             <div className="text-center text-xs text-silver-dark mt-6 italic">
-                * Click on an account to view its transactions in the General Ledger. "Current Year Net Income" is auto-calculated from Revenue minus Expenses. "Historical Balancing" adjusts Equity to match Total Assets - Total Liabilities.
+                * Click on an account to view its transactions in the General Ledger. "LABA / RUGI PERIODE BERJALAN" is auto-calculated from Revenue minus Expenses.
             </div>
         </div>
     );

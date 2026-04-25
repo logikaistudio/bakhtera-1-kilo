@@ -216,15 +216,15 @@ export async function resolveCOA({ codes = [], prefixes = [], type, nameHint, co
 
 // ── Standard Account Resolvers ────────────────────────────────────────────────
 
-/** Piutang Usaha (AR) — ASSET, code 1-03 / 1-04 */
+/** Piutang Usaha (AR) — ASSET, code 1-01-400 */
 export async function resolveARAccount(coaList) {
     return resolveCOA({
         coaList,
-        codes: ['1200', '1-03-001', '1-03-100', '1-04-001'],
-        prefixes: ['12', '1-03', '1-04'],
+        codes: ['1-01-400-0-1-00', '1-01-401-0-1-00', '1200', '1-03-100'],
+        prefixes: ['1-01-4', '1-01-40', '12'],
         type: 'ASSET',
-        nameHint: 'piutang'
-    }) || { code: '1200', name: 'Piutang Usaha', id: null, type: 'ASSET' };
+        nameHint: 'receivable'
+    }) || { code: '1-01-400-0-1-00', name: 'ACCOUNT RECEIVABLE', id: null, type: 'ASSET' };
 }
 
 /** Revenue / Pendapatan — REVENUE, code 4 */
@@ -285,15 +285,15 @@ export async function resolveBankAccount(coaList, selectedBank = null) {
     }) || { code: '1-01-101', name: 'Kas/Bank', id: null, type: 'ASSET' };
 }
 
-/** Hutang Usaha (AP) — LIABILITY, code 2 */
+/** Hutang Usaha (AP) — LIABILITY, code 2-01-100 */
 export async function resolveAPAccount(coaList) {
     return resolveCOA({
         coaList,
-        codes: ['2000', '2100', '2-01-001', '2-01-100'],
-        prefixes: ['2-01', '2'],
+        codes: ['2-01-100-0-1-00', '2-01-101-0-1-00', '2100', '2000'],
+        prefixes: ['2-01-1', '2-01-10', '2-01'],
         type: 'LIABILITY',
-        nameHint: 'hutang'
-    }) || { code: '2000', name: 'Hutang Usaha', id: null, type: 'LIABILITY' };
+        nameHint: 'payable'
+    }) || { code: '2-01-100-0-1-00', name: 'ACCOUNT PAYABLE', id: null, type: 'LIABILITY' };
 }
 
 /** HPP / COGS — COGS, code 5 */
