@@ -130,7 +130,6 @@ const GeneralJournal = () => {
             let q = supabase
                 .from('blink_journal_entries')
                 .select('*')
-                .eq('journal_type', 'general')
                 .order('entry_date', { ascending: false })
                 .order('created_at', { ascending: false });
 
