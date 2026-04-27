@@ -15,7 +15,7 @@ ALTER TABLE blink_journal_entries
 
 ALTER TABLE blink_journal_entries
     ADD CONSTRAINT blink_journal_entries_entry_type_check
-    CHECK (entry_type IN ('invoice', 'payment', 'po', 'bill_payment', 'adjustment', 'ar', 'ap', 'journal'));
+    CHECK (entry_type IN ('invoice', 'payment', 'purchase_order', 'manual', 'ar_payment', 'ap_payment', 'cogs', 'expense', 'po', 'bill_payment', 'adjustment', 'ar', 'ap', 'journal', 'auto'));
 
 -- 3. Also ensure blink_journal_entries has extra columns used by auto-journal code
 ALTER TABLE blink_journal_entries
