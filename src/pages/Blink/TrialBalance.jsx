@@ -57,13 +57,18 @@ const TrialBalance = () => {
 
             const combined = [...(r1.data || []), ...(r2.data || [])];
             
-            // Enhanced deduplication: use composite key (entry_number + entry_date + debit + credit)
-            // to catch duplicates from different fetch sources
+            // Deduplicate by id only (original entries are unique)
             const uniqueMap = new Map();
             combined.forEach(r => {
-                const key = `${r.id}-${r.entry_date}-${r.debit}-${r.credit}`;
-                if (!uniqueMap.has(key)) {
-                    uniqueMap.set(key, r);
+                if (!uniqueMap.has(r.id)) {
+                    uniqueMap.set(r.id, r);
+                } else {
+                    // If duplicate found, merge the values (in case of different sources)
+                    const existing = uniqueMap.get(r.id);
+                    // Keep the entry with coa_id if available
+                    if (!existing.coa_id && r.coa_id) {
+                        uniqueMap.set(r.id, r);
+                    }
                 }
             });
             const entries = Array.from(uniqueMap.values());
@@ -86,10 +91,10 @@ const TrialBalance = () => {
                 if (acc.name) accNameMap[acc.name.toLowerCase().trim()] = acc.id;
             });
 
-            // Conversion helper with edge case handling
+            // Conversion helper (revert to simple version to show all entries)
             const toIDR = (value, currency, exchangeRate) => {
-                if (!value || !Number.isFinite(value)) return 0;
-                if (currency && currency !== 'IDR' && (exchangeRate || 1) > 1) {
+                if (!value) return 0;
+                if (currency && currency !== 'IDR' && exchangeRate > 1) {
                     return value * exchangeRate;
                 }
                 return value;
@@ -123,8 +128,6 @@ const TrialBalance = () => {
                 const debit = toIDR(e.debit, e.currency, e.exchange_rate);
                 const credit = toIDR(e.credit, e.currency, e.exchange_rate);
 
-                if (!Number.isFinite(debit) || !Number.isFinite(credit)) return;
-
                 if (e.entry_date < dateRange.start) {
                     // It's Opening Balance
                     const isNormalCredit = ['LIABILITY', 'EQUITY', 'REVENUE'].includes(acc.type);
@@ -140,7 +143,7 @@ const TrialBalance = () => {
                 }
             });
 
-            // Calculate Closing with edge case handling
+            // Calculate Closing
             let totalOpening = 0;
             let totalDebit = 0;
             let totalCredit = 0;
@@ -157,11 +160,10 @@ const TrialBalance = () => {
                         acc.closing = acc.opening + acc.debitPeriod - acc.creditPeriod;
                     }
 
-                    // Accumulate totals with NaN check
-                    if (Number.isFinite(acc.opening)) totalOpening += acc.opening;
-                    if (Number.isFinite(acc.debitPeriod)) totalDebit += acc.debitPeriod;
-                    if (Number.isFinite(acc.creditPeriod)) totalCredit += acc.creditPeriod;
-                    if (Number.isFinite(acc.closing)) totalClosing += acc.closing;
+                    totalOpening += acc.opening;
+                    totalDebit += acc.debitPeriod;
+                    totalCredit += acc.creditPeriod;
+                    totalClosing += acc.closing;
 
                     return acc;
                 })
