@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { createAPPaymentJournal, getAllCOA } from '../../utils/journalHelper';
+import { createAPPaymentJournal, createAPReversalJournal, getAllCOA } from '../../utils/journalHelper';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
 import {
@@ -121,7 +121,7 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
 
             // Update AP transaction
             const newPaidAmount = (ap.paid_amount || 0) + parseFloat(formData.amount);
-            const newOutstanding = ap.original_amount - newPaidAmount;
+            const newOutstanding = Math.max(0, ap.original_amount - newPaidAmount);
 
             let newStatus = ap.status;
             if (newOutstanding <= 0) {
@@ -226,6 +226,27 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
                 console.log('AP Payment journal entries created');
             } catch (jeError) {
                 console.warn('[AP] Journal entry creation failed (non-critical):', jeError.message);
+            }
+
+            // ── REVERSAL JOURNAL: Jika Lunas ───────────────────────────────
+            if (newStatus === 'paid' && newOutstanding <= 0 && poIdentifier) {
+                try {
+                    const { data: poData } = await supabase
+                        .from('blink_purchase_orders')
+                        .select('*')
+                        .eq('id', poIdentifier)
+                        .single();
+
+                    if (poData) {
+                        await createAPReversalJournal({
+                            po: poData,
+                            coaList
+                        });
+                        console.log('[AP] Reversal journal created for PO', poIdentifier);
+                    }
+                } catch (revError) {
+                    console.warn('[AP] Reversal journal warning (non-critical):', revError.message);
+                }
             }
             // ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 

@@ -825,6 +825,109 @@ export async function createARPaymentJournal({
 }
 
 /**
+ * Create reversal journal entries when AR is fully paid.
+ * Reverses the original invoice journal: Dr Pendapatan / Cr Piutang Usaha
+ * This brings the AR balance to zero in GL while revenue is recognized.
+ */
+export async function createARReversalJournal({ invoice, coaList: providedCOA }) {
+    if (!invoice || !invoice.id) {
+        return { success: false, skipped: true, reason: 'invalid_invoice' };
+    }
+    const exists = await journalExists({ refType: 'ar_reversal', refId: invoice.id, entryType: 'reversal' });
+    if (exists) {
+        return { success: true, skipped: true, reason: 'duplicate_ar_reversal_journal' };
+    }
+    const coaList = providedCOA || await getAllCOA();
+    const [arCOA, defaultRevCOA] = await Promise.all([
+        resolveARAccount(coaList),
+        resolveRevenueAccount(coaList)
+    ]);
+
+    const batchId = generateUUID();
+    const jeNum = await generateJENumber('REV');
+    const exRate = invoice.currency !== 'IDR' ? (invoice.exchange_rate || 16000) : 1;
+    const desc = `Reversal - Invoice ${invoice.invoice_number} - ${invoice.customer_name}`;
+
+    const rows = [];
+    const items = Array.isArray(invoice.invoice_items) ? invoice.invoice_items : [];
+
+    if (items.length > 0) {
+        let itemIdx = 0;
+        for (const item of items) {
+            const amount = parseFloat(item.amount) || 0;
+            if (amount <= 0) continue;
+            itemIdx++;
+
+            let itemCOA = null;
+            if (item.coa_id) itemCOA = coaList.find(c => c.id === item.coa_id) || null;
+            if (!itemCOA) {
+                itemCOA = await resolveCOA({
+                    coaList,
+                    prefixes: ['4'],
+                    type: 'REVENUE',
+                    nameHint: item.description || item.item_name
+                }) || defaultRevCOA;
+            }
+
+            rows.push(buildJERow({
+                entryNumber: jeNum, suffix: `-D${String(itemIdx).padStart(2, '0')}`,
+                date: invoice.invoice_date,
+                entryType: 'reversal', refType: 'ar_reversal',
+                refId: invoice.id, refNumber: invoice.invoice_number,
+                coa: itemCOA,
+                debit: amount, credit: 0,
+                currency: invoice.currency, exchangeRate: exRate,
+                description: `${item.description || item.item_name || 'Revenue'} - ${desc}`,
+                batchId, source: 'auto',
+                partyName: invoice.customer_name, partyId: invoice.customer_id
+            }));
+        }
+    } else {
+        rows.push(buildJERow({
+            entryNumber: jeNum, suffix: '-D01',
+            date: invoice.invoice_date,
+            entryType: 'reversal', refType: 'ar_reversal',
+            refId: invoice.id, refNumber: invoice.invoice_number,
+            coa: defaultRevCOA,
+            debit: invoice.subtotal || invoice.total_amount, credit: 0,
+            currency: invoice.currency, exchangeRate: exRate,
+            description: desc, batchId, source: 'auto',
+            partyName: invoice.customer_name, partyId: invoice.customer_id
+        }));
+    }
+
+    if (invoice.tax_amount > 0) {
+        const taxCOA = await resolveCOA({ coaList, codes: ['2-01-406-0-1-00', '2-01-405-0-1-00'], prefixes: ['2'], type: 'LIABILITY', nameHint: 'ppn' }) ||
+            await resolveCOA({ coaList, prefixes: ['2'], type: 'LIABILITY', nameHint: 'tax' });
+        rows.push(buildJERow({
+            entryNumber: jeNum, suffix: '-D-TAX',
+            date: invoice.invoice_date,
+            entryType: 'reversal', refType: 'ar_reversal',
+            refId: invoice.id, refNumber: invoice.invoice_number,
+            coa: taxCOA,
+            debit: invoice.tax_amount, credit: 0,
+            currency: invoice.currency, exchangeRate: exRate,
+            description: `Tax Reversal - ${desc}`, batchId, source: 'auto',
+            partyName: invoice.customer_name, partyId: invoice.customer_id
+        }));
+    }
+
+    rows.push(buildJERow({
+        entryNumber: jeNum, suffix: '-C',
+        date: invoice.invoice_date,
+        entryType: 'reversal', refType: 'ar_reversal',
+        refId: invoice.id, refNumber: invoice.invoice_number,
+        coa: arCOA,
+        debit: 0, credit: invoice.total_amount,
+        currency: invoice.currency, exchangeRate: exRate,
+        description: desc, batchId, source: 'auto',
+        partyName: invoice.customer_name, partyId: invoice.customer_id
+    }));
+
+    return insertJournalEntries(rows);
+}
+
+/**
  * Create journal entries for COGS recognition (when invoice is created).
  * Dr HPP (COGS) / Cr Persediaan / Biaya Langsung
  * Note: Only creates if cogsAmount > 0
@@ -972,6 +1075,92 @@ export async function createAPPaymentJournal({
             partyName: ap.vendor_name, partyId: ap.vendor_id
         })
     ]);
+}
+
+/**
+ * Create reversal journal entries when AP is fully paid.
+ * Reverses the original PO approval journal: Dr Hutang Usaha / Cr Beban/COGS
+ */
+export async function createAPReversalJournal({ po, coaList: providedCOA }) {
+    if (!po || !po.id) {
+        return { success: false, skipped: true, reason: 'invalid_po' };
+    }
+    const exists = await journalExists({ refType: 'ap_reversal', refId: po.id, entryType: 'reversal' });
+    if (exists) {
+        return { success: true, skipped: true, reason: 'duplicate_ap_reversal_journal' };
+    }
+    const coaList = providedCOA || await getAllCOA();
+    const apCOA = await resolveAPAccount(coaList);
+
+    const batchId = generateUUID();
+    const jeNum = await generateJENumber('REV');
+    const exRate = po.currency !== 'IDR' ? (po.exchange_rate || 16000) : 1;
+    const desc = `Reversal - PO ${po.po_number} - ${po.vendor_name}`;
+
+    const rows = [];
+    const items = Array.isArray(po.po_items) ? po.po_items : [];
+
+    rows.push(buildJERow({
+        entryNumber: jeNum, suffix: '-D',
+        date: po.po_date,
+        entryType: 'reversal', refType: 'ap_reversal',
+        refId: po.id, refNumber: po.po_number,
+        coa: apCOA,
+        debit: po.total_amount || 0, credit: 0,
+        currency: po.currency, exchangeRate: exRate,
+        description: desc, batchId, source: 'auto',
+        partyName: po.vendor_name, partyId: po.vendor_id
+    }));
+
+    if (items.length > 0) {
+        let itemIdx = 0;
+        for (const item of items) {
+            const amount = parseFloat(item.amount) || 0;
+            if (amount <= 0) continue;
+            itemIdx++;
+
+            let itemCOA = null;
+            if (item.coa_id) {
+                itemCOA = coaList.find(c => c.id === item.coa_id) || null;
+            }
+            if (!itemCOA) {
+                itemCOA = await resolveCOA({
+                    coaList,
+                    prefixes: ['5', '6'],
+                    type: 'COGS',
+                    nameHint: item.item_name || item.description
+                });
+            }
+
+            rows.push(buildJERow({
+                entryNumber: jeNum, suffix: `-C${String(itemIdx).padStart(2, '0')}`,
+                date: po.po_date,
+                entryType: 'reversal', refType: 'ap_reversal',
+                refId: po.id, refNumber: po.po_number,
+                coa: itemCOA,
+                debit: 0, credit: amount,
+                currency: po.currency, exchangeRate: exRate,
+                description: `${item.item_name || item.description || 'Expense'} - ${desc}`,
+                batchId, source: 'auto',
+                partyName: po.vendor_name, partyId: po.vendor_id
+            }));
+        }
+    } else {
+        const defaultCOGS = await resolveCOGSAccount(coaList);
+        rows.push(buildJERow({
+            entryNumber: jeNum, suffix: '-C01',
+            date: po.po_date,
+            entryType: 'reversal', refType: 'ap_reversal',
+            refId: po.id, refNumber: po.po_number,
+            coa: defaultCOGS,
+            debit: 0, credit: po.total_amount || 0,
+            currency: po.currency, exchangeRate: exRate,
+            description: desc, batchId, source: 'auto',
+            partyName: po.vendor_name, partyId: po.vendor_id
+        }));
+    }
+
+    return insertJournalEntries(rows);
 }
 
 /**

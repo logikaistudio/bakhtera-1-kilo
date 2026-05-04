@@ -1,4 +1,3 @@
-```javascript
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import Button from '../../components/Common/Button';
@@ -93,9 +92,10 @@ const FinanceReports = () => {
             });
         }
 
-        // Process Inflows (Unpaid Invoices)
+        // Process Inflows (Unpaid and Partially Paid Invoices)
         invData.forEach(inv => {
             if (inv.status === 'paid' || inv.status === 'cancelled' || !inv.due_date) return;
+            if (inv.status === 'partially_paid' && (inv.outstanding_amount || 0) <= 0) return;
             
             const dueDate = new Date(inv.due_date);
             const amount = inv.outstanding_amount || inv.total || 0;
@@ -112,9 +112,11 @@ const FinanceReports = () => {
             }
         });
 
-        // Process Outflows (Outstanding POs)
+        // Process Outflows (Outstanding and Partially Paid POs)
         poData.forEach(po => {
             if (po.status === 'received' || po.status === 'cancelled' || !po.delivery_date) return;
+            if (po.status === 'paid' && (po.outstanding_amount || 0) <= 0) return;
+            if (po.status === 'partially_paid' && (po.outstanding_amount || 0) <= 0) return;
             
             // Assume Payment Due Date = Delivery Date + Term (approx 30 days if term missing)
             let dueDate = new Date(po.delivery_date);
@@ -149,31 +151,44 @@ const FinanceReports = () => {
         return 'Rp ' + value.toLocaleString('id-ID');
     };
 
-    // Calculate AR Outstanding
+    // Calculate AR Outstanding - include unpaid and partially paid
     const totalAROutstanding = invoices
-        .filter(inv => inv.status !== 'cancelled' && inv.status !== 'paid')
-        .reduce((sum, inv) => sum + (inv.outstanding_amount || 0), 0);
+        .filter(inv => 
+            inv.status !== 'cancelled' && 
+            inv.status !== 'paid' &&
+            inv.status !== 'partially_paid'
+        )
+        .reduce((sum, inv) => sum + (inv.outstanding_amount || inv.total_amount || 0), 0);
 
-    // Calculate AP Outstanding
+    // Calculate AP Outstanding - include unpaid and partially paid
     const totalAPOutstanding = pos
-        .filter(po => po.status !== 'cancelled' && po.status !== 'received')
+        .filter(po => 
+            po.status !== 'cancelled' && 
+            po.status !== 'received' &&
+            po.status !== 'paid'
+        )
         .reduce((sum, po) => sum + (po.outstanding_amount || po.total_amount || 0), 0);
 
     // Net Position
     const netPosition = totalAROutstanding - totalAPOutstanding;
 
-    // Overdue counts
+    // Overdue counts - include overdue unpaid and partially paid
     const overdueInvoices = invoices.filter(inv => {
-        if (!inv.due_date || inv.status === 'paid' || inv.status === 'cancelled') return false;
+        if (!inv.due_date || inv.status === 'paid' || inv.status === 'cancelled' || inv.status === 'partially_paid') return false;
         return new Date(inv.due_date) < new Date();
     }).length;
 
     const overduePOs = pos.filter(po => {
-        if (!po.delivery_date || po.status === 'received' || po.status === 'cancelled') return false;
-        return new Date(po.delivery_date) < new Date();
+        if (!po.delivery_date || po.status === 'received' || po.status === 'cancelled' || po.status === 'paid') return false;
+        const dueDate = new Date(po.delivery_date);
+        if (po.payment_terms) {
+            const days = parseInt(po.payment_terms.match(/\d+/) || [30]);
+            dueDate.setDate(dueDate.getDate() + days);
+        }
+        return dueDate < new Date();
     }).length;
 
-    // AR Aging calculation
+    // AR Aging calculation - include partially paid
     const calculateARAging = () => {
         const today = new Date();
         const aging = {
@@ -186,6 +201,7 @@ const FinanceReports = () => {
 
         invoices.forEach(inv => {
             if (inv.status === 'cancelled' || inv.status === 'paid' || !inv.due_date) return;
+            if (inv.status === 'partially_paid' && (inv.outstanding_amount || 0) <= 0) return;
 
             const dueDate = new Date(inv.due_date);
             const daysOverdue = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));
@@ -230,8 +246,17 @@ const FinanceReports = () => {
 
         pos.forEach(po => {
             if (po.status === 'cancelled' || po.status === 'received' || !po.delivery_date) return;
+            if (po.status === 'paid' && (po.outstanding_amount || 0) <= 0) return;
+            // Handle partially paid - check if there's still outstanding
+            if (po.status === 'partially_paid' && (po.outstanding_amount || 0) <= 0) return;
 
-            const dueDate = new Date(po.delivery_date);
+            let dueDate = new Date(po.delivery_date);
+            // Calculate actual due date based on payment terms
+            if (po.payment_terms) {
+                const days = parseInt(po.payment_terms.match(/\d+/) || [30]);
+                dueDate.setDate(dueDate.getDate() + days);
+            }
+            
             const daysOverdue = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));
             const outstanding = po.outstanding_amount || po.total_amount || 0;
 

@@ -358,9 +358,9 @@ const GeneralLedger = () => {
             };
 
             const prev = await fetchPrev();
-            const prevD = prev.reduce((s, e) => s + (toIDR(e.debit, e.currency, e.exchange_rate) ?? 0), 0);
-            const prevC = prev.reduce((s, e) => s + (toIDR(e.credit, e.currency, e.exchange_rate) ?? 0), 0);
-            const opening = isNormalCredit ? prevC - prevD : prevD - prevC;
+            const prevD = prev.reduce((s, e) => s + ((toIDR(e.debit, e.currency, e.exchange_rate) ?? 0)), 0);
+            const prevC = prev.reduce((s, e) => s + ((toIDR(e.credit, e.currency, e.exchange_rate) ?? 0)), 0);
+            const opening = isNormalCredit ? (prevC - prevD) : (prevD - prevC);
             setOpeningBalance(opening);
 
             // Current period: dual-fetch same pattern
@@ -391,8 +391,18 @@ const GeneralLedger = () => {
 
             if (r1.error) throw r1.error;
             const combined = [...(r1.data || []), ...(r2.data || []), ...(r3.data || [])];
-            // deduplicate
-            const unique = [...new Map(combined.map(r => [r.id, r])).values()];
+            
+            // Enhanced deduplication: use composite key (entry_number + entry_date + debit + credit)
+            // to catch duplicates from different fetch sources
+            const uniqueMap = new Map();
+            combined.forEach(r => {
+                const key = `${r.entry_number || r.id}-${r.entry_date}-${r.debit}-${r.credit}`;
+                if (!uniqueMap.has(key)) {
+                    uniqueMap.set(key, r);
+                }
+            });
+            const unique = Array.from(uniqueMap.values());
+            
             // sort chronologically
             unique.sort((a, b) => {
                 const d = a.entry_date.localeCompare(b.entry_date);
@@ -434,20 +444,40 @@ const GeneralLedger = () => {
         return list;
     }, [entries, searchTerm, sourceFilter]);
 
-    const totalDebit = filteredEntries.reduce((s, e) => s + (toIDR(e.debit, e.currency, e.exchange_rate) ?? 0), 0);
-    const totalCredit = filteredEntries.reduce((s, e) => s + (toIDR(e.credit, e.currency, e.exchange_rate) ?? 0), 0);
-    const closingBalance = isNormalCredit
-        ? openingBalance + totalCredit - totalDebit
-        : openingBalance + totalDebit - totalCredit;
+    const totalDebit = filteredEntries.reduce((s, e) => {
+        const val = toIDR(e.debit, e.currency, e.exchange_rate);
+        return s + (val ?? 0);
+    }, 0);
+    const totalCredit = filteredEntries.reduce((s, e) => {
+        const val = toIDR(e.credit, e.currency, e.exchange_rate);
+        return s + (val ?? 0);
+    }, 0);
+    
+    // Enhanced balance calculation with edge case handling
+    const closingBalance = useMemo(() => {
+        if (!Number.isFinite(openingBalance)) return 0;
+        const td = Number.isFinite(totalDebit) ? totalDebit : 0;
+        const tc = Number.isFinite(totalCredit) ? totalCredit : 0;
+        
+        if (isNormalCredit) {
+            return openingBalance + tc - td;
+        } else {
+            return openingBalance + td - tc;
+        }
+    }, [openingBalance, totalDebit, totalCredit, isNormalCredit]);
 
-    // Running balance with DR/CR tag
+    // Running balance with DR/CR tag and edge case handling
     const rows = useMemo(() => {
-        let running = openingBalance;
+        let running = Number.isFinite(openingBalance) ? openingBalance : 0;
         return filteredEntries.map(e => {
             const d = toIDR(e.debit, e.currency, e.exchange_rate) ?? 0;
             const c = toIDR(e.credit, e.currency, e.exchange_rate) ?? 0;
-            if (isNormalCredit) running += (c - d);
-            else running += (d - c);
+            
+            if (isNormalCredit) {
+                running = running + c - d;
+            } else {
+                running = running + d - c;
+            }
             return { ...e, runningBalance: running };
         });
     }, [filteredEntries, openingBalance, isNormalCredit]);

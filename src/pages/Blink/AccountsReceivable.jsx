@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { createARPaymentJournal, getAllCOA } from '../../utils/journalHelper';
+import { createARPaymentJournal, createARReversalJournal, getAllCOA } from '../../utils/journalHelper';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
 import {
@@ -962,6 +962,27 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
                 console.log('[AR] Payment journal created for', paymentNumber);
             } catch (jeError) {
                 console.warn('[AR] Payment journal warning (non-critical):', jeError.message);
+            }
+
+            // ── REVERSAL JOURNAL: Jika Lunas ───────────────────────────────
+            if (newStatus === 'paid' && newOutstanding <= 0) {
+                try {
+                    const { data: invoiceData } = await supabase
+                        .from('blink_invoices')
+                        .select('*')
+                        .eq('id', invoiceId)
+                        .single();
+
+                    if (invoiceData) {
+                        await createARReversalJournal({
+                            invoice: invoiceData,
+                            coaList
+                        });
+                        console.log('[AR] Reversal journal created for', invoiceId);
+                    }
+                } catch (revError) {
+                    console.warn('[AR] Reversal journal warning (non-critical):', revError.message);
+                }
             }
             // ───────────────────────────────────────────────────────────────
 

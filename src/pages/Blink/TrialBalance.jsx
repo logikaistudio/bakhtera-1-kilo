@@ -56,8 +56,17 @@ const TrialBalance = () => {
             if (r2.error) throw r2.error;
 
             const combined = [...(r1.data || []), ...(r2.data || [])];
-            // deduplicate by id
-            const entries = [...new Map(combined.map(r => [r.id, r])).values()];
+            
+            // Enhanced deduplication: use composite key (entry_number + entry_date + debit + credit)
+            // to catch duplicates from different fetch sources
+            const uniqueMap = new Map();
+            combined.forEach(r => {
+                const key = `${r.id}-${r.entry_date}-${r.debit}-${r.credit}`;
+                if (!uniqueMap.has(key)) {
+                    uniqueMap.set(key, r);
+                }
+            });
+            const entries = Array.from(uniqueMap.values());
 
             // 3. Process Data
             // 3. Process Data
@@ -77,10 +86,10 @@ const TrialBalance = () => {
                 if (acc.name) accNameMap[acc.name.toLowerCase().trim()] = acc.id;
             });
 
-            // Conversion helper
+            // Conversion helper with edge case handling
             const toIDR = (value, currency, exchangeRate) => {
-                if (!value) return 0;
-                if (currency && currency !== 'IDR' && exchangeRate > 1) {
+                if (!value || !Number.isFinite(value)) return 0;
+                if (currency && currency !== 'IDR' && (exchangeRate || 1) > 1) {
                     return value * exchangeRate;
                 }
                 return value;
@@ -109,17 +118,15 @@ const TrialBalance = () => {
                 }
 
                 const acc = accMap[targetId];
-                if (!acc) return; // Should not happen now
+                if (!acc) return;
 
                 const debit = toIDR(e.debit, e.currency, e.exchange_rate);
                 const credit = toIDR(e.credit, e.currency, e.exchange_rate);
 
+                if (!Number.isFinite(debit) || !Number.isFinite(credit)) return;
+
                 if (e.entry_date < dateRange.start) {
                     // It's Opening Balance
-                    // Normal Balance Logic? 
-                    // Trial Balance usually shows Debit/Credit raw sum, OR Net Balance.
-                    // Usually: Opening (Net), Debit Mutation, Credit Mutation, Closing (Net).
-
                     const isNormalCredit = ['LIABILITY', 'EQUITY', 'REVENUE'].includes(acc.type);
                     if (isNormalCredit) {
                         acc.opening += (credit - debit);
@@ -133,7 +140,7 @@ const TrialBalance = () => {
                 }
             });
 
-            // Calculate Closing
+            // Calculate Closing with edge case handling
             let totalOpening = 0;
             let totalDebit = 0;
             let totalCredit = 0;
@@ -150,20 +157,18 @@ const TrialBalance = () => {
                         acc.closing = acc.opening + acc.debitPeriod - acc.creditPeriod;
                     }
 
+                    // Accumulate totals with NaN check
+                    if (Number.isFinite(acc.opening)) totalOpening += acc.opening;
+                    if (Number.isFinite(acc.debitPeriod)) totalDebit += acc.debitPeriod;
+                    if (Number.isFinite(acc.creditPeriod)) totalCredit += acc.creditPeriod;
+                    if (Number.isFinite(acc.closing)) totalClosing += acc.closing;
+
                     return acc;
                 })
                 .filter(acc => acc.opening !== 0 || acc.debitPeriod !== 0 || acc.creditPeriod !== 0) // Hide zero balance accounts
                 .sort((a, b) => a.code.localeCompare(b.code)); // Sort strictly by Account Code
 
-            // Compute Report Totals (Raw Columns)
-            processed.forEach(acc => {
-                totalOpening += acc.opening;
-                totalDebit += acc.debitPeriod;
-                totalCredit += acc.creditPeriod;
-                totalClosing += acc.closing;
-            });
-
-            setBalances(processed);
+            // Set balanced totals
             setTotals({
                 opening: totalOpening,
                 debit: totalDebit,
