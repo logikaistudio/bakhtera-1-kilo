@@ -646,7 +646,7 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment, canEditAP
     };
 
     return (
-        <Modal isOpen={true} onClose={onClose} maxWidth="max-w-4xl">
+        <Modal isOpen={true} onClose={onClose} maxWidth="max-w-6xl">
             <div className="p-6">
                 <div className="flex items-center justify-between mb-6">
                     <h2 className="text-2xl font-bold gradient-text">AP Detail</h2>
@@ -711,10 +711,7 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment, canEditAP
                                                 {item.description || '-'}
                                             </td>
                                             <td className="py-3 px-4 text-right text-silver-light align-top whitespace-nowrap">
-                                                <div className="flex flex-col items-end">
-                                                    <span>{item.qty}</span>
-                                                    <span className="text-xs text-silver-dark">{item.unit}</span>
-                                                </div>
+                                                {item.qty} {item.unit}
                                             </td>
                                             <td className="py-3 px-4 text-right text-silver-light align-top whitespace-nowrap">
                                                 {formatCurrency(item.unit_price || item.rate || 0, ap.currency)}

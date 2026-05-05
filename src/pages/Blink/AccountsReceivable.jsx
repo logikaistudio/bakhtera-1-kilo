@@ -545,7 +545,7 @@ const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency, canEditAR
     const sc = statusConfig[ar.status] || { label: (ar.status || 'OUTSTANDING').toUpperCase(), cls: 'bg-gray-500/20 text-gray-400' };
 
     return (
-        <Modal isOpen={true} onClose={onClose} maxWidth="max-w-4xl">
+        <Modal isOpen={true} onClose={onClose} maxWidth="max-w-6xl">
             <div className="p-6">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
@@ -624,10 +624,7 @@ const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency, canEditAR
                                                 {item.description || '-'}
                                             </td>
                                             <td className="py-3 px-4 text-right text-silver-light align-top whitespace-nowrap">
-                                                <div className="flex flex-col items-end">
-                                                    <span>{item.qty || 1}</span>
-                                                    <span className="text-xs text-silver-dark">{item.unit || 'Job'}</span>
-                                                </div>
+                                                {item.qty || 1} {item.unit || 'Job'}
                                             </td>
                                             <td className="py-3 px-4 text-right text-silver-light align-top whitespace-nowrap">
                                                 {formatCurrency(parseFloat(item.rate || item.unit_price) || 0, ar.currency)}
