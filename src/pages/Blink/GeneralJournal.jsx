@@ -604,7 +604,6 @@ const GeneralJournal = () => {
                                 <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '130px' }}>Debit</th>
                                 <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '130px' }}>Credit</th>
                                 <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '110px' }}>Source</th>
-                                <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '60px' }}>Action</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
@@ -668,15 +667,6 @@ const GeneralJournal = () => {
                                                     {badge.label}
                                                 </span>
                                             </td>
-                                            <td className="px-3 py-2.5 text-center">
-                                                <button
-                                                    onClick={ev => { ev.stopPropagation(); setSelectedGroup(group); setShowDetailModal(true); }}
-                                                    className="p-1.5 text-silver-dark hover:text-accent-blue hover:bg-blue-500/10 rounded smooth-transition"
-                                                    title="View Detail"
-                                                >
-                                                    <Eye className="w-3.5 h-3.5" />
-                                                </button>
-                                            </td>
                                         </tr>
 
                                         {/* ── Expanded Lines ── */}
@@ -717,7 +707,6 @@ const GeneralJournal = () => {
                                                     ) : <span className="text-silver-dark">-</span>}
                                                 </td>
                                                 <td />
-                                                <td />
                                             </tr>
                                         ))}
                                     </React.Fragment>
@@ -730,7 +719,7 @@ const GeneralJournal = () => {
                                     <td colSpan={8} className="px-3 py-2 text-right font-bold text-silver-light uppercase text-xs">TOTAL</td>
                                     <td className="px-3 py-2 text-right font-bold text-green-400 text-sm whitespace-nowrap">{fmtIDR(totals.totalDebit)}{totals.hasMixedCcy && <span className="text-xs text-amber-400 ml-1">IDR only</span>}</td>
                                     <td className="px-3 py-2 text-right font-bold text-blue-400 text-sm whitespace-nowrap">{fmtIDR(totals.totalCredit)}{totals.hasMixedCcy && <span className="text-xs text-amber-400 ml-1">IDR only</span>}</td>
-                                    <td colSpan={2} />
+                                    <td />
                                 </tr>
                             </tfoot>
                         )}
