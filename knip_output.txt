@@ -1,0 +1,239 @@
+Unused files (187)
+.agent/BUTTON_CODE_SNIPPET.jsx                    
+.agent/BUTTON_UPDATE_CODE.jsx                     
+.agent/CLEAN_ITEM_EDITOR_MODAL.jsx                
+.agent/CLEAN_OUTBOUND_MODAL.jsx                   
+.agent/ITEM_EDITOR_MODAL_CODE.jsx                 
+.agent/PASTE_DETAIL_MODAL.jsx                     
+.agent/PASTE_QUICK_OUTBOUND_BUTTON.jsx            
+.agent/PASTE_THIS_MODAL.jsx                       
+check_all_tables.js                               
+check_db_detail.js                                
+check_db.js                                       
+check_env_diff.js                                 
+check_finance_data.js                             
+check_menus.js                                    
+check_rls.js                                      
+copy_finance.cjs                                  
+debug_tb.js                                       
+fix_db.js                                         
+public/debug-create-so.js                         
+public/debug-quotation.js                         
+scripts/add-currency-column.js                    
+scripts/add-currency-via-api.js                   
+scripts/apply-invoice-migration.js                
+scripts/attempt_migration.js                      
+scripts/audit-duplication.js                      
+scripts/backfill/backfill_ar_simple.cjs           
+scripts/backfill/backfill_arap.cjs                
+scripts/backfill/backfill_invoices.mjs            
+scripts/backfill/backfill_journals.cjs            
+scripts/check-company-settings.js                 
+scripts/check-revenue-data.js                     
+scripts/check-shipments.js                        
+scripts/checks/check_account_usage.js             
+scripts/checks/check_big_ar.cjs                   
+scripts/checks/check_big_tables.cjs               
+scripts/checks/check_coa.mjs                      
+scripts/checks/check_column_presence.mjs          
+scripts/checks/check_columns.js                   
+scripts/checks/check_gl_tables.js                 
+scripts/checks/check_invoice_columns.js           
+scripts/checks/check_item_tables.js               
+scripts/checks/check_journal_dates.js             
+scripts/checks/check_journals.mjs                 
+scripts/checks/check_json_content.js              
+scripts/checks/check_migration.mjs                
+scripts/checks/check_partners.mjs                 
+scripts/checks/check_pl_dupes.mjs                 
+scripts/checks/check_po_columns.js                
+scripts/checks/check_po_data.js                   
+scripts/checks/check_pos.js                       
+scripts/checks/check_tables.cjs                   
+scripts/checks/check_tables.js                    
+scripts/checks/check_vendors.js                   
+scripts/checks/check-coa.js                       
+scripts/cleanup_orphaned_data.js                  
+scripts/cleanup/clean_blink_orphaned.mjs          
+scripts/cleanup/clean_coa_whitespace.mjs          
+scripts/cleanup/cleanup_outbound_data.mjs         
+scripts/clear_mutations.mjs                       
+scripts/complete-fix.js                           
+scripts/create_sales_quotations.js                
+scripts/delete-all-blink-data.js                  
+scripts/final-cleanup.js                          
+scripts/fix-quotation-mapping.js                  
+scripts/fix-with-service-role.js                  
+scripts/generate_password_hash.js                 
+scripts/generate-sample-revenue-data.js           
+scripts/insert-missing-shipments.js               
+scripts/migrate-p0-p2.js                          
+scripts/migration_stub.mjs                        
+scripts/migration-summary.js                      
+scripts/migration/apply_aging_view.mjs            
+scripts/migration/apply_migration.mjs             
+scripts/migration/execute_big_migration.mjs       
+scripts/migration/migrate_ar_ap.js                
+scripts/migration/migrate_invoices.js             
+scripts/migration/migrate_journal_schema.mjs      
+scripts/migration/migrate_raw_sql.js              
+scripts/migration/migrate_rest_api.js             
+scripts/migration/run_all_migrations.mjs          
+scripts/migration/run_big_migration.mjs           
+scripts/migration/run_bridge_finance_migration.mjs
+scripts/migration/run_cleanup_migration.mjs       
+scripts/migration/run_finance_migration.mjs       
+scripts/migration/run_fix_migration.mjs           
+scripts/migration/run_invoice_migration.mjs       
+scripts/migration/run_journal_migration.mjs       
+scripts/migration/run_migration.mjs               
+scripts/migration/run_outbound_migration.mjs      
+scripts/migration/run_outbound_ref_migration.mjs  
+scripts/migration/run_quotation_migration.mjs     
+scripts/migration/run_temp_migration.mjs          
+scripts/migration/run-migration-011.js            
+scripts/migration/run-partner-migrations.js       
+scripts/reset_mutation_status.mjs                 
+scripts/run_direct_migration_pg.cjs               
+scripts/run_migration_012.js                      
+scripts/run-migration-043.js                      
+scripts/run-migration.js                          
+scripts/run-migration.mjs                         
+scripts/seed-cogs-coa.mjs                         
+scripts/seed-superadmin.js                        
+scripts/setup-database.js                         
+scripts/test-insert.js                            
+scripts/test-supabase-access.js                   
+scripts/update_superadmin_level.js                
+scripts/utils/create_sample_journals.mjs          
+scripts/utils/debug_access.mjs                    
+scripts/utils/debug_bridge_schema.js              
+scripts/utils/debug_check_mutations.js            
+scripts/utils/debug_data_consistency.js           
+scripts/utils/debug_dump_inventory.js             
+scripts/utils/debug_duplicates.js                 
+scripts/utils/debug_inventory_schema.js           
+scripts/utils/debug_references.js                 
+scripts/utils/debug_schema.mjs                    
+scripts/utils/debug_structure.js                  
+scripts/utils/debug_warehouse_schema.js           
+scripts/utils/fix_coa_codes.js                    
+scripts/utils/fix_coa_rls_policy.mjs              
+scripts/utils/fix_journals.js                     
+scripts/utils/fix_quotation.js                    
+scripts/utils/force_delete_all.mjs                
+scripts/utils/get_all_tables.mjs                  
+scripts/utils/inspect_blink_quotations_columns.mjs
+scripts/utils/PATCH_QuotationManagement.js        
+scripts/utils/query_status.js                     
+scripts/utils/schema_check.js                     
+scripts/utils/test_db.js                          
+scripts/utils/test_db2.js                         
+scripts/utils/test_journal_insert.js              
+scripts/utils/test_schema.js                      
+scripts/utils/test_supabase.js                    
+scripts/utils/test-cogs.js                        
+scripts/utils/test-cogs2.js                       
+scripts/utils/test.js                             
+scripts/utils/test3.js                            
+scripts/utils/translate_blink.cjs                 
+scripts/utils/verify_app_tables.mjs               
+scripts/utils/verify_coa_codes.js                 
+scripts/utils/verify_database_detailed.mjs        
+scripts/utils/verify_database_structure.mjs       
+scripts/utils/verify_finance_db.mjs               
+scripts/utils/verify_journal_integrity_v2.js      
+scripts/utils/verify_journal_integrity.js         
+scripts/utils/verify_ledger_logic.js              
+scripts/utils/verify_quotation_fix.mjs            
+scripts/utils/verify_rls_policies.mjs             
+src/App.css                                       
+src/components/Blink/BLPreviewModal.jsx           
+src/components/Blink/ShipmentDetailModal.jsx      
+src/components/Common/CustomCostsManager.jsx      
+src/components/Common/DirectCosts.jsx             
+src/components/Common/LineItemManager.jsx         
+src/components/Common/QuotationSummary.jsx        
+src/components/Common/ServiceBreakdown.jsx        
+src/components/Finance/POFormModal.jsx            
+src/components/Warehouse/ItemDetailModal.jsx      
+src/components/Warehouse/PengajuanDetailView.jsx  
+src/context/TPPBWorkflowHelpers.jsx               
+src/hooks/usePermission.js                        
+src/pages/Big/Finance/AccountsReceivable.jsx      
+src/pages/Big/Finance/Invoices.jsx                
+src/pages/Blink/FinanceReports.jsx                
+src/pages/Blink/ShipmentAll.jsx                   
+src/pages/Blink/TransactionRecord.jsx             
+src/pages/Blink/TransactionReport.jsx             
+src/pages/Bridge/BridgeDashboard.jsx              
+src/pages/Bridge/BridgeFinanceReports.jsx         
+src/pages/Bridge/CustomsDocumentation.jsx         
+src/pages/Bridge/CustomsMonitoring.jsx            
+src/pages/Bridge/InboundManagement.jsx            
+src/pages/Bridge/InspectionManagement.jsx         
+src/pages/Bridge/PICMaster.jsx                    
+src/pages/Bridge/RevenueAnalysis.jsx              
+src/services/approvalService.js                   
+src/services/permissionService.js                 
+src/services/transactionLoggingExamples.js        
+src/services/transactionReportAPI.js              
+src/utils/currencyInputFormatter.js               
+src/utils/letterhead.js                           
+src/utils/periodHelper.js                         
+src/utils/seedARData.js                           
+src/utils/seedSampleData.js                       
+supabase/sample_data/insert_sample_data.mjs       
+test_dates.js                                     
+test_frontend_data.js                             
+Unused dependencies (1)
+pg  package.json:22:6
+Unused devDependencies (1)
+dotenv  package.json:37:6
+Unused exports (43)
+ProtectedRoute                         src/components/Auth/ProtectedRoute.jsx:12:14
+getAllMenus                            src/config/menuConfig.js:132:14             
+getAllMenuCodes                        src/config/menuConfig.js:142:14             
+default                      variable  src/context/AuthContext.jsx:268:16          
+useTheme                               src/context/ThemeContext.jsx:5:14           
+default                      variable  src/context/ThemeContext.jsx:34:16          
+cleanupExpiredSessions                 src/services/authService.js:243:14          
+validatePasswordStrength               src/services/passwordService.js:48:14       
+isCommonPassword                       src/services/passwordService.js:107:14      
+getTransactionLogs           function  src/services/transactionLogService.js:108:23
+getTransactionSummary        function  src/services/transactionLogService.js:178:23
+exportTransactionLogs        function  src/services/transactionLogService.js:240:23
+getUserById                            src/services/userService.js:419:14          
+getUserAuditLog                        src/services/userService.js:458:14          
+formatWithCurrency                     src/utils/currencyFormatter.js:20:14        
+useCurrencyInput                       src/utils/currencyFormatter.js:48:14        
+getYYMM                                src/utils/documentNumbers.js:18:14          
+generatePaymentNumber                  src/utils/documentNumbers.js:253:14         
+exportAWBCertificateToExcel            src/utils/excelExport.js:158:14             
+clearCOACache                function  src/utils/journalHelper.js:50:17            
+resolveCOA                   function  src/utils/journalHelper.js:111:23           
+resolveBankAccount           function  src/utils/journalHelper.js:253:23           
+resolveAPAccount             function  src/utils/journalHelper.js:289:23           
+resolveCOGSAccount           function  src/utils/journalHelper.js:300:23           
+resolveGainLossAccount       function  src/utils/journalHelper.js:311:23           
+generateJENumber             function  src/utils/journalHelper.js:326:23           
+getPeriodFromDate            function  src/utils/journalHelper.js:350:17           
+roundToTwo                   function  src/utils/journalHelper.js:361:17           
+buildJERow                   function  src/utils/journalHelper.js:365:17           
+resolveKBIAccount            function  src/utils/journalHelper.js:419:17           
+convertCurrency              function  src/utils/journalHelper.js:429:17           
+createGeneralJournal         function  src/utils/journalHelper.js:437:23           
+createReversalJournal        function  src/utils/journalHelper.js:474:23           
+createNoteJournal            function  src/utils/journalHelper.js:511:23           
+insertJournalEntries         function  src/utils/journalHelper.js:578:23           
+journalExists                function  src/utils/journalHelper.js:615:23           
+ensureBlinkARTransaction     function  src/utils/journalHelper.js:1334:23          
+ensureBlinkAPTransaction     function  src/utils/journalHelper.js:1375:23          
+generateBLPrintHTML                    src/utils/printUtils.js:12:14               
+generateAWBPrintHTML                   src/utils/printUtils.js:554:14              
+printAWBCertificate                    src/utils/printUtils.js:558:14              
+validateImage                          src/utils/validateImage.js:7:14             
+fileToBase64                           src/utils/validateImage.js:33:14            
+Duplicate exports (1)
+ProtectedRoute|default  src/components/Auth/ProtectedRoute.jsx
+Configuration hints (1)
