@@ -819,7 +819,7 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment, canEditAP
                 )}
 
                 {ap.source === 'po_fallback' && (
-                    <div className="glass-card p-4 rounded-lg mb-6 bg-yellow-500/10 border border-yellow-500/20 text-sm text-yellow-200">
+                    <div className="glass-card p-4 rounded-lg mb-6 bg-yellow-100 border border-yellow-300 text-sm text-black font-medium">
                         This AP record is derived from purchase order fallback data. A proper AP transaction is required before payments can be recorded.
                     </div>
                 )}
