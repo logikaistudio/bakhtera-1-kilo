@@ -410,8 +410,8 @@ const ProfitLoss = () => {
     // ── Render Helpers ────────────────────────────────────────────────
 
     const SectionLabel = ({ label }) => (
-        <div className="px-4 py-1.5 bg-dark-surface/70 border-b border-t border-dark-border mt-2">
-            <span className="text-[11px] font-extrabold text-silver-light uppercase tracking-widest">{label}</span>
+        <div className="px-4 py-1.5 bg-slate-100 dark:bg-dark-surface/70 border-b border-t border-slate-200 dark:border-dark-border mt-2">
+            <span className="text-[11px] font-extrabold text-slate-800 dark:text-silver-light uppercase tracking-widest">{label}</span>
         </div>
     );
 
@@ -423,27 +423,27 @@ const ProfitLoss = () => {
         const total = group.items.reduce((s, a) => s + a.amount, 0);
         return (
             <div
-                className="flex items-center bg-yellow-300/20 dark:bg-yellow-500/10 border-b border-yellow-400/30 cursor-pointer hover:bg-yellow-300/30 transition-colors"
+                className="flex items-center bg-yellow-50 dark:bg-yellow-500/10 border-b border-yellow-200 dark:border-yellow-400/30 cursor-pointer hover:bg-yellow-100 dark:hover:bg-yellow-300/30 transition-colors"
                 onClick={() => toggleGroup(key)}
             >
                 <div className="flex items-center gap-2 flex-1 min-w-0 px-4 py-1">
                     {isOpen
-                        ? <ChevronDown className="w-3 h-3 text-yellow-500 flex-shrink-0" />
-                        : <ChevronRight className="w-3 h-3 text-yellow-500 flex-shrink-0" />}
-                    <span className="text-[11px] font-bold text-yellow-700 dark:text-yellow-300 uppercase truncate">
+                        ? <ChevronDown className="w-3 h-3 text-yellow-600 dark:text-yellow-500 flex-shrink-0" />
+                        : <ChevronRight className="w-3 h-3 text-yellow-600 dark:text-yellow-500 flex-shrink-0" />}
+                    <span className="text-[11px] font-bold text-yellow-800 dark:text-yellow-300 uppercase truncate">
                         {group.parent.name}
-                        <span className="ml-2 font-mono font-normal text-yellow-600/70 dark:text-yellow-400/60 normal-case">
+                        <span className="ml-2 font-mono font-normal text-yellow-600 dark:text-yellow-400/60 normal-case">
                             ( {group.parent.code} )
                         </span>
                     </span>
                 </div>
                 <div className="flex items-center flex-shrink-0 pr-2">
                     {reportMonths.map(m => (
-                        <span key={m} className={`text-[10px] font-mono text-yellow-600 dark:text-yellow-400 text-right ${colW} px-1`}>
+                        <span key={m} className={`text-[10px] font-mono text-yellow-700 dark:text-yellow-400 text-right ${colW} px-1`}>
                             {fmt(group.parent.byMonth?.[m] || 0)}
                         </span>
                     ))}
-                    <span className={`text-[11px] font-bold font-mono text-yellow-700 dark:text-yellow-300 text-right ${colW} px-1`}>
+                    <span className={`text-[11px] font-bold font-mono text-yellow-800 dark:text-yellow-300 text-right ${colW} px-1`}>
                         {fmt(total)}
                     </span>
                 </div>
@@ -454,19 +454,19 @@ const ProfitLoss = () => {
     const ItemRow = ({ item, indent }) => (
         <div
             onClick={() => navigate('/blink/finance/general-ledger', { state: { preSelectedAccount: item.id } })}
-            className="flex items-center border-b border-dark-border/20 hover:bg-dark-surface/40 cursor-pointer group"
+            className="flex items-center border-b border-gray-100 dark:border-dark-border/20 hover:bg-gray-50 dark:hover:bg-dark-surface/40 cursor-pointer group"
         >
-            <span className="text-[11px] text-silver-light group-hover:underline truncate flex-1 min-w-0 group-hover:underline"
+            <span className="text-[11px] text-slate-700 dark:text-silver-light group-hover:underline truncate flex-1 min-w-0"
                 style={{ paddingLeft: indent ? '3.5rem' : '1.5rem', paddingRight: '0.5rem', paddingTop: '2px', paddingBottom: '2px' }}>
                 {item.name}
             </span>
             <div className="flex items-center flex-shrink-0 pr-2">
                 {reportMonths.map(m => (
-                    <span key={m} className={`text-[10px] font-mono text-silver-dark text-right ${colW} px-1`}>
+                    <span key={m} className={`text-[10px] font-mono text-slate-500 dark:text-silver-dark text-right ${colW} px-1`}>
                         {fmt(item.byMonth?.[m] || 0)}
                     </span>
                 ))}
-                <span className={`text-[11px] font-mono text-silver-light text-right ${colW} px-1`}>{fmt(item.amount)}</span>
+                <span className={`text-[11px] font-mono text-slate-800 dark:text-silver-light text-right ${colW} px-1`}>{fmt(item.amount)}</span>
             </div>
         </div>
     );
@@ -492,12 +492,12 @@ const ProfitLoss = () => {
 
     const TotalRow = ({ label, amount, byMonthFn, highlight, thick, indent }) => {
         const colors = {
-            green: 'bg-green-500/10 border-green-500/30 text-green-400',
-            blue: 'bg-blue-500/10 border-blue-500/30 text-blue-400',
-            red: 'bg-red-500/10 border-red-500/30 text-red-400',
+            green: 'bg-green-50 dark:bg-green-500/10 border-green-200 dark:border-green-500/30 text-green-700 dark:text-green-400',
+            blue: 'bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/30 text-blue-700 dark:text-blue-400',
+            red: 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-400',
         };
-        const cls = highlight ? colors[highlight] : 'border-dark-border/30 text-silver-light';
-        const valCls = highlight ? '' : (amount < 0 ? 'text-red-400' : '');
+        const cls = highlight ? colors[highlight] : 'bg-slate-50 dark:bg-transparent border-slate-200 dark:border-dark-border/30 text-slate-800 dark:text-silver-light';
+        const valCls = highlight ? '' : (amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-silver-light');
         return (
             <div className={`flex items-center border-y ${cls} ${thick ? 'border-t-2' : ''}`}>
                 <span className={`text-[11px] font-bold uppercase flex-1 min-w-0 px-4 py-1.5 ${indent ? 'pl-8' : ''}`}>{label}</span>
@@ -515,15 +515,15 @@ const ProfitLoss = () => {
 
     // ── Main Render ────────────────────────────────────────────────────
     return (
-        <div className="max-w-3xl mx-auto pb-20">
+        <div className="w-full px-4 xl:px-8 mx-auto pb-20">
             {/* Toolbar */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                 <div>
-                    <h1 className="text-xl font-bold text-silver-light flex items-center gap-2">
+                    <h1 className="text-xl font-bold text-slate-800 dark:text-silver-light flex items-center gap-2">
                         <DollarSign className="w-5 h-5 text-accent-orange" />
                         Profit & Loss
                     </h1>
-                    <p className="text-silver-dark text-xs">Period: {period}</p>
+                    <p className="text-slate-500 dark:text-silver-dark text-xs">Period: {period}</p>
                 </div>
                 <div className="flex items-center gap-2 bg-white dark:bg-dark-surface p-1 rounded-lg border border-gray-200 dark:border-dark-border shadow-sm">
                     <div className="flex items-center px-2 border-r border-gray-200 dark:border-dark-border/50">
@@ -531,27 +531,27 @@ const ProfitLoss = () => {
                         <span className="text-xs text-gray-500 dark:text-silver-dark mr-2">Range:</span>
                         <input type="date" value={dateRange.startDate}
                             onChange={e => setDateRange({ ...dateRange, startDate: e.target.value })}
-                            style={{ color: '#000000', colorScheme: 'light' }}
-                            className="bg-transparent border-none text-xs focus:ring-0 p-0 w-24" />
+                            style={{ colorScheme: 'light' }}
+                            className="bg-transparent border-none text-xs text-slate-800 dark:text-white focus:ring-0 p-0 w-24" />
                         <span className="text-gray-400 dark:text-silver-dark mx-1">–</span>
                         <input type="date" value={dateRange.endDate}
                             onChange={e => setDateRange({ ...dateRange, endDate: e.target.value })}
-                            style={{ color: '#000000', colorScheme: 'light' }}
-                            className="bg-transparent border-none text-xs focus:ring-0 p-0 w-24" />
+                            style={{ colorScheme: 'light' }}
+                            className="bg-transparent border-none text-xs text-slate-800 dark:text-white focus:ring-0 p-0 w-24" />
                     </div>
                     <button onClick={fetchReportData} className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded transition-colors" title="Refresh">
-                        <RefreshCw className={`w-4 h-4 text-silver-light ${loading ? 'animate-spin' : ''}`} />
+                        <RefreshCw className={`w-4 h-4 text-slate-600 dark:text-silver-light ${loading ? 'animate-spin' : ''}`} />
                     </button>
                     {/* Tax Rate */}
                     <div className="flex items-center gap-1 border-l border-gray-200 dark:border-dark-border/50 pl-2 ml-1">
-                        <span className="text-xs text-silver-dark">Tax:</span>
+                        <span className="text-xs text-slate-500 dark:text-silver-dark">Tax:</span>
                         <input
                             type="number" value={taxRate}
                             onChange={e => setTaxRate(parseFloat(e.target.value) || 0)}
-                            className="w-10 text-xs bg-transparent border border-dark-border rounded px-1 py-0.5 text-silver-light text-center focus:outline-none focus:border-accent-blue"
+                            className="w-10 text-xs bg-transparent border border-gray-300 dark:border-dark-border rounded px-1 py-0.5 text-slate-800 dark:text-silver-light text-center focus:outline-none focus:border-accent-blue"
                             min="0" max="100" step="0.5"
                         />
-                        <span className="text-xs text-silver-dark">%</span>
+                        <span className="text-xs text-slate-500 dark:text-silver-dark">%</span>
                     </div>
                     {/* Export buttons */}
                     <div className="flex items-center gap-1 border-l border-gray-200 dark:border-dark-border/50 pl-2 ml-1">
@@ -570,12 +570,14 @@ const ProfitLoss = () => {
             </div>
 
             {/* Report Card */}
-            <div className="bg-white dark:bg-dark-surface/20 border border-gray-200 dark:border-dark-border rounded-lg overflow-hidden shadow-lg">
-                {/* Title */}
-                <div className="text-center py-4 border-b border-dark-border bg-white dark:bg-dark-surface/40">
-                    <h2 className="text-base font-extrabold text-red-500 tracking-widest uppercase">Profit & Loss</h2>
-                    <p className="text-xs text-silver-dark mt-1">{period}</p>
-                </div>
+            <div className="bg-white dark:bg-dark-surface/20 border border-gray-200 dark:border-dark-border rounded-lg shadow-lg overflow-hidden">
+                <div className="w-full overflow-x-auto">
+                    <div className="min-w-[800px]">
+                        {/* Title */}
+                        <div className="text-center py-4 border-b border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface/40">
+                            <h2 className="text-base font-extrabold text-red-600 dark:text-red-500 tracking-widest uppercase">Profit & Loss</h2>
+                            <p className="text-xs text-slate-500 dark:text-silver-dark mt-1">{period}</p>
+                        </div>
 
                 {/* Column header — putih di atas biru agar terlihat jelas */}
                 <div className="flex items-center" style={{ background: '#0070BB' }}>
@@ -591,7 +593,7 @@ const ProfitLoss = () => {
                 </div>
 
                 {loading ? (
-                    <div className="p-12 text-center text-silver-dark">Loading data...</div>
+                    <div className="p-12 text-center text-slate-500 dark:text-silver-dark">Loading data...</div>
                 ) : (
                     <>
                         {/* ── INCOME ── */}
@@ -640,7 +642,7 @@ const ProfitLoss = () => {
                         )}
 
                         {/* ── Summary ── */}
-                        <div className="border-t-2 border-dark-border mt-1">
+                        <div className="border-t-2 border-slate-300 dark:border-dark-border mt-1">
                             <TotalRow label="Total Other Income / Expenses" amount={totals.otherNet} byMonthFn={m => {
                                 const mOI = reportData.other_income.groups.reduce((s, g) => s + g.items.reduce((ss, a) => ss + (a.byMonth?.[m] || 0), 0), 0);
                                 const mOE = reportData.other_expense.groups.reduce((s, g) => s + g.items.reduce((ss, a) => ss + (a.byMonth?.[m] || 0), 0), 0);
@@ -650,11 +652,11 @@ const ProfitLoss = () => {
                             <TotalRow label="Total Net Income Before Tax" amount={totals.netIncomeBeforeTax} />
 
                             {/* Corporate Income Tax */}
-                            <div className="flex items-center justify-between px-4 py-1.5 bg-red-500/10 border-y border-red-500/30">
-                                <span className="text-[11px] font-bold text-red-400 uppercase">
+                            <div className="flex items-center justify-between px-4 py-1.5 bg-red-50 dark:bg-red-500/10 border-y border-red-200 dark:border-red-500/30">
+                                <span className="text-[11px] font-bold text-red-600 dark:text-red-400 uppercase">
                                     Corporate Income Tax ({taxRate}%)
                                 </span>
-                                <span className="text-[11px] font-bold font-mono text-red-400 text-right min-w-[140px]">
+                                <span className="text-[11px] font-bold font-mono text-red-600 dark:text-red-400 text-right min-w-[140px]">
                                     {fmt(-totals.taxAmount)}
                                 </span>
                             </div>
@@ -664,6 +666,8 @@ const ProfitLoss = () => {
                         </div>
                     </>
                 )}
+                    </div>
+                </div>
             </div>
 
             <div className="text-center text-xs text-gray-400 dark:text-silver-dark mt-6 italic">
