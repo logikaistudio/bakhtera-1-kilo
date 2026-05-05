@@ -1139,7 +1139,7 @@ const PurchaseOrder = () => {
                 payment_terms: formData.payment_terms,
                 po_items: formData.po_items,
                 currency: formData.currency,
-                exchange_rate: formData.currency === 'USD' ? 16000 : 1,
+                exchange_rate: formData.exchange_rate || 1,
                 subtotal: subtotal,
                 tax_rate: formData.tax_rate,
                 tax_amount: taxAmount,
@@ -1740,7 +1740,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                     setFormData(prev => ({
                                         ...prev,
                                         currency: cur,
-                                        exchange_rate: cur === 'IDR' ? 1 : (prev.exchange_rate > 1 ? prev.exchange_rate : 16000)
+                                        exchange_rate: cur === 'IDR' ? 1 : (prev.exchange_rate > 1 ? prev.exchange_rate : 1)
                                     }));
                                 }}
                                 className="w-full px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"

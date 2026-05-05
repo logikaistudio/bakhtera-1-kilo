@@ -664,7 +664,7 @@ export async function createInvoiceJournal({ invoice, coaList: providedCOA }) {
 
     const batchId = generateUUID();
     const jeNum = await generateJENumber('INV');
-    const exRate = invoice.currency !== 'IDR' ? (invoice.exchange_rate || 16000) : 1;
+    const exRate = invoice.currency !== 'IDR' ? (invoice.exchange_rate || 1) : 1;
     const note = invoice.currency !== 'IDR' ? ` (Rate: ${exRate.toLocaleString('id-ID')})` : '';
     const desc = `Invoice ${invoice.invoice_number} - ${invoice.customer_name}${note}`;
 
@@ -789,7 +789,7 @@ export async function createARPaymentJournal({
 
     const batchId = generateUUID();
     const jeNum = await generateJENumber('PAY-IN');
-    const exRate = invoice.currency !== 'IDR' ? (invoice.exchange_rate || 16000) : 1;
+    const exRate = invoice.currency !== 'IDR' ? (invoice.exchange_rate || 1) : 1;
     const note = invoice.currency !== 'IDR' ? ` (Rate: ${exRate.toLocaleString('id-ID')})` : '';
     const bankLabel = selectedBank
         ? `${selectedBank.bank_name} ${selectedBank.account_number ? '- ' + selectedBank.account_number : ''}`
@@ -845,7 +845,7 @@ export async function createARReversalJournal({ invoice, coaList: providedCOA })
 
     const batchId = generateUUID();
     const jeNum = await generateJENumber('REV');
-    const exRate = invoice.currency !== 'IDR' ? (invoice.exchange_rate || 16000) : 1;
+    const exRate = invoice.currency !== 'IDR' ? (invoice.exchange_rate || 1) : 1;
     const desc = `Reversal - Invoice ${invoice.invoice_number} - ${invoice.customer_name}`;
 
     const rows = [];
@@ -952,7 +952,7 @@ export async function createCOGSJournal({ invoice, cogsAmount, coaList: provided
 
     const batchId = generateUUID();
     const jeNum = await generateJENumber('COGS');
-    const exRate = invoice.currency !== 'IDR' ? (invoice.exchange_rate || 16000) : 1;
+    const exRate = invoice.currency !== 'IDR' ? (invoice.exchange_rate || 1) : 1;
     const desc = `COGS - ${invoice.invoice_number} - ${invoice.customer_name}`;
 
     const rows = [];
@@ -1042,7 +1042,7 @@ export async function createAPPaymentJournal({
     if (!apCOA) apCOA = await resolveAPAccount(coaList);
     const batchId = generateUUID();
     const jeNum = await generateJENumber('PAY-OUT');
-    const exRate = ap.currency !== 'IDR' ? (ap.exchange_rate || 16000) : 1;
+    const exRate = ap.currency !== 'IDR' ? (ap.exchange_rate || 1) : 1;
     const note = ap.currency !== 'IDR' ? ` (Rate: ${exRate.toLocaleString('id-ID')})` : '';
     const bankLabel = selectedBank
         ? `${selectedBank.bank_name} ${selectedBank.account_number ? '- ' + selectedBank.account_number : ''}`
@@ -1094,7 +1094,7 @@ export async function createAPReversalJournal({ po, coaList: providedCOA }) {
 
     const batchId = generateUUID();
     const jeNum = await generateJENumber('REV');
-    const exRate = po.currency !== 'IDR' ? (po.exchange_rate || 16000) : 1;
+    const exRate = po.currency !== 'IDR' ? (po.exchange_rate || 1) : 1;
     const desc = `Reversal - PO ${po.po_number} - ${po.vendor_name}`;
 
     const rows = [];
@@ -1179,7 +1179,7 @@ export async function createPOApprovalJournal({ po, coaList: providedCOA }) {
     const [apCOA] = await Promise.all([resolveAPAccount(coaList)]);
     const batchId = generateUUID();
     const jeNum = await generateJENumber('PO');
-    const exRate = po.currency !== 'IDR' ? (po.exchange_rate || 16000) : 1;
+    const exRate = po.currency !== 'IDR' ? (po.exchange_rate || 1) : 1;
     const desc = `PO Approved: ${po.po_number} - ${po.vendor_name}`;
 
     // Build per-item debit entries + one lump AP credit

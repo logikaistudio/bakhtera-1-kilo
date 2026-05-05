@@ -237,7 +237,7 @@ const InvoiceManagement = () => {
                 destination: quotation.destination,
                 service_type: quotation.serviceType || quotation.service_type,
                 billing_currency: quotation.currency || 'IDR',
-                exchange_rate: quotation.currency === 'USD' ? 16000 : 1,
+                exchange_rate: quotation.exchange_rate || quotation.exchangeRate || 1,
                 due_date: dueDate.toISOString().split('T')[0],
                 cargo_details: {
                     weight: quotation.weight,
@@ -309,7 +309,7 @@ const InvoiceManagement = () => {
                 destination: shipment.destination,
                 service_type: shipment.service_type,
                 billing_currency: shipment.currency || 'IDR',
-                exchange_rate: shipment.currency === 'USD' ? 16000 : 1,
+                exchange_rate: shipment.exchange_rate || shipment.exchangeRate || 1,
                 due_date: dueDate.toISOString().split('T')[0],
                 cargo_details: {
                     weight: shipment.weight,
@@ -514,8 +514,8 @@ const InvoiceManagement = () => {
             let itemVal = item.amount || 0;
             const itemCurr = item.currency || formData.billing_currency;
             if (itemCurr !== formData.billing_currency) {
-                if (formData.billing_currency === 'IDR' && itemCurr !== 'IDR') itemVal *= (formData.exchange_rate || 16000);
-                else if (formData.billing_currency !== 'IDR' && itemCurr === 'IDR') itemVal /= (formData.exchange_rate || 16000);
+                if (formData.billing_currency === 'IDR' && itemCurr !== 'IDR') itemVal *= (formData.exchange_rate || 1);
+                else if (formData.billing_currency !== 'IDR' && itemCurr === 'IDR') itemVal /= (formData.exchange_rate || 1);
                 // simplified mapping for USD/SGD vs IDR assuming IDR is base for non-matching ones except same
             }
             return sum + itemVal;
@@ -525,8 +525,8 @@ const InvoiceManagement = () => {
             let itemTax = Number(item.tax_amount) || 0;
             const itemCurr = item.currency || formData.billing_currency;
             if (itemCurr !== formData.billing_currency) {
-                if (formData.billing_currency === 'IDR' && itemCurr !== 'IDR') itemTax *= (formData.exchange_rate || 16000);
-                else if (formData.billing_currency !== 'IDR' && itemCurr === 'IDR') itemTax /= (formData.exchange_rate || 16000);
+                if (formData.billing_currency === 'IDR' && itemCurr !== 'IDR') itemTax *= (formData.exchange_rate || 1);
+                else if (formData.billing_currency !== 'IDR' && itemCurr === 'IDR') itemTax /= (formData.exchange_rate || 1);
             }
             return sum + itemTax;
         }, 0);
@@ -2100,7 +2100,7 @@ const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFor
                                     setFormData(prev => ({
                                         ...prev,
                                         billing_currency: newCurrency,
-                                        exchange_rate: newCurrency === 'IDR' ? 1 : (prev.exchange_rate || 16000)
+                                        exchange_rate: newCurrency === 'IDR' ? 1 : (prev.exchange_rate || 1)
                                     }));
                                 }}
                                 className="w-full px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
