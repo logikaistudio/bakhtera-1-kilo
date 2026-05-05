@@ -694,29 +694,32 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment, canEditAP
                             <table className="w-full text-sm">
                                 <thead className="bg-[#0070bc]">
                                     <tr className="text-left">
-                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase rounded-tl-lg">Item</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase rounded-tl-lg whitespace-nowrap">Item</th>
                                         <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase">Description</th>
-                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right">Qty</th>
-                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right">Unit Price</th>
-                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right rounded-tr-lg">Amount</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right whitespace-nowrap">Qty</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right whitespace-nowrap">Unit Price</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right rounded-tr-lg whitespace-nowrap">Amount</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-dark-border/50">
                                     {poItems.map((item, idx) => (
                                         <tr key={idx} className="hover:bg-blue-500/5 transition-colors">
-                                            <td className="py-3 px-4 text-silver-light font-medium align-top">
+                                            <td className="py-3 px-4 text-silver-light font-medium align-top whitespace-nowrap">
                                                 {item.item_name || 'Item ' + (idx + 1)}
                                             </td>
-                                            <td className="py-3 px-4 text-silver-light align-top">
+                                            <td className="py-3 px-4 text-silver-light align-top min-w-[200px]">
                                                 {item.description || '-'}
                                             </td>
-                                            <td className="py-3 px-4 text-right text-silver-light align-top">
-                                                {item.qty} {item.unit}
+                                            <td className="py-3 px-4 text-right text-silver-light align-top whitespace-nowrap">
+                                                <div className="flex flex-col items-end">
+                                                    <span>{item.qty}</span>
+                                                    <span className="text-xs text-silver-dark">{item.unit}</span>
+                                                </div>
                                             </td>
-                                            <td className="py-3 px-4 text-right text-silver-light align-top">
+                                            <td className="py-3 px-4 text-right text-silver-light align-top whitespace-nowrap">
                                                 {formatCurrency(item.unit_price || item.rate || 0, ap.currency)}
                                             </td>
-                                            <td className="py-3 px-4 text-right text-silver-light font-medium align-top">
+                                            <td className="py-3 px-4 text-right text-silver-light font-medium align-top whitespace-nowrap">
                                                 {formatCurrency(item.amount || (item.qty * (item.unit_price || item.rate)) || 0, ap.currency)}
                                             </td>
                                         </tr>
