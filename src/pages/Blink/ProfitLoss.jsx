@@ -410,8 +410,8 @@ const ProfitLoss = () => {
     // ── Render Helpers ────────────────────────────────────────────────
 
     const SectionLabel = ({ label }) => (
-        <div className="px-4 py-1.5 bg-slate-100 dark:bg-dark-surface/70 border-b border-t border-slate-200 dark:border-dark-border mt-2">
-            <span className="text-[11px] font-extrabold text-slate-800 dark:text-silver-light uppercase tracking-widest">{label}</span>
+        <div className="px-4 py-2 bg-slate-100 dark:bg-dark-surface/70 border-b border-t border-slate-200 dark:border-dark-border mt-2">
+            <span className="text-xs font-extrabold text-slate-800 dark:text-silver-light uppercase tracking-widest">{label}</span>
         </div>
     );
 
@@ -423,27 +423,27 @@ const ProfitLoss = () => {
         const total = group.items.reduce((s, a) => s + a.amount, 0);
         return (
             <div
-                className="flex items-center bg-yellow-50 dark:bg-yellow-500/10 border-b border-yellow-200 dark:border-yellow-400/30 cursor-pointer hover:bg-yellow-100 dark:hover:bg-yellow-300/30 transition-colors"
+                className="flex items-center bg-blue-50 dark:bg-blue-500/10 border-b border-blue-200 dark:border-blue-400/30 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-300/30 transition-colors"
                 onClick={() => toggleGroup(key)}
             >
-                <div className="flex items-center gap-2 flex-1 min-w-0 px-4 py-1">
+                <div className="flex items-center gap-2 flex-1 min-w-0 px-4 py-1.5">
                     {isOpen
-                        ? <ChevronDown className="w-3 h-3 text-yellow-600 dark:text-yellow-500 flex-shrink-0" />
-                        : <ChevronRight className="w-3 h-3 text-yellow-600 dark:text-yellow-500 flex-shrink-0" />}
-                    <span className="text-[11px] font-bold text-yellow-800 dark:text-yellow-300 uppercase truncate">
+                        ? <ChevronDown className="w-4 h-4 text-blue-600 dark:text-blue-500 flex-shrink-0" />
+                        : <ChevronRight className="w-4 h-4 text-blue-600 dark:text-blue-500 flex-shrink-0" />}
+                    <span className="text-xs font-bold text-blue-800 dark:text-blue-300 uppercase truncate">
                         {group.parent.name}
-                        <span className="ml-2 font-mono font-normal text-yellow-600 dark:text-yellow-400/60 normal-case">
+                        <span className="ml-2 font-mono font-normal text-blue-600 dark:text-blue-400/60 normal-case">
                             ( {group.parent.code} )
                         </span>
                     </span>
                 </div>
                 <div className="flex items-center flex-shrink-0 pr-2">
                     {reportMonths.map(m => (
-                        <span key={m} className={`text-[10px] font-mono text-yellow-700 dark:text-yellow-400 text-right ${colW} px-1`}>
+                        <span key={m} className={`text-xs font-mono text-blue-700 dark:text-blue-400 text-right ${colW} px-1`}>
                             {fmt(group.parent.byMonth?.[m] || 0)}
                         </span>
                     ))}
-                    <span className={`text-[11px] font-bold font-mono text-yellow-800 dark:text-yellow-300 text-right ${colW} px-1`}>
+                    <span className={`text-sm font-bold font-mono text-blue-800 dark:text-blue-300 text-right ${colW} px-1`}>
                         {fmt(total)}
                     </span>
                 </div>
@@ -456,17 +456,17 @@ const ProfitLoss = () => {
             onClick={() => navigate('/blink/finance/general-ledger', { state: { preSelectedAccount: item.id } })}
             className="flex items-center border-b border-gray-100 dark:border-dark-border/20 hover:bg-gray-50 dark:hover:bg-dark-surface/40 cursor-pointer group"
         >
-            <span className="text-[11px] text-slate-700 dark:text-silver-light group-hover:underline truncate flex-1 min-w-0"
-                style={{ paddingLeft: indent ? '3.5rem' : '1.5rem', paddingRight: '0.5rem', paddingTop: '2px', paddingBottom: '2px' }}>
+            <span className="text-xs text-slate-700 dark:text-silver-light group-hover:underline truncate flex-1 min-w-0"
+                style={{ paddingLeft: indent ? '3.5rem' : '1.5rem', paddingRight: '0.5rem', paddingTop: '6px', paddingBottom: '6px' }}>
                 {item.name}
             </span>
             <div className="flex items-center flex-shrink-0 pr-2">
                 {reportMonths.map(m => (
-                    <span key={m} className={`text-[10px] font-mono text-slate-500 dark:text-silver-dark text-right ${colW} px-1`}>
+                    <span key={m} className={`text-xs font-mono text-slate-500 dark:text-silver-dark text-right ${colW} px-1`}>
                         {fmt(item.byMonth?.[m] || 0)}
                     </span>
                 ))}
-                <span className={`text-[11px] font-mono text-slate-800 dark:text-silver-light text-right ${colW} px-1`}>{fmt(item.amount)}</span>
+                <span className={`text-sm font-mono text-slate-800 dark:text-silver-light text-right ${colW} px-1`}>{fmt(item.amount)}</span>
             </div>
         </div>
     );
@@ -492,22 +492,22 @@ const ProfitLoss = () => {
 
     const TotalRow = ({ label, amount, byMonthFn, highlight, thick, indent }) => {
         const colors = {
-            green: 'bg-green-50 dark:bg-green-500/10 border-green-200 dark:border-green-500/30 text-green-700 dark:text-green-400',
-            blue: 'bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/30 text-blue-700 dark:text-blue-400',
+            green: 'bg-green-50 dark:bg-green-500/10 border-green-200 dark:border-green-500/30 text-green-800 dark:text-green-500',
+            blue: 'bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/30 text-blue-800 dark:text-blue-500',
             red: 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-400',
         };
         const cls = highlight ? colors[highlight] : 'bg-slate-50 dark:bg-transparent border-slate-200 dark:border-dark-border/30 text-slate-800 dark:text-silver-light';
         const valCls = highlight ? '' : (amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-silver-light');
         return (
             <div className={`flex items-center border-y ${cls} ${thick ? 'border-t-2' : ''}`}>
-                <span className={`text-[11px] font-bold uppercase flex-1 min-w-0 px-4 py-1.5 ${indent ? 'pl-8' : ''}`}>{label}</span>
+                <span className={`text-xs font-bold uppercase flex-1 min-w-0 px-4 py-2 ${indent ? 'pl-8' : ''}`}>{label}</span>
                 <div className="flex items-center flex-shrink-0 pr-2">
                     {reportMonths.map(m => (
-                        <span key={m} className={`text-[10px] font-bold font-mono text-right ${colW} px-1 py-1.5`}>
+                        <span key={m} className={`text-xs font-bold font-mono text-right ${colW} px-1 py-2`}>
                             {byMonthFn ? fmt(byMonthFn(m)) : '-'}
                         </span>
                     ))}
-                    <span className={`text-[11px] font-bold font-mono text-right ${colW} px-1 py-1.5 ${valCls}`}>{fmt(amount)}</span>
+                    <span className={`text-sm font-bold font-mono text-right ${colW} px-1 py-2 ${valCls}`}>{fmt(amount)}</span>
                 </div>
             </div>
         );
@@ -581,14 +581,14 @@ const ProfitLoss = () => {
 
                 {/* Column header — putih di atas biru agar terlihat jelas */}
                 <div className="flex items-center" style={{ background: '#0070BB' }}>
-                    <span className="text-[11px] font-bold uppercase tracking-wider flex-1 px-4 py-2" style={{ color: '#FFFFFF' }}>Description</span>
+                    <span className="text-xs font-bold uppercase tracking-wider flex-1 px-4 py-2.5" style={{ color: '#FFFFFF' }}>Description</span>
                     <div className="flex items-center flex-shrink-0 pr-2">
                         {reportMonths.map(m => (
-                            <span key={m} className={`text-[10px] font-bold uppercase text-right ${colW} px-1 py-2`} style={{ color: '#FFFFFF' }}>
+                            <span key={m} className={`text-xs font-bold uppercase text-right ${colW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>
                                 {mLabel(m)}
                             </span>
                         ))}
-                        <span className={`text-[11px] font-bold uppercase text-right ${colW} px-1 py-2`} style={{ color: '#FFFFFF' }}>Total</span>
+                        <span className={`text-sm font-bold uppercase text-right ${colW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>Total</span>
                     </div>
                 </div>
 
@@ -652,11 +652,11 @@ const ProfitLoss = () => {
                             <TotalRow label="Total Net Income Before Tax" amount={totals.netIncomeBeforeTax} />
 
                             {/* Corporate Income Tax */}
-                            <div className="flex items-center justify-between px-4 py-1.5 bg-red-50 dark:bg-red-500/10 border-y border-red-200 dark:border-red-500/30">
-                                <span className="text-[11px] font-bold text-red-600 dark:text-red-400 uppercase">
+                            <div className="flex items-center justify-between px-4 py-2 bg-red-50 dark:bg-red-500/10 border-y border-red-200 dark:border-red-500/30">
+                                <span className="text-xs font-bold text-red-600 dark:text-red-400 uppercase">
                                     Corporate Income Tax ({taxRate}%)
                                 </span>
-                                <span className="text-[11px] font-bold font-mono text-red-600 dark:text-red-400 text-right min-w-[140px]">
+                                <span className="text-sm font-bold font-mono text-red-600 dark:text-red-400 text-right min-w-[140px]">
                                     {fmt(-totals.taxAmount)}
                                 </span>
                             </div>
