@@ -170,6 +170,9 @@ const TrialBalance = () => {
                 .filter(acc => acc.opening !== 0 || acc.debitPeriod !== 0 || acc.creditPeriod !== 0) // Hide zero balance accounts
                 .sort((a, b) => a.code.localeCompare(b.code)); // Sort strictly by Account Code
 
+            // Set balances
+            setBalances(processed);
+
             // Set balanced totals
             setTotals({
                 opening: totalOpening,
