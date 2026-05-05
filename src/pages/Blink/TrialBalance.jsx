@@ -156,14 +156,16 @@ const TrialBalance = () => {
                     // Closing Balance Calculation based on normal balance rules
                     if (isNormalCredit) {
                         acc.closing = acc.opening + acc.creditPeriod - acc.debitPeriod;
+                        totalOpening -= acc.opening;
+                        totalClosing -= acc.closing;
                     } else {
                         acc.closing = acc.opening + acc.debitPeriod - acc.creditPeriod;
+                        totalOpening += acc.opening;
+                        totalClosing += acc.closing;
                     }
 
-                    totalOpening += acc.opening;
                     totalDebit += acc.debitPeriod;
                     totalCredit += acc.creditPeriod;
-                    totalClosing += acc.closing;
 
                     return acc;
                 })
