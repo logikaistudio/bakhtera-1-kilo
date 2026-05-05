@@ -754,6 +754,7 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
     const [formData, setFormData] = useState({
         payment_date: new Date().toISOString().split('T')[0],
         amount: ar.outstanding_amount || 0,
+        payment_exchange_rate: ar.exchange_rate || 1,
         payment_method: 'bank_transfer',
         reference_number: '',
         received_in_account: '',
@@ -957,6 +958,7 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
                     selectedBank,
                     arCOAId: formData.ar_coa_id,
                     bankCOAId: selectedBank?.coa_id || null,
+                    paymentExchangeRate: formData.payment_exchange_rate,
                     coaList
                 });
                 console.log('[AR] Payment journal created for', paymentNumber);
@@ -1108,7 +1110,7 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
                                 type="number"
                                 value={formData.amount}
                                 onChange={(e) => setFormData(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
-                                className="w-full"
+                                className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg"
                                 min="0"
                                 max={ar.outstanding_amount}
                                 step="0.01"
@@ -1118,6 +1120,25 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
                                 Max: {formatCurrency(ar.outstanding_amount, ar.currency)}
                             </p>
                         </div>
+                        {ar.currency !== 'IDR' && (
+                            <div>
+                                <label className="block text-sm font-medium text-silver-dark mb-2">
+                                    Kurs Pencairan *
+                                </label>
+                                <input
+                                    type="number"
+                                    value={formData.payment_exchange_rate}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, payment_exchange_rate: parseFloat(e.target.value) || 1 }))}
+                                    className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg"
+                                    min="1"
+                                    step="0.01"
+                                    required
+                                />
+                                <p className="text-xs text-amber-500 mt-1">
+                                    Kurs Invoice Awal: Rp {(ar.exchange_rate || 1).toLocaleString('id-ID')}
+                                </p>
+                            </div>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">

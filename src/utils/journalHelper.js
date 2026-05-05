@@ -307,6 +307,16 @@ export async function resolveCOGSAccount(coaList) {
     }) || { code: '5-01-001', name: 'HPP - Ocean Freight', id: null, type: 'COGS' };
 }
 
+/** Laba/Rugi Selisih Kurs — REVENUE/EXPENSE */
+export async function resolveGainLossAccount(coaList) {
+    return resolveCOA({
+        coaList,
+        codes: ['7-01-002', '8-01-001', '7-01', '8-01'],
+        prefixes: ['7', '8'],
+        nameHint: 'kurs'
+    }) || { code: '8-01-001', name: 'Laba/Rugi Selisih Kurs', id: null, type: 'OTHER' };
+}
+
 // ── Journal Entry Builder ─────────────────────────────────────────────────────
 
 /**
@@ -770,7 +780,7 @@ export async function createInvoiceJournal({ invoice, coaList: providedCOA }) {
  */
 export async function createARPaymentJournal({
     invoice, paymentAmount, paymentDate, paymentNumber, selectedBank, coaList: providedCOA,
-    arCOAId, bankCOAId
+    arCOAId, bankCOAId, paymentExchangeRate
 }) {
     if (!invoice || !invoice.id) return { success: false, reason: 'invalid_invoice' };
     if (!paymentAmount || paymentAmount <= 0) return { success: false, reason: 'amount_zero' };
@@ -790,13 +800,14 @@ export async function createARPaymentJournal({
     const batchId = generateUUID();
     const jeNum = await generateJENumber('PAY-IN');
     const exRate = invoice.currency !== 'IDR' ? (invoice.exchange_rate || 1) : 1;
-    const note = invoice.currency !== 'IDR' ? ` (Rate: ${exRate.toLocaleString('id-ID')})` : '';
+    const payRate = invoice.currency !== 'IDR' ? (paymentExchangeRate || exRate) : 1;
+    const note = invoice.currency !== 'IDR' ? ` (Rate: ${payRate.toLocaleString('id-ID')})` : '';
     const bankLabel = selectedBank
         ? `${selectedBank.bank_name} ${selectedBank.account_number ? '- ' + selectedBank.account_number : ''}`
         : 'Kas/Bank';
     const desc = `Payment ${bankLabel} for ${invoice.invoice_number} - ${invoice.customer_name}${note}`;
 
-    return insertJournalEntries([
+    const rows = [
         buildJERow({
             entryNumber: jeNum, suffix: '-D',
             date: paymentDate,
@@ -806,7 +817,7 @@ export async function createARPaymentJournal({
             accountCodeFallback: selectedBank?.coa_code || '1-01-001',
             accountNameFallback: bankLabel,
             debit: paymentAmount, credit: 0,
-            currency: invoice.currency, exchangeRate: exRate,
+            currency: invoice.currency, exchangeRate: payRate,
             description: desc, batchId,
             partyName: invoice.customer_name, partyId: invoice.customer_id
         }),
@@ -821,7 +832,41 @@ export async function createARPaymentJournal({
             description: desc, batchId,
             partyName: invoice.customer_name, partyId: invoice.customer_id
         })
-    ]);
+    ];
+
+    if (invoice.currency !== 'IDR' && payRate !== exRate) {
+        const diffIDR = (paymentAmount * payRate) - (paymentAmount * exRate);
+        const gainLossCOA = await resolveGainLossAccount(coaList);
+        if (diffIDR > 0) {
+            // Laba (Credit)
+            rows.push(buildJERow({
+                entryNumber: jeNum, suffix: '-C-GL',
+                date: paymentDate,
+                entryType: 'payment', refType: 'ar_payment',
+                refId: invoice.id, refNumber: paymentNumber,
+                coa: gainLossCOA,
+                debit: 0, credit: diffIDR,
+                currency: 'IDR', exchangeRate: 1,
+                description: `Laba Selisih Kurs - ${invoice.invoice_number}`, batchId,
+                partyName: invoice.customer_name, partyId: invoice.customer_id
+            }));
+        } else if (diffIDR < 0) {
+            // Rugi (Debit)
+            rows.push(buildJERow({
+                entryNumber: jeNum, suffix: '-D-GL',
+                date: paymentDate,
+                entryType: 'payment', refType: 'ar_payment',
+                refId: invoice.id, refNumber: paymentNumber,
+                coa: gainLossCOA,
+                debit: Math.abs(diffIDR), credit: 0,
+                currency: 'IDR', exchangeRate: 1,
+                description: `Rugi Selisih Kurs - ${invoice.invoice_number}`, batchId,
+                partyName: invoice.customer_name, partyId: invoice.customer_id
+            }));
+        }
+    }
+
+    return insertJournalEntries(rows);
 }
 
 /**
@@ -1024,7 +1069,7 @@ export async function createCOGSJournal({ invoice, cogsAmount, coaList: provided
  */
 export async function createAPPaymentJournal({
     ap, paymentAmount, paymentDate, paymentNumber, selectedBank, coaList: providedCOA,
-    apCOAId, bankCOAId
+    apCOAId, bankCOAId, paymentExchangeRate
 }) {
     if (!ap || !ap.id || !paymentNumber) {
         return { success: false, skipped: true, reason: 'invalid_payment' };
@@ -1043,13 +1088,14 @@ export async function createAPPaymentJournal({
     const batchId = generateUUID();
     const jeNum = await generateJENumber('PAY-OUT');
     const exRate = ap.currency !== 'IDR' ? (ap.exchange_rate || 1) : 1;
-    const note = ap.currency !== 'IDR' ? ` (Rate: ${exRate.toLocaleString('id-ID')})` : '';
+    const payRate = ap.currency !== 'IDR' ? (paymentExchangeRate || exRate) : 1;
+    const note = ap.currency !== 'IDR' ? ` (Rate: ${payRate.toLocaleString('id-ID')})` : '';
     const bankLabel = selectedBank
         ? `${selectedBank.bank_name} ${selectedBank.account_number ? '- ' + selectedBank.account_number : ''}`
         : 'Kas/Bank';
     const desc = `Payment via ${bankLabel} for ${ap.po_number || ap.ap_number} to ${ap.vendor_name}${note}`;
 
-    return insertJournalEntries([
+    const rows = [
         buildJERow({
             entryNumber: jeNum, suffix: '-D',
             date: paymentDate,
@@ -1070,11 +1116,45 @@ export async function createAPPaymentJournal({
             accountCodeFallback: selectedBank?.coa_code || '1-01-001',
             accountNameFallback: bankLabel,
             debit: 0, credit: paymentAmount,
-            currency: ap.currency, exchangeRate: exRate,
+            currency: ap.currency, exchangeRate: payRate,
             description: desc, batchId,
             partyName: ap.vendor_name, partyId: ap.vendor_id
         })
-    ]);
+    ];
+
+    if (ap.currency !== 'IDR' && payRate !== exRate) {
+        const diffIDR = (paymentAmount * payRate) - (paymentAmount * exRate);
+        const gainLossCOA = await resolveGainLossAccount(coaList);
+        if (diffIDR < 0) {
+            // Laba (Credit)
+            rows.push(buildJERow({
+                entryNumber: jeNum, suffix: '-C-GL',
+                date: paymentDate,
+                entryType: 'bill_payment', refType: 'ap_payment',
+                refId: ap.id, refNumber: paymentNumber,
+                coa: gainLossCOA,
+                debit: 0, credit: Math.abs(diffIDR),
+                currency: 'IDR', exchangeRate: 1,
+                description: `Laba Selisih Kurs - ${ap.po_number || ap.ap_number}`, batchId,
+                partyName: ap.vendor_name, partyId: ap.vendor_id
+            }));
+        } else if (diffIDR > 0) {
+            // Rugi (Debit)
+            rows.push(buildJERow({
+                entryNumber: jeNum, suffix: '-D-GL',
+                date: paymentDate,
+                entryType: 'bill_payment', refType: 'ap_payment',
+                refId: ap.id, refNumber: paymentNumber,
+                coa: gainLossCOA,
+                debit: diffIDR, credit: 0,
+                currency: 'IDR', exchangeRate: 1,
+                description: `Rugi Selisih Kurs - ${ap.po_number || ap.ap_number}`, batchId,
+                partyName: ap.vendor_name, partyId: ap.vendor_id
+            }));
+        }
+    }
+
+    return insertJournalEntries(rows);
 }
 
 /**
