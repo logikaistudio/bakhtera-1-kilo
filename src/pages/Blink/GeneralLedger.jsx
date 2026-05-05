@@ -601,17 +601,17 @@ const GeneralLedger = () => {
 
                 {/* ── COA SIDEBAR ── */}
                 {showSidebar && (
-                    <div className="w-60 shrink-0 glass-card rounded-xl border border-dark-border flex flex-col overflow-hidden">
+                    <div className="w-80 shrink-0 glass-card rounded-xl border border-dark-border flex flex-col overflow-hidden">
                         <div className="px-3 pt-3 pb-2 border-b border-dark-border bg-dark-bg/80 shrink-0">
                             <div className="flex items-center justify-between mb-2">
-                                <span className="text-[10px] font-bold text-silver-light uppercase tracking-widest">Chart of Accounts</span>
-                                <span className="text-[9px] text-silver-dark bg-dark-surface px-1.5 py-0.5 rounded border border-dark-border">YTD</span>
+                                <span className="text-xs font-bold text-silver-light uppercase tracking-widest">Chart of Accounts</span>
+                                <span className="text-[10px] text-silver-dark bg-dark-surface px-1.5 py-0.5 rounded border border-dark-border">YTD</span>
                             </div>
                             <div className="relative">
                                 <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-silver-dark" />
                                 <input type="text" placeholder="Search account code or name..."
                                     value={coaSearchTerm} onChange={e => setCoaSearchTerm(e.target.value)}
-                                    className="w-full pl-6 pr-5 py-1.5 bg-dark-surface border border-dark-border rounded text-[11px] text-silver-light placeholder:text-silver-dark/40 focus:border-accent-blue/50 smooth-transition" />
+                                    className="w-full pl-7 pr-5 py-2 bg-dark-surface border border-dark-border rounded text-xs text-silver-light placeholder:text-silver-dark/40 focus:border-accent-blue/50 smooth-transition" />
                                 {coaSearchTerm && (
                                     <button onClick={() => setCoaSearchTerm('')} className="absolute right-1.5 top-1/2 -translate-y-1/2">
                                         <X className="w-2.5 h-2.5 text-silver-dark hover:text-white" />
@@ -624,8 +624,8 @@ const GeneralLedger = () => {
                                 <div className="flex justify-center py-8"><div className="animate-spin w-4 h-4 border-2 border-accent-orange border-t-transparent rounded-full" /></div>
                             ) : Object.keys(groupedAccounts).length === 0 ? (
                                 <div className="py-8 px-3 text-center">
-                                    <Search className="w-5 h-5 text-silver-dark/30 mx-auto mb-1.5" />
-                                    <p className="text-[10px] text-silver-dark">No results for "{coaSearchTerm}"</p>
+                                    <Search className="w-6 h-6 text-silver-dark/30 mx-auto mb-2" />
+                                    <p className="text-xs text-silver-dark">No results for "{coaSearchTerm}"</p>
                                 </div>
                             ) : (
                                 Object.entries(groupedAccounts).map(([type, accs]) => {
@@ -637,11 +637,11 @@ const GeneralLedger = () => {
                                             <button onClick={() => toggleType(type)}
                                                 className="w-full flex items-center justify-between px-2.5 py-1.5 bg-dark-surface/60 hover:bg-dark-surface smooth-transition border-b border-dark-border/40">
                                                 <div className="flex items-center gap-1.5">
-                                                    {isEx ? <ChevronDown className="w-2.5 h-2.5 text-silver-dark" /> : <ChevronRight className="w-2.5 h-2.5 text-silver-dark" />}
-                                                    <span className={`px-1 py-0.5 rounded text-[9px] font-bold border ${cfg.color}`}>{cfg.label}</span>
-                                                    <span className="text-[9px] text-silver-dark/50">({accs.length})</span>
+                                                    {isEx ? <ChevronDown className="w-3 h-3 text-silver-dark" /> : <ChevronRight className="w-3 h-3 text-silver-dark" />}
+                                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${cfg.color}`}>{cfg.label}</span>
+                                                    <span className="text-[10px] text-silver-dark/50">({accs.length})</span>
                                                 </div>
-                                                <span className={`text-[9px] font-mono ${typeTotal >= 0 ? 'text-silver-dark' : 'text-red-400'}`}>
+                                                <span className={`text-[11px] font-mono ${typeTotal >= 0 ? 'text-silver-dark' : 'text-red-400'}`}>
                                                     {balancesLoading ? '...' : Math.abs(typeTotal) > 1e9 ? `${(typeTotal / 1e9).toFixed(1)}B` : Math.abs(typeTotal) > 1e6 ? `${(typeTotal / 1e6).toFixed(1)}M` : Math.abs(typeTotal) > 1e3 ? `${(typeTotal / 1e3).toFixed(0)}K` : '-'}
                                                 </span>
                                             </button>
@@ -652,10 +652,10 @@ const GeneralLedger = () => {
                                                     <button key={acc.id} onClick={() => setSelectedAccount(acc.id)}
                                                         className={`w-full px-2.5 py-1.5 text-left flex items-center justify-between border-b border-dark-border/20 smooth-transition group ${isSelected ? 'bg-accent-orange/10 border-l-2 border-l-accent-orange' : 'hover:bg-dark-surface/40'}`}>
                                                         <div className="min-w-0 flex-1">
-                                                            <p className={`text-[9px] font-mono truncate ${isSelected ? 'text-accent-orange' : 'text-silver-dark/60'}`}>{acc.code}</p>
-                                                            <p className={`text-[10px] truncate mt-0.5 ${isSelected ? 'text-white font-medium' : 'text-silver-dark group-hover:text-silver-light'}`}>{acc.name}</p>
+                                                            <p className={`text-xs font-mono truncate ${isSelected ? 'text-accent-orange font-bold' : 'text-silver-dark/80 font-medium'}`}>{acc.code}</p>
+                                                            <p className={`text-[13px] truncate mt-0.5 ${isSelected ? 'text-white font-bold' : 'text-silver-light group-hover:text-white'}`}>{acc.name}</p>
                                                         </div>
-                                                        <span className={`text-[9px] ml-1 shrink-0 font-mono ${bal < 0 ? 'text-red-400' : bal > 0 ? 'text-silver-light' : 'text-silver-dark/20'}`}>
+                                                        <span className={`text-[11px] ml-2 shrink-0 font-mono font-medium ${bal < 0 ? 'text-red-400' : bal > 0 ? 'text-silver-light' : 'text-silver-dark/40'}`}>
                                                             {bal === 0 ? '' : Math.abs(bal) > 1e9 ? `${(Math.abs(bal) / 1e9).toFixed(1)}B` : Math.abs(bal) > 1e6 ? `${(Math.abs(bal) / 1e6).toFixed(1)}M` : `${(Math.abs(bal) / 1e3).toFixed(0)}K`}
                                                         </span>
                                                     </button>
