@@ -995,13 +995,13 @@ const Sidebar = () => {
                 {/* Branding */}
                 <div className="text-center pt-2 border-t border-dark-border/30 mt-2">
                     <p className="text-[10px] text-silver-dark/50">
-                        © 2024 Bakhtera-1 • v1.0.0
+                        © 2026 Bakhtera-1 • v1.0.0
                     </p>
                     <a
                         href="https://logikai.studio"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[10px] text-accent-orange/60 hover:text-accent-orange/90 transition-colors"
+                        className="text-xs font-bold text-black hover:text-black/80 transition-colors mt-1 inline-block"
                     >
                         By : LogikAi.studio
                     </a>

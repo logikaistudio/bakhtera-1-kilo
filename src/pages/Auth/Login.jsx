@@ -205,7 +205,7 @@ const Login = () => {
 
                 {/* Bottom branding */}
                 <p className="text-center text-xs text-blue-200/60 mt-6">
-                    © 2024 Bakhtera-1 &nbsp;•&nbsp; Powered by&nbsp;
+                    © 2026 Bakhtera-1 &nbsp;•&nbsp; Powered by&nbsp;
                     <a href="https://logikai.studio" target="_blank" rel="noopener noreferrer" className="text-cyan-300/80 hover:text-cyan-200 transition-colors">
                         LogikAi.studio
                     </a>
