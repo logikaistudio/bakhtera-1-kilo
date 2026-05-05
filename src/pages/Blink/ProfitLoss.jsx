@@ -423,27 +423,24 @@ const ProfitLoss = () => {
         const total = group.items.reduce((s, a) => s + a.amount, 0);
         return (
             <div
-                className="flex items-center bg-blue-50 dark:bg-blue-500/10 border-b border-blue-200 dark:border-blue-400/30 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-300/30 transition-colors"
+                className="flex items-center bg-slate-50 dark:bg-dark-surface/40 border-b border-slate-200 dark:border-dark-border/60 cursor-pointer hover:bg-slate-100 dark:hover:bg-dark-surface/60 transition-colors"
                 onClick={() => toggleGroup(key)}
             >
-                <div className="flex items-center gap-2 flex-1 min-w-0 px-4 py-1.5">
+                <div className="flex items-center gap-2 flex-1 px-4 py-2">
                     {isOpen
-                        ? <ChevronDown className="w-4 h-4 text-blue-600 dark:text-blue-500 flex-shrink-0" />
-                        : <ChevronRight className="w-4 h-4 text-blue-600 dark:text-blue-500 flex-shrink-0" />}
-                    <span className="text-xs font-bold text-blue-800 dark:text-blue-300 uppercase truncate">
+                        ? <ChevronDown className="w-4 h-4 text-slate-600 dark:text-silver-dark flex-shrink-0" />
+                        : <ChevronRight className="w-4 h-4 text-slate-600 dark:text-silver-dark flex-shrink-0" />}
+                    <span className="text-[13px] font-extrabold text-slate-800 dark:text-silver-light uppercase">
                         {group.parent.name}
-                        <span className="ml-2 font-mono font-normal text-blue-600 dark:text-blue-400/60 normal-case">
-                            ( {group.parent.code} )
-                        </span>
                     </span>
                 </div>
                 <div className="flex items-center flex-shrink-0 pr-2">
                     {reportMonths.map(m => (
-                        <span key={m} className={`text-xs font-mono text-blue-700 dark:text-blue-400 text-right ${colW} px-1`}>
+                        <span key={m} className={`text-xs font-mono text-slate-600 dark:text-silver-dark text-right ${colW} px-1`}>
                             {fmt(group.parent.byMonth?.[m] || 0)}
                         </span>
                     ))}
-                    <span className={`text-sm font-bold font-mono text-blue-800 dark:text-blue-300 text-right ${colW} px-1`}>
+                    <span className={`text-sm font-bold font-mono text-slate-800 dark:text-silver-light text-right ${colW} px-1`}>
                         {fmt(total)}
                     </span>
                 </div>
@@ -456,8 +453,8 @@ const ProfitLoss = () => {
             onClick={() => navigate('/blink/finance/general-ledger', { state: { preSelectedAccount: item.id } })}
             className="flex items-center border-b border-gray-100 dark:border-dark-border/20 hover:bg-gray-50 dark:hover:bg-dark-surface/40 cursor-pointer group"
         >
-            <span className="text-xs text-slate-700 dark:text-silver-light group-hover:underline truncate flex-1 min-w-0"
-                style={{ paddingLeft: indent ? '3.5rem' : '1.5rem', paddingRight: '0.5rem', paddingTop: '6px', paddingBottom: '6px' }}>
+            <span className="text-[13px] text-slate-700 dark:text-silver-light group-hover:underline flex-1 pr-2 py-2"
+                style={{ paddingLeft: indent ? '3.5rem' : '1.5rem' }}>
                 {item.name}
             </span>
             <div className="flex items-center flex-shrink-0 pr-2">
