@@ -193,6 +193,7 @@ const Sidebar = () => {
                 { path: '/bridge/hs-master', label: 'Master Kode HS', menuCode: 'bridge_hs_master' },
                 { path: '/bridge/item-master', label: 'Master Kode Barang', menuCode: 'bridge_item_master' },
                 { path: '/bridge/code-of-account', label: 'Code of Account', menuCode: 'bridge_coa' },
+                { path: '/bridge/master/settings', label: 'Pengaturan Modul', menuCode: 'bridge_settings' },
             ]
         },
 
@@ -201,8 +202,7 @@ const Sidebar = () => {
             type: 'category', label: '🔔 Persetujuan & Log', items: [
                 { path: '/bridge/approvals', label: 'Approval Manager', menuCode: 'bridge_approval', showBadge: true },
                 { path: '/bridge/logger', label: 'Activity Logger', menuCode: 'bridge_activity' },
-                { path: '/bridge/master/settings', label: 'Pengaturan Modul', menuCode: 'bridge_settings' },
-            ]
+                            ]
         },
     ];
 

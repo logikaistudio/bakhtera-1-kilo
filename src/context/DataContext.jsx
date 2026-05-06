@@ -19,6 +19,10 @@ export const DataProvider = ({ children }) => {
     const [finance, setFinance] = useState([]);
     const [companySettings, setCompanySettings] = useState(null);
     const [bankAccounts, setBankAccounts] = useState([]);
+    const [bridgeSettings, setBridgeSettings] = useState(null);
+    const [bigSettings, setBigSettings] = useState(null);
+    const [bridgeBankAccounts, setBridgeBankAccounts] = useState([]);
+    const [bigBankAccounts, setBigBankAccounts] = useState([]);
 
     // Module-specific data
     const [shipments, setShipments] = useState([]);
@@ -517,7 +521,9 @@ export const DataProvider = ({ children }) => {
                 }
 
                 // Load Company Settings
-                await fetchCompanySettings();
+                await fetchCompanySettings('blink');
+                await fetchCompanySettings('bridge');
+                await fetchCompanySettings('big');
 
             } catch (error) {
                 console.error("Failed to load data from Supabase:", error);
@@ -2734,7 +2740,35 @@ export const DataProvider = ({ children }) => {
     };
 
     // Company Settings operations
-    const fetchCompanySettings = async () => {
+
+    const getSettingsTableName = (module = 'blink') => module === 'blink' ? 'company_settings' : `${module}_company_settings`;
+    const getBanksTableName = (module = 'blink') => module === 'blink' ? 'company_bank_accounts' : `${module}_company_bank_accounts`;
+    
+    const setSettingsState = (module, data) => {
+        if (module === 'bridge') setBridgeSettings(data);
+        else if (module === 'big') setBigSettings(data);
+        else setSettingsState(module, data);
+    };
+
+    const getSettingsState = (module) => {
+        if (module === 'bridge') return bridgeSettings;
+        if (module === 'big') return bigSettings;
+        return companySettings;
+    };
+
+    const setBanksState = (module, data) => {
+        if (module === 'bridge') setBridgeBankAccounts(data);
+        else if (module === 'big') setBigBankAccounts(data);
+        else setBankAccounts(data);
+    };
+
+    const getBanksState = (module) => {
+        if (module === 'bridge') return bridgeBankAccounts;
+        if (module === 'big') return bigBankAccounts;
+        return bankAccounts;
+    };
+    
+    const fetchCompanySettings = async (module = 'blink') => {
         let retrievedSettings = null;
 
         try {
@@ -2742,7 +2776,7 @@ export const DataProvider = ({ children }) => {
             // Fetch company settings - use limit(1) instead of single() to avoid error
             try {
                 const { data: settingsData, error: settingsError } = await supabase
-                    .from('company_settings')
+                    .from(getSettingsTableName(module))
                     .select('*')
                     .order('updated_at', { ascending: false })
                     .limit(1);
@@ -2754,7 +2788,7 @@ export const DataProvider = ({ children }) => {
                 } else if (settingsData && settingsData.length > 0) {
                     console.log('✅ Company settings loaded:', settingsData[0]);
                     retrievedSettings = settingsData[0];
-                    setCompanySettings(settingsData[0]);
+                    setSettingsState(module, settingsData[0]);
                 } else {
                     console.log('ℹ️ No company settings found');
                 }
@@ -2765,14 +2799,14 @@ export const DataProvider = ({ children }) => {
             // Fetch bank accounts - wrapped in try-catch to handle missing table
             try {
                 const { data: bankData, error: bankError } = await supabase
-                    .from('company_bank_accounts')
+                    .from(getBanksTableName(module))
                     .select('*')
                     .order('display_order', { ascending: true });
 
                 if (bankError) {
                     console.warn('Warning: Could not fetch bank accounts:', bankError.message);
                 } else if (bankData) {
-                    setBankAccounts(bankData);
+                    setBanksState(module, bankData);
                 }
             } catch (e) {
                 console.warn('company_bank_accounts table may not exist:', e.message);
@@ -2784,16 +2818,17 @@ export const DataProvider = ({ children }) => {
         return retrievedSettings;
     };
 
-    const updateCompanySettings = async (settings) => {
+    const updateCompanySettings = async (settings, module = 'blink') => {
+            const currentSettings = getSettingsState(module);
         try {
             console.log('📝 updateCompanySettings called:', settings);
             console.log('📝 Current companySettings:', companySettings);
 
-            if (companySettings?.id) {
+            if (currentSettings?.id) {
                 // Update existing
-                console.log('📝 Updating existing settings with ID:', companySettings.id);
+                console.log('📝 Updating existing settings with ID:', currentSettings.id);
                 const { data, error } = await supabase
-                    .from('company_settings')
+                    .from(getSettingsTableName(module))
                     .update({
                         company_name: settings.company_name || null,
                         company_address: settings.company_address || null,
@@ -2804,7 +2839,7 @@ export const DataProvider = ({ children }) => {
                         logo_url: settings.logo_url || null,
                         updated_at: new Date().toISOString()
                     })
-                    .eq('id', companySettings.id)
+                    .eq('id', currentSettings.id)
                     .select();
 
                 if (error) {
@@ -2813,7 +2848,7 @@ export const DataProvider = ({ children }) => {
                 }
 
                 console.log('✅ Settings updated successfully:', data);
-                setCompanySettings({ ...companySettings, ...settings });
+                setSettingsState(module, { ...currentSettings, ...settings });
             } else {
                 // Insert new
                 console.log('📝 Inserting new settings...');
@@ -2830,7 +2865,7 @@ export const DataProvider = ({ children }) => {
                 };
 
                 const { data, error } = await supabase
-                    .from('company_settings')
+                    .from(getSettingsTableName(module))
                     .insert([newSettings])
                     .select()
                     .single();
@@ -2841,7 +2876,7 @@ export const DataProvider = ({ children }) => {
                 }
 
                 console.log('✅ New settings inserted:', data);
-                setCompanySettings(data);
+                setSettingsState(module, data);
             }
         } catch (error) {
             console.error('Error updating company settings:', error);
@@ -2849,7 +2884,7 @@ export const DataProvider = ({ children }) => {
         }
     };
 
-    const uploadCompanyLogo = async (file) => {
+    const uploadCompanyLogo = async (file, module = 'blink') => {
         try {
             const fileName = `logo-${Date.now()}.${file.name.split('.').pop()}`;
             const filePath = `${fileName}`;
@@ -2870,10 +2905,7 @@ export const DataProvider = ({ children }) => {
                 .getPublicUrl(filePath);
 
             // Update company settings with new logo URL
-            await updateCompanySettings({
-                ...companySettings,
-                logo_url: publicUrl
-            });
+            await updateCompanySettings({ ...getSettingsState(module), logo_url: publicUrl }, module);
 
             return publicUrl;
         } catch (error) {
@@ -2882,12 +2914,12 @@ export const DataProvider = ({ children }) => {
         }
     };
 
-    const addBankAccount = async (bankAccount) => {
+    const addBankAccount = async (bankAccount, module = 'blink') => {
         try {
-            let currentCompanySettings = companySettings;
+            let currentCompanySettings = getSettingsState(module);
 
             if (!currentCompanySettings?.id) {
-                currentCompanySettings = await fetchCompanySettings();
+                currentCompanySettings = await fetchCompanySettings(module);
             }
 
             if (!currentCompanySettings?.id) {
@@ -2903,7 +2935,7 @@ export const DataProvider = ({ children }) => {
                 currency: bankAccount.currency || 'IDR',
                 swift_code: bankAccount.swift_code || null,
                 company_settings_id: currentCompanySettings.id,
-                display_order: bankAccounts.length + 1,
+                display_order: getBanksState(module).length + 1,
                 coa_id: bankAccount.coa_id || null,
                 coa_code: bankAccount.coa_code || null,
                 coa_name: bankAccount.coa_name || null,
@@ -2911,21 +2943,21 @@ export const DataProvider = ({ children }) => {
             };
 
             const { data, error } = await supabase
-                .from('company_bank_accounts')
+                .from(getBanksTableName(module))
                 .insert([normalizedBankAccount])
                 .select()
                 .single();
 
             if (error) throw error;
 
-            setBankAccounts([...bankAccounts, data]);
+            setBanksState(module, [...getBanksState(module), data]);
         } catch (error) {
             console.error('Error adding bank account:', error);
             throw error;
         }
     };
 
-    const updateBankAccount = async (id, updatedBankAccount) => {
+    const updateBankAccount = async (id, updatedBankAccount, module = 'blink') => {
         try {
             const normalizedUpdate = {
                 bank_name: updatedBankAccount.bank_name || null,
@@ -2942,13 +2974,13 @@ export const DataProvider = ({ children }) => {
             };
 
             const { error } = await supabase
-                .from('company_bank_accounts')
+                .from(getBanksTableName(module))
                 .update(normalizedUpdate)
                 .eq('id', id);
 
             if (error) throw error;
 
-            setBankAccounts(prev =>
+            setBanksState(module, getBanksState(module).map(bank => bank.id === id ? { ...bank, ...normalizedUpdate } : bank)); //
                 prev.map(bank => bank.id === id ? { ...bank, ...normalizedUpdate } : bank)
             );
         } catch (error) {
@@ -2957,16 +2989,16 @@ export const DataProvider = ({ children }) => {
         }
     };
 
-    const deleteBankAccount = async (id) => {
+    const deleteBankAccount = async (id, module = 'blink') => {
         try {
             const { error } = await supabase
-                .from('company_bank_accounts')
+                .from(getBanksTableName(module))
                 .delete()
                 .eq('id', id);
 
             if (error) throw error;
 
-            setBankAccounts(prev => prev.filter(bank => bank.id !== id));
+            setBanksState(module, getBanksState(module).map(bank => bank.id === id ? { ...bank, ...normalizedUpdate } : bank)); // prev.filter(bank => bank.id !== id));
         } catch (error) {
             console.error('Error deleting bank account:', error);
             throw error;
