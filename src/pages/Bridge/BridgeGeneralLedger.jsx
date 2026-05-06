@@ -96,475 +96,737 @@ const Sparkline = ({ data, color = '#f97316', width = 80, height = 24 }) => {
         </svg>
     );
 };
+// ── Export PDF ─────────────────────────────────────────────────────────────
+const exportToPDF = (selectedAccount, accountInfo, dateRange, openingBalance, totalDebit, totalCredit, closingBalance, rows, typeConfig, companyInfo) => {
+    if (!selectedAccount || !accountInfo) return;
+    const period = `${fmtDatePrint(dateRange.start)} – ${fmtDatePrint(dateRange.end)}`;
+    const fmtP = (v) => {
+        if (v === undefined || v === null) return '-';
+        const neg = v < 0;
+        const s = `Rp ${Math.abs(v).toLocaleString('id-ID')}`;
+        return neg ? `(${s})` : s;
+    };
+    const fmtAmt = (value, currency, exchangeRate) => {
+        if (!value || value === 0) return '';
+        if (currency && currency !== 'IDR' && (exchangeRate || 1) > 1)
+            return `Rp ${Math.abs(value * exchangeRate).toLocaleString('id-ID')}`;
+        if (currency === 'USD') return `$${Math.abs(value).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+        return `Rp ${Math.abs(value).toLocaleString('id-ID')}`;
+    };
 
+    const bodyHTML = `
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <div class="label">Opening Balance</div>
+                    <div class="value">${fmtP(openingBalance)}</div>
+                    <div style="font-size:8px;color:#94a3b8">Before ${fmtDatePrint(dateRange.start)}</div>
+                </div>
+                <div class="summary-card green-card">
+                    <div class="label">Total Debit</div>
+                    <div class="value">${fmtP(totalDebit)}</div>
+                    <div style="font-size:8px;color:#94a3b8">${rows.filter(r => r.debit > 0).length} lines</div>
+                </div>
+                <div class="summary-card blue-card">
+                    <div class="label">Total Credit</div>
+                    <div class="value">${fmtP(totalCredit)}</div>
+                    <div style="font-size:8px;color:#94a3b8">${rows.filter(r => r.credit > 0).length} lines</div>
+                </div>
+                <div class="summary-card ${closingBalance >= 0 ? 'purple-card' : 'red-card'}">
+                    <div class="label">Closing Balance</div>
+                    <div class="value">${fmtP(closingBalance)}</div>
+                    <div style="font-size:8px;color:#94a3b8">${fmtDatePrint(dateRange.end)}</div>
+                </div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="min-width:90px">Date</th>
+                        <th style="min-width:130px">Entry No.</th>
+                        <th style="min-width:180px">Description</th>
+                        <th style="min-width:110px">Reference</th>
+                        <th style="min-width:100px">Party</th>
+                        <th style="min-width:80px">Source</th>
+                        <th class="text-right" style="min-width:110px">Debit</th>
+                        <th class="text-right" style="min-width:110px">Credit</th>
+                        <th class="text-right" style="min-width:120px">Balance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="row-opening">
+                        <td colspan="6" class="yellow-label">↑ Opening Balance
+                            <span style="font-weight:normal;color:#92400e;font-size:8px"> (before ${fmtDatePrint(dateRange.start)})</span>
+                        </td>
+                        <td></td><td></td>
+                        <td class="text-right mono yellow-label">${fmtP(openingBalance)}</td>
+                    </tr>
+                    ${rows.map(entry => `
+                    <tr>
+                        <td class="muted">${fmtDatePrint(entry.entry_date)}</td>
+                        <td class="code">${entry.entry_number || '-'}</td>
+                        <td>${(entry.description || '-').substring(0, 50)}</td>
+                        <td class="muted">${entry.reference_number || '-'}</td>
+                        <td class="muted">${(entry.party_name || '-').substring(0, 20)}</td>
+                        <td class="muted">${(entry.reference_type || entry.source || 'auto').toUpperCase()}</td>
+                        <td class="text-right mono green">${entry.debit > 0 ? fmtAmt(entry.debit, entry.currency, entry.exchange_rate) : ''}</td>
+                        <td class="text-right mono" style="color:#1d4ed8">${entry.credit > 0 ? fmtAmt(entry.credit, entry.currency, entry.exchange_rate) : ''}</td>
+                        <td class="text-right mono ${entry.runningBalance < 0 ? 'red' : ''}">${fmtP(entry.runningBalance)}</td>
+                    </tr>`).join('')}
+                    <tr class="row-closing">
+                        <td colspan="6" class="purple">↓ Closing Balance
+                            <span style="font-weight:normal;color:#7c3aed;font-size:8px"> (${fmtDatePrint(dateRange.end)})</span>
+                        </td>
+                        <td class="text-right mono green bold">${fmtP(totalDebit)}</td>
+                        <td class="text-right mono bold" style="color:#1d4ed8">${fmtP(totalCredit)}</td>
+                        <td class="text-right mono ${closingBalance < 0 ? 'red' : 'purple'} bold">${fmtP(closingBalance)}</td>
+                    </tr>
+                </tbody>
+            </table>`;
+
+    printReport({
+        reportName: 'General Ledger',
+        companyInfo,
+        period,
+        bodyHTML,
+        note: `Account: [${accountInfo.code}] ${accountInfo.name} | Type: ${typeConfig.label} | Normal Balance: ${typeConfig.normalBalance} | Showing ${rows.length} transactions.`
+    });
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 const BridgeGeneralLedger = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { user } = useData();
+    const { companySettings } = useData();
 
-    // ─── State ─────────────────────────────────────────────────────────────────
     const [accounts, setAccounts] = useState([]);
-    const [selectedAccount, setSelectedAccount] = useState(null);
-    const [dateRange, setDateRange] = useState({
-        start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-        end: new Date().toISOString().split('T')[0]
-    });
-    const [loading, setLoading] = useState(true);
+    const [selectedAccount, setSelectedAccount] = useState('');
+    const [entries, setEntries] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [loadingAccounts, setLoadingAccounts] = useState(true);
+    const [openingBalance, setOpeningBalance] = useState(0);
     const [searchTerm, setSearchTerm] = useState('');
-    const [filterType, setFilterType] = useState('ALL');
-    const [showDrillDown, setShowDrillDown] = useState(false);
-    const [drillDownData, setDrillDownData] = useState(null);
-    const [expandedAccounts, setExpandedAccounts] = useState(new Set());
+    const [sourceFilter, setSourceFilter] = useState('all');
+    const [showSidebar, setShowSidebar] = useState(true);
+    const [accountBalances, setAccountBalances] = useState({}); // coaId / account_code → balance
+    const [balancesLoading, setBalancesLoading] = useState(false);
+    const [journalHasCoaId, setJournalHasCoaId] = useState(null);
+    const [coaSearchTerm, setCoaSearchTerm] = useState('');
 
-    // ─── Data Fetching ─────────────────────────────────────────────────────────
+    const today = new Date();
+    const [dateRange, setDateRange] = useState({
+        start: new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0],
+        end: today.toISOString().split('T')[0]
+    });
+
+    // ── Deep-link from Trial Balance ─────────────────────────────────────────
+    useEffect(() => { fetchAccounts(); }, []);
+
     useEffect(() => {
-        fetchAccounts();
+        const checkColumn = async () => {
+            const hasCoaColumn = await journalEntriesHasColumn('coa_id');
+            setJournalHasCoaId(hasCoaColumn);
+        };
+        checkColumn();
     }, []);
 
+    useEffect(() => {
+        if (location.state?.preSelectedAccount) {
+            setSelectedAccount(location.state.preSelectedAccount);
+        }
+    }, [location.state]);
+
+    useEffect(() => {
+        if (journalHasCoaId === null) return;
+        if (selectedAccount && dateRange.start && dateRange.end) {
+            fetchLedgerData();
+        } else {
+            setEntries([]);
+            setOpeningBalance(0);
+        }
+    }, [selectedAccount, dateRange, journalHasCoaId]);
+
+    useEffect(() => {
+        if (journalHasCoaId === null) return;
+        if (accounts.length > 0) fetchAccountBalances(accounts);
+    }, [accounts, journalHasCoaId]);
+
+    // ── Fetch Accounts ────────────────────────────────────────────────────────
     const fetchAccounts = async () => {
         try {
+            setLoadingAccounts(true);
+            const { data } = await supabase.from('bridge_coa').select('*').order('code');
+            setAccounts(data || []);
+            // After loading accounts, compute balances
+            if (data && data.length > 0) fetchAccountBalances(data);
+        } catch (e) { console.error(e); }
+        finally { setLoadingAccounts(false); }
+    };
+
+    // compute closing balance for each account (YTD, current year)
+    const fetchAccountBalances = async (accs) => {
+        try {
+            setBalancesLoading(true);
+            const yearStart = `${today.getFullYear()}-01-01`;
+            const yearEnd = today.toISOString().split('T')[0];
+
+            const selectCols = journalHasCoaId
+                ? 'coa_id, account_code, debit, credit, currency, exchange_rate'
+                : 'account_code, debit, credit, currency, exchange_rate';
+
+            const { data } = await supabase
+                .from('bridge_journal_entries')
+                .select(selectCols)
+                .gte('entry_date', yearStart)
+                .lte('entry_date', yearEnd);
+
+            if (!data) return;
+
+            const codeMap = {};
+            const nameMap = {};
+            accs.forEach(acc => {
+                if (acc.code) codeMap[acc.code] = acc.id;
+                if (acc.name) nameMap[acc.name.toLowerCase().trim()] = acc.id;
+            });
+
+            const bal = {};
+            data.forEach(e => {
+                let targetId = journalHasCoaId ? e.coa_id : codeMap[e.account_code];
+                if (!targetId && e.account_name) {
+                    targetId = nameMap[e.account_name.toLowerCase().trim()];
+                }
+                if (!targetId) return;
+                if (!bal[targetId]) bal[targetId] = { d: 0, c: 0 };
+                bal[targetId].d += toIDR(e.debit, e.currency, e.exchange_rate) ?? 0;
+                bal[targetId].c += toIDR(e.credit, e.currency, e.exchange_rate) ?? 0;
+            });
+
+            const result = {};
+            accs.forEach(acc => {
+                const b = bal[acc.id] || { d: 0, c: 0 };
+                const isCredit = ['LIABILITY', 'EQUITY', 'REVENUE'].includes(acc.type);
+                result[acc.id] = isCredit ? (b.c - b.d) : (b.d - b.c);
+            });
+            setAccountBalances(result);
+        } catch (e) {
+            console.error('Balance fetch error:', e);
+        } finally {
+            setBalancesLoading(false);
+        }
+    };
+
+    // ── Fetch Ledger ──────────────────────────────────────────────────────────
+    const fetchLedgerData = async () => {
+        try {
             setLoading(true);
+            
+            if (!selectedAccount) {
+                setLoading(false);
+                return;
+            }
 
-            // Fetch Bridge COA
-            const { data: coaData, error: coaError } = await supabase
-                .from('bridge_coa')
-                .select('*')
-                .eq('is_active', true)
-                .order('code');
+            const isUnclassified = selectedAccount.startsWith('unclassified_');
+            const unclassifiedCode = isUnclassified ? selectedAccount.replace('unclassified_', '') : null;
 
-            if (coaError) throw coaError;
+            const acc = accounts.find(a => a.id === selectedAccount);
+            if (!acc && !isUnclassified) {
+                setLoading(false);
+                return;
+            }
+            
+            const isNormalCredit = isUnclassified ? false : ['LIABILITY', 'EQUITY', 'REVENUE'].includes(acc?.type);
 
-            // Process accounts with balance calculations
-            const processedAccounts = await Promise.all(
-                coaData.map(async (account) => {
-                    const balance = await calculateAccountBalance(account.id, dateRange);
-                    return {
-                        ...account,
-                        balance: balance.closing,
-                        debit: balance.totalDebit,
-                        credit: balance.totalCredit,
-                        transactions: balance.transactionCount
-                    };
-                })
-            );
+            // Opening balance: dual-match by coa_id OR account_code
+            // (old entries might have code but no coa_id)
+            const fetchPrev = async () => {
+                const results = await Promise.all([
+                    supabase.from('bridge_journal_entries')
+                        .select('debit, credit, currency, exchange_rate, id')
+                        .eq('coa_id', selectedAccount)
+                        .lt('entry_date', dateRange.start),
+                    (acc?.code || isUnclassified) ? supabase.from('bridge_journal_entries')
+                        .select('debit, credit, currency, exchange_rate, id')
+                        .eq('account_code', acc?.code || unclassifiedCode)
+                        .is('coa_id', null)
+                        .lt('entry_date', dateRange.start) : Promise.resolve({ data: [] }),
+                    acc?.name ? supabase.from('bridge_journal_entries')
+                        .select('debit, credit, currency, exchange_rate, id')
+                        .ilike('account_name', acc.name)
+                        .lt('entry_date', dateRange.start) : Promise.resolve({ data: [] })
+                ]);
+                const rows = [...(results[0].data || []), ...(results[1].data || []), ...(results[2].data || [])];
+                // deduplicate by id
+                return [...new Map(rows.map(r => [r.id, r])).values()];
+            };
 
-            setAccounts(processedAccounts);
-        } catch (error) {
-            console.error('Error fetching accounts:', error);
-            alert('Failed to load accounts: ' + error.message);
+            const prev = await fetchPrev();
+            const prevD = prev.reduce((s, e) => s + (toIDR(e.debit, e.currency, e.exchange_rate) ?? 0), 0);
+            const prevC = prev.reduce((s, e) => s + (toIDR(e.credit, e.currency, e.exchange_rate) ?? 0), 0);
+            const opening = isNormalCredit ? prevC - prevD : prevD - prevC;
+            setOpeningBalance(opening);
+
+            // Current period: dual-fetch same pattern
+            const [r1, r2, r3] = await Promise.all([
+                supabase.from('bridge_journal_entries')
+                    .select('*')
+                    .eq('coa_id', selectedAccount)
+                    .gte('entry_date', dateRange.start)
+                    .lte('entry_date', dateRange.end)
+                    .order('entry_date', { ascending: true })
+                    .order('created_at', { ascending: true }),
+                (acc?.code || isUnclassified) ? supabase.from('bridge_journal_entries')
+                    .select('*')
+                    .eq('account_code', acc?.code || unclassifiedCode)
+                    .is('coa_id', null)
+                    .gte('entry_date', dateRange.start)
+                    .lte('entry_date', dateRange.end)
+                    .order('entry_date', { ascending: true })
+                    .order('created_at', { ascending: true }) : Promise.resolve({ data: [] }),
+                acc?.name ? supabase.from('bridge_journal_entries')
+                    .select('*')
+                    .ilike('account_name', acc.name)
+                    .gte('entry_date', dateRange.start)
+                    .lte('entry_date', dateRange.end)
+                    .order('entry_date', { ascending: true })
+                    .order('created_at', { ascending: true }) : Promise.resolve({ data: [] })
+            ]);
+
+            if (r1.error) throw r1.error;
+            const combined = [...(r1.data || []), ...(r2.data || []), ...(r3.data || [])];
+            
+            // Deduplicate by id only - merge entries with same id (prefer one with coa_id)
+            const uniqueMap = new Map();
+            combined.forEach(r => {
+                if (!uniqueMap.has(r.id)) {
+                    uniqueMap.set(r.id, r);
+                } else {
+                    const existing = uniqueMap.get(r.id);
+                    if (!existing.coa_id && r.coa_id) {
+                        uniqueMap.set(r.id, r);
+                    }
+                }
+            });
+            const unique = Array.from(uniqueMap.values());
+            
+            // sort chronologically
+            unique.sort((a, b) => {
+                const d = a.entry_date.localeCompare(b.entry_date);
+                return d !== 0 ? d : (a.created_at || '').localeCompare(b.created_at || '');
+            });
+            setEntries(unique);
+        } catch (e) {
+            console.error('Error fetching ledger:', e);
         } finally {
             setLoading(false);
         }
     };
 
-    const calculateAccountBalance = async (accountId, dateRange) => {
-        try {
-            // Get journal entries for this account within date range
-            const { data: entries, error } = await supabase
-                .from('bridge_journal_line_items')
-                .select(`
-                    debit, credit, entry_date,
-                    bridge_journal_entries!inner(entry_date)
-                `)
-                .eq('coa_id', accountId)
-                .gte('bridge_journal_entries.entry_date', dateRange.start)
-                .lte('bridge_journal_entries.entry_date', dateRange.end)
-                .order('bridge_journal_entries.entry_date');
+    // ── Computed ──────────────────────────────────────────────────────────────
+    const isUnclassifiedSelected = selectedAccount && selectedAccount.startsWith('unclassified_');
+    const accountInfo = isUnclassifiedSelected 
+        ? { code: selectedAccount.replace('unclassified_', ''), name: 'Unmapped Account', type: 'ASSET' }
+        : accounts.find(a => a.id === selectedAccount);
+    const isNormalCredit = ['LIABILITY', 'EQUITY', 'REVENUE'].includes(accountInfo?.type);
+    const typeConfig = COA_TYPE_CONFIG[accountInfo?.type] || COA_TYPE_CONFIG.ASSET;
 
-            if (error) throw error;
-
-            let totalDebit = 0;
-            let totalCredit = 0;
-
-            entries.forEach(entry => {
-                totalDebit += entry.debit || 0;
-                totalCredit += entry.credit || 0;
+    const filteredEntries = useMemo(() => {
+        let list = entries;
+        if (sourceFilter !== 'all') {
+            list = list.filter(e => {
+                const key = e.reference_type || e.entry_type || (e.source === 'manual' ? 'manual' : 'auto');
+                return key === sourceFilter;
             });
-
-            // Calculate closing balance based on account type
-            const account = accounts.find(acc => acc.id === accountId);
-            const normalBalance = account ? COA_TYPE_CONFIG[account.type]?.normalBalance : 'DEBIT';
-
-            const closing = normalBalance === 'DEBIT'
-                ? totalDebit - totalCredit
-                : totalCredit - totalDebit;
-
-            return {
-                totalDebit,
-                totalCredit,
-                closing,
-                transactionCount: entries.length
-            };
-        } catch (error) {
-            console.error('Error calculating balance:', error);
-            return { totalDebit: 0, totalCredit: 0, closing: 0, transactionCount: 0 };
         }
-    };
+        if (searchTerm) {
+            const t = searchTerm.toLowerCase();
+            list = list.filter(e =>
+                e.description?.toLowerCase().includes(t) ||
+                e.reference_number?.toLowerCase().includes(t) ||
+                e.entry_number?.toLowerCase().includes(t) ||
+                e.party_name?.toLowerCase().includes(t)
+            );
+        }
+        return list;
+    }, [entries, searchTerm, sourceFilter]);
 
-    // ─── Filtering & Search ───────────────────────────────────────────────────
-    const filteredAccounts = useMemo(() => {
-        return accounts.filter(account => {
-            const matchesSearch = account.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                account.code.toLowerCase().includes(searchTerm.toLowerCase());
-            const matchesType = filterType === 'ALL' || account.type === filterType;
-            return matchesSearch && matchesType;
+    const totalDebit = filteredEntries.reduce((s, e) => s + (toIDR(e.debit, e.currency, e.exchange_rate) ?? 0), 0);
+    const totalCredit = filteredEntries.reduce((s, e) => s + (toIDR(e.credit, e.currency, e.exchange_rate) ?? 0), 0);
+    const closingBalance = isNormalCredit
+        ? openingBalance + totalCredit - totalDebit
+        : openingBalance + totalDebit - totalCredit;
+
+    // Running balance with DR/CR tag
+    const rows = useMemo(() => {
+        let running = openingBalance;
+        return filteredEntries.map(e => {
+            const d = toIDR(e.debit, e.currency, e.exchange_rate) ?? 0;
+            const c = toIDR(e.credit, e.currency, e.exchange_rate) ?? 0;
+            if (isNormalCredit) running += (c - d);
+            else running += (d - c);
+            return { ...e, runningBalance: running };
         });
-    }, [accounts, searchTerm, filterType]);
+    }, [filteredEntries, openingBalance, isNormalCredit]);
 
-    // ─── Drill Down ───────────────────────────────────────────────────────────
-    const handleDrillDown = async (account) => {
-        try {
-            const { data: entries, error } = await supabase
-                .from('bridge_journal_line_items')
-                .select(`
-                    *,
-                    bridge_journal_entries!inner(
-                        entry_number, entry_date, description, reference_type, reference_number
-                    )
-                `)
-                .eq('coa_id', account.id)
-                .gte('bridge_journal_entries.entry_date', dateRange.start)
-                .lte('bridge_journal_entries.entry_date', dateRange.end)
-                .order('bridge_journal_entries.entry_date', { ascending: false });
+    // Sparkline data for closing balance trend (last 7 rows)
+    const sparkData = rows.slice(-Math.min(rows.length, 12)).map(r => r.runningBalance);
 
-            if (error) throw error;
+    // Source options (only those that appear in entries)
+    const availableSources = useMemo(() => {
+        const keys = new Set(entries.map(e => e.reference_type || e.entry_type || (e.source === 'manual' ? 'manual' : 'auto')));
+        return [...keys].filter(Boolean);
+    }, [entries]);
 
-            setDrillDownData({
-                account,
-                entries: entries || []
-            });
-            setShowDrillDown(true);
-        } catch (error) {
-            console.error('Error fetching drill-down data:', error);
-            alert('Failed to load transaction details: ' + error.message);
-        }
+    // ── Navigate to source ────────────────────────────────────────────────────
+    const goToSource = (entry) => {
+        const rt = entry.reference_type;
+        if (rt === 'invoice' || rt === 'ar_invoice') navigate('/blink/finance/invoices');
+        else if (rt === 'po' || rt === 'ap') navigate('/blink/finance/purchase-orders');
+        else if (rt === 'ar_payment') navigate('/blink/finance/ar');
+        else if (rt === 'ap_payment') navigate('/blink/finance/ap');
     };
 
-    // ─── Export ───────────────────────────────────────────────────────────────
-    const exportToPDF = (selectedAccount, accountInfo, dateRange, openingBalance, totalDebit, totalCredit, closingBalance, rows, typeConfig, companyInfo) => {
-        // PDF export implementation (similar to Blink version but for Bridge)
-        const printWindow = window.open('', '_blank');
-        const content = `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Bridge General Ledger - ${selectedAccount?.name || 'All Accounts'}</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        .header { text-align: center; margin-bottom: 30px; }
-        .account-info { margin: 20px 0; padding: 15px; background: #f5f5f5; }
-        .summary { margin: 20px 0; display: flex; justify-content: space-between; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background: #f2f2f2; }
-        .debit { text-align: right; color: #d32f2f; }
-        .credit { text-align: right; color: #2e7d32; }
-        .balance { text-align: right; font-weight: bold; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>Bridge General Ledger</h1>
-        <h2>${selectedAccount?.name || 'All Accounts'}</h2>
-        <p>Period: ${new Date(dateRange.start).toLocaleDateString()} - ${new Date(dateRange.end).toLocaleDateString()}</p>
-    </div>
-
-    <div class="account-info">
-        <h3>Account Information</h3>
-        <p><strong>Code:</strong> ${selectedAccount?.code || '-'}</p>
-        <p><strong>Name:</strong> ${selectedAccount?.name || '-'}</p>
-        <p><strong>Type:</strong> ${selectedAccount?.type || '-'}</p>
-    </div>
-
-    <div class="summary">
-        <div>
-            <strong>Opening Balance:</strong> ${fmtIDR(openingBalance)}
-        </div>
-        <div>
-            <strong>Total Debit:</strong> ${fmtIDR(totalDebit)}
-            <strong>Total Credit:</strong> ${fmtIDR(totalCredit)}
-        </div>
-        <div>
-            <strong>Closing Balance:</strong> ${fmtIDR(closingBalance)}
-        </div>
-    </div>
-
-    <table>
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Description</th>
-                <th>Reference</th>
-                <th class="debit">Debit</th>
-                <th class="credit">Credit</th>
-                <th class="balance">Balance</th>
-            </tr>
-        </thead>
-        <tbody>
-            ${rows.map(row => `
-                <tr>
-                    <td>${row.date}</td>
-                    <td>${row.description}</td>
-                    <td>${row.reference}</td>
-                    <td class="debit">${fmtIDR(row.debit)}</td>
-                    <td class="credit">${fmtIDR(row.credit)}</td>
-                    <td class="balance">${fmtIDR(row.balance)}</td>
-                </tr>
-            `).join('')}
-        </tbody>
-    </table>
-</body>
-</html>`;
-
-        printWindow.document.write(content);
-        printWindow.document.close();
-        printWindow.print();
+    // ── Export ────────────────────────────────────────────────────────────────
+    const exportCSV = () => {
+        if (!selectedAccount) return;
+        const headers = ['Date', 'Entry No.', 'Description', 'Ref. No.', 'Party', 'Debit (IDR)', 'Credit (IDR)', 'Balance (IDR)', 'Currency', 'Source'];
+        const csvRows = [
+            ['Opening Balance', '', '', '', '', '', '', openingBalance, '', ''],
+            ...rows.map(r => [
+                r.entry_date, r.entry_number, r.description || '',
+                r.reference_number || '', r.party_name || '',
+                toIDR(r.debit, r.currency, r.exchange_rate) ?? 0,
+                toIDR(r.credit, r.currency, r.exchange_rate) ?? 0,
+                r.runningBalance, r.currency || 'IDR',
+                r.reference_type || r.source || ''
+            ]),
+            ['Closing Balance', '', '', '', '', totalDebit, totalCredit, closingBalance, '', '']
+        ];
+        const esc = f => { const s = String(f ?? ''); return s.includes(',') ? `"${s}"` : s; };
+        const csv = [headers.join(','), ...csvRows.map(r => r.map(esc).join(','))].join('\n');
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+        a.download = `Ledger_${accountInfo?.code || 'Account'}_${dateRange.start}_${dateRange.end}.csv`;
+        a.click();
     };
 
-    // ─── Render ───────────────────────────────────────────────────────────────
-    if (loading) {
+    // ── Balance DR/CR tag ──────────────────────────────────────────────────────
+    const BalanceTag = ({ bal }) => {
+        if (Math.abs(bal) < 0.01) return <span className="text-xs text-silver-dark px-1">–</span>;
+        // For normal-debit accounts (ASSET, EXPENSE): positive = DR (normal)
+        // For normal-credit accounts (LIABILITY, EQUITY, REVENUE): positive = CR (normal)
+        const isNormal = isNormalCredit ? bal > 0 : bal > 0;
+        const isDR = isNormalCredit ? bal < 0 : bal > 0;
         return (
-            <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-            </div>
+            <span className={`text-[10px] font-bold px-1 py-0.5 rounded ${isDR ? 'bg-green-500/10 text-green-400' : 'bg-blue-500/10 text-blue-400'}`}>
+                {isDR ? 'DR' : 'CR'}
+            </span>
         );
-    }
+    };
 
+    // ── Group accounts for sidebar ────────────────────────────────────────────
+    const groupedAccounts = useMemo(() => {
+        const groups = {};
+        const term = coaSearchTerm.toLowerCase();
+        accounts.forEach(acc => {
+            if (term && !(acc.code.toLowerCase().includes(term) || acc.name.toLowerCase().includes(term))) return;
+            if (!groups[acc.type]) groups[acc.type] = [];
+            groups[acc.type].push(acc);
+        });
+        return groups;
+    }, [accounts, coaSearchTerm]);
+
+    const [expandedTypes, setExpandedTypes] = useState(new Set(['ASSET', 'LIABILITY', 'REVENUE', 'EXPENSE']));
+    const toggleType = (type) => setExpandedTypes(prev => {
+        const next = new Set(prev);
+        next.has(type) ? next.delete(type) : next.add(type);
+        return next;
+    });
+
+
+    // ─────────────────────────────────────────────────────────────────────────
     return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                        <BookOpen className="h-6 w-6 text-blue-500" />
-                        Bridge General Ledger
-                    </h1>
-                    <p className="text-gray-600 dark:text-gray-400 mt-1">
-                        Chart of Accounts and transaction details for Bridge module
-                    </p>
-                </div>
-                <Button
-                    onClick={fetchAccounts}
-                    variant="outline"
-                    className="flex items-center gap-2"
-                >
-                    <RefreshCw className="h-4 w-4" />
-                    Refresh
-                </Button>
-            </div>
+        <div className="flex flex-col gap-3" style={{ minHeight: 'calc(100vh - 80px)' }}>
 
-            {/* Filters */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* ── TOP BAR ── */}
+            <div className="glass-card rounded-xl px-4 py-3 flex flex-col md:flex-row md:items-center gap-3 border border-dark-border">
+                <div className="flex items-center gap-2.5 shrink-0">
+                    <BookOpen className="w-5 h-5 text-accent-orange" />
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Start Date
-                        </label>
-                        <input
-                            type="date"
-                            value={dateRange.start}
-                            onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            End Date
-                        </label>
-                        <input
-                            type="date"
-                            value={dateRange.end}
-                            onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Account Type
-                        </label>
-                        <select
-                            value={filterType}
-                            onChange={(e) => setFilterType(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                        >
-                            <option value="ALL">All Types</option>
-                            <option value="ASSET">Assets</option>
-                            <option value="LIABILITY">Liabilities</option>
-                            <option value="EQUITY">Equity</option>
-                            <option value="REVENUE">Revenue</option>
-                            <option value="EXPENSE">Expenses</option>
-                            <option value="COGS">COGS</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Search
-                        </label>
-                        <input
-                            type="text"
-                            placeholder="Search accounts..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                        />
+                        <h1 className="text-base font-bold gradient-text leading-tight">General Ledger</h1>
+                        <p className="text-[10px] text-silver-dark">Per-account transaction detail with running balance</p>
                     </div>
                 </div>
-            </div>
-
-            {/* Accounts Table */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead className="bg-gray-50 dark:bg-gray-700">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Account
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Type
-                                </th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Debit
-                                </th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Credit
-                                </th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Balance
-                                </th>
-                                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Actions
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                            {filteredAccounts.map((account) => {
-                                const typeConfig = COA_TYPE_CONFIG[account.type] || COA_TYPE_CONFIG.ASSET;
-                                return (
-                                    <tr key={account.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div>
-                                                <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                                    {account.code}
-                                                </div>
-                                                <div className="text-sm text-gray-500 dark:text-gray-400">
-                                                    {account.name}
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${typeConfig.color}`}>
-                                                {typeConfig.label}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900 dark:text-white">
-                                            {fmtIDR(account.debit)}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900 dark:text-white">
-                                            {fmtIDR(account.credit)}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900 dark:text-white">
-                                            {fmtIDR(account.balance)}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                                            <Button
-                                                onClick={() => handleDrillDown(account)}
-                                                variant="outline"
-                                                size="sm"
-                                                className="flex items-center gap-1"
-                                            >
-                                                <ExternalLink className="h-3 w-3" />
-                                                View
-                                            </Button>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            {/* Drill Down Modal */}
-            {showDrillDown && drillDownData && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-6xl w-full mx-4 max-h-[90vh] overflow-hidden">
-                        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-                            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                                Transaction Details - {drillDownData.account.name}
-                            </h2>
-                            <button
-                                onClick={() => setShowDrillDown(false)}
-                                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                            >
-                                <X className="h-6 w-6" />
+                <div className="w-px h-7 bg-dark-border hidden md:block mx-1 shrink-0" />
+                <div className="flex items-center gap-2 flex-wrap flex-1">
+                    <Calendar className="w-3.5 h-3.5 text-silver-dark shrink-0" />
+                    <input type="date" value={dateRange.start}
+                        onChange={e => setDateRange({ ...dateRange, start: e.target.value })}
+                        className="px-2.5 py-1.5 bg-dark-bg border border-dark-border rounded text-silver-light text-xs" />
+                    <span className="text-silver-dark text-xs">—</span>
+                    <input type="date" value={dateRange.end}
+                        onChange={e => setDateRange({ ...dateRange, end: e.target.value })}
+                        className="px-2.5 py-1.5 bg-dark-bg border border-dark-border rounded text-silver-light text-xs" />
+                    <div className="flex gap-1">
+                        {[
+                            { label: 'This Month', fn: () => { const d = new Date(); setDateRange({ start: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`, end: d.toISOString().split('T')[0] }); } },
+                            { label: 'Quarter', fn: () => { const d = new Date(); const q = Math.floor(d.getMonth() / 3); setDateRange({ start: `${d.getFullYear()}-${String(q * 3 + 1).padStart(2, '0')}-01`, end: d.toISOString().split('T')[0] }); } },
+                            { label: 'This Year', fn: () => { const d = new Date(); setDateRange({ start: `${d.getFullYear()}-01-01`, end: d.toISOString().split('T')[0] }); } },
+                        ].map(({ label, fn }) => (
+                            <button key={label} onClick={fn} className="px-2 py-1 text-[10px] bg-dark-surface border border-dark-border text-silver-dark hover:text-white hover:border-accent-blue/50 rounded smooth-transition">
+                                {label}
                             </button>
-                        </div>
+                        ))}
+                    </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                    <button onClick={() => setShowSidebar(v => !v)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded border text-xs smooth-transition ${showSidebar ? 'bg-accent-orange/10 border-accent-orange/40 text-accent-orange' : 'bg-dark-surface border-dark-border text-silver-dark hover:text-white'}`}>
+                        <Layers className="w-3.5 h-3.5" />{showSidebar ? 'Hide' : 'Show'} Accounts
+                    </button>
+                    <button onClick={fetchLedgerData} disabled={!selectedAccount}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded border border-dark-border text-xs text-silver-dark hover:text-white hover:bg-dark-card smooth-transition disabled:opacity-40">
+                        <RefreshCw className="w-3.5 h-3.5" /> Refresh
+                    </button>
+                    <button onClick={exportCSV} disabled={!selectedAccount || loading}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded border border-dark-border text-xs text-silver-dark hover:text-white hover:bg-dark-card smooth-transition disabled:opacity-40">
+                        <FileText className="w-3.5 h-3.5" /> CSV
+                    </button>
+                    <button onClick={() => exportToPDF(selectedAccount, accountInfo, dateRange, openingBalance, totalDebit, totalCredit, closingBalance, rows, typeConfig, companySettings)} disabled={!selectedAccount || loading || rows.length === 0}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded border border-dark-border text-xs text-red-400 hover:text-red-300 hover:bg-dark-card smooth-transition disabled:opacity-40">
+                        <Printer className="w-3.5 h-3.5" /> Print PDF
+                    </button>
+                </div>
+            </div>
 
-                        <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                                    <thead className="bg-gray-50 dark:bg-gray-700">
-                                        <tr>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                                Date
-                                            </th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                                Description
-                                            </th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                                Reference
-                                            </th>
-                                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                                Debit
-                                            </th>
-                                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                                Credit
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                                        {drillDownData.entries.map((entry, index) => (
-                                            <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                                    {new Date(entry.bridge_journal_entries?.entry_date).toLocaleDateString()}
-                                                </td>
-                                                <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
-                                                    {entry.bridge_journal_entries?.description || '-'}
-                                                </td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                                    {entry.bridge_journal_entries?.reference_number || '-'}
-                                                </td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-right text-sm text-red-600 dark:text-red-400">
-                                                    {fmtIDR(entry.debit)}
-                                                </td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-right text-sm text-green-600 dark:text-green-400">
-                                                    {fmtIDR(entry.credit)}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+            {/* ── BODY: Sidebar + Content (each scrolls independently) ── */}
+            <div className="flex gap-3 flex-1 overflow-hidden" style={{ height: 'calc(100vh - 145px)' }}>
+
+                {/* ── COA SIDEBAR ── */}
+                {showSidebar && (
+                    <div className="w-80 shrink-0 glass-card rounded-xl border border-dark-border flex flex-col overflow-hidden">
+                        <div className="px-3 pt-3 pb-2 border-b border-dark-border bg-dark-bg/80 shrink-0">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs font-bold text-silver-light uppercase tracking-widest">Chart of Accounts</span>
+                                <span className="text-[10px] text-silver-dark bg-dark-surface px-1.5 py-0.5 rounded border border-dark-border">YTD</span>
+                            </div>
+                            <div className="relative">
+                                <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-silver-dark" />
+                                <input type="text" placeholder="Search account code or name..."
+                                    value={coaSearchTerm} onChange={e => setCoaSearchTerm(e.target.value)}
+                                    className="w-full pl-7 pr-5 py-2 bg-dark-surface border border-dark-border rounded text-xs text-silver-light placeholder:text-silver-dark/40 focus:border-accent-blue/50 smooth-transition" />
+                                {coaSearchTerm && (
+                                    <button onClick={() => setCoaSearchTerm('')} className="absolute right-1.5 top-1/2 -translate-y-1/2">
+                                        <X className="w-2.5 h-2.5 text-silver-dark hover:text-white" />
+                                    </button>
+                                )}
                             </div>
                         </div>
-
-                        <div className="flex justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700">
-                            <Button
-                                onClick={() => exportToPDF(drillDownData.account, {}, dateRange, 0, 0, 0, 0, drillDownData.entries, {}, {})}
-                                variant="outline"
-                                className="flex items-center gap-2"
-                            >
-                                <Download className="h-4 w-4" />
-                                Export PDF
-                            </Button>
-                            <Button onClick={() => setShowDrillDown(false)}>
-                                Close
-                            </Button>
+                        <div className="overflow-y-auto flex-1">
+                            {loadingAccounts ? (
+                                <div className="flex justify-center py-8"><div className="animate-spin w-4 h-4 border-2 border-accent-orange border-t-transparent rounded-full" /></div>
+                            ) : Object.keys(groupedAccounts).length === 0 ? (
+                                <div className="py-8 px-3 text-center">
+                                    <Search className="w-6 h-6 text-silver-dark/30 mx-auto mb-2" />
+                                    <p className="text-xs text-silver-dark">No results for "{coaSearchTerm}"</p>
+                                </div>
+                            ) : (
+                                Object.entries(groupedAccounts).map(([type, accs]) => {
+                                    const cfg = COA_TYPE_CONFIG[type] || COA_TYPE_CONFIG.ASSET;
+                                    const isEx = expandedTypes.has(type);
+                                    const typeTotal = accs.reduce((s, a) => s + (accountBalances[a.id] || 0), 0);
+                                    return (
+                                        <div key={type}>
+                                            <button onClick={() => toggleType(type)}
+                                                className="w-full flex items-center justify-between px-2.5 py-1.5 bg-dark-surface/60 hover:bg-dark-surface smooth-transition border-b border-dark-border/40">
+                                                <div className="flex items-center gap-1.5">
+                                                    {isEx ? <ChevronDown className="w-3 h-3 text-silver-dark" /> : <ChevronRight className="w-3 h-3 text-silver-dark" />}
+                                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${cfg.color}`}>{cfg.label}</span>
+                                                    <span className="text-[10px] text-silver-dark/50">({accs.length})</span>
+                                                </div>
+                                                <span className={`text-[11px] font-mono ${typeTotal >= 0 ? 'text-silver-dark' : 'text-red-400'}`}>
+                                                    {balancesLoading ? '...' : Math.abs(typeTotal) > 1e9 ? `${(typeTotal / 1e9).toFixed(1)}B` : Math.abs(typeTotal) > 1e6 ? `${(typeTotal / 1e6).toFixed(1)}M` : Math.abs(typeTotal) > 1e3 ? `${(typeTotal / 1e3).toFixed(0)}K` : '-'}
+                                                </span>
+                                            </button>
+                                            {isEx && accs.map(acc => {
+                                                const bal = accountBalances[acc.id] || 0;
+                                                const isSelected = selectedAccount === acc.id;
+                                                return (
+                                                    <button key={acc.id} onClick={() => setSelectedAccount(acc.id)}
+                                                        className={`w-full px-2.5 py-1.5 text-left flex items-center justify-between border-b border-dark-border/20 smooth-transition group ${isSelected ? 'bg-accent-orange/10 border-l-2 border-l-accent-orange' : 'hover:bg-dark-surface/40'}`}>
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className={`text-xs font-mono truncate ${isSelected ? 'text-accent-orange font-bold' : 'text-silver-dark/80 font-medium'}`}>{acc.code}</p>
+                                                            <p className={`text-[13px] truncate mt-0.5 ${isSelected ? 'text-white font-bold' : 'text-silver-light group-hover:text-white'}`}>{acc.name}</p>
+                                                        </div>
+                                                        <span className={`text-[11px] ml-2 shrink-0 font-mono font-medium ${bal < 0 ? 'text-red-400' : bal > 0 ? 'text-silver-light' : 'text-silver-dark/40'}`}>
+                                                            {bal === 0 ? '' : Math.abs(bal) > 1e9 ? `${(Math.abs(bal) / 1e9).toFixed(1)}B` : Math.abs(bal) > 1e6 ? `${(Math.abs(bal) / 1e6).toFixed(1)}M` : `${(Math.abs(bal) / 1e3).toFixed(0)}K`}
+                                                        </span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    );
+                                })
+                            )}
                         </div>
                     </div>
+                )}
+
+                {/* ── MAIN CONTENT ── */}
+                <div className="flex-1 min-w-0 overflow-y-auto space-y-3">
+                    {!selectedAccount ? (
+                        <div className="glass-card rounded-xl border border-dark-border p-12 flex flex-col items-center justify-center text-center">
+                            <div className="w-14 h-14 rounded-2xl bg-accent-orange/10 flex items-center justify-center mb-4">
+                                <BookOpen className="w-7 h-7 text-accent-orange/50" />
+                            </div>
+                            <p className="text-sm font-semibold text-silver-light">Select a COA Account</p>
+                            <p className="text-xs text-silver-dark mt-1">Click an account in the left sidebar to view the ledger</p>
+                            {!showSidebar && (
+                                <button onClick={() => setShowSidebar(true)}
+                                    className="mt-4 px-4 py-2 bg-accent-orange/10 border border-accent-orange/30 text-accent-orange text-xs rounded-lg hover:bg-accent-orange/20 smooth-transition">
+                                    Show Account Sidebar
+                                </button>
+                            )}
+                        </div>
+                    ) : (
+                        <>
+                            {/* Account info banner */}
+                            <div className="glass-card rounded-xl border border-dark-border px-4 py-2.5 flex items-center gap-2 flex-wrap">
+                                <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold border ${typeConfig.color}`}>{typeConfig.label}</span>
+                                <span className="font-mono text-accent-blue text-xs font-bold">{accountInfo?.code}</span>
+                                <span className="text-silver-light font-semibold text-sm">{accountInfo?.name}</span>
+                                <span className="text-[10px] text-silver-dark border border-dark-border rounded px-1.5 py-0.5">Normal Balance: {typeConfig.normalBalance}</span>
+                                <span className="text-[10px] text-silver-dark">{filteredEntries.length} transactions</span>
+                                {sparkData.length > 1 && <span className="ml-auto"><Sparkline data={sparkData} color={typeConfig.accent} width={80} height={22} /></span>}
+                            </div>
+
+                            {/* Summary Cards */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                {[
+                                    { label: 'Opening Balance', value: fmtIDR(openingBalance), sub: `Before ${new Date(dateRange.start + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}`, border: 'border-yellow-500', text: 'text-silver-light' },
+                                    { label: 'Total Debit', value: fmtIDR(totalDebit), sub: `${filteredEntries.filter(e => e.debit > 0).length} lines`, border: 'border-green-500', text: 'text-green-400' },
+                                    { label: 'Total Credit', value: fmtIDR(totalCredit), sub: `${filteredEntries.filter(e => e.credit > 0).length} lines`, border: 'border-blue-500', text: 'text-blue-400' },
+                                    { label: 'Closing Balance', value: fmtIDR(closingBalance), sub: new Date(dateRange.end + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }), border: closingBalance >= 0 ? 'border-purple-500' : 'border-red-500', text: closingBalance >= 0 ? 'text-purple-400' : 'text-red-400' },
+                                ].map(c => (
+                                    <div key={c.label} className={`glass-card p-3 rounded-xl border-l-4 ${c.border} border border-dark-border`}>
+                                        <p className="text-[9px] text-silver-dark uppercase tracking-wider">{c.label}</p>
+                                        <p className={`text-xs font-bold mt-1 font-mono ${c.text}`}>{c.value}</p>
+                                        <p className="text-[9px] text-silver-dark mt-0.5">{c.sub}</p>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Search + Filter */}
+                            <div className="flex gap-2 items-center flex-wrap">
+                                <div className="relative flex-1 min-w-[180px]">
+                                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-silver-dark" />
+                                    <input type="text" placeholder="Search description, reference, party..."
+                                        value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+                                        className="w-full pl-7 pr-4 py-1.5 bg-dark-surface border border-dark-border rounded text-silver-light text-xs" />
+                                    {searchTerm && (
+                                        <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                                            <X className="w-2.5 h-2.5 text-silver-dark hover:text-white" />
+                                        </button>
+                                    )}
+                                </div>
+                                <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)}
+                                    className="px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded text-silver-light text-xs">
+                                    <option value="all">All Sources</option>
+                                    {availableSources.map(s => <option key={s} value={s}>{SOURCE_CONFIG[s]?.label || s}</option>)}
+                                </select>
+                                {(searchTerm || sourceFilter !== 'all') && (
+                                    <button onClick={() => { setSearchTerm(''); setSourceFilter('all'); }}
+                                        className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-silver-dark border border-dark-border rounded hover:text-white smooth-transition">
+                                        <X className="w-2.5 h-2.5" /> Reset
+                                    </button>
+                                )}
+                                <span className="text-[10px] text-silver-dark ml-auto">{rows.length}/{entries.length} entries</span>
+                            </div>
+
+                            {/* Ledger Table */}
+                            <div className="glass-card rounded-xl border border-dark-border overflow-hidden">
+                                {loading ? (
+                                    <div className="flex items-center justify-center py-12">
+                                        <div className="animate-spin w-6 h-6 border-2 border-accent-orange border-t-transparent rounded-full mr-3" />
+                                        <span className="text-silver-dark text-xs">Loading ledger data...</span>
+                                    </div>
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-xs min-w-max">
+                                            <thead>
+                                                <tr className="bg-accent-orange">
+                                                    {['Date', 'Entry No.', 'Description', 'Reference', 'Party', 'Source', 'Debit', 'Credit', 'Balance'].map((h, i) => (
+                                                        <th key={h} className={`px-3 py-2 font-semibold text-white uppercase whitespace-nowrap ${i >= 6 ? 'text-right' : i === 5 ? 'text-center' : 'text-left'}`}
+                                                            style={{ minWidth: [90, 150, 200, 120, 110, 90, 120, 120, 130][i] }}>{h}</th>
+                                                    ))}
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-dark-border/40">
+                                                <tr className="bg-yellow-500/5 border-l-2 border-yellow-500">
+                                                    <td className="px-3 py-1.5" colSpan={6}>
+                                                        <span className="font-semibold text-yellow-400">↑ Opening Balance</span>
+                                                        <span className="ml-2 text-silver-dark text-[10px]">(before {new Date(dateRange.start + 'T00:00:00').toLocaleDateString('en-GB', { dateStyle: 'medium' })})</span>
+                                                    </td>
+                                                    <td className="px-3 py-1.5" />
+                                                    <td className="px-3 py-1.5" />
+                                                    <td className="px-3 py-1.5 text-right font-bold text-yellow-400 font-mono">{fmtIDR(openingBalance)}</td>
+                                                </tr>
+                                                {rows.length === 0 ? (
+                                                    <tr><td colSpan={9} className="px-4 py-10 text-center text-silver-dark">Tidak ada transactions pada periode dan akun ini.</td></tr>
+                                                ) : rows.map((entry, idx) => {
+                                                    const srcCfg = getSourceConfig(entry);
+                                                    const isLinked = entry.reference_type && entry.reference_type !== 'adjustment' && entry.reference_number;
+                                                    const debitAmt = fmtAmount(entry.debit, entry.currency, entry.exchange_rate);
+                                                    const creditAmt = fmtAmount(entry.credit, entry.currency, entry.exchange_rate);
+                                                    return (
+                                                        <tr key={entry.id || idx} className="hover:bg-accent-orange/5 smooth-transition group">
+                                                            <td className="px-3 py-2 text-silver-dark whitespace-nowrap">{new Date(entry.entry_date + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                                                            <td className="px-3 py-2 text-accent-orange font-mono whitespace-nowrap">{entry.entry_number}</td>
+                                                            <td className="px-3 py-2 max-w-[200px]" title={entry.description}><span className="block truncate text-silver-light">{entry.description || '-'}</span></td>
+                                                            <td className="px-3 py-2 whitespace-nowrap">
+                                                                {isLinked ? (
+                                                                    <button onClick={() => goToSource(entry)} className="flex items-center gap-1 text-accent-blue hover:text-blue-300 smooth-transition">
+                                                                        {entry.reference_number}<ExternalLink className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100" />
+                                                                    </button>
+                                                                ) : <span className="text-silver-dark">{entry.reference_number || '-'}</span>}
+                                                            </td>
+                                                            <td className="px-3 py-2 text-silver-dark whitespace-nowrap max-w-[110px]"><span className="block truncate">{entry.party_name || '-'}</span></td>
+                                                            <td className="px-3 py-2 text-center">
+                                                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-medium border ${srcCfg.color}`}>{srcCfg.label}</span>
+                                                            </td>
+                                                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">
+                                                                {debitAmt ? <><span className="text-green-400 font-medium">{debitAmt.primary}</span>{debitAmt.secondary && <div className="text-[9px] text-silver-dark">{debitAmt.secondary}</div>}</> : <span className="text-silver-dark/30">—</span>}
+                                                            </td>
+                                                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">
+                                                                {creditAmt ? <><span className="text-blue-400 font-medium">{creditAmt.primary}</span>{creditAmt.secondary && <div className="text-[9px] text-silver-dark">{creditAmt.secondary}</div>}</> : <span className="text-silver-dark/30">—</span>}
+                                                            </td>
+                                                            <td className="px-3 py-2 text-right font-mono font-medium whitespace-nowrap">
+                                                                <span className={entry.runningBalance >= 0 ? 'text-silver-light' : 'text-red-400'}>{fmtIDR(entry.runningBalance)}</span>
+                                                                <div className="flex justify-end mt-0.5"><BalanceTag bal={entry.runningBalance} /></div>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                                {rows.length > 0 && (
+                                                    <tr className="bg-purple-500/5 border-l-2 border-purple-500">
+                                                        <td className="px-3 py-1.5" colSpan={6}>
+                                                            <span className="font-semibold text-purple-400">↓ Closing Balance</span>
+                                                            <span className="ml-2 text-silver-dark text-[10px]">({new Date(dateRange.end + 'T00:00:00').toLocaleDateString('en-GB', { dateStyle: 'medium' })})</span>
+                                                        </td>
+                                                        <td className="px-3 py-1.5 text-right font-bold text-green-400 font-mono">{fmtIDR(totalDebit)}</td>
+                                                        <td className="px-3 py-1.5 text-right font-bold text-blue-400 font-mono">{fmtIDR(totalCredit)}</td>
+                                                        <td className="px-3 py-1.5 text-right font-mono">
+                                                            <span className={`font-bold ${closingBalance >= 0 ? 'text-purple-400' : 'text-red-400'}`}>{fmtIDR(closingBalance)}</span>
+                                                            <div className="flex justify-end mt-0.5"><BalanceTag bal={closingBalance} /></div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    )}
                 </div>
-            )}
+            </div>
         </div>
     );
 };

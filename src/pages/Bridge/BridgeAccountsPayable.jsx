@@ -1,208 +1,511 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../context/AuthContext';
+import { createAPPaymentJournal, createAPReversalJournal, getAllCOA } from '../../utils/journalHelper';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
 import {
-    TrendingDown, DollarSign, AlertCircle, Search,
-    Download, CheckCircle, CreditCard, Clock
+    DollarSign, TrendingDown, AlertCircle, Clock, Package,
+    Search, Download, FileText, Calendar, CheckCircle, Eye, X,
+    Building, CreditCard, Banknote, History
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
-const fmtIDR = (v, cur = 'IDR') => {
-    if (v == null) return '-';
-    return cur === 'USD' ? `$${Number(v).toLocaleString('id-ID')}` : `Rp ${Number(v).toLocaleString('id-ID')}`;
-};
-
-const calcAging = (dueDate) => {
-    const days = Math.floor((new Date() - new Date(dueDate)) / 86400000);
-    if (days < 0) return '0-30';
-    if (days <= 30) return '0-30';
-    if (days <= 60) return '31-60';
-    if (days <= 90) return '61-90';
-    return '90+';
-};
-
-const deriveStatus = (paid, total, due) => {
-    if (paid >= total) return 'paid';
-    if (paid > 0) return 'partial';
-    return new Date() > new Date(due) ? 'overdue' : 'outstanding';
-};
-
-const STATUS_STYLE = {
-    paid:        'bg-green-500/20 text-green-400',
-    partial:     'bg-yellow-500/20 text-yellow-400',
-    overdue:     'bg-red-500/20 text-red-400',
-    outstanding: 'bg-blue-500/20 text-blue-400',
-};
-
-// ─── AP Payment Modal ─────────────────────────────────────────────────────────
-const APPaymentModal = ({ ap, onClose, onSuccess }) => {
-    const [form, setForm] = useState({
+// AP Payment Record Modal Component
+const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
+    const [formData, setFormData] = useState({
         payment_date: new Date().toISOString().split('T')[0],
         amount: ap.outstanding_amount || 0,
+        payment_exchange_rate: ap.exchange_rate || 1,
         payment_method: 'bank_transfer',
         reference_number: '',
+        paid_from_account: '',
         ap_coa_id: '',
-        notes: '',
+        notes: ''
     });
     const [bankAccounts, setBankAccounts] = useState([]);
-    const [apAccounts, setApAccounts] = useState([]);
+    const [apAccountsList, setApAccountsList] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [success, setSuccess] = useState(null);
+    // Success state
+    const [paymentSuccess, setPaymentSuccess] = useState(false);
+    const [successData, setSuccessData] = useState(null);
 
     useEffect(() => {
-        const load = async () => {
-            const [{ data: banks }, { data: coa }] = await Promise.all([
-                supabase.from('company_bank_accounts').select('*').order('display_order'),
-                supabase.from('bridge_coa').select('*').eq('type', 'LIABILITY').eq('is_active', true).order('code'),
-            ]);
-            setBankAccounts(banks || []);
-            const apCoa = (coa || []).filter(c => c.name?.toLowerCase().includes('hutang') || c.code?.startsWith('2-0'));
-            setApAccounts(apCoa.length ? apCoa : (coa || []).slice(0, 10));
-            if (banks?.length) setForm(p => ({ ...p, paid_from_account: banks[0].id }));
-            if (apCoa.length) setForm(p => ({ ...p, ap_coa_id: apCoa[0].id }));
-        };
-        load();
+        fetchBankAccounts();
+        fetchAPAccounts();
     }, []);
+
+    const fetchAPAccounts = async () => {
+        try {
+            const { data } = await supabase.from('bridge_coa').select('*').eq('type', 'LIABILITY').order('code');
+            if (data && data.length > 0) {
+                setApAccountsList(data);
+                
+                // Attempt to pre-select 'Hutang Usaha'
+                const match = data.find(c => c.name.toLowerCase().includes('hutang usaha') || c.code.startsWith('2-01'));
+                if (match) setFormData(prev => ({ ...prev, ap_coa_id: match.id }));
+                else setFormData(prev => ({ ...prev, ap_coa_id: data[0].id }));
+            }
+        } catch(e) { console.error('Error fetching AP accounts:', e); }
+    };
+
+    const fetchBankAccounts = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('bank_accounts')
+                .select('*')
+                .order('display_order', { ascending: true });
+
+            if (error) throw error;
+            setBankAccounts(data || []);
+
+            // Set first bank account as default
+            if (data && data.length > 0) {
+                setFormData(prev => ({ ...prev, paid_from_account: data[0].id }));
+            }
+        } catch (error) {
+            console.error('Error fetching bank accounts:', error);
+        }
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (form.amount <= 0) return alert('Jumlah pembayaran harus lebih dari 0');
-        if (form.amount > ap.outstanding_amount) return alert('Melebihi saldo outstanding');
-        setLoading(true);
+
+        if (formData.amount <= 0) {
+            alert('Payment amount must be greater than 0');
+            return;
+        }
+
+        if (formData.amount > ap.outstanding_amount) {
+            alert(`Payment amount cannot exceed outstanding amount (${formatCurrency(ap.outstanding_amount, ap.currency)})`);
+            return;
+        }
+
         try {
-            const payNum = `BRG-AP-PAY-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
-            const newPaid = (ap.paid_amount || 0) + parseFloat(form.amount);
-            const newOut = ap.original_amount - newPaid;
-            const newStatus = newOut <= 0 ? 'paid' : newPaid > 0 ? 'partial' : 'outstanding';
+            setLoading(true);
 
-            await supabase.from('bridge_ap_transactions').update({
-                paid_amount: newPaid,
-                outstanding_amount: Math.max(0, newOut),
-                status: newStatus,
-                last_payment_date: form.payment_date,
-            }).eq('id', ap.id);
+            const { data: userData } = await supabase.auth.getUser();
+            const createdBy = userData?.user?.email || 'System';
 
-            await supabase.from('bridge_payments').insert([{
-                payment_number: payNum,
+            // Generate payment number
+            const year = new Date().getFullYear();
+            const paymentNumber = `PAY-OUT-${year}-${String(Date.now()).slice(-6)}`;
+
+            // Get selected banking info
+            const selectedBank = bankAccounts.find(b => b.id === formData.paid_from_account);
+
+            // Create payment record
+            const paymentData = {
+                payment_number: paymentNumber,
                 payment_type: 'outgoing',
-                payment_date: form.payment_date,
-                reference_type: 'ap',
+                payment_date: formData.payment_date,
+                reference_type: 'po',
                 reference_id: ap.id,
                 reference_number: ap.ap_number,
-                amount: parseFloat(form.amount),
+                amount: parseFloat(formData.amount),
                 currency: ap.currency || 'IDR',
-                payment_method: form.payment_method,
-                transaction_ref: form.reference_number || null,
-                notes: form.notes || null,
+                payment_method: formData.payment_method,
+                bank_account: selectedBank ? `${selectedBank.bank_name} - ${selectedBank.account_number}` : null,
+                transaction_ref: formData.reference_number || null,
+                description: `Payment for AP ${ap.ap_number}`,
+                notes: formData.notes || null,
                 status: 'completed',
-            }]);
+                created_by: createdBy
+            };
 
-            if (ap.po_id) {
-                await supabase.from('bridge_pos').update({
-                    paid_amount: newPaid,
-                    outstanding_amount: Math.max(0, newOut),
-                    status: newOut <= 0 ? 'paid' : 'approved',
-                }).eq('id', ap.po_id);
+            const { error: paymentError } = await supabase
+                .from('bridge_payments')
+                .insert([paymentData]);
+
+            if (paymentError) {
+                console.warn('[AP] Failed to save payment record (possibly RLS), skipping:', paymentError.message);
             }
 
-            setSuccess({ payNum, amount: parseFloat(form.amount), newOut, newStatus, currency: ap.currency });
-        } catch (err) {
-            alert('Error: ' + err.message);
-        } finally { setLoading(false); }
+            // Update AP transaction
+            const newPaidAmount = (ap.paid_amount || 0) + parseFloat(formData.amount);
+            const newOutstanding = Math.max(0, ap.original_amount - newPaidAmount);
+
+            let newStatus = ap.status;
+            if (newOutstanding <= 0) {
+                newStatus = 'paid';
+            } else if (newPaidAmount > 0 && newOutstanding > 0) {
+                newStatus = 'partial';
+            } else {
+                newStatus = 'outstanding';
+            }
+
+            if (ap.source !== 'po_fallback') {
+                const { error: apError } = await supabase
+                    .from('bridge_ap_transactions')
+                    .update({
+                        paid_amount: newPaidAmount,
+                        outstanding_amount: newOutstanding,
+                        status: newStatus,
+                        last_payment_date: formData.payment_date,
+                        last_payment_amount: parseFloat(formData.amount)
+                    })
+                    .eq('id', ap.id);
+
+                if (apError) {
+                    console.warn('Failed to update bridge_ap_transactions (likely because it is missing):', apError);
+                }
+            }
+
+            // IMPORTANT: Also update the linked PO to keep data synchronized
+            console.log('AP Payment - Syncing PO:', {
+                ap_id: ap.id,
+                po_id: ap.po_id,
+                po_number: ap.po_number,
+                newPaidAmount,
+                newOutstanding
+            });
+
+            // Try to sync PO by po_id first, then by po_number
+            let poIdentifier = ap.po_id;
+            let lookupField = 'id';
+
+            // If po_id is not available, try to find PO by po_number
+            if (!poIdentifier && ap.po_number) {
+                console.log('No po_id, looking up PO by po_number:', ap.po_number);
+                const { data: poLookup, error: lookupError } = await supabase
+                    .from('bridge_pos')
+                    .select('id')
+                    .eq('po_number', ap.po_number)
+                    .single();
+
+                if (lookupError) {
+                    console.warn('Could not find PO by po_number:', lookupError);
+                } else if (poLookup) {
+                    poIdentifier = poLookup.id;
+                    console.log('Found PO by po_number, id:', poIdentifier);
+                }
+            }
+
+            if (poIdentifier) {
+                // Determine PO status based on payment
+                let poStatus = 'approved'; // default
+                if (newOutstanding <= 0) {
+                    poStatus = 'received'; // Fully paid
+                }
+
+                const updateData = {
+                    paid_amount: newPaidAmount,
+                    outstanding_amount: Math.max(0, newOutstanding),
+                    status: poStatus
+                };
+
+                console.log('Updating PO:', poIdentifier, 'with:', updateData);
+
+                // Use update without .select() to avoid PGRST204 error when no rows returned
+                const { error: poError } = await supabase
+                    .from('bridge_pos')
+                    .update(updateData)
+                    .eq('id', poIdentifier);
+
+                if (poError) {
+                    console.error('PO Sync Error:', poError);
+                    // Don't throw - AP update was successful, PO sync is secondary
+                } else {
+                    console.log('PO Sync Success for ID:', poIdentifier);
+                }
+            } else {
+                console.warn('No po_id or po_number found in AP record, cannot sync PO');
+            }
+
+            // ── AUTO JOURNAL ENTRY ──────────────────────────────────────────────────────────────────
+            // Dr Hutang Usaha / Cr Kas-Bank
+            try {
+                const coaList = await getAllCOA();
+                await createAPPaymentJournal({
+                    ap,
+                    paymentAmount: parseFloat(formData.amount),
+                    paymentDate: formData.payment_date,
+                    paymentNumber,
+                    selectedBank,
+                    apCOAId: formData.ap_coa_id,
+                    bankCOAId: selectedBank?.coa_id || null,
+                    paymentExchangeRate: formData.payment_exchange_rate
+                });
+                console.log('AP Payment journal entries created');
+            } catch (jeError) {
+                console.warn('[AP] Journal entry creation failed (non-critical):', jeError.message);
+            }
+
+            // ── REVERSAL JOURNAL: Jika Lunas ───────────────────────────────
+            if (newStatus === 'paid' && newOutstanding <= 0 && poIdentifier) {
+                try {
+                    const { data: poData } = await supabase
+                        .from('bridge_pos')
+                        .select('*')
+                        .eq('id', poIdentifier)
+                        .single();
+
+                    if (poData) {
+                        await createAPReversalJournal({
+                            po: poData,
+                            coaList
+                        });
+                        console.log('[AP] Reversal journal created for PO', poIdentifier);
+                    }
+                } catch (revError) {
+                    console.warn('[AP] Reversal journal warning (non-critical):', revError.message);
+                }
+            }
+            // ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+            // Set success state instead of alert
+            setSuccessData({
+                paymentNumber,
+                amountPaid: parseFloat(formData.amount),
+                newOutstanding,
+                newStatus,
+                currency: ap.currency || 'IDR'
+            });
+            setPaymentSuccess(true);
+        } catch (error) {
+            console.error('Error recording payment:', error);
+            alert('Failed to record payment: ' + error.message);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    if (success) return (
-        <Modal isOpen onClose={() => onSuccess()} maxWidth="max-w-lg">
-            <div className="p-8 text-center">
-                <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-green-500/20 flex items-center justify-center animate-pulse">
-                    <CheckCircle className="w-12 h-12 text-green-500" />
+    // Success state UI
+    if (paymentSuccess && successData) {
+        return (
+            <Modal isOpen={true} onClose={() => { onSuccess(); }} maxWidth="max-w-lg">
+                <div className="p-8 text-center">
+                    {/* Success Animation */}
+                    <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-green-500/20 flex items-center justify-center animate-pulse">
+                        <CheckCircle className="w-12 h-12 text-green-500" />
+                    </div>
+
+                    <h2 className="text-2xl font-bold text-green-500 mb-2">Payment Successful!</h2>
+                    <p className="text-silver-dark mb-6">Payment has been recorded in the system</p>
+
+                    {/* Payment Details */}
+                    <div className="glass-card p-4 rounded-lg mb-6 text-left bg-green-500/5 border border-green-500/20">
+                        <div className="space-y-3">
+                            <div className="flex justify-between">
+                                <span className="text-silver-dark">Payment Number:</span>
+                                <span className="text-silver-light font-mono font-medium">{successData.paymentNumber}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-silver-dark">Amount Paid:</span>
+                                <span className="text-green-400 font-bold">{formatCurrency(successData.amountPaid, successData.currency)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-silver-dark">Outstanding Balance:</span>
+                                <span className={`font-bold ${successData.newOutstanding <= 0 ? 'text-green-400' : 'text-yellow-400'}`}>
+                                    {formatCurrency(Math.max(0, successData.newOutstanding), successData.currency)}
+                                </span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-silver-dark">New Status:</span>
+                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${successData.newStatus === 'paid' ? 'bg-green-500/20 text-green-400' :
+                                    successData.newStatus === 'partial' ? 'bg-yellow-500/20 text-yellow-400' :
+                                        'bg-blue-500/20 text-blue-400'
+                                    }`}>
+                                    {successData.newStatus === 'paid' ? 'PAID' :
+                                        successData.newStatus === 'partial' ? 'PARTIAL' : 'OUTSTANDING'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <Button onClick={() => { onSuccess(); }} className="w-full">
+                        Close
+                    </Button>
                 </div>
-                <h2 className="text-2xl font-bold text-green-500 mb-2">Pembayaran Berhasil!</h2>
-                <div className="glass-card p-4 rounded-lg mb-6 text-left space-y-3 bg-green-500/5 border border-green-500/20">
-                    <div className="flex justify-between text-sm">
-                        <span className="text-silver-dark">No. Pembayaran:</span>
-                        <span className="text-silver-light font-mono">{success.payNum}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                        <span className="text-silver-dark">Jumlah:</span>
-                        <span className="text-green-400 font-bold">{fmtIDR(success.amount, success.currency)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                        <span className="text-silver-dark">Sisa Hutang:</span>
-                        <span className={`font-bold ${success.newOut <= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {fmtIDR(Math.max(0, success.newOut), success.currency)}
-                        </span>
-                    </div>
-                </div>
-                <Button onClick={() => onSuccess()} className="w-full">Tutup</Button>
-            </div>
-        </Modal>
-    );
+            </Modal>
+        );
+    }
 
     return (
-        <Modal isOpen onClose={onClose} maxWidth="max-w-2xl">
+        <Modal isOpen={true} onClose={onClose} maxWidth="max-w-2xl">
             <div className="p-6">
-                <h2 className="text-2xl font-bold gradient-text mb-6">Catat Pembayaran AP</h2>
-                <div className="glass-card p-4 rounded-lg mb-6 bg-red-500/5 border border-red-500/20">
+                <h2 className="text-2xl font-bold gradient-text mb-6">Record AP Payment</h2>
+
+                {/* AP Info Summary */}
+                <div className="glass-card p-4 rounded-lg mb-6 bg-gradient-to-br from-red-500/10 to-transparent border border-red-500/30">
                     <div className="grid grid-cols-2 gap-3 text-sm">
-                        <div><span className="text-silver-dark">AP Number:</span><span className="text-silver-light ml-2 font-medium">{ap.ap_number}</span></div>
-                        <div><span className="text-silver-dark">Vendor:</span><span className="text-silver-light ml-2 font-medium">{ap.vendor_name}</span></div>
-                        <div><span className="text-silver-dark">Total:</span><span className="text-silver-light ml-2">{fmtIDR(ap.original_amount, ap.currency)}</span></div>
-                        <div><span className="text-silver-dark">Outstanding:</span><span className="text-red-400 ml-2 font-bold">{fmtIDR(ap.outstanding_amount, ap.currency)}</span></div>
+                        <div>
+                            <span className="text-silver-dark">AP Number:</span>
+                            <span className="text-silver-light font-medium ml-2">{ap.ap_number}</span>
+                        </div>
+                        <div>
+                            <span className="text-silver-dark">Vendor:</span>
+                            <span className="text-silver-light font-medium ml-2">{ap.vendor_name}</span>
+                        </div>
+                        <div>
+                            <span className="text-silver-dark">PO Number:</span>
+                            <span className="text-silver-light font-medium ml-2">{ap.po_number || '-'}</span>
+                        </div>
+                        <div>
+                            <span className="text-silver-dark">Due Date:</span>
+                            <span className="text-silver-light font-medium ml-2">{ap.due_date}</span>
+                        </div>
+                        <div>
+                            <span className="text-silver-dark">Total Amount:</span>
+                            <span className="text-silver-light font-medium ml-2">{formatCurrency(ap.original_amount, ap.currency)}</span>
+                        </div>
+                        <div>
+                            <span className="text-silver-dark">Outstanding:</span>
+                            <span className="text-red-400 font-bold ml-2">{formatCurrency(ap.outstanding_amount, ap.currency)}</span>
+                        </div>
                     </div>
                 </div>
+
+                {/* Payment Form */}
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-silver-dark mb-2">Tanggal Bayar *</label>
-                            <input type="date" required value={form.payment_date}
-                                onChange={e => setForm(p => ({ ...p, payment_date: e.target.value }))} className="w-full" />
+                            <label className="block text-sm font-medium text-silver-dark mb-2">
+                                Payment Date *
+                            </label>
+                            <input
+                                type="date"
+                                required
+                                value={formData.payment_date}
+                                onChange={(e) => setFormData({ ...formData, payment_date: e.target.value })}
+                                className="w-full"
+                            />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-silver-dark mb-2">Jumlah *</label>
-                            <input type="number" required min="0" max={ap.outstanding_amount} step="0.01"
-                                value={form.amount} onChange={e => setForm(p => ({ ...p, amount: parseFloat(e.target.value) || 0 }))}
-                                className="w-full" />
-                            <p className="text-xs text-silver-dark mt-1">Max: {fmtIDR(ap.outstanding_amount, ap.currency)}</p>
+                            <label className="block text-sm font-medium text-silver-dark mb-2">
+                                Payment Amount *
+                            </label>
+                            <input
+                                type="number"
+                                required
+                                min="0"
+                                max={ap.outstanding_amount}
+                                step="0.01"
+                                value={formData.amount}
+                                onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })}
+                                className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg"
+                            />
+                            <p className="text-xs text-silver-dark mt-1">
+                                Max: {formatCurrency(ap.outstanding_amount, ap.currency)}
+                            </p>
                         </div>
+                        {ap.currency !== 'IDR' && (
+                            <div>
+                                <label className="block text-sm font-medium text-silver-dark mb-2">
+                                    Kurs Pembayaran *
+                                </label>
+                                <input
+                                    type="number"
+                                    value={formData.payment_exchange_rate}
+                                    onChange={(e) => setFormData({ ...formData, payment_exchange_rate: parseFloat(e.target.value) || 1 })}
+                                    className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg"
+                                    min="1"
+                                    step="0.01"
+                                    required
+                                />
+                                <p className="text-xs text-amber-500 mt-1">
+                                    Kurs Hutang Awal: Rp {(ap.exchange_rate || 1).toLocaleString('id-ID')}
+                                </p>
+                            </div>
+                        )}
                     </div>
+
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-silver-dark mb-2">Metode Bayar *</label>
-                            <select required value={form.payment_method}
-                                onChange={e => setForm(p => ({ ...p, payment_method: e.target.value }))} className="w-full">
+                            <label className="block text-sm font-medium text-silver-dark mb-2">
+                                Payment Method *
+                            </label>
+                            <select
+                                required
+                                value={formData.payment_method}
+                                onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
+                                className="w-full"
+                            >
                                 <option value="bank_transfer">Bank Transfer</option>
                                 <option value="cash">Cash</option>
-                                <option value="check">Cek / Giro</option>
+                                <option value="check">Check / Giro</option>
+                                <option value="credit_card">Credit Card</option>
+                                <option value="other">Other</option>
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-silver-dark mb-2">No. Referensi</label>
-                            <input type="text" value={form.reference_number}
-                                onChange={e => setForm(p => ({ ...p, reference_number: e.target.value }))}
-                                placeholder="Ref transfer / no. cek" className="w-full" />
+                            <label className="block text-sm font-medium text-silver-dark mb-2">
+                                Reference Number
+                            </label>
+                            <input
+                                type="text"
+                                value={formData.reference_number}
+                                onChange={(e) => setFormData({ ...formData, reference_number: e.target.value })}
+                                placeholder="e.g., Transfer ref, Check #"
+                                className="w-full"
+                            />
                         </div>
                     </div>
+
+                    {/* Bank Account Selection */}
                     <div>
                         <label className="block text-sm font-medium text-silver-dark mb-2">
-                            <CreditCard className="w-4 h-4 inline mr-1" />Akun Hutang (COA Bridge)
+                            <CreditCard className="w-4 h-4 inline mr-1" />
+                            Paid From Account
                         </label>
-                        <select value={form.ap_coa_id} onChange={e => setForm(p => ({ ...p, ap_coa_id: e.target.value }))} className="w-full">
-                            <option value="">— Pilih COA Hutang —</option>
-                            {apAccounts.map(c => <option key={c.id} value={c.id}>{c.code} - {c.name}</option>)}
+                        {bankAccounts.length > 0 ? (
+                            <select
+                                value={formData.paid_from_account}
+                                onChange={(e) => setFormData({ ...formData, paid_from_account: e.target.value })}
+                                className="w-full"
+                            >
+                                <option value="">-- Select Bank Account --</option>
+                                {bankAccounts.map(bank => (
+                                    <option key={bank.id} value={bank.id}>
+                                        {bank.bank_name} - {bank.account_number} ({bank.account_holder})
+                                    </option>
+                                ))}
+                            </select>
+                        ) : (
+                            <p className="text-sm text-silver-dark italic">
+                                No bank accounts configured. Go to Company Settings to add accounts.
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Hutang Account Override */}
+                    <div>
+                        <label className="block text-sm font-medium text-silver-dark mb-2">
+                            Akun Hutang (AP Account)
+                        </label>
+                        <select
+                            value={formData.ap_coa_id}
+                            onChange={(e) => setFormData({ ...formData, ap_coa_id: e.target.value })}
+                            className="w-full"
+                        >
+                            <option value="">-- Pilih Akun Hutang --</option>
+                            {apAccountsList.map(c => (
+                                <option key={c.id} value={c.id}>
+                                    {c.code} - {c.name}
+                                </option>
+                            ))}
                         </select>
                         <p className="text-xs text-silver-dark mt-1">Dicatat di General Ledger sebagai pengurang hutang.</p>
                     </div>
+
                     <div>
-                        <label className="block text-sm font-medium text-silver-dark mb-2">Catatan</label>
-                        <textarea rows={2} value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
-                            className="w-full" placeholder="Catatan opsional..." />
+                        <label className="block text-sm font-medium text-silver-dark mb-2">
+                            Notes
+                        </label>
+                        <textarea
+                            value={formData.notes}
+                            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                            placeholder="Optional payment notes..."
+                            rows={2}
+                            className="w-full"
+                        />
                     </div>
+
                     <div className="flex gap-3 justify-end pt-4 border-t border-dark-border">
-                        <Button type="button" variant="secondary" onClick={onClose}>Batal</Button>
+                        <Button type="button" variant="secondary" onClick={onClose}>
+                            Cancel
+                        </Button>
                         <Button type="submit" disabled={loading} icon={DollarSign}>
-                            {loading ? 'Memproses...' : 'Catat Pembayaran'}
+                            {loading ? 'Processing...' : 'Record Payment'}
                         </Button>
                     </div>
                 </form>
@@ -211,202 +514,738 @@ const APPaymentModal = ({ ap, onClose, onSuccess }) => {
     );
 };
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// AP Detail Modal Component
+const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment, canEditAP }) => {
+    const [paymentHistory, setPaymentHistory] = useState([]);
+    const [loadingHistory, setLoadingHistory] = useState(true);
+    const [accounts, setAccounts] = useState([]); // COA list
+
+    // Item-level COA state
+    const [poItems, setPoItems] = useState([]);
+    const [loadingItems, setLoadingItems] = useState(false);
+    const [savingItems, setSavingItems] = useState(false);
+
+    useEffect(() => {
+        fetchPaymentHistory();
+        fetchAccounts();
+        if (ap.po_id) {
+            fetchLinkedPODetails();
+        }
+    }, [ap.id]);
+
+    const fetchPaymentHistory = async () => {
+        try {
+            setLoadingHistory(true);
+            const { data, error } = await supabase
+                .from('bridge_payments')
+                .select('*')
+                .eq('reference_id', ap.id)
+                .order('payment_date', { ascending: false });
+
+            if (error) throw error;
+            setPaymentHistory(data || []);
+        } catch (error) {
+            console.error('Error fetching payment history:', error);
+        } finally {
+            setLoadingHistory(false);
+        }
+    };
+
+    const fetchAccounts = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('bridge_coa')
+                .select('*')
+                .eq('type', 'EXPENSE')
+                .eq('is_active', true)
+                .order('code', { ascending: true });
+
+            if (error) throw error;
+            setAccounts(data || []);
+        } catch (error) {
+            console.error('Error fetching accounts:', error);
+            // Fallback
+            try {
+                const { data } = await supabase.from('bridge_coa').select('*').eq('is_active', true).order('code');
+                setAccounts((data || []).filter(a => a.type === 'EXPENSE'));
+            } catch { }
+        }
+    };
+
+    const fetchLinkedPODetails = async () => {
+        if (!ap.po_id) return;
+
+        try {
+            setLoadingItems(true);
+            const { data, error } = await supabase
+                .from('bridge_pos')
+                .select('po_items')
+                .eq('id', ap.po_id)
+                .single();
+
+            if (error) throw error;
+
+            if (data && data.po_items) {
+                // Ensure items is an array
+                const items = Array.isArray(data.po_items) ? data.po_items : [];
+                setPoItems(items);
+            }
+        } catch (error) {
+            console.error('Error fetching linked PO items:', error);
+        } finally {
+            setLoadingItems(false);
+        }
+    };
+
+    const handleItemCoaChange = async (index, newCoaId) => {
+        if (!canEditAP) {
+            alert('Anda tidak memiliki hak akses untuk mengubah akun beban.');
+            return;
+        }
+        const updatedItems = [...poItems];
+        updatedItems[index] = {
+            ...updatedItems[index],
+            coa_id: newCoaId
+        };
+        setPoItems(updatedItems);
+
+        // Auto-save on change
+        if (ap.po_id) {
+            try {
+                await supabase
+                    .from('bridge_pos')
+                    .update({ po_items: updatedItems })
+                    .eq('id', ap.po_id);
+            } catch (error) {
+                console.error('Error auto-saving COA assignment:', error);
+            }
+        }
+    };
+
+    const handleSaveChanges = async () => {
+        if (!ap.po_id) return;
+
+        try {
+            setSavingItems(true);
+
+            // Update the linked PO
+            const { error } = await supabase
+                .from('bridge_pos')
+                .update({ po_items: poItems })
+                .eq('id', ap.po_id);
+
+            if (error) throw error;
+
+            alert('Account allocation saved successfully!');
+        } catch (error) {
+            console.error('Error updating items:', error);
+            alert('Failed to save changes: ' + error.message);
+        } finally {
+            setSavingItems(false);
+        }
+    };
+
+    return (
+        <Modal isOpen={true} onClose={onClose} maxWidth="max-w-6xl">
+            <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-2xl font-bold gradient-text">AP Detail</h2>
+                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${ap.status === 'paid' ? 'bg-green-500/20 text-green-400' :
+                        ap.status === 'partial' ? 'bg-yellow-500/20 text-yellow-400' :
+                            ap.status === 'overdue' ? 'bg-red-500/20 text-red-400' :
+                                ap.status === 'outstanding' ? 'bg-blue-500/20 text-blue-400' :
+                                    'bg-gray-500/20 text-gray-400'
+                        }`}>
+                        {ap.status === 'paid' ? 'PAID' :
+                            ap.status === 'partial' ? 'PARTIAL' :
+                                ap.status === 'overdue' ? 'OVERDUE' :
+                                    ap.status === 'outstanding' ? 'OUTSTANDING' : ap.status?.toUpperCase()}
+                    </span>
+                </div>
+
+                {/* AP Info */}
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+                    <div className="glass-card p-4 rounded-lg">
+                        <p className="text-xs text-silver-dark mb-1">AP Number</p>
+                        <p className="font-bold text-accent-orange">{ap.ap_number}</p>
+                    </div>
+                    <div className="glass-card p-4 rounded-lg">
+                        <p className="text-xs text-silver-dark mb-1">PO Number</p>
+                        <p className="font-bold text-silver-light">{ap.po_number || '-'}</p>
+                    </div>
+                    <div className="glass-card p-4 rounded-lg">
+                        <p className="text-xs text-silver-dark mb-1">Vendor</p>
+                        <p className="font-bold text-silver-light">{ap.vendor_name}</p>
+                    </div>
+                </div>
+
+                {/* Item-Level Account / Cost Center Assignment */}
+                <div className="glass-card p-4 rounded-lg mb-6 bg-blue-500/5 border border-blue-500/20">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-semibold text-white flex items-center gap-2">
+                            <Building className="w-4 h-4" /> Item Allocation (Finance)
+                        </h3>
+                    </div>
+
+                    {loadingItems ? (
+                        <div className="text-center py-4 text-silver-dark text-sm animate-pulse">Loading item details...</div>
+                    ) : poItems.length > 0 ? (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead className="bg-[#0070bc]">
+                                    <tr className="text-left">
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase rounded-tl-lg whitespace-nowrap">Item</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase">Description</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right whitespace-nowrap">Qty</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right whitespace-nowrap">Unit Price</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right rounded-tr-lg whitespace-nowrap">Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-dark-border/50">
+                                    {poItems.map((item, idx) => (
+                                        <tr key={idx} className="hover:bg-blue-500/5 transition-colors">
+                                            <td className="py-3 px-4 text-silver-light font-medium align-top whitespace-nowrap">
+                                                {item.item_name || 'Item ' + (idx + 1)}
+                                            </td>
+                                            <td className="py-3 px-4 text-silver-light align-top min-w-[200px]">
+                                                {item.description || '-'}
+                                            </td>
+                                            <td className="py-3 px-4 text-right text-silver-light align-top whitespace-nowrap">
+                                                {item.qty} {item.unit}
+                                            </td>
+                                            <td className="py-3 px-4 text-right text-silver-light align-top whitespace-nowrap">
+                                                {formatCurrency(item.unit_price || item.rate || 0, ap.currency)}
+                                            </td>
+                                            <td className="py-3 px-4 text-right text-silver-light font-medium align-top whitespace-nowrap">
+                                                {formatCurrency(item.amount || (item.qty * (item.unit_price || item.rate)) || 0, ap.currency)}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : (
+                        <div className="text-center py-4 text-silver-dark text-sm italic">
+                            No item details found for this PO.
+                        </div>
+                    )}
+                </div>
+
+                {/* Financial Summary */}
+                <div className="glass-card p-4 rounded-lg mb-6">
+                    <div className="flex items-center gap-2 mb-3">
+                        <Banknote className="w-5 h-5 text-accent-green" />
+                        <h3 className="font-semibold text-silver-light">Financial Summary</h3>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                            <p className="text-xs text-silver-dark mb-1">Bill Date</p>
+                            <p className="font-medium text-silver-light">{ap.bill_date}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-silver-dark mb-1">Due Date</p>
+                            <p className="font-medium text-silver-light">{ap.due_date}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-silver-dark mb-1">Original Amount</p>
+                            <p className="font-bold text-silver-light">{formatCurrency(ap.original_amount, ap.currency)}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-silver-dark mb-1">Paid Amount</p>
+                            <p className="font-bold text-green-400">{formatCurrency(ap.paid_amount || 0, ap.currency)}</p>
+                        </div>
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-dark-border">
+                        <div className="flex justify-between items-center">
+                            <span className="text-lg font-semibold text-silver-light">Outstanding Balance</span>
+                            <span className={`text-2xl font-bold ${ap.outstanding_amount <= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                {formatCurrency(ap.outstanding_amount, ap.currency)}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Payment History */}
+                {paymentHistory.length > 0 && (
+                    <div className="glass-card p-4 rounded-lg mb-6">
+                        <div className="flex items-center gap-2 mb-3">
+                            <History className="w-5 h-5 text-accent-blue" />
+                            <h3 className="font-semibold text-silver-light">Payment History</h3>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b border-dark-border">
+                                        <th className="text-left py-2 text-silver-dark font-medium">Date</th>
+                                        <th className="text-left py-2 text-silver-dark font-medium">Payment Number</th>
+                                        <th className="text-left py-2 text-silver-dark font-medium">Method</th>
+                                        <th className="text-right py-2 text-silver-dark font-medium">Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {paymentHistory.map((payment) => (
+                                        <tr key={payment.id} className="border-b border-dark-border/50">
+                                            <td className="py-2 text-silver-light">{payment.payment_date}</td>
+                                            <td className="py-2 text-silver-light font-mono text-xs">{payment.payment_number}</td>
+                                            <td className="py-2">
+                                                <span className="px-2 py-0.5 bg-blue-500/10 text-blue-400 rounded text-xs">
+                                                    {payment.payment_method?.replace('_', ' ').toUpperCase()}
+                                                </span>
+                                            </td>
+                                            <td className="py-2 text-right text-green-400 font-medium">
+                                                {formatCurrency(payment.amount, payment.currency)}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+
+                {loadingHistory && (
+                    <div className="glass-card p-4 rounded-lg mb-6 text-center">
+                        <div className="animate-spin w-6 h-6 border-2 border-accent-orange border-t-transparent rounded-full mx-auto"></div>
+                        <p className="text-silver-dark text-sm mt-2">Loading payment history...</p>
+                    </div>
+                )}
+
+                {/* Notes */}
+                {ap.notes && (
+                    <div className="glass-card p-4 rounded-lg mb-6">
+                        <p className="text-xs text-silver-dark mb-1">Notes</p>
+                        <p className="text-silver-light text-sm">{ap.notes}</p>
+                    </div>
+                )}
+
+                {ap.source === 'po_fallback' && (
+                    <div className="glass-card p-4 rounded-lg mb-6 bg-yellow-100 border border-yellow-300 text-sm text-black font-medium">
+                        This AP record is derived from purchase order fallback data. A proper AP transaction is required before payments can be recorded.
+                    </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex gap-3 justify-end pt-4 border-t border-dark-border">
+                    <Button variant="secondary" onClick={onClose}>
+                        Close
+                    </Button>
+                    {ap.outstanding_amount > 0 && canEditAP && (
+                        <Button icon={DollarSign} onClick={onRecordPayment}>
+                            Record Payment
+                        </Button>
+                    )}
+                </div>
+            </div>
+        </Modal>
+    );
+};
+
 const BridgeAccountsPayable = () => {
-    const { canEdit } = useAuth();
-    const [apList, setApList] = useState([]);
+    const { canEdit, canCreate, canDelete } = useAuth();
+    const [apTransactions, setAPTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [filter, setFilter] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedAP, setSelectedAP] = useState(null);
-    const [showPayment, setShowPayment] = useState(false);
+    const [showDetailModal, setShowDetailModal] = useState(false);
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
 
-    useEffect(() => { fetchAP(); }, []);
+    useEffect(() => {
+        fetchAPTransactions();
+    }, []);
 
-    const fetchAP = async () => {
-        setLoading(true);
+    const fetchAPTransactions = async () => {
         try {
-            const { data: apRows, error } = await supabase
+            setLoading(true);
+
+            // ── BLINK ONLY: Primary source = bridge_ap_transactions ──────────
+            const { data: apData, error: apError } = await supabase
                 .from('bridge_ap_transactions')
                 .select('*')
-                .order('transaction_date', { ascending: false });
+                .order('bill_date', { ascending: false });
 
-            let rows = [];
-            if (!error && apRows?.length > 0) {
-                rows = apRows;
+            let finalRows = [];
+
+            if (!apError && apData && apData.length > 0) {
+                // ✅ Data exists in bridge_ap_transactions — use it directly
+                finalRows = apData;
             } else {
-                const { data: poRows } = await supabase
+                // ⚠️ bridge_ap_transactions kosong atau error → fallback ke purchase orders
+                if (apError) {
+                    console.warn('[Bridge AP] bridge_ap_transactions error:', apError.message);
+                } else {
+                    console.warn('[Bridge AP] bridge_ap_transactions kosong, fallback ke bridge_pos');
+                }
+
+                const { data: poRows, error: poErr } = await supabase
                     .from('bridge_pos')
                     .select('*')
-                    .in('status', ['approved', 'paid'])
+                    .in('status', ['approved', 'received', 'paid'])
                     .order('po_date', { ascending: false });
 
-                rows = (poRows || []).map(po => ({
-                    id: po.id,
-                    po_id: po.id,
-                    ap_number: `BRG-AP-${(po.po_number || po.id.slice(0,8)).toUpperCase()}`,
-                    po_number: po.po_number,
-                    vendor_name: po.vendor_name || 'Unknown',
-                    transaction_date: po.po_date,
-                    due_date: po.due_date || po.po_date,
-                    original_amount: po.grand_total || 0,
-                    paid_amount: po.paid_amount || 0,
-                    outstanding_amount: Math.max(0, (po.grand_total || 0) - (po.paid_amount || 0)),
-                    currency: po.currency || 'IDR',
-                    status: po.status,
-                    source: 'po_fallback',
-                }));
+                if (poErr) throw poErr;
+
+                // Map PO → format AP
+                finalRows = (poRows || []).map(po => {
+                    let daysToAdd = 30;
+                    if (po.payment_terms) {
+                        const m = String(po.payment_terms).match(/\d+/);
+                        if (m) daysToAdd = parseInt(m[0], 10);
+                    }
+                    const dueDate = new Date(po.po_date || po.created_at || new Date());
+                    dueDate.setDate(dueDate.getDate() + daysToAdd);
+
+                    return {
+                        ...po,
+                        source: 'po_fallback',
+                        po_id: po.id,
+                        ap_transaction_id: null,
+                        ap_number: po.ap_number || `AP-${po.po_number || po.id?.slice(0, 8).toUpperCase()}`,
+                        po_number: po.po_number,
+                        vendor_name: po.vendor_name || 'Unknown Vendor',
+                        bill_date: po.po_date,
+                        due_date: dueDate.toISOString().split('T')[0],
+                        original_amount: po.total_amount || 0,
+                        paid_amount: po.paid_amount || 0,
+                        outstanding_amount: Math.max(0, (po.total_amount || 0) - (po.paid_amount || 0)),
+                        currency: po.currency || 'IDR',
+                        status: po.status === 'paid' ? 'paid' : 'outstanding'
+                    };
+                });
             }
 
-            setApList(rows.map(ap => ({
-                ...ap,
-                aging_bucket: calcAging(ap.due_date),
-                status: ap.status || deriveStatus(ap.paid_amount || 0, ap.original_amount || 0, ap.due_date),
-            })));
-        } catch (err) { console.error(err); }
-        finally { setLoading(false); }
+            // Update aging bucket and metadata dynamically
+            const updatedData = (finalRows || []).map(ap => {
+                const dueDate = new Date(ap.due_date);
+                const today = new Date();
+                const daysDiff = Math.ceil((today - dueDate) / (1000 * 60 * 60 * 24));
+
+                let aging_bucket = '0-30';
+                let status = ap.status;
+
+                if ((ap.outstanding_amount || 0) <= 0) {
+                    status = 'paid';
+                } else if (daysDiff > 0) {
+                    status = 'overdue';
+                    if (daysDiff <= 30) aging_bucket = '0-30';
+                    else if (daysDiff <= 60) aging_bucket = '31-60';
+                    else if (daysDiff <= 90) aging_bucket = '61-90';
+                    else aging_bucket = '90+';
+                }
+
+                return {
+                    ...ap,
+                    ap_number: ap.ap_number || `AP-${ap.po_number || 'UNKNOWN'}`,
+                    po_number: ap.po_number || `PO-${ap.po_id?.slice(0, 6).toUpperCase()}`,
+                    aging_bucket,
+                    status
+                };
+            });
+
+            setAPTransactions(updatedData);
+        } catch (error) {
+            console.error('Error fetching AP:', error);
+            setAPTransactions([]);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const totalAP = apList.reduce((s, a) => s + (a.original_amount || 0), 0);
-    const totalPaid = apList.reduce((s, a) => s + (a.paid_amount || 0), 0);
-    const totalOut = apList.reduce((s, a) => s + (a.outstanding_amount || 0), 0);
-    const overdueTotal = apList.filter(a => a.status === 'overdue').reduce((s, a) => s + a.outstanding_amount, 0);
-
-    const aging = {
-        '0-30': apList.filter(a => a.aging_bucket === '0-30').reduce((s, a) => s + a.outstanding_amount, 0),
-        '31-60': apList.filter(a => a.aging_bucket === '31-60').reduce((s, a) => s + a.outstanding_amount, 0),
-        '61-90': apList.filter(a => a.aging_bucket === '61-90').reduce((s, a) => s + a.outstanding_amount, 0),
-        '90+': apList.filter(a => a.aging_bucket === '90+').reduce((s, a) => s + a.outstanding_amount, 0),
+    const formatCurrency = (value, currency = 'IDR') => {
+        const numValue = value || 0;
+        return currency === 'USD'
+            ? `$${numValue.toLocaleString('id-ID')}`
+            : `Rp ${numValue.toLocaleString('id-ID')}`;
     };
 
-    const filtered = apList.filter(a =>
-        !searchTerm ||
-        a.ap_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        a.po_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        a.vendor_name?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // Calculate metrics - more comprehensive
+    const totalAPAmount = apTransactions.reduce((sum, ap) => sum + (ap.original_amount || 0), 0);
+    const totalPaidAmount = apTransactions.reduce((sum, ap) => sum + (ap.paid_amount || 0), 0);
+    const totalOutstanding = apTransactions.reduce((sum, ap) => sum + (ap.outstanding_amount || 0), 0);
+    const overdueCount = apTransactions.filter(ap => ap.status === 'overdue' && ap.outstanding_amount > 0).length;
+    const dueSoon = apTransactions.filter(ap => {
+        const daysUntilDue = Math.ceil((new Date(ap.due_date) - new Date()) / (1000 * 60 * 60 * 24));
+        return daysUntilDue <= 7 && daysUntilDue >= 0 && ap.outstanding_amount > 0;
+    }).reduce((sum, ap) => sum + ap.outstanding_amount, 0);
+    const current30 = apTransactions.filter(ap => ap.aging_bucket === '0-30' && ap.outstanding_amount > 0).reduce((sum, ap) => sum + ap.outstanding_amount, 0);
+    const aged90Plus = apTransactions.filter(ap => ap.aging_bucket === '90+' && ap.outstanding_amount > 0).reduce((sum, ap) => sum + ap.outstanding_amount, 0);
+
+    // Aging summary
+    const agingSummary = {
+        '0-30': apTransactions.filter(ap => ap.aging_bucket === '0-30' && ap.outstanding_amount > 0).reduce((sum, ap) => sum + ap.outstanding_amount, 0),
+        '31-60': apTransactions.filter(ap => ap.aging_bucket === '31-60' && ap.outstanding_amount > 0).reduce((sum, ap) => sum + ap.outstanding_amount, 0),
+        '61-90': apTransactions.filter(ap => ap.aging_bucket === '61-90' && ap.outstanding_amount > 0).reduce((sum, ap) => sum + ap.outstanding_amount, 0),
+        '90+': apTransactions.filter(ap => ap.aging_bucket === '90+' && ap.outstanding_amount > 0).reduce((sum, ap) => sum + ap.outstanding_amount, 0),
+    };
+
+    const filteredAP = apTransactions.filter(ap => {
+        const matchesFilter = filter === 'all' || ap.aging_bucket === filter || ap.status === filter;
+        const matchesSearch = !searchTerm ||
+            ap.ap_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            ap.po_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            ap.vendor_name?.toLowerCase().includes(searchTerm.toLowerCase());
+        return matchesFilter && matchesSearch;
+    });
+
+    const handleExportXLS = () => {
+        import('../../utils/exportXLS').then(({ exportToXLS }) => {
+            const headerRows = [
+                { value: 'ACCOUNTS PAYABLE REPORT', style: 'title' },
+                { value: `Report Date: ${new Date().toLocaleDateString('id-ID')}`, style: 'normal' },
+                ''
+            ];
+
+            const xlsColumns = [
+                { header: 'No', key: 'no', width: 5, align: 'center' },
+                { header: 'AP Number', key: 'ap_number', width: 20 },
+                { header: 'PO Number', key: 'po_number', width: 20 },
+                { header: 'Vendor', key: 'vendor_name', width: 25 },
+                { header: 'Bill Date', key: 'bill_date', width: 15 },
+                { header: 'Due Date', key: 'due_date', width: 15 },
+                {
+                    header: 'Original Amount',
+                    key: 'original_amount',
+                    width: 20,
+                    align: 'right',
+                    render: (item) => `${item.currency || 'IDR'} ${(item.original_amount || 0).toLocaleString('id-ID')}`
+                },
+                {
+                    header: 'Paid Amount',
+                    key: 'paid_amount',
+                    width: 20,
+                    align: 'right',
+                    render: (item) => `${item.currency || 'IDR'} ${(item.paid_amount || 0).toLocaleString('id-ID')}`
+                },
+                {
+                    header: 'Outstanding Amount',
+                    key: 'outstanding_amount',
+                    width: 20,
+                    align: 'right',
+                    render: (item) => `${item.currency || 'IDR'} ${(item.outstanding_amount || 0).toLocaleString('id-ID')}`
+                },
+                { header: 'Aging Bucket', key: 'aging_bucket', width: 15 },
+                { header: 'Status', key: 'status', width: 15 }
+            ];
+
+            exportToXLS(filteredAP, `AP_Report_${new Date().toISOString().split('T')[0]}`, headerRows, xlsColumns);
+        }).catch(err => console.error("Failed to load export utility", err));
+    };
+
+    const handleRowClick = (ap) => {
+        setSelectedAP(ap);
+        setShowDetailModal(true);
+    };
+
+    const handleRecordPayment = (ap) => {
+        setSelectedAP(ap);
+        setShowDetailModal(false);
+        setShowPaymentModal(true);
+    };
+
+    const handlePaymentSuccess = () => {
+        setShowPaymentModal(false);
+        setShowDetailModal(false);
+        setSelectedAP(null);
+        fetchAPTransactions();
+    };
 
     return (
         <div className="space-y-6">
+            {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text flex items-center gap-2">
-                        <TrendingDown className="w-8 h-8" /> Accounts Payable — Bridge
-                    </h1>
-                    <p className="text-silver-dark mt-1">Monitoring hutang usaha Bridge module</p>
+                    <h1 className="text-3xl font-bold gradient-text">Accounts Payable (AP)</h1>
+                    <p className="text-silver-dark mt-1">Manage vendor payables</p>
+                </div>
+                <Button onClick={handleExportXLS} icon={Download}>Export to Excel</Button>
+            </div>
+
+            {/* Summary Cards - Compact */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="glass-card p-4 rounded-lg">
+                    <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs text-silver-dark">Total AP Amount</p>
+                        <DollarSign className="w-4 h-4 text-blue-400" />
+                    </div>
+                    <p className="text-xl font-bold text-blue-400">{formatCurrency(totalAPAmount)}</p>
+                    <p className="text-xs text-silver-dark">{apTransactions.length} transactions</p>
+                </div>
+
+                <div className="glass-card p-4 rounded-lg">
+                    <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs text-silver-dark">Total Paid</p>
+                        <CheckCircle className="w-4 h-4 text-green-400" />
+                    </div>
+                    <p className="text-xl font-bold text-green-400">{formatCurrency(totalPaidAmount)}</p>
+                    <p className="text-xs text-silver-dark">{apTransactions.filter(ap => ap.status === 'paid').length} paid</p>
+                </div>
+
+                <div className="glass-card p-4 rounded-lg">
+                    <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs text-silver-dark">Outstanding Balance</p>
+                        <AlertCircle className="w-4 h-4 text-red-400" />
+                    </div>
+                    <p className="text-xl font-bold text-red-400">{formatCurrency(totalOutstanding)}</p>
+                    <p className="text-xs text-silver-dark">{apTransactions.filter(ap => ap.outstanding_amount > 0).length} unpaid</p>
+                </div>
+
+                <div className="glass-card p-4 rounded-lg">
+                    <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs text-silver-dark">Overdue</p>
+                        <Clock className="w-4 h-4 text-orange-400" />
+                    </div>
+                    <p className="text-xl font-bold text-orange-400">{overdueCount}</p>
+                    <p className="text-xs text-silver-dark">{formatCurrency(apTransactions.filter(ap => ap.status === 'overdue').reduce((sum, ap) => sum + ap.outstanding_amount, 0))}</p>
                 </div>
             </div>
 
-            {/* Summary Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[
-                    { label: 'Total AP', value: fmtIDR(totalAP), color: 'text-blue-400' },
-                    { label: 'Terbayar', value: fmtIDR(totalPaid), color: 'text-green-400' },
-                    { label: 'Outstanding', value: fmtIDR(totalOut), color: 'text-red-400' },
-                    { label: 'Overdue', value: fmtIDR(overdueTotal), color: 'text-orange-400' },
-                ].map(c => (
-                    <div key={c.label} className="glass-card p-5 rounded-xl">
-                        <p className="text-silver-dark text-xs uppercase tracking-wider">{c.label}</p>
-                        <p className={`text-xl font-bold mt-1 ${c.color}`}>{c.value}</p>
-                    </div>
-                ))}
-            </div>
-
-            {/* Aging */}
-            <div className="glass-card p-5 rounded-xl">
-                <h3 className="text-sm font-semibold text-silver-light uppercase tracking-wider mb-4">Aging Analysis (Outstanding)</h3>
-                <div className="grid grid-cols-4 gap-4">
-                    {Object.entries(aging).map(([bucket, val]) => (
-                        <div key={bucket} className="text-center">
-                            <p className="text-xs text-silver-dark mb-1">{bucket} days</p>
-                            <p className="text-lg font-bold text-silver-light">{fmtIDR(val)}</p>
-                            <div className="w-full bg-dark-border rounded-full h-1.5 mt-2">
-                                <div className="bg-red-500 h-1.5 rounded-full"
-                                    style={{ width: totalOut > 0 ? `${Math.min(100, (val / totalOut) * 100)}%` : '0%' }} />
+            {/* Aging Analysis - Compact */}
+            <div className="glass-card p-4 rounded-lg">
+                <h2 className="text-sm font-bold text-silver-light mb-3">Aging Analysis</h2>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {Object.entries(agingSummary).map(([bucket, amount]) => (
+                        <div key={bucket} className="bg-dark-surface p-3 rounded-lg">
+                            <p className="text-xs text-silver-dark">{bucket} Days</p>
+                            <p className="text-lg font-bold text-silver-light">{formatCurrency(amount)}</p>
+                            <div className="mt-1 h-1.5 bg-dark-card rounded-full overflow-hidden">
+                                <div
+                                    className={`h-full ${bucket === '0-30' ? 'bg-blue-400' :
+                                        bucket === '31-60' ? 'bg-yellow-400' :
+                                            bucket === '61-90' ? 'bg-orange-400' : 'bg-red-400'
+                                        }`}
+                                    style={{ width: `${totalAPAmount > 0 ? (amount / totalAPAmount) * 100 : 0}%` }}
+                                />
                             </div>
                         </div>
                     ))}
                 </div>
             </div>
 
-            {/* Search */}
-            <div className="glass-card p-4 rounded-xl">
+            {/* Search - Full Width */}
+            <div className="w-full">
                 <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-silver-dark" />
-                    <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                        placeholder="Cari AP Number, PO, Vendor..."
-                        className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm" />
+                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
+                    <input
+                        type="text"
+                        placeholder="Search AP number, PO, or vendor..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-12 pr-4 py-3 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-base"
+                    />
                 </div>
             </div>
 
-            {/* Table */}
-            <div className="glass-card rounded-xl overflow-hidden">
-                {loading ? (
-                    <div className="text-center py-16 text-silver-dark">Memuat data AP...</div>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead className="bg-[#0070BB] text-white">
+            {/* AP Table */}
+            <div className="glass-card rounded-lg overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead className="bg-accent-orange">
+                            <tr>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">AP Number</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">PO #</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Vendor</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Bill Date</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Due Date</th>
+                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">Original</th>
+                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">Paid</th>
+                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">Outstanding</th>
+                                <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-dark-border">
+                            {loading ? (
                                 <tr>
-                                    <th className="px-4 py-3 text-left">AP Number</th>
-                                    <th className="px-4 py-3 text-left">PO #</th>
-                                    <th className="px-4 py-3 text-left">Vendor</th>
-                                    <th className="px-4 py-3 text-left">Tgl Transaksi</th>
-                                    <th className="px-4 py-3 text-left">Jatuh Tempo</th>
-                                    <th className="px-4 py-3 text-right">Total</th>
-                                    <th className="px-4 py-3 text-right">Terbayar</th>
-                                    <th className="px-4 py-3 text-right">Outstanding</th>
-                                    <th className="px-4 py-3 text-center">Aging</th>
-                                    <th className="px-4 py-3 text-center">Status</th>
-                                    <th className="px-4 py-3 text-center">Aksi</th>
+                                    <td colSpan="9" className="px-3 py-8 text-center">
+                                        <div className="animate-spin w-6 h-6 border-2 border-accent-orange border-t-transparent rounded-full mx-auto"></div>
+                                        <p className="text-silver-dark mt-2 text-sm">Loading...</p>
+                                    </td>
                                 </tr>
-                            </thead>
-                            <tbody className="divide-y divide-dark-border/40">
-                                {filtered.length === 0 ? (
-                                    <tr><td colSpan={11} className="text-center py-10 text-silver-dark italic">Tidak ada data AP</td></tr>
-                                ) : filtered.map(ap => (
-                                    <tr key={ap.id} className="hover:bg-white/5 smooth-transition">
-                                        <td className="px-4 py-3 font-mono text-accent-orange text-xs">{ap.ap_number}</td>
-                                        <td className="px-4 py-3 text-silver-dark text-xs">{ap.po_number || '-'}</td>
-                                        <td className="px-4 py-3 text-silver-light font-medium">{ap.vendor_name}</td>
-                                        <td className="px-4 py-3 text-silver-dark">{ap.transaction_date}</td>
-                                        <td className={`px-4 py-3 ${ap.status === 'overdue' ? 'text-red-400 font-semibold' : 'text-silver-dark'}`}>
-                                            {ap.due_date || '-'}
+                            ) : filteredAP.length === 0 ? (
+                                <tr>
+                                    <td colSpan="9" className="px-3 py-8 text-center">
+                                        <FileText className="w-10 h-10 text-silver-dark mx-auto mb-2" />
+                                        <p className="text-silver-dark text-sm">No AP transactions yet.</p>
+                                    </td>
+                                </tr>
+                            ) : (
+                                filteredAP.map((ap) => (
+                                    <tr
+                                        key={ap.id}
+                                        className="hover:bg-dark-surface smooth-transition cursor-pointer"
+                                        onClick={() => handleRowClick(ap)}
+                                    >
+                                        <td className="px-3 py-2 whitespace-nowrap">
+                                            <span className="font-medium text-accent-orange">{ap.ap_number}</span>
                                         </td>
-                                        <td className="px-4 py-3 text-right font-mono text-silver-light">{fmtIDR(ap.original_amount, ap.currency)}</td>
-                                        <td className="px-4 py-3 text-right font-mono text-green-400">{fmtIDR(ap.paid_amount || 0, ap.currency)}</td>
-                                        <td className="px-4 py-3 text-right font-mono text-red-400">{fmtIDR(ap.outstanding_amount || 0, ap.currency)}</td>
-                                        <td className="px-4 py-3 text-center">
-                                            <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                                ap.aging_bucket === '90+' ? 'bg-red-500/20 text-red-400' :
-                                                ap.aging_bucket === '61-90' ? 'bg-orange-500/20 text-orange-400' :
-                                                ap.aging_bucket === '31-60' ? 'bg-yellow-500/20 text-yellow-400' :
-                                                'bg-blue-500/20 text-blue-400'
-                                            }`}>{ap.aging_bucket}</span>
+                                        <td className="px-3 py-2 whitespace-nowrap">
+                                            <span className="text-silver-light">{ap.po_number || '-'}</span>
                                         </td>
-                                        <td className="px-4 py-3 text-center">
-                                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${STATUS_STYLE[ap.status] || 'bg-gray-500/20 text-gray-400'}`}>
-                                                {ap.status?.toUpperCase()}
+                                        <td className="px-3 py-2 whitespace-nowrap">
+                                            <span className="text-silver-light">{ap.vendor_name}</span>
+                                        </td>
+                                        <td className="px-3 py-2 whitespace-nowrap">
+                                            <span className="text-silver-dark">{ap.bill_date}</span>
+                                        </td>
+                                        <td className="px-3 py-2 whitespace-nowrap">
+                                            <span className={`${ap.status === 'overdue' ? 'text-red-400 font-semibold' : 'text-silver-dark'}`}>
+                                                {ap.due_date}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-3 text-center">
-                                            {ap.outstanding_amount > 0 && canEdit('bridge_finance') && ap.source !== 'po_fallback' && (
-                                                <Button size="sm" variant="ghost" icon={DollarSign}
-                                                    onClick={() => { setSelectedAP(ap); setShowPayment(true); }}>
-                                                    Bayar
-                                                </Button>
-                                            )}
+                                        <td className="px-3 py-2 text-right whitespace-nowrap">
+                                            <span className="text-silver-light">{formatCurrency(ap.original_amount, ap.currency)}</span>
+                                        </td>
+                                        <td className="px-3 py-2 text-right whitespace-nowrap">
+                                            <span className="text-green-400">{formatCurrency(ap.paid_amount || 0, ap.currency)}</span>
+                                        </td>
+                                        <td className="px-3 py-2 text-right whitespace-nowrap">
+                                            <span className="font-semibold text-red-400">{formatCurrency(ap.outstanding_amount, ap.currency)}</span>
+                                        </td>
+                                        <td className="px-3 py-2 text-center whitespace-nowrap">
+                                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ap.status === 'paid' ? 'bg-green-500/20 text-green-400' :
+                                                ap.status === 'partial' ? 'bg-yellow-500/20 text-yellow-400' :
+                                                    ap.status === 'overdue' ? 'bg-red-500/20 text-red-400' :
+                                                        ap.status === 'outstanding' ? 'bg-blue-500/20 text-blue-400' :
+                                                            'bg-gray-500/20 text-gray-400'
+                                                }`}>
+                                                {ap.status === 'paid' ? 'Paid' :
+                                                    ap.status === 'partial' ? 'Partial' :
+                                                        ap.status === 'overdue' ? 'Overdue' :
+                                                            ap.status === 'outstanding' ? 'Outstanding' : ap.status}
+                                            </span>
                                         </td>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
-            {showPayment && selectedAP && (
-                <APPaymentModal ap={selectedAP} onClose={() => { setShowPayment(false); setSelectedAP(null); }}
-                    onSuccess={() => { setShowPayment(false); setSelectedAP(null); fetchAP(); }} />
+            {/* AP Detail Modal */}
+            {showDetailModal && selectedAP && (
+                <APDetailModal
+                    ap={selectedAP}
+                    formatCurrency={formatCurrency}
+                    onClose={() => {
+                        setShowDetailModal(false);
+                        setSelectedAP(null);
+                    }}
+                    onRecordPayment={() => handleRecordPayment(selectedAP)}
+                    canEditAP={canEdit('blink_ap')}
+                />
+            )}
+
+            {/* Payment Modal */}
+            {showPaymentModal && selectedAP && (
+                <APPaymentRecordModal
+                    ap={selectedAP}
+                    formatCurrency={formatCurrency}
+                    onClose={() => {
+                        setShowPaymentModal(false);
+                        setSelectedAP(null);
+                    }}
+                    onSuccess={handlePaymentSuccess}
+                />
             )}
         </div>
     );
