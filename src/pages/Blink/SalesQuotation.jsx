@@ -946,6 +946,55 @@ const SalesQuotation = () => {
             createdFrom: 'sales_order'
         };
 
+        // --- AUTO-FLATTENING WITH SMART CURRENCY CONVERSION ---
+        const baseCurrency = quotation.currency || 'USD';
+        const baseExchangeRate = quotation.exchange_rate || 16000;
+
+        const flattenItems = (groupedItems) => {
+            const flatList = [];
+            (groupedItems || []).forEach(groupOrItem => {
+                const isGroup = groupOrItem.items !== undefined;
+                const groupName = isGroup ? (groupOrItem.groupName || 'General') : 'General';
+                const groupRate = isGroup ? (groupOrItem.groupExchangeRate || baseExchangeRate) : baseExchangeRate;
+                const subItems = isGroup ? groupOrItem.items : [groupOrItem];
+
+                subItems.forEach(item => {
+                    const originalAmt = parseFloat(item.amount) || 0;
+                    const originalCurrency = item.currency || 'USD';
+                    let finalAmt = originalAmt;
+
+                    // Convert to base currency if different
+                    if (originalCurrency !== baseCurrency) {
+                        if (baseCurrency === 'IDR' && originalCurrency === 'USD') {
+                            finalAmt = originalAmt * groupRate;
+                        } else if (baseCurrency === 'USD' && originalCurrency === 'IDR') {
+                            finalAmt = originalAmt / groupRate;
+                        }
+                    }
+
+                    flatList.push({
+                        id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                        description: isGroup ? `[${groupName}] ${item.description || item.name || 'Item'}` : (item.description || item.name || 'Item'),
+                        qty: parseFloat(item.quantity) || 1,
+                        unit: item.unit || 'Job',
+                        rate: finalAmt / (parseFloat(item.quantity) || 1), // Standardized rate
+                        amount: finalAmt, // Standardized amount in baseCurrency
+                        coa_id: item.coa_id || null,
+                        // Metadata for Audit Trail
+                        original_currency: originalCurrency,
+                        original_amount: originalAmt,
+                        exchange_rate_used: groupRate,
+                        group_name: groupName,
+                        item_name: item.name || item.description || 'Item' // Required for PO Generator
+                    });
+                });
+            });
+            return flatList;
+        };
+
+        const flatSellingItems = flattenItems(quotation.serviceItems || []);
+        const flatBuyingItems = flattenItems(quotation.costItems || []);
+
         // Save shipment to Supabase
         try {
             // Determine BL type based on service type
@@ -977,14 +1026,14 @@ const SalesQuotation = () => {
                     status: newShipment.status,
                     created_from: 'sales_order',
 
-                    service_items: quotation.serviceItems || [],
+                    service_items: flatSellingItems,
                     notes: quotation.notes || '',
                     gross_weight: quotation.grossWeight || null,
                     net_weight: quotation.netWeight || null,
                     measure: quotation.measure || null,
                     packages: quotation.quantity && quotation.packageType ? `${quotation.quantity} ${quotation.packageType}` : (quotation.packageType || null),
-                    selling_items: quotation.serviceItems || [],
-                    buying_items: quotation.costItems || [],
+                    selling_items: flatSellingItems,
+                    buying_items: flatBuyingItems,
                     // === AUTO-CREATE BL/AWB DRAFT ===
                     bl_number: blNumber,
                     bl_type: blType,
