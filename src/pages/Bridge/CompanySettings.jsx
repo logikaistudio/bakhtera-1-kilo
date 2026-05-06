@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabase';
 import { useData } from '../../context/DataContext';
 import Modal from '../../components/Common/Modal';
 import Button from '../../components/Common/Button';
-import { Plus, Building, MapPin, CreditCard, Upload, X, Image as ImageIcon, Trash2, Phone, Mail, FileText } from 'lucide-react';
+import { Plus, Building, MapPin, CreditCard, Upload, X, Image as ImageIcon, Trash2, Phone, Mail, FileText, Link2 } from 'lucide-react';
 import { validateAndConvertImage } from '../../utils/validateImage';
+import { useAuth } from '../../context/AuthContext';
 
 const BridgeCompanySettings = () => {
+    const { canEdit, canCreate, canDelete } = useAuth();
     const {
-        bridgeSettings, // Bridge Settings
-        bridgeBankAccounts, // Bridge Bank Accounts
+        bridgeSettings, // Blink Settings (default)
+        bridgeBankAccounts, // Blink Bank Accounts (default)
         updateCompanySettings,
         addBankAccount,
         updateBankAccount,
@@ -41,8 +44,13 @@ const BridgeCompanySettings = () => {
         account_holder: '',
         branch: '',
         swift_code: '',
-        currency: 'IDR'
+        currency: 'IDR',
+        coa_id: '',
+        coa_code: '',
+        coa_name: ''
     });
+    const [coaAssetList, setCoaAssetList] = useState([]);
+    const [loadingCOA, setLoadingCOA] = useState(false);
 
     // Load company settings on mount
     useEffect(() => {
@@ -57,8 +65,33 @@ const BridgeCompanySettings = () => {
         }
     }, [bridgeSettings]);
 
+    // Fetch ASSET COA accounts (code starts with 1) for bank mapping
+    useEffect(() => {
+        const fetchCOAAssets = async () => {
+            setLoadingCOA(true);
+            try {
+                const { data } = await supabase
+                    .from('bridge_coa')
+                    .select('id, code, name, type')
+                    .eq('type', 'ASSET')
+                    .order('code', { ascending: true });
+                // Filter for Kas/Bank group, allow both hyphenated and plain numeric codes
+                setCoaAssetList((data || []).filter(c => /^1-?([01])/.test(c.code || '')));
+            } catch (e) {
+                console.warn('Could not load COA assets:', e.message);
+            } finally {
+                setLoadingCOA(false);
+            }
+        };
+        fetchCOAAssets();
+    }, []);
+
     // Handle company info save
     const handleSaveCompanyInfo = async () => {
+        if (!canEdit('bridge_settings')) {
+            alert('Anda tidak memiliki hak akses untuk mengubah pengaturan perusahaan.');
+            return;
+        }
         setIsSaving(true);
         try {
             console.log(`💾 Saving ${MODULE} company info...`);
@@ -87,6 +120,10 @@ const BridgeCompanySettings = () => {
 
     // Handle logo upload
     const handleLogoUpload = async (e) => {
+        if (!canEdit('bridge_settings')) {
+            alert('Anda tidak memiliki hak akses untuk mengubah logo perusahaan.');
+            return;
+        }
         const file = e.target.files[0];
         if (!file) return;
 
@@ -112,6 +149,10 @@ const BridgeCompanySettings = () => {
 
     // Bank Account Handlers
     const handleAddBank = () => {
+        if (!canCreate('bridge_settings')) {
+            alert('Anda tidak memiliki hak akses untuk menambah rekening bank.');
+            return;
+        }
         if (!bridgeSettings?.id) {
             alert('Simpan informasi perusahaan terlebih dahulu sebelum menambahkan rekening bank.');
             return;
@@ -123,54 +164,75 @@ const BridgeCompanySettings = () => {
             account_holder: '',
             branch: '',
             swift_code: '',
-            currency: 'IDR'
+            currency: 'IDR',
+            coa_id: '',
+            coa_code: '',
+            coa_name: ''
         });
         setIsBankModalOpen(true);
     };
 
     const handleEditBank = (bank) => {
+        if (!canEdit('bridge_settings')) {
+            alert('Anda tidak memiliki hak akses untuk mengubah rekening bank.');
+            return;
+        }
         setEditingBank(bank);
         setBankFormData({
             bank_name: bank.bank_name,
             account_number: bank.account_number,
             account_holder: bank.account_holder,
-            branch: bank.branch || '',
+            branch: bank.branch_name || '',
             swift_code: bank.swift_code || '',
-            currency: bank.currency || 'IDR'
+            currency: bank.currency || 'IDR',
+            coa_id: bank.coa_id || '',
+            coa_code: bank.coa_code || '',
+            coa_name: bank.coa_name || ''
         });
         setIsBankModalOpen(true);
     };
 
     const handleDeleteBank = async (id) => {
+        if (!canDelete('bridge_settings')) {
+            alert('Anda tidak memiliki hak akses untuk menghapus rekening bank.');
+            return;
+        }
         if (window.confirm('Hapus rekening ini?')) {
             try {
                 await deleteBankAccount(id, MODULE);
                 alert('Rekening dihapus');
             } catch (error) {
-                alert('Gagal menghapus rekening');
+                alert('Failed to delete rekening');
             }
         }
     };
 
     const handleBankSubmit = async (e) => {
         e.preventDefault();
+        // Enrich with COA denormalized fields from selected COA
+        const selectedCOA = coaAssetList.find(c => c.id === bankFormData.coa_id);
+        const enrichedData = {
+            ...bankFormData,
+            coa_id: bankFormData.coa_id || null,
+            coa_code: selectedCOA?.code || bankFormData.coa_code || null,
+            coa_name: selectedCOA?.name || bankFormData.coa_name || null,
+        };
         try {
             if (editingBank) {
-                await updateBankAccount(editingBank.id, bankFormData, MODULE);
+                await updateBankAccount(editingBank.id, enrichedData, MODULE);
             } else {
-                await addBankAccount(bankFormData, MODULE);
+                await addBankAccount(enrichedData, MODULE);
             }
             setIsBankModalOpen(false);
-            // alert('Rekening berhasil disimpan'); // Optional feedback
         } catch (error) {
-            alert('Gagal menyimpan rekening: ' + error.message);
+            alert('Failed to save rekening: ' + error.message);
         }
     };
 
     return (
         <div className="p-6 max-w-7xl mx-auto">
             <h1 className="text-2xl font-bold mb-6 flex items-center gap-2">
-                <Building className="h-6 w-6 text-indigo-600" />
+                <Building className="h-6 w-6 text-blue-600" />
                 Pengaturan Perusahaan (Bridge)
             </h1>
 
@@ -191,7 +253,7 @@ const BridgeCompanySettings = () => {
                                     type="text"
                                     value={companyName}
                                     onChange={(e) => setCompanyName(e.target.value)}
-                                    className="w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                                    className="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
                                     placeholder="PT. Example Name"
                                 />
                             </div>
@@ -202,7 +264,7 @@ const BridgeCompanySettings = () => {
                                     value={companyAddress}
                                     onChange={(e) => setCompanyAddress(e.target.value)}
                                     rows={3}
-                                    className="w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                                    className="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
                                     placeholder="Jl. Alamat Perusahaan..."
                                 />
                             </div>
@@ -216,18 +278,7 @@ const BridgeCompanySettings = () => {
                                         type="text"
                                         value={companyPhone}
                                         onChange={(e) => setCompanyPhone(e.target.value)}
-                                        className="w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
-                                        <Phone className="h-3 w-3" /> Fax
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={companyFax}
-                                        onChange={(e) => setCompanyFax(e.target.value)}
-                                        className="w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                                        className="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
                                     />
                                 </div>
                             </div>
@@ -241,7 +292,7 @@ const BridgeCompanySettings = () => {
                                         type="email"
                                         value={companyEmail}
                                         onChange={(e) => setCompanyEmail(e.target.value)}
-                                        className="w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                                        className="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
                                     />
                                 </div>
                                 <div>
@@ -250,16 +301,18 @@ const BridgeCompanySettings = () => {
                                         type="text"
                                         value={companyNpwp}
                                         onChange={(e) => setCompanyNpwp(e.target.value)}
-                                        className="w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                                        className="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
                                     />
                                 </div>
                             </div>
                         </div>
 
                         <div className="mt-6 flex justify-end">
-                            <Button onClick={handleSaveCompanyInfo} disabled={isSaving}>
-                                {isSaving ? 'Menyimpan...' : 'Simpan Perubahan'}
-                            </Button>
+                            {canEdit('bridge_settings') && (
+                                <Button onClick={handleSaveCompanyInfo} disabled={isSaving}>
+                                    {isSaving ? 'Menyimpan...' : 'Simpan Perubahan'}
+                                </Button>
+                            )}
                         </div>
                     </div>
 
@@ -270,42 +323,50 @@ const BridgeCompanySettings = () => {
                                 <CreditCard className="h-5 w-5 text-gray-500" />
                                 Rekening Bank
                             </h2>
-                            <Button
-                                size="sm"
-                                onClick={handleAddBank}
-                                Icon={Plus}
-                                disabled={!bridgeSettings?.id || (bridgeBankAccounts && bridgeBankAccounts.length >= 4)}
-                                title={!bridgeSettings?.id ? "Simpan informasi perusahaan terlebih dahulu" : bridgeBankAccounts && bridgeBankAccounts.length >= 4 ? "Maksimal 4 rekening bank" : ""}
-                            >
-                                Tambah Rekening
-                            </Button>
+                            {canCreate('bridge_settings') && (
+                                <Button size="sm" disabled={!bridgeSettings?.id} onClick={handleAddBank} Icon={Plus}>
+                                    Tambah Rekening
+                                </Button>
+                            )}
                         </div>
 
                         <div className="space-y-3">
-                            {bridgeBankAccounts && bridgeBankAccounts.length === 0 ? (
+                            {bridgeBankAccounts.length === 0 ? (
                                 <p className="text-gray-500 text-center py-4">Belum ada rekening bank terdaftar.</p>
                             ) : (
-                                bridgeBankAccounts && bridgeBankAccounts.map((bank) => (
+                                bridgeBankAccounts.map((bank) => (
                                     <div key={bank.id} className="flex justify-between items-center p-3 border rounded-md hover:bg-gray-50 transition-colors">
                                         <div>
                                             <div className="font-bold text-gray-800">{bank.bank_name} ({bank.currency || 'IDR'})</div>
-                                            <div className="text-indigo-600 font-mono tracking-wide">{bank.account_number}</div>
+                                            <div className="text-blue-600 font-mono tracking-wide">{bank.account_number}</div>
                                             <div className="text-sm text-gray-600">a/n {bank.account_holder}</div>
-                                            {bank.branch && <div className="text-xs text-gray-500">Cabang: {bank.branch}</div>}
+                                            {bank.branch_name && <div className="text-xs text-gray-500">Cabang: {bank.branch_name}</div>}
+                                            {bank.coa_code ? (
+                                                <div className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                                                    <Link2 className="h-3 w-3" />
+                                                    COA: {bank.coa_code} — {bank.coa_name}
+                                                </div>
+                                            ) : (
+                                                <div className="text-xs text-orange-500 mt-1">⚠️ COA belum ditautkan — journal tidak akan akurat</div>
+                                            )}
                                         </div>
                                         <div className="flex gap-2">
-                                            <button
-                                                onClick={() => handleEditBank(bank)}
-                                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
-                                            >
-                                                Edit
-                                            </button>
-                                            <button
-                                                onClick={() => handleDeleteBank(bank.id)}
-                                                className="p-1.5 text-red-600 hover:bg-red-50 rounded"
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </button>
+                                            {canEdit('bridge_settings') && (
+                                                <button
+                                                    onClick={() => handleEditBank(bank)}
+                                                    className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
+                                                >
+                                                    Edit
+                                                </button>
+                                            )}
+                                            {canDelete('bridge_settings') && (
+                                                <button
+                                                    onClick={() => handleDeleteBank(bank.id)}
+                                                    className="p-1.5 text-red-600 hover:bg-red-50 rounded"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 ))
@@ -353,8 +414,17 @@ const BridgeCompanySettings = () => {
                                 disabled={isUploading}
                             />
                             <label
-                                htmlFor="logo-upload"
-                                className="cursor-pointer bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50 flex items-center gap-2 shadow-sm"
+                                htmlFor={canEdit('bridge_settings') ? "logo-upload" : ""}
+                                className={`bg-white border text-gray-700 px-4 py-2 rounded-md flex items-center gap-2 shadow-sm ${canEdit('bridge_settings')
+                                        ? 'cursor-pointer hover:bg-gray-50 border-gray-300'
+                                        : 'cursor-not-allowed border-gray-100 opacity-50 bg-gray-50'
+                                    }`}
+                                onClick={(e) => {
+                                    if (!canEdit('bridge_settings')) {
+                                        e.preventDefault();
+                                        alert('Anda tidak memiliki hak akses untuk mengubah logo.');
+                                    }
+                                }}
                             >
                                 <Upload className="h-4 w-4" />
                                 {logoUrl ? 'Ganti Logo' : 'Upload Logo'}
@@ -440,6 +510,52 @@ const BridgeCompanySettings = () => {
                             placeholder="BMRIIDJA"
                             className="w-full px-3 py-2 border rounded-md"
                         />
+                    </div>
+
+                    {/* COA Mapping — REQUIRED for accurate journal entries */}
+                    <div className="border border-orange-200 rounded-lg p-3 bg-orange-50">
+                        <label className="block text-sm font-semibold mb-1 text-orange-800 flex items-center gap-1">
+                            <Link2 className="h-4 w-4" />
+                            Akun Buku Besar (COA) <span className="text-red-500">*</span>
+                        </label>
+                        <p className="text-xs text-orange-600 mb-2">
+                            Pilih akun Kas/Bank yang sesuai di Chart of Accounts.
+                            Ini menentukan ke mana jurnal pembukuan akan dicatat saat terjadi transaksi AR/AP.
+                        </p>
+                        {loadingCOA ? (
+                            <div className="text-xs text-gray-500">Memuat daftar COA...</div>
+                        ) : (
+                            <select
+                                value={bankFormData.coa_id}
+                                onChange={(e) => {
+                                    const selected = coaAssetList.find(c => c.id === e.target.value);
+                                    setBankFormData({
+                                        ...bankFormData,
+                                        coa_id: e.target.value,
+                                        coa_code: selected?.code || '',
+                                        coa_name: selected?.name || ''
+                                    });
+                                }}
+                                className="w-full px-3 py-2 border border-orange-300 rounded-md bg-white text-sm focus:ring-orange-400 focus:border-orange-400"
+                            >
+                                <option value="">— Pilih Akun COA Kas/Bank —</option>
+                                {coaAssetList.map(c => (
+                                    <option key={c.id} value={c.id}>
+                                        {c.code} — {c.name}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
+                        {bankFormData.coa_id && (
+                            <p className="text-xs text-green-600 mt-1 font-medium">
+                                ✅ Terhubung ke: {bankFormData.coa_code} — {bankFormData.coa_name}
+                            </p>
+                        )}
+                        {!bankFormData.coa_id && (
+                            <p className="text-xs text-red-500 mt-1">
+                                ⚠️ Wajib diisi agar jurnal pembukuan akurat.
+                            </p>
+                        )}
                     </div>
 
                     <div className="flex gap-3 justify-end mt-6">

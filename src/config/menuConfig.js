@@ -48,10 +48,10 @@ export const APP_MENUS = {
             { code: 'bridge_bc_master', label: 'Master Kode BC', group: 'Master Data', path: '/bridge/bc-master' },
             { code: 'bridge_item_master', label: 'Master Kode Barang', group: 'Master Data', path: '/bridge/item-master' },
             { code: 'bridge_hs_master', label: 'Master Kode HS', group: 'Master Data', path: '/bridge/hs-master' },
+            { code: 'bridge_settings', label: 'Pengaturan Modul', group: 'Master Data', path: '/bridge/master/settings' },
             // ─── Persetujuan & Log ───
             { code: 'bridge_approval', label: 'Approval Manager', group: 'Persetujuan & Log', path: '/bridge/approvals' },
             { code: 'bridge_activity', label: 'Activity Logger', group: 'Persetujuan & Log', path: '/bridge/logger' },
-            { code: 'bridge_settings', label: 'Pengaturan Modul', group: 'Persetujuan & Log', path: '/bridge/master/settings' },
             // ─── Pabean ───
             { code: 'bridge_pabean', label: 'Pabean — Dashboard', group: 'Pabean', path: '/bridge/pabean' },
             { code: 'bridge_barang_masuk', label: 'Pabean — Barang Masuk', group: 'Pabean', path: '/bridge/pabean/barang-masuk' },
