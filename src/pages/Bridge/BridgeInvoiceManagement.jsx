@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { createInvoiceJournal, createCOGSJournal, createARPaymentJournal, getAllCOA, resolveARAccount, resolveRevenueAccount, generateUUID, migrateBridgeFinancialRecords } from '../../utils/journalHelper';
+import { createInvoiceJournal, createCOGSJournal, createARPaymentJournal, getAllCOA, resolveARAccount, resolveRevenueAccount, generateUUID, migrateBridgeFinancialRecords } from '../../utils/bridgeJournalHelper';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useData } from '../../context/DataContext';

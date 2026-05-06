@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { createAPPaymentJournal, createAPReversalJournal, getAllCOA } from '../../utils/journalHelper';
+import { createAPPaymentJournal, createAPReversalJournal, getAllCOA } from '../../utils/bridgeJournalHelper';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
 import {

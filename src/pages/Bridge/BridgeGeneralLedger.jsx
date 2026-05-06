@@ -9,7 +9,7 @@ import {
     BarChart2, Filter, X, DollarSign, Layers, Tag, Printer
 } from 'lucide-react';
 import { printReport, fmtDatePrint } from '../../utils/printPDF';
-import { journalEntriesHasColumn } from '../../utils/journalHelper';
+import { journalEntriesHasColumn } from '../../utils/bridgeJournalHelper';
 import { useData } from '../../context/DataContext';
 
 // ─── COA Type Config ─────────────────────────────────────────────────────────

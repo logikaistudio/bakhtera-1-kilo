@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useData } from '../../context/DataContext';
 import { generatePONumber, generateAPNumber } from '../../utils/documentNumbers';
-import { createPOApprovalJournal, getAllCOA } from '../../utils/journalHelper';
+import { createPOApprovalJournal, getAllCOA } from '../../utils/bridgeJournalHelper';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
 import COAPicker from '../../components/Common/COAPicker';
