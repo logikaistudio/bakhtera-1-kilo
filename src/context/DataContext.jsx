@@ -2980,9 +2980,7 @@ export const DataProvider = ({ children }) => {
 
             if (error) throw error;
 
-            setBanksState(module, getBanksState(module).map(bank => bank.id === id ? { ...bank, ...normalizedUpdate } : bank)); //
-                prev.map(bank => bank.id === id ? { ...bank, ...normalizedUpdate } : bank)
-            );
+            setBanksState(module, getBanksState(module).map(bank => bank.id === id ? { ...bank, ...normalizedUpdate } : bank));
         } catch (error) {
             console.error('Error updating bank account:', error);
             throw error;
