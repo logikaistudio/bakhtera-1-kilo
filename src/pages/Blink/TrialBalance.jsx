@@ -171,6 +171,15 @@ const TrialBalance = () => {
             let totalCredit = 0;
             let totalClosing = 0;
 
+            const isHeader = (a) => {
+                if (!a) return false;
+                // treat explicit level <=2 as header
+                if (a.level && !isNaN(parseInt(a.level, 10)) && parseInt(a.level, 10) <= 2) return true;
+                // patterns like 4-00-000... or 4-02-000-0-1-00
+                if (a.code && (/^\d-\d{2}-000/.test(a.code) || /^\d-00-000/.test(a.code) || /-000($|[-_])/.test(a.code))) return true;
+                return false;
+            };
+
             const processed = Object.values(accMap)
                 .map(acc => {
                     const isNormalCredit = ['LIABILITY', 'EQUITY', 'REVENUE'].includes(acc.type);
@@ -191,8 +200,14 @@ const TrialBalance = () => {
 
                     return acc;
                 })
-                .filter(acc => acc.opening !== 0 || acc.debitPeriod !== 0 || acc.creditPeriod !== 0) // Hide zero balance accounts
-                .sort((a, b) => a.code.localeCompare(b.code)); // Sort strictly by Account Code
+                // Hide header/group accounts and zero-activity accounts. Also skip accounts explicitly marked not for TB
+                .filter(acc => {
+                    if (!acc) return false;
+                    if (acc.is_trial_balance === false) return false;
+                    if (isHeader(acc)) return false;
+                    return acc.opening !== 0 || acc.debitPeriod !== 0 || acc.creditPeriod !== 0;
+                })
+                .sort((a, b) => (a.code || '').localeCompare(b.code || ''));
 
             // Set balances
             setBalances(processed);
