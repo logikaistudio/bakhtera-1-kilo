@@ -167,7 +167,8 @@ const ProfitLoss = () => {
         return neg ? `(${s})` : s;
     };
 
-    const period = `Periode: ${new Date(dateRange.startDate).getFullYear()}`;
+    const periodYear = new Date(dateRange.startDate).getFullYear();
+    const period = `Periode: 1 Januari ${periodYear} - 31 Desember ${periodYear}`;
 
     // ── Export Excel ─────────────────────────────────────────────────
     const handleExportExcel = () => {
