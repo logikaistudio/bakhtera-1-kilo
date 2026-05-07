@@ -11,9 +11,10 @@ import { useData } from '../../context/DataContext';
 const BridgeProfitLoss = () => {
     const navigate = useNavigate();
     const { companySettings } = useData();
+    const currentYear = new Date().getFullYear();
     const [dateRange, setDateRange] = useState({
-        startDate: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
-        endDate: new Date().toISOString().split('T')[0]
+        startDate: `${currentYear}-01-01`,
+        endDate: `${currentYear}-12-31`
     });
     const [loading, setLoading] = useState(true);
     const [taxRate, setTaxRate] = useState(22);
@@ -64,26 +65,26 @@ const BridgeProfitLoss = () => {
                 .from('bridge_coa').select('*').order('code', { ascending: true });
             if (coaError) throw coaError;
 
-            // Build month list (max 12)
+            // Build month list (Jan to Dec of the selected year)
             const d1 = new Date(dateRange.startDate + 'T00:00:00');
-            const d2 = new Date(dateRange.endDate + 'T00:00:00');
+            const targetYear = d1.getFullYear();
             const monthsList = [];
-            let cd = new Date(d1.getFullYear(), d1.getMonth(), 1);
-            const ed = new Date(d2.getFullYear(), d2.getMonth(), 1);
-            while (cd <= ed && monthsList.length < 12) {
-                monthsList.push(`${cd.getFullYear()}-${String(cd.getMonth() + 1).padStart(2, '0')}`);
-                cd.setMonth(cd.getMonth() + 1);
+            for (let i = 1; i <= 12; i++) {
+                monthsList.push(`${targetYear}-${String(i).padStart(2, '0')}`);
             }
+
+            const queryStart = `${targetYear}-01-01`;
+            const queryEnd = `${targetYear}-12-31`;
 
             const [r1, r2] = await Promise.all([
                 supabase.from('bridge_journal_entries')
                     .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate')
                     .not('coa_id', 'is', null)
-                    .gte('entry_date', dateRange.startDate).lte('entry_date', dateRange.endDate),
+                    .gte('entry_date', queryStart).lte('entry_date', queryEnd),
                 supabase.from('bridge_journal_entries')
                     .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate')
                     .is('coa_id', null)
-                    .gte('entry_date', dateRange.startDate).lte('entry_date', dateRange.endDate)
+                    .gte('entry_date', queryStart).lte('entry_date', queryEnd)
             ]);
             if (r1.error) throw r1.error;
             if (r2.error) throw r2.error;
@@ -188,7 +189,7 @@ const BridgeProfitLoss = () => {
         return neg ? `(${s})` : s;
     };
 
-    const period = `${new Date(dateRange.startDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} – ${new Date(dateRange.endDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`;
+    const period = `Tahun ${new Date(dateRange.startDate).getFullYear()}`;
 
     // ── Export Excel ─────────────────────────────────────────────────
     const handleExportExcel = () => {
@@ -434,6 +435,9 @@ const BridgeProfitLoss = () => {
                         {group.parent.name}
                     </span>
                 </div>
+                <div className="w-32 px-2 py-2 flex items-center">
+                    <span className="text-[13px] font-bold text-slate-800 dark:text-silver-light">{group.parent.code}</span>
+                </div>
                 <div className="flex items-center flex-shrink-0 pr-2">
                     {reportMonths.map(m => (
                         <span key={m} className={`text-xs font-mono text-slate-600 dark:text-silver-dark text-right ${colW} px-1`}>
@@ -457,6 +461,9 @@ const BridgeProfitLoss = () => {
                 style={{ paddingLeft: indent ? '3.5rem' : '1.5rem' }}>
                 {item.name}
             </span>
+            <div className="w-32 px-2 py-2 flex items-center">
+                <span className="text-[13px] text-slate-700 dark:text-silver-light font-mono">{item.code}</span>
+            </div>
             <div className="flex items-center flex-shrink-0 pr-2">
                 {reportMonths.map(m => (
                     <span key={m} className={`text-xs font-mono text-slate-500 dark:text-silver-dark text-right ${colW} px-1`}>
@@ -498,6 +505,7 @@ const BridgeProfitLoss = () => {
         return (
             <div className={`flex items-center border-y ${cls} ${thick ? 'border-t-2' : ''}`}>
                 <span className={`text-xs font-bold uppercase flex-1 min-w-0 px-4 py-2 ${indent ? 'pl-8' : ''}`}>{label}</span>
+                <div className="w-32 px-2 py-2"></div>
                 <div className="flex items-center flex-shrink-0 pr-2">
                     {reportMonths.map(m => (
                         <span key={m} className={`text-xs font-bold font-mono text-right ${colW} px-1 py-2`}>
@@ -525,16 +533,13 @@ const BridgeProfitLoss = () => {
                 <div className="flex items-center gap-2 bg-white dark:bg-dark-surface p-1 rounded-lg border border-gray-200 dark:border-dark-border shadow-sm">
                     <div className="flex items-center px-2 border-r border-gray-200 dark:border-dark-border/50">
                         <Calendar className="w-3 h-3 text-gray-500 dark:text-silver-dark mr-2" />
-                        <span className="text-xs text-gray-500 dark:text-silver-dark mr-2">Range:</span>
-                        <input type="date" value={dateRange.startDate}
-                            onChange={e => setDateRange({ ...dateRange, startDate: e.target.value })}
-                            style={{ colorScheme: 'light' }}
-                            className="bg-transparent border-none text-xs text-slate-800 dark:text-white focus:ring-0 p-0 w-24" />
-                        <span className="text-gray-400 dark:text-silver-dark mx-1">–</span>
-                        <input type="date" value={dateRange.endDate}
-                            onChange={e => setDateRange({ ...dateRange, endDate: e.target.value })}
-                            style={{ colorScheme: 'light' }}
-                            className="bg-transparent border-none text-xs text-slate-800 dark:text-white focus:ring-0 p-0 w-24" />
+                        <span className="text-xs text-gray-500 dark:text-silver-dark mr-2">Tahun:</span>
+                        <input type="number" value={new Date(dateRange.startDate).getFullYear()}
+                            onChange={e => {
+                                const y = e.target.value;
+                                setDateRange({ startDate: `${y}-01-01`, endDate: `${y}-12-31` });
+                            }}
+                            className="bg-transparent border-none text-xs text-slate-800 dark:text-white focus:ring-0 p-0 w-20" />
                     </div>
                     <button onClick={fetchReportData} className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded transition-colors" title="Refresh">
                         <RefreshCw className={`w-4 h-4 text-slate-600 dark:text-silver-light ${loading ? 'animate-spin' : ''}`} />
@@ -579,6 +584,7 @@ const BridgeProfitLoss = () => {
                 {/* Column header — putih di atas biru agar terlihat jelas */}
                 <div className="flex items-center" style={{ background: '#0070BB' }}>
                     <span className="text-xs font-bold uppercase tracking-wider flex-1 px-4 py-2.5" style={{ color: '#FFFFFF' }}>Description</span>
+                    <span className="text-xs font-bold uppercase tracking-wider w-32 px-2 py-2.5" style={{ color: '#FFFFFF' }}>Account Code</span>
                     <div className="flex items-center flex-shrink-0 pr-2">
                         {reportMonths.map(m => (
                             <span key={m} className={`text-xs font-bold uppercase text-right ${colW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>
@@ -649,13 +655,19 @@ const BridgeProfitLoss = () => {
                             <TotalRow label="Total Net Income Before Tax" amount={totals.netIncomeBeforeTax} />
 
                             {/* Corporate Income Tax */}
-                            <div className="flex items-center justify-between px-4 py-2 bg-red-50 dark:bg-red-500/10 border-y border-red-200 dark:border-red-500/30">
-                                <span className="text-xs font-bold text-red-600 dark:text-red-400 uppercase">
+                            <div className="flex items-center bg-red-50 dark:bg-red-500/10 border-y border-red-200 dark:border-red-500/30">
+                                <span className="text-xs font-bold text-red-600 dark:text-red-400 uppercase flex-1 min-w-0 px-4 py-2">
                                     Corporate Income Tax ({taxRate}%)
                                 </span>
-                                <span className="text-sm font-bold font-mono text-red-600 dark:text-red-400 text-right min-w-[140px]">
-                                    {fmt(-totals.taxAmount)}
-                                </span>
+                                <div className="w-32 px-2 py-2"></div>
+                                <div className="flex items-center flex-shrink-0 pr-2">
+                                    {reportMonths.map(m => (
+                                        <span key={m} className={`text-xs font-bold font-mono text-right ${colW} px-1 py-2`}>-</span>
+                                    ))}
+                                    <span className={`text-sm font-bold font-mono text-red-600 dark:text-red-400 text-right ${colW} px-1 py-2`}>
+                                        {fmt(-totals.taxAmount)}
+                                    </span>
+                                </div>
                             </div>
 
                             <TotalRow label="Total Net Income After Tax" amount={totals.netIncomeAfterTax}
