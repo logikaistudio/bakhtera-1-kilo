@@ -182,6 +182,12 @@ const ProfitLossDetail = () => {
 
     const period = `Bulan: ${selectedMonth}`;
 
+    const getMonthName = (offset) => {
+        const [y, m] = selectedMonth.split('-');
+        const date = new Date(parseInt(y, 10), parseInt(m, 10) - 1 + offset, 1);
+        return date.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' }).toUpperCase();
+    };
+
     const SectionLabel = ({ label }) => (
         <div className="px-4 py-2 bg-slate-100 dark:bg-dark-surface/70 border-b border-t border-slate-200 dark:border-dark-border mt-2">
             <span className="text-xs font-extrabold text-slate-800 dark:text-silver-light uppercase tracking-widest">{label}</span>
@@ -297,7 +303,7 @@ const ProfitLossDetail = () => {
                         <span className="text-xs text-gray-500 dark:text-silver-dark mr-2">Bulan:</span>
                         <input type="month" value={selectedMonth}
                             onChange={e => setSelectedMonth(e.target.value)}
-                            className="bg-transparent border-none text-xs text-slate-800 dark:text-white focus:ring-0 p-0" />
+                            className="bg-transparent border-none text-xs font-bold text-slate-900 dark:text-blue-400 focus:ring-0 p-0" />
                     </div>
                     <button onClick={fetchReportData} className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded transition-colors" title="Refresh">
                         <RefreshCw className="w-4 h-4 text-slate-600 dark:text-silver-light" />
@@ -331,8 +337,8 @@ const ProfitLossDetail = () => {
                     <span className="text-[11px] font-bold uppercase tracking-wider w-[140px] flex-shrink-0 pl-4 pr-2 py-2.5" style={{ color: '#FFFFFF' }}>Code</span>
                     <span className="text-[11px] font-bold uppercase tracking-wider flex-1 px-2 py-2.5" style={{ color: '#FFFFFF' }}>Description</span>
                     <div className="flex items-center flex-shrink-0 pr-2">
-                        <span className={`text-[11px] font-bold uppercase text-right ${totalW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>Bulan Sebelumnya</span>
-                        <span className={`text-[11px] font-bold uppercase text-right ${totalW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>Bulan Berjalan</span>
+                        <span className={`text-[11px] font-bold uppercase text-right ${totalW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>{getMonthName(-1)}</span>
+                        <span className={`text-[11px] font-bold uppercase text-right ${totalW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>{getMonthName(0)}</span>
                         <span className={`text-[11px] font-bold uppercase text-right ${totalW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>Total YTD</span>
                     </div>
                 </div>
