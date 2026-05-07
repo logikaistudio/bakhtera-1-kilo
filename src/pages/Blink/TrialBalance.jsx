@@ -16,6 +16,8 @@ const TrialBalance = () => {
     const [loading, setLoading] = useState(true);
     const [balances, setBalances] = useState([]);
     const [totals, setTotals] = useState({ opening: 0, debit: 0, credit: 0, closing: 0 });
+    const [unclassifiedAccounts, setUnclassifiedAccounts] = useState([]);
+    const [duplicateEntries, setDuplicateEntries] = useState([]);
 
     // Default: Current Year
     const today = new Date();
@@ -27,6 +29,7 @@ const TrialBalance = () => {
     useEffect(() => {
         fetchTrialBalance();
     }, [dateRange]);
+
 
     const fetchTrialBalance = async () => {
         try {
@@ -56,7 +59,24 @@ const TrialBalance = () => {
             if (r2.error) throw r2.error;
 
             const combined = [...(r1.data || []), ...(r2.data || [])];
-            
+
+            // Deteksi duplikasi berdasarkan nilai, tanggal, dan akun
+            const entryKeyMap = new Map();
+            const duplicates = [];
+            combined.forEach(r => {
+                const key = `${r.account_code || ''}|${r.coa_id || ''}|${r.debit || 0}|${r.credit || 0}|${r.entry_date}`;
+                if (entryKeyMap.has(key)) {
+                    duplicates.push({
+                        id1: entryKeyMap.get(key).id,
+                        id2: r.id,
+                        ...r
+                    });
+                } else {
+                    entryKeyMap.set(key, r);
+                }
+            });
+            setDuplicateEntries(duplicates);
+
             // Deduplicate by id only (original entries are unique)
             const uniqueMap = new Map();
             combined.forEach(r => {
@@ -65,7 +85,6 @@ const TrialBalance = () => {
                 } else {
                     // If duplicate found, merge the values (in case of different sources)
                     const existing = uniqueMap.get(r.id);
-                    // Keep the entry with coa_id if available
                     if (!existing.coa_id && r.coa_id) {
                         uniqueMap.set(r.id, r);
                     }
@@ -100,6 +119,7 @@ const TrialBalance = () => {
                 return value;
             };
 
+            const unclassified = [];
             entries.forEach(e => {
                 // Match by ID first, fallback to code
                 let targetId = e.coa_id || accCodeMap[e.account_code];
@@ -120,6 +140,7 @@ const TrialBalance = () => {
                             closing: 0
                         };
                     }
+                    unclassified.push(accMap[targetId]);
                 }
 
                 const acc = accMap[targetId];
@@ -142,6 +163,7 @@ const TrialBalance = () => {
                     acc.creditPeriod += credit;
                 }
             });
+            setUnclassifiedAccounts(unclassified);
 
             // Calculate Closing
             let totalOpening = 0;
@@ -413,6 +435,27 @@ const TrialBalance = () => {
                 </div>
             </div>
 
+            {unclassifiedAccounts.length > 0 && (
+                <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 mb-4 rounded">
+                    <strong>Warning:</strong> Ada akun <b>Unclassified/Unmapped</b> yang terisi. Mohon cek mapping COA dan jurnal!
+                    <ul className="mt-2 text-xs">
+                        {unclassifiedAccounts.map(acc => (
+                            <li key={acc.id}>{acc.code} - {acc.name}</li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+            {duplicateEntries.length > 0 && (
+                <div className="bg-red-100 border-l-4 border-red-500 text-red-800 p-4 mb-4 rounded">
+                    <strong>Warning:</strong> Ditemukan potensi <b>duplikasi jurnal</b> berdasarkan akun, nilai, dan tanggal yang sama. Mohon audit data jurnal!
+                    <ul className="mt-2 text-xs">
+                        {duplicateEntries.slice(0, 10).map((dup, idx) => (
+                            <li key={idx}>ID {dup.id1} & {dup.id2} | Akun: {dup.account_code || '-'} | Debit: {dup.debit} | Kredit: {dup.credit} | Tanggal: {dup.entry_date}</li>
+                        ))}
+                        {duplicateEntries.length > 10 && <li>Dan {duplicateEntries.length - 10} duplikasi lainnya...</li>}
+                    </ul>
+                </div>
+            )}
             {loading ? (
                 <div className="p-12 text-center text-silver-dark border border-dark-border rounded-lg bg-dark-surface/30">Loading financial data...</div>
             ) : (
