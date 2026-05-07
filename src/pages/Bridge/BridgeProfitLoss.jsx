@@ -183,7 +183,7 @@ const BridgeProfitLoss = () => {
     };
 
     const fmt = (amount) => {
-        if (amount === 0) return '-';
+        if (!amount || amount === 0) return '';
         const neg = amount < 0;
         const s = Math.abs(amount).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         return neg ? `(${s})` : s;
@@ -416,7 +416,8 @@ const BridgeProfitLoss = () => {
         </div>
     );
 
-    const colW = reportMonths.length > 6 ? 'min-w-[80px]' : 'min-w-[110px]';
+    const colW = 'w-[85px] min-w-[85px]';
+    const totalW = 'w-[100px] min-w-[100px]';
 
     const ParentRow = ({ group, sectionKey, index }) => {
         const key = `${sectionKey}-${group.parent?.code || index}`;
@@ -427,24 +428,24 @@ const BridgeProfitLoss = () => {
                 className="flex items-center bg-slate-50 dark:bg-dark-surface/40 border-b border-slate-200 dark:border-dark-border/60 cursor-pointer hover:bg-slate-100 dark:hover:bg-dark-surface/60 transition-colors"
                 onClick={() => toggleGroup(key)}
             >
-                <div className="flex items-center gap-2 flex-1 px-4 py-2">
+                <div className="w-[100px] pl-4 pr-2 py-2 flex items-center">
+                    <span className="text-[12px] font-bold text-slate-800 dark:text-silver-light">{group.parent.code}</span>
+                </div>
+                <div className="flex items-center gap-2 flex-1 px-2 py-2">
                     {isOpen
                         ? <ChevronDown className="w-4 h-4 text-slate-600 dark:text-silver-dark flex-shrink-0" />
                         : <ChevronRight className="w-4 h-4 text-slate-600 dark:text-silver-dark flex-shrink-0" />}
-                    <span className="text-[13px] font-extrabold text-slate-800 dark:text-silver-light uppercase">
+                    <span className="text-[12px] font-extrabold text-slate-800 dark:text-silver-light uppercase truncate" title={group.parent.name}>
                         {group.parent.name}
                     </span>
                 </div>
-                <div className="w-32 px-2 py-2 flex items-center">
-                    <span className="text-[13px] font-bold text-slate-800 dark:text-silver-light">{group.parent.code}</span>
-                </div>
                 <div className="flex items-center flex-shrink-0 pr-2">
                     {reportMonths.map(m => (
-                        <span key={m} className={`text-xs font-mono text-slate-600 dark:text-silver-dark text-right ${colW} px-1`}>
+                        <span key={m} className={`text-[11px] font-mono text-slate-600 dark:text-silver-dark text-right ${colW} px-1 truncate`} title={fmt(group.parent.byMonth?.[m] || 0)}>
                             {fmt(group.parent.byMonth?.[m] || 0)}
                         </span>
                     ))}
-                    <span className={`text-sm font-bold font-mono text-slate-800 dark:text-silver-light text-right ${colW} px-1`}>
+                    <span className={`text-[12px] font-bold font-mono text-slate-800 dark:text-silver-light text-right ${totalW} px-1 truncate`} title={fmt(total)}>
                         {fmt(total)}
                     </span>
                 </div>
@@ -457,20 +458,19 @@ const BridgeProfitLoss = () => {
             onClick={() => navigate('/blink/finance/general-ledger', { state: { preSelectedAccount: item.id } })}
             className="flex items-center border-b border-gray-100 dark:border-dark-border/20 hover:bg-gray-50 dark:hover:bg-dark-surface/40 cursor-pointer group"
         >
-            <span className="text-[13px] text-slate-700 dark:text-silver-light group-hover:underline flex-1 pr-2 py-2"
-                style={{ paddingLeft: indent ? '3.5rem' : '1.5rem' }}>
+            <div className={`w-[100px] pl-4 pr-2 py-2 flex items-center ${indent ? 'pl-8' : ''}`}>
+                <span className="text-[11px] text-slate-600 dark:text-silver-dark font-mono">{item.code}</span>
+            </div>
+            <span className="text-[12px] text-slate-700 dark:text-silver-light group-hover:underline flex-1 px-2 py-2 truncate" title={item.name}>
                 {item.name}
             </span>
-            <div className="w-32 px-2 py-2 flex items-center">
-                <span className="text-[13px] text-slate-700 dark:text-silver-light font-mono">{item.code}</span>
-            </div>
             <div className="flex items-center flex-shrink-0 pr-2">
                 {reportMonths.map(m => (
-                    <span key={m} className={`text-xs font-mono text-slate-500 dark:text-silver-dark text-right ${colW} px-1`}>
+                    <span key={m} className={`text-[11px] font-mono text-slate-500 dark:text-silver-dark text-right ${colW} px-1 truncate`} title={fmt(item.byMonth?.[m] || 0)}>
                         {fmt(item.byMonth?.[m] || 0)}
                     </span>
                 ))}
-                <span className={`text-sm font-mono text-slate-800 dark:text-silver-light text-right ${colW} px-1`}>{fmt(item.amount)}</span>
+                <span className={`text-[12px] font-mono text-slate-800 dark:text-silver-light text-right ${totalW} px-1 truncate`} title={fmt(item.amount)}>{fmt(item.amount)}</span>
             </div>
         </div>
     );
@@ -504,15 +504,15 @@ const BridgeProfitLoss = () => {
         const valCls = highlight ? '' : (amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-silver-light');
         return (
             <div className={`flex items-center border-y ${cls} ${thick ? 'border-t-2' : ''}`}>
-                <span className={`text-xs font-bold uppercase flex-1 min-w-0 px-4 py-2 ${indent ? 'pl-8' : ''}`}>{label}</span>
-                <div className="w-32 px-2 py-2"></div>
+                <div className="w-[100px] px-2 py-2"></div>
+                <span className={`text-[12px] font-bold uppercase flex-1 min-w-0 px-2 py-2 ${indent ? 'pl-6' : ''} truncate`} title={label}>{label}</span>
                 <div className="flex items-center flex-shrink-0 pr-2">
                     {reportMonths.map(m => (
-                        <span key={m} className={`text-xs font-bold font-mono text-right ${colW} px-1 py-2`}>
-                            {byMonthFn ? fmt(byMonthFn(m)) : '-'}
+                        <span key={m} className={`text-[11px] font-bold font-mono text-right ${colW} px-1 py-2 truncate`} title={fmt(byMonthFn ? byMonthFn(m) : 0)}>
+                            {byMonthFn ? fmt(byMonthFn(m)) : ''}
                         </span>
                     ))}
-                    <span className={`text-sm font-bold font-mono text-right ${colW} px-1 py-2 ${valCls}`}>{fmt(amount)}</span>
+                    <span className={`text-[12px] font-bold font-mono text-right ${totalW} px-1 py-2 ${valCls} truncate`} title={fmt(amount)}>{fmt(amount)}</span>
                 </div>
             </div>
         );
@@ -583,15 +583,15 @@ const BridgeProfitLoss = () => {
 
                 {/* Column header — putih di atas biru agar terlihat jelas */}
                 <div className="flex items-center" style={{ background: '#0070BB' }}>
-                    <span className="text-xs font-bold uppercase tracking-wider flex-1 px-4 py-2.5" style={{ color: '#FFFFFF' }}>Description</span>
-                    <span className="text-xs font-bold uppercase tracking-wider w-32 px-2 py-2.5" style={{ color: '#FFFFFF' }}>Account Code</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wider w-[100px] pl-4 pr-2 py-2.5" style={{ color: '#FFFFFF' }}>Code</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wider flex-1 px-2 py-2.5" style={{ color: '#FFFFFF' }}>Description</span>
                     <div className="flex items-center flex-shrink-0 pr-2">
                         {reportMonths.map(m => (
-                            <span key={m} className={`text-xs font-bold uppercase text-right ${colW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>
+                            <span key={m} className={`text-[11px] font-bold uppercase text-right ${colW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>
                                 {mLabel(m)}
                             </span>
                         ))}
-                        <span className={`text-sm font-bold uppercase text-right ${colW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>Total</span>
+                        <span className={`text-[11px] font-bold uppercase text-right ${totalW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>Total</span>
                     </div>
                 </div>
 
@@ -656,15 +656,15 @@ const BridgeProfitLoss = () => {
 
                             {/* Corporate Income Tax */}
                             <div className="flex items-center bg-red-50 dark:bg-red-500/10 border-y border-red-200 dark:border-red-500/30">
-                                <span className="text-xs font-bold text-red-600 dark:text-red-400 uppercase flex-1 min-w-0 px-4 py-2">
+                                <div className="w-[100px] px-2 py-2"></div>
+                                <span className="text-[12px] font-bold text-red-600 dark:text-red-400 uppercase flex-1 min-w-0 px-2 py-2 truncate" title={`Corporate Income Tax (${taxRate}%)`}>
                                     Corporate Income Tax ({taxRate}%)
                                 </span>
-                                <div className="w-32 px-2 py-2"></div>
                                 <div className="flex items-center flex-shrink-0 pr-2">
                                     {reportMonths.map(m => (
-                                        <span key={m} className={`text-xs font-bold font-mono text-right ${colW} px-1 py-2`}>-</span>
+                                        <span key={m} className={`text-[11px] font-bold font-mono text-right ${colW} px-1 py-2`}></span>
                                     ))}
-                                    <span className={`text-sm font-bold font-mono text-red-600 dark:text-red-400 text-right ${colW} px-1 py-2`}>
+                                    <span className={`text-[12px] font-bold font-mono text-red-600 dark:text-red-400 text-right ${totalW} px-1 py-2 truncate`} title={fmt(-totals.taxAmount)}>
                                         {fmt(-totals.taxAmount)}
                                     </span>
                                 </div>
