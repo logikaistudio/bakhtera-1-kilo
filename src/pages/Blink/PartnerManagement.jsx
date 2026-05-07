@@ -35,6 +35,8 @@ const PartnerManagement = () => {
         is_vendor: false,
         is_agent: false,
         is_transporter: false,
+        is_consignee: false,
+        is_shipper: false,
         // Financial
         payment_terms: 'NET 30',
         credit_limit: 0,
@@ -143,6 +145,8 @@ const PartnerManagement = () => {
             is_vendor: false,
             is_agent: false,
             is_transporter: false,
+            is_consignee: false,
+            is_shipper: false,
             payment_terms: 'NET 30',
             credit_limit: 0,
             currency: 'IDR',
@@ -164,7 +168,9 @@ const PartnerManagement = () => {
             (roleFilter === 'customer' && p.is_customer) ||
             (roleFilter === 'vendor' && p.is_vendor) ||
             (roleFilter === 'agent' && p.is_agent) ||
-            (roleFilter === 'transporter' && p.is_transporter);
+            (roleFilter === 'transporter' && p.is_transporter) ||
+            (roleFilter === 'consignee' && p.is_consignee) ||
+            (roleFilter === 'shipper' && p.is_shipper);
 
         return matchesSearch && matchesRole;
     });
@@ -175,6 +181,8 @@ const PartnerManagement = () => {
         if (partner.is_vendor) roles.push({ label: 'Vendor', color: 'bg-blue-500/20 text-blue-400' });
         if (partner.is_agent) roles.push({ label: 'Agent', color: 'bg-purple-500/20 text-purple-400' });
         if (partner.is_transporter) roles.push({ label: 'Transporter', color: 'bg-orange-500/20 text-orange-400' });
+        if (partner.is_consignee) roles.push({ label: 'Consignee', color: 'bg-teal-500/20 text-teal-400' });
+        if (partner.is_shipper) roles.push({ label: 'Shipper', color: 'bg-indigo-500/20 text-indigo-400' });
         return roles;
     };
 
@@ -292,7 +300,7 @@ const PartnerManagement = () => {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
                 <div className="glass-card p-4 rounded-lg">
                     <p className="text-xs text-silver-dark">Total Mitra</p>
                     <p className="text-2xl font-bold text-silver-light mt-1">{partners.length}</p>
@@ -321,6 +329,18 @@ const PartnerManagement = () => {
                         {partners.filter(p => p.is_transporter).length}
                     </p>
                 </div>
+                <div className="glass-card p-4 rounded-lg">
+                    <p className="text-xs text-silver-dark">Consignee</p>
+                    <p className="text-2xl font-bold text-teal-400 mt-1">
+                        {partners.filter(p => p.is_consignee).length}
+                    </p>
+                </div>
+                <div className="glass-card p-4 rounded-lg">
+                    <p className="text-xs text-silver-dark">Shipper</p>
+                    <p className="text-2xl font-bold text-indigo-400 mt-1">
+                        {partners.filter(p => p.is_shipper).length}
+                    </p>
+                </div>
             </div>
 
             {/* Search & Filter */}
@@ -345,6 +365,8 @@ const PartnerManagement = () => {
                     <option value="vendor">Vendor</option>
                     <option value="agent">Agent</option>
                     <option value="transporter">Transporter</option>
+                    <option value="consignee">Consignee</option>
+                    <option value="shipper">Shipper</option>
                 </select>
             </div>
 
@@ -476,12 +498,14 @@ const PartnerManagement = () => {
                             {/* Roles */}
                             <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
                                 <h3 className="text-sm font-bold text-purple-400 mb-3 uppercase">Role Partner (bisa lebih dari 1)</h3>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
                                     {[
                                         { key: 'is_customer', label: 'Customer', desc: 'Bisa ditagih Invoice' },
                                         { key: 'is_vendor', label: 'Vendor', desc: 'Bisa terima PO' },
                                         { key: 'is_agent', label: 'Agent', desc: 'Partner agent' },
-                                        { key: 'is_transporter', label: 'Transporter', desc: 'Trucking/Airline' }
+                                        { key: 'is_transporter', label: 'Transporter', desc: 'Trucking/Airline' },
+                                        { key: 'is_consignee', label: 'Consignee', desc: 'Penerima barang' },
+                                        { key: 'is_shipper', label: 'Shipper', desc: 'Pengirim barang' }
                                     ].map(role => (
                                         <label key={role.key} className="flex items-start gap-2 p-2 rounded border border-dark-border hover:bg-dark-surface/50 cursor-pointer">
                                             <input
