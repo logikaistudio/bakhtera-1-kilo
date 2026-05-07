@@ -410,11 +410,11 @@ const BridgeProfitLoss = () => {
             </span>
             <div className="flex items-center flex-shrink-0 pr-2">
                 {reportMonths.map(m => (
-                    <span key={m} className={`text-[11px] font-mono text-slate-500 dark:text-silver-dark text-right ${colW} px-1`} title={fmt(item.byMonth?.[m] || 0)}>
+                    <div key={m} className={`text-[11px] font-mono text-slate-500 dark:text-silver-dark text-right ${colW} px-1`} title={fmt(item.byMonth?.[m] || 0)}>
                         {fmt(item.byMonth?.[m] || 0)}
-                    </span>
+                    </div>
                 ))}
-                <span className={`text-[12px] font-mono text-slate-800 dark:text-silver-light text-right ${totalW} px-1`} title={fmt(item.amount)}>{fmt(item.amount)}</span>
+                <div className={`text-[12px] font-mono text-slate-800 dark:text-silver-light text-right ${totalW} px-1`} title={fmt(item.amount)}>{fmt(item.amount)}</div>
             </div>
         </div>
     );
@@ -435,14 +435,14 @@ const BridgeProfitLoss = () => {
         return (
             <div className={`flex items-center border-y ${cls} ${thick ? 'border-t-2' : ''}`}>
                 <div className="w-[140px] flex-shrink-0 px-2 py-2"></div>
-                <span className={`text-[12px] font-bold uppercase flex-1 min-w-0 px-2 py-2 ${indent ? 'pl-6' : ''}`} title={label}>{label}</span>
+                <span className={`text-[12px] font-bold uppercase flex-1 min-w-0 px-2 py-2 whitespace-nowrap ${indent ? 'pl-6' : ''}`} title={label}>{label}</span>
                 <div className="flex items-center flex-shrink-0 pr-2">
                     {reportMonths.map(m => (
-                        <span key={m} className={`text-[11px] font-bold font-mono text-right ${colW} px-1 py-2`} title={fmt(byMonthFn ? byMonthFn(m) : 0)}>
+                        <div key={m} className={`text-[11px] font-bold font-mono text-right ${colW} px-1 py-2`} title={fmt(byMonthFn ? byMonthFn(m) : 0)}>
                             {byMonthFn ? fmt(byMonthFn(m)) : ''}
-                        </span>
+                        </div>
                     ))}
-                    <span className={`text-[12px] font-bold font-mono text-right ${totalW} px-1 py-2 ${valCls}`} title={fmt(amount)}>{fmt(amount)}</span>
+                    <div className={`text-[12px] font-bold font-mono text-right ${totalW} px-1 py-2 ${valCls}`} title={fmt(amount)}>{fmt(amount)}</div>
                 </div>
             </div>
         );
@@ -517,11 +517,11 @@ const BridgeProfitLoss = () => {
                     <span className="text-[11px] font-bold uppercase tracking-wider flex-1 px-2 py-2.5" style={{ color: '#FFFFFF' }}>Description</span>
                     <div className="flex items-center flex-shrink-0 pr-2">
                         {reportMonths.map(m => (
-                            <span key={m} className={`text-[11px] font-bold uppercase text-right ${colW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>
+                            <div key={m} className={`text-[11px] font-bold uppercase text-right ${colW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>
                                 {mLabel(m)}
-                            </span>
+                            </div>
                         ))}
-                        <span className={`text-[11px] font-bold uppercase text-right ${totalW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>Total</span>
+                        <div className={`text-[11px] font-bold uppercase text-right ${totalW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>Total</div>
                     </div>
                 </div>
 
