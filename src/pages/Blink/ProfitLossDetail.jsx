@@ -180,7 +180,11 @@ const ProfitLossDetail = () => {
         return neg ? `(${s})` : s;
     };
 
-    const period = `Bulan: ${selectedMonth}`;
+    const [selY, selM] = selectedMonth.split('-');
+    const firstDate = new Date(parseInt(selY, 10), parseInt(selM, 10) - 1, 1);
+    const lastDate = new Date(parseInt(selY, 10), parseInt(selM, 10), 0);
+    const formatDate = (d) => d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    const period = `Bulan: ${formatDate(firstDate)} - ${formatDate(lastDate)}`;
 
     const getMonthName = (offset) => {
         const [y, m] = selectedMonth.split('-');
@@ -216,8 +220,8 @@ const ProfitLossDetail = () => {
                     </span>
                 </div>
                 <div className="flex items-center flex-shrink-0 pr-2">
-                    <span className={`text-[12px] font-bold font-mono text-slate-800 dark:text-silver-light text-right ${totalW} px-1`} title={fmt(group.parent.prevMonthAmount)}>{fmt(group.parent.prevMonthAmount)}</span>
                     <span className={`text-[12px] font-bold font-mono text-slate-800 dark:text-silver-light text-right ${totalW} px-1`} title={fmt(group.parent.currentMonthAmount)}>{fmt(group.parent.currentMonthAmount)}</span>
+                    <span className={`text-[12px] font-bold font-mono text-slate-800 dark:text-silver-light text-right ${totalW} px-1`} title={fmt(group.parent.prevMonthAmount)}>{fmt(group.parent.prevMonthAmount)}</span>
                     <span className={`text-[12px] font-bold font-mono text-slate-800 dark:text-silver-light text-right ${totalW} px-1`} title={fmt(group.parent.ytdAmount)}>{fmt(group.parent.ytdAmount)}</span>
                 </div>
             </div>
@@ -236,8 +240,8 @@ const ProfitLossDetail = () => {
                 {item.name}
             </span>
             <div className="flex items-center flex-shrink-0 pr-2">
-                <span className={`text-[11px] font-mono text-slate-500 dark:text-silver-light text-right ${totalW} px-1`} title={fmt(item.prevMonthAmount)}>{fmt(item.prevMonthAmount)}</span>
                 <span className={`text-[11px] font-mono text-slate-500 dark:text-silver-light text-right ${totalW} px-1`} title={fmt(item.currentMonthAmount)}>{fmt(item.currentMonthAmount)}</span>
+                <span className={`text-[11px] font-mono text-slate-500 dark:text-silver-light text-right ${totalW} px-1`} title={fmt(item.prevMonthAmount)}>{fmt(item.prevMonthAmount)}</span>
                 <span className={`text-[12px] font-bold font-mono text-slate-800 dark:text-silver-light text-right ${totalW} px-1`} title={fmt(item.ytdAmount)}>{fmt(item.ytdAmount)}</span>
             </div>
         </div>
@@ -274,8 +278,8 @@ const ProfitLossDetail = () => {
                 <div className="w-[140px] flex-shrink-0 px-2 py-2"></div>
                 <span className={`text-[12px] font-bold uppercase flex-1 min-w-0 px-2 py-2 ${indent ? 'pl-6' : ''}`} title={label}>{label}</span>
                 <div className="flex items-center flex-shrink-0 pr-2">
-                    <span className={`text-[12px] font-bold font-mono text-right ${totalW} px-1 py-2 ${highlight ? '' : (vals.prev < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-silver-light')}`} title={fmt(vals.prev)}>{fmt(vals.prev)}</span>
                     <span className={`text-[12px] font-bold font-mono text-right ${totalW} px-1 py-2 ${highlight ? '' : (vals.current < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-silver-light')}`} title={fmt(vals.current)}>{fmt(vals.current)}</span>
+                    <span className={`text-[12px] font-bold font-mono text-right ${totalW} px-1 py-2 ${highlight ? '' : (vals.prev < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-silver-light')}`} title={fmt(vals.prev)}>{fmt(vals.prev)}</span>
                     <span className={`text-[12px] font-bold font-mono text-right ${totalW} px-1 py-2 ${highlight ? '' : (vals.ytd < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-silver-light')}`} title={fmt(vals.ytd)}>{fmt(vals.ytd)}</span>
                 </div>
             </div>
@@ -337,8 +341,8 @@ const ProfitLossDetail = () => {
                     <span className="text-[11px] font-bold uppercase tracking-wider w-[140px] flex-shrink-0 pl-4 pr-2 py-2.5" style={{ color: '#FFFFFF' }}>Code</span>
                     <span className="text-[11px] font-bold uppercase tracking-wider flex-1 px-2 py-2.5" style={{ color: '#FFFFFF' }}>Description</span>
                     <div className="flex items-center flex-shrink-0 pr-2">
-                        <span className={`text-[11px] font-bold uppercase text-right ${totalW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>{getMonthName(-1)}</span>
                         <span className={`text-[11px] font-bold uppercase text-right ${totalW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>{getMonthName(0)}</span>
+                        <span className={`text-[11px] font-bold uppercase text-right ${totalW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>{getMonthName(-1)}</span>
                         <span className={`text-[11px] font-bold uppercase text-right ${totalW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>Total YTD</span>
                     </div>
                 </div>
@@ -401,8 +405,8 @@ const ProfitLossDetail = () => {
                                     Corporate Income Tax ({taxRate}%)
                                 </span>
                                 <div className="flex items-center flex-shrink-0 pr-2">
-                                    <span className={`text-[12px] font-bold font-mono text-red-600 dark:text-red-400 text-right ${totalW} px-1 py-2`} title={fmt(-totals.prof.prev.tax)}>{fmt(-totals.prof.prev.tax)}</span>
                                     <span className={`text-[12px] font-bold font-mono text-red-600 dark:text-red-400 text-right ${totalW} px-1 py-2`} title={fmt(-totals.prof.current.tax)}>{fmt(-totals.prof.current.tax)}</span>
+                                    <span className={`text-[12px] font-bold font-mono text-red-600 dark:text-red-400 text-right ${totalW} px-1 py-2`} title={fmt(-totals.prof.prev.tax)}>{fmt(-totals.prof.prev.tax)}</span>
                                     <span className={`text-[12px] font-bold font-mono text-red-600 dark:text-red-400 text-right ${totalW} px-1 py-2`} title={fmt(-totals.prof.ytd.tax)}>{fmt(-totals.prof.ytd.tax)}</span>
                                 </div>
                             </div>
