@@ -87,6 +87,7 @@ const BLManagement = () => {
                 countryOfOrigin: selectedBL.blCountryOfOrigin || 'INDONESIA',
 
                 // Cargo - use only BL-specific fields (no fallback to shipment data)
+                containers: selectedBL.containers || [],
                 containerNumber: selectedBL.containerNumber || '',
                 sealNumber: selectedBL.sealNumber || '',
                 marksNumbers: selectedBL.blMarksNumbers || '',
@@ -142,8 +143,10 @@ const BLManagement = () => {
                 voyage: ship.voyage || ship.booking?.voyageNumber || '',
                 portOfLoading: ship.origin || ship.booking?.portOfLoading || '',
                 portOfDischarge: ship.destination || ship.booking?.portOfDischarge || '',
-                containerNumber: ship.container_number || (ship.containers?.[0]?.containerNumber) || '',
-                sealNumber: ship.seal_number || (ship.containers?.[0]?.sealNumber) || '',
+                // Get ALL containers (not just the first one)
+                containers: ship.containers || [],
+                containerNumber: ship.container_number || (ship.containers?.map(c => c.containerNumber).filter(Boolean).join(', ')) || '',
+                sealNumber: ship.seal_number || (ship.containers?.map(c => c.sealNumber).filter(Boolean).join(', ')) || '',
                 cargoDescription: ship.cargo_description || ship.commodity || '',
                 grossWeight: ship.weight,
                 measurement: ship.volume,
@@ -475,6 +478,7 @@ const BLManagement = () => {
                 hbl: editForm.hbl || null,
                 mawb: editForm.mawb || null,
                 hawb: editForm.hawb || null,
+                containers: editForm.containers || [],
             };
 
             const { error } = await supabase
@@ -1138,22 +1142,90 @@ const BLManagement = () => {
 
                             {/* TAB: Cargo */}
                             {activeTab === 'cargo' && (
-                                <div className="animate-fade-in grid grid-cols-12 gap-6">
-                                    <div className="col-span-3">
-                                        <h3 className="font-bold text-gray-500 dark:text-silver-dark text-xs uppercase mb-3 border-b border-gray-200 dark:border-dark-border pb-1">Container Details</h3>
-                                        {renderInput('Container No', 'containerNumber')}
-                                        {renderInput('Seal No', 'sealNumber')}
-                                        {renderInput('Marks & Numbers', 'marksNumbers', 'textarea', 'e.g. N/M')}
+                                <div className="animate-fade-in space-y-4">
+                                    {/* Container List */}
+                                    <div className="bg-gray-50 dark:bg-dark-bg/30 p-4 rounded-lg">
+                                        <div className="flex justify-between items-center mb-3">
+                                            <h3 className="font-bold text-gray-500 dark:text-silver-dark text-xs uppercase">Containers ({editForm.containers?.length || 0})</h3>
+                                            {isEditing && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setEditForm({
+                                                        ...editForm,
+                                                        containers: [...(editForm.containers || []), { containerNumber: '', sealNumber: '', containerType: '' }]
+                                                    })}
+                                                    className="text-xs bg-accent-orange text-white px-2 py-1 rounded hover:bg-orange-600"
+                                                >
+                                                    + Add Container
+                                                </button>
+                                            )}
+                                        </div>
+                                        {editForm.containers?.length > 0 ? (
+                                            <div className="space-y-2">
+                                                {editForm.containers.map((c, idx) => (
+                                                    <div key={idx} className="flex gap-2 items-center bg-white dark:bg-dark-surface p-2 rounded border border-gray-200 dark:border-dark-border">
+                                                        <span className="text-xs font-bold text-gray-400 w-6">#{idx + 1}</span>
+                                                        {isEditing ? (
+                                                            <>
+                                                                <input
+                                                                    type="text"
+                                                                    value={c.containerNumber || ''}
+                                                                    onChange={(e) => {
+                                                                        const newContainers = [...editForm.containers];
+                                                                        newContainers[idx].containerNumber = e.target.value;
+                                                                        setEditForm({ ...editForm, containers: newContainers });
+                                                                    }}
+                                                                    placeholder="Container No"
+                                                                    className="flex-1 px-2 py-1 text-xs bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded"
+                                                                />
+                                                                <input
+                                                                    type="text"
+                                                                    value={c.sealNumber || ''}
+                                                                    onChange={(e) => {
+                                                                        const newContainers = [...editForm.containers];
+                                                                        newContainers[idx].sealNumber = e.target.value;
+                                                                        setEditForm({ ...editForm, containers: newContainers });
+                                                                    }}
+                                                                    placeholder="Seal No"
+                                                                    className="w-32 px-2 py-1 text-xs bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded"
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const newContainers = editForm.containers.filter((_, i) => i !== idx);
+                                                                        setEditForm({ ...editForm, containers: newContainers });
+                                                                    }}
+                                                                    className="text-red-500 hover:text-red-700 p-1"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <div className="flex-1 text-xs text-gray-900 dark:text-silver-light">{c.containerNumber || '-'}</div>
+                                                                <div className="w-32 text-xs text-gray-500 dark:text-silver-dark">{c.sealNumber || '-'}</div>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="text-xs text-gray-400 italic">No containers added</div>
+                                        )}
                                     </div>
-                                    <div className="col-span-6">
-                                        <h3 className="font-bold text-gray-500 dark:text-silver-dark text-xs uppercase mb-3 border-b border-gray-200 dark:border-dark-border pb-1">Description</h3>
-                                        {renderInput('Description of Packages and Goods', 'descriptionPackages', 'textarea', 'FULL DESCRIPTION OF GOODS')}
-                                        {renderInput('Total Packages Text', 'totalPackages', 'text', 'SAY: ONE CONTAINER ONLY')}
-                                    </div>
-                                    <div className="col-span-3">
-                                        <h3 className="font-bold text-gray-500 dark:text-silver-dark text-xs uppercase mb-3 border-b border-gray-200 dark:border-dark-border pb-1">Measurements</h3>
-                                        {renderInput('Gross Weight', 'grossWeight', 'text', 'e.g. 18,500 KGS')}
-                                        {renderInput('Measurement', 'measurement', 'text', 'e.g. 33.20 CBM')}
+
+                                    <div className="grid grid-cols-12 gap-6">
+                                        <div className="col-span-4">
+                                            <h3 className="font-bold text-gray-500 dark:text-silver-dark text-xs uppercase mb-3 border-b border-gray-200 dark:border-dark-border pb-1">Marks & Description</h3>
+                                            {renderInput('Marks & Numbers', 'marksNumbers', 'textarea', 'e.g. N/M')}
+                                            {renderInput('Description of Packages and Goods', 'descriptionPackages', 'textarea', 'FULL DESCRIPTION OF GOODS')}
+                                            {renderInput('Total Packages Text', 'totalPackages', 'text', 'SAY: ONE CONTAINER ONLY')}
+                                        </div>
+                                        <div className="col-span-4">
+                                            <h3 className="font-bold text-gray-500 dark:text-silver-dark text-xs uppercase mb-3 border-b border-gray-200 dark:border-dark-border pb-1">Weight & Volume</h3>
+                                            {renderInput('Gross Weight', 'grossWeight', 'text', 'e.g. 18,500 KGS')}
+                                            {renderInput('Measurement', 'measurement', 'text', 'e.g. 33.20 CBM')}
+                                        </div>
                                     </div>
                                 </div>
                             )}
