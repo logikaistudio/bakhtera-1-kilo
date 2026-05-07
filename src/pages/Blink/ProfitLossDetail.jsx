@@ -176,7 +176,7 @@ const ProfitLossDetail = () => {
     const fmt = (amount) => {
         if (!amount || amount === 0) return '';
         const neg = amount < 0;
-        const s = Math.abs(amount).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const s = Math.abs(amount).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
         return neg ? `(${s})` : s;
     };
 
@@ -205,14 +205,14 @@ const ProfitLossDetail = () => {
                     {isOpen
                         ? <ChevronDown className="w-4 h-4 text-slate-600 dark:text-silver-dark flex-shrink-0" />
                         : <ChevronRight className="w-4 h-4 text-slate-600 dark:text-silver-dark flex-shrink-0" />}
-                    <span className="text-[12px] font-extrabold text-slate-800 dark:text-silver-light uppercase truncate" title={group.parent.name}>
+                    <span className="text-[12px] font-extrabold text-slate-800 dark:text-silver-light uppercase" title={group.parent.name}>
                         {group.parent.name}
                     </span>
                 </div>
                 <div className="flex items-center flex-shrink-0 pr-2">
-                    <span className={`text-[12px] font-bold font-mono text-slate-800 dark:text-silver-light text-right ${totalW} px-1 truncate`} title={fmt(group.parent.prevMonthAmount)}>{fmt(group.parent.prevMonthAmount)}</span>
-                    <span className={`text-[12px] font-bold font-mono text-slate-800 dark:text-silver-light text-right ${totalW} px-1 truncate`} title={fmt(group.parent.currentMonthAmount)}>{fmt(group.parent.currentMonthAmount)}</span>
-                    <span className={`text-[12px] font-bold font-mono text-slate-800 dark:text-silver-light text-right ${totalW} px-1 truncate`} title={fmt(group.parent.ytdAmount)}>{fmt(group.parent.ytdAmount)}</span>
+                    <span className={`text-[12px] font-bold font-mono text-slate-800 dark:text-silver-light text-right ${totalW} px-1`} title={fmt(group.parent.prevMonthAmount)}>{fmt(group.parent.prevMonthAmount)}</span>
+                    <span className={`text-[12px] font-bold font-mono text-slate-800 dark:text-silver-light text-right ${totalW} px-1`} title={fmt(group.parent.currentMonthAmount)}>{fmt(group.parent.currentMonthAmount)}</span>
+                    <span className={`text-[12px] font-bold font-mono text-slate-800 dark:text-silver-light text-right ${totalW} px-1`} title={fmt(group.parent.ytdAmount)}>{fmt(group.parent.ytdAmount)}</span>
                 </div>
             </div>
         );
@@ -226,13 +226,13 @@ const ProfitLossDetail = () => {
             <div className={`w-[140px] flex-shrink-0 pl-4 pr-2 py-2 flex items-center ${indent ? 'pl-8' : ''}`}>
                 <span className="text-[11px] text-slate-600 dark:text-silver-dark font-mono whitespace-nowrap">{item.code}</span>
             </div>
-            <span className="text-[12px] text-slate-700 dark:text-silver-light group-hover:underline flex-1 px-2 py-2 truncate" title={item.name}>
+            <span className="text-[12px] text-slate-700 dark:text-silver-light group-hover:underline flex-1 px-2 py-2" title={item.name}>
                 {item.name}
             </span>
             <div className="flex items-center flex-shrink-0 pr-2">
-                <span className={`text-[11px] font-mono text-slate-500 dark:text-silver-light text-right ${totalW} px-1 truncate`} title={fmt(item.prevMonthAmount)}>{fmt(item.prevMonthAmount)}</span>
-                <span className={`text-[11px] font-mono text-slate-500 dark:text-silver-light text-right ${totalW} px-1 truncate`} title={fmt(item.currentMonthAmount)}>{fmt(item.currentMonthAmount)}</span>
-                <span className={`text-[12px] font-bold font-mono text-slate-800 dark:text-silver-light text-right ${totalW} px-1 truncate`} title={fmt(item.ytdAmount)}>{fmt(item.ytdAmount)}</span>
+                <span className={`text-[11px] font-mono text-slate-500 dark:text-silver-light text-right ${totalW} px-1`} title={fmt(item.prevMonthAmount)}>{fmt(item.prevMonthAmount)}</span>
+                <span className={`text-[11px] font-mono text-slate-500 dark:text-silver-light text-right ${totalW} px-1`} title={fmt(item.currentMonthAmount)}>{fmt(item.currentMonthAmount)}</span>
+                <span className={`text-[12px] font-bold font-mono text-slate-800 dark:text-silver-light text-right ${totalW} px-1`} title={fmt(item.ytdAmount)}>{fmt(item.ytdAmount)}</span>
             </div>
         </div>
     );
@@ -266,11 +266,11 @@ const ProfitLossDetail = () => {
         return (
             <div className={`flex items-center border-y ${cls} ${thick ? 'border-t-2' : ''}`}>
                 <div className="w-[140px] flex-shrink-0 px-2 py-2"></div>
-                <span className={`text-[12px] font-bold uppercase flex-1 min-w-0 px-2 py-2 ${indent ? 'pl-6' : ''} truncate`} title={label}>{label}</span>
+                <span className={`text-[12px] font-bold uppercase flex-1 min-w-0 px-2 py-2 ${indent ? 'pl-6' : ''}`} title={label}>{label}</span>
                 <div className="flex items-center flex-shrink-0 pr-2">
-                    <span className={`text-[12px] font-bold font-mono text-right ${totalW} px-1 py-2 truncate ${highlight ? '' : (vals.prev < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-silver-light')}`} title={fmt(vals.prev)}>{fmt(vals.prev)}</span>
-                    <span className={`text-[12px] font-bold font-mono text-right ${totalW} px-1 py-2 truncate ${highlight ? '' : (vals.current < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-silver-light')}`} title={fmt(vals.current)}>{fmt(vals.current)}</span>
-                    <span className={`text-[12px] font-bold font-mono text-right ${totalW} px-1 py-2 truncate ${highlight ? '' : (vals.ytd < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-silver-light')}`} title={fmt(vals.ytd)}>{fmt(vals.ytd)}</span>
+                    <span className={`text-[12px] font-bold font-mono text-right ${totalW} px-1 py-2 ${highlight ? '' : (vals.prev < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-silver-light')}`} title={fmt(vals.prev)}>{fmt(vals.prev)}</span>
+                    <span className={`text-[12px] font-bold font-mono text-right ${totalW} px-1 py-2 ${highlight ? '' : (vals.current < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-silver-light')}`} title={fmt(vals.current)}>{fmt(vals.current)}</span>
+                    <span className={`text-[12px] font-bold font-mono text-right ${totalW} px-1 py-2 ${highlight ? '' : (vals.ytd < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-silver-light')}`} title={fmt(vals.ytd)}>{fmt(vals.ytd)}</span>
                 </div>
             </div>
         );
@@ -391,13 +391,13 @@ const ProfitLossDetail = () => {
                             {/* Corporate Income Tax */}
                             <div className="flex items-center bg-red-50 dark:bg-red-500/10 border-y border-red-200 dark:border-red-500/30">
                                 <div className="w-[140px] flex-shrink-0 px-2 py-2"></div>
-                                <span className="text-[12px] font-bold text-red-600 dark:text-red-400 uppercase flex-1 min-w-0 px-2 py-2 truncate" title={`Corporate Income Tax (${taxRate}%)`}>
+                                <span className="text-[12px] font-bold text-red-600 dark:text-red-400 uppercase flex-1 min-w-0 px-2 py-2" title={`Corporate Income Tax (${taxRate}%)`}>
                                     Corporate Income Tax ({taxRate}%)
                                 </span>
                                 <div className="flex items-center flex-shrink-0 pr-2">
-                                    <span className={`text-[12px] font-bold font-mono text-red-600 dark:text-red-400 text-right ${totalW} px-1 py-2 truncate`} title={fmt(-totals.prof.prev.tax)}>{fmt(-totals.prof.prev.tax)}</span>
-                                    <span className={`text-[12px] font-bold font-mono text-red-600 dark:text-red-400 text-right ${totalW} px-1 py-2 truncate`} title={fmt(-totals.prof.current.tax)}>{fmt(-totals.prof.current.tax)}</span>
-                                    <span className={`text-[12px] font-bold font-mono text-red-600 dark:text-red-400 text-right ${totalW} px-1 py-2 truncate`} title={fmt(-totals.prof.ytd.tax)}>{fmt(-totals.prof.ytd.tax)}</span>
+                                    <span className={`text-[12px] font-bold font-mono text-red-600 dark:text-red-400 text-right ${totalW} px-1 py-2`} title={fmt(-totals.prof.prev.tax)}>{fmt(-totals.prof.prev.tax)}</span>
+                                    <span className={`text-[12px] font-bold font-mono text-red-600 dark:text-red-400 text-right ${totalW} px-1 py-2`} title={fmt(-totals.prof.current.tax)}>{fmt(-totals.prof.current.tax)}</span>
+                                    <span className={`text-[12px] font-bold font-mono text-red-600 dark:text-red-400 text-right ${totalW} px-1 py-2`} title={fmt(-totals.prof.ytd.tax)}>{fmt(-totals.prof.ytd.tax)}</span>
                                 </div>
                             </div>
 
