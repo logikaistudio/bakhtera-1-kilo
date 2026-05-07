@@ -1797,21 +1797,13 @@ const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFor
 
     const { subtotal, taxAmount, total, cogsSubtotal, grossProfit, profitMargin } = calculateTotals();
 
-    // Blend quotations and shipments into single list
-    const blendedReferences = [
-        ...quotations.map(q => ({
-            id: q.id,
-            type: 'quotation',
-            label: `[QUOTATION] ${q.quotationNumber || q.quotation_number} - ${q.customerName || q.customer_name} (${q.origin} → ${q.destination})`,
-            data: q
-        })),
-        ...shipments.map(s => ({
-            id: s.id,
-            type: 'shipment',
-            label: `[SO] ${s.so_number || s.job_number} - ${s.customer} (${s.origin} → ${s.destination})`,
-            data: s
-        }))
-    ];
+    // SO only (quotation option removed)
+    const blendedReferences = shipments.map(s => ({
+        id: s.id,
+        type: 'shipment',
+        label: `[SO] ${s.so_number || s.job_number} - ${s.customer} (${s.origin} → ${s.destination})`,
+        data: s
+    }));
 
     const handleReferenceSelect = (e) => {
         const selectedId = e.target.value;
@@ -1837,7 +1829,7 @@ const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFor
                             {isEditing ? 'Edit Invoice' : 'Create New Invoice'}
                         </h2>
                         <p className="text-silver-dark text-sm mt-1">
-                            {isEditing ? 'Make changes to the invoice details' : 'Draft a new invoice from Quotation or SO'}
+                            {isEditing ? 'Make changes to the invoice details' : 'Draft a new invoice from Sales Order (SO)'}
                         </p>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-dark-surface rounded-full smooth-transition text-silver-dark hover:text-silver-light">
@@ -1850,7 +1842,7 @@ const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFor
                     {!isEditing && (
                         <div className="glass-card p-4 rounded-lg">
                             <label className="block text-[11px] font-semibold text-silver-light mb-1.5">
-                                Referensi (Quotation / SO) <span className="text-red-400">*</span>
+                                Referensi (Sales Order) <span className="text-red-400">*</span>
                             </label>
                             <select
                                 value={formData.quotation_id || formData.shipment_id || ''}
@@ -1858,7 +1850,7 @@ const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFor
                                 className="w-full px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded text-silver-light text-[11px]"
                                 required
                             >
-                                <option value="">-- Pilih Quotation atau Sales Order --</option>
+                                <option value="">-- Pilih Sales Order --</option>
                                 {blendedReferences.map(ref => (
                                     <option key={`${ref.type}-${ref.id}`} value={ref.id}>
                                         {ref.label}
@@ -1890,7 +1882,7 @@ const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFor
                             </div>
 
                             <div className="glass-card p-2 rounded-lg">
-                                <h3 className="text-[11px] font-semibold text-accent-orange mb-1.5">Informasi {selectedQuotation ? 'Quotation' : 'SO'}</h3>
+                                <h3 className="text-[11px] font-semibold text-accent-orange mb-1.5">Informasi SO</h3>
                                 <div className="space-y-1 text-[11px]">
                                     <div><span className="text-silver-dark">Route:</span> <span className="text-silver-light">{formData.origin} → {formData.destination}</span></div>
                                     <div><span className="text-silver-dark">Service:</span> <span className="text-silver-light">{formData.service_type?.toUpperCase()}</span></div>
