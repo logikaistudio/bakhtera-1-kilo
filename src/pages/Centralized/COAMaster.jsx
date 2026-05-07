@@ -1096,7 +1096,7 @@ const COAMaster = () => {
                                     onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                                     className="w-full px-3 py-1.5 text-sm bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue outline-none"
                                 >
-                                    {accountTypes.map(t => (
+                                    {accountGroups.map(t => (
                                         <option key={t} value={t}>
                                             {t.charAt(0) + t.slice(1).toLowerCase()}
                                         </option>
