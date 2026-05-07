@@ -64,21 +64,21 @@ const BLManagement = () => {
                 // Subject
                 subject: selectedBL.blSubject || '',
 
-                // Parties
-                shipperName: selectedBL.blShipperName || selectedBL.shipperName,
+                // Parties - Use only BL-specific fields (no fallback to shipment data)
+                shipperName: selectedBL.blShipperName || '',
                 shipperAddress: selectedBL.blShipperAddress || '',
-                consigneeName: selectedBL.blConsigneeName || selectedBL.consigneeName,
+                consigneeName: selectedBL.blConsigneeName || '',
                 consigneeAddress: selectedBL.blConsigneeAddress || '',
                 notifyPartyName: selectedBL.blNotifyPartyName || 'SAME AS CONSIGNEE',
                 notifyPartyAddress: selectedBL.blNotifyPartyAddress || '',
 
-                // Routing
-                vessel: selectedBL.vessel,
-                voyage: selectedBL.voyage,
-                placeOfReceipt: selectedBL.blPlaceOfReceipt || selectedBL.portOfLoading,
-                portOfLoading: selectedBL.portOfLoading,
-                portOfDischarge: selectedBL.portOfDischarge,
-                placeOfDelivery: selectedBL.blPlaceOfDelivery || selectedBL.portOfDischarge,
+                // Routing - use only BL-specific fields (no fallback to shipment data)
+                vessel: selectedBL.vessel || '',
+                voyage: selectedBL.voyage || '',
+                placeOfReceipt: selectedBL.blPlaceOfReceipt || '',
+                portOfLoading: selectedBL.portOfLoading || '',
+                portOfDischarge: selectedBL.portOfDischarge || '',
+                placeOfDelivery: selectedBL.blPlaceOfDelivery || '',
                 preCarriageBy: selectedBL.blPreCarriageBy || '',
                 loadingPier: selectedBL.blLoadingPier || '',
 
@@ -86,14 +86,14 @@ const BLManagement = () => {
                 typeOfMove: selectedBL.blTypeOfMove || 'FCL/FCL',
                 countryOfOrigin: selectedBL.blCountryOfOrigin || 'INDONESIA',
 
-                // Cargo
-                containerNumber: selectedBL.containerNumber,
-                sealNumber: selectedBL.sealNumber,
-                marksNumbers: selectedBL.blMarksNumbers || selectedBL.containerNumber || 'N/A',
-                descriptionPackages: selectedBL.blDescriptionPackages || selectedBL.cargoDescription,
-                grossWeight: selectedBL.blGrossWeightText || (selectedBL.grossWeight ? `${selectedBL.grossWeight} KGS` : ''),
-                measurement: selectedBL.blMeasurementText || (selectedBL.measurement ? `${selectedBL.measurement} CBM` : ''),
-                totalPackages: selectedBL.blTotalPackagesText || 'SAY: ONE CONTAINER ONLY',
+                // Cargo - use only BL-specific fields (no fallback to shipment data)
+                containerNumber: selectedBL.containerNumber || '',
+                sealNumber: selectedBL.sealNumber || '',
+                marksNumbers: selectedBL.blMarksNumbers || '',
+                descriptionPackages: selectedBL.blDescriptionPackages || '',
+                grossWeight: selectedBL.blGrossWeightText || '',
+                measurement: selectedBL.blMeasurementText || '',
+                totalPackages: selectedBL.blTotalPackagesText || '',
 
                 // Footer
                 freightPayableAt: selectedBL.blFreightPayableAt || 'DESTINATION',
