@@ -94,12 +94,25 @@ const PartnerPicker = ({
         }
     };
 
-    const filteredPartners = partners.filter(p =>
-        !searchTerm ||
-        p.partner_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.partner_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.email?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // Sanitize partner_name: remove carriage-return/newline characters
+    // that come from bulk-imported data (e.g. "EMO TRANS MIAMI\r\nEMOMIA")
+    const cleanName = (name) => {
+        if (!name) return '';
+        // Split on \r\n or \n, take only the first line (actual company name)
+        return name.split(/\r?\n/)[0].trim();
+    };
+
+    const filteredPartners = partners.filter(p => {
+        const displayName = cleanName(p.partner_name);
+        const search = searchTerm.toLowerCase();
+        return (
+            !searchTerm ||
+            displayName.toLowerCase().includes(search) ||
+            p.partner_name?.toLowerCase().includes(search) ||
+            p.partner_code?.toLowerCase().includes(search) ||
+            p.email?.toLowerCase().includes(search)
+        );
+    });
 
     const sizeClasses = {
         sm: 'text-xs py-1.5 px-2',
@@ -137,7 +150,7 @@ const PartnerPicker = ({
                             ) : (
                                 <User className={`w-4 h-4 flex-shrink-0 ${theme === 'light' ? 'text-gray-500' : 'text-silver-dark'}`} />
                             )}
-                            <span className="truncate">{selectedPartner.partner_name}</span>
+                            <span className="truncate">{cleanName(selectedPartner.partner_name)}</span>
                             <span className="text-xs text-blue-500 font-mono flex-shrink-0">
                                 {getRoleBadges(selectedPartner)}
                             </span>
@@ -205,7 +218,7 @@ const PartnerPicker = ({
                                         <div className="flex-1 min-w-0">
                                             <p className={`text-sm font-medium truncate ${theme !== 'light' ? 'text-silver-light' : ''}`}
                                                 style={theme === 'light' ? { color: '#1f2937' } : {}}>
-                                                {partner.partner_name}
+                                                {cleanName(partner.partner_name)}
                                             </p>
                                             <div className="flex items-center gap-2 mt-0.5">
                                                 <span className={`text-xs font-mono ${theme === 'light' ? 'text-gray-500' : 'text-silver-dark'}`}>{partner.partner_code}</span>
