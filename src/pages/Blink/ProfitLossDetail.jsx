@@ -113,28 +113,7 @@ const ProfitLossDetail = () => {
                 if (mKey.startsWith(String(targetYear)) && mKey <= currentMonthCol) acc.ytdAmount += val;
             });
 
-            const buildGroups = (accounts) => {
-                const groups = {};
-                const ungrouped = [];
-                accounts.forEach(acc => {
-                    const parentMeta = acc.parent_code ? codeToMeta[acc.parent_code] : null;
-                    if (parentMeta) {
-                        if (!groups[acc.parent_code]) {
-                            groups[acc.parent_code] = { parent: { ...parentMeta, currentMonthAmount: 0, prevMonthAmount: 0, ytdAmount: 0 }, items: [] };
-                        }
-                        groups[acc.parent_code].items.push(acc);
-                        groups[acc.parent_code].parent.currentMonthAmount += acc.currentMonthAmount;
-                        groups[acc.parent_code].parent.prevMonthAmount += acc.prevMonthAmount;
-                        groups[acc.parent_code].parent.ytdAmount += acc.ytdAmount;
-                    } else {
-                        ungrouped.push(acc);
-                    }
-                });
-                const sorted = Object.values(groups).sort((a, b) => a.parent.code.localeCompare(b.parent.code));
-                return [...sorted, ...ungrouped.map(acc => ({ parent: null, items: [acc] }))];
-            };
-
-            const all = Object.values(coaMap);
+                        const all = Object.values(coaMap);
             const valid = a => a.currentMonthAmount !== 0 || a.prevMonthAmount !== 0 || a.ytdAmount !== 0;
             const revenue = all.filter(a => a.type === 'REVENUE' && valid(a)).sort((a, b) => a.code.localeCompare(b.code));
             const cogs = all.filter(a => ['COGS', 'COST', 'DIRECT_COST'].includes(a.type) && valid(a)).sort((a, b) => a.code.localeCompare(b.code));
@@ -159,11 +138,11 @@ const ProfitLossDetail = () => {
             const prof = { current: calcProfits(rawTotals.current), prev: calcProfits(rawTotals.prev), ytd: calcProfits(rawTotals.ytd) };
 
             setReportData({
-                revenue: { groups: buildGroups(revenue) },
-                cogs: { groups: buildGroups(cogs) },
-                expenses: { groups: buildGroups(expenses) },
-                other_income: { groups: buildGroups(other_income) },
-                other_expense: { groups: buildGroups(other_expense) },
+                revenue,
+                cogs,
+                expenses,
+                other_income,
+                other_expense,
             });
             setTotals({ raw: rawTotals, prof });
         } catch (error) {
@@ -200,40 +179,12 @@ const ProfitLossDetail = () => {
 
     const totalW = 'w-[120px] min-w-[120px]';
 
-    const ParentRow = ({ group, sectionKey, index }) => {
-        const key = `${sectionKey}-${group.parent?.code || index}`;
-        const isOpen = expandedGroups[key] !== false;
-        return (
-            <div
-                className="flex items-center bg-slate-50 dark:bg-dark-surface/40 border-b border-slate-200 dark:border-dark-border/60 cursor-pointer hover:bg-slate-100 dark:hover:bg-dark-surface/60 transition-colors"
-                onClick={() => toggleGroup(key)}
-            >
-                <div className="w-[140px] flex-shrink-0 pl-4 pr-2 py-2 flex items-center">
-                    <span className="text-[12px] font-bold text-slate-800 dark:text-silver-light whitespace-nowrap">{group.parent.code}</span>
-                </div>
-                <div className="flex items-center gap-2 flex-1 px-2 py-2">
-                    {isOpen
-                        ? <ChevronDown className="w-4 h-4 text-slate-600 dark:text-silver-dark flex-shrink-0" />
-                        : <ChevronRight className="w-4 h-4 text-slate-600 dark:text-silver-dark flex-shrink-0" />}
-                    <span className="text-[12px] font-extrabold text-slate-800 dark:text-silver-light uppercase" title={group.parent.name}>
-                        {group.parent.name}
-                    </span>
-                </div>
-                <div className="flex items-center flex-shrink-0 pr-2">
-                    <span className={`text-[12px] font-bold font-mono text-slate-800 dark:text-silver-light text-right ${totalW} px-1`} title={fmt(group.parent.currentMonthAmount)}>{fmt(group.parent.currentMonthAmount)}</span>
-                    <span className={`text-[12px] font-bold font-mono text-slate-800 dark:text-silver-light text-right ${totalW} px-1`} title={fmt(group.parent.prevMonthAmount)}>{fmt(group.parent.prevMonthAmount)}</span>
-                    <span className={`text-[12px] font-bold font-mono text-slate-800 dark:text-silver-light text-right ${totalW} px-1`} title={fmt(group.parent.ytdAmount)}>{fmt(group.parent.ytdAmount)}</span>
-                </div>
-            </div>
-        );
-    };
-
-    const ItemRow = ({ item, indent }) => (
+    const ItemRow = ({ item }) => (
         <div
             onClick={() => navigate('/blink/finance/general-ledger', { state: { preSelectedAccount: item.id } })}
             className="flex items-center border-b border-gray-100 dark:border-dark-border/20 hover:bg-gray-50 dark:hover:bg-dark-surface/40 cursor-pointer group"
         >
-            <div className={`w-[140px] flex-shrink-0 pl-4 pr-2 py-2 flex items-center ${indent ? 'pl-8' : ''}`}>
+            <div className={`w-[140px] flex-shrink-0 pl-4 pr-2 py-2 flex items-center`}>
                 <span className="text-[11px] text-slate-600 dark:text-silver-dark font-mono whitespace-nowrap">{item.code}</span>
             </div>
             <span className="text-[12px] text-slate-700 dark:text-silver-light group-hover:underline flex-1 px-2 py-2" title={item.name}>
@@ -247,23 +198,9 @@ const ProfitLossDetail = () => {
         </div>
     );
 
-    const renderSection = (sectionData, sectionKey) => {
-        const { groups } = sectionData;
-        if (groups.length === 0) return <div className="px-6 py-2 text-[11px] text-silver-dark italic">No data</div>;
-        return groups.map((group, gi) => {
-            const key = `${sectionKey}-${group.parent?.code || gi}`;
-            const isOpen = expandedGroups[key] !== false;
-            return (
-                <div key={key}>
-                    {group.parent
-                        ? <ParentRow group={group} sectionKey={sectionKey} index={gi} />
-                        : null}
-                    {(group.parent ? isOpen : true) && group.items.map(item => (
-                        <ItemRow key={item.id} item={item} indent={!!group.parent} />
-                    ))}
-                </div>
-            );
-        });
+    const renderSection = (accounts, sectionKey) => {
+        if (!accounts || accounts.length === 0) return <div className="px-6 py-2 text-[11px] text-silver-dark italic">No data</div>;
+        return accounts.map(item => <ItemRow key={item.id} item={item} />);
     };
 
     const TotalRow = ({ label, vals, highlight, thick, indent }) => {
@@ -373,14 +310,14 @@ const ProfitLossDetail = () => {
 
                         {/* ── OTHER INCOME / EXPENSES ── */}
                         <SectionLabel label="Other Income / Expenses" />
-                        {reportData.other_income.groups.length > 0 && (
+                        {reportData.other_income && reportData.other_income.length > 0 && (
                             <>
                                 {renderSection(reportData.other_income, 'other_income')}
                                 <TotalRow label="Total Other Income" indent
                                     vals={{ current: totals.raw.current.oi, prev: totals.raw.prev.oi, ytd: totals.raw.ytd.oi }} />
                             </>
                         )}
-                        {reportData.other_expense.groups.length > 0 && (
+                        {reportData.other_expense && reportData.other_expense.length > 0 && (
                             <>
                                 {renderSection(reportData.other_expense, 'other_expense')}
                                 <TotalRow label="Total Other Expenses" indent
