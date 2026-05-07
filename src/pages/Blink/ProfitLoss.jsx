@@ -110,6 +110,8 @@ const ProfitLoss = () => {
                 return cur && cur !== 'IDR' && rate > 1 ? v * rate : v;
             };
 
+            const getCodePrefix = (code) => code ? code.charAt(0) : null;
+
             entries.forEach(e => {
                 const targetId = e.coa_id || accCodeMap[e.account_code];
                 if (!targetId) return;
@@ -117,57 +119,51 @@ const ProfitLoss = () => {
                 if (!acc) return;
                 const debit = toIDR(e.debit, e.currency, e.exchange_rate);
                 const credit = toIDR(e.credit, e.currency, e.exchange_rate);
+                const prefix = getCodePrefix(acc.code);
                 let val = 0;
-                if (['REVENUE', 'OTHER_INCOME'].includes(acc.type)) val = (credit - debit);
-                else if (['EXPENSE', 'COGS', 'COST', 'DIRECT_COST', 'OTHER_EXPENSE'].includes(acc.type)) val = (debit - credit);
+                // Use CODE PREFIX for calculation (not type field):
+                // 4xx = REVENUE (credit - debit)
+                // 5xx = COGS (debit - credit)
+                // 6xx = EXPENSE - General Expenses (debit - credit)
+                // 7xx, 8xx = OTHER INCOME (credit - debit)
+                if (prefix === '4' || prefix === '7' || prefix === '8') {
+                    val = (credit - debit);
+                } else {
+                    val = (debit - credit);
+                }
                 acc.amount += val;
                 const mKey = e.entry_date?.substring(0, 7);
                 if (mKey && acc.byMonth && acc.byMonth[mKey] !== undefined) acc.byMonth[mKey] += val;
             });
 
             // ── Account Classification by Code Prefix ─────────────────────────────
-            // Rule: code prefix takes priority over `type` field
-            //   1-xx → ASSET (not shown in P&L)
-            //   2-xx → LIABILITY (not shown in P&L)
-            //   3-xx → EQUITY (not shown in P&L)
             //   4-xx → REVENUE
             //   5-xx → COGS / Direct Cost
-            //   6-xx → Administrasi & General Expenses (even if type=OTHER_EXPENSE)
-            //   7-xx → Other Income (all accounts)
-            //   8-xx → Other Income (all accounts)
-            const getCodePrefix = (code) => code ? code.charAt(0) : null;
-
+            //   6-xx → Administrasi & General Expenses
+            //   7-xx → Other Income
+            //   8-xx → Other Income
             const all = Object.values(coaMap);
 
             const revenue = all.filter(a => {
                 const prefix = getCodePrefix(a.code);
-                if (prefix === '4') return a.amount !== 0;
-                if (['5','6','7','8'].includes(prefix)) return false;
-                return a.type === 'REVENUE' && a.amount !== 0;
+                return prefix === '4' && a.amount !== 0;
             }).sort((a, b) => a.code.localeCompare(b.code));
 
             const cogs = all.filter(a => {
                 const prefix = getCodePrefix(a.code);
-                if (prefix === '5') return a.amount !== 0;
-                if (['4','6','7','8'].includes(prefix)) return false;
-                return ['COGS', 'COST', 'DIRECT_COST'].includes(a.type) && a.amount !== 0;
+                return prefix === '5' && a.amount !== 0;
             }).sort((a, b) => a.code.localeCompare(b.code));
 
             // Code 6 → Administrasi & General Expenses
             const expenses = all.filter(a => {
                 const prefix = getCodePrefix(a.code);
-                if (prefix === '6') return a.amount !== 0;
-                if (['4','5','7','8'].includes(prefix)) return false;
-                return a.type === 'EXPENSE' && a.amount !== 0;
+                return prefix === '6' && a.amount !== 0;
             }).sort((a, b) => a.code.localeCompare(b.code));
 
             // Code 7 & 8 → Other Income (ALL 7xx and 8xx accounts go here)
             const other_income = all.filter(a => {
                 const prefix = getCodePrefix(a.code);
-                if (prefix === '7' || prefix === '8') {
-                    return a.amount !== 0;
-                }
-                return a.type === 'OTHER_INCOME' && a.amount !== 0;
+                return (prefix === '7' || prefix === '8') && a.amount !== 0;
             }).sort((a, b) => a.code.localeCompare(b.code));
 
             // Other Expense: Only non-7/8 accounts with OTHER_EXPENSE type
