@@ -504,15 +504,14 @@ const BlinkApproval = () => {
                 const blPrefix = isAirFreight ? 'AWB' : 'BL';
                 const blNumber = `${blPrefix}-${soNumber}`;
 
-                // Auto-create Shipment (minimal fields to avoid schema cache issues)
+                // Auto-create Shipment — only use columns that exist in blink_shipments
                 const coreData = {
                     job_number: quotationData.job_number,
                     so_number: soNumber,
                     quotation_id: quotationData.id,
                     customer: quotationData.customer_name || '',
-                    // Use pic_ops for operations quotations; sales_person for sales quotations
+                    customer_id: quotationData.customer_id || null,
                     sales_person: quotationData.sales_person || '',
-                    pic_ops: quotationData.sales_person || '',
                     quotation_type: quotationData.quotation_type || 'RG',
                     quotation_date: quotationData.quotation_date,
                     origin: quotationData.origin,
@@ -525,8 +524,6 @@ const BlinkApproval = () => {
                     quoted_amount: quotationData.total_amount || 0,
                     currency: quotationData.currency || 'USD',
                     exchange_rate: quotationData.exchange_rate || null,
-                    // 'pending' so the Ops team must still submit it to Approval Center
-                    // before Generate PO / Create Invoice buttons unlock
                     status: 'pending',
                     created_from: 'ops_order',
                     service_items: quotationData.service_items || [],
@@ -540,12 +537,19 @@ const BlinkApproval = () => {
                         : (quotationData.package_type || null),
                     incoterm: quotationData.incoterm || null,
                     payment_terms: quotationData.payment_terms || null,
-                    customer_id: quotationData.customer_id || null,
+                    // BL fields
+                    bl_number: blNumber,
+                    bl_type: isAirFreight ? 'AWB' : 'MBL',
+                    bl_status: 'draft',
+                    bl_subject: `${(quotationData.service_type || 'SEA').toUpperCase()} Freight - ${quotationData.origin} to ${quotationData.destination}`,
+                    bl_place_of_receipt: quotationData.origin || '',
+                    bl_place_of_delivery: quotationData.destination || '',
                 };
 
                 const { error: shipErr } = await supabase
                     .from('blink_shipments')
                     .insert([coreData]);
+
 
                 if (shipErr) throw shipErr;
 
