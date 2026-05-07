@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { createARPaymentJournal, createARReversalJournal, getAllCOA } from '../../utils/journalHelper';
+import { createARPaymentJournal, getAllCOA } from '../../utils/journalHelper';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
 import {
@@ -966,26 +966,13 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
                 console.warn('[AR] Payment journal warning (non-critical):', jeError.message);
             }
 
-            // ── REVERSAL JOURNAL: Jika Lunas ───────────────────────────────
-            if (newStatus === 'paid' && newOutstanding <= 0) {
-                try {
-                    const { data: invoiceData } = await supabase
-                        .from('blink_invoices')
-                        .select('*')
-                        .eq('id', invoiceId)
-                        .single();
-
-                    if (invoiceData) {
-                        await createARReversalJournal({
-                            invoice: invoiceData,
-                            coaList
-                        });
-                        console.log('[AR] Reversal journal created for', invoiceId);
-                    }
-                } catch (revError) {
-                    console.warn('[AR] Reversal journal warning (non-critical):', revError.message);
-                }
-            }
+            // ── CATATAN AKUNTANSI ──────────────────────────────────────────
+            // TIDAK perlu reversal journal saat invoice lunas.
+            // Saldo AR sudah nol dari alur:
+            //   1. Invoice approved → Dr AR / Cr Revenue
+            //   2. Payment received → Dr Bank / Cr AR
+            // Membuat reversal (Dr Revenue / Cr AR) adalah SALAH dan
+            // menyebabkan Other Assets & Other Payables muncul di Trial Balance.
             // ───────────────────────────────────────────────────────────────
 
 

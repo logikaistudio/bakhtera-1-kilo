@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { createAPPaymentJournal, createAPReversalJournal, getAllCOA } from '../../utils/journalHelper';
+import { createAPPaymentJournal, getAllCOA } from '../../utils/journalHelper';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
 import {
@@ -230,27 +230,14 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
                 console.warn('[AP] Journal entry creation failed (non-critical):', jeError.message);
             }
 
-            // ── REVERSAL JOURNAL: Jika Lunas ───────────────────────────────
-            if (newStatus === 'paid' && newOutstanding <= 0 && poIdentifier) {
-                try {
-                    const { data: poData } = await supabase
-                        .from('blink_purchase_orders')
-                        .select('*')
-                        .eq('id', poIdentifier)
-                        .single();
-
-                    if (poData) {
-                        await createAPReversalJournal({
-                            po: poData,
-                            coaList
-                        });
-                        console.log('[AP] Reversal journal created for PO', poIdentifier);
-                    }
-                } catch (revError) {
-                    console.warn('[AP] Reversal journal warning (non-critical):', revError.message);
-                }
-            }
-            // ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+            // ── CATATAN AKUNTANSI ──────────────────────────────────────────
+            // TIDAK perlu reversal journal saat AP lunas.
+            // Saldo AP sudah nol dari alur:
+            //   1. PO approved → Dr Beban/COGS / Cr Hutang (AP)
+            //   2. Payment sent → Dr Hutang (AP) / Cr Bank
+            // Membuat reversal (Dr AP / Cr COGS) adalah SALAH dan
+            // menyebabkan Other Assets & Other Payables muncul di Trial Balance.
+            // ─────────────────────────────────────────────────────────────────
 
             // Set success state instead of alert
             setSuccessData({
