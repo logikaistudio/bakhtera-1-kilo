@@ -125,12 +125,56 @@ const BridgeProfitLoss = () => {
                 if (mKey && acc.byMonth && acc.byMonth[mKey] !== undefined) acc.byMonth[mKey] += val;
             });
 
-                        const all = Object.values(coaMap);
-            const revenue = all.filter(a => a.type === 'REVENUE' && a.amount !== 0).sort((a, b) => a.code.localeCompare(b.code));
-            const cogs = all.filter(a => ['COGS', 'COST', 'DIRECT_COST'].includes(a.type) && a.amount !== 0).sort((a, b) => a.code.localeCompare(b.code));
-            const expenses = all.filter(a => a.type === 'EXPENSE' && a.amount !== 0).sort((a, b) => a.code.localeCompare(b.code));
-            const other_income = all.filter(a => a.type === 'OTHER_INCOME' && a.amount !== 0).sort((a, b) => a.code.localeCompare(b.code));
-            const other_expense = all.filter(a => a.type === 'OTHER_EXPENSE' && a.amount !== 0).sort((a, b) => a.code.localeCompare(b.code));
+            // ── Account Classification by Code Prefix ─────────────────────────────
+            // Rule: code prefix takes priority over `type` field
+            //   4-xx → REVENUE
+            //   5-xx → COGS / Direct Cost
+            //   6-xx → Administrasi & General Expenses (even if type=OTHER_EXPENSE)
+            //   7-xx & 8-xx → Other Income / Other Expense
+            const getCodePrefix = (code) => code ? code.charAt(0) : null;
+
+            const all = Object.values(coaMap);
+
+            const revenue = all.filter(a => {
+                const prefix = getCodePrefix(a.code);
+                if (prefix === '4') return a.amount !== 0;
+                if (['5','6','7','8'].includes(prefix)) return false;
+                return a.type === 'REVENUE' && a.amount !== 0;
+            }).sort((a, b) => a.code.localeCompare(b.code));
+
+            const cogs = all.filter(a => {
+                const prefix = getCodePrefix(a.code);
+                if (prefix === '5') return a.amount !== 0;
+                if (['4','6','7','8'].includes(prefix)) return false;
+                return ['COGS', 'COST', 'DIRECT_COST'].includes(a.type) && a.amount !== 0;
+            }).sort((a, b) => a.code.localeCompare(b.code));
+
+            // Code 6 → Administrasi & General Expenses
+            const expenses = all.filter(a => {
+                const prefix = getCodePrefix(a.code);
+                if (prefix === '6') return a.amount !== 0;
+                if (['4','5','7','8'].includes(prefix)) return false;
+                return a.type === 'EXPENSE' && a.amount !== 0;
+            }).sort((a, b) => a.code.localeCompare(b.code));
+
+            // Code 7 & 8 → Other Income (REVENUE / OTHER_INCOME type)
+            const other_income = all.filter(a => {
+                const prefix = getCodePrefix(a.code);
+                if (prefix === '7' || prefix === '8') {
+                    return (a.type === 'REVENUE' || a.type === 'OTHER_INCOME') && a.amount !== 0;
+                }
+                return a.type === 'OTHER_INCOME' && a.amount !== 0;
+            }).sort((a, b) => a.code.localeCompare(b.code));
+
+            // Code 7 & 8 → Other Expense (OTHER_EXPENSE type)
+            const other_expense = all.filter(a => {
+                const prefix = getCodePrefix(a.code);
+                if (prefix === '7' || prefix === '8') {
+                    return a.type === 'OTHER_EXPENSE' && a.amount !== 0;
+                }
+                if (prefix === '6') return false;
+                return a.type === 'OTHER_EXPENSE' && a.amount !== 0;
+            }).sort((a, b) => a.code.localeCompare(b.code));
 
             const totalRevenue = revenue.reduce((s, a) => s + a.amount, 0);
             const totalCOGS = cogs.reduce((s, a) => s + a.amount, 0);
