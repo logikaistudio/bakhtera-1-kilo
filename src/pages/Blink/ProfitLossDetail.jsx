@@ -191,9 +191,9 @@ const ProfitLossDetail = () => {
                 {item.name}
             </span>
             <div className="flex items-center flex-shrink-0 pr-2">
-                <div className={`text-[11px] font-mono text-slate-500 dark:text-silver-light text-right ${totalW} px-1`} title={fmt(item.currentMonthAmount)}>{fmt(item.currentMonthAmount)}</div>
-                <div className={`text-[11px] font-mono text-slate-500 dark:text-silver-light text-right ${totalW} px-1`} title={fmt(item.prevMonthAmount)}>{fmt(item.prevMonthAmount)}</div>
-                <div className={`text-[12px] font-bold font-mono text-slate-800 dark:text-silver-light text-right ${totalW} px-1`} title={fmt(item.ytdAmount)}>{fmt(item.ytdAmount)}</div>
+                <div className={`flex items-center justify-end text-[11px] font-mono text-slate-500 dark:text-silver-light ${totalW} px-1`} title={fmt(item.currentMonthAmount)}>{fmt(item.currentMonthAmount)}</div>
+                <div className={`flex items-center justify-end text-[11px] font-mono text-slate-500 dark:text-silver-light ${totalW} px-1`} title={fmt(item.prevMonthAmount)}>{fmt(item.prevMonthAmount)}</div>
+                <div className={`flex items-center justify-end text-[12px] font-bold font-mono text-slate-800 dark:text-silver-light ${totalW} px-1`} title={fmt(item.ytdAmount)}>{fmt(item.ytdAmount)}</div>
             </div>
         </div>
     );
@@ -215,9 +215,9 @@ const ProfitLossDetail = () => {
                 <div className="w-[140px] flex-shrink-0 px-2 py-2"></div>
                 <span className={`text-[12px] font-bold uppercase flex-1 min-w-0 px-2 py-2 whitespace-nowrap ${indent ? 'pl-6' : ''}`} title={label}>{label}</span>
                 <div className="flex items-center flex-shrink-0 pr-2">
-                    <div className={`text-[12px] font-bold font-mono text-right ${totalW} px-1 py-2 ${highlight ? '' : (vals.current < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-silver-light')}`} title={fmt(vals.current)}>{fmt(vals.current)}</div>
-                    <div className={`text-[12px] font-bold font-mono text-right ${totalW} px-1 py-2 ${highlight ? '' : (vals.prev < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-silver-light')}`} title={fmt(vals.prev)}>{fmt(vals.prev)}</div>
-                    <div className={`text-[12px] font-bold font-mono text-right ${totalW} px-1 py-2 ${highlight ? '' : (vals.ytd < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-silver-light')}`} title={fmt(vals.ytd)}>{fmt(vals.ytd)}</div>
+                    <div className={`flex items-center justify-end text-[12px] font-bold font-mono ${totalW} px-1 py-2 ${highlight ? '' : (vals.current < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-silver-light')}`} title={fmt(vals.current)}>{fmt(vals.current)}</div>
+                    <div className={`flex items-center justify-end text-[12px] font-bold font-mono ${totalW} px-1 py-2 ${highlight ? '' : (vals.prev < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-silver-light')}`} title={fmt(vals.prev)}>{fmt(vals.prev)}</div>
+                    <div className={`flex items-center justify-end text-[12px] font-bold font-mono ${totalW} px-1 py-2 ${highlight ? '' : (vals.ytd < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-silver-light')}`} title={fmt(vals.ytd)}>{fmt(vals.ytd)}</div>
                 </div>
             </div>
         );
@@ -278,9 +278,9 @@ const ProfitLossDetail = () => {
                     <span className="text-[11px] font-bold uppercase tracking-wider w-[140px] flex-shrink-0 pl-4 pr-2 py-2.5" style={{ color: '#FFFFFF' }}>Code</span>
                     <span className="text-[11px] font-bold uppercase tracking-wider flex-1 px-2 py-2.5" style={{ color: '#FFFFFF' }}>Description</span>
                     <div className="flex items-center flex-shrink-0 pr-2">
-                        <div className={`text-[11px] font-bold uppercase text-right ${totalW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>{getMonthName(0)}</div>
-                        <div className={`text-[11px] font-bold uppercase text-right ${totalW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>{getMonthName(-1)}</div>
-                        <div className={`text-[11px] font-bold uppercase text-right ${totalW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>Total YTD</div>
+                        <div className={`flex items-center justify-end text-[11px] font-bold uppercase ${totalW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>{getMonthName(0)}</div>
+                        <div className={`flex items-center justify-end text-[11px] font-bold uppercase ${totalW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>{getMonthName(-1)}</div>
+                        <div className={`flex items-center justify-end text-[11px] font-bold uppercase ${totalW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>Total YTD</div>
                     </div>
                 </div>
 
