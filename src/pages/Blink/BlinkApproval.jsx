@@ -83,6 +83,19 @@ const recordApprovalHistory = async (item, action, reason = null, approverName =
         const { data, error } = await supabase.from('blink_approval_history').insert([payload]).select();
         
         if (error) {
+            // If 'module' column doesn't exist yet, retry without it (graceful fallback)
+            if (error.message?.includes("Could not find the 'module' column")) {
+                console.warn('⚠️ blink_approval_history.module column missing — running without it.');
+                console.warn('👉 Admin: Run migration 090_add_module_to_blink_approval_history.sql in Supabase Dashboard.');
+                const { module: _omit, ...payloadWithoutModule } = payload;
+                const { error: retryError } = await supabase.from('blink_approval_history').insert([payloadWithoutModule]).select();
+                if (retryError) {
+                    console.error('❌ Failed to record approval history (fallback):', retryError);
+                } else {
+                    console.log(`✅ Approval history recorded (without module):`, action);
+                }
+                return true; // Let approval proceed
+            }
             console.error('❌ Failed to record approval history:', error);
             throw error;
         }
@@ -95,6 +108,7 @@ const recordApprovalHistory = async (item, action, reason = null, approverName =
         return false;
     }
 };
+
 
 const BlinkApproval = () => {
     const navigate = useNavigate();
@@ -272,18 +286,37 @@ const BlinkApproval = () => {
             setSubmissions([...mappedShipments, ...mappedPOs, ...mappedQuotations, ...mappedInvoices]);
 
             // Fetch History - ISOLATED for Blink only
-            const { data: historyData, error: histErr } = await supabase
+            let historyData = [];
+            let histErr = null;
+
+            // Try with module filter first
+            const histRes = await supabase
                 .from('blink_approval_history')
                 .select('*')
                 .in('module', ['blink_sales', 'blink_operations'])
                 .order('approved_at', { ascending: false });
+
+            if (histRes.error && histRes.error.message?.includes("Could not find the 'module' column")) {
+                // Fallback: fetch all without module filter (column not yet migrated)
+                console.warn('⚠️ Fetching approval history without module filter (column missing).');
+                const fallbackRes = await supabase
+                    .from('blink_approval_history')
+                    .select('*')
+                    .order('approved_at', { ascending: false });
+                histErr = fallbackRes.error;
+                historyData = fallbackRes.data || [];
+            } else {
+                histErr = histRes.error;
+                historyData = histRes.data || [];
+            }
                 
             if (histErr) {
                 console.error('❌ Error fetching approval history:', histErr);
             } else {
-                console.log('✅ Blink approval history loaded:', historyData?.length || 0, 'records');
-                setHistoryLogs(historyData || []);
+                console.log('✅ Blink approval history loaded:', historyData.length, 'records');
+                setHistoryLogs(historyData);
             }
+
 
         } catch (error) {
             console.error('Error fetching submissions:', error);
