@@ -144,6 +144,47 @@ const ProfitLoss = () => {
             //   8-xx → Other Income
             const all = Object.values(coaMap);
 
+            const groupByParent = (accounts) => {
+                const groups = {};
+                const orphans = [];
+                accounts.forEach(acc => {
+                    const parent = acc.parent_code;
+                    if (parent) {
+                        if (!groups[parent]) {
+                            groups[parent] = { parentCode: parent, items: [] };
+                        }
+                        groups[parent].items.push(acc);
+                    } else {
+                        orphans.push(acc);
+                    }
+                });
+                return { groups, orphans };
+            };
+
+            const buildGroupedData = (accounts) => {
+                const { groups, orphans } = groupByParent(accounts);
+                const result = [];
+                orphans.forEach(acc => result.push({ item: acc, isParent: false }));
+                Object.values(groups).forEach(g => {
+                    const totalAmount = g.items.reduce((s, i) => s + i.amount, 0);
+                    const byMonthTotal = {};
+                    reportMonths.forEach(m => {
+                        byMonthTotal[m] = g.items.reduce((s, i) => s + (i.byMonth?.[m] || 0), 0);
+                    });
+                    result.push({
+                        parent: {
+                            code: g.parentCode,
+                            name: g.items[0]?.name?.split(' - ')[0] || g.parentCode,
+                            amount: totalAmount,
+                            byMonth: byMonthTotal
+                        },
+                        items: g.items,
+                        isParent: true
+                    });
+                });
+                return result;
+            };
+
             const revenue = all.filter(a => {
                 const prefix = getCodePrefix(a.code);
                 return prefix === '4' && a.amount !== 0;
@@ -174,6 +215,12 @@ const ProfitLoss = () => {
                 return a.type === 'OTHER_EXPENSE' && a.amount !== 0;
             }).sort((a, b) => a.code.localeCompare(b.code));
 
+            const groupedRevenue = buildGroupedData(revenue);
+            const groupedCogs = buildGroupedData(cogs);
+            const groupedExpenses = buildGroupedData(expenses);
+            const groupedOtherIncome = buildGroupedData(other_income);
+            const groupedOtherExpense = buildGroupedData(other_expense);
+
             const totalRevenue = revenue.reduce((s, a) => s + a.amount, 0);
             const totalCOGS = cogs.reduce((s, a) => s + a.amount, 0);
             const grossProfit = totalRevenue - totalCOGS;
@@ -188,11 +235,11 @@ const ProfitLoss = () => {
 
             setReportMonths(monthsList);
             setReportData({
-                revenue,
-                cogs,
-                expenses,
-                other_income,
-                other_expense,
+                revenue: groupedRevenue,
+                cogs: groupedCogs,
+                expenses: groupedExpenses,
+                other_income: groupedOtherIncome,
+                other_expense: groupedOtherExpense,
             });
             setTotals({ totalRevenue, totalCOGS, grossProfit, totalExpenses, operatingProfit, totalOtherIncome, totalOtherExpense, otherNet, netIncomeBeforeTax, taxAmount, netIncomeAfterTax });
         } catch (error) {
@@ -462,9 +509,35 @@ const ProfitLoss = () => {
         </div>
     );
 
-    const renderSection = (accounts, sectionKey) => {
-        if (!accounts || accounts.length === 0) return <div className="px-6 py-2 text-[11px] text-silver-dark italic">No data</div>;
-        return accounts.map(item => <ItemRow key={item.id} item={item} />);
+    const renderSection = (groupedData, sectionKey) => {
+        if (!groupedData || groupedData.length === 0) return <div className="px-6 py-2 text-[11px] text-silver-dark italic">No data</div>;
+        
+        return groupedData.map((group, idx) => {
+            if (group.isParent) {
+                return (
+                    <div key={`parent-${group.parent.code}`}>
+                        <div className="flex items-center bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800">
+                            <div className="w-[140px] flex-shrink-0 pl-4 pr-2 py-2 flex items-center">
+                                <span className="text-[11px] text-yellow-700 dark:text-yellow-400 font-bold font-mono whitespace-nowrap">{group.parent.code}</span>
+                            </div>
+                            <div className="text-[12px] text-yellow-700 dark:text-yellow-400 font-bold flex-1 min-w-[300px] px-2 py-2 whitespace-nowrap" title={group.parent.name}>
+                                {group.parent.name} (Group Total)
+                            </div>
+                            <div className="flex items-center flex-shrink-0 pr-2">
+                                {reportMonths.map(m => (
+                                    <div key={m} className={`flex items-center justify-end text-[11px] font-mono text-yellow-700 dark:text-yellow-400 font-bold ${colW} px-1`} title={fmt(group.parent.byMonth?.[m] || 0)}>
+                                        {fmt(group.parent.byMonth?.[m] || 0)}
+                                    </div>
+                                ))}
+                                <div className={`flex items-center justify-end text-[12px] font-mono text-yellow-700 dark:text-yellow-400 font-bold ${totalW} px-1`} title={fmt(group.parent.amount)}>{fmt(group.parent.amount)}</div>
+                            </div>
+                        </div>
+                        {group.items.map(item => <ItemRow key={item.id} item={item} />)}
+                    </div>
+                );
+            }
+            return <ItemRow key={group.item.id} item={group.item} />;
+        });
     };
 
     const TotalRow = ({ label, amount, byMonthFn, highlight, thick, indent }) => {
@@ -576,13 +649,19 @@ const ProfitLoss = () => {
                         <SectionLabel label="INCOME" />
                         {renderSection(reportData.revenue, 'revenue')}
                         <TotalRow label="Total Sales Income" amount={totals.totalRevenue} highlight="green"
-                            byMonthFn={m => reportData.revenue.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0)} />
+                            byMonthFn={m => reportData.revenue.reduce((s, g) => {
+                                if (g.isParent) return s + (g.parent?.byMonth?.[m] || 0);
+                                return s + (g.item?.byMonth?.[m] || 0);
+                            }, 0)} />
 
                         {/* ── COST OF GOOD SOLD ── */}
                         <SectionLabel label="Cost of Good Sold" />
                         {renderSection(reportData.cogs, 'cogs')}
                         <TotalRow label="Total Cost of Good Sold" amount={totals.totalCOGS}
-                            byMonthFn={m => reportData.cogs.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0)} />
+                            byMonthFn={m => reportData.cogs.reduce((s, g) => {
+                                if (g.isParent) return s + (g.parent?.byMonth?.[m] || 0);
+                                return s + (g.item?.byMonth?.[m] || 0);
+                            }, 0)} />
 
                         {/* ── GROSS PROFIT ── */}
                         <TotalRow label="Total Operation Income ( Gross Profit )"
@@ -598,7 +677,10 @@ const ProfitLoss = () => {
                         <SectionLabel label="Administrasi & General Expenses" />
                         {renderSection(reportData.expenses, 'expenses')}
                         <TotalRow label="Total Administrasi & General Expenses" amount={totals.totalExpenses}
-                            byMonthFn={m => reportData.expenses.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0)} />
+                            byMonthFn={m => reportData.expenses.reduce((s, g) => {
+                                if (g.isParent) return s + (g.parent?.byMonth?.[m] || 0);
+                                return s + (g.item?.byMonth?.[m] || 0);
+                            }, 0)} />
 
                         {/* ── OTHER INCOME / EXPENSES ── */}
                         <SectionLabel label="Other Income / Expenses" />
@@ -606,14 +688,20 @@ const ProfitLoss = () => {
                             <>
                                 {renderSection(reportData.other_income, 'other_income')}
                                 <TotalRow label="Total Other Income" amount={totals.totalOtherIncome} indent
-                                    byMonthFn={m => reportData.other_income.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0)} />
+                                    byMonthFn={m => reportData.other_income.reduce((s, g) => {
+                                if (g.isParent) return s + (g.parent?.byMonth?.[m] || 0);
+                                return s + (g.item?.byMonth?.[m] || 0);
+                            }, 0)} />
                             </>
                         )}
                         {reportData.other_expense && reportData.other_expense.length > 0 && (
                             <>
                                 {renderSection(reportData.other_expense, 'other_expense')}
                                 <TotalRow label="Total Other Expenses" amount={-totals.totalOtherExpense} indent
-                                    byMonthFn={m => -reportData.other_expense.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0)} />
+                                    byMonthFn={m => -reportData.other_expense.reduce((s, g) => {
+                                if (g.isParent) return s + (g.parent?.byMonth?.[m] || 0);
+                                return s + (g.item?.byMonth?.[m] || 0);
+                            }, 0)} />
                             </>
                         )}
 
