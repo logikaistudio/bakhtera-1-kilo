@@ -163,7 +163,7 @@ const ProfitLossDetail = () => {
     const firstDate = new Date(parseInt(selY, 10), parseInt(selM, 10) - 1, 1);
     const lastDate = new Date(parseInt(selY, 10), parseInt(selM, 10), 0);
     const formatDate = (d) => d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-    const period = `Bulan: ${formatDate(firstDate)} - ${formatDate(lastDate)}`;
+    const period = `Periode: ${formatDate(firstDate)} - ${formatDate(lastDate)}`;
 
     const getMonthName = (offset) => {
         const [y, m] = selectedMonth.split('-');
@@ -241,7 +241,7 @@ const ProfitLossDetail = () => {
                 <div className="flex items-center gap-2 bg-white dark:bg-dark-surface p-1 rounded-lg border border-gray-200 dark:border-dark-border shadow-sm">
                     <div className="flex items-center px-2 border-r border-gray-200 dark:border-dark-border/50">
                         <Calendar className="w-3 h-3 text-gray-500 dark:text-silver-dark mr-2" />
-                        <span className="text-xs text-gray-500 dark:text-silver-dark mr-2">Bulan:</span>
+                        <span className="text-xs text-gray-500 dark:text-silver-dark mr-2">Periode:</span>
                         <input type="month" value={selectedMonth}
                             onChange={e => setSelectedMonth(e.target.value)}
                             className="bg-transparent border-none text-xs font-bold text-slate-900 dark:text-blue-400 focus:ring-0 p-0" />

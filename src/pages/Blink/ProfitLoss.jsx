@@ -167,7 +167,7 @@ const ProfitLoss = () => {
         return neg ? `(${s})` : s;
     };
 
-    const period = `Tahun ${new Date(dateRange.startDate).getFullYear()}`;
+    const period = `Periode: ${new Date(dateRange.startDate).getFullYear()}`;
 
     // ── Export Excel ─────────────────────────────────────────────────
     const handleExportExcel = () => {
@@ -405,7 +405,7 @@ const ProfitLoss = () => {
             <div className={`w-[140px] flex-shrink-0 pl-4 pr-2 py-2 flex items-center`}>
                 <span className="text-[11px] text-slate-600 dark:text-silver-dark font-mono whitespace-nowrap">{item.code}</span>
             </div>
-            <span className="text-[12px] text-slate-700 dark:text-silver-light group-hover:underline flex-1 px-2 py-2" title={item.name}>
+            <span className="text-[12px] text-slate-700 dark:text-silver-light group-hover:underline flex-1 px-2 py-2 whitespace-nowrap" title={item.name}>
                 {item.name}
             </span>
             <div className="flex items-center flex-shrink-0 pr-2">
@@ -463,7 +463,7 @@ const ProfitLoss = () => {
                 <div className="flex items-center gap-2 bg-white dark:bg-dark-surface p-1 rounded-lg border border-gray-200 dark:border-dark-border shadow-sm">
                     <div className="flex items-center px-2 border-r border-gray-200 dark:border-dark-border/50">
                         <Calendar className="w-3 h-3 text-gray-500 dark:text-silver-dark mr-2" />
-                        <span className="text-xs text-gray-500 dark:text-silver-dark mr-2">Tahun:</span>
+                        <span className="text-xs text-gray-500 dark:text-silver-dark mr-2">Periode:</span>
                         <input type="number" value={new Date(dateRange.startDate).getFullYear()}
                             onChange={e => {
                                 const y = e.target.value;
@@ -504,7 +504,7 @@ const ProfitLoss = () => {
             {/* Report Card */}
             <div className="bg-white dark:bg-dark-surface/20 border border-gray-200 dark:border-dark-border rounded-lg shadow-lg overflow-hidden">
                 <div className="w-full overflow-x-auto">
-                    <div className="min-w-[800px]">
+                    <div className="min-w-[1600px]">
                         {/* Title */}
                         <div className="text-center py-4 border-b border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface/40">
                             <h2 className="text-base font-extrabold text-red-600 dark:text-red-500 tracking-widest uppercase">Profit & Loss</h2>
