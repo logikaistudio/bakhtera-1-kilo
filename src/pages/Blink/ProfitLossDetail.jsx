@@ -187,9 +187,9 @@ const ProfitLossDetail = () => {
             <div className={`w-[140px] flex-shrink-0 pl-4 pr-2 py-2 flex items-center`}>
                 <span className="text-[11px] text-slate-600 dark:text-silver-dark font-mono whitespace-nowrap">{item.code}</span>
             </div>
-            <span className="text-[12px] text-slate-700 dark:text-silver-light group-hover:underline flex-1 px-2 py-2" title={item.name}>
+            <div className="text-[12px] text-slate-700 dark:text-silver-light group-hover:underline flex-1 min-w-[300px] px-2 py-2 whitespace-nowrap" title={item.name}>
                 {item.name}
-            </span>
+            </div>
             <div className="flex items-center flex-shrink-0 pr-2">
                 <div className={`flex items-center justify-end text-[11px] font-mono text-slate-500 dark:text-silver-light ${totalW} px-1`} title={fmt(item.currentMonthAmount)}>{fmt(item.currentMonthAmount)}</div>
                 <div className={`flex items-center justify-end text-[11px] font-mono text-slate-500 dark:text-silver-light ${totalW} px-1`} title={fmt(item.prevMonthAmount)}>{fmt(item.prevMonthAmount)}</div>
@@ -213,7 +213,7 @@ const ProfitLossDetail = () => {
         return (
             <div className={`flex items-center border-y ${cls} ${thick ? 'border-t-2' : ''}`}>
                 <div className="w-[140px] flex-shrink-0 px-2 py-2"></div>
-                <span className={`text-[12px] font-bold uppercase flex-1 min-w-0 px-2 py-2 whitespace-nowrap ${indent ? 'pl-6' : ''}`} title={label}>{label}</span>
+                <div className={`text-[12px] font-bold uppercase flex-1 min-w-[300px] px-2 py-2 whitespace-nowrap ${indent ? 'pl-6' : ''}`} title={label}>{label}</div>
                 <div className="flex items-center flex-shrink-0 pr-2">
                     <div className={`flex items-center justify-end text-[12px] font-bold font-mono ${totalW} px-1 py-2 ${highlight ? '' : (vals.current < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-silver-light')}`} title={fmt(vals.current)}>{fmt(vals.current)}</div>
                     <div className={`flex items-center justify-end text-[12px] font-bold font-mono ${totalW} px-1 py-2 ${highlight ? '' : (vals.prev < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-silver-light')}`} title={fmt(vals.prev)}>{fmt(vals.prev)}</div>
@@ -266,7 +266,7 @@ const ProfitLossDetail = () => {
             {/* Report Card */}
             <div className="bg-white dark:bg-dark-surface/20 border border-gray-200 dark:border-dark-border rounded-lg shadow-lg overflow-hidden">
                 <div className="w-full overflow-x-auto">
-                    <div className="min-w-[800px]">
+                    <div className="w-max min-w-full">
                         {/* Title */}
                         <div className="text-center py-4 border-b border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface/40">
                             <h2 className="text-base font-extrabold text-red-600 dark:text-red-500 tracking-widest uppercase">Detail Profit & Loss</h2>
@@ -275,8 +275,8 @@ const ProfitLossDetail = () => {
 
                 {/* Column header */}
                 <div className="flex items-center" style={{ background: '#0070BB' }}>
-                    <span className="text-[11px] font-bold uppercase tracking-wider w-[140px] flex-shrink-0 pl-4 pr-2 py-2.5" style={{ color: '#FFFFFF' }}>Code</span>
-                    <span className="text-[11px] font-bold uppercase tracking-wider flex-1 px-2 py-2.5" style={{ color: '#FFFFFF' }}>Description</span>
+                    <div className="text-[11px] font-bold uppercase tracking-wider w-[140px] flex-shrink-0 pl-4 pr-2 py-2.5" style={{ color: '#FFFFFF' }}>Code</div>
+                    <div className="text-[11px] font-bold uppercase tracking-wider flex-1 min-w-[300px] px-2 py-2.5" style={{ color: '#FFFFFF' }}>Description</div>
                     <div className="flex items-center flex-shrink-0 pr-2">
                         <div className={`flex items-center justify-end text-[11px] font-bold uppercase ${totalW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>{getMonthName(0)}</div>
                         <div className={`flex items-center justify-end text-[11px] font-bold uppercase ${totalW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>{getMonthName(-1)}</div>
