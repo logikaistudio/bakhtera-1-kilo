@@ -52,6 +52,7 @@ import NotedJournal from './pages/Blink/NotedJournal';
 import AccountsReceivable from './pages/Blink/AccountsReceivable';
 import AccountsPayable from './pages/Blink/AccountsPayable';
 import ProfitLoss from './pages/Blink/ProfitLoss';
+import ProfitLossDetail from './pages/Blink/ProfitLossDetail';
 import BalanceSheet from './pages/Blink/BalanceSheet';
 import GeneralLedger from './pages/Blink/GeneralLedger';
 import TrialBalance from './pages/Blink/TrialBalance';
@@ -181,6 +182,7 @@ function App() {
                     <Route path="/blink/finance/ar" element={<ProtectedRoute menuCode="blink_ar"><AccountsReceivable /></ProtectedRoute>} />
                     <Route path="/blink/finance/ap" element={<ProtectedRoute menuCode="blink_ap"><AccountsPayable /></ProtectedRoute>} />
                     <Route path="/blink/finance/profit-loss" element={<ProtectedRoute menuCode="blink_pnl"><ProfitLoss /></ProtectedRoute>} />
+                    <Route path="/blink/finance/profit-loss-detail" element={<ProtectedRoute menuCode="blink_pnl"><ProfitLossDetail /></ProtectedRoute>} />
                     <Route path="/blink/finance/balance-sheet" element={<ProtectedRoute menuCode="blink_balance_sheet"><BalanceSheet /></ProtectedRoute>} />
                     <Route path="/blink/finance/selling-buying" element={<ProtectedRoute menuCode="blink_selling_buying"><SellingVsBuying /></ProtectedRoute>} />
                     <Route path="/blink/sales-revenue" element={<ProtectedRoute menuCode="blink_dashboard"><SalesRevenue /></ProtectedRoute>} />

@@ -428,8 +428,8 @@ const ProfitLoss = () => {
                 className="flex items-center bg-slate-50 dark:bg-dark-surface/40 border-b border-slate-200 dark:border-dark-border/60 cursor-pointer hover:bg-slate-100 dark:hover:bg-dark-surface/60 transition-colors"
                 onClick={() => toggleGroup(key)}
             >
-                <div className="w-[100px] pl-4 pr-2 py-2 flex items-center">
-                    <span className="text-[12px] font-bold text-slate-800 dark:text-silver-light">{group.parent.code}</span>
+                <div className="w-[140px] flex-shrink-0 pl-4 pr-2 py-2 flex items-center">
+                    <span className="text-[12px] font-bold text-slate-800 dark:text-silver-light whitespace-nowrap">{group.parent.code}</span>
                 </div>
                 <div className="flex items-center gap-2 flex-1 px-2 py-2">
                     {isOpen
@@ -458,8 +458,8 @@ const ProfitLoss = () => {
             onClick={() => navigate('/blink/finance/general-ledger', { state: { preSelectedAccount: item.id } })}
             className="flex items-center border-b border-gray-100 dark:border-dark-border/20 hover:bg-gray-50 dark:hover:bg-dark-surface/40 cursor-pointer group"
         >
-            <div className={`w-[100px] pl-4 pr-2 py-2 flex items-center ${indent ? 'pl-8' : ''}`}>
-                <span className="text-[11px] text-slate-600 dark:text-silver-dark font-mono">{item.code}</span>
+            <div className={`w-[140px] flex-shrink-0 pl-4 pr-2 py-2 flex items-center ${indent ? 'pl-8' : ''}`}>
+                <span className="text-[11px] text-slate-600 dark:text-silver-dark font-mono whitespace-nowrap">{item.code}</span>
             </div>
             <span className="text-[12px] text-slate-700 dark:text-silver-light group-hover:underline flex-1 px-2 py-2 truncate" title={item.name}>
                 {item.name}
@@ -504,7 +504,7 @@ const ProfitLoss = () => {
         const valCls = highlight ? '' : (amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-silver-light');
         return (
             <div className={`flex items-center border-y ${cls} ${thick ? 'border-t-2' : ''}`}>
-                <div className="w-[100px] px-2 py-2"></div>
+                <div className="w-[140px] flex-shrink-0 px-2 py-2"></div>
                 <span className={`text-[12px] font-bold uppercase flex-1 min-w-0 px-2 py-2 ${indent ? 'pl-6' : ''} truncate`} title={label}>{label}</span>
                 <div className="flex items-center flex-shrink-0 pr-2">
                     {reportMonths.map(m => (
@@ -583,7 +583,7 @@ const ProfitLoss = () => {
 
                 {/* Column header — putih di atas biru agar terlihat jelas */}
                 <div className="flex items-center" style={{ background: '#0070BB' }}>
-                    <span className="text-[11px] font-bold uppercase tracking-wider w-[100px] pl-4 pr-2 py-2.5" style={{ color: '#FFFFFF' }}>Code</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wider w-[140px] flex-shrink-0 pl-4 pr-2 py-2.5" style={{ color: '#FFFFFF' }}>Code</span>
                     <span className="text-[11px] font-bold uppercase tracking-wider flex-1 px-2 py-2.5" style={{ color: '#FFFFFF' }}>Description</span>
                     <div className="flex items-center flex-shrink-0 pr-2">
                         {reportMonths.map(m => (
@@ -656,7 +656,7 @@ const ProfitLoss = () => {
 
                             {/* Corporate Income Tax */}
                             <div className="flex items-center bg-red-50 dark:bg-red-500/10 border-y border-red-200 dark:border-red-500/30">
-                                <div className="w-[100px] px-2 py-2"></div>
+                                <div className="w-[140px] flex-shrink-0 px-2 py-2"></div>
                                 <span className="text-[12px] font-bold text-red-600 dark:text-red-400 uppercase flex-1 min-w-0 px-2 py-2 truncate" title={`Corporate Income Tax (${taxRate}%)`}>
                                     Corporate Income Tax ({taxRate}%)
                                 </span>
