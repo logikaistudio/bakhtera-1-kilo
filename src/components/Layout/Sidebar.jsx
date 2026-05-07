@@ -12,6 +12,7 @@ import {
     Menu,
     X,
     ChevronRight,
+    ChevronLeft,
     TrendingUp,
     Truck,
     DollarSign,
@@ -34,7 +35,7 @@ import { useData } from '../../context/DataContext';
 
 
 
-const Sidebar = () => {
+const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
     const location = useLocation();
     const navigate = useNavigate();
     const { user, logout, canAccess, isSuperAdmin, isAdmin } = useAuth();
@@ -360,11 +361,20 @@ const Sidebar = () => {
     const SidebarContent = ({ isMobile = false }) => (
         <div className="flex flex-col h-full">
             {/* Logo */}
-            <div className="px-6 py-6 border-b border-dark-border">
+            <div className="px-6 py-6 border-b border-dark-border flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold gradient-text">BAKHTERA-1</h1>
                     <p className="text-xs text-silver-dark mt-1">Freight & Asset Management</p>
                 </div>
+                {!isMobile && setIsSidebarOpen && (
+                    <button
+                        onClick={() => setIsSidebarOpen(false)}
+                        className="p-1.5 rounded-lg text-silver-dark hover:text-silver hover:bg-dark-surface smooth-transition"
+                        title="Sembunyikan Sidebar"
+                    >
+                        <ChevronLeft className="w-5 h-5" />
+                    </button>
+                )}
             </div>
 
             {/* Navigation */}
@@ -1028,7 +1038,7 @@ const Sidebar = () => {
             </button>
 
             {/* Desktop Sidebar */}
-            <aside className="hidden lg:flex lg:w-[308px] lg:flex-col lg:fixed lg:inset-y-0 glass-card border-r border-dark-border">
+            <aside className={`hidden lg:flex lg:w-[308px] lg:flex-col lg:fixed lg:inset-y-0 glass-card border-r border-dark-border transition-transform duration-300 z-40 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
                 <SidebarContent />
             </aside>
 
