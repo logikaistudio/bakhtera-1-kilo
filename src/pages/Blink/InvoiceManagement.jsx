@@ -2256,12 +2256,12 @@ const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFor
                             </button>
                         </div>
 
-                        <div className="overflow-x-auto">
+                        <div className="overflow-visible pb-40">
                             <table className="w-full">
                                 <thead className="bg-accent-orange">
                                     <tr>
                                         <th className="px-2 py-2 text-center text-xs text-white w-10 font-normal">No</th>
-                                        <th className="px-2 py-2 text-left text-xs text-white min-w-[150px] font-normal">Item</th>
+                                        <th className="px-2 py-2 text-left text-xs text-white min-w-[200px] font-normal">Item (COA)</th>
                                         <th className="px-2 py-2 text-left text-xs text-white min-w-[200px] font-normal">Description</th>
                                         <th className="px-2 py-2 text-center text-xs text-white w-24 font-normal">Qty</th>
                                         <th className="px-2 py-2 text-center text-xs text-white w-24 font-normal">Unit</th>
@@ -2278,26 +2278,26 @@ const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFor
                                         <tr key={index} className="hover:bg-dark-surface/50 smooth-transition">
                                             <td className="px-2 py-2 text-center text-silver-light text-xs">{index + 1}</td>
                                             <td className="px-3 py-2">
-                                                {/* COA Revenue Dropdown Picker (mirrors PO form) */}
+                                                {/* COA Revenue Dropdown Picker */}
                                                 <div className="relative">
                                                     <div
-                                                        className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded cursor-pointer flex justify-between items-center text-sm"
+                                                        className="w-full px-2 py-1.5 bg-white border border-gray-300 rounded cursor-pointer flex justify-between items-center text-sm shadow-sm"
                                                         onClick={() => setCoaDropdownMapInv(prev => ({ ...prev, [index]: !prev[index] }))}
                                                     >
-                                                        <span className={item.item_name ? 'text-accent-orange font-medium truncate text-xs' : 'text-silver-dark text-xs'}>
+                                                        <span className={item.item_name ? 'text-black font-semibold truncate text-xs' : 'text-gray-500 text-xs'}>
                                                             {item.item_name || 'Pilih COA...'}
                                                         </span>
-                                                        <span className="text-silver-dark text-xs ml-1">▼</span>
+                                                        <span className="text-black text-xs ml-1">▼</span>
                                                     </div>
                                                     {coaDropdownMapInv[index] && (
-                                                        <div className="absolute z-50 top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-2xl max-h-52 flex flex-col w-full min-w-[240px]">
-                                                            <div className="p-2 border-b border-gray-100">
+                                                        <div className="absolute z-50 top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-2xl max-h-52 flex flex-col w-full min-w-[280px]">
+                                                            <div className="p-2 border-b border-gray-200">
                                                                 <input
                                                                     type="text"
                                                                     placeholder="Cari kode / nama akun revenue..."
                                                                     value={coaSearchMapInv[index] || ''}
                                                                     onChange={e => setCoaSearchMapInv(prev => ({ ...prev, [index]: e.target.value }))}
-                                                                    className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-gray-800 text-xs focus:outline-none focus:border-orange-400"
+                                                                    className="w-full px-2 py-1.5 bg-gray-50 border border-gray-300 rounded text-black text-xs focus:outline-none focus:border-blue-500"
                                                                     autoFocus
                                                                 />
                                                             </div>
@@ -2310,7 +2310,7 @@ const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFor
                                                                             a.code?.toLowerCase().includes(q))
                                                                         : revenueAccounts;
                                                                     return filtered.slice(0, 50).length === 0
-                                                                        ? <div className="px-3 py-2 text-gray-400 text-xs">Tidak ditemukan</div>
+                                                                        ? <div className="px-3 py-2 text-black text-xs">Tidak ditemukan</div>
                                                                         : filtered.slice(0, 50).map(acc => (
                                                                             <button
                                                                                 type="button"
@@ -2322,12 +2322,12 @@ const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFor
                                                                                     setCoaDropdownMapInv(prev => ({ ...prev, [index]: false }));
                                                                                     setCoaSearchMapInv(prev => ({ ...prev, [index]: '' }));
                                                                                 }}
-                                                                                className={`w-full text-left px-3 py-2 hover:bg-orange-50 transition-colors text-xs border-b border-gray-50 last:border-0 ${item.coa_id === acc.id ? 'bg-orange-50 text-orange-600 font-semibold' : 'text-gray-700'}`}
+                                                                                className={`w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors text-xs border-b border-gray-100 last:border-0 ${item.coa_id === acc.id ? 'bg-blue-50 text-blue-700 font-bold' : 'text-black font-medium'}`}
                                                                             >
                                                                                 <div className="flex items-center gap-2">
-                                                                                    <span className="font-mono text-gray-400 text-[10px] w-20 shrink-0">{acc.code}</span>
-                                                                                    <span className="font-medium flex-1 truncate">{acc.name}</span>
-                                                                                    <span className="text-[9px] px-1.5 py-0.5 rounded font-semibold shrink-0 bg-green-100 text-green-600">REV</span>
+                                                                                    <span className="font-mono text-gray-500 text-[10px] w-20 shrink-0">{acc.code}</span>
+                                                                                    <span className="flex-1 truncate">{acc.name}</span>
+                                                                                    <span className="text-[9px] px-1.5 py-0.5 rounded font-bold shrink-0 bg-green-100 text-green-700">REV</span>
                                                                                 </div>
                                                                             </button>
                                                                         ));

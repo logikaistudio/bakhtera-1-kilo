@@ -151,7 +151,8 @@ export async function resolveCOA({ codes = [], prefixes = [], type, nameHint, co
         }
         if (bestMatch) return bestMatch;
 
-        // Fallback to Fuzzy / Typo matching (e.g., "Hanling" -> "Handling")
+        // Fallback to Fuzzy / Typo matching on the ENTIRE string, not word-by-word.
+        // Word-by-word causes severe false positives (e.g. "Extra Forklift" = "Extra Sales Discount").
         function levenshtein(s1, s2) {
             if (!s1 || !s2) return 99;
             if (s1.length === 0) return s2.length;
@@ -169,25 +170,17 @@ export async function resolveCOA({ codes = [], prefixes = [], type, nameHint, co
             return v1[s2.length];
         }
 
-        const hintWords = hint.split(/\s+/).filter(w => w.length >= 4); // only check typos for words >= 4 chars
         let bestDistance = Infinity;
-
         for (const can of typeCandidates) {
             if (!can.name) continue;
             const canName = can.name.toLowerCase().trim();
-            const canWords = canName.split(/\s+|\//).map(w => w.trim()).filter(w => w.length >= 4);
-
-            for (const hw of hintWords) {
-                for (const cw of canWords) {
-                    const dist = levenshtein(hw, cw);
-                    const maxLen = Math.max(hw.length, cw.length);
-                    // Match if 1 error max or 2 errors on very long words, ignoring exact length mismatch
-                    if (dist <= 2 && dist < maxLen / 2) {
-                        if (dist < bestDistance) {
-                            bestDistance = dist;
-                            bestMatch = can;
-                        }
-                    }
+            // Only attempt Levenshtein if lengths are somewhat similar
+            if (Math.abs(hint.length - canName.length) <= 5) {
+                const dist = levenshtein(hint, canName);
+                // Allow max 2 typos for the entire string
+                if (dist <= 2 && dist < bestDistance) {
+                    bestDistance = dist;
+                    bestMatch = can;
                 }
             }
         }

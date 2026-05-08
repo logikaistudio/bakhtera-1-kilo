@@ -1927,35 +1927,35 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                                     className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg cursor-pointer flex justify-between items-center text-sm shadow-sm"
                                                     onClick={() => setCoaDropdownMap(prev => ({ ...prev, [index]: !prev[index] }))}
                                                 >
-                                                    <span className={item.item_name ? 'text-blue-600 font-medium truncate' : 'text-gray-400 text-xs'}>
+                                                    <span className={item.item_name ? 'text-black font-bold truncate' : 'text-gray-500 text-xs'}>
                                                         {item.item_name || 'COA...'}
                                                     </span>
-                                                    <span className="text-gray-400 text-xs ml-1">▼</span>
+                                                    <span className="text-black text-xs ml-1">▼</span>
                                                 </div>
                                                 {coaDropdownMap[index] && (
-                                                    <div className="absolute z-50 top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-2xl max-h-52 flex flex-col w-full min-w-[260px]">
-                                                        <div className="p-2 border-b border-gray-100">
+                                                    <div className="absolute z-50 top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-2xl max-h-52 flex flex-col w-full min-w-[280px]">
+                                                        <div className="p-2 border-b border-gray-200">
                                                             <input
                                                                 type="text"
                                                                 placeholder="Cari nama / kode COA..."
                                                                 value={coaSearchMap[index] || ''}
                                                                 onChange={e => setCoaSearchMap(prev => ({ ...prev, [index]: e.target.value }))}
-                                                                className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-gray-800 text-xs focus:outline-none focus:border-orange-400"
+                                                                className="w-full px-2 py-1.5 bg-gray-50 border border-gray-300 rounded text-black text-xs focus:outline-none focus:border-blue-500"
                                                                 autoFocus
                                                             />
                                                         </div>
                                                         <div className="overflow-y-auto flex-1">
                                                             {getFilteredCOA(coaSearchMap[index]).length === 0 ? (
-                                                                <div className="px-3 py-2 text-gray-400 text-xs">Tidak ditemukan</div>
+                                                                <div className="px-3 py-2 text-black text-xs">Tidak ditemukan</div>
                                                             ) : (
                                                                 getFilteredCOA(coaSearchMap[index]).map(coa => {
                                                                     const isActive = item.coa_id === coa.id;
                                                                     const prefix = coa.code?.charAt(0);
                                                                     const badgeColor = prefix === '5'
-                                                                        ? 'bg-blue-100 text-blue-600'
+                                                                        ? 'bg-blue-100 text-blue-800'
                                                                         : prefix === '6'
-                                                                            ? 'bg-purple-100 text-purple-600'
-                                                                            : 'bg-gray-100 text-gray-500';
+                                                                            ? 'bg-purple-100 text-purple-800'
+                                                                            : 'bg-gray-100 text-gray-700';
                                                                     return (
                                                                         <button
                                                                             type="button"
@@ -1966,7 +1966,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                                                                 setCoaDropdownMap(prev => ({ ...prev, [index]: false }));
                                                                                 setCoaSearchMap(prev => ({ ...prev, [index]: '' }));
                                                                             }}
-                                                                            className={`w-full text-left px-3 py-2 hover:bg-orange-50 transition-colors text-xs border-b border-gray-50 last:border-0 ${isActive ? 'bg-orange-50 text-orange-600 font-semibold' : 'text-gray-700'}`}
+                                                                            className={`w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors text-xs border-b border-gray-200 last:border-0 ${isActive ? 'bg-blue-100 text-black font-bold' : 'text-black font-medium'}`}
                                                                         >
                                                                             <div className="flex items-center gap-2">
                                                                                 <span className="font-mono text-gray-400 text-[10px] w-24 shrink-0">{coa.code}</span>
