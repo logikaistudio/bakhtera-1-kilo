@@ -1177,6 +1177,21 @@ const PurchaseOrder = () => {
                 }
             }
 
+            // Delete old journal entries so they can be recreated with new amounts on re-approval
+            // Bug Fix #4: capture delete result to avoid silent failures
+            if (wasApproved) {
+                const { error: delJournalErr } = await supabase
+                    .from('blink_journal_entries')
+                    .delete()
+                    .eq('reference_id', editId)
+                    .in('reference_type', ['ap', 'po', 'blink_po']);
+                if (delJournalErr) {
+                    console.warn('[PO Update] ⚠️ Failed to delete old journal entries — they will remain in GL until manually removed:', delJournalErr.message);
+                } else {
+                    console.log('[PO Update] ✅ Old journal entries deleted for PO:', editId);
+                }
+            }
+
             const { error } = await supabase
                 .from('blink_purchase_orders')
                 .update(updates)
@@ -1467,11 +1482,31 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
     const [coaSearchMap, setCoaSearchMap] = useState({});   // { [itemIndex]: searchTerm }
     const [coaDropdownMap, setCoaDropdownMap] = useState({}); // { [itemIndex]: boolean open }
 
-    // Fetch COA on mount
+    // Fetch COA on mount — use code PREFIX (5xx = COGS/HPP, 6xx = Beban) not just type field.
+    // This matches the P&L classification logic and ensures ALL cost accounts appear in the list
+    // regardless of whether their type is EXPENSE, COGS, DIRECT_COST, COST, or OTHER_EXPENSE.
     useEffect(() => {
         const fetchCOA = async () => {
-            const { data } = await supabase.from('finance_coa').select('id,code,name,type').in('type', ['EXPENSE', 'COGS']).order('code', { ascending: true });
-            setCoaList(data || []);
+            // Fetch all accounts that start with 5 or 6 (cost accounts by code prefix)
+            const [{ data: cogs5 }, { data: exp6 }] = await Promise.all([
+                supabase
+                    .from('finance_coa')
+                    .select('id,code,name,type,is_active')
+                    .like('code', '5%')
+                    .neq('is_active', false)
+                    .order('code', { ascending: true }),
+                supabase
+                    .from('finance_coa')
+                    .select('id,code,name,type,is_active')
+                    .like('code', '6%')
+                    .neq('is_active', false)
+                    .order('code', { ascending: true }),
+            ]);
+            // Merge & deduplicate by id
+            const merged = [...(cogs5 || []), ...(exp6 || [])];
+            const unique = [...new Map(merged.map(c => [c.id, c])).values()]
+                .sort((a, b) => (a.code || '').localeCompare(b.code || ''));
+            setCoaList(unique);
         };
         fetchCOA();
     }, []);
@@ -1483,10 +1518,15 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
 
     const selectedVendorName = vendors.find(v => v.id === formData.vendor_id)?.partner_name || '';
 
-    const getFilteredCOA = (search) => coaList.filter(c =>
-        c.name?.toLowerCase().includes((search || '').toLowerCase()) ||
-        c.code?.toLowerCase().includes((search || '').toLowerCase())
-    ).slice(0, 30);
+    const getFilteredCOA = (search) => {
+        const q = (search || '').toLowerCase().trim();
+        if (!q) return coaList.slice(0, 50);
+        return coaList.filter(c =>
+            c.name?.toLowerCase().includes(q) ||
+            c.code?.toLowerCase().includes(q) ||
+            c.type?.toLowerCase().includes(q)
+        ).slice(0, 50);
+    };
 
     const { subtotal, taxAmount, total } = calculateTotals();
 
@@ -1908,24 +1948,36 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                                             {getFilteredCOA(coaSearchMap[index]).length === 0 ? (
                                                                 <div className="px-3 py-2 text-gray-400 text-xs">Tidak ditemukan</div>
                                                             ) : (
-                                                                getFilteredCOA(coaSearchMap[index]).map(coa => (
-                                                                    <button
-                                                                        type="button"
-                                                                        key={coa.id}
-                                                                        onClick={() => {
-                                                                            updatePOItem(index, 'item_name', coa.name);
-                                                                            updatePOItem(index, 'coa_id', coa.id);
-                                                                            setCoaDropdownMap(prev => ({ ...prev, [index]: false }));
-                                                                            setCoaSearchMap(prev => ({ ...prev, [index]: '' }));
-                                                                        }}
-                                                                        className={`w-full text-left px-3 py-2 hover:bg-orange-50 transition-colors text-xs border-b border-gray-50 last:border-0 ${item.coa_id === coa.id ? 'bg-orange-50 text-orange-600 font-semibold' : 'text-gray-700'
-                                                                            } `}
-                                                                    >
-                                                                        <span className="font-mono text-gray-400 mr-2">{coa.code}</span>
-                                                                        <span className="font-medium">{coa.name}</span>
-                                                                        <span className="ml-1 text-gray-300 text-[10px]">({coa.type})</span>
-                                                                    </button>
-                                                                ))
+                                                                getFilteredCOA(coaSearchMap[index]).map(coa => {
+                                                                    const isActive = item.coa_id === coa.id;
+                                                                    const prefix = coa.code?.charAt(0);
+                                                                    const badgeColor = prefix === '5'
+                                                                        ? 'bg-blue-100 text-blue-600'
+                                                                        : prefix === '6'
+                                                                            ? 'bg-purple-100 text-purple-600'
+                                                                            : 'bg-gray-100 text-gray-500';
+                                                                    return (
+                                                                        <button
+                                                                            type="button"
+                                                                            key={coa.id}
+                                                                            onClick={() => {
+                                                                                updatePOItem(index, 'item_name', coa.name);
+                                                                                updatePOItem(index, 'coa_id', coa.id);
+                                                                                setCoaDropdownMap(prev => ({ ...prev, [index]: false }));
+                                                                                setCoaSearchMap(prev => ({ ...prev, [index]: '' }));
+                                                                            }}
+                                                                            className={`w-full text-left px-3 py-2 hover:bg-orange-50 transition-colors text-xs border-b border-gray-50 last:border-0 ${isActive ? 'bg-orange-50 text-orange-600 font-semibold' : 'text-gray-700'}`}
+                                                                        >
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className="font-mono text-gray-400 text-[10px] w-24 shrink-0">{coa.code}</span>
+                                                                                <span className="font-medium flex-1 truncate">{coa.name}</span>
+                                                                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-semibold shrink-0 ${badgeColor}`}>
+                                                                                    {prefix === '5' ? 'COGS' : prefix === '6' ? 'BEBAN' : coa.type}
+                                                                                </span>
+                                                                            </div>
+                                                                        </button>
+                                                                    );
+                                                                })
                                                             )}
                                                         </div>
                                                     </div>

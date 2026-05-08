@@ -118,10 +118,16 @@ export async function resolveCOA({ codes = [], prefixes = [], type, nameHint, co
     }
 
     // 2. Type + name ilike (Best Text Match)
-    if (type && nameHint) {
+    if (nameHint) {
         const hint = nameHint.toLowerCase().trim();
-        // Check active accounts of exactly this type
-        const typeCandidates = list.filter(c => c.type === type && c.is_active !== false);
+        
+        let typeCandidates = list.filter(c => c.is_active !== false);
+        if (type) {
+            typeCandidates = typeCandidates.filter(c => c.type === type);
+        } else if (prefixes && prefixes.length > 0) {
+            typeCandidates = typeCandidates.filter(c => prefixes.some(p => c.code?.startsWith(p)));
+        }
+        
         // Sort candidates from longest to shortest name to avoid matching generic short words first
         typeCandidates.sort((a, b) => (b.name?.length || 0) - (a.name?.length || 0));
         
@@ -726,11 +732,14 @@ export async function createInvoiceJournal({ invoice, coaList: providedCOA }) {
             let itemCOA = null;
             if (item.coa_id) itemCOA = coaList.find(c => c.id === item.coa_id) || null;
             if (!itemCOA) {
+                const itemNameHint = item.description || item.item_name || '';
+                const isDiscountItem = itemNameHint.toLowerCase().includes('discount') || itemNameHint.toLowerCase().includes('diskon');
+                
                 itemCOA = await resolveCOA({
                     coaList,
-                    prefixes: ['4'],
-                    type: 'REVENUE',
-                    nameHint: item.description || item.item_name
+                    prefixes: isDiscountItem ? ['4', '5'] : ['4'],
+                    type: isDiscountItem ? null : 'REVENUE',
+                    nameHint: itemNameHint
                 }) || defaultRevCOA;
             }
 

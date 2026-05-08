@@ -18,6 +18,10 @@ const TrialBalance = () => {
     const [totals, setTotals] = useState({ opening: 0, debit: 0, credit: 0, closing: 0 });
     const [unclassifiedAccounts, setUnclassifiedAccounts] = useState([]);
     const [duplicateEntries, setDuplicateEntries] = useState([]);
+    const [typeSummaries, setTypeSummaries] = useState({});
+    const [arSummary, setArSummary] = useState({ count: 0, opening: 0, debit: 0, credit: 0, closing: 0 });
+    const [apSummary, setApSummary] = useState({ count: 0, opening: 0, debit: 0, credit: 0, closing: 0 });
+    const [suspiciousAccounts, setSuspiciousAccounts] = useState([]);
 
     // Default: Current Year
     const today = new Date();
@@ -208,6 +212,41 @@ const TrialBalance = () => {
                     return acc.opening !== 0 || acc.debitPeriod !== 0 || acc.creditPeriod !== 0;
                 })
                 .sort((a, b) => (a.code || '').localeCompare(b.code || ''));
+
+            // --- Diagnostics: compute summaries by type, AR/AP and suspicious accounts ---
+            const typeMap = {};
+            let ar = { count: 0, opening: 0, debit: 0, credit: 0, closing: 0 };
+            let ap = { count: 0, opening: 0, debit: 0, credit: 0, closing: 0 };
+            const suspicious = [];
+
+            processed.forEach(acc => {
+                const t = acc.type || 'UNKNOWN';
+                if (!typeMap[t]) typeMap[t] = { count: 0, opening: 0, debit: 0, credit: 0, closing: 0 };
+                typeMap[t].count += 1;
+                typeMap[t].opening += acc.opening || 0;
+                typeMap[t].debit += acc.debitPeriod || 0;
+                typeMap[t].credit += acc.creditPeriod || 0;
+                typeMap[t].closing += acc.closing || 0;
+
+                // AR / AP detection via explicit flags or by type
+                if (acc.is_ar) {
+                    ar.count += 1; ar.opening += acc.opening || 0; ar.debit += acc.debitPeriod || 0; ar.credit += acc.creditPeriod || 0; ar.closing += acc.closing || 0;
+                }
+                if (acc.is_ap) {
+                    ap.count += 1; ap.opening += acc.opening || 0; ap.debit += acc.debitPeriod || 0; ap.credit += acc.creditPeriod || 0; ap.closing += acc.closing || 0;
+                }
+
+                // Suspicious: name contains 'discount' or 'diskon' but type is REVENUE or not COGS
+                const nameLower = (acc.name || '').toLowerCase();
+                if ((nameLower.includes('discount') || nameLower.includes('diskon') || nameLower.includes('discount air') || nameLower.includes('air')) && acc.type !== 'COGS' && acc.type !== 'COST') {
+                    suspicious.push({ id: acc.id, code: acc.code, name: acc.name, type: acc.type, closing: acc.closing });
+                }
+            });
+
+            setTypeSummaries(typeMap);
+            setArSummary(ar);
+            setApSummary(ap);
+            setSuspiciousAccounts(suspicious);
 
             // Set balances
             setBalances(processed);
@@ -468,6 +507,47 @@ const TrialBalance = () => {
                             <li key={idx}>ID {dup.id1} & {dup.id2} | Akun: {dup.account_code || '-'} | Debit: {dup.debit} | Kredit: {dup.credit} | Tanggal: {dup.entry_date}</li>
                         ))}
                         {duplicateEntries.length > 10 && <li>Dan {duplicateEntries.length - 10} duplikasi lainnya...</li>}
+                    </ul>
+                </div>
+            )}
+            {/* Diagnostics summary for AR/AP and suspicious accounts */}
+            {Object.keys(typeSummaries || {}).length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div className="glass-card p-3 rounded">
+                        <div className="text-xs text-silver-dark font-semibold">Type Summary</div>
+                        <div className="text-sm mt-2">
+                            {Object.entries(typeSummaries).map(([t, v]) => (
+                                <div key={t} className="flex justify-between text-xs py-1">
+                                    <span>{t}</span>
+                                    <span className="font-mono">{(v.closing || 0).toLocaleString('id-ID')}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="glass-card p-3 rounded">
+                        <div className="text-xs text-silver-dark font-semibold">Accounts Receivable (AR)</div>
+                        <div className="text-sm mt-2">
+                            <div className="flex justify-between text-xs py-1"><span>Count</span><span className="font-mono">{arSummary.count}</span></div>
+                            <div className="flex justify-between text-xs py-1"><span>Closing</span><span className="font-mono">{(arSummary.closing || 0).toLocaleString('id-ID')}</span></div>
+                        </div>
+                    </div>
+                    <div className="glass-card p-3 rounded">
+                        <div className="text-xs text-silver-dark font-semibold">Accounts Payable (AP)</div>
+                        <div className="text-sm mt-2">
+                            <div className="flex justify-between text-xs py-1"><span>Count</span><span className="font-mono">{apSummary.count}</span></div>
+                            <div className="flex justify-between text-xs py-1"><span>Closing</span><span className="font-mono">{(apSummary.closing || 0).toLocaleString('id-ID')}</span></div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {suspiciousAccounts.length > 0 && (
+                <div className="bg-indigo-50 border-l-4 border-indigo-400 text-indigo-800 p-4 mb-4 rounded">
+                    <strong>Notice:</strong> Ditemukan akun dengan nama terkait discount/air yang tidak diklasifikasikan sebagai COGS.
+                    <ul className="mt-2 text-xs">
+                        {suspiciousAccounts.map(acc => (
+                            <li key={acc.id}>{acc.code} - {acc.name} — type: {acc.type} — balance: {(acc.closing || 0).toLocaleString('id-ID')}</li>
+                        ))}
                     </ul>
                 </div>
             )}

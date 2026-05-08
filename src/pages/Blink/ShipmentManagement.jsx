@@ -113,7 +113,7 @@ const ShipmentManagement = () => {
                 paymentTerms: s.payment_terms || s.paymentTerms || null,
                 payment_terms: s.payment_terms || null,
                 // Items mapping
-                sellingItems: s.selling_items || s.sellingItems || [],
+                sellingItems: s.selling_items || s.service_items || s.sellingItems || [],
                 buyingItems: s.buying_items || s.buyingItems || []
             }));
 
@@ -254,11 +254,44 @@ const ShipmentManagement = () => {
 
             const poItemsRaw = [];
 
-            // Legacy COGS fields
-            const addIfPresent = (label, value) => {
+            // Legacy COGS fields — handled below via addIfPresent with COA auto-resolve
+
+            // Buying items with COA name lookup
+            const coaIds = buyingItems.map(i => i.coa_id).filter(Boolean);
+            let coaMap = {};
+            if (coaIds.length > 0) {
+                const { data: coaData } = await supabase.from('finance_coa').select('id, name, code').in('id', coaIds);
+                (coaData || []).forEach(c => { coaMap[c.id] = c; });
+            }
+
+            // Pre-fetch COGS accounts for legacy label-based lookup (Bug Fix #2)
+            const { data: allCOGSAccounts } = await supabase
+                .from('finance_coa')
+                .select('id, name, code')
+                .like('code', '5%');
+            const cogsAccounts = allCOGSAccounts || [];
+
+            // Helper: find best COA for a label among COGS accounts
+            const findCOGSByName = (label) => {
+                if (!label) return null;
+                const lower = label.toLowerCase();
+                return cogsAccounts.find(a => a.name && a.name.toLowerCase().includes(lower)) || null;
+            };
+
+            // Bug Fix #2: addIfPresent now accepts optional coa_id
+            const addIfPresent = (label, value, coaId = null) => {
                 const val = parseFloat(String(value || '').replace(/,/g, ''));
                 if (val && val > 0) {
-                    poItemsRaw.push({ item_name: label, description: `${label} - ${ship.jobNumber}`, qty: 1, unit: 'Job', unit_price: val, amount: val, coa_id: null });
+                    const resolvedCoa = coaId ? { id: coaId } : findCOGSByName(label);
+                    poItemsRaw.push({
+                        item_name: label,
+                        description: `${label} - ${ship.jobNumber}`,
+                        qty: 1,
+                        unit: 'Job',
+                        unit_price: val,
+                        amount: val,
+                        coa_id: resolvedCoa?.id || null
+                    });
                 }
             };
             addIfPresent('Ocean Freight', cogsData.oceanFreight);
@@ -271,13 +304,6 @@ const ShipmentManagement = () => {
             addIfPresent('Demurrage', cogsData.demurrage);
             addIfPresent(cogsData.otherDescription || 'Other Charges', cogsData.other);
 
-            // Buying items with COA name lookup
-            const coaIds = buyingItems.map(i => i.coa_id).filter(Boolean);
-            let coaMap = {};
-            if (coaIds.length > 0) {
-                const { data: coaData } = await supabase.from('finance_coa').select('id, name').in('id', coaIds);
-                (coaData || []).forEach(c => { coaMap[c.id] = c; });
-            }
             buyingItems.forEach(item => {
                 const val = parseFloat(String(item.amount || 0).replace(/,/g, ''));
                 if (val && val > 0) {

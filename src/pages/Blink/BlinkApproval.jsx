@@ -46,21 +46,65 @@ const tryInsertTable = async (tableName, payload) => {
 
 const insertARTransaction = async (blinkRow, fallbackRow) => {
     try {
+        const { data: existing } = await supabase.from('blink_ar_transactions').select('id').eq('invoice_id', blinkRow.invoice_id).single();
+        if (existing) {
+            await supabase.from('blink_ar_transactions').update({
+                status: blinkRow.status,
+                original_amount: blinkRow.original_amount,
+                outstanding_amount: blinkRow.outstanding_amount,
+                due_date: blinkRow.due_date,
+                updated_at: new Date().toISOString()
+            }).eq('id', existing.id);
+            return;
+        }
         if (await tryInsertTable('blink_ar_transactions', blinkRow)) return;
+        
+        const { data: existingBig } = await supabase.from('big_ar_transactions').select('id').eq('invoice_id', fallbackRow.invoice_id).single();
+        if (existingBig) {
+            await supabase.from('big_ar_transactions').update({
+                status: fallbackRow.status,
+                original_amount: fallbackRow.original_amount,
+                outstanding_amount: fallbackRow.outstanding_amount,
+                due_date: fallbackRow.due_date
+            }).eq('id', existingBig.id);
+            return;
+        }
         const { error } = await supabase.from('big_ar_transactions').insert([fallbackRow]);
         if (error) throw error;
     } catch (e) {
-        console.warn('AR transaction creation skipped (no valid DB table available):', e.message);
+        console.warn('AR transaction creation/update skipped (no valid DB table available):', e.message);
     }
 };
 
 const insertAPTransaction = async (blinkRow, fallbackRow) => {
     try {
+        const { data: existing } = await supabase.from('blink_ap_transactions').select('id').eq('po_id', blinkRow.po_id).single();
+        if (existing) {
+            await supabase.from('blink_ap_transactions').update({
+                status: blinkRow.status,
+                original_amount: blinkRow.original_amount,
+                outstanding_amount: blinkRow.outstanding_amount,
+                due_date: blinkRow.due_date,
+                updated_at: new Date().toISOString()
+            }).eq('id', existing.id);
+            return;
+        }
         if (await tryInsertTable('blink_ap_transactions', blinkRow)) return;
+        
+        const { data: existingBig } = await supabase.from('big_ap_transactions').select('id').eq('po_id', fallbackRow.po_id).single();
+        if (existingBig) {
+            await supabase.from('big_ap_transactions').update({
+                status: fallbackRow.status,
+                original_amount: fallbackRow.original_amount,
+                outstanding_amount: fallbackRow.outstanding_amount,
+                due_date: fallbackRow.due_date
+            }).eq('id', existingBig.id);
+            return;
+        }
         const { error } = await supabase.from('big_ap_transactions').insert([fallbackRow]);
         if (error) throw error;
     } catch (e) {
-        console.warn('AP transaction creation skipped (no valid DB table available):', e.message);
+        console.warn('AP transaction creation/update skipped (no valid DB table available):', e.message);
     }
 };
 
@@ -526,8 +570,11 @@ const BlinkApproval = () => {
                     exchange_rate: quotationData.exchange_rate || null,
                     status: 'pending',
                     created_from: 'ops_order',
+                    // Bug Fix: also carry service_items/cost_items so Invoice & PO generation
+                    // have the full detail with coa_id for correct GL posting
                     service_items: quotationData.service_items || [],
                     selling_items: quotationData.service_items || [],
+                    buying_items: quotationData.cost_items || [],
                     notes: quotationData.notes || '',
                     gross_weight: quotationData.gross_weight || null,
                     net_weight: quotationData.net_weight || null,

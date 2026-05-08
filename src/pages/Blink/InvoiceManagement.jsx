@@ -43,6 +43,8 @@ const InvoiceManagement = () => {
     const [selectedShipment, setSelectedShipment] = useState(null);
     const [referenceType, setReferenceType] = useState('quotation'); // 'quotation' or 'so'
     const [revenueAccounts, setRevenueAccounts] = useState([]);
+    const [coaSearchMapInv, setCoaSearchMapInv] = useState({});    // { [itemIndex]: searchTerm }
+    const [coaDropdownMapInv, setCoaDropdownMapInv] = useState({}); // { [itemIndex]: boolean open }
     const [confirmSubmitAction, setConfirmSubmitAction] = useState(null);
     const [successSubmitMsg, setSuccessSubmitMsg] = useState('');
     const [isEditingInvoice, setIsEditingInvoice] = useState(false);
@@ -122,10 +124,13 @@ const InvoiceManagement = () => {
 
     const fetchRevenueAccounts = async () => {
         try {
+            // Use code PREFIX (4xx = Revenue) not type='REVENUE' to ensure all
+            // revenue accounts appear, consistent with P&L classification logic.
             const { data, error } = await supabase
                 .from('finance_coa')
                 .select('*')
-                .eq('type', 'REVENUE')
+                .like('code', '4%')
+                .neq('is_active', false)
                 .order('code');
             if (!error && data) {
                 setRevenueAccounts(data);
@@ -316,47 +321,67 @@ const InvoiceManagement = () => {
                     volume: shipment.volume,
                     commodity: shipment.commodity
                 },
-                invoice_items: shipment.selling_items && shipment.selling_items.length > 0
-                    ? shipment.selling_items.map(item => {
-                        const acc = revenueAccounts.find(a => a.code === item.itemCode);
-                        return {
-                            item_name: acc?.name || item.itemCode || item.name || item.service_name || 'Item',
-                            description: item.description || item.name || '',
-                            qty: parseFloat(item.quantity) || parseFloat(item.qty) || 1,
-                            unit: item.unit || 'Job',
-                            rate: parseFloat(item.unitPrice) || parseFloat(item.price) || parseFloat(item.rate) || 0,
-                            amount: parseFloat(item.amount) || parseFloat(item.total) || 
-                                ((parseFloat(item.quantity) || 1) * (parseFloat(item.unitPrice) || parseFloat(item.price) || parseFloat(item.rate) || 0)),
-                            tax_amount: typeof item.tax_amount !== 'undefined' ? Number(item.tax_amount) : 0,
-                            tax_rate: typeof item.tax_rate !== 'undefined' ? Number(item.tax_rate) : 0,
-                            currency: item.currency || shipment.currency || 'IDR',
-                            coa_id: acc?.id || item.coa_id || null,
-                            coa_code: acc?.code || item.itemCode || item.coa_code || null
-                        };
-                    })
-                    : [{
+                // Bug Fix #1 & #5: Use selling_items OR service_items (whichever is populated).
+                // coa_id is taken directly from item.coa_id — do NOT rely on itemCode lookup
+                // which never existed on flattened items from SalesQuotation flattenItems().
+                invoice_items: (() => {
+                    const srcItems = (shipment.selling_items && shipment.selling_items.length > 0)
+                        ? shipment.selling_items
+                        : (shipment.service_items && shipment.service_items.length > 0)
+                            ? shipment.service_items
+                            : null;
+
+                    if (srcItems) {
+                        return srcItems.map(item => {
+                            // coa_id is authoritative from the item itself.
+                            // Only look up revenueAccounts if coa_id is missing.
+                            const accById = item.coa_id ? revenueAccounts.find(a => a.id === item.coa_id) : null;
+                            const accByCode = !accById && item.itemCode ? revenueAccounts.find(a => a.code === item.itemCode) : null;
+                            const acc = accById || accByCode;
+                            return {
+                                item_name: acc?.name || item.item_name || item.description || item.name || item.service_name || 'Item',
+                                description: item.description || item.name || '',
+                                qty: parseFloat(item.qty) || parseFloat(item.quantity) || 1,
+                                unit: item.unit || 'Job',
+                                rate: parseFloat(item.rate) || parseFloat(item.unitPrice) || parseFloat(item.price) || 0,
+                                amount: parseFloat(item.amount) || parseFloat(item.total) ||
+                                    ((parseFloat(item.qty) || parseFloat(item.quantity) || 1) * (parseFloat(item.rate) || parseFloat(item.unitPrice) || 0)),
+                                tax_amount: typeof item.tax_amount !== 'undefined' ? Number(item.tax_amount) : 0,
+                                tax_rate: typeof item.tax_rate !== 'undefined' ? Number(item.tax_rate) : 0,
+                                currency: item.currency || shipment.currency || 'IDR',
+                                // Direct coa_id takes priority - this is the key fix
+                                coa_id: item.coa_id || acc?.id || null,
+                                coa_code: item.coa_code || acc?.code || item.itemCode || null
+                            };
+                        });
+                    }
+                    return [{
                         item_name: (shipment.service_type || 'Freight').toUpperCase(),
                         description: `${(shipment.service_type || 'Freight').toUpperCase()} - ${shipment.origin} to ${shipment.destination}`,
                         qty: 1,
                         unit: 'Shipment',
                         rate: shipment.quoted_amount || 0,
                         amount: shipment.quoted_amount || 0,
-                        tax_amount: 0
-                    }],
+                        tax_amount: 0,
+                        coa_id: null
+                    }];
+                })(),
                 // Extract COGS from shipment buying_items and old cogs JSON
                 cogs_items: (() => {
                     const extractedItems = [];
-                    // 1. From Buying Items
+                    // 1. From Buying Items — Bug Fix #3: carry coa_id so COGS journals post
+                    //    to the correct specific HPP account (e.g. 5-01-003 THC), not the default.
                     if (shipment.buying_items && Array.isArray(shipment.buying_items)) {
                         shipment.buying_items.forEach(item => {
                             extractedItems.push({
-                                description: item.description || item.name || 'Cost Item',
-                                qty: item.quantity || item.qty || 1,
+                                description: item.description || item.item_name || item.name || 'Cost Item',
+                                qty: item.qty || item.quantity || 1,
                                 unit: item.unit || 'Job',
-                                rate: item.unitPrice || item.rate || item.price || 0,
-                                amount: item.total || item.amount || 0,
+                                rate: item.rate || item.unitPrice || item.price || 0,
+                                amount: item.amount || item.total || 0,
                                 vendor: item.vendor || item.supplier || '',
-                                currency: item.currency || shipment.currency || 'IDR'
+                                currency: item.currency || shipment.currency || 'IDR',
+                                coa_id: item.coa_id || null  // ← Key fix: preserve COA mapping
                             });
                         });
                     }
@@ -810,6 +835,52 @@ const InvoiceManagement = () => {
                 .eq('id', editInvoiceId);
 
             if (error) throw error;
+            
+            // Sync AR transaction if it exists
+            await supabase
+                .from('blink_ar_transactions')
+                .update({
+                    original_amount: total,
+                    outstanding_amount: total,
+                    due_date: formData.due_date,
+                    currency: formData.billing_currency
+                })
+                .eq('invoice_id', editInvoiceId);
+                
+            // Sync big AR transaction if it exists
+            await supabase
+                .from('big_ar_transactions')
+                .update({
+                    original_amount: total,
+                    outstanding_amount: total,
+                    due_date: formData.due_date
+                })
+                .eq('invoice_id', editInvoiceId);
+
+            // Delete old journal entries so they can be recreated with new amounts
+            // Bug Fix #4: capture delete result so failures are visible in console
+            const { error: delInvJournalErr } = await supabase
+                .from('blink_journal_entries')
+                .delete()
+                .eq('reference_id', editInvoiceId)
+                .in('reference_type', ['ar', 'blink_invoice']);
+            if (delInvJournalErr) {
+                console.warn('[Invoice Update] ⚠️ Failed to delete old journal entries:', delInvJournalErr.message);
+            } else {
+                console.log('[Invoice Update] ✅ Old journal entries deleted for Invoice:', editInvoiceId);
+            }
+                
+            // Re-create journal entries for the updated invoice
+            const { data: updatedInv } = await supabase
+                .from('blink_invoices')
+                .select('*')
+                .eq('id', editInvoiceId)
+                .single();
+                
+            if (updatedInv && updatedInv.status === 'unpaid') {
+                const coaList = await getAllCOA();
+                await createInvoiceJournal({ invoice: updatedInv, coaList });
+            }
             
             await fetchInvoices();
             setShowCreateModal(false);
@@ -2207,14 +2278,64 @@ const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFor
                                         <tr key={index} className="hover:bg-dark-surface/50 smooth-transition">
                                             <td className="px-2 py-2 text-center text-silver-light text-xs">{index + 1}</td>
                                             <td className="px-3 py-2">
-                                                <input
-                                                    type="text"
-                                                    value={item.item_name}
-                                                    onChange={(e) => updateInvoiceItem(index, 'item_name', e.target.value)}
-                                                    className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm"
-                                                    placeholder="Nama Item (e.g. THL, Freight)"
-                                                    required
-                                                />
+                                                {/* COA Revenue Dropdown Picker (mirrors PO form) */}
+                                                <div className="relative">
+                                                    <div
+                                                        className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded cursor-pointer flex justify-between items-center text-sm"
+                                                        onClick={() => setCoaDropdownMapInv(prev => ({ ...prev, [index]: !prev[index] }))}
+                                                    >
+                                                        <span className={item.item_name ? 'text-accent-orange font-medium truncate text-xs' : 'text-silver-dark text-xs'}>
+                                                            {item.item_name || 'Pilih COA...'}
+                                                        </span>
+                                                        <span className="text-silver-dark text-xs ml-1">▼</span>
+                                                    </div>
+                                                    {coaDropdownMapInv[index] && (
+                                                        <div className="absolute z-50 top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-2xl max-h-52 flex flex-col w-full min-w-[240px]">
+                                                            <div className="p-2 border-b border-gray-100">
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="Cari kode / nama akun revenue..."
+                                                                    value={coaSearchMapInv[index] || ''}
+                                                                    onChange={e => setCoaSearchMapInv(prev => ({ ...prev, [index]: e.target.value }))}
+                                                                    className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-gray-800 text-xs focus:outline-none focus:border-orange-400"
+                                                                    autoFocus
+                                                                />
+                                                            </div>
+                                                            <div className="overflow-y-auto flex-1">
+                                                                {(() => {
+                                                                    const q = (coaSearchMapInv[index] || '').toLowerCase();
+                                                                    const filtered = q
+                                                                        ? revenueAccounts.filter(a =>
+                                                                            a.name?.toLowerCase().includes(q) ||
+                                                                            a.code?.toLowerCase().includes(q))
+                                                                        : revenueAccounts;
+                                                                    return filtered.slice(0, 50).length === 0
+                                                                        ? <div className="px-3 py-2 text-gray-400 text-xs">Tidak ditemukan</div>
+                                                                        : filtered.slice(0, 50).map(acc => (
+                                                                            <button
+                                                                                type="button"
+                                                                                key={acc.id}
+                                                                                onClick={() => {
+                                                                                    updateInvoiceItem(index, 'item_name', acc.name);
+                                                                                    updateInvoiceItem(index, 'coa_id', acc.id);
+                                                                                    updateInvoiceItem(index, 'coa_code', acc.code);
+                                                                                    setCoaDropdownMapInv(prev => ({ ...prev, [index]: false }));
+                                                                                    setCoaSearchMapInv(prev => ({ ...prev, [index]: '' }));
+                                                                                }}
+                                                                                className={`w-full text-left px-3 py-2 hover:bg-orange-50 transition-colors text-xs border-b border-gray-50 last:border-0 ${item.coa_id === acc.id ? 'bg-orange-50 text-orange-600 font-semibold' : 'text-gray-700'}`}
+                                                                            >
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <span className="font-mono text-gray-400 text-[10px] w-20 shrink-0">{acc.code}</span>
+                                                                                    <span className="font-medium flex-1 truncate">{acc.name}</span>
+                                                                                    <span className="text-[9px] px-1.5 py-0.5 rounded font-semibold shrink-0 bg-green-100 text-green-600">REV</span>
+                                                                                </div>
+                                                                            </button>
+                                                                        ));
+                                                                })()}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className="px-3 py-2">
                                                 <input
