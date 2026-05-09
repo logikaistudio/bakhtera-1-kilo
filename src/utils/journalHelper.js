@@ -111,105 +111,12 @@ export async function journalEntriesHasColumn(columnName) {
 export async function resolveCOA({ codes = [], prefixes = [], type, nameHint, coaList } = {}) {
     const list = coaList || await getAllCOA();
 
-    // 1. Exact code match
+    // PATCH: Hanya izinkan resolve COA berdasarkan id atau code yang valid
     for (const code of codes) {
         const found = list.find(c => c.code === code && c.is_active !== false);
         if (found) return found;
     }
-
-    // 2. Type + name ilike (Best Text Match)
-    if (nameHint) {
-        const hint = nameHint.toLowerCase().trim();
-        
-        let typeCandidates = list.filter(c => c.is_active !== false);
-        if (type) {
-            typeCandidates = typeCandidates.filter(c => c.type === type);
-        } else if (prefixes && prefixes.length > 0) {
-            typeCandidates = typeCandidates.filter(c => prefixes.some(p => c.code?.startsWith(p)));
-        }
-        
-        // Sort candidates from longest to shortest name to avoid matching generic short words first
-        typeCandidates.sort((a, b) => (b.name?.length || 0) - (a.name?.length || 0));
-        
-        // Find best match by direct inclusion
-        let bestMatch = null;
-        for (const can of typeCandidates) {
-            if (can.name) {
-                const canName = can.name.toLowerCase().trim();
-                // Bidirectional check (at least 3 characters to avoid meaningless short matches):
-                // 1. Does the COA Name contain the Invoice Description (e.g. "Handling" -> "Handling Charges")
-                // 2. Does the Invoice Description contain the COA Name (e.g. "Ocean freight jkt vietnam" -> "Ocean Freight")
-                // Also handles slashes (e.g. "Trucking / Darat" -> "Trucking")
-                const parts = canName.split('/').map(p => p.trim());
-                const isMatch = parts.some(p => p.length >= 3 && (p.includes(hint) || hint.includes(p)));
-                
-                if (hint.length >= 3 && canName.length >= 3 && isMatch) {
-                    bestMatch = can;
-                    break; // Take the first best matching
-                }
-            }
-        }
-        if (bestMatch) return bestMatch;
-
-        // Fallback to Fuzzy / Typo matching on the ENTIRE string, not word-by-word.
-        // Word-by-word causes severe false positives (e.g. "Extra Forklift" = "Extra Sales Discount").
-        function levenshtein(s1, s2) {
-            if (!s1 || !s2) return 99;
-            if (s1.length === 0) return s2.length;
-            if (s2.length === 0) return s1.length;
-            let v0 = new Array(s2.length + 1).fill(0).map((_, i) => i);
-            let v1 = new Array(s2.length + 1).fill(0);
-            for (let i = 0; i < s1.length; i++) {
-                v1[0] = i + 1;
-                for (let j = 0; j < s2.length; j++) {
-                    let cost = (s1[i] === s2[j]) ? 0 : 1;
-                    v1[j + 1] = Math.min(v1[j] + 1, v0[j + 1] + 1, v0[j] + cost);
-                }
-                for (let j = 0; j < v0.length; j++) v0[j] = v1[j];
-            }
-            return v1[s2.length];
-        }
-
-        let bestDistance = Infinity;
-        for (const can of typeCandidates) {
-            if (!can.name) continue;
-            const canName = can.name.toLowerCase().trim();
-            // Only attempt Levenshtein if lengths are somewhat similar
-            if (Math.abs(hint.length - canName.length) <= 5) {
-                const dist = levenshtein(hint, canName);
-                // Allow max 2 typos for the entire string
-                if (dist <= 2 && dist < bestDistance) {
-                    bestDistance = dist;
-                    bestMatch = can;
-                }
-            }
-        }
-
-        if (bestMatch) return bestMatch;
-    }
-
-    // 3. Code prefix match (Fallback to general group account if name not matched)
-    for (const prefix of prefixes) {
-        const candidates = list.filter(c => c.code?.startsWith(prefix) && c.is_active !== false);
-        if (candidates.length > 0) {
-            candidates.sort((a, b) => {
-                if (type) {
-                    const aMatch = a.type === type ? 0 : 1;
-                    const bMatch = b.type === type ? 0 : 1;
-                    if (aMatch !== bMatch) return aMatch - bMatch;
-                }
-                return a.code.localeCompare(b.code);
-            });
-            return candidates[0]; // Returns first account in that group (e.g., 4-01-100)
-        }
-    }
-
-    // 4. Type only fallback (first active account of that type)
-    if (type) {
-        const found = list.find(c => c.type === type && c.is_active !== false);
-        if (found) return found;
-    }
-
+    // Tidak ada fallback ke nameHint, prefix, atau fuzzy match
     return null;
 }
 

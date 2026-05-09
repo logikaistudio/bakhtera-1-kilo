@@ -83,30 +83,19 @@ const ProfitLoss = () => {
             const queryStart = `${prevYear}-${String(prevMonth).padStart(2, '0')}-01`;
             const queryEnd = `${targetYear}-${String(targetMonth).padStart(2, '0')}-${String(new Date(targetYear, targetMonth, 0).getDate()).padStart(2, '0')}`;
 
-            const [r1, r2] = await Promise.all([
-                supabase.from('blink_journal_entries')
-                    .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate')
-                    .not('coa_id', 'is', null)
-                    .gte('entry_date', queryStart).lte('entry_date', queryEnd),
-                supabase.from('blink_journal_entries')
-                    .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate')
-                    .is('coa_id', null)
-                    .gte('entry_date', queryStart).lte('entry_date', queryEnd)
-            ]);
-            if (r1.error) throw r1.error;
-            if (r2.error) throw r2.error;
-
-            const combined = [...(r1.data || []), ...(r2.data || [])];
-            const entries = [...new Map(combined.map(r => [r.id, r])).values()];
+            const res = await supabase.from('blink_journal_entries')
+                .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate')
+                .not('coa_id', 'is', null)
+                .gte('entry_date', queryStart).lte('entry_date', queryEnd);
+            if (res.error) throw res.error;
+            const entries = [...new Map((res.data || []).map(r => [r.id, r])).values()];
 
             const coaMap = {};
-            const accCodeMap = {};
             const codeToMeta = {};
             (coaData || []).forEach(coa => {
                 const byMonth = { current: 0, previous: 0, ytd: 0 };
                 coaMap[coa.id] = { ...coa, amount: 0, byMonth };
                 if (coa.code) {
-                    accCodeMap[coa.code] = coa.id;
                     codeToMeta[coa.code] = coa;
                 }
             });
@@ -119,10 +108,10 @@ const ProfitLoss = () => {
             const getCodePrefix = (code) => code ? code.charAt(0) : null;
 
             entries.forEach(e => {
-                const targetId = e.coa_id || accCodeMap[e.account_code];
+                const targetId = e.coa_id; // only use explicit coa_id
                 if (!targetId) return;
                 const acc = coaMap[targetId];
-                if (!acc) return;
+                if (!acc) return; // skip if coa_id doesn't exist in master
                 const debit = toIDR(e.debit, e.currency, e.exchange_rate);
                 const credit = toIDR(e.credit, e.currency, e.exchange_rate);
                 const prefix = getCodePrefix(acc.code);
