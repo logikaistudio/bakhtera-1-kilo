@@ -651,8 +651,8 @@ const ProfitLoss = () => {
                         <TotalRow label="Total Operation Income ( Gross Profit )"
                             amount={totals.grossProfit}
                             byMonthFn={m => {
-                                const mRev = reportData.revenue.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0);
-                                const mCogs = reportData.cogs.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0);
+                                const mRev = reportData.revenue.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
+                                const mCogs = reportData.cogs.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
                                 return mRev - mCogs;
                             }}
                             highlight={totals.grossProfit >= 0 ? 'blue' : 'red'} thick />
@@ -692,12 +692,20 @@ const ProfitLoss = () => {
                         {/* ── Summary ── */}
                         <div className="border-t-2 border-slate-300 dark:border-dark-border mt-1">
                             <TotalRow label="Total Other Income / Expenses" amount={totals.otherNet} byMonthFn={m => {
-                                const mOI = reportData.other_income.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0);
-                                const mOE = reportData.other_expense.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0);
+                                const mOI = reportData.other_income.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
+                                const mOE = reportData.other_expense.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
                                 return mOI - mOE;
                             }} />
-                            <TotalRow label="Total Income" amount={totals.operatingProfit + totals.otherNet} highlight="blue" />
-                            <TotalRow label="Total Net Income Before Tax" amount={totals.netIncomeBeforeTax} />
+                            <TotalRow label="Total Net Income Before Tax" amount={totals.netIncomeBeforeTax}
+                                byMonthFn={m => {
+                                    const mRev = reportData.revenue.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
+                                    const mCogs = reportData.cogs.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
+                                    const mExp = reportData.expenses.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
+                                    const mOI = reportData.other_income.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
+                                    const mOE = reportData.other_expense.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
+                                    return mRev - mCogs - mExp + mOI - mOE;
+                                }}
+                                highlight="blue" />
 
                             {/* Corporate Income Tax */}
                             <div className="flex items-center bg-red-50 dark:bg-red-500/10 border-y border-red-200 dark:border-red-500/30">
@@ -706,9 +714,20 @@ const ProfitLoss = () => {
                                     Corporate Income Tax ({taxRate}%)
                                 </span>
                                 <div className="flex items-center flex-shrink-0 pr-2">
-                                    {reportMonths.map(m => (
-                                        <span key={m} className={`text-[11px] font-bold font-mono text-right ${colW} px-1 py-2`}></span>
-                                    ))}
+                                    {reportMonths.map(m => {
+                                        const mRev = reportData.revenue.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
+                                        const mCogs = reportData.cogs.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
+                                        const mExp = reportData.expenses.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
+                                        const mOI = reportData.other_income.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
+                                        const mOE = reportData.other_expense.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
+                                        const mNet = mRev - mCogs - mExp + mOI - mOE;
+                                        const mTax = mNet > 0 ? mNet * (taxRate / 100) : 0;
+                                        return (
+                                            <span key={m} className={`text-[11px] font-bold font-mono text-right text-red-600 dark:text-red-400 ${colW} px-1 py-2`}>
+                                                {fmt(-mTax)}
+                                            </span>
+                                        );
+                                    })}
                                     <span className={`text-[12px] font-bold font-mono text-red-600 dark:text-red-400 text-right ${totalW} px-1 py-2`} title={fmt(-totals.taxAmount)}>
                                         {fmt(-totals.taxAmount)}
                                     </span>
@@ -716,6 +735,16 @@ const ProfitLoss = () => {
                             </div>
 
                             <TotalRow label="Total Net Income After Tax" amount={totals.netIncomeAfterTax}
+                                byMonthFn={m => {
+                                    const mRev = reportData.revenue.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
+                                    const mCogs = reportData.cogs.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
+                                    const mExp = reportData.expenses.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
+                                    const mOI = reportData.other_income.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
+                                    const mOE = reportData.other_expense.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
+                                    const mNet = mRev - mCogs - mExp + mOI - mOE;
+                                    const mTax = mNet > 0 ? mNet * (taxRate / 100) : 0;
+                                    return mNet - mTax;
+                                }}
                                 highlight={totals.netIncomeAfterTax >= 0 ? 'blue' : 'red'} thick />
                         </div>
                     </>

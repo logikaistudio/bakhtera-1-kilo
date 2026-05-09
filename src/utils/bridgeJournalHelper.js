@@ -887,12 +887,10 @@ export async function createCOGSJournal({ invoice, cogsAmount, coaList: provided
     }
     const coaList = providedCOA || await getAllCOA();
     const defaultCOGS = await resolveCOGSAccount(coaList);
-    const defaultCost = await resolveCOA({
-        coaList,
-        prefixes: ['5-02', '5'],
-        type: 'COGS',
-        nameHint: 'biaya'
-    }) || defaultCOGS;
+    // Credit side: use COST OF GOOD SOLD clearing account (5-00-000-0-1-00)
+    const defaultCost = coaList.find(c => c.code === '5-00-000-0-1-00') ||
+        coaList.find(c => c.code.startsWith('5-00')) ||
+        defaultCOGS;
 
     const batchId = generateUUID();
     const jeNum = await generateJENumber('COGS');
