@@ -12,6 +12,7 @@ const ProfitLoss = () => {
     const navigate = useNavigate();
     const { companySettings } = useData();
     const currentYear = new Date().getFullYear();
+    const [selectedMonth, setSelectedMonth] = useState(`${currentYear}-01`);
     const [dateRange, setDateRange] = useState({
         startDate: `${currentYear}-01-01`,
         endDate: `${currentYear}-12-31`
@@ -37,6 +38,11 @@ const ProfitLoss = () => {
     const [expandedSections, setExpandedSections] = useState({
         revenue: true, cogs: true, expenses: true, other_income: true, other_expense: true
     });
+
+    useEffect(() => {
+        const year = selectedMonth.split('-')[0];
+        setDateRange({ startDate: `${year}-01-01`, endDate: `${year}-12-31` });
+    }, [selectedMonth]);
 
     useEffect(() => { fetchReportData(); }, [dateRange]);
 
@@ -580,12 +586,9 @@ const ProfitLoss = () => {
                     <div className="flex items-center px-2 border-r border-gray-200 dark:border-dark-border/50">
                         <Calendar className="w-3 h-3 text-gray-500 dark:text-silver-dark mr-2" />
                         <span className="text-xs text-gray-500 dark:text-silver-dark mr-2">Periode:</span>
-                        <input type="number" value={new Date(dateRange.startDate).getFullYear()}
-                            onChange={e => {
-                                const y = e.target.value;
-                                setDateRange({ startDate: `${y}-01-01`, endDate: `${y}-12-31` });
-                            }}
-                            className="bg-transparent border-none text-xs text-slate-800 dark:text-white focus:ring-0 p-0 w-20" />
+                        <input type="month" value={selectedMonth}
+                            onChange={e => setSelectedMonth(e.target.value)}
+                            className="bg-transparent border-none text-xs text-slate-800 dark:text-white focus:ring-0 p-0 w-32" />
                     </div>
                     <button onClick={fetchReportData} className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded transition-colors" title="Refresh">
                         <RefreshCw className={`w-4 h-4 text-slate-600 dark:text-silver-light ${loading ? 'animate-spin' : ''}`} />
@@ -627,19 +630,18 @@ const ProfitLoss = () => {
                             <p className="text-xs text-slate-500 dark:text-silver-dark mt-1">{period}</p>
                         </div>
 
-                {/* Column header — putih di atas biru agar terlihat jelas */}
-                <div className="flex items-center" style={{ background: '#0070BB' }}>
-                    <div className="text-[11px] font-bold uppercase tracking-wider w-[140px] flex-shrink-0 pl-4 pr-2 py-2.5" style={{ color: '#FFFFFF' }}>Code</div>
-                    <div className="text-[11px] font-bold uppercase tracking-wider flex-1 min-w-[300px] px-2 py-2.5" style={{ color: '#FFFFFF' }}>Description</div>
-                    <div className="flex items-center flex-shrink-0 pr-2">
-                        {reportMonths.map(m => (
-                            <div key={m} className={`flex items-center justify-end text-[11px] font-bold uppercase ${colW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>
-                                {mLabel(m)}
+                        <div className="flex items-center" style={{ background: '#0070BB' }}>
+                            <div className="text-[11px] font-bold uppercase tracking-wider w-[140px] flex-shrink-0 pl-4 pr-2 py-2.5" style={{ color: '#FFFFFF' }}>Code</div>
+                            <div className="text-[11px] font-bold uppercase tracking-wider flex-1 min-w-[300px] px-2 py-2.5" style={{ color: '#FFFFFF' }}>Description</div>
+                            <div className="flex items-center flex-shrink-0 pr-2">
+                                {reportMonths.map(m => (
+                                    <div key={m} className={`flex items-center justify-end text-[11px] font-bold uppercase ${colW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>
+                                        {mLabel(m)}
+                                    </div>
+                                ))}
+                                <div className={`flex items-center justify-end text-[11px] font-bold uppercase ${totalW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>Total</div>
                             </div>
-                        ))}
-                        <div className={`flex items-center justify-end text-[11px] font-bold uppercase ${totalW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>Total</div>
-                    </div>
-                </div>
+                        </div>
 
                 {loading ? (
                     <div className="p-12 text-center text-slate-500 dark:text-silver-dark">Loading data...</div>
