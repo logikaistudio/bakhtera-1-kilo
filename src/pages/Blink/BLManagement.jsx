@@ -90,11 +90,31 @@ const BLManagement = () => {
                 containers: selectedBL.containers || [],
                 containerNumber: selectedBL.containerNumber || '',
                 sealNumber: selectedBL.sealNumber || '',
-                marksNumbers: selectedBL.blMarksNumbers || (selectedBL.containerNumber || 'N/M'),
-                descriptionPackages: selectedBL.blDescriptionPackages || selectedBL.cargoDescription || '',
+                marksNumbers: (() => {
+                    if (selectedBL.blMarksNumbers) return selectedBL.blMarksNumbers;
+                    const conts = selectedBL.containers || [];
+                    if (conts.length > 0) return conts.map(c => c.containerNumber || 'N/M').join('\n');
+                    return selectedBL.containerNumber || 'N/M';
+                })(),
+                descriptionPackages: (() => {
+                    if (selectedBL.blDescriptionPackages) return selectedBL.blDescriptionPackages;
+                    const conts = selectedBL.containers || [];
+                    const baseDesc = selectedBL.cargoDescription || '';
+                    if (conts.length > 1) {
+                        return conts.map(c => `${c.containerNumber || 'CONTAINER'}: ${baseDesc}`).join('\n');
+                    }
+                    return baseDesc;
+                })(),
                 grossWeight: selectedBL.blGrossWeightText || (selectedBL.grossWeight ? `${selectedBL.grossWeight} KGS` : ''),
                 measurement: selectedBL.blMeasurementText || (selectedBL.measurement ? `${selectedBL.measurement} CBM` : ''),
-                totalPackages: selectedBL.blTotalPackagesText || '',
+                totalPackages: selectedBL.blTotalPackagesText || (() => {
+                    const conts = selectedBL.containers || [];
+                    const n = conts.length || 1;
+                    const words = ['', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE', 'TEN'];
+                    const word = words[n] || String(n);
+                    const types = [...new Set(conts.map(c => c.containerType).filter(Boolean))];
+                    return `SAY: ${word} (${n}) CONTAINER${n > 1 ? 'S' : ''} ONLY${types.length ? ' (' + types.join(', ') + ')' : ''}`;
+                })(),
 
                 // Footer
                 freightPayableAt: selectedBL.blFreightPayableAt || 'DESTINATION',
@@ -1013,7 +1033,7 @@ const BLManagement = () => {
                                                     roleFilter="all"
                                                     placeholder="🔍 Search & select shipper..."
                                                     size="sm"
-                                                    className="bg-white border-gray-300 text-black placeholder-gray-400"
+                                                    theme="light"
                                                 />
                                             </div>
                                         )}
@@ -1061,7 +1081,7 @@ const BLManagement = () => {
                                                     roleFilter="all"
                                                     placeholder="🔍 Search & select consignee..."
                                                     size="sm"
-                                                    className="bg-white border-gray-300 text-black placeholder-gray-400"
+                                                    theme="light"
                                                 />
                                             </div>
                                         )}
@@ -1109,7 +1129,7 @@ const BLManagement = () => {
                                                     roleFilter="all"
                                                     placeholder="🔍 Search & select notify party..."
                                                     size="sm"
-                                                    className="bg-white border-gray-300 text-black placeholder-gray-400"
+                                                    theme="light"
                                                 />
                                             </div>
                                         )}
