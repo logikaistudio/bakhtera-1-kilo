@@ -252,7 +252,7 @@ const InvoiceManagement = () => {
                 },
                 invoice_items: quotation.service_items && quotation.service_items.length > 0
                     ? quotation.service_items.map(item => {
-                        const acc = revenueAccounts.find(a => a.code === item.itemCode);
+                        const acc = (typeof revenueAccounts !== 'undefined' && revenueAccounts) ? revenueAccounts.find(a => a.code === item.itemCode) : null;
                         return {
                             item_name: acc?.name || item.itemCode || item.name || item.service_name || 'Item',
                             description: item.description || item.name || '',
@@ -336,8 +336,8 @@ const InvoiceManagement = () => {
                         return srcItems.map(item => {
                             // coa_id is authoritative from the item itself.
                             // Only look up revenueAccounts if coa_id is missing.
-                            const accById = item.coa_id ? revenueAccounts.find(a => a.id === item.coa_id) : null;
-                            const accByCode = !accById && item.itemCode ? revenueAccounts.find(a => a.code === item.itemCode) : null;
+                            const accById = (typeof revenueAccounts !== 'undefined' && revenueAccounts && item.coa_id) ? revenueAccounts.find(a => a.id === item.coa_id) : null;
+                            const accByCode = !accById && (typeof revenueAccounts !== 'undefined' && revenueAccounts && item.itemCode) ? revenueAccounts.find(a => a.code === item.itemCode) : null;
                             const acc = accById || accByCode;
                             return {
                                 item_name: acc?.name || item.item_name || item.description || item.name || item.service_name || 'Item',
@@ -502,7 +502,7 @@ const InvoiceManagement = () => {
 
             // Auto-map COA if item_name changes
             if (field === 'item_name') {
-                const acc = revenueAccounts.find(a => a.name === value || a.code === value);
+                const acc = (typeof revenueAccounts !== 'undefined' && revenueAccounts) ? revenueAccounts.find(a => a.name === value || a.code === value) : null;
                 if (acc) {
                     items[index].coa_id = acc.id;
                     items[index].coa_code = acc.code;
