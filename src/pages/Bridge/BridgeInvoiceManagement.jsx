@@ -878,18 +878,29 @@ const BridgeInvoiceManagement = () => {
             const safeDate = (date) => date ? new Date(date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
 
             // Generate items rows
-            const itemsRows = invoice.invoice_items?.map((item, index) => `
+            const itemsRows = invoice.invoice_items?.map((item, index) => {
+                let rawDesc = String(item.description || item.item_name || '');
+                // Split by <br/>, remove duplicates, and join
+                let parts = rawDesc.split(/<br\s*\/?>/i).map(p => p.trim()).filter(Boolean);
+                if (item.item_name && !parts.includes(item.item_name.trim())) {
+                    parts.unshift(`<b>${item.item_name.trim()}</b>`);
+                }
+                let uniqueParts = [...new Set(parts)];
+                let finalDesc = uniqueParts.join('<br/>');
+
+                return `
                 <tr>
                     <td style="text-align: center; vertical-align: top; border-bottom: 1px solid #ccc; border-right: 1px solid #ccc; padding: 4px 8px;">${index + 1}</td>
                     <td style="vertical-align: top; text-transform: capitalize; border-bottom: 1px solid #ccc; border-right: 1px solid #ccc; padding: 4px 8px;">
-                        ${item.item_name ? `<b>${item.item_name}</b><br/>` : ''}<span style="color: #444;">${String(item.description || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>
+                        <span style="color: #444;">${finalDesc}</span>
                     </td>
                     <td style="text-align: center; vertical-align: top; border-bottom: 1px solid #ccc; border-right: 1px solid #ccc; padding: 4px 8px;">${item.qty || 1} ${item.unit || ''}</td>
                     <td style="text-align: right; vertical-align: top; border-bottom: 1px solid #ccc; border-right: 1px solid #ccc; padding: 4px 8px;">${formatCurrency(item.rate || item.amount || 0, invoice.currency).replace('Rp ', '').replace('$', '')}</td>
                     <td style="text-align: right; vertical-align: top; border-bottom: 1px solid #ccc; border-right: 1px solid #ccc; padding: 4px 8px;">${formatCurrency(typeof item.tax_amount !== 'undefined' ? Number(item.tax_amount) : ((item.amount || 0) * (invoice.tax_rate || 0) / 100), invoice.currency).replace('Rp ', '').replace('$', '')}</td>
                     <td style="text-align: right; vertical-align: top; border-bottom: 1px solid #ccc; padding: 4px 8px; padding-right: 10px;">${formatCurrency(item.amount || 0, invoice.currency).replace('Rp ', '').replace('$', '')}</td>
                 </tr>
-            `).join('') || '<tr><td colspan="6" style="text-align: center; padding: 10px;">No items</td></tr>';
+                `;
+            }).join('') || '<tr><td colspan="6" style="text-align: center; padding: 10px;">No items</td></tr>';
 
             const printContent = `
                 <!DOCTYPE html>
@@ -1130,7 +1141,7 @@ const BridgeInvoiceManagement = () => {
                                     <span>${formatCurrency(invoice.subtotal || 0, invoice.currency)}</span>
                                 </div>
                                 <div class="totals-row border-bottom">
-                                    <span>TAX Total${invoice.tax_amount > 0 && invoice.tax_rate > 0 ? ` (${invoice.tax_rate}%)` : ''}</span>
+                                    <span>TAX Total</span>
                                     <span>${formatCurrency(invoice.tax_amount || 0, invoice.currency)}</span>
                                 </div>
                                  <div class="totals-row grand-total">
@@ -3532,7 +3543,19 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                                                     {index + 1}
                                                 </td>
                                                 <td style={{ borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textTransform: 'capitalize' }}>
-                                                    {item.item_name ? <b>{item.item_name}</b> : null} {item.item_name ? '<br/>' : ''}<span style={{color: '#444'}}>{item.description}</span>
+                                                    {(() => {
+                                                        let rawDesc = String(item.description || item.item_name || '');
+                                                        let parts = rawDesc.split(/<br\s*\/?>/i).map(p => p.trim()).filter(Boolean);
+                                                        if (item.item_name && !parts.includes(item.item_name.trim())) {
+                                                            parts.unshift(item.item_name.trim());
+                                                        }
+                                                        let uniqueParts = [...new Set(parts)];
+                                                        return uniqueParts.map((part, i) => (
+                                                            <div key={i} style={{ color: i === 0 && item.item_name && part === item.item_name.trim() ? '#000' : '#444', fontWeight: i === 0 && item.item_name && part === item.item_name.trim() ? 'bold' : 'normal' }}>
+                                                                {part}
+                                                            </div>
+                                                        ));
+                                                    })()}
                                                 </td>
                                                 <td style={{ borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textAlign: 'center' }}>
                                                     {item.splitQty} {item.unit}
@@ -3569,7 +3592,7 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                                     <span>{formatCurrency(splitSubtotal, printCurrency)}</span>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', fontWeight: 'bold', fontSize: '11px', borderBottom: '1px solid #ccc' }}>
-                                    <span>TAX Total{splitTax > 0 ? ` (${printTaxRate}%)` : ''}</span>
+                                    <span>TAX Total</span>
                                     <span>{formatCurrency(splitTax, printCurrency)}</span>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', fontWeight: 'bold', fontSize: '13px', background: '#333', color: 'white' }}>
