@@ -81,6 +81,8 @@ CREATE TABLE IF NOT EXISTS blink_invoices (
     updated_by UUID REFERENCES auth.users(id) ON DELETE SET NULL
 );
 
+-- Added later: rejection columns (kept in separate migration 010)
+
 -- Indexes
 CREATE INDEX idx_blink_invoices_invoice_number ON blink_invoices(invoice_number);
 CREATE INDEX idx_blink_invoices_job_number ON blink_invoices(job_number);
