@@ -44,6 +44,44 @@ const tryInsertTable = async (tableName, payload) => {
     throw error;
 };
 
+// Robust update helper: attempts update, and if it fails due to missing column(s),
+// retries with a reduced payload (drops the missing columns) so UI flow doesn't break.
+const safeUpdateById = async (table, id, payload) => {
+    try {
+        const { error } = await supabase.from(table).update(payload).eq('id', id);
+        if (!error) return { success: true };
+
+        const msg = String(error?.message || error?.details || '');
+        // If schema error (missing column), attempt to remove the referenced column(s) and retry
+        if (/could not find the|'column .* does not exist|missing column/i.test(msg)) {
+            // try to detect the offending column name
+            const colMatch = msg.match(/Could not find the '([^']+)' column/i) || msg.match(/column "([^"]+)" does not exist/i);
+            if (colMatch) {
+                const col = colMatch[1] || colMatch[2];
+                if (col && payload.hasOwnProperty(col)) {
+                    const reduced = { ...payload };
+                    delete reduced[col];
+                    const retry = await supabase.from(table).update(reduced).eq('id', id);
+                    if (!retry.error) return { success: true, fallback: true };
+                }
+            }
+            // As a last-resort fallback: only update status and updated_at if present
+            const minimal = {};
+            if (payload.status) minimal.status = payload.status;
+            if (payload.updated_at) minimal.updated_at = payload.updated_at;
+            if (Object.keys(minimal).length > 0) {
+                const retry2 = await supabase.from(table).update(minimal).eq('id', id);
+                if (!retry2.error) return { success: true, fallback: true };
+            }
+            return { success: false, error };
+        }
+
+        return { success: false, error };
+    } catch (e) {
+        return { success: false, error: e };
+    }
+};
+
 const insertARTransaction = async (blinkRow, fallbackRow) => {
     try {
         const { data: existing } = await supabase.from('blink_ar_transactions').select('id').eq('invoice_id', blinkRow.invoice_id).single();
@@ -644,43 +682,35 @@ const BlinkApproval = () => {
             setProcessing(true);
 
             if (item.type === 'shipment') {
-                const { error } = await supabase
-                    .from('blink_shipments')
-                    .update({
-                        status: 'rejected',
-                        bl_status: 'rejected',
-                        rejection_reason: rejectReason,
-                        updated_at: new Date().toISOString(),
-                    })
-                    .eq('id', item.id);
-                if (error) throw error;
+                const res = await safeUpdateById('blink_shipments', item.id, {
+                    status: 'rejected',
+                    bl_status: 'rejected',
+                    rejection_reason: rejectReason,
+                    updated_at: new Date().toISOString(),
+                });
+                if (!res.success) throw res.error || new Error('Failed to update shipment');
 
             } else if (item.type === 'po') {
-                const { error } = await supabase
-                    .from('blink_purchase_orders')
-                    .update({
-                        status: 'draft',
-                        rejection_reason: rejectReason,
-                        updated_at: new Date().toISOString()
-                    })
-                    .eq('id', item.id);
-                if (error) throw error;
+                const res = await safeUpdateById('blink_purchase_orders', item.id, {
+                    status: 'draft',
+                    rejection_reason: rejectReason,
+                    updated_at: new Date().toISOString()
+                });
+                if (!res.success) throw res.error || new Error('Failed to update purchase order');
             } else if (item.type === 'invoice') {
-                const { error } = await supabase
-                    .from('blink_invoices')
-                    .update({
-                        status: 'draft',
-                        rejection_reason: rejectReason,
-                        updated_at: new Date().toISOString()
-                    })
-                    .eq('id', item.id);
-                if (error) throw error;
+                const res = await safeUpdateById('blink_invoices', item.id, {
+                    status: 'draft',
+                    rejection_reason: rejectReason,
+                    updated_at: new Date().toISOString()
+                });
+                if (!res.success) throw res.error || new Error('Failed to update invoice');
             } else {
-                const { error } = await supabase
-                    .from('blink_quotations')
-                    .update({ status: 'rejected', rejection_reason: rejectReason, updated_at: new Date().toISOString() })
-                    .eq('id', item.id);
-                if (error) throw error;
+                const res = await safeUpdateById('blink_quotations', item.id, {
+                    status: 'rejected',
+                    rejection_reason: rejectReason,
+                    updated_at: new Date().toISOString()
+                });
+                if (!res.success) throw res.error || new Error('Failed to update quotation');
             }
 
             // Log history
