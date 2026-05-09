@@ -12,14 +12,10 @@ const ProfitLoss = () => {
     const navigate = useNavigate();
     const { companySettings } = useData();
     const currentYear = new Date().getFullYear();
-    const [selectedMonth, setSelectedMonth] = useState(`${currentYear}-01`);
-    const [dateRange, setDateRange] = useState({
-        startDate: `${currentYear}-01-01`,
-        endDate: `${currentYear}-12-31`
-    });
+    const [selectedMonth, setSelectedMonth] = useState(`${currentYear}-${String(new Date().getMonth() + 1).padStart(2, '0')}`);
     const [loading, setLoading] = useState(true);
     const [taxRate, setTaxRate] = useState(22);
-    const [reportMonths, setReportMonths] = useState([]);
+    const reportMonths = ['current', 'previous', 'ytd'];
     const [reportData, setReportData] = useState({
         revenue: { groups: [], total: 0 },
         cogs: { groups: [], total: 0 },
@@ -39,12 +35,7 @@ const ProfitLoss = () => {
         revenue: true, cogs: true, expenses: true, other_income: true, other_expense: true
     });
 
-    useEffect(() => {
-        const year = selectedMonth.split('-')[0];
-        setDateRange({ startDate: `${year}-01-01`, endDate: `${year}-12-31` });
-    }, [selectedMonth]);
-
-    useEffect(() => { fetchReportData(); }, [dateRange]);
+    useEffect(() => { fetchReportData(); }, [selectedMonth]);
 
     useEffect(() => {
         if (totals.netIncomeBeforeTax !== undefined) {
@@ -59,9 +50,17 @@ const ProfitLoss = () => {
     const toggleSection = (s) =>
         setExpandedSections(prev => ({ ...prev, [s]: !prev[s] }));
 
+    const getMonthName = (offset) => {
+        const [y, mm] = selectedMonth.split('-');
+        const date = new Date(parseInt(y, 10), parseInt(mm, 10) - 1 + offset, 1);
+        return date.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+    };
+
     const mLabel = (m) => {
-        const [y, mm] = m.split('-');
-        return new Date(parseInt(y), parseInt(mm) - 1, 1).toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+        if (m === 'current') return getMonthName(0);
+        if (m === 'previous') return getMonthName(-1);
+        if (m === 'ytd') return 'YTD';
+        return m;
     };
 
     const fetchReportData = async () => {
@@ -71,16 +70,18 @@ const ProfitLoss = () => {
                 .from('finance_coa').select('*').order('code', { ascending: true });
             if (coaError) throw coaError;
 
-            // Build month list (Jan to Dec of the selected year)
-            const d1 = new Date(dateRange.startDate + 'T00:00:00');
-            const targetYear = d1.getFullYear();
-            const monthsList = [];
-            for (let i = 1; i <= 12; i++) {
-                monthsList.push(`${targetYear}-${String(i).padStart(2, '0')}`);
+            const [year, month] = selectedMonth.split('-');
+            const targetYear = parseInt(year, 10);
+            const targetMonth = parseInt(month, 10);
+            let prevYear = targetYear;
+            let prevMonth = targetMonth - 1;
+            if (prevMonth === 0) {
+                prevMonth = 12;
+                prevYear -= 1;
             }
-
-            const queryStart = `${targetYear}-01-01`;
-            const queryEnd = `${targetYear}-12-31`;
+            const prevMonthKey = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+            const queryStart = `${prevYear}-${String(prevMonth).padStart(2, '0')}-01`;
+            const queryEnd = `${targetYear}-${String(targetMonth).padStart(2, '0')}-${String(new Date(targetYear, targetMonth, 0).getDate()).padStart(2, '0')}`;
 
             const [r1, r2] = await Promise.all([
                 supabase.from('blink_journal_entries')
@@ -102,8 +103,7 @@ const ProfitLoss = () => {
             const accCodeMap = {};
             const codeToMeta = {};
             (coaData || []).forEach(coa => {
-                const byMonth = {};
-                monthsList.forEach(m => byMonth[m] = 0);
+                const byMonth = { current: 0, previous: 0, ytd: 0 };
                 coaMap[coa.id] = { ...coa, amount: 0, byMonth };
                 if (coa.code) {
                     accCodeMap[coa.code] = coa.id;
@@ -127,11 +127,6 @@ const ProfitLoss = () => {
                 const credit = toIDR(e.credit, e.currency, e.exchange_rate);
                 const prefix = getCodePrefix(acc.code);
                 let val = 0;
-                // Use CODE PREFIX for calculation (not type field):
-                // 4xx = REVENUE (credit - debit)
-                // 5xx = COGS (debit - credit)
-                // 6xx = EXPENSE - General Expenses (debit - credit)
-                // 7xx, 8xx = OTHER INCOME (credit - debit)
                 if (prefix === '4' || prefix === '7' || prefix === '8') {
                     val = (credit - debit);
                 } else {
@@ -139,15 +134,12 @@ const ProfitLoss = () => {
                 }
                 acc.amount += val;
                 const mKey = e.entry_date?.substring(0, 7);
-                if (mKey && acc.byMonth && acc.byMonth[mKey] !== undefined) acc.byMonth[mKey] += val;
+                if (!mKey) return;
+                if (mKey === selectedMonth) acc.byMonth.current += val;
+                if (mKey === prevMonthKey) acc.byMonth.previous += val;
+                if (mKey.startsWith(`${targetYear}-`) && mKey <= selectedMonth) acc.byMonth.ytd += val;
             });
 
-            // ── Account Classification by Code Prefix ─────────────────────────────
-            //   4-xx → REVENUE
-            //   5-xx → COGS / Direct Cost
-            //   6-xx → Administrasi & General Expenses
-            //   7-xx → Other Income
-            //   8-xx → Other Income
             const all = Object.values(coaMap);
 
             const groupByParent = (accounts) => {
@@ -172,7 +164,7 @@ const ProfitLoss = () => {
                 const result = [];
                 orphans.forEach(acc => result.push({ item: acc, isParent: false }));
                 Object.values(groups).forEach(g => {
-                    const totalAmount = g.items.reduce((s, i) => s + i.amount, 0);
+                    const totalAmount = g.items.reduce((s, i) => s + (i.byMonth?.ytd || 0), 0);
                     const byMonthTotal = {};
                     reportMonths.forEach(m => {
                         byMonthTotal[m] = g.items.reduce((s, i) => s + (i.byMonth?.[m] || 0), 0);
@@ -227,19 +219,18 @@ const ProfitLoss = () => {
             const groupedOtherIncome = buildGroupedData(other_income);
             const groupedOtherExpense = buildGroupedData(other_expense);
 
-            const totalRevenue = revenue.reduce((s, a) => s + a.amount, 0);
-            const totalCOGS = cogs.reduce((s, a) => s + a.amount, 0);
+            const totalRevenue = revenue.reduce((s, a) => s + (a.byMonth?.ytd || 0), 0);
+            const totalCOGS = cogs.reduce((s, a) => s + (a.byMonth?.ytd || 0), 0);
             const grossProfit = totalRevenue - totalCOGS;
-            const totalExpenses = expenses.reduce((s, a) => s + a.amount, 0);
+            const totalExpenses = expenses.reduce((s, a) => s + (a.byMonth?.ytd || 0), 0);
             const operatingProfit = grossProfit - totalExpenses;
-            const totalOtherIncome = other_income.reduce((s, a) => s + a.amount, 0);
-            const totalOtherExpense = other_expense.reduce((s, a) => s + a.amount, 0);
+            const totalOtherIncome = other_income.reduce((s, a) => s + (a.byMonth?.ytd || 0), 0);
+            const totalOtherExpense = other_expense.reduce((s, a) => s + (a.byMonth?.ytd || 0), 0);
             const otherNet = totalOtherIncome - totalOtherExpense;
             const netIncomeBeforeTax = operatingProfit + otherNet;
             const taxAmount = netIncomeBeforeTax > 0 ? netIncomeBeforeTax * (taxRate / 100) : 0;
             const netIncomeAfterTax = netIncomeBeforeTax - taxAmount;
 
-            setReportMonths(monthsList);
             setReportData({
                 revenue: groupedRevenue,
                 cogs: groupedCogs,
@@ -262,8 +253,11 @@ const ProfitLoss = () => {
         return neg ? `(${s})` : s;
     };
 
-    const periodYear = new Date(dateRange.startDate).getFullYear();
-    const period = `Periode: 1 Januari ${periodYear} - 31 Desember ${periodYear}`;
+    const [selY, selM] = selectedMonth.split('-');
+    const firstDate = new Date(parseInt(selY, 10), parseInt(selM, 10) - 1, 1);
+    const lastDate = new Date(parseInt(selY, 10), parseInt(selM, 10), 0);
+    const formatDate = (d) => d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    const period = `Periode: ${formatDate(firstDate)} - ${formatDate(lastDate)}`;
 
     // ── Export Excel ─────────────────────────────────────────────────
     const handleExportExcel = () => {
@@ -522,20 +516,20 @@ const ProfitLoss = () => {
             if (group.isParent) {
                 return (
                     <div key={`parent-${group.parent.code}`}>
-                        <div className="flex items-center bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800">
+                        <div className="flex items-center bg-slate-50 dark:bg-transparent border-b border-slate-200 dark:border-dark-border/30">
                             <div className="w-[140px] flex-shrink-0 pl-4 pr-2 py-2 flex items-center">
-                                <span className="text-[11px] text-yellow-700 dark:text-yellow-400 font-bold font-mono whitespace-nowrap">{group.parent.code}</span>
+                                <span className="text-[11px] text-slate-600 dark:text-silver-dark font-bold font-mono whitespace-nowrap">{group.parent.code}</span>
                             </div>
-                            <div className="text-[12px] text-yellow-700 dark:text-yellow-400 font-bold flex-1 min-w-[300px] px-2 py-2 whitespace-nowrap" title={group.parent.name}>
-                                {group.parent.name} (Group Total)
+                            <div className="text-[12px] text-slate-700 dark:text-silver-light font-bold flex-1 min-w-[300px] px-2 py-2 whitespace-nowrap" title={group.parent.name}>
+                                {group.parent.name}
                             </div>
                             <div className="flex items-center flex-shrink-0 pr-2">
                                 {reportMonths.map(m => (
-                                    <div key={m} className={`flex items-center justify-end text-[11px] font-mono text-yellow-700 dark:text-yellow-400 font-bold ${colW} px-1`} title={fmt(group.parent.byMonth?.[m] || 0)}>
+                                    <div key={m} className={`flex items-center justify-end text-[11px] font-mono text-slate-600 dark:text-silver-dark font-bold ${colW} px-1`} title={fmt(group.parent.byMonth?.[m] || 0)}>
                                         {fmt(group.parent.byMonth?.[m] || 0)}
                                     </div>
                                 ))}
-                                <div className={`flex items-center justify-end text-[12px] font-mono text-yellow-700 dark:text-yellow-400 font-bold ${totalW} px-1`} title={fmt(group.parent.amount)}>{fmt(group.parent.amount)}</div>
+                                <div className={`flex items-center justify-end text-[12px] font-mono text-slate-700 dark:text-silver-light font-bold ${totalW} px-1`} title={fmt(group.parent.amount)}>{fmt(group.parent.amount)}</div>
                             </div>
                         </div>
                         {group.items.map(item => <ItemRow key={item.id} item={item} />)}
@@ -553,18 +547,17 @@ const ProfitLoss = () => {
             red: 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-400',
         };
         const cls = highlight ? colors[highlight] : 'bg-slate-50 dark:bg-transparent border-slate-200 dark:border-dark-border/30 text-slate-800 dark:text-silver-light';
-        const valCls = highlight ? '' : (amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-silver-light');
         return (
             <div className={`flex items-center border-y ${cls} ${thick ? 'border-t-2' : ''}`}>
                 <div className="w-[140px] flex-shrink-0 px-2 py-2"></div>
                 <div className={`text-[12px] font-bold uppercase flex-1 min-w-[300px] px-2 py-2 whitespace-nowrap ${indent ? 'pl-6' : ''}`} title={label}>{label}</div>
                 <div className="flex items-center flex-shrink-0 pr-2">
                     {reportMonths.map(m => (
-                        <div key={m} className={`flex items-center justify-end text-[11px] font-bold font-mono ${colW} px-1 py-2`} title={fmt(byMonthFn ? byMonthFn(m) : 0)}>
+                        <div key={m} className={`flex items-center justify-end text-[11px] font-bold font-mono ${colW} px-1 py-2 ${highlight ? '' : 'text-slate-600 dark:text-silver-dark'}`} title={fmt(byMonthFn ? byMonthFn(m) : 0)}>
                             {byMonthFn ? fmt(byMonthFn(m)) : ''}
                         </div>
                     ))}
-                    <div className={`flex items-center justify-end text-[12px] font-bold font-mono ${totalW} px-1 py-2 ${valCls}`} title={fmt(amount)}>{fmt(amount)}</div>
+                    <div className={`flex items-center justify-end text-[12px] font-bold font-mono ${totalW} px-1 py-2 ${highlight ? '' : 'text-slate-800 dark:text-silver-light'}`} title={fmt(amount)}>{fmt(amount)}</div>
                 </div>
             </div>
         );
@@ -607,12 +600,12 @@ const ProfitLoss = () => {
                     {/* Export buttons */}
                     <div className="flex items-center gap-1 border-l border-gray-200 dark:border-dark-border/50 pl-2 ml-1">
                         <button onClick={handleExportExcel}
-                            className="p-1.5 hover:bg-green-100 dark:hover:bg-green-900/20 rounded transition-colors text-green-600 dark:text-green-400"
+                            className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded transition-colors text-slate-600 dark:text-silver-light"
                             title="Export Excel (dengan kop surat)">
                             <FileSpreadsheet className="w-4 h-4" />
                         </button>
                         <button onClick={handleExportPDF}
-                            className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/20 rounded transition-colors text-red-500 dark:text-red-400"
+                            className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded transition-colors text-slate-600 dark:text-silver-light"
                             title="Export PDF / Cetak">
                             <Printer className="w-4 h-4" />
                         </button>
@@ -626,20 +619,20 @@ const ProfitLoss = () => {
                     <div className="w-max min-w-full">
                         {/* Title */}
                         <div className="text-center py-4 border-b border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface/40">
-                            <h2 className="text-base font-extrabold text-red-600 dark:text-red-500 tracking-widest uppercase">Profit & Loss</h2>
+                            <h2 className="text-base font-extrabold text-slate-800 dark:text-silver-light tracking-widest uppercase">Profit & Loss</h2>
                             <p className="text-xs text-slate-500 dark:text-silver-dark mt-1">{period}</p>
                         </div>
 
-                        <div className="flex items-center" style={{ background: '#0070BB' }}>
-                            <div className="text-[11px] font-bold uppercase tracking-wider w-[140px] flex-shrink-0 pl-4 pr-2 py-2.5" style={{ color: '#FFFFFF' }}>Code</div>
-                            <div className="text-[11px] font-bold uppercase tracking-wider flex-1 min-w-[300px] px-2 py-2.5" style={{ color: '#FFFFFF' }}>Description</div>
+                        <div className="flex items-center bg-slate-100 dark:bg-dark-surface/70 border-b border-slate-200 dark:border-dark-border">
+                            <div className="text-[11px] font-bold uppercase tracking-wider w-[140px] flex-shrink-0 pl-4 pr-2 py-2.5 text-slate-800 dark:text-silver-light">Code</div>
+                            <div className="text-[11px] font-bold uppercase tracking-wider flex-1 min-w-[300px] px-2 py-2.5 text-slate-800 dark:text-silver-light">Description</div>
                             <div className="flex items-center flex-shrink-0 pr-2">
                                 {reportMonths.map(m => (
-                                    <div key={m} className={`flex items-center justify-end text-[11px] font-bold uppercase ${colW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>
+                                    <div key={m} className={`flex items-center justify-end text-[11px] font-bold uppercase ${colW} px-1 py-2.5 text-slate-800 dark:text-silver-light`}>
                                         {mLabel(m)}
                                     </div>
                                 ))}
-                                <div className={`flex items-center justify-end text-[11px] font-bold uppercase ${totalW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>Total</div>
+                                <div className={`flex items-center justify-end text-[11px] font-bold uppercase ${totalW} px-1 py-2.5 text-slate-800 dark:text-silver-light`}>Total</div>
                             </div>
                         </div>
 
