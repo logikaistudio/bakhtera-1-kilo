@@ -64,21 +64,21 @@ const BLManagement = () => {
                 // Subject
                 subject: selectedBL.blSubject || '',
 
-                // Parties - Use only BL-specific fields (no fallback to shipment data)
-                shipperName: selectedBL.blShipperName || '',
+                // Parties - Auto-populate from shipment data
+                shipperName: selectedBL.blShipperName || (selectedBL.shipperName !== 'N/A' ? selectedBL.shipperName : ''),
                 shipperAddress: selectedBL.blShipperAddress || '',
-                consigneeName: selectedBL.blConsigneeName || '',
+                consigneeName: selectedBL.blConsigneeName || (selectedBL.consigneeName !== 'N/A' ? selectedBL.consigneeName : ''),
                 consigneeAddress: selectedBL.blConsigneeAddress || '',
                 notifyPartyName: selectedBL.blNotifyPartyName || 'SAME AS CONSIGNEE',
                 notifyPartyAddress: selectedBL.blNotifyPartyAddress || '',
 
-                // Routing - use only BL-specific fields (no fallback to shipment data)
+                // Routing - Auto-populate from shipment data
                 vessel: selectedBL.vessel || '',
                 voyage: selectedBL.voyage || '',
-                placeOfReceipt: selectedBL.blPlaceOfReceipt || '',
+                placeOfReceipt: selectedBL.blPlaceOfReceipt || selectedBL.portOfLoading || '',
                 portOfLoading: selectedBL.portOfLoading || '',
                 portOfDischarge: selectedBL.portOfDischarge || '',
-                placeOfDelivery: selectedBL.blPlaceOfDelivery || '',
+                placeOfDelivery: selectedBL.blPlaceOfDelivery || selectedBL.portOfDischarge || '',
                 preCarriageBy: selectedBL.blPreCarriageBy || '',
                 loadingPier: selectedBL.blLoadingPier || '',
 
@@ -86,14 +86,14 @@ const BLManagement = () => {
                 typeOfMove: selectedBL.blTypeOfMove || 'FCL/FCL',
                 countryOfOrigin: selectedBL.blCountryOfOrigin || 'INDONESIA',
 
-                // Cargo - use only BL-specific fields (no fallback to shipment data)
+                // Cargo - Auto-populate from shipment data
                 containers: selectedBL.containers || [],
                 containerNumber: selectedBL.containerNumber || '',
                 sealNumber: selectedBL.sealNumber || '',
-                marksNumbers: selectedBL.blMarksNumbers || '',
-                descriptionPackages: selectedBL.blDescriptionPackages || '',
-                grossWeight: selectedBL.blGrossWeightText || '',
-                measurement: selectedBL.blMeasurementText || '',
+                marksNumbers: selectedBL.blMarksNumbers || (selectedBL.containerNumber || 'N/M'),
+                descriptionPackages: selectedBL.blDescriptionPackages || selectedBL.cargoDescription || '',
+                grossWeight: selectedBL.blGrossWeightText || (selectedBL.grossWeight ? `${selectedBL.grossWeight} KGS` : ''),
+                measurement: selectedBL.blMeasurementText || (selectedBL.measurement ? `${selectedBL.measurement} CBM` : ''),
                 totalPackages: selectedBL.blTotalPackagesText || '',
 
                 // Footer
@@ -952,51 +952,6 @@ const BLManagement = () => {
                             {/* TAB: Header */}
                             {activeTab === 'header' && (
                                 <div className="animate-fade-in space-y-4">
-                                    {/* Load from Quotation */}
-                                    {isEditing && (
-                                        <div className="grid grid-cols-2 gap-4 mb-4">
-                                            <div className="p-3 bg-orange-50/50 dark:bg-orange-900/10 rounded-lg border border-orange-100 dark:border-orange-900/30">
-                                                <label className="block text-xs text-orange-500 font-semibold uppercase mb-2">
-                                                    🚀 Auto-Populate from Quotation
-                                                </label>
-                                                <select
-                                                    value={selectedQuotationId || ''}
-                                                    onChange={(e) => handleLoadFromQuotation(e.target.value)}
-                                                    className="w-full px-3 py-2 bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded text-sm text-gray-900 dark:text-silver-light focus:border-accent-orange"
-                                                >
-                                                    <option value="">-- Select Quotation --</option>
-                                                    {quotations.map(q => (
-                                                        <option key={q.id} value={q.id}>
-                                                            {q.quotation_number} - {q.customer_name} ({q.origin} → {q.destination})
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                                <p className="text-xs text-gray-500 dark:text-silver-dark mt-1">
-                                                    Fills shipper, consignee, routing, cargo
-                                                </p>
-                                            </div>
-                                            <div className="p-3 bg-blue-50/50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-900/30">
-                                                <label className="block text-xs text-blue-500 font-semibold uppercase mb-2">
-                                                    📦 Auto-Populate from SO/Shipment
-                                                </label>
-                                                <select
-                                                    onChange={(e) => handleLoadFromShipment(e.target.value)}
-                                                    className="w-full px-3 py-2 bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded text-sm text-gray-900 dark:text-silver-light focus:border-blue-500"
-                                                >
-                                                    <option value="">-- Select SO/Shipment --</option>
-                                                    {shipments.map(s => (
-                                                        <option key={s.id} value={s.id}>
-                                                            {s.so_number || s.job_number} - {s.customer_name || s.customer} ({s.origin} → {s.destination})
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                                <p className="text-xs text-gray-500 dark:text-silver-dark mt-1">
-                                                    Fills vessel, voyage, routing, container, seal, cargo, marks, shipper, consignee, doc numbers, dates
-                                                </p>
-                                            </div>
-                                        </div>
-                                    )}
-
                                     <div className="p-3 bg-blue-50/50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-900/30 mb-4">
                                         <h3 className="text-sm font-bold text-blue-500 mb-2">Basic Information</h3>
                                         <div className="grid grid-cols-3 gap-4">
@@ -1041,16 +996,16 @@ const BLManagement = () => {
 
                             {/* TAB: Parties */}
                             {activeTab === 'parties' && (
-                                <div className="animate-fade-in grid grid-cols-3 gap-6 h-full">
+                                <div className="animate-fade-in grid grid-cols-3 gap-6 h-full bg-white text-black p-4 rounded-lg shadow-sm border border-gray-200">
                                     {/* SHIPPER */}
-                                    <div className="col-span-1 border-r border-dashed border-gray-200 dark:border-dark-border pr-6">
-                                        <div className="flex items-center gap-2 text-purple-500 font-bold uppercase text-xs tracking-wider mb-3">
-                                            <User className="w-3.5 h-3.5" />
+                                    <div className="col-span-1 border-r border-dashed border-gray-300 pr-6">
+                                        <div className="flex items-center gap-2 text-gray-800 font-bold uppercase text-sm tracking-wider mb-3">
+                                            <User className="w-4 h-4 text-gray-600" />
                                             <span>Shipper / Exporter</span>
                                         </div>
                                         {isEditing && (
                                             <div className="mb-3">
-                                                <label className="block text-xs text-gray-400 mb-1">Select from Business Partners</label>
+                                                <label className="block text-xs text-gray-600 mb-1">Select from Business Partners</label>
                                                 <PartnerPicker
                                                     value={""}
                                                     onChange={() => { }}
@@ -1058,23 +1013,47 @@ const BLManagement = () => {
                                                     roleFilter="all"
                                                     placeholder="🔍 Search & select shipper..."
                                                     size="sm"
+                                                    className="bg-white border-gray-300 text-black placeholder-gray-400"
                                                 />
                                             </div>
                                         )}
                                         <div className="space-y-4">
-                                            {renderInput('Name', 'shipperName')}
-                                            {renderInput('Address', 'shipperAddress', 'textarea', 'Full address with country & phone')}
+                                            <div className="mb-4">
+                                                <label className="block text-xs text-gray-600 font-semibold uppercase mb-1">Name</label>
+                                                {isEditing ? (
+                                                    <input
+                                                        type="text"
+                                                        value={editForm.shipperName || ''}
+                                                        onChange={(e) => setEditForm({ ...editForm, shipperName: e.target.value })}
+                                                        className="w-full px-3 py-2 bg-white border border-gray-300 rounded text-sm text-black focus:border-gray-500"
+                                                    />
+                                                ) : (
+                                                    <div className="text-sm text-black font-medium p-2 bg-gray-50 rounded border border-gray-200">{editForm.shipperName || '-'}</div>
+                                                )}
+                                            </div>
+                                            <div className="mb-4">
+                                                <label className="block text-xs text-gray-600 font-semibold uppercase mb-1">Address</label>
+                                                {isEditing ? (
+                                                    <textarea
+                                                        value={editForm.shipperAddress || ''}
+                                                        onChange={(e) => setEditForm({ ...editForm, shipperAddress: e.target.value })}
+                                                        className="w-full px-3 py-2 bg-white border border-gray-300 rounded text-sm text-black focus:border-gray-500 h-24 font-mono"
+                                                    />
+                                                ) : (
+                                                    <div className="text-xs text-black font-medium p-2 bg-gray-50 rounded border border-gray-200 whitespace-pre-wrap font-mono">{editForm.shipperAddress || '-'}</div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                     {/* CONSIGNEE */}
-                                    <div className="col-span-1 border-r border-dashed border-gray-200 dark:border-dark-border pr-6">
-                                        <div className="flex items-center gap-2 text-pink-500 font-bold uppercase text-xs tracking-wider mb-3">
-                                            <User className="w-3.5 h-3.5" />
+                                    <div className="col-span-1 border-r border-dashed border-gray-300 pr-6">
+                                        <div className="flex items-center gap-2 text-gray-800 font-bold uppercase text-sm tracking-wider mb-3">
+                                            <User className="w-4 h-4 text-gray-600" />
                                             <span>Consignee</span>
                                         </div>
                                         {isEditing && (
                                             <div className="mb-3">
-                                                <label className="block text-xs text-gray-400 mb-1">Select from Business Partners</label>
+                                                <label className="block text-xs text-gray-600 mb-1">Select from Business Partners</label>
                                                 <PartnerPicker
                                                     value={""}
                                                     onChange={() => { }}
@@ -1082,23 +1061,47 @@ const BLManagement = () => {
                                                     roleFilter="all"
                                                     placeholder="🔍 Search & select consignee..."
                                                     size="sm"
+                                                    className="bg-white border-gray-300 text-black placeholder-gray-400"
                                                 />
                                             </div>
                                         )}
                                         <div className="space-y-4">
-                                            {renderInput('Name', 'consigneeName')}
-                                            {renderInput('Address', 'consigneeAddress', 'textarea', 'Full address with country & phone')}
+                                            <div className="mb-4">
+                                                <label className="block text-xs text-gray-600 font-semibold uppercase mb-1">Name</label>
+                                                {isEditing ? (
+                                                    <input
+                                                        type="text"
+                                                        value={editForm.consigneeName || ''}
+                                                        onChange={(e) => setEditForm({ ...editForm, consigneeName: e.target.value })}
+                                                        className="w-full px-3 py-2 bg-white border border-gray-300 rounded text-sm text-black focus:border-gray-500"
+                                                    />
+                                                ) : (
+                                                    <div className="text-sm text-black font-medium p-2 bg-gray-50 rounded border border-gray-200">{editForm.consigneeName || '-'}</div>
+                                                )}
+                                            </div>
+                                            <div className="mb-4">
+                                                <label className="block text-xs text-gray-600 font-semibold uppercase mb-1">Address</label>
+                                                {isEditing ? (
+                                                    <textarea
+                                                        value={editForm.consigneeAddress || ''}
+                                                        onChange={(e) => setEditForm({ ...editForm, consigneeAddress: e.target.value })}
+                                                        className="w-full px-3 py-2 bg-white border border-gray-300 rounded text-sm text-black focus:border-gray-500 h-24 font-mono"
+                                                    />
+                                                ) : (
+                                                    <div className="text-xs text-black font-medium p-2 bg-gray-50 rounded border border-gray-200 whitespace-pre-wrap font-mono">{editForm.consigneeAddress || '-'}</div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                     {/* NOTIFY PARTY */}
                                     <div className="col-span-1">
-                                        <div className="flex items-center gap-2 text-orange-500 font-bold uppercase text-xs tracking-wider mb-3">
-                                            <User className="w-3.5 h-3.5" />
+                                        <div className="flex items-center gap-2 text-gray-800 font-bold uppercase text-sm tracking-wider mb-3">
+                                            <User className="w-4 h-4 text-gray-600" />
                                             <span>Notify Party</span>
                                         </div>
                                         {isEditing && (
                                             <div className="mb-3">
-                                                <label className="block text-xs text-gray-400 mb-1">Select from Business Partners</label>
+                                                <label className="block text-xs text-gray-600 mb-1">Select from Business Partners</label>
                                                 <PartnerPicker
                                                     value={""}
                                                     onChange={() => { }}
@@ -1106,12 +1109,36 @@ const BLManagement = () => {
                                                     roleFilter="all"
                                                     placeholder="🔍 Search & select notify party..."
                                                     size="sm"
+                                                    className="bg-white border-gray-300 text-black placeholder-gray-400"
                                                 />
                                             </div>
                                         )}
                                         <div className="space-y-4">
-                                            {renderInput('Name', 'notifyPartyName')}
-                                            {renderInput('Address', 'notifyPartyAddress', 'textarea', 'Usually SAME AS CONSIGNEE')}
+                                            <div className="mb-4">
+                                                <label className="block text-xs text-gray-600 font-semibold uppercase mb-1">Name</label>
+                                                {isEditing ? (
+                                                    <input
+                                                        type="text"
+                                                        value={editForm.notifyPartyName || ''}
+                                                        onChange={(e) => setEditForm({ ...editForm, notifyPartyName: e.target.value })}
+                                                        className="w-full px-3 py-2 bg-white border border-gray-300 rounded text-sm text-black focus:border-gray-500"
+                                                    />
+                                                ) : (
+                                                    <div className="text-sm text-black font-medium p-2 bg-gray-50 rounded border border-gray-200">{editForm.notifyPartyName || '-'}</div>
+                                                )}
+                                            </div>
+                                            <div className="mb-4">
+                                                <label className="block text-xs text-gray-600 font-semibold uppercase mb-1">Address</label>
+                                                {isEditing ? (
+                                                    <textarea
+                                                        value={editForm.notifyPartyAddress || ''}
+                                                        onChange={(e) => setEditForm({ ...editForm, notifyPartyAddress: e.target.value })}
+                                                        className="w-full px-3 py-2 bg-white border border-gray-300 rounded text-sm text-black focus:border-gray-500 h-24 font-mono"
+                                                    />
+                                                ) : (
+                                                    <div className="text-xs text-black font-medium p-2 bg-gray-50 rounded border border-gray-200 whitespace-pre-wrap font-mono">{editForm.notifyPartyAddress || '-'}</div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -1215,11 +1242,45 @@ const BLManagement = () => {
                                     </div>
 
                                     <div className="grid grid-cols-12 gap-6">
-                                        <div className="col-span-4">
+                                        <div className="col-span-8">
                                             <h3 className="font-bold text-gray-500 dark:text-silver-dark text-xs uppercase mb-3 border-b border-gray-200 dark:border-dark-border pb-1">Marks & Description</h3>
-                                            {renderInput('Marks & Numbers', 'marksNumbers', 'textarea', 'e.g. N/M')}
-                                            {renderInput('Description of Packages and Goods', 'descriptionPackages', 'textarea', 'FULL DESCRIPTION OF GOODS')}
-                                            {renderInput('Total Packages Text', 'totalPackages', 'text', 'SAY: ONE CONTAINER ONLY')}
+                                            <div className="grid grid-cols-5 gap-4">
+                                                <div className="col-span-2">
+                                                    <label className="block text-xs text-gray-500 dark:text-silver-dark font-semibold uppercase mb-1">Marks & Numbers</label>
+                                                    {isEditing ? (
+                                                        <textarea
+                                                            value={editForm.marksNumbers || ''}
+                                                            onChange={(e) => setEditForm({ ...editForm, marksNumbers: e.target.value })}
+                                                            className="w-full px-3 py-2 bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded text-sm text-gray-900 dark:text-silver-light focus:border-accent-orange font-mono"
+                                                            style={{ minHeight: '200px' }}
+                                                            placeholder="e.g. N/M"
+                                                        />
+                                                    ) : (
+                                                        <div className="text-xs text-gray-900 dark:text-silver-light font-medium p-2 bg-gray-50 dark:bg-dark-bg/50 rounded border border-transparent whitespace-pre-wrap font-mono" style={{ minHeight: '200px' }}>
+                                                            {editForm.marksNumbers || '-'}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="col-span-3">
+                                                    <label className="block text-xs text-gray-500 dark:text-silver-dark font-semibold uppercase mb-1">Description of Packages and Goods</label>
+                                                    {isEditing ? (
+                                                        <textarea
+                                                            value={editForm.descriptionPackages || ''}
+                                                            onChange={(e) => setEditForm({ ...editForm, descriptionPackages: e.target.value })}
+                                                            className="w-full px-3 py-2 bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded text-sm text-gray-900 dark:text-silver-light focus:border-accent-orange font-mono"
+                                                            style={{ minHeight: '200px' }}
+                                                            placeholder="FULL DESCRIPTION OF GOODS&#10;Container 1: ...&#10;Container 2: ..."
+                                                        />
+                                                    ) : (
+                                                        <div className="text-xs text-gray-900 dark:text-silver-light font-medium p-2 bg-gray-50 dark:bg-dark-bg/50 rounded border border-transparent whitespace-pre-wrap font-mono" style={{ minHeight: '200px' }}>
+                                                            {editForm.descriptionPackages || '-'}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="mt-4">
+                                                {renderInput('Total Packages Text', 'totalPackages', 'text', 'SAY: ONE CONTAINER ONLY')}
+                                            </div>
                                         </div>
                                         <div className="col-span-4">
                                             <h3 className="font-bold text-gray-500 dark:text-silver-dark text-xs uppercase mb-3 border-b border-gray-200 dark:border-dark-border pb-1">Weight & Volume</h3>
