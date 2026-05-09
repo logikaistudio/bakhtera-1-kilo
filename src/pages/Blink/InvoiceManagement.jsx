@@ -91,6 +91,7 @@ const InvoiceManagement = () => {
         partially_paid: { label: 'Partial Payment', color: 'bg-yellow-500/20 text-yellow-400', icon: DollarSign },
         paid: { label: 'Paid', color: 'bg-green-500/20 text-green-400', icon: CheckCircle },
         overdue: { label: 'Overdue', color: 'bg-red-500/20 text-red-400', icon: AlertCircle },
+        rejected: { label: 'Rejected', color: 'bg-red-500/20 text-red-400', icon: XCircle },
         cancelled: { label: 'Cancelled', color: 'bg-gray-500/20 text-gray-400', icon: XCircle },
         unpaid: { label: 'Unpaid', color: 'bg-orange-500/20 text-orange-400', icon: Clock },
         manager_approval: { label: 'Manager Approval', color: 'bg-yellow-500/20 text-yellow-400', icon: Clock }
@@ -1444,9 +1445,9 @@ const InvoiceManagement = () => {
 
         if (!matchesSearch) return false;
 
-        // Default: hide cancelled unless explicitly filtered
+        // Default: hide cancelled and rejected unless explicitly filtered
         if (filter === 'all') {
-            return inv.status !== 'cancelled';
+            return inv.status !== 'cancelled' && inv.status !== 'rejected';
         }
 
         // Status filter
@@ -1454,8 +1455,8 @@ const InvoiceManagement = () => {
         return inv.status === filter;
     });
 
-    // Calculate summary stats excluding draft, manager_approval and cancelled
-    const activeInvoices = invoices.filter(inv => !['draft', 'manager_approval', 'cancelled'].includes(inv.status));
+    // Calculate summary stats excluding draft, manager_approval, cancelled, and rejected
+    const activeInvoices = invoices.filter(inv => !['draft', 'manager_approval', 'cancelled', 'rejected'].includes(inv.status));
     const totalRevenue = activeInvoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
     const totalOutstanding = activeInvoices.reduce((sum, inv) => sum + (inv.outstanding_amount || 0), 0);
     const overdueCount = activeInvoices.filter(inv => inv.status === 'overdue').length;

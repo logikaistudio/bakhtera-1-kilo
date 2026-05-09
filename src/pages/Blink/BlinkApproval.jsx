@@ -686,6 +686,7 @@ const BlinkApproval = () => {
                     status: 'rejected',
                     bl_status: 'rejected',
                     rejection_reason: rejectReason,
+                    rejection_date: new Date().toISOString(),
                     updated_at: new Date().toISOString(),
                 });
                 if (!res.success) throw res.error || new Error('Failed to update shipment');
@@ -699,8 +700,9 @@ const BlinkApproval = () => {
                 if (!res.success) throw res.error || new Error('Failed to update purchase order');
             } else if (item.type === 'invoice') {
                 const res = await safeUpdateById('blink_invoices', item.id, {
-                    status: 'draft',
+                    status: 'rejected',
                     rejection_reason: rejectReason,
+                    rejection_date: new Date().toISOString(),
                     updated_at: new Date().toISOString()
                 });
                 if (!res.success) throw res.error || new Error('Failed to update invoice');
@@ -708,6 +710,7 @@ const BlinkApproval = () => {
                 const res = await safeUpdateById('blink_quotations', item.id, {
                     status: 'rejected',
                     rejection_reason: rejectReason,
+                    rejection_date: new Date().toISOString(),
                     updated_at: new Date().toISOString()
                 });
                 if (!res.success) throw res.error || new Error('Failed to update quotation');
