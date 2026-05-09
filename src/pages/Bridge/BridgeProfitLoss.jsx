@@ -17,7 +17,7 @@ const BridgeProfitLoss = () => {
         endDate: `${currentYear}-12-31`
     });
     const [loading, setLoading] = useState(true);
-    const [taxRate, setTaxRate] = useState(22);
+    const [taxRate, setTaxRate] = useState(11);
     const [reportMonths, setReportMonths] = useState([]);
     const [reportData, setReportData] = useState({
         revenue: { groups: [], total: 0 },

@@ -14,7 +14,7 @@ const ProfitLoss = () => {
     const currentYear = new Date().getFullYear();
     const [selectedMonth, setSelectedMonth] = useState(`${currentYear}-${String(new Date().getMonth() + 1).padStart(2, '0')}`);
     const [loading, setLoading] = useState(true);
-    const [taxRate, setTaxRate] = useState(22);
+    const [taxRate, setTaxRate] = useState(11);
     const reportMonths = ['current', 'previous', 'ytd'];
     const [reportData, setReportData] = useState({
         revenue: { groups: [], total: 0 },
