@@ -634,13 +634,7 @@ export async function createInvoiceJournal({ invoice, coaList: providedCOA }) {
             if (!itemCOA) {
                 const itemNameHint = item.description || item.item_name || '';
                 const isDiscountItem = itemNameHint.toLowerCase().includes('discount') || itemNameHint.toLowerCase().includes('diskon');
-                
-                itemCOA = await resolveCOA({
-                    coaList,
-                    prefixes: isDiscountItem ? ['4', '5'] : ['4'],
-                    type: isDiscountItem ? null : 'REVENUE',
-                    nameHint: itemNameHint
-                }) || defaultRevCOA;
+                itemCOA = isDiscountItem && discountCOA ? discountCOA : defaultRevCOA;
             }
 
             rows.push(buildJERow({
@@ -821,12 +815,7 @@ export async function createARReversalJournal({ invoice, coaList: providedCOA })
             let itemCOA = null;
             if (item.coa_id) itemCOA = coaList.find(c => c.id === item.coa_id) || null;
             if (!itemCOA) {
-                itemCOA = await resolveCOA({
-                    coaList,
-                    prefixes: ['4'],
-                    type: 'REVENUE',
-                    nameHint: item.description || item.item_name
-                }) || defaultRevCOA;
+                itemCOA = defaultRevCOA;
             }
 
             rows.push(buildJERow({
@@ -929,12 +918,7 @@ export async function createCOGSJournal({ invoice, cogsAmount, coaList: provided
             let itemCOA = null;
             if (item.coa_id) itemCOA = coaList.find(c => c.id === item.coa_id) || null;
             if (!itemCOA) {
-                itemCOA = await resolveCOA({
-                    coaList,
-                    prefixes: ['5', '6'],
-                    type: 'COGS',
-                    nameHint: item.description || item.item_name
-                }) || defaultCOGS;
+                itemCOA = defaultCOGS;
             }
 
             rows.push(buildJERow({

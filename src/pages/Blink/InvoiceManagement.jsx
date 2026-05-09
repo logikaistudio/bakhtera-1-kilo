@@ -1742,6 +1742,7 @@ const InvoiceManagement = () => {
                         handleCreateInvoice={isEditingInvoice ? handleUpdateInvoice : handleCreateInvoice}
                         formatCurrency={formatCurrency}
                         bankAccounts={bankAccounts}
+                        revenueAccounts={revenueAccounts}
                         onClose={() => {
                             setShowCreateModal(false);
                             resetForm();
@@ -1865,7 +1866,7 @@ const InvoiceManagement = () => {
 const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFormData, selectedQuotation, selectedShipment,
     referenceType, setReferenceType, handleQuotationSelect, handleShipmentSelect, handlePaymentTermsChange,
     addInvoiceItem, removeInvoiceItem, updateInvoiceItem, calculateTotals, handleGlobalTaxRateChange,
-    handleCreateInvoice, formatCurrency, onClose, bankAccounts }) => {
+    handleCreateInvoice, formatCurrency, onClose, bankAccounts, revenueAccounts }) => {
 
     const { subtotal, taxAmount, total, cogsSubtotal, grossProfit, profitMargin } = calculateTotals();
 
