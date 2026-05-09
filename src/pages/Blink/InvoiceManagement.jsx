@@ -1868,6 +1868,10 @@ const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFor
 
     const { subtotal, taxAmount, total, cogsSubtotal, grossProfit, profitMargin } = calculateTotals();
 
+    // Local UI state for COA dropdowns within the modal
+    const [coaSearchMapInv, setCoaSearchMapInv] = useState({});    // { [itemIndex]: searchTerm }
+    const [coaDropdownMapInv, setCoaDropdownMapInv] = useState({}); // { [itemIndex]: boolean open }
+
     // SO only (quotation option removed)
     const blendedReferences = shipments.map(s => ({
         id: s.id,
