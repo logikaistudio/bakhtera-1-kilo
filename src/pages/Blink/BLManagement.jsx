@@ -87,22 +87,24 @@ const BLManagement = () => {
                 countryOfOrigin: selectedBL.blCountryOfOrigin || 'INDONESIA',
 
                 // Cargo - Auto-populate from shipment data
-                containers: (() => {
-                    const conts = (selectedBL.containers || []).map((c, idx) => {
-                        // Try to parse existing saved marks/descriptions per container
-                        const savedMarks = (selectedBL.blMarksNumbers || '').split('\n').filter(Boolean);
-                        const savedDesc = (selectedBL.blDescriptionPackages || '').split('\n').filter(Boolean);
-                        const baseDesc = selectedBL.cargoDescription || '';
-                        return {
-                            ...c,
-                            marks: savedMarks[idx] || c.containerNumber || 'N/M',
-                            description: savedDesc[idx] || baseDesc,
-                        };
-                    });
-                    return conts;
-                })(),
+                containers: selectedBL.containers || [],
                 containerNumber: selectedBL.containerNumber || '',
                 sealNumber: selectedBL.sealNumber || '',
+                marksNumbers: (() => {
+                    if (selectedBL.blMarksNumbers) return selectedBL.blMarksNumbers;
+                    const conts = selectedBL.containers || [];
+                    if (conts.length > 0) return conts.map(c => c.containerNumber || 'N/M').join('\n');
+                    return selectedBL.containerNumber || 'N/M';
+                })(),
+                descriptionPackages: (() => {
+                    if (selectedBL.blDescriptionPackages) return selectedBL.blDescriptionPackages;
+                    const conts = selectedBL.containers || [];
+                    const baseDesc = selectedBL.cargoDescription || '';
+                    if (conts.length > 1) {
+                        return conts.map(c => `${c.containerNumber || 'CONTAINER'}: ${baseDesc}`).join('\n');
+                    }
+                    return baseDesc;
+                })(),
                 grossWeight: selectedBL.blGrossWeightText || (selectedBL.grossWeight ? `${selectedBL.grossWeight} KGS` : ''),
                 measurement: selectedBL.blMeasurementText || (selectedBL.measurement ? `${selectedBL.measurement} CBM` : ''),
                 totalPackages: selectedBL.blTotalPackagesText || (() => {
@@ -407,20 +409,53 @@ const BLManagement = () => {
 
     const handlePrintBL = (bl) => {
         try {
-            // Build print data – always use editForm when modal is open
-            const base = { ...bl, ...editForm };
-
-            // Aggregate per-container marks & description into BL fields for print
-            const conts = editForm.containers || bl.containers || [];
-            if (conts.length > 0) {
-                base.blMarksNumbers = conts.map(c => c.marks || c.containerNumber || 'N/M').join('\n');
-                base.blDescriptionPackages = conts.map(c => c.description || '').join('\n');
-            }
-
-            printBLCertificate(base);
+            printBLCertificate(bl);
         } catch (error) {
             console.error('Print error:', error);
             alert('Failed to print BL');
+        }
+    };
+
+    const handlePrintPreview = () => {
+        if (!selectedBL) return;
+        try {
+            // Map editForm to printData correctly by overwriting the blXxx properties
+            // printUtils.js checks blData.blShipperName before blData.shipperName
+            const printData = {
+                ...selectedBL,
+                ...editForm,
+                blShipperName: editForm.shipperName,
+                blShipperAddress: editForm.shipperAddress,
+                blConsigneeName: editForm.consigneeName,
+                blConsigneeAddress: editForm.consigneeAddress,
+                blNotifyPartyName: editForm.notifyPartyName,
+                blNotifyPartyAddress: editForm.notifyPartyAddress,
+                blPlaceOfReceipt: editForm.placeOfReceipt,
+                blPlaceOfDelivery: editForm.placeOfDelivery,
+                blPreCarriageBy: editForm.preCarriageBy,
+                blLoadingPier: editForm.loadingPier,
+                blExportReferences: editForm.exportReferences,
+                blForwardingAgentRef: editForm.forwardingAgentRef,
+                blTypeOfMove: editForm.typeOfMove,
+                blCountryOfOrigin: editForm.countryOfOrigin,
+                blMarksNumbers: editForm.marksNumbers,
+                blDescriptionPackages: editForm.descriptionPackages,
+                blGrossWeightText: editForm.grossWeight,
+                blMeasurementText: editForm.measurement,
+                blTotalPackagesText: editForm.totalPackages,
+                blFreightPayableAt: editForm.freightPayableAt,
+                blNumberOfOriginals: editForm.numberOfOriginals,
+                blIssuedPlace: editForm.issuedPlace,
+                blIssuedDate: editForm.issuedDate,
+                blFreightCharges: editForm.freightCharges,
+                blPrepaid: editForm.prepaid,
+                blCollect: editForm.collect,
+                blShippedOnBoardDate: editForm.shippedOnBoardDate,
+            };
+            printBLCertificate(printData);
+        } catch (error) {
+            console.error('Print Preview error:', error);
+            alert('Failed to print preview');
         }
     };
 
@@ -485,13 +520,8 @@ const BLManagement = () => {
                 bl_forwarding_agent_ref: editForm.forwardingAgentRef || null,
                 bl_type_of_move: editForm.typeOfMove || null,
                 bl_country_of_origin: editForm.countryOfOrigin || null,
-                // Aggregate per-container marks & description into combined BL fields
-                bl_marks_numbers: (editForm.containers || []).length > 0
-                    ? (editForm.containers).map(c => c.marks || c.containerNumber || 'N/M').join('\n')
-                    : (editForm.marksNumbers || null),
-                bl_description_packages: (editForm.containers || []).length > 0
-                    ? (editForm.containers).map(c => c.description || '').join('\n')
-                    : (editForm.descriptionPackages || null),
+                bl_marks_numbers: editForm.marksNumbers || null,
+                bl_description_packages: editForm.descriptionPackages || null,
                 bl_gross_weight_text: editForm.grossWeight || null,
                 bl_measurement_text: editForm.measurement || null,
                 bl_total_packages_text: editForm.totalPackages || null,
@@ -1201,135 +1231,121 @@ const BLManagement = () => {
                             {/* TAB: Cargo */}
                             {activeTab === 'cargo' && (
                                 <div className="animate-fade-in space-y-4">
-                                    {/* Container table with per-container marks & description */}
-                                    <div className="border border-gray-200 dark:border-dark-border rounded-lg overflow-hidden">
-                                        {/* Header */}
-                                        <div className="grid bg-gray-100 dark:bg-dark-bg/50 border-b border-gray-200 dark:border-dark-border text-xs font-bold text-gray-500 dark:text-silver-dark uppercase tracking-wider" style={{ gridTemplateColumns: '2.5rem 12rem 8rem 1fr 1.5fr 2rem' }}>
-                                            <div className="px-2 py-2 text-center">#</div>
-                                            <div className="px-2 py-2">Container No.</div>
-                                            <div className="px-2 py-2">Seal No.</div>
-                                            <div className="px-2 py-2">Marks / Numbers</div>
-                                            <div className="px-2 py-2">Description of Packages & Goods</div>
-                                            <div className="px-2 py-2"></div>
-                                        </div>
-                                        {/* Rows */}
-                                        {(editForm.containers || []).length > 0 ? (
-                                            (editForm.containers).map((c, idx) => (
-                                                <div key={idx} className={`grid items-start border-b last:border-0 border-gray-200 dark:border-dark-border ${idx % 2 === 0 ? 'bg-white dark:bg-dark-card' : 'bg-gray-50/60 dark:bg-dark-surface/40'}`} style={{ gridTemplateColumns: '2.5rem 12rem 8rem 1fr 1.5fr 2rem' }}>
-                                                    <div className="px-2 py-2 text-xs font-bold text-gray-400 text-center pt-2.5">#{idx + 1}</div>
-                                                    <div className="px-1 py-1">
-                                                        {isEditing ? (
-                                                            <input
-                                                                type="text"
-                                                                value={c.containerNumber || ''}
-                                                                onChange={(e) => {
-                                                                    const updated = [...editForm.containers];
-                                                                    updated[idx] = { ...updated[idx], containerNumber: e.target.value };
-                                                                    setEditForm({ ...editForm, containers: updated });
-                                                                }}
-                                                                placeholder="Container No"
-                                                                className="w-full px-2 py-1.5 text-xs bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded font-mono"
-                                                            />
-                                                        ) : (
-                                                            <span className="text-xs font-mono text-gray-900 dark:text-silver-light font-semibold">{c.containerNumber || '-'}</span>
-                                                        )}
-                                                    </div>
-                                                    <div className="px-1 py-1">
-                                                        {isEditing ? (
-                                                            <input
-                                                                type="text"
-                                                                value={c.sealNumber || ''}
-                                                                onChange={(e) => {
-                                                                    const updated = [...editForm.containers];
-                                                                    updated[idx] = { ...updated[idx], sealNumber: e.target.value };
-                                                                    setEditForm({ ...editForm, containers: updated });
-                                                                }}
-                                                                placeholder="Seal No"
-                                                                className="w-full px-2 py-1.5 text-xs bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded font-mono"
-                                                            />
-                                                        ) : (
-                                                            <span className="text-xs font-mono text-gray-500 dark:text-silver-dark">{c.sealNumber || '-'}</span>
-                                                        )}
-                                                    </div>
-                                                    <div className="px-1 py-1">
-                                                        {isEditing ? (
-                                                            <textarea
-                                                                value={c.marks || ''}
-                                                                onChange={(e) => {
-                                                                    const updated = [...editForm.containers];
-                                                                    updated[idx] = { ...updated[idx], marks: e.target.value };
-                                                                    setEditForm({ ...editForm, containers: updated });
-                                                                }}
-                                                                placeholder="N/M"
-                                                                rows={3}
-                                                                className="w-full px-2 py-1.5 text-xs bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded font-mono resize-y"
-                                                            />
-                                                        ) : (
-                                                            <span className="text-xs font-mono text-gray-900 dark:text-silver-light whitespace-pre-wrap">{c.marks || 'N/M'}</span>
-                                                        )}
-                                                    </div>
-                                                    <div className="px-1 py-1">
-                                                        {isEditing ? (
-                                                            <textarea
-                                                                value={c.description || ''}
-                                                                onChange={(e) => {
-                                                                    const updated = [...editForm.containers];
-                                                                    updated[idx] = { ...updated[idx], description: e.target.value };
-                                                                    setEditForm({ ...editForm, containers: updated });
-                                                                }}
-                                                                placeholder="Description of goods for this container..."
-                                                                rows={3}
-                                                                className="w-full px-2 py-1.5 text-xs bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded font-mono resize-y"
-                                                            />
-                                                        ) : (
-                                                            <span className="text-xs font-mono text-gray-900 dark:text-silver-light whitespace-pre-wrap">{c.description || '-'}</span>
-                                                        )}
-                                                    </div>
-                                                    <div className="px-1 py-1 flex items-center justify-center">
-                                                        {isEditing && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    const updated = editForm.containers.filter((_, i) => i !== idx);
-                                                                    setEditForm({ ...editForm, containers: updated });
-                                                                }}
-                                                                className="text-red-400 hover:text-red-600 p-0.5"
-                                                            >
-                                                                <Trash2 className="w-3.5 h-3.5" />
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))
-                                        ) : (
-                                            <div className="px-4 py-6 text-center text-xs text-gray-400 italic">No containers added</div>
-                                        )}
-                                        {/* Add button row */}
-                                        {isEditing && (
-                                            <div className="bg-gray-50 dark:bg-dark-bg/20 px-3 py-2 border-t border-gray-200 dark:border-dark-border">
+                                    {/* Container List */}
+                                    <div className="bg-gray-50 dark:bg-dark-bg/30 p-4 rounded-lg">
+                                        <div className="flex justify-between items-center mb-3">
+                                            <h3 className="font-bold text-gray-500 dark:text-silver-dark text-xs uppercase">Containers ({editForm.containers?.length || 0})</h3>
+                                            {isEditing && (
                                                 <button
                                                     type="button"
                                                     onClick={() => setEditForm({
                                                         ...editForm,
-                                                        containers: [...(editForm.containers || []), { containerNumber: '', sealNumber: '', containerType: '', marks: 'N/M', description: '' }]
+                                                        containers: [...(editForm.containers || []), { containerNumber: '', sealNumber: '', containerType: '' }]
                                                     })}
-                                                    className="text-xs text-accent-orange hover:text-orange-600 font-semibold flex items-center gap-1"
+                                                    className="text-xs bg-accent-orange text-white px-2 py-1 rounded hover:bg-orange-600"
                                                 >
                                                     + Add Container
                                                 </button>
+                                            )}
+                                        </div>
+                                        {editForm.containers?.length > 0 ? (
+                                            <div className="space-y-2">
+                                                {editForm.containers.map((c, idx) => (
+                                                    <div key={idx} className="flex gap-2 items-center bg-white dark:bg-dark-surface p-2 rounded border border-gray-200 dark:border-dark-border">
+                                                        <span className="text-xs font-bold text-gray-400 w-6">#{idx + 1}</span>
+                                                        {isEditing ? (
+                                                            <>
+                                                                <input
+                                                                    type="text"
+                                                                    value={c.containerNumber || ''}
+                                                                    onChange={(e) => {
+                                                                        const newContainers = [...editForm.containers];
+                                                                        newContainers[idx].containerNumber = e.target.value;
+                                                                        setEditForm({ ...editForm, containers: newContainers });
+                                                                    }}
+                                                                    placeholder="Container No"
+                                                                    className="flex-1 px-2 py-1 text-xs bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded"
+                                                                />
+                                                                <input
+                                                                    type="text"
+                                                                    value={c.sealNumber || ''}
+                                                                    onChange={(e) => {
+                                                                        const newContainers = [...editForm.containers];
+                                                                        newContainers[idx].sealNumber = e.target.value;
+                                                                        setEditForm({ ...editForm, containers: newContainers });
+                                                                    }}
+                                                                    placeholder="Seal No"
+                                                                    className="w-32 px-2 py-1 text-xs bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded"
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const newContainers = editForm.containers.filter((_, i) => i !== idx);
+                                                                        setEditForm({ ...editForm, containers: newContainers });
+                                                                    }}
+                                                                    className="text-red-500 hover:text-red-700 p-1"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <div className="flex-1 text-xs text-gray-900 dark:text-silver-light">{c.containerNumber || '-'}</div>
+                                                                <div className="w-32 text-xs text-gray-500 dark:text-silver-dark">{c.sealNumber || '-'}</div>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                ))}
                                             </div>
+                                        ) : (
+                                            <div className="text-xs text-gray-400 italic">No containers added</div>
                                         )}
                                     </div>
 
-                                    {/* Total Packages + Weight */}
-                                    <div className="grid grid-cols-3 gap-4">
-                                        <div className="col-span-1">
-                                            {renderInput('Total Packages Text', 'totalPackages', 'text', 'SAY: ONE CONTAINER ONLY')}
+                                    <div className="grid grid-cols-12 gap-6">
+                                        <div className="col-span-8">
+                                            <h3 className="font-bold text-gray-500 dark:text-silver-dark text-xs uppercase mb-3 border-b border-gray-200 dark:border-dark-border pb-1">Marks & Description</h3>
+                                            <div className="grid grid-cols-5 gap-4">
+                                                <div className="col-span-2">
+                                                    <label className="block text-xs text-gray-500 dark:text-silver-dark font-semibold uppercase mb-1">Marks & Numbers</label>
+                                                    {isEditing ? (
+                                                        <textarea
+                                                            value={editForm.marksNumbers || ''}
+                                                            onChange={(e) => setEditForm({ ...editForm, marksNumbers: e.target.value })}
+                                                            className="w-full px-3 py-2 bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded text-sm text-gray-900 dark:text-silver-light focus:border-accent-orange font-mono"
+                                                            style={{ minHeight: '200px' }}
+                                                            placeholder="e.g. N/M"
+                                                        />
+                                                    ) : (
+                                                        <div className="text-xs text-gray-900 dark:text-silver-light font-medium p-2 bg-gray-50 dark:bg-dark-bg/50 rounded border border-transparent whitespace-pre-wrap font-mono" style={{ minHeight: '200px' }}>
+                                                            {editForm.marksNumbers || '-'}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="col-span-3">
+                                                    <label className="block text-xs text-gray-500 dark:text-silver-dark font-semibold uppercase mb-1">Description of Packages and Goods</label>
+                                                    {isEditing ? (
+                                                        <textarea
+                                                            value={editForm.descriptionPackages || ''}
+                                                            onChange={(e) => setEditForm({ ...editForm, descriptionPackages: e.target.value })}
+                                                            className="w-full px-3 py-2 bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded text-sm text-gray-900 dark:text-silver-light focus:border-accent-orange font-mono"
+                                                            style={{ minHeight: '200px' }}
+                                                            placeholder="FULL DESCRIPTION OF GOODS&#10;Container 1: ...&#10;Container 2: ..."
+                                                        />
+                                                    ) : (
+                                                        <div className="text-xs text-gray-900 dark:text-silver-light font-medium p-2 bg-gray-50 dark:bg-dark-bg/50 rounded border border-transparent whitespace-pre-wrap font-mono" style={{ minHeight: '200px' }}>
+                                                            {editForm.descriptionPackages || '-'}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="mt-4">
+                                                {renderInput('Total Packages Text', 'totalPackages', 'text', 'SAY: ONE CONTAINER ONLY')}
+                                            </div>
                                         </div>
-                                        <div className="col-span-1">
+                                        <div className="col-span-4">
+                                            <h3 className="font-bold text-gray-500 dark:text-silver-dark text-xs uppercase mb-3 border-b border-gray-200 dark:border-dark-border pb-1">Weight & Volume</h3>
                                             {renderInput('Gross Weight', 'grossWeight', 'text', 'e.g. 18,500 KGS')}
-                                        </div>
-                                        <div className="col-span-1">
                                             {renderInput('Measurement', 'measurement', 'text', 'e.g. 33.20 CBM')}
                                         </div>
                                     </div>
@@ -1417,7 +1433,7 @@ const BLManagement = () => {
                                     <Button
                                         variant="secondary"
                                         icon={Printer}
-                                        onClick={() => handlePrintBL(selectedBL)}
+                                        onClick={handlePrintPreview}
                                     >
                                         Print Preview
                                     </Button>

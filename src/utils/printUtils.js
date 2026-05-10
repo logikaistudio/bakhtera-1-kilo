@@ -10,82 +10,52 @@
  * @returns {string} HTML string
  */
 export const generateBLPrintHTML = (blData) => {
-    // editForm fields take priority (passed merged into blData)
+    // Prefer BL specific fields if available, otherwise fallback to generic
     const d = {
-        shipper: blData.shipperName || blData.blShipperName || blData.shipper || '',
-        shipperAddr: blData.shipperAddress || blData.blShipperAddress || '',
-        consignee: blData.consigneeName || blData.blConsigneeName || blData.consignee || '',
-        consigneeAddr: blData.consigneeAddress || blData.blConsigneeAddress || '',
-        notify: blData.notifyPartyName || blData.blNotifyPartyName || 'SAME AS CONSIGNEE',
-        notifyAddr: blData.notifyPartyAddress || blData.blNotifyPartyAddress || '',
+        shipper: blData.blShipperName || blData.shipperName || blData.shipper || '',
+        shipperAddr: blData.blShipperAddress || blData.shipperAddress || '',
+        consignee: blData.blConsigneeName || blData.consigneeName || blData.consignee || '',
+        consigneeAddr: blData.blConsigneeAddress || blData.consigneeAddress || '',
+        notify: blData.blNotifyPartyName || blData.notifyPartyName || 'SAME AS CONSIGNEE',
+        notifyAddr: blData.blNotifyPartyAddress || blData.notifyPartyAddress || '',
 
         blNo: blData.blNumber || blData.mbl || blData.hbl || '-',
         bookingNo: blData.soNumber || '-',
-        exportRefs: blData.exportReferences || blData.blExportReferences || '',
-        agentRefs: blData.forwardingAgentRef || blData.blForwardingAgentRef || '',
+        exportRefs: blData.blExportReferences || blData.exportReferences || '',
+        agentRefs: blData.blForwardingAgentRef || blData.forwardingAgentRef || '',
 
-        preCarriage: blData.preCarriageBy || blData.blPreCarriageBy || '',
-        placeReceipt: blData.placeOfReceipt || blData.blPlaceOfReceipt || blData.portOfLoading || '',
+        preCarriage: blData.blPreCarriageBy || blData.preCarriageBy || '',
+        placeReceipt: blData.blPlaceOfReceipt || blData.placeOfReceipt || blData.portOfLoading || '',
         vessel: blData.vessel || blData.vesselName || '',
         voyage: blData.voyage || '',
         pol: blData.portOfLoading || '',
         pod: blData.portOfDischarge || '',
-        placeDelivery: blData.placeOfDelivery || blData.blPlaceOfDelivery || blData.portOfDischarge || '',
-        loadingPier: blData.loadingPier || blData.blLoadingPier || '',
+        placeDelivery: blData.blPlaceOfDelivery || blData.placeOfDelivery || blData.portOfDischarge || '',
+        loadingPier: blData.blLoadingPier || blData.loadingPier || '',
 
-        pkgs: blData.totalPackages || blData.blTotalPackagesText || '1 CONTAINER',
-        weight: blData.grossWeight || blData.blGrossWeightText || '',
-        measurement: blData.measurement || blData.blMeasurementText || '',
+        containerNo: blData.containerNumber || '',
+        sealNo: blData.sealNumber || '',
+        marks: blData.blMarksNumbers || blData.marksNumbers || blData.containerNumber || 'N/M',
+        pkgs: blData.blTotalPackagesText || blData.totalPackages || '1 CONTAINER',
+        description: blData.blDescriptionPackages || blData.descriptionPackages || blData.cargoDescription || 'GENERAL CARGO',
+        weight: blData.blGrossWeightText || blData.grossWeight || '',
+        measurement: blData.blMeasurementText || blData.measurement || '',
 
-        freightPayable: blData.freightPayableAt || blData.blFreightPayableAt || 'DESTINATION',
-        originals: blData.numberOfOriginals || blData.blNumberOfOriginals || 'THREE (3)',
-        placeIssue: blData.issuedPlace || blData.blIssuedPlace || 'JAKARTA',
-        dateIssue: blData.issuedDate || blData.blIssuedDate || new Date().toLocaleDateString('en-GB'),
-        typeOfMove: blData.typeOfMove || blData.blTypeOfMove || 'FCL/FCL',
-        countryOfOrigin: blData.countryOfOrigin || blData.blCountryOfOrigin || 'INDONESIA',
-        freightCharges: blData.freightCharges || blData.blFreightCharges || '',
-        prepaid: blData.prepaid || blData.blPrepaid || '',
-        collect: blData.collect || blData.blCollect || '',
-        shippedOnBoardDate: blData.shippedOnBoardDate || blData.blShippedOnBoardDate || '',
+        freightPayable: blData.blFreightPayableAt || blData.freightPayableAt || 'DESTINATION',
+        originals: blData.blNumberOfOriginals || blData.numberOfOriginals || 'THREE (3)',
+        placeIssue: blData.blIssuedPlace || blData.issuedPlace || 'JAKARTA',
+        dateIssue: blData.blIssuedDate || blData.issuedDate || new Date().toLocaleDateString('en-GB'),
+
+        // NEW: Fields that were previously hardcoded
+        typeOfMove: blData.blTypeOfMove || blData.typeOfMove || 'FCL/FCL',
+        countryOfOrigin: blData.blCountryOfOrigin || blData.countryOfOrigin || 'INDONESIA',
+        freightCharges: blData.blFreightCharges || blData.freightCharges || '',
+        prepaid: blData.blPrepaid || blData.prepaid || '',
+        collect: blData.blCollect || blData.collect || '',
+        shippedOnBoardDate: blData.blShippedOnBoardDate || blData.shippedOnBoardDate || '',
+
         mode: blData.blType || 'MBL'
     };
-
-    // Build per-container cargo rows
-    const containers = blData.containers || [];
-    const marksLines = (blData.blMarksNumbers || blData.marksNumbers || '').split('\n').filter(Boolean);
-    const descLines = (blData.blDescriptionPackages || blData.descriptionPackages || blData.cargoDescription || 'GENERAL CARGO').split('\n').filter(Boolean);
-
-    let cargoRows = '';
-    if (containers.length > 0) {
-        cargoRows = containers.map((c, idx) => {
-            const mark = c.marks || marksLines[idx] || c.containerNumber || 'N/M';
-            const desc = c.description || descLines[idx] || descLines[0] || 'GENERAL CARGO';
-            return `<tr>
-                <td style="white-space:pre-wrap;font-family:monospace;font-size:8pt;">
-                    ${mark}<br><span style="font-size:7pt;color:#555;">SEAL: ${c.sealNumber || '-'}</span>
-                </td>
-                <td style="text-align:center;font-size:8pt;">${idx === 0 ? d.pkgs : ''}</td>
-                <td style="font-weight:bold;font-size:9pt;white-space:pre-wrap;">${desc}</td>
-                <td style="text-align:right;font-size:8pt;">${idx === 0 ? d.weight : ''}</td>
-                <td style="text-align:right;font-size:8pt;">${idx === 0 ? d.measurement : ''}</td>
-            </tr>`;
-        }).join('');
-    } else {
-        const marks = blData.blMarksNumbers || blData.marksNumbers || blData.containerNumber || 'N/M';
-        const desc = blData.blDescriptionPackages || blData.descriptionPackages || blData.cargoDescription || 'GENERAL CARGO';
-        const cNo = blData.containerNumber || '';
-        const sNo = blData.sealNumber || '';
-        cargoRows = `<tr>
-            <td>
-                <div style="white-space:pre-wrap;font-family:monospace;">${marks}</div>
-                <div style="font-size:7pt;margin-top:8px;color:#555;">${cNo ? 'CNTR: ' + cNo : ''}${sNo ? '<br>SEAL: ' + sNo : ''}</div>
-            </td>
-            <td style="text-align:center;"><div>${d.pkgs}</div></td>
-            <td><div style="font-weight:bold;white-space:pre-wrap;">${desc}</div></td>
-            <td style="text-align:right;"><div>${d.weight}</div></td>
-            <td style="text-align:right;"><div>${d.measurement}</div></td>
-        </tr>`;
-    }
 
     return `
 <!DOCTYPE html>
@@ -377,7 +347,27 @@ export const generateBLPrintHTML = (blData) => {
                         </tr>
                     </thead>
                     <tbody>
-                        ${cargoRows}
+                        <tr>
+                            <td>
+                                <div class="value" style="white-space: pre-wrap;">${d.marks}</div>
+                                <div class="value small-text" style="margin-top: 8px;">
+                                    ${d.containerNo ? 'CNTR: ' + d.containerNo : ''}
+                                    ${d.sealNo ? '<br>SEAL: ' + d.sealNo : ''}
+                                </div>
+                            </td>
+                             <td style="text-align: center;">
+                                <div class="value">${d.pkgs}</div>
+                            </td>
+                            <td>
+                                <div class="value" style="font-weight: bold;">${d.description}</div>
+                            </td>
+                             <td style="text-align: right;">
+                                <div class="value">${d.weight}</div>
+                            </td>
+                             <td style="text-align: right;">
+                                <div class="value">${d.measurement}</div>
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
