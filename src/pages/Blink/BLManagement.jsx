@@ -407,9 +407,17 @@ const BLManagement = () => {
 
     const handlePrintBL = (bl) => {
         try {
-            // Merge form data for preview if editing
-            const printData = isEditing ? { ...bl, ...editForm } : bl;
-            printBLCertificate(printData);
+            // Build print data – always use editForm when modal is open
+            const base = { ...bl, ...editForm };
+
+            // Aggregate per-container marks & description into BL fields for print
+            const conts = editForm.containers || bl.containers || [];
+            if (conts.length > 0) {
+                base.blMarksNumbers = conts.map(c => c.marks || c.containerNumber || 'N/M').join('\n');
+                base.blDescriptionPackages = conts.map(c => c.description || '').join('\n');
+            }
+
+            printBLCertificate(base);
         } catch (error) {
             console.error('Print error:', error);
             alert('Failed to print BL');
