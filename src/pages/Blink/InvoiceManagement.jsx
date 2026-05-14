@@ -1933,7 +1933,7 @@ const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFor
                                 Referensi (Sales Order) <span className="text-red-400">*</span>
                             </label>
                             <select
-                                value={formData.quotation_id || formData.shipment_id || ''}
+                                value={formData.shipment_id || formData.quotation_id || ''}
                                 onChange={handleReferenceSelect}
                                 className="w-full px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded text-silver-light text-[11px]"
                                 required
