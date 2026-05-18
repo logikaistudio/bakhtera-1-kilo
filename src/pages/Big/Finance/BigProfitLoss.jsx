@@ -7,6 +7,7 @@ import { useData } from '../../../context/DataContext';
 import { printReport } from '../../../utils/printPDF';
 
 const fmtIDR = (v) => v != null ? 'Rp ' + Number(v).toLocaleString('id-ID') : 'Rp 0';
+const ensureArray = (value) => Array.isArray(value) ? value : [];
 
 const BigProfitLoss = () => {
     const { companySettings } = useData();
@@ -55,10 +56,10 @@ const BigProfitLoss = () => {
         finally { setLoading(false); }
     };
 
-    const totalRevenue = data.revenue.reduce((s, a) => s + a.net, 0);
-    const totalCogs = data.cogs.reduce((s, a) => s + a.net, 0);
+    const totalRevenue = ensureArray(data.revenue).reduce((s, a) => s + a.net, 0);
+    const totalCogs = ensureArray(data.cogs).reduce((s, a) => s + a.net, 0);
     const grossProfit = totalRevenue - totalCogs;
-    const totalExpenses = data.expenses.reduce((s, a) => s + a.net, 0);
+    const totalExpenses = ensureArray(data.expenses).reduce((s, a) => s + a.net, 0);
     const netIncome = grossProfit - totalExpenses;
 
     // ── Export Excel ────────────────────────────────────────────────────────────
@@ -78,18 +79,18 @@ const BigProfitLoss = () => {
         ws.push([]);
         
         ws.push(['PENDAPATAN (REVENUE)', fmtIDR(totalRevenue)]);
-        data.revenue.forEach(a => ws.push([`  ${a.name}`, fmtIDR(a.net)]));
+        ensureArray(data.revenue).forEach(a => ws.push([`  ${a.name}`, fmtIDR(a.net)]));
         ws.push([]);
         
         ws.push(['HARGA POKOK (COGS)', fmtIDR(totalCogs)]);
-        data.cogs.forEach(a => ws.push([`  ${a.name}`, fmtIDR(a.net)]));
+        ensureArray(data.cogs).forEach(a => ws.push([`  ${a.name}`, fmtIDR(a.net)]));
         ws.push([]);
         
         ws.push(['LABA KOTOR (GROSS PROFIT)', fmtIDR(grossProfit)]);
         ws.push([]);
         
         ws.push(['BIAYA OPERASIONAL (EXPENSES)', fmtIDR(totalExpenses)]);
-        data.expenses.forEach(a => ws.push([`  ${a.name}`, fmtIDR(a.net)]));
+        ensureArray(data.expenses).forEach(a => ws.push([`  ${a.name}`, fmtIDR(a.net)]));
         ws.push([]);
         
         ws.push(['LABA BERSIH (NET INCOME)', fmtIDR(netIncome)]);
@@ -111,12 +112,12 @@ const BigProfitLoss = () => {
         
         <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px">
             <thead><tr style="background:#0070BB;color:white;font-weight:bold"><th style="border:1px solid #ccc;padding:8px;text-align:left">PENDAPATAN (REVENUE)</th><th style="border:1px solid #ccc;padding:8px;text-align:right">Jumlah</th></tr></thead>
-            <tbody>${data.revenue.map(a => `<tr style="border:1px solid #e0e0e0"><td style="padding:6px">${a.name}</td><td style="text-align:right;padding:6px">${fmtIDR(a.net)}</td></tr>`).join('')}<tr style="background:#f5f5f5;font-weight:bold"><td style="border:1px solid #ccc;padding:8px">TOTAL PENDAPATAN</td><td style="text-align:right;border:1px solid #ccc;padding:8px">${fmtIDR(totalRevenue)}</td></tr></tbody>
+            <tbody>${ensureArray(data.revenue).map(a => `<tr style="border:1px solid #e0e0e0"><td style="padding:6px">${a.name}</td><td style="text-align:right;padding:6px">${fmtIDR(a.net)}</td></tr>`).join('')}<tr style="background:#f5f5f5;font-weight:bold"><td style="border:1px solid #ccc;padding:8px">TOTAL PENDAPATAN</td><td style="text-align:right;border:1px solid #ccc;padding:8px">${fmtIDR(totalRevenue)}</td></tr></tbody>
         </table>
         
         <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px">
             <thead><tr style="background:#0070BB;color:white;font-weight:bold"><th style="border:1px solid #ccc;padding:8px;text-align:left">HARGA POKOK (COGS)</th><th style="border:1px solid #ccc;padding:8px;text-align:right">Jumlah</th></tr></thead>
-            <tbody>${data.cogs.map(a => `<tr style="border:1px solid #e0e0e0"><td style="padding:6px">${a.name}</td><td style="text-align:right;padding:6px">${fmtIDR(a.net)}</td></tr>`).join('')}<tr style="background:#f5f5f5;font-weight:bold"><td style="border:1px solid #ccc;padding:8px">TOTAL COGS</td><td style="text-align:right;border:1px solid #ccc;padding:8px">${fmtIDR(totalCogs)}</td></tr></tbody>
+            <tbody>${ensureArray(data.cogs).map(a => `<tr style="border:1px solid #e0e0e0"><td style="padding:6px">${a.name}</td><td style="text-align:right;padding:6px">${fmtIDR(a.net)}</td></tr>`).join('')}<tr style="background:#f5f5f5;font-weight:bold"><td style="border:1px solid #ccc;padding:8px">TOTAL COGS</td><td style="text-align:right;border:1px solid #ccc;padding:8px">${fmtIDR(totalCogs)}</td></tr></tbody>
         </table>
         
         <div style="background:#f0f0f0;padding:12px;margin-bottom:16px;border:1px solid #ccc;border-radius:4px">
@@ -128,7 +129,7 @@ const BigProfitLoss = () => {
         
         <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px">
             <thead><tr style="background:#0070BB;color:white;font-weight:bold"><th style="border:1px solid #ccc;padding:8px;text-align:left">BIAYA OPERASIONAL (EXPENSES)</th><th style="border:1px solid #ccc;padding:8px;text-align:right">Jumlah</th></tr></thead>
-            <tbody>${data.expenses.map(a => `<tr style="border:1px solid #e0e0e0"><td style="padding:6px">${a.name}</td><td style="text-align:right;padding:6px">${fmtIDR(a.net)}</td></tr>`).join('')}<tr style="background:#f5f5f5;font-weight:bold"><td style="border:1px solid #ccc;padding:8px">TOTAL BIAYA</td><td style="text-align:right;border:1px solid #ccc;padding:8px">${fmtIDR(totalExpenses)}</td></tr></tbody>
+            <tbody>${ensureArray(data.expenses).map(a => `<tr style="border:1px solid #e0e0e0"><td style="padding:6px">${a.name}</td><td style="text-align:right;padding:6px">${fmtIDR(a.net)}</td></tr>`).join('')}<tr style="background:#f5f5f5;font-weight:bold"><td style="border:1px solid #ccc;padding:8px">TOTAL BIAYA</td><td style="text-align:right;border:1px solid #ccc;padding:8px">${fmtIDR(totalExpenses)}</td></tr></tbody>
         </table>
         
         <div style="background:${netIncome >= 0 ? '#d4edda' : '#f8d7da'};padding:12px;border:2px solid ${netIncome >= 0 ? '#28a745' : '#dc3545'};border-radius:4px">
@@ -156,9 +157,9 @@ const BigProfitLoss = () => {
             </div>
             <table className="w-full text-sm">
                 <tbody className="divide-y divide-dark-border/30">
-                    {items.length === 0 ? (
+                    {ensureArray(items).length === 0 ? (
                         <tr><td colSpan={2} className="px-4 py-3 text-silver-dark italic text-xs">Tidak ada transaksi</td></tr>
-                    ) : items.map(acc => (
+                    ) : ensureArray(items).map(acc => (
                         <tr key={acc.id} className="hover:bg-white/5">
                             <td className="px-4 py-2.5">
                                 <span className="font-mono text-accent-orange text-xs mr-3">{acc.code}</span>

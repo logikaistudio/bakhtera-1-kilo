@@ -24,14 +24,23 @@ const EQUITY_GROUPS = [
     { prefix: '3-02', label: 'PROFIT / LOSS', totalLabel: 'TOTAL PROFIT / LOSS' },
 ];
 
+const ensureArray = (value) => Array.isArray(value) ? value : [];
+
+const normalizeGroups = (groups) => ensureArray(groups).map((group) => ({
+    ...group,
+    items: ensureArray(group?.items),
+}));
+
 function groupAccounts(accounts, groupDefs) {
-    const grouped = groupDefs.map((groupDef) => ({
+    const safeAccounts = ensureArray(accounts);
+    const safeGroupDefs = ensureArray(groupDefs);
+    const grouped = safeGroupDefs.map((groupDef) => ({
         ...groupDef,
-        items: accounts.filter((account) => account.code && account.code.startsWith(groupDef.prefix) && !account.isHeader),
+        items: safeAccounts.filter((account) => account.code && account.code.startsWith(groupDef.prefix) && !account.isHeader),
         total: 0
     }));
     const categorised = new Set(grouped.flatMap((group) => group.items.map((item) => item.id)));
-    const uncategorised = accounts.filter((account) => !categorised.has(account.id) && !account.isHeader);
+    const uncategorised = safeAccounts.filter((account) => !categorised.has(account.id) && !account.isHeader);
     if (uncategorised.length > 0) {
         grouped.push({ prefix: '_other', label: 'OTHER', totalLabel: 'TOTAL OTHER', items: uncategorised, total: 0 });
     }
@@ -69,7 +78,7 @@ const BigBalanceSheet = () => {
             if (lineItemsError) throw lineItemsError;
 
             const accMap = {};
-            accounts.forEach((account) => {
+            ensureArray(accounts).forEach((account) => {
                 accMap[account.id] = { ...account, balance: 0 };
             });
 
@@ -132,6 +141,7 @@ const BigBalanceSheet = () => {
             setTotals({ totalAssets, totalLiabilities, totalEquity: finalTotalEquity });
         } catch (error) {
             console.error('Error fetching balance sheet:', error);
+            setReportData({ assetGroups: [], liabilityGroups: [], equityGroups: [], assets: [], liabilities: [], equity: [] });
         } finally {
             setLoading(false);
         }
@@ -145,6 +155,10 @@ const BigBalanceSheet = () => {
     };
 
     const asOfLabel = new Date(asOfDate).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+    const assetGroups = normalizeGroups(reportData?.assetGroups);
+    const liabilityGroups = normalizeGroups(reportData?.liabilityGroups);
+    const equityGroups = normalizeGroups(reportData?.equityGroups);
+    const equityAccounts = ensureArray(reportData?.equity);
 
     const handleAccountClick = (accountId) => {
         if (accountId === 'net-income' || accountId === 'historical-balancing') return;
@@ -173,9 +187,9 @@ const BigBalanceSheet = () => {
             data.push({ Account: '', Amount: '' });
         };
 
-        addGroup('ASSETS', reportData.assetGroups, totals.totalAssets, 'TOTAL ASSETS');
-        addGroup('LIABILITIES', reportData.liabilityGroups, totals.totalLiabilities, 'TOTAL LIABILITIES');
-        addGroup('EQUITY', reportData.equityGroups, totals.totalEquity, 'TOTAL EQUITY');
+        addGroup('ASSETS', assetGroups, totals.totalAssets, 'TOTAL ASSETS');
+        addGroup('LIABILITIES', liabilityGroups, totals.totalLiabilities, 'TOTAL LIABILITIES');
+        addGroup('EQUITY', equityGroups, totals.totalEquity, 'TOTAL EQUITY');
         data.push({ Account: '', Amount: '' });
         data.push({ Account: '            TOTAL LIABILITIES DAN EQUITY', Amount: fmtCur(totals.totalLiabilities + totals.totalEquity) });
 
@@ -197,7 +211,7 @@ const BigBalanceSheet = () => {
 
         const doubleUnderline = `border-top:1px solid #000;border-bottom:3px double #000;`;
 
-        const renderGroup = (groups) => groups.map((group) => {
+        const renderGroup = (groups) => normalizeGroups(groups).map((group) => {
             if (group.items.length === 0) return '';
             return `
                 <tr><td colspan="2" style="padding:8px 0 2px 32px;font-weight:700;font-size:12px">${group.label}</td></tr>
@@ -279,7 +293,7 @@ const BigBalanceSheet = () => {
         const stafelBodyHTML = `
         <table style="width:100%;border-collapse:collapse;font-family:'Times New Roman',Times,serif;border:2px solid #334155">
             <tr><td colspan="2" style="padding:12px 16px 4px;font-weight:800;font-size:14px;border-bottom:1px solid #e2e8f0">ASSETS</td></tr>
-            ${renderGroup(reportData.assetGroups)}
+            ${renderGroup(assetGroups)}
             <tr>
                 <td style="text-align:right;padding:8px 16px 4px 0;font-weight:900;font-size:13px">TOTAL ASSETS</td>
                 <td style="text-align:right;padding:8px 8px 4px;font-weight:900;font-size:13px;${doubleUnderline}">${fmtAmt(totals.totalAssets)}</td>
@@ -287,11 +301,11 @@ const BigBalanceSheet = () => {
             <tr><td colspan="2" style="padding:16px 0;border-bottom:2px solid #334155"></td></tr>
 
             <tr><td colspan="2" style="padding:12px 16px 4px;font-weight:800;font-size:14px;border-bottom:1px solid #e2e8f0">LIABILITIES</td></tr>
-            ${renderGroup(reportData.liabilityGroups)}
+            ${renderGroup(liabilityGroups)}
             <tr><td colspan="2" style="padding:8px 0"></td></tr>
 
             <tr><td colspan="2" style="padding:12px 16px 4px;font-weight:800;font-size:14px;border-bottom:1px solid #e2e8f0">EQUITY</td></tr>
-            ${renderGroup(reportData.equityGroups)}
+            ${renderGroup(equityGroups)}
             <tr><td colspan="2" style="padding:8px 0"></td></tr>
 
             <tr>
@@ -307,17 +321,17 @@ const BigBalanceSheet = () => {
 
         const alignedPrint = buildAlignedSectionRows({
             leftSectionLabel: 'ASSETS',
-            leftGroups: reportData.assetGroups,
+            leftGroups: assetGroups,
             leftTotalLabel: 'TOTAL ASSETS',
             leftTotalValue: totals.totalAssets,
             rightSectionLabel: 'LIABILITIES',
-            rightGroups: reportData.liabilityGroups,
+            rightGroups: liabilityGroups,
             rightTotalLabel: 'TOTAL LIABILITIES',
             rightTotalValue: totals.totalLiabilities,
             fmtValue: fmtAmt
         });
 
-        const printEquityRows = toPrintRows('EQUITY', reportData.equityGroups, 'TOTAL EQUITY', totals.totalEquity);
+        const printEquityRows = toPrintRows('EQUITY', equityGroups, 'TOTAL EQUITY', totals.totalEquity);
         const printRightTail = [
             { kind: 'space', label: '', value: '' },
             ...printEquityRows,
@@ -454,7 +468,7 @@ const BigBalanceSheet = () => {
     );
 
     const renderGroupedSection = (groups) => (
-        groups.map((group, index) => {
+        normalizeGroups(groups).map((group, index) => {
             if (group.items.length === 0) return null;
             return (
                 <div key={index} className="mb-2">
@@ -478,7 +492,7 @@ const BigBalanceSheet = () => {
 
     const toScontroRows = (label, groups, totalLabel, totalValue) => {
         const rows = [{ kind: 'section', label, value: '' }];
-        groups.forEach((group) => {
+        normalizeGroups(groups).forEach((group) => {
             if (!group.items.length) return;
             rows.push({ kind: 'group', label: group.label, value: '' });
             group.items.forEach((account) => {
@@ -502,13 +516,15 @@ const BigBalanceSheet = () => {
         rightTotalValue,
         fmtValue
     }) => {
+        const safeLeftGroups = normalizeGroups(leftGroups);
+        const safeRightGroups = normalizeGroups(rightGroups);
         const leftRows = [{ kind: 'section', label: leftSectionLabel, value: '' }];
         const rightRows = [{ kind: 'section', label: rightSectionLabel, value: '' }];
-        const maxGroups = Math.max(leftGroups.length, rightGroups.length);
+        const maxGroups = Math.max(safeLeftGroups.length, safeRightGroups.length);
 
         for (let index = 0; index < maxGroups; index += 1) {
-            const leftGroup = leftGroups[index];
-            const rightGroup = rightGroups[index];
+            const leftGroup = safeLeftGroups[index];
+            const rightGroup = safeRightGroups[index];
             const hasLeft = leftGroup && leftGroup.items && leftGroup.items.length;
             const hasRight = rightGroup && rightGroup.items && rightGroup.items.length;
             if (!hasLeft && !hasRight) continue;
@@ -540,17 +556,17 @@ const BigBalanceSheet = () => {
 
     const alignedScreen = buildAlignedSectionRows({
         leftSectionLabel: 'ASSETS',
-        leftGroups: reportData?.assetGroups || [],
+        leftGroups: assetGroups,
         leftTotalLabel: 'TOTAL ASSETS',
         leftTotalValue: totals.totalAssets,
         rightSectionLabel: 'LIABILITIES',
-        rightGroups: reportData?.liabilityGroups || [],
+        rightGroups: liabilityGroups,
         rightTotalLabel: 'TOTAL LIABILITIES',
         rightTotalValue: totals.totalLiabilities,
         fmtValue: fmtCur
     });
 
-    const equityRows = toScontroRows('EQUITY', reportData?.equityGroups || [], 'TOTAL EQUITY', totals.totalEquity);
+    const equityRows = toScontroRows('EQUITY', equityGroups, 'TOTAL EQUITY', totals.totalEquity);
     const rightTailRows = [
         { kind: 'space', label: '', value: '' },
         ...equityRows,
@@ -726,21 +742,21 @@ const BigBalanceSheet = () => {
             ) : reportData ? (
                 tableMode === 'stafel' ? (
                     <div className="glass-card rounded-lg overflow-hidden border border-dark-border/50">
-                        {renderSectionBlock('ASSETS', reportData.assetGroups, 'TOTAL ASSETS', totals.totalAssets)}
+                        {renderSectionBlock('ASSETS', assetGroups, 'TOTAL ASSETS', totals.totalAssets)}
                         <div className="border-t-2 border-dark-border/40 mx-4" />
 
                         <div className="mt-4" />
-                        {renderSectionBlock('LIABILITIES', reportData.liabilityGroups, 'TOTAL LIABILITIES', totals.totalLiabilities)}
+                        {renderSectionBlock('LIABILITIES', liabilityGroups, 'TOTAL LIABILITIES', totals.totalLiabilities)}
                         <div className="border-t-2 border-dark-border/40 mx-4" />
 
                         <div className="mt-4" />
                         <SectionHeader label="EQUITY" />
-                        {renderGroupedSection(reportData.equityGroups)}
+                        {renderGroupedSection(equityGroups)}
                         <div className="flex justify-between items-center py-[3px] pl-8 pr-4 text-sm mt-2">
                             <span className="text-silver-dark italic">LABA / RUGI Per {asOfLabel}</span>
                             <span className="font-mono text-silver-light text-xs min-w-[160px] text-right italic">{fmtCur(
                                 (() => {
-                                    const niAcc = reportData.equity.find((account) => account.id === 'net-income');
+                                    const niAcc = equityAccounts.find((account) => account.id === 'net-income');
                                     return niAcc ? niAcc.balance : 0;
                                 })()
                             )}</span>

@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 
+const ensureArray = (value) => Array.isArray(value) ? value : [];
+
 const BridgeProfitLoss = () => {
     const navigate = useNavigate();
     const { companySettings } = useData();
@@ -20,11 +22,11 @@ const BridgeProfitLoss = () => {
     const [taxRate, setTaxRate] = useState(22);
     const [reportMonths, setReportMonths] = useState([]);
     const [reportData, setReportData] = useState({
-        revenue: { groups: [], total: 0 },
-        cogs: { groups: [], total: 0 },
-        expenses: { groups: [], total: 0 },
-        other_income: { groups: [], total: 0 },
-        other_expense: { groups: [], total: 0 },
+        revenue: [],
+        cogs: [],
+        expenses: [],
+        other_income: [],
+        other_expense: [],
     });
     const [totals, setTotals] = useState({
         totalRevenue: 0, totalCOGS: 0, grossProfit: 0,
@@ -265,45 +267,42 @@ const BridgeProfitLoss = () => {
                 { v: total, t: 'n', s: { numFmt: '#,##0', font: { bold: true, color: { rgb: color } }, fill: { fgColor: { rgb: 'F1F5F9' } } } }
             ]);
         };
-        const mSum = (groups, m) => groups.reduce((s, g) => s + g.items.reduce((ss, a) => ss + (a.byMonth?.[m] || 0), 0), 0);
+        const mSum = (accounts, m) => ensureArray(accounts).reduce((sum, account) => sum + (account.byMonth?.[m] || 0), 0);
 
         const renderGroupsToExcel = (sectionData) => {
-            sectionData.groups.forEach(group => {
-                if (group.parent) addParent(group.parent.name, group.parent.code, group.parent.byMonth, group.items.reduce((s, a) => s + a.amount, 0));
-                group.items.forEach(item => addItem(item.name, item.byMonth, item.amount));
-            });
+            ensureArray(sectionData).forEach(item => addItem(item.name, item.byMonth, item.amount));
         };
 
         addSection('INCOME');
         renderGroupsToExcel(reportData.revenue);
-        addTotal('TOTAL SALES INCOME', m => mSum(reportData.revenue.groups, m), totals.totalRevenue, '16A34A');
+            addTotal('TOTAL SALES INCOME', m => mSum(reportData.revenue, m), totals.totalRevenue, '16A34A');
         rows.push([{ v: '' }]);
 
         addSection('COST OF GOOD SOLD');
         renderGroupsToExcel(reportData.cogs);
-        addTotal('TOTAL COST OF GOOD SOLD', m => mSum(reportData.cogs.groups, m), totals.totalCOGS);
+            addTotal('TOTAL COST OF GOOD SOLD', m => mSum(reportData.cogs, m), totals.totalCOGS);
         rows.push([{ v: '' }]);
 
-        addTotal('TOTAL OPERATION INCOME (GROSS PROFIT)', m => mSum(reportData.revenue.groups, m) - mSum(reportData.cogs.groups, m), totals.grossProfit, '1D4ED8');
+            addTotal('TOTAL OPERATION INCOME (GROSS PROFIT)', m => mSum(reportData.revenue, m) - mSum(reportData.cogs, m), totals.grossProfit, '1D4ED8');
         rows.push([{ v: '' }]);
 
         addSection('ADMINISTRASI & GENERAL EXPENSES');
         renderGroupsToExcel(reportData.expenses);
-        addTotal('TOTAL ADMINISTRASI & GENERAL EXPENSES', m => mSum(reportData.expenses.groups, m), totals.totalExpenses, 'DC2626');
+            addTotal('TOTAL ADMINISTRASI & GENERAL EXPENSES', m => mSum(reportData.expenses, m), totals.totalExpenses, 'DC2626');
         rows.push([{ v: '' }]);
 
         addSection('OTHER INCOME / EXPENSES');
-        if (reportData.other_income && reportData.other_income.length > 0) {
+        if (ensureArray(reportData.other_income).length > 0) {
             renderGroupsToExcel(reportData.other_income);
-            addTotal('TOTAL OTHER INCOME', m => mSum(reportData.other_income.groups, m), totals.totalOtherIncome, '16A34A');
+            addTotal('TOTAL OTHER INCOME', m => mSum(reportData.other_income, m), totals.totalOtherIncome, '16A34A');
         }
-        if (reportData.other_expense && reportData.other_expense.length > 0) {
+        if (ensureArray(reportData.other_expense).length > 0) {
             renderGroupsToExcel(reportData.other_expense);
-            addTotal('TOTAL OTHER EXPENSES', m => -mSum(reportData.other_expense.groups, m), -totals.totalOtherExpense, 'DC2626');
+            addTotal('TOTAL OTHER EXPENSES', m => -mSum(reportData.other_expense, m), -totals.totalOtherExpense, 'DC2626');
         }
         rows.push([{ v: '' }]);
 
-        addTotal('TOTAL OTHER INCOME / EXPENSES', m => mSum(reportData.other_income.groups, m) - mSum(reportData.other_expense.groups, m), totals.otherNet);
+        addTotal('TOTAL OTHER INCOME / EXPENSES', m => mSum(reportData.other_income, m) - mSum(reportData.other_expense, m), totals.otherNet);
         addTotal('TOTAL NET INCOME BEFORE TAX', null, totals.netIncomeBeforeTax, '1D4ED8');
         rows.push([
             { v: `CORPORATE INCOME TAX (${taxRate}%)`, s: { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: 'DC2626' } } } },
@@ -335,7 +334,7 @@ const BridgeProfitLoss = () => {
             const s = Math.abs(v).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
             return neg ? `<span style="color:#dc2626">(${s})</span>` : s;
         };
-        const mSum = (groups, m) => groups.reduce((s, g) => s + g.items.reduce((ss, a) => ss + (a.byMonth?.[m] || 0), 0), 0);
+        const mSum = (accounts, m) => ensureArray(accounts).reduce((sum, account) => sum + (account.byMonth?.[m] || 0), 0);
 
         const thStyle = 'padding:4px 8px;text-align:right;font-size:10px;background:#0070BB;color:#fff;border:1px solid #0060AA;white-space:nowrap';
         const thDescStyle = 'padding:4px 8px;text-align:left;font-size:10px;background:#0070BB;color:#fff;border:1px solid #0060AA;min-width:200px';
@@ -344,13 +343,6 @@ const BridgeProfitLoss = () => {
 
         const sectionRow = (label) =>
             `<tr><td colspan="${reportMonths.length + 2}" style="padding:5px 8px;font-size:10px;font-weight:800;text-transform:uppercase;background:#E2E8F0;color:#334155;letter-spacing:.06em">${label}</td></tr>`;
-
-        const parentRow = (name, code, byMonth, total) =>
-            `<tr style="background:#FEF9C3">
-                <td style="padding:3px 8px 3px 24px;font-size:10px;font-weight:700;color:#713F12">${name} <span style="font-weight:400;color:#92400E">(${code})</span></td>
-                ${reportMonths.map(m => `<td style="padding:3px 8px;text-align:right;font-size:10px;font-family:monospace;color:#713F12">${fmtAmt(byMonth?.[m] || 0)}</td>`).join('')}
-                <td style="padding:3px 8px;text-align:right;font-size:10px;font-weight:700;font-family:monospace;color:#713F12">${fmtAmt(total)}</td>
-            </tr>`;
 
         const itemRow = (name, byMonth, total) =>
             `<tr>
@@ -367,29 +359,26 @@ const BridgeProfitLoss = () => {
             </tr>`;
 
         const renderGroupsHTML = (sectionData) =>
-            sectionData.groups.map(group => [
-                group.parent ? parentRow(group.parent.name, group.parent.code, group.parent.byMonth, group.items.reduce((s, a) => s + a.amount, 0)) : '',
-                ...group.items.map(item => itemRow(item.name, item.byMonth, item.amount))
-            ].join('')).join('');
+            ensureArray(sectionData).map(item => itemRow(item.name, item.byMonth, item.amount)).join('');
 
         const tableHTML = `
         <table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif">
             ${headerRow}
             ${sectionRow('INCOME')}
             ${renderGroupsHTML(reportData.revenue)}
-            ${totalRow('TOTAL SALES INCOME', m => mSum(reportData.revenue.groups, m), totals.totalRevenue, '#DCFCE7', '#15803D')}
+            ${totalRow('TOTAL SALES INCOME', m => mSum(reportData.revenue, m), totals.totalRevenue, '#DCFCE7', '#15803D')}
             ${sectionRow('COST OF GOOD SOLD')}
             ${renderGroupsHTML(reportData.cogs)}
-            ${totalRow('TOTAL COST OF GOOD SOLD', m => mSum(reportData.cogs.groups, m), totals.totalCOGS)}
-            ${totalRow('TOTAL OPERATION INCOME (GROSS PROFIT)', m => mSum(reportData.revenue.groups, m) - mSum(reportData.cogs.groups, m), totals.grossProfit, '#DBEAFE', '#1D4ED8')}
+            ${totalRow('TOTAL COST OF GOOD SOLD', m => mSum(reportData.cogs, m), totals.totalCOGS)}
+            ${totalRow('TOTAL OPERATION INCOME (GROSS PROFIT)', m => mSum(reportData.revenue, m) - mSum(reportData.cogs, m), totals.grossProfit, '#DBEAFE', '#1D4ED8')}
             ${sectionRow('ADMINISTRASI & GENERAL EXPENSES')}
             ${renderGroupsHTML(reportData.expenses)}
-            ${totalRow('TOTAL ADMINISTRASI & GENERAL EXPENSES', m => mSum(reportData.expenses.groups, m), totals.totalExpenses, '#FEE2E2', '#DC2626')}
+            ${totalRow('TOTAL ADMINISTRASI & GENERAL EXPENSES', m => mSum(reportData.expenses, m), totals.totalExpenses, '#FEE2E2', '#DC2626')}
             ${sectionRow('OTHER INCOME / EXPENSES')}
-            ${reportData.other_income && reportData.other_income.length > 0 ? renderGroupsHTML(reportData.other_income) + totalRow('TOTAL OTHER INCOME', m => mSum(reportData.other_income.groups, m), totals.totalOtherIncome, '#DCFCE7', '#15803D', true) : ''}
-            ${reportData.other_expense && reportData.other_expense.length > 0 ? renderGroupsHTML(reportData.other_expense) + totalRow('TOTAL OTHER EXPENSES', m => -mSum(reportData.other_expense.groups, m), -totals.totalOtherExpense, '#FEE2E2', '#DC2626', true) : ''}
+            ${ensureArray(reportData.other_income).length > 0 ? renderGroupsHTML(reportData.other_income) + totalRow('TOTAL OTHER INCOME', m => mSum(reportData.other_income, m), totals.totalOtherIncome, '#DCFCE7', '#15803D', true) : ''}
+            ${ensureArray(reportData.other_expense).length > 0 ? renderGroupsHTML(reportData.other_expense) + totalRow('TOTAL OTHER EXPENSES', m => -mSum(reportData.other_expense, m), -totals.totalOtherExpense, '#FEE2E2', '#DC2626', true) : ''}
             <tr><td colspan="${reportMonths.length + 2}" style="padding:4px 0;border-top:2px solid #94A3B8"></td></tr>
-            ${totalRow('TOTAL OTHER INCOME / EXPENSES', m => mSum(reportData.other_income.groups, m) - mSum(reportData.other_expense.groups, m), totals.otherNet)}
+            ${totalRow('TOTAL OTHER INCOME / EXPENSES', m => mSum(reportData.other_income, m) - mSum(reportData.other_expense, m), totals.otherNet)}
             ${totalRow('TOTAL NET INCOME BEFORE TAX', null, totals.netIncomeBeforeTax, '#EFF6FF', '#1D4ED8')}
             <tr style="background:#FEE2E2">
                 <td style="padding:4px 8px;font-size:10px;font-weight:700;color:#DC2626">CORPORATE INCOME TAX (${taxRate}%)</td>
@@ -444,7 +433,7 @@ const BridgeProfitLoss = () => {
 
     const ItemRow = ({ item }) => (
         <div
-            onClick={() => navigate('/blink/finance/general-ledger', { state: { preSelectedAccount: item.id } })}
+            onClick={() => navigate('/bridge/finance/general-ledger', { state: { preSelectedAccount: item.id } })}
             className="flex items-center border-b border-gray-100 dark:border-dark-border/20 hover:bg-gray-50 dark:hover:bg-dark-surface/40 cursor-pointer group"
         >
             <div className={`w-[140px] flex-shrink-0 pl-4 pr-2 py-2 flex items-center`}>
@@ -604,14 +593,14 @@ const BridgeProfitLoss = () => {
 
                         {/* ── OTHER INCOME / EXPENSES ── */}
                         <SectionLabel label="Other Income / Expenses" />
-                        {reportData.other_income && reportData.other_income.length > 0 && (
+                        {ensureArray(reportData.other_income).length > 0 && (
                             <>
                                 {renderSection(reportData.other_income, 'other_income')}
                                 <TotalRow label="Total Other Income" amount={totals.totalOtherIncome} indent
                                     byMonthFn={m => reportData.other_income.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0)} />
                             </>
                         )}
-                        {reportData.other_expense && reportData.other_expense.length > 0 && (
+                        {ensureArray(reportData.other_expense).length > 0 && (
                             <>
                                 {renderSection(reportData.other_expense, 'other_expense')}
                                 <TotalRow label="Total Other Expenses" amount={-totals.totalOtherExpense} indent
