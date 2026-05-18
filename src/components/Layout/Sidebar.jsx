@@ -473,26 +473,36 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                                                                                 exit={{ height: 0, opacity: 0 }}
                                                                                 className="overflow-hidden"
                                                                             >
-                                                                                {subItem.items.filter(menuItem =>
-                                                                                    !menuItem.menuCode || canAccessPortal(menuItem.menuCode)
-                                                                                ).map((menuItem) => (
-                                                                                    <Link
-                                                                                        key={menuItem.path}
-                                                                                        to={menuItem.path}
-                                                                                        onClick={() => isMobile && setIsOpen(false)}
-                                                                                        className={`flex items-center pl-14 pr-4 py-2 text-sm smooth-transition border-l-2 ml-2 ${isActive(menuItem.path)
-                                                                                            ? 'bg-white/20 text-white font-medium border-white sidebar-active-item'
-                                                                                            : 'text-silver-dark hover:text-white hover:bg-white/10 border-transparent hover:border-white/50'
-                                                                                            }`}
-                                                                                    >
-                                                                                        <span className="flex-1">{menuItem.label}</span>
-                                                                                        {menuItem.showBadge && pendingApprovalCount > 0 && (
-                                                                                            <span className="ml-2 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1 animate-pulse">
-                                                                                                {pendingApprovalCount > 99 ? '99+' : pendingApprovalCount}
-                                                                                            </span>
-                                                                                        )}
-                                                                                    </Link>
-                                                                                ))}
+                                                                                {accessibleItems.map((menuItem, itemIdx) => {
+                                                                                    if (menuItem.type === 'divider') {
+                                                                                        return (
+                                                                                            <div key={`divider-${itemIdx}`} className="pl-8 pr-4 pt-3 pb-1 border-t border-dark-border/30 mt-2 first:mt-0 first:border-t-0">
+                                                                                                <span className="text-xs font-bold text-silver-light uppercase tracking-widest">
+                                                                                                    {menuItem.label}
+                                                                                                </span>
+                                                                                            </div>
+                                                                                        );
+                                                                                    }
+
+                                                                                    return (
+                                                                                        <Link
+                                                                                            key={menuItem.path}
+                                                                                            to={menuItem.path}
+                                                                                            onClick={() => isMobile && setIsOpen(false)}
+                                                                                            className={`flex items-center ${menuItem.indent ? 'pl-16' : 'pl-14'} pr-4 py-2 text-sm smooth-transition border-l-2 ml-2 ${isActive(menuItem.path)
+                                                                                                ? 'bg-white/20 text-white font-medium border-white sidebar-active-item'
+                                                                                                : 'text-silver-dark hover:text-white hover:bg-white/10 border-transparent hover:border-white/50'
+                                                                                                }`}
+                                                                                        >
+                                                                                            <span className="flex-1">{menuItem.label}</span>
+                                                                                            {menuItem.showBadge && pendingApprovalCount > 0 && (
+                                                                                                <span className="ml-2 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1 animate-pulse">
+                                                                                                    {pendingApprovalCount > 99 ? '99+' : pendingApprovalCount}
+                                                                                                </span>
+                                                                                            )}
+                                                                                        </Link>
+                                                                                    );
+                                                                                })}
                                                                             </motion.div>
                                                                         )}
                                                                     </AnimatePresence>

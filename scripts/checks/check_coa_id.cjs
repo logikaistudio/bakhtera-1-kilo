@@ -1,6 +1,6 @@
 // Script: check_coa_id.cjs
 // Mengecek apakah semua master COA sudah punya COA id (kolom id tidak null)
-// Jalankan: node scripts/check_coa_id.cjs
+// Jalankan: node scripts/checks/check_coa_id.cjs
 
 const { createClient } = require('@supabase/supabase-js');
 

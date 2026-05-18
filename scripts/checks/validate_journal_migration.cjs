@@ -1,6 +1,6 @@
 // Script: validate_journal_migration.cjs
 // Validasi hasil migrasi coa_id pada blink_journal_entries
-// Jalankan: node scripts/validate_journal_migration.cjs
+// Jalankan: node scripts/checks/validate_journal_migration.cjs
 
 const { createClient } = require('@supabase/supabase-js');
 

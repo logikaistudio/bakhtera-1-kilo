@@ -8,7 +8,7 @@
  *   - reference_type IN ('ar_reversal', 'ap_reversal')
  * 
  * Cara pakai:
- *   node scripts/cleanup_reversal_journals.js
+ *   node scripts/fixes/cleanup_reversal_journals.js
  */
 
 import { createClient } from '@supabase/supabase-js';

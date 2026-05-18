@@ -1,6 +1,6 @@
 // Script: audit_migrated_journals.cjs
 // Buat CSV audit untuk jurnal dengan account_code yang telah dipetakan ke coa_id
-// Jalankan: node scripts/audit_migrated_journals.cjs
+// Jalankan: node scripts/checks/audit_migrated_journals.cjs
 
 const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
@@ -40,7 +40,8 @@ async function main() {
     process.exit(1);
   }
 
-  const outPath = path.join(__dirname, 'migrated_journals_audit.csv');
+  const outPath = path.join(__dirname, '../../docs/artifacts', 'migrated_journals_audit.csv');
+  fs.mkdirSync(path.dirname(outPath), { recursive: true });
   const header = ['id','entry_date','account_code','mapped_coa_id','coa_id','mapped_match','debit','credit','reference_type','reference_id','description','created_at','updated_at'];
   const lines = [header.join(',')];
 
