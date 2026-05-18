@@ -29,6 +29,8 @@ const TrialBalance = () => {
         start: new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0],
         end: today.toISOString().split('T')[0]
     });
+    const [printOrientation, setPrintOrientation] = useState('auto'); // 'auto' | 'portrait' | 'landscape'
+    const [printPageSize, setPrintPageSize] = useState('A4'); // 'A4' | 'Letter' | 'Legal'
 
     useEffect(() => {
         fetchTrialBalance();
@@ -395,7 +397,9 @@ const TrialBalance = () => {
             companyInfo: companySettings,
             period,
             bodyHTML,
-            note: 'Values in parentheses ( ) represent Credit-normal balances (Liabilities / Equity / Revenue). Total Debit and Credit movements must always be balanced.'
+            note: 'Values in parentheses ( ) represent Credit-normal balances (Liabilities / Equity / Revenue). Total Debit and Credit movements must always be balanced.',
+            orientation: printOrientation,
+            pageSize: printPageSize
         });
     };
 
@@ -429,6 +433,26 @@ const TrialBalance = () => {
                     >
                         <FileText className="w-4 h-4" /> CSV
                     </button>
+                    <select
+                        value={printOrientation}
+                        onChange={(e) => setPrintOrientation(e.target.value)}
+                        className="px-2 py-2 bg-dark-surface border border-dark-border rounded-lg text-xs text-silver-light hover:bg-dark-card smooth-transition"
+                        title="Orientasi cetak"
+                    >
+                        <option value="auto">Auto</option>
+                        <option value="portrait">Portrait</option>
+                        <option value="landscape">Landscape</option>
+                    </select>
+                    <select
+                        value={printPageSize}
+                        onChange={(e) => setPrintPageSize(e.target.value)}
+                        className="px-2 py-2 bg-dark-surface border border-dark-border rounded-lg text-xs text-silver-light hover:bg-dark-card smooth-transition"
+                        title="Ukuran kertas"
+                    >
+                        <option value="A4">A4</option>
+                        <option value="Letter">Letter</option>
+                        <option value="Legal">Legal</option>
+                    </select>
                     <button
                         onClick={exportToPDF}
                         disabled={loading || balances.length === 0}

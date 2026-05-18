@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import XLSX from 'xlsx-js-style';
 import { supabase } from '../../../lib/supabase';
 import Button from '../../../components/Common/Button';
-import { TrendingUp, RefreshCw } from 'lucide-react';
+import { TrendingUp, RefreshCw, FileSpreadsheet, Printer } from 'lucide-react';
+import { useData } from '../../../context/DataContext';
+import { printReport } from '../../../utils/printPDF';
 
 const fmtIDR = (v) => v != null ? 'Rp ' + Number(v).toLocaleString('id-ID') : 'Rp 0';
 
 const BigProfitLoss = () => {
+    const { companySettings } = useData();
     const [data, setData] = useState({ revenue: [], cogs: [], expenses: [] });
     const [loading, setLoading] = useState(true);
     const today = new Date();
@@ -13,6 +17,8 @@ const BigProfitLoss = () => {
         start: new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0],
         end: today.toISOString().split('T')[0],
     });
+    const [printOrientation, setPrintOrientation] = useState('auto'); // 'auto' | 'portrait' | 'landscape'
+    const [printPageSize, setPrintPageSize] = useState('A4'); // 'A4' | 'Letter' | 'Legal'
 
     useEffect(() => { fetchPL(); }, [dateRange]);
 
@@ -55,6 +61,94 @@ const BigProfitLoss = () => {
     const totalExpenses = data.expenses.reduce((s, a) => s + a.net, 0);
     const netIncome = grossProfit - totalExpenses;
 
+    // ── Export Excel ────────────────────────────────────────────────────────────
+    const handleExportExcel = () => {
+        const ws = [];
+        const cs = companySettings;
+        const dateLabel = `${new Date(dateRange.start).toLocaleDateString('id-ID')} - ${new Date(dateRange.end).toLocaleDateString('id-ID')}`;
+        
+        // KOP SURAT
+        ws.push([cs?.company_name || 'Big Module']);
+        ws.push([cs?.company_address || '']);
+        if (cs?.company_phone) ws.push([`Telp: ${cs.company_phone}`]);
+        if (cs?.company_npwp) ws.push([`NPWP: ${cs.company_npwp}`]);
+        ws.push([]);
+        ws.push(['LAPORAN LABA RUGI (PROFIT & LOSS)']);
+        ws.push([`Periode: ${dateLabel}`]);
+        ws.push([]);
+        
+        ws.push(['PENDAPATAN (REVENUE)', fmtIDR(totalRevenue)]);
+        data.revenue.forEach(a => ws.push([`  ${a.name}`, fmtIDR(a.net)]));
+        ws.push([]);
+        
+        ws.push(['HARGA POKOK (COGS)', fmtIDR(totalCogs)]);
+        data.cogs.forEach(a => ws.push([`  ${a.name}`, fmtIDR(a.net)]));
+        ws.push([]);
+        
+        ws.push(['LABA KOTOR (GROSS PROFIT)', fmtIDR(grossProfit)]);
+        ws.push([]);
+        
+        ws.push(['BIAYA OPERASIONAL (EXPENSES)', fmtIDR(totalExpenses)]);
+        data.expenses.forEach(a => ws.push([`  ${a.name}`, fmtIDR(a.net)]));
+        ws.push([]);
+        
+        ws.push(['LABA BERSIH (NET INCOME)', fmtIDR(netIncome)]);
+        
+        const csv = ws.map(r => r.join('\t')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `ProfitLoss_Big_${dateRange.start}_${dateRange.end}.csv`;
+        link.click();
+    };
+
+    // ── Export PDF ──────────────────────────────────────────────────────────────
+    const handleExportPDF = () => {
+        const dateLabel = `${new Date(dateRange.start).toLocaleDateString('id-ID')} - ${new Date(dateRange.end).toLocaleDateString('id-ID')}`;
+        const bodyHTML = `
+        <h2 style="text-align:center;margin-bottom:16px">LAPORAN LABA RUGI (PROFIT & LOSS)</h2>
+        <p style="text-align:center;font-size:11px;margin-bottom:16px">Periode: ${dateLabel}</p>
+        
+        <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px">
+            <thead><tr style="background:#0070BB;color:white;font-weight:bold"><th style="border:1px solid #ccc;padding:8px;text-align:left">PENDAPATAN (REVENUE)</th><th style="border:1px solid #ccc;padding:8px;text-align:right">Jumlah</th></tr></thead>
+            <tbody>${data.revenue.map(a => `<tr style="border:1px solid #e0e0e0"><td style="padding:6px">${a.name}</td><td style="text-align:right;padding:6px">${fmtIDR(a.net)}</td></tr>`).join('')}<tr style="background:#f5f5f5;font-weight:bold"><td style="border:1px solid #ccc;padding:8px">TOTAL PENDAPATAN</td><td style="text-align:right;border:1px solid #ccc;padding:8px">${fmtIDR(totalRevenue)}</td></tr></tbody>
+        </table>
+        
+        <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px">
+            <thead><tr style="background:#0070BB;color:white;font-weight:bold"><th style="border:1px solid #ccc;padding:8px;text-align:left">HARGA POKOK (COGS)</th><th style="border:1px solid #ccc;padding:8px;text-align:right">Jumlah</th></tr></thead>
+            <tbody>${data.cogs.map(a => `<tr style="border:1px solid #e0e0e0"><td style="padding:6px">${a.name}</td><td style="text-align:right;padding:6px">${fmtIDR(a.net)}</td></tr>`).join('')}<tr style="background:#f5f5f5;font-weight:bold"><td style="border:1px solid #ccc;padding:8px">TOTAL COGS</td><td style="text-align:right;border:1px solid #ccc;padding:8px">${fmtIDR(totalCogs)}</td></tr></tbody>
+        </table>
+        
+        <div style="background:#f0f0f0;padding:12px;margin-bottom:16px;border:1px solid #ccc;border-radius:4px">
+            <div style="display:flex;justify-content:space-between;font-weight:bold">
+                <span>LABA KOTOR (GROSS PROFIT)</span>
+                <span>${fmtIDR(grossProfit)}</span>
+            </div>
+        </div>
+        
+        <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px">
+            <thead><tr style="background:#0070BB;color:white;font-weight:bold"><th style="border:1px solid #ccc;padding:8px;text-align:left">BIAYA OPERASIONAL (EXPENSES)</th><th style="border:1px solid #ccc;padding:8px;text-align:right">Jumlah</th></tr></thead>
+            <tbody>${data.expenses.map(a => `<tr style="border:1px solid #e0e0e0"><td style="padding:6px">${a.name}</td><td style="text-align:right;padding:6px">${fmtIDR(a.net)}</td></tr>`).join('')}<tr style="background:#f5f5f5;font-weight:bold"><td style="border:1px solid #ccc;padding:8px">TOTAL BIAYA</td><td style="text-align:right;border:1px solid #ccc;padding:8px">${fmtIDR(totalExpenses)}</td></tr></tbody>
+        </table>
+        
+        <div style="background:${netIncome >= 0 ? '#d4edda' : '#f8d7da'};padding:12px;border:2px solid ${netIncome >= 0 ? '#28a745' : '#dc3545'};border-radius:4px">
+            <div style="display:flex;justify-content:space-between;font-weight:bold;color:${netIncome >= 0 ? '#155724' : '#721c24'}">
+                <span>LABA BERSIH (NET INCOME)</span>
+                <span>${fmtIDR(netIncome)}</span>
+            </div>
+        </div>`;
+        printReport({
+            reportName: 'PROFIT & LOSS',
+            company: 'Big Module',
+            companyInfo: companySettings,
+            period: `Periode: ${dateLabel}`,
+            bodyHTML,
+            note: '',
+            orientation: printOrientation,
+            pageSize: printPageSize
+        });
+    };
+
     const Section = ({ title, items, total, totalLabel, totalColor = 'text-silver-light' }) => (
         <div className="glass-card rounded-xl overflow-hidden mb-4">
             <div className="bg-[#0070BB] px-4 py-2.5">
@@ -93,7 +187,37 @@ const BigProfitLoss = () => {
                     </h1>
                     <p className="text-silver-dark mt-1">Laporan laba rugi Big module</p>
                 </div>
-                <Button variant="secondary" icon={RefreshCw} onClick={fetchPL}>Refresh</Button>
+                <div className="flex items-center gap-2">
+                    <Button variant="secondary" icon={RefreshCw} onClick={fetchPL}>Refresh</Button>
+                    <button onClick={handleExportExcel}
+                        className="flex items-center gap-2 px-3 py-2 bg-dark-surface text-green-400 hover:bg-dark-card smooth-transition rounded-lg border border-dark-border text-xs">
+                        <FileSpreadsheet className="w-4 h-4" /> Excel
+                    </button>
+                    <select
+                        value={printOrientation}
+                        onChange={(e) => setPrintOrientation(e.target.value)}
+                        className="px-2 py-2 bg-dark-surface border border-dark-border rounded-lg text-xs text-silver-light hover:bg-dark-card smooth-transition"
+                        title="Orientasi cetak"
+                    >
+                        <option value="auto">Auto</option>
+                        <option value="portrait">Portrait</option>
+                        <option value="landscape">Landscape</option>
+                    </select>
+                    <select
+                        value={printPageSize}
+                        onChange={(e) => setPrintPageSize(e.target.value)}
+                        className="px-2 py-2 bg-dark-surface border border-dark-border rounded-lg text-xs text-silver-light hover:bg-dark-card smooth-transition"
+                        title="Ukuran kertas"
+                    >
+                        <option value="A4">A4</option>
+                        <option value="Letter">Letter</option>
+                        <option value="Legal">Legal</option>
+                    </select>
+                    <button onClick={handleExportPDF}
+                        className="flex items-center gap-2 px-3 py-2 bg-dark-surface text-red-400 hover:bg-dark-card smooth-transition rounded-lg border border-dark-border text-xs">
+                        <Printer className="w-4 h-4" /> Print PDF
+                    </button>
+                </div>
             </div>
 
             <div className="glass-card p-4 rounded-xl flex items-center gap-4">
