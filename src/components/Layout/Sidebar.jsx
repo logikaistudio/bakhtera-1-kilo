@@ -480,7 +480,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                                                                                         key={menuItem.path}
                                                                                         to={menuItem.path}
                                                                                         onClick={() => isMobile && setIsOpen(false)}
-                                                                                        className={`flex items-center pl-12 pr-4 py-1.5 text-sm smooth-transition border-l-2 ml-4 ${isActive(menuItem.path)
+                                                                                        className={`flex items-center pl-14 pr-4 py-2 text-sm smooth-transition border-l-2 ml-2 ${isActive(menuItem.path)
                                                                                             ? 'bg-white/20 text-white font-medium border-white sidebar-active-item'
                                                                                             : 'text-silver-dark hover:text-white hover:bg-white/10 border-transparent hover:border-white/50'
                                                                                             }`}
@@ -704,8 +704,8 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                                                                                 {accessibleItems.map((menuItem, itemIdx) => {
                                                                                     if (menuItem.type === 'divider') {
                                                                                         return (
-                                                                                            <div key={`divider-${itemIdx}`} className="pl-6 pr-4 pt-3 pb-1 border-t border-dark-border/30 mt-1 first:mt-0 first:border-t-0">
-                                                                                                <span className="text-xs font-bold text-silver uppercase tracking-wider">
+                                                                                            <div key={`divider-${itemIdx}`} className="pl-8 pr-4 pt-3 pb-1 border-t border-dark-border/30 mt-2 first:mt-0 first:border-t-0">
+                                                                                                <span className="text-xs font-bold text-silver-light uppercase tracking-widest">
                                                                                                     {menuItem.label}
                                                                                                 </span>
                                                                                             </div>
@@ -717,7 +717,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                                                                                             key={menuItem.path}
                                                                                             to={menuItem.path}
                                                                                             onClick={() => isMobile && setIsOpen(false)}
-                                                                                            className={`block pl-12 pr-4 py-1.5 text-sm smooth-transition border-l-2 ml-4 ${isActive(menuItem.path)
+                                                                                            className={`block pl-14 pr-4 py-2 text-sm smooth-transition border-l-2 ml-2 ${isActive(menuItem.path)
                                                                                                 ? 'bg-white/10 text-white font-medium border-white'
                                                                                                 : 'text-silver-dark hover:text-white hover:bg-white/10 border-transparent hover:border-white/50'
                                                                                                 }`}
@@ -856,8 +856,8 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                                                                                     // Handle divider type for subcategory headers
                                                                                     if (itemObj.type === 'divider') {
                                                                                         return (
-                                                                                            <div key={`divider-${itemIdx}`} className="pl-6 pr-4 pt-3 pb-1 border-t border-dark-border/30 mt-1 first:mt-0 first:border-t-0">
-                                                                                                <span className="text-xs font-bold text-silver uppercase tracking-wider">
+                                                                                            <div key={`divider-${itemIdx}`} className="pl-8 pr-4 pt-3 pb-1 border-t border-dark-border/30 mt-2 first:mt-0 first:border-t-0">
+                                                                                                <span className="text-xs font-bold text-silver-light uppercase tracking-widest">
                                                                                                     {itemObj.label}
                                                                                                 </span>
                                                                                             </div>
@@ -870,7 +870,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                                                                                             key={itemObj.path}
                                                                                             to={itemObj.path}
                                                                                             onClick={() => isMobile && setIsOpen(false)}
-                                                                                            className={`flex items-center ${itemObj.indent ? 'pl-16' : 'pl-12'} pr-4 py-1.5 text-sm smooth-transition border-l-2 ml-4 ${isActive(itemObj.path)
+                                                                                            className={`flex items-center ${itemObj.indent ? 'pl-16' : 'pl-14'} pr-4 py-2 text-sm smooth-transition border-l-2 ml-2 ${isActive(itemObj.path)
                                                                                                 ? 'bg-white/20 text-white font-medium border-white sidebar-active-item'
                                                                                                 : 'text-silver-dark hover:text-white hover:bg-white/10 border-transparent hover:border-white/50'
                                                                                                 }`}
