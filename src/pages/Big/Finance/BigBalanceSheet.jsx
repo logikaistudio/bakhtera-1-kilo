@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
 import Button from '../../../components/Common/Button';
-import { BarChart2, RefreshCw } from 'lucide-react';
+import { BarChart2, RefreshCw, FileSpreadsheet, Printer } from 'lucide-react';
+import { printReport } from '../../../utils/printPDF';
 
 const fmtIDR = (v) => v != null ? 'Rp ' + Number(v).toLocaleString('id-ID') : 'Rp 0';
 
@@ -9,6 +10,8 @@ const BigBalanceSheet = () => {
     const [data, setData] = useState({ assets: [], liabilities: [], equity: [] });
     const [loading, setLoading] = useState(true);
     const [asOf, setAsOf] = useState(new Date().toISOString().split('T')[0]);
+    const [printOrientation, setPrintOrientation] = useState('auto'); // 'auto' | 'portrait' | 'landscape'
+    const [printPageSize, setPrintPageSize] = useState('A4'); // 'A4' | 'Letter' | 'Legal'
 
     useEffect(() => { fetchBS(); }, [asOf]);
 
@@ -56,6 +59,55 @@ const BigBalanceSheet = () => {
     const totalLE = totalLiabilities + totalEquity;
     const isBalanced = Math.abs(totalAssets - totalLE) < 1;
 
+    // ── Export Excel ────────────────────────────────────────────────────────────
+    const exportToExcel = () => {
+        const ws = [];
+        ws.push(['BALANCE SHEET - BIG MODULE']);
+        ws.push([`Per ${new Date(asOf).toLocaleDateString('id-ID')}`]);
+        ws.push([]);
+        ws.push(['ASET', 'Jumlah']);
+        data.assets.forEach(a => ws.push([a.name, a.net]));
+        ws.push(['TOTAL ASET', totalAssets]);
+        ws.push([]);
+        ws.push(['KEWAJIBAN DAN EKUITAS', 'Jumlah']);
+        data.liabilities.forEach(a => ws.push([a.name, a.net]));
+        ws.push(['TOTAL KEWAJIBAN', totalLiabilities]);
+        data.equity.forEach(a => ws.push([a.name, a.net]));
+        ws.push(['TOTAL EKUITAS', totalEquity]);
+        ws.push(['TOTAL KEWAJIBAN & EKUITAS', totalLE]);
+        const csv = ws.map(r => r.join('\t')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `BalanceSheet_Big_${asOf}.csv`;
+        link.click();
+    };
+
+    // ── Export PDF ──────────────────────────────────────────────────────────────
+    const handleExportPDF = () => {
+        const asOfLabel = new Date(asOf).toLocaleDateString('id-ID');
+        const bodyHTML = `
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead><tr style="background:#0070BB;color:white;font-weight:bold"><th style="border:1px solid #ccc;padding:8px;text-align:left">ASET</th><th style="border:1px solid #ccc;padding:8px;text-align:right">Jumlah</th></tr></thead>
+            <tbody>${data.assets.map(a => `<tr style="border:1px solid #e0e0e0"><td style="padding:6px">${a.name}</td><td style="text-align:right;padding:6px">${fmtIDR(a.net)}</td></tr>`).join('')}<tr style="background:#f5f5f5;font-weight:bold"><td style="border:1px solid #ccc;padding:8px">TOTAL ASET</td><td style="text-align:right;border:1px solid #ccc;padding:8px">${fmtIDR(totalAssets)}</td></tr></tbody>
+        </table>
+        <br/>
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead><tr style="background:#0070BB;color:white;font-weight:bold"><th style="border:1px solid #ccc;padding:8px;text-align:left">KEWAJIBAN & EKUITAS</th><th style="border:1px solid #ccc;padding:8px;text-align:right">Jumlah</th></tr></thead>
+            <tbody>${data.liabilities.map(a => `<tr style="border:1px solid #e0e0e0"><td style="padding:6px">${a.name}</td><td style="text-align:right;padding:6px">${fmtIDR(a.net)}</td></tr>`).join('')}${data.equity.map(a => `<tr style="border:1px solid #e0e0e0"><td style="padding:6px">${a.name}</td><td style="text-align:right;padding:6px">${fmtIDR(a.net)}</td></tr>`).join('')}<tr style="background:#f5f5f5;font-weight:bold"><td style="border:1px solid #ccc;padding:8px">TOTAL KEWAJIBAN & EKUITAS</td><td style="text-align:right;border:1px solid #ccc;padding:8px">${fmtIDR(totalLE)}</td></tr></tbody>
+        </table>`;
+        printReport({
+            reportName: 'BALANCE SHEET',
+            company: 'Big Module',
+            companyInfo: { name: 'Big Module' },
+            period: `Per ${asOfLabel}`,
+            bodyHTML,
+            note: '',
+            orientation: printOrientation,
+            pageSize: printPageSize
+        });
+    };
+
     const Section = ({ title, items, total, color }) => (
         <div className="glass-card rounded-xl overflow-hidden mb-4">
             <div className="bg-[#0070BB] px-4 py-2.5">
@@ -94,7 +146,37 @@ const BigBalanceSheet = () => {
                     </h1>
                     <p className="text-silver-dark mt-1">Neraca keuangan Big module</p>
                 </div>
-                <Button variant="secondary" icon={RefreshCw} onClick={fetchBS}>Refresh</Button>
+                <div className="flex items-center gap-2">
+                    <Button variant="secondary" icon={RefreshCw} onClick={fetchBS}>Refresh</Button>
+                    <button onClick={exportToExcel}
+                        className="flex items-center gap-2 px-3 py-2 bg-dark-surface text-green-400 hover:bg-dark-card smooth-transition rounded-lg border border-dark-border text-xs">
+                        <FileSpreadsheet className="w-4 h-4" /> Excel
+                    </button>
+                    <select
+                        value={printOrientation}
+                        onChange={(e) => setPrintOrientation(e.target.value)}
+                        className="px-2 py-2 bg-dark-surface border border-dark-border rounded-lg text-xs text-silver-light hover:bg-dark-card smooth-transition"
+                        title="Orientasi cetak"
+                    >
+                        <option value="auto">Auto</option>
+                        <option value="portrait">Portrait</option>
+                        <option value="landscape">Landscape</option>
+                    </select>
+                    <select
+                        value={printPageSize}
+                        onChange={(e) => setPrintPageSize(e.target.value)}
+                        className="px-2 py-2 bg-dark-surface border border-dark-border rounded-lg text-xs text-silver-light hover:bg-dark-card smooth-transition"
+                        title="Ukuran kertas"
+                    >
+                        <option value="A4">A4</option>
+                        <option value="Letter">Letter</option>
+                        <option value="Legal">Legal</option>
+                    </select>
+                    <button onClick={handleExportPDF}
+                        className="flex items-center gap-2 px-3 py-2 bg-dark-surface text-red-400 hover:bg-dark-card smooth-transition rounded-lg border border-dark-border text-xs">
+                        <Printer className="w-4 h-4" /> Print PDF
+                    </button>
+                </div>
             </div>
 
             <div className="glass-card p-4 rounded-xl flex items-center gap-4">

@@ -465,18 +465,157 @@ const BlinkApproval = () => {
                 })));
             }
 
-            const combinedHistory = [...historyData, ...cancellationLogs].sort((a, b) => {
+            // Fallback history from document statuses (for environments where blink_approval_history
+            // is empty or insert/select is restricted). This affects display only, not business flow.
+            const [histShipRes, histPoRes, histInvRes, histQuotRes] = await Promise.all([
+                supabase
+                    .from('blink_shipments')
+                    .select('id, job_number, so_number, status, bl_status, updated_at, created_at, rejection_reason')
+                    .or('status.in.(approved,rejected,cancelled),bl_status.in.(approved,rejected,cancelled)')
+                    .order('updated_at', { ascending: false })
+                    .limit(200),
+                supabase
+                    .from('blink_purchase_orders')
+                    .select('id, po_number, status, updated_at, created_at, rejection_reason')
+                    .or('status.in.(approved,cancelled),rejection_reason.not.is.null')
+                    .order('updated_at', { ascending: false })
+                    .limit(200),
+                supabase
+                    .from('blink_invoices')
+                    .select('id, invoice_number, status, updated_at, created_at, rejection_reason')
+                    .in('status', ['approved', 'unpaid', 'paid', 'partially_paid', 'overdue', 'rejected', 'cancelled'])
+                    .order('updated_at', { ascending: false })
+                    .limit(200),
+                supabase
+                    .from('blink_quotations')
+                    .select('id, quotation_number, job_number, status, updated_at, created_at, rejection_reason')
+                    .in('status', ['converted', 'approved', 'rejected', 'cancelled'])
+                    .order('updated_at', { ascending: false })
+                    .limit(200)
+            ]);
+
+            const derivedLogs = [];
+
+            if (!histShipRes.error) {
+                derivedLogs.push(...(histShipRes.data || []).map((row) => {
+                    const mergedStatus = String(row.status || row.bl_status || '').toLowerCase();
+                    const mappedStatus = mergedStatus === 'cancelled'
+                        ? 'cancelled'
+                        : mergedStatus === 'rejected'
+                            ? 'rejected'
+                            : 'approved';
+                    return {
+                        id: `derived-shipment-${row.id}-${mappedStatus}`,
+                        approved_at: row.updated_at || row.created_at || new Date().toISOString(),
+                        document_number: row.job_number || row.so_number || '-',
+                        document_type: 'shipment',
+                        approver: 'System',
+                        status: mappedStatus,
+                        reason: mappedStatus === 'rejected'
+                            ? (row.rejection_reason || 'Rejected from shipment workflow')
+                            : mappedStatus === 'cancelled'
+                                ? (row.rejection_reason || 'Cancelled from shipment workflow')
+                                : 'Approved from shipment workflow',
+                        module: 'blink_operations'
+                    };
+                }));
+            }
+
+            if (!histPoRes.error) {
+                derivedLogs.push(...(histPoRes.data || []).map((row) => {
+                    const status = String(row.status || '').toLowerCase();
+                    const mappedStatus = status === 'cancelled'
+                        ? 'cancelled'
+                        : row.rejection_reason
+                            ? 'rejected'
+                            : 'approved';
+                    return {
+                        id: `derived-po-${row.id}-${mappedStatus}`,
+                        approved_at: row.updated_at || row.created_at || new Date().toISOString(),
+                        document_number: row.po_number || '-',
+                        document_type: 'po',
+                        approver: 'System',
+                        status: mappedStatus,
+                        reason: mappedStatus === 'rejected'
+                            ? (row.rejection_reason || 'Rejected from PO workflow')
+                            : mappedStatus === 'cancelled'
+                                ? 'Cancelled from PO workflow'
+                                : 'Approved from PO workflow',
+                        module: 'blink_operations'
+                    };
+                }));
+            }
+
+            if (!histInvRes.error) {
+                derivedLogs.push(...(histInvRes.data || []).map((row) => {
+                    const status = String(row.status || '').toLowerCase();
+                    const mappedStatus = status === 'cancelled'
+                        ? 'cancelled'
+                        : status === 'rejected'
+                            ? 'rejected'
+                            : 'approved';
+                    return {
+                        id: `derived-invoice-${row.id}-${mappedStatus}`,
+                        approved_at: row.updated_at || row.created_at || new Date().toISOString(),
+                        document_number: row.invoice_number || '-',
+                        document_type: 'invoice',
+                        approver: 'System',
+                        status: mappedStatus,
+                        reason: mappedStatus === 'rejected'
+                            ? (row.rejection_reason || 'Rejected from invoice workflow')
+                            : mappedStatus === 'cancelled'
+                                ? 'Cancelled from invoice workflow'
+                                : 'Approved from invoice workflow',
+                        module: 'blink_sales'
+                    };
+                }));
+            }
+
+            if (!histQuotRes.error) {
+                derivedLogs.push(...(histQuotRes.data || []).map((row) => {
+                    const status = String(row.status || '').toLowerCase();
+                    const mappedStatus = status === 'cancelled'
+                        ? 'cancelled'
+                        : status === 'rejected'
+                            ? 'rejected'
+                            : 'approved';
+                    return {
+                        id: `derived-quotation-${row.id}-${mappedStatus}`,
+                        approved_at: row.updated_at || row.created_at || new Date().toISOString(),
+                        document_number: row.quotation_number || row.job_number || '-',
+                        document_type: 'quotation',
+                        approver: 'System',
+                        status: mappedStatus,
+                        reason: mappedStatus === 'rejected'
+                            ? (row.rejection_reason || 'Rejected from quotation workflow')
+                            : mappedStatus === 'cancelled'
+                                ? 'Cancelled from quotation workflow'
+                                : 'Approved from quotation workflow',
+                        module: 'blink_sales'
+                    };
+                }));
+            }
+
+            const mergedHistory = [...historyData, ...cancellationLogs, ...derivedLogs].sort((a, b) => {
                 const aDate = new Date(a.approved_at || a.created_at || 0).getTime();
                 const bDate = new Date(b.approved_at || b.created_at || 0).getTime();
                 return bDate - aDate;
             });
+
+            const seen = new Set();
+            const combinedHistory = mergedHistory.filter((row) => {
+                const key = `${String(row.document_type || '').toLowerCase()}|${String(row.document_number || '').toLowerCase()}|${String(row.status || '').toLowerCase()}`;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            });
                 
             if (histErr) {
                 console.error('❌ Error fetching approval history:', histErr);
-            } else {
-                console.log('✅ Blink approval history loaded:', combinedHistory.length, 'records');
-                setHistoryLogs(combinedHistory);
             }
+
+            console.log('✅ Blink approval history loaded:', combinedHistory.length, 'records');
+            setHistoryLogs(combinedHistory);
 
 
         } catch (error) {

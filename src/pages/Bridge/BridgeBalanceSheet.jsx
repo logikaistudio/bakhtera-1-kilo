@@ -48,6 +48,8 @@ const BridgeBalanceSheet = () => {
     const [loading, setLoading] = useState(false);
     const [reportData, setReportData] = useState(null);
     const [totals, setTotals] = useState({ totalAssets: 0, totalLiabilities: 0, totalEquity: 0 });
+    const [printOrientation, setPrintOrientation] = useState('auto'); // 'auto' | 'portrait' | 'landscape'
+    const [printPageSize, setPrintPageSize] = useState('A4'); // 'A4' | 'Letter' | 'Legal'
 
     useEffect(() => { fetchBalanceSheet(); }, [asOfDate]);
 
@@ -265,7 +267,9 @@ const BridgeBalanceSheet = () => {
             companyInfo: companySettings,
             period: `Per ${asOfLabel}`,
             bodyHTML,
-            note: ''
+            note: '',
+            orientation: printOrientation,
+            pageSize: printPageSize
         });
     };
 
@@ -354,6 +358,26 @@ const BridgeBalanceSheet = () => {
                         className="flex items-center gap-2 px-3 py-2 bg-dark-surface text-green-400 hover:bg-dark-card smooth-transition rounded-lg border border-dark-border text-xs">
                         <FileSpreadsheet className="w-4 h-4" /> Excel
                     </button>
+                    <select
+                        value={printOrientation}
+                        onChange={(e) => setPrintOrientation(e.target.value)}
+                        className="px-2 py-2 bg-dark-surface border border-dark-border rounded-lg text-xs text-silver-light hover:bg-dark-card smooth-transition"
+                        title="Orientasi cetak"
+                    >
+                        <option value="auto">Auto</option>
+                        <option value="portrait">Portrait</option>
+                        <option value="landscape">Landscape</option>
+                    </select>
+                    <select
+                        value={printPageSize}
+                        onChange={(e) => setPrintPageSize(e.target.value)}
+                        className="px-2 py-2 bg-dark-surface border border-dark-border rounded-lg text-xs text-silver-light hover:bg-dark-card smooth-transition"
+                        title="Ukuran kertas"
+                    >
+                        <option value="A4">A4</option>
+                        <option value="Letter">Letter</option>
+                        <option value="Legal">Legal</option>
+                    </select>
                     <button onClick={handleExportPDF}
                         className="flex items-center gap-2 px-3 py-2 bg-dark-surface text-red-400 hover:bg-dark-card smooth-transition rounded-lg border border-dark-border text-xs">
                         <Printer className="w-4 h-4" /> Print PDF

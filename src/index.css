@@ -372,6 +372,37 @@ tbody tr:nth-child(even):hover {
   background-color: #F0F7FF !important;
 }
 
+/* Keep balance-sheet scontro amount columns right-aligned despite global table overrides */
+.balance-sheet-scontro-table tbody td.scontro-amount-cell {
+  text-align: right !important;
+  min-width: 200px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.balance-sheet-scontro-table {
+  border-collapse: collapse !important;
+  border-spacing: 0 !important;
+  table-layout: auto !important;
+}
+
+.balance-sheet-scontro-table thead th {
+  padding: 10px 12px !important;
+}
+
+.balance-sheet-scontro-table tbody td {
+  padding: 6px 10px !important;
+}
+
+.balance-sheet-scontro-table thead th.scontro-divider,
+.balance-sheet-scontro-table tbody td.scontro-divider {
+  width: 12px !important;
+  min-width: 12px !important;
+  max-width: 12px !important;
+  padding: 0 !important;
+  background: transparent !important;
+}
+
 /* Card Header — Transparent Title Section */
 .glass-card>div.border-b,
 .glass-card>.p-4.border-b {

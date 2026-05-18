@@ -155,9 +155,11 @@ const PRINT_STYLES = `
  * @param {string}  opts.period       - e.g. "01 Jan 2025 – 31 Dec 2025"
  * @param {string}  opts.bodyHTML     - The HTML body (table + summary cards etc.)
  * @param {string}  [opts.note]       - Optional footnote text
+ * @param {'auto'|'portrait'|'landscape'} [opts.orientation] - Print page orientation
+ * @param {'A4'|'Letter'|'Legal'} [opts.pageSize] - Print paper size
  * @param {string}  [opts.company]    - (legacy) plain string company name fallback
  */
-export const printReport = ({ reportName, company, companyInfo, period, bodyHTML, note }) => {
+export const printReport = ({ reportName, company, companyInfo, period, bodyHTML, note, orientation = 'auto', pageSize = 'A4' }) => {
   const now = new Date().toLocaleString('en-GB', {
     day: '2-digit', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit'
@@ -183,12 +185,16 @@ export const printReport = ({ reportName, company, companyInfo, period, bodyHTML
     coNpwp ? `<div>NPWP: ${coNpwp}</div>` : '',
   ].filter(Boolean).join('');
 
+  const safeOrientation = ['auto', 'portrait', 'landscape'].includes(orientation) ? orientation : 'auto';
+  const safePageSize = ['A4', 'Letter', 'Legal'].includes(pageSize) ? pageSize : 'A4';
+  const pageSizeRule = safeOrientation === 'auto' ? safePageSize : `${safePageSize} ${safeOrientation}`;
+
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <title>${reportName} \u2013 ${period}</title>
-  <style>${PRINT_STYLES}
+  <style>${PRINT_STYLES.replace('size: A4 landscape;', `size: ${pageSizeRule};`)}
     .report-header { border-bottom: 2px solid #0070BB; padding-bottom: 14px; margin-bottom:18px; display:flex; justify-content:space-between; align-items:flex-start; }
     .header-left { display:flex; align-items:flex-start; gap:14px; }
     .header-company-name { font-size:15px; font-weight:800; color:#0f172a; margin-bottom:3px; }

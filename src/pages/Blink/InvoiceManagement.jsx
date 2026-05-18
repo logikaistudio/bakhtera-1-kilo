@@ -579,32 +579,70 @@ const InvoiceManagement = () => {
             return;
         }
 
+        const normalizeRate = (value) => {
+            const parsed = Number(value);
+            if (!Number.isFinite(parsed) || parsed <= 0) return 1;
+            return Number(parsed.toFixed(6));
+        };
+
         try {
-            // 1. Check if active invoice already exists for this job + currency combination
-            // Check by job_number ensures no duplicates per job, instead of just checking quotation/shipment IDs
+            // 1. Validate duplicates for the same SO / shipment reference.
+            // A new invoice is allowed only when its exchange rate differs from the existing SO-generated invoice.
             if (formData.job_number) {
                 const { data: allInvoices, error: allCheckError } = await supabase
                     .from('blink_invoices')
-                    .select('id, invoice_number, status, currency')
+                    .select('id, invoice_number, status, currency, exchange_rate, shipment_id, so_number, created_at')
                     .eq('job_number', formData.job_number)
+                    .not('invoice_number', 'ilike', '%-RB')
                     .neq('status', 'cancelled');
 
                 if (allCheckError) throw allCheckError;
 
+                const selectedShipmentId = formData.shipment_id || selectedShipment?.id || null;
+                const selectedSoNumber = formData.so_number || selectedShipment?.so_number || null;
                 const selectedCurrency = formData.billing_currency || 'IDR';
-                const existingCurrencyInvoices = (allInvoices || []).filter(inv => inv.currency === selectedCurrency);
+                const selectedRate = selectedCurrency === 'IDR' ? 1 : normalizeRate(formData.exchange_rate || 1);
 
-                if (existingCurrencyInvoices.length > 0) {
-                    const activeInv = existingCurrencyInvoices[0];
-                    alert(`Cannot create invoice: An active ${selectedCurrency} invoice (${activeInv.invoice_number}) already exists for Job ${formData.job_number}.\n\nNote: You can create a maximum of 2 invoices per job (1 IDR + 1 USD). Please cancel the existing invoice first if you need to create a replacement.`);
-                    return;
+                const relevantInvoices = (allInvoices || []).filter(inv => {
+                    if (selectedShipmentId) return inv.shipment_id === selectedShipmentId;
+                    if (selectedSoNumber) return inv.so_number === selectedSoNumber;
+                    return true;
+                });
+
+                const sameCurrencyInvoices = relevantInvoices.filter(inv => (inv.currency || 'IDR') === selectedCurrency);
+
+                if (sameCurrencyInvoices.length > 0) {
+                    const hasSameRate = sameCurrencyInvoices.some(inv => {
+                        const existingRate = (inv.currency || 'IDR') === 'IDR' ? 1 : normalizeRate(inv.exchange_rate || 1);
+                        return existingRate === selectedRate;
+                    });
+
+                    if (hasSameRate) {
+                        const duplicateInv = sameCurrencyInvoices.find(inv => {
+                            const existingRate = (inv.currency || 'IDR') === 'IDR' ? 1 : normalizeRate(inv.exchange_rate || 1);
+                            return existingRate === selectedRate;
+                        });
+                        alert(
+                            `Cannot create invoice: invoice ${selectedCurrency} dengan kurs yang sama sudah ada (${duplicateInv?.invoice_number || '-'}) untuk SO/Job ${formData.so_number || formData.job_number}.\n\n` +
+                            `Gunakan kurs yang berbeda untuk fitur Generate Invoice (Beda Kurs).`
+                        );
+                        return;
+                    }
+
+                    if (sameCurrencyInvoices.length >= 2) {
+                        alert(
+                            `Cannot create invoice: batas invoice ${selectedCurrency} untuk SO/Job ini sudah tercapai.\n\n` +
+                            `Hanya diperbolehkan 1 invoice auto-generate + 1 invoice beda kurs per mata uang.`
+                        );
+                        return;
+                    }
                 }
 
-                const existingCurrencies = [...new Set((allInvoices || []).map(inv => inv.currency))];
+                const existingCurrencies = [...new Set(relevantInvoices.map(inv => inv.currency || 'IDR'))];
 
                 // If there are already 2 currencies and this is a new one, block it
                 if (existingCurrencies.length >= 2 && !existingCurrencies.includes(selectedCurrency)) {
-                    alert(`Cannot create invoice: This job already has invoices in ${existingCurrencies.join(' and ')}.\n\nMaximum 2 currencies (IDR and USD) are allowed per job.`);
+                    alert(`Cannot create invoice: This SO/Job already has invoices in ${existingCurrencies.join(' and ')}.\n\nMaximum 2 currencies are allowed per SO/Job.`);
                     return;
                 }
             }
@@ -637,6 +675,7 @@ const InvoiceManagement = () => {
                 cargo_details: formData.cargo_details || null,
                 invoice_items: formData.invoice_items,
                 currency: formData.billing_currency || 'IDR',
+                exchange_rate: (formData.billing_currency || 'IDR') === 'IDR' ? 1 : (formData.exchange_rate || 1),
                 subtotal: subtotal,
                 tax_rate: formData.tax_rate,
                 tax_amount: taxAmount,
@@ -800,6 +839,7 @@ const InvoiceManagement = () => {
                 invoice_date: formData.invoice_date,
                 due_date: formData.due_date,
                 currency: formData.billing_currency,
+                exchange_rate: formData.billing_currency === 'IDR' ? 1 : (formData.exchange_rate || 1),
                 payment_bank_id: formData.payment_bank_id || null,
                 invoice_items: formData.invoice_items,
                 cogs_items: formData.cogs_items || [],
@@ -1950,7 +1990,7 @@ const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFor
                     )}
 
                     {/* Existing Invoices Indicator */}
-                    {selectedQuotation && (
+                    {(selectedShipment || selectedQuotation) && (
                         <ExistingInvoicesIndicator jobNumber={formData.job_number} />
                     )}
 
@@ -3785,9 +3825,10 @@ const ExistingInvoicesIndicator = ({ jobNumber }) => {
             try {
                 const { data, error } = await supabase
                     .from('blink_invoices')
-                    .select('invoice_number, currency, status, total_amount, created_at')
+                    .select('invoice_number, currency, status, total_amount, exchange_rate, created_at')
                     .eq('job_number', jobNumber)
                     .neq('status', 'cancelled')
+                    .not('invoice_number', 'ilike', '%-RB')
                     .order('created_at', { ascending: false });
 
                 if (error) throw error;
@@ -3820,7 +3861,7 @@ const ExistingInvoicesIndicator = ({ jobNumber }) => {
                         Existing Invoices for Job {jobNumber}
                     </h4>
                     <p className="text-[10px] text-silver-dark mb-2">
-                        Maximum 2 invoices allowed: 1 IDR + 1 USD
+                        Beda kurs aktif: invoice baru per mata uang harus menggunakan kurs yang berbeda
                     </p>
                 </div>
             </div>
@@ -3840,6 +3881,7 @@ const ExistingInvoicesIndicator = ({ jobNumber }) => {
                         <div className="text-[9px] text-silver-dark space-y-0.5">
                             <div className="font-mono text-green-400">{idrInvoice.invoice_number}</div>
                             <div>Rp {idrInvoice.total_amount?.toLocaleString('id-ID')}</div>
+                            <div>Kurs: {Number(idrInvoice.exchange_rate || 1).toLocaleString('id-ID')}</div>
                             <div className="text-[8px] opacity-70">{idrInvoice.status}</div>
                         </div>
                     ) : (
@@ -3861,6 +3903,7 @@ const ExistingInvoicesIndicator = ({ jobNumber }) => {
                         <div className="text-[9px] text-silver-dark space-y-0.5">
                             <div className="font-mono text-green-400">{usdInvoice.invoice_number}</div>
                             <div>${usdInvoice.total_amount?.toLocaleString('id-ID')}</div>
+                            <div>Kurs: {Number(usdInvoice.exchange_rate || 1).toLocaleString('id-ID')}</div>
                             <div className="text-[8px] opacity-70">{usdInvoice.status}</div>
                         </div>
                     ) : (
