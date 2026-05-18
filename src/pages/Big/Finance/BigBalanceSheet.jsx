@@ -1,153 +1,632 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
+import { useNavigate } from 'react-router-dom';
+import {
+    Scale, Calendar,
+    RefreshCw, FileSpreadsheet, Printer
+} from 'lucide-react';
+import XLSX from 'xlsx-js-style';
 import Button from '../../../components/Common/Button';
-import { BarChart2, RefreshCw, FileSpreadsheet, Printer } from 'lucide-react';
 import { printReport } from '../../../utils/printPDF';
+import { useData } from '../../../context/DataContext';
 
-const fmtIDR = (v) => v != null ? 'Rp ' + Number(v).toLocaleString('id-ID') : 'Rp 0';
+const ASSET_GROUPS = [
+    { prefix: '1-01', label: 'CURRENT ASSETS', totalLabel: 'TOTAL CURRENT ASSETS' },
+    { prefix: '1-02', label: 'FIXED ASSETS', totalLabel: 'TOTAL FIXED ASSETS' },
+    { prefix: '1-03', label: 'OTHER ASSETS', totalLabel: 'TOTAL OTHER ASSETS' },
+];
+const LIABILITY_GROUPS = [
+    { prefix: '2-01', label: 'CURRENT PAYABLE', totalLabel: 'TOTAL CURRENT PAYABLE' },
+    { prefix: '2-02', label: 'LONG TERM PAYABLE', totalLabel: 'TOTAL LONG TERM PAYABLE' },
+];
+const EQUITY_GROUPS = [
+    { prefix: '3-01', label: 'STOCKHOLDERS', totalLabel: 'TOTAL STOCKHOLDERS' },
+    { prefix: '3-02', label: 'PROFIT / LOSS', totalLabel: 'TOTAL PROFIT / LOSS' },
+];
+
+function groupAccounts(accounts, groupDefs) {
+    const grouped = groupDefs.map((groupDef) => ({
+        ...groupDef,
+        items: accounts.filter((account) => account.code && account.code.startsWith(groupDef.prefix) && !account.isHeader),
+        total: 0
+    }));
+    const categorised = new Set(grouped.flatMap((group) => group.items.map((item) => item.id)));
+    const uncategorised = accounts.filter((account) => !categorised.has(account.id) && !account.isHeader);
+    if (uncategorised.length > 0) {
+        grouped.push({ prefix: '_other', label: 'OTHER', totalLabel: 'TOTAL OTHER', items: uncategorised, total: 0 });
+    }
+    grouped.forEach((group) => {
+        group.total = group.items.reduce((sum, account) => sum + account.balance, 0);
+    });
+    return grouped;
+}
 
 const BigBalanceSheet = () => {
-    const [data, setData] = useState({ assets: [], liabilities: [], equity: [] });
-    const [loading, setLoading] = useState(true);
-    const [asOf, setAsOf] = useState(new Date().toISOString().split('T')[0]);
-    const [printOrientation, setPrintOrientation] = useState('auto'); // 'auto' | 'portrait' | 'landscape'
-    const [printPageSize, setPrintPageSize] = useState('A4'); // 'A4' | 'Letter' | 'Legal'
+    const navigate = useNavigate();
+    const { bigSettings, companySettings } = useData();
+    const [asOfDate, setAsOfDate] = useState(new Date().toISOString().split('T')[0]);
+    const [loading, setLoading] = useState(false);
+    const [reportData, setReportData] = useState(null);
+    const [totals, setTotals] = useState({ totalAssets: 0, totalLiabilities: 0, totalEquity: 0 });
+    const [tableMode, setTableMode] = useState('stafel');
+    const [printOrientation, setPrintOrientation] = useState('auto');
+    const [printPageSize, setPrintPageSize] = useState('A4');
 
-    useEffect(() => { fetchBS(); }, [asOf]);
+    useEffect(() => { fetchBalanceSheet(); }, [asOfDate]);
 
-    const fetchBS = async () => {
-        setLoading(true);
+    const fetchBalanceSheet = async () => {
         try {
-            const [{ data: accounts }, { data: entries }] = await Promise.all([
-                supabase.from('big_coa').select('*').order('code'),
-                supabase.from('big_journal_line_items')
-                    .select('coa_id, debit, credit, big_journal_entries!inner(entry_date)')
-                    .lte('big_journal_entries.entry_date', asOf),
-            ]);
+            setLoading(true);
 
-            const totals = {};
-            (entries || []).forEach(e => {
-                if (!totals[e.coa_id]) totals[e.coa_id] = { debit: 0, credit: 0 };
-                totals[e.coa_id].debit += e.debit || 0;
-                totals[e.coa_id].credit += e.credit || 0;
+            const { data: accounts, error: coaError } = await supabase
+                .from('big_coa').select('*').order('code', { ascending: true });
+            if (coaError) throw coaError;
+
+            const { data: lineItems, error: lineItemsError } = await supabase
+                .from('big_journal_line_items')
+                .select('id, coa_id, debit, credit, big_journal_entries!inner(entry_date)')
+                .lte('big_journal_entries.entry_date', asOfDate);
+            if (lineItemsError) throw lineItemsError;
+
+            const accMap = {};
+            accounts.forEach((account) => {
+                accMap[account.id] = { ...account, balance: 0 };
             });
 
-            const assets = [], liabilities = [], equity = [];
-            (accounts || []).forEach(acc => {
-                const t = totals[acc.id];
-                if (!t) return;
-                if (acc.type === 'ASSET') {
-                    const net = t.debit - t.credit;
-                    if (net !== 0) assets.push({ ...acc, net });
-                } else if (acc.type === 'LIABILITY') {
-                    const net = t.credit - t.debit;
-                    if (net !== 0) liabilities.push({ ...acc, net });
-                } else if (acc.type === 'EQUITY') {
-                    const net = t.credit - t.debit;
-                    if (net !== 0) equity.push({ ...acc, net });
-                }
+            (lineItems || []).forEach((lineItem) => {
+                if (!lineItem.coa_id) return;
+                const account = accMap[lineItem.coa_id];
+                if (!account) return;
+                const debit = Number(lineItem.debit || 0);
+                const credit = Number(lineItem.credit || 0);
+                const isNormalCredit = ['LIABILITY', 'EQUITY', 'REVENUE'].includes(account.type);
+                if (isNormalCredit) account.balance += (credit - debit);
+                else account.balance += (debit - credit);
             });
 
-            setData({ assets, liabilities, equity });
-        } catch (err) { console.error(err); }
-        finally { setLoading(false); }
+            const all = Object.values(accMap);
+            const isHeader = (account) => account.level <= 2 || /^\d-\d{2}-000/.test(account.code) || /^\d-00-000/.test(account.code);
+            const assets = all.filter((account) => account.type === 'ASSET' && account.balance !== 0 && !isHeader(account)).sort((left, right) => left.code.localeCompare(right.code));
+            const liabilities = all.filter((account) => account.type === 'LIABILITY' && account.balance !== 0 && !isHeader(account)).sort((left, right) => left.code.localeCompare(right.code));
+            const equity = all.filter((account) => account.type === 'EQUITY' && account.balance !== 0 && !isHeader(account)).sort((left, right) => left.code.localeCompare(right.code));
+
+            const totalAssets = assets.reduce((sum, account) => sum + account.balance, 0);
+            const totalLiabilities = liabilities.reduce((sum, account) => sum + account.balance, 0);
+            const baseTotalEquity = equity.reduce((sum, account) => sum + account.balance, 0);
+
+            const revenueAccounts = all.filter((account) => account.type === 'REVENUE');
+            const expenseAccounts = all.filter((account) => ['EXPENSE', 'COGS', 'DIRECT_COST', 'OTHER_EXPENSE', 'COST'].includes(account.type));
+            const totalRevenue = revenueAccounts.reduce((sum, account) => sum + account.balance, 0);
+            const totalExpense = expenseAccounts.reduce((sum, account) => sum + account.balance, 0);
+            const netIncome = totalRevenue - totalExpense;
+
+            if (netIncome !== 0) {
+                equity.push({
+                    id: 'net-income',
+                    code: '3-02-900-0-1-00',
+                    name: 'LABA / RUGI PERIODE BERJALAN',
+                    balance: netIncome,
+                    type: 'EQUITY',
+                    isCalculated: true
+                });
+            }
+
+            const finalTotalEquity = totalAssets - totalLiabilities;
+            const historicalBalancing = finalTotalEquity - (baseTotalEquity + netIncome);
+            if (Math.abs(historicalBalancing) > 0.5) {
+                equity.push({
+                    id: 'historical-balancing',
+                    code: '3-02-800-0-1-00',
+                    name: 'HISTORICAL BALANCING',
+                    balance: historicalBalancing,
+                    type: 'EQUITY',
+                    isCalculated: true
+                });
+            }
+
+            const assetGroups = groupAccounts(assets, ASSET_GROUPS);
+            const liabilityGroups = groupAccounts(liabilities, LIABILITY_GROUPS);
+            const equityGroups = groupAccounts(equity, EQUITY_GROUPS);
+
+            setReportData({ assetGroups, liabilityGroups, equityGroups, assets, liabilities, equity });
+            setTotals({ totalAssets, totalLiabilities, totalEquity: finalTotalEquity });
+        } catch (error) {
+            console.error('Error fetching balance sheet:', error);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const totalAssets = data.assets.reduce((s, a) => s + a.net, 0);
-    const totalLiabilities = data.liabilities.reduce((s, a) => s + a.net, 0);
-    const totalEquity = data.equity.reduce((s, a) => s + a.net, 0);
-    const totalLE = totalLiabilities + totalEquity;
-    const isBalanced = Math.abs(totalAssets - totalLE) < 1;
+    const fmtCur = (val) => {
+        if (val === null || val === undefined) return '-';
+        const neg = val < 0;
+        const absValue = Math.abs(val).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return neg ? `Rp.(${absValue})` : `Rp. ${absValue}`;
+    };
 
-    // ── Export Excel ────────────────────────────────────────────────────────────
+    const asOfLabel = new Date(asOfDate).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+
+    const handleAccountClick = (accountId) => {
+        if (accountId === 'net-income' || accountId === 'historical-balancing') return;
+        navigate('/big/finance/general-ledger', { state: { preSelectedAccount: accountId } });
+    };
+
     const exportToExcel = () => {
-        const ws = [];
-        ws.push(['BALANCE SHEET - BIG MODULE']);
-        ws.push([`Per ${new Date(asOf).toLocaleDateString('id-ID')}`]);
-        ws.push([]);
-        ws.push(['ASET', 'Jumlah']);
-        data.assets.forEach(a => ws.push([a.name, a.net]));
-        ws.push(['TOTAL ASET', totalAssets]);
-        ws.push([]);
-        ws.push(['KEWAJIBAN DAN EKUITAS', 'Jumlah']);
-        data.liabilities.forEach(a => ws.push([a.name, a.net]));
-        ws.push(['TOTAL KEWAJIBAN', totalLiabilities]);
-        data.equity.forEach(a => ws.push([a.name, a.net]));
-        ws.push(['TOTAL EKUITAS', totalEquity]);
-        ws.push(['TOTAL KEWAJIBAN & EKUITAS', totalLE]);
-        const csv = ws.map(r => r.join('\t')).join('\n');
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `BalanceSheet_Big_${asOf}.csv`;
-        link.click();
+        if (!reportData) return;
+        const data = [];
+        data.push({ Account: 'BALANCE SHEET', Amount: `Per ${asOfLabel}` });
+        data.push({ Account: '', Amount: '' });
+
+        const addGroup = (mainLabel, groups, grandTotal, grandLabel) => {
+            data.push({ Account: mainLabel, Amount: '' });
+            data.push({ Account: '', Amount: '' });
+            groups.forEach((group) => {
+                if (group.items.length === 0) return;
+                data.push({ Account: `  ${group.label}`, Amount: '' });
+                group.items.forEach((account) => data.push({ Account: `      ${account.name}`, Amount: fmtCur(account.balance) }));
+                data.push({ Account: '', Amount: '' });
+                data.push({ Account: `            ${group.totalLabel}`, Amount: fmtCur(group.total) });
+                data.push({ Account: '', Amount: '' });
+            });
+            data.push({ Account: '', Amount: '' });
+            data.push({ Account: `            ${grandLabel}`, Amount: fmtCur(grandTotal) });
+            data.push({ Account: '', Amount: '' });
+        };
+
+        addGroup('ASSETS', reportData.assetGroups, totals.totalAssets, 'TOTAL ASSETS');
+        addGroup('LIABILITIES', reportData.liabilityGroups, totals.totalLiabilities, 'TOTAL LIABILITIES');
+        addGroup('EQUITY', reportData.equityGroups, totals.totalEquity, 'TOTAL EQUITY');
+        data.push({ Account: '', Amount: '' });
+        data.push({ Account: '            TOTAL LIABILITIES DAN EQUITY', Amount: fmtCur(totals.totalLiabilities + totals.totalEquity) });
+
+        const ws = XLSX.utils.json_to_sheet(data);
+        ws['!cols'] = [{ wch: 55 }, { wch: 25 }];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Balance Sheet');
+        XLSX.writeFile(wb, `BalanceSheet_Big_${asOfDate}.xlsx`);
     };
 
-    // ── Export PDF ──────────────────────────────────────────────────────────────
     const handleExportPDF = () => {
-        const asOfLabel = new Date(asOf).toLocaleDateString('id-ID');
-        const bodyHTML = `
-        <table style="width:100%;border-collapse:collapse;font-size:12px">
-            <thead><tr style="background:#0070BB;color:white;font-weight:bold"><th style="border:1px solid #ccc;padding:8px;text-align:left">ASET</th><th style="border:1px solid #ccc;padding:8px;text-align:right">Jumlah</th></tr></thead>
-            <tbody>${data.assets.map(a => `<tr style="border:1px solid #e0e0e0"><td style="padding:6px">${a.name}</td><td style="text-align:right;padding:6px">${fmtIDR(a.net)}</td></tr>`).join('')}<tr style="background:#f5f5f5;font-weight:bold"><td style="border:1px solid #ccc;padding:8px">TOTAL ASET</td><td style="text-align:right;border:1px solid #ccc;padding:8px">${fmtIDR(totalAssets)}</td></tr></tbody>
+        if (!reportData) return;
+        const fmtAmt = (v) => {
+            if (v === null || v === undefined) return '';
+            const neg = v < 0;
+            const absValue = Math.abs(v).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            return neg ? `Rp.(${absValue})` : `Rp. ${absValue}`;
+        };
+
+        const doubleUnderline = `border-top:1px solid #000;border-bottom:3px double #000;`;
+
+        const renderGroup = (groups) => groups.map((group) => {
+            if (group.items.length === 0) return '';
+            return `
+                <tr><td colspan="2" style="padding:8px 0 2px 32px;font-weight:700;font-size:12px">${group.label}</td></tr>
+                ${group.items.map((item) => `
+                    <tr>
+                        <td style="padding:1px 0 1px 64px;font-size:11px">${item.name}${item.isCalculated ? ' <em style="font-size:9px;color:#888">(calc)</em>' : ''}</td>
+                        <td style="text-align:right;padding:1px 8px;font-size:11px;white-space:nowrap">${fmtAmt(item.balance)}</td>
+                    </tr>
+                `).join('')}
+                <tr><td></td><td style="padding:4px 0"></td></tr>
+                <tr>
+                    <td style="text-align:right;padding:2px 16px 2px 0;font-weight:800;font-size:11px">${group.totalLabel}</td>
+                    <td style="text-align:right;padding:2px 8px;font-weight:800;font-size:12px;${doubleUnderline}">${fmtAmt(group.total)}</td>
+                </tr>
+                <tr><td colspan="2" style="padding:6px 0"></td></tr>
+            `;
+        }).join('');
+
+        const toPrintRows = (label, groups, totalLabel, totalValue) => {
+            const rows = [{ kind: 'section', label, value: '' }];
+            groups.forEach((group) => {
+                if (!group.items.length) return;
+                rows.push({ kind: 'group', label: group.label, value: '' });
+                group.items.forEach((account) => rows.push({ kind: 'item', label: account.name, value: fmtAmt(account.balance) }));
+                rows.push({ kind: 'subtotal', label: group.totalLabel, value: fmtAmt(group.total) });
+                rows.push({ kind: 'space', label: '', value: '' });
+            });
+            rows.push({ kind: 'grand', label: totalLabel, value: fmtAmt(totalValue) });
+            return rows;
+        };
+
+        const buildAlignedSectionRows = ({
+            leftSectionLabel,
+            leftGroups,
+            leftTotalLabel,
+            leftTotalValue,
+            rightSectionLabel,
+            rightGroups,
+            rightTotalLabel,
+            rightTotalValue,
+            fmtValue
+        }) => {
+            const leftRows = [{ kind: 'section', label: leftSectionLabel, value: '' }];
+            const rightRows = [{ kind: 'section', label: rightSectionLabel, value: '' }];
+            const maxGroups = Math.max(leftGroups.length, rightGroups.length);
+
+            for (let index = 0; index < maxGroups; index += 1) {
+                const leftGroup = leftGroups[index];
+                const rightGroup = rightGroups[index];
+                const hasLeft = leftGroup && leftGroup.items && leftGroup.items.length;
+                const hasRight = rightGroup && rightGroup.items && rightGroup.items.length;
+                if (!hasLeft && !hasRight) continue;
+
+                leftRows.push(hasLeft ? { kind: 'group', label: leftGroup.label, value: '' } : { kind: 'space', label: '', value: '' });
+                rightRows.push(hasRight ? { kind: 'group', label: rightGroup.label, value: '' } : { kind: 'space', label: '', value: '' });
+
+                const leftItems = hasLeft ? leftGroup.items : [];
+                const rightItems = hasRight ? rightGroup.items : [];
+                const maxItems = Math.max(leftItems.length, rightItems.length);
+
+                for (let itemIndex = 0; itemIndex < maxItems; itemIndex += 1) {
+                    const leftItem = leftItems[itemIndex];
+                    const rightItem = rightItems[itemIndex];
+                    leftRows.push(leftItem ? { kind: 'item', label: leftItem.name, value: fmtValue(leftItem.balance), accId: leftItem.id, isCalculated: leftItem.isCalculated } : { kind: 'space', label: '', value: '' });
+                    rightRows.push(rightItem ? { kind: 'item', label: rightItem.name, value: fmtValue(rightItem.balance), accId: rightItem.id, isCalculated: rightItem.isCalculated } : { kind: 'space', label: '', value: '' });
+                }
+
+                leftRows.push(hasLeft ? { kind: 'subtotal', label: leftGroup.totalLabel, value: fmtValue(leftGroup.total) } : { kind: 'space', label: '', value: '' });
+                rightRows.push(hasRight ? { kind: 'subtotal', label: rightGroup.totalLabel, value: fmtValue(rightGroup.total) } : { kind: 'space', label: '', value: '' });
+                leftRows.push({ kind: 'space', label: '', value: '' });
+                rightRows.push({ kind: 'space', label: '', value: '' });
+            }
+
+            leftRows.push({ kind: 'grand', label: leftTotalLabel, value: fmtValue(leftTotalValue) });
+            rightRows.push({ kind: 'grand', label: rightTotalLabel, value: fmtValue(rightTotalValue) });
+            return { leftRows, rightRows };
+        };
+
+        const stafelBodyHTML = `
+        <table style="width:100%;border-collapse:collapse;font-family:'Times New Roman',Times,serif;border:2px solid #334155">
+            <tr><td colspan="2" style="padding:12px 16px 4px;font-weight:800;font-size:14px;border-bottom:1px solid #e2e8f0">ASSETS</td></tr>
+            ${renderGroup(reportData.assetGroups)}
+            <tr>
+                <td style="text-align:right;padding:8px 16px 4px 0;font-weight:900;font-size:13px">TOTAL ASSETS</td>
+                <td style="text-align:right;padding:8px 8px 4px;font-weight:900;font-size:13px;${doubleUnderline}">${fmtAmt(totals.totalAssets)}</td>
+            </tr>
+            <tr><td colspan="2" style="padding:16px 0;border-bottom:2px solid #334155"></td></tr>
+
+            <tr><td colspan="2" style="padding:12px 16px 4px;font-weight:800;font-size:14px;border-bottom:1px solid #e2e8f0">LIABILITIES</td></tr>
+            ${renderGroup(reportData.liabilityGroups)}
+            <tr><td colspan="2" style="padding:8px 0"></td></tr>
+
+            <tr><td colspan="2" style="padding:12px 16px 4px;font-weight:800;font-size:14px;border-bottom:1px solid #e2e8f0">EQUITY</td></tr>
+            ${renderGroup(reportData.equityGroups)}
+            <tr><td colspan="2" style="padding:8px 0"></td></tr>
+
+            <tr>
+                <td style="text-align:right;padding:8px 16px 4px 0;font-weight:900;font-size:13px">TOTAL LIABILITIES DAN EQUITY</td>
+                <td style="text-align:right;padding:8px 8px 4px;font-weight:900;font-size:13px;${doubleUnderline}">${fmtAmt(totals.totalLiabilities + totals.totalEquity)}</td>
+            </tr>
+            <tr><td colspan="2" style="padding:8px 0"></td></tr>
         </table>
-        <br/>
-        <table style="width:100%;border-collapse:collapse;font-size:12px">
-            <thead><tr style="background:#0070BB;color:white;font-weight:bold"><th style="border:1px solid #ccc;padding:8px;text-align:left">KEWAJIBAN & EKUITAS</th><th style="border:1px solid #ccc;padding:8px;text-align:right">Jumlah</th></tr></thead>
-            <tbody>${data.liabilities.map(a => `<tr style="border:1px solid #e0e0e0"><td style="padding:6px">${a.name}</td><td style="text-align:right;padding:6px">${fmtIDR(a.net)}</td></tr>`).join('')}${data.equity.map(a => `<tr style="border:1px solid #e0e0e0"><td style="padding:6px">${a.name}</td><td style="text-align:right;padding:6px">${fmtIDR(a.net)}</td></tr>`).join('')}<tr style="background:#f5f5f5;font-weight:bold"><td style="border:1px solid #ccc;padding:8px">TOTAL KEWAJIBAN & EKUITAS</td><td style="text-align:right;border:1px solid #ccc;padding:8px">${fmtIDR(totalLE)}</td></tr></tbody>
-        </table>`;
+        <div style="display:flex;justify-content:space-between;margin-top:32px;font-size:11px;font-family:'Times New Roman',Times,serif">
+            <div style="text-align:center;min-width:180px"><div>Approved By,</div><div style="margin-top:48px;border-top:1px solid #000;padding-top:4px">________________</div></div>
+            <div style="text-align:center;min-width:180px"><div>Created By,</div><div style="margin-top:48px;border-top:1px solid #000;padding-top:4px">________________</div></div>
+        </div>`;
+
+        const alignedPrint = buildAlignedSectionRows({
+            leftSectionLabel: 'ASSETS',
+            leftGroups: reportData.assetGroups,
+            leftTotalLabel: 'TOTAL ASSETS',
+            leftTotalValue: totals.totalAssets,
+            rightSectionLabel: 'LIABILITIES',
+            rightGroups: reportData.liabilityGroups,
+            rightTotalLabel: 'TOTAL LIABILITIES',
+            rightTotalValue: totals.totalLiabilities,
+            fmtValue: fmtAmt
+        });
+
+        const printEquityRows = toPrintRows('EQUITY', reportData.equityGroups, 'TOTAL EQUITY', totals.totalEquity);
+        const printRightTail = [
+            { kind: 'space', label: '', value: '' },
+            ...printEquityRows,
+            { kind: 'grand', label: 'TOTAL LIABILITIES DAN EQUITY', value: fmtAmt(totals.totalLiabilities + totals.totalEquity) }
+        ];
+        const scontroLeftRows = [
+            ...alignedPrint.leftRows,
+            ...Array.from({ length: printRightTail.length }, () => ({ kind: 'space', label: '', value: '' }))
+        ];
+        const scontroRightRows = [
+            ...alignedPrint.rightRows,
+            ...printRightTail
+        ];
+        const maxRows = Math.max(scontroLeftRows.length, scontroRightRows.length);
+
+        const renderPrintCell = (row) => {
+            if (!row || row.kind === 'space') return `<td colspan="2" style="padding:4px 6px"></td>`;
+            if (row.kind === 'section') return `<td colspan="2" style="padding:6px 8px;font-weight:800;font-size:12px;border-bottom:1px solid #ddd">${row.label}</td>`;
+            if (row.kind === 'group') return `<td colspan="2" style="padding:5px 8px;font-weight:700;font-size:11px;background:#f5f5f5">${row.label}</td>`;
+            if (row.kind === 'subtotal') {
+                return `
+                    <td style="padding:4px 8px;text-align:right;font-size:10px;font-weight:700">${row.label}</td>
+                    <td style="padding:4px 8px;text-align:right;font-size:10px;font-weight:700;white-space:nowrap">${row.value}</td>
+                `;
+            }
+            if (row.kind === 'grand') {
+                return `
+                    <td style="padding:6px 8px;text-align:right;font-size:11px;font-weight:800">${row.label}</td>
+                    <td style="padding:6px 8px;text-align:right;font-size:11px;font-weight:800;white-space:nowrap">${row.value}</td>
+                `;
+            }
+            return `
+                <td style="padding:3px 8px;text-align:right;font-size:10px;font-weight:700">${row.label}</td>
+                <td style="padding:3px 8px;text-align:right;font-size:10px;white-space:nowrap">${row.value}</td>
+            `;
+        };
+
+        const scontroBodyHTML = `
+        <table style="width:100%;border-collapse:collapse;font-family:'Times New Roman',Times,serif;border:2px solid #334155">
+            <colgroup>
+                <col style="width:auto" />
+                <col style="width:170px" />
+                <col style="width:12px" />
+                <col style="width:auto" />
+                <col style="width:170px" />
+            </colgroup>
+            <thead>
+                <tr>
+                    <th colspan="2" style="background:#0f6fb8;color:#fff;padding:8px 10px;text-align:left;font-size:11px;letter-spacing:0.7px">ASSETS</th>
+                    <th style="width:12px;padding:0;background:transparent"></th>
+                    <th colspan="2" style="background:#0f6fb8;color:#fff;padding:8px 10px;text-align:left;font-size:11px;letter-spacing:0.7px">LIABILITIES & EQUITY</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${Array.from({ length: maxRows }).map((_, index) => {
+                    const left = scontroLeftRows[index];
+                    const right = scontroRightRows[index];
+                    return `
+                        <tr style="border-bottom:1px solid #e2e8f0;vertical-align:top">
+                            ${renderPrintCell(left)}
+                            <td style="width:12px;padding:0;background:transparent"></td>
+                            ${renderPrintCell(right)}
+                        </tr>
+                    `;
+                }).join('')}
+            </tbody>
+        </table>
+        <div style="display:flex;justify-content:space-between;margin-top:32px;font-size:11px;font-family:'Times New Roman',Times,serif">
+            <div style="text-align:center;min-width:180px"><div>Approved By,</div><div style="margin-top:48px;border-top:1px solid #000;padding-top:4px">________________</div></div>
+            <div style="text-align:center;min-width:180px"><div>Created By,</div><div style="margin-top:48px;border-top:1px solid #000;padding-top:4px">________________</div></div>
+        </div>`;
+
         printReport({
             reportName: 'BALANCE SHEET',
-            company: 'Big Module',
-            companyInfo: { name: 'Big Module' },
-            period: `Per ${asOfLabel}`,
-            bodyHTML,
+            companyInfo: bigSettings || companySettings,
+            period: `Per ${asOfLabel} (${tableMode === 'scontro' ? 'Scontro' : 'Stafel'})`,
+            bodyHTML: tableMode === 'scontro' ? scontroBodyHTML : stafelBodyHTML,
             note: '',
             orientation: printOrientation,
             pageSize: printPageSize
         });
     };
 
-    const Section = ({ title, items, total, color }) => (
-        <div className="glass-card rounded-xl overflow-hidden mb-4">
-            <div className="bg-[#0070BB] px-4 py-2.5">
-                <span className="text-white font-semibold text-sm uppercase tracking-wider">{title}</span>
-            </div>
-            <table className="w-full text-sm">
-                <tbody className="divide-y divide-dark-border/30">
-                    {items.length === 0 ? (
-                        <tr><td colSpan={2} className="px-4 py-3 text-silver-dark italic text-xs">Tidak ada saldo</td></tr>
-                    ) : items.map(acc => (
-                        <tr key={acc.id} className="hover:bg-white/5">
-                            <td className="px-4 py-2.5">
-                                <span className="font-mono text-accent-orange text-xs mr-3">{acc.code}</span>
-                                <span className="text-silver-light">{acc.name}</span>
-                            </td>
-                            <td className="px-4 py-2.5 text-right font-mono text-silver-light">{fmtIDR(acc.net)}</td>
-                        </tr>
-                    ))}
-                </tbody>
-                <tfoot className="bg-dark-surface/50 font-semibold border-t border-dark-border">
-                    <tr>
-                        <td className="px-4 py-3 text-silver-light">Total {title}</td>
-                        <td className={`px-4 py-3 text-right font-mono font-bold ${color}`}>{fmtIDR(total)}</td>
-                    </tr>
-                </tfoot>
-            </table>
+    const DoubleUnderline = () => (
+        <div className="flex flex-col gap-[2px] mt-1 ml-auto" style={{ width: '140px' }}>
+            <div className="border-t border-silver-light/60" />
+            <div className="border-t-2 border-silver-light/60" />
         </div>
     );
+
+    const AccountRow = ({ acc }) => (
+        <div
+            onClick={() => handleAccountClick(acc.id)}
+            className={`flex justify-between items-center py-[3px] pl-16 pr-4 text-sm hover:bg-dark-surface/50 smooth-transition ${acc.isCalculated ? 'cursor-default italic text-silver-dark' : 'cursor-pointer group'}`}
+        >
+            <span className={`text-silver-light ${acc.isCalculated ? 'text-silver-dark italic' : 'group-hover:text-accent-orange'}`}>{acc.name}</span>
+            <span className="font-mono text-silver-light text-xs min-w-[160px] text-right">{fmtCur(acc.balance)}</span>
+        </div>
+    );
+
+    const SubGroupHeader = ({ label }) => (
+        <div className="py-2 pl-8 pr-4">
+            <span className="text-sm font-bold text-silver-light tracking-wide">{label}</span>
+        </div>
+    );
+
+    const SubTotal = ({ label, value }) => (
+        <div className="flex justify-end items-center py-1 pr-4 mt-1">
+            <span className="text-sm font-bold text-silver-light mr-6 tracking-wide">{label}</span>
+            <div className="min-w-[160px] text-right">
+                <span className="font-mono text-sm font-bold text-silver-light">{fmtCur(value)}</span>
+                <DoubleUnderline />
+            </div>
+        </div>
+    );
+
+    const GrandTotal = ({ label, value }) => (
+        <div className="flex justify-end items-center py-3 pr-4 mt-2">
+            <span className="text-base font-extrabold text-white mr-6 tracking-wide">{label}</span>
+            <div className="min-w-[160px] text-right">
+                <span className="font-mono text-base font-extrabold text-white">{fmtCur(value)}</span>
+                <div className="flex flex-col gap-[2px] mt-1 ml-auto" style={{ width: '160px' }}>
+                    <div className="border-t border-white/60" />
+                    <div className="border-t-2 border-white/60" />
+                </div>
+            </div>
+        </div>
+    );
+
+    const SectionHeader = ({ label }) => (
+        <div className="py-3 pl-4 pr-4 border-b border-dark-border/40">
+            <span className="text-lg font-extrabold text-white tracking-wider">{label}</span>
+        </div>
+    );
+
+    const renderGroupedSection = (groups) => (
+        groups.map((group, index) => {
+            if (group.items.length === 0) return null;
+            return (
+                <div key={index} className="mb-2">
+                    <SubGroupHeader label={group.label} />
+                    {group.items.map((account) => <AccountRow key={account.id} acc={account} />)}
+                    <div className="h-2" />
+                    <SubTotal label={group.totalLabel} value={group.total} />
+                    <div className="h-4" />
+                </div>
+            );
+        })
+    );
+
+    const renderSectionBlock = (label, groups, totalLabel, totalValue) => (
+        <>
+            <SectionHeader label={label} />
+            {renderGroupedSection(groups)}
+            <GrandTotal label={totalLabel} value={totalValue} />
+        </>
+    );
+
+    const toScontroRows = (label, groups, totalLabel, totalValue) => {
+        const rows = [{ kind: 'section', label, value: '' }];
+        groups.forEach((group) => {
+            if (!group.items.length) return;
+            rows.push({ kind: 'group', label: group.label, value: '' });
+            group.items.forEach((account) => {
+                rows.push({ kind: 'item', label: account.name, value: fmtCur(account.balance), accId: account.id, isCalculated: account.isCalculated });
+            });
+            rows.push({ kind: 'subtotal', label: group.totalLabel, value: fmtCur(group.total) });
+            rows.push({ kind: 'space', label: '', value: '' });
+        });
+        rows.push({ kind: 'grand', label: totalLabel, value: fmtCur(totalValue) });
+        return rows;
+    };
+
+    const buildAlignedSectionRows = ({
+        leftSectionLabel,
+        leftGroups,
+        leftTotalLabel,
+        leftTotalValue,
+        rightSectionLabel,
+        rightGroups,
+        rightTotalLabel,
+        rightTotalValue,
+        fmtValue
+    }) => {
+        const leftRows = [{ kind: 'section', label: leftSectionLabel, value: '' }];
+        const rightRows = [{ kind: 'section', label: rightSectionLabel, value: '' }];
+        const maxGroups = Math.max(leftGroups.length, rightGroups.length);
+
+        for (let index = 0; index < maxGroups; index += 1) {
+            const leftGroup = leftGroups[index];
+            const rightGroup = rightGroups[index];
+            const hasLeft = leftGroup && leftGroup.items && leftGroup.items.length;
+            const hasRight = rightGroup && rightGroup.items && rightGroup.items.length;
+            if (!hasLeft && !hasRight) continue;
+
+            leftRows.push(hasLeft ? { kind: 'group', label: leftGroup.label, value: '' } : { kind: 'space', label: '', value: '' });
+            rightRows.push(hasRight ? { kind: 'group', label: rightGroup.label, value: '' } : { kind: 'space', label: '', value: '' });
+
+            const leftItems = hasLeft ? leftGroup.items : [];
+            const rightItems = hasRight ? rightGroup.items : [];
+            const maxItems = Math.max(leftItems.length, rightItems.length);
+
+            for (let itemIndex = 0; itemIndex < maxItems; itemIndex += 1) {
+                const leftItem = leftItems[itemIndex];
+                const rightItem = rightItems[itemIndex];
+                leftRows.push(leftItem ? { kind: 'item', label: leftItem.name, value: fmtValue(leftItem.balance), accId: leftItem.id, isCalculated: leftItem.isCalculated } : { kind: 'space', label: '', value: '' });
+                rightRows.push(rightItem ? { kind: 'item', label: rightItem.name, value: fmtValue(rightItem.balance), accId: rightItem.id, isCalculated: rightItem.isCalculated } : { kind: 'space', label: '', value: '' });
+            }
+
+            leftRows.push(hasLeft ? { kind: 'subtotal', label: leftGroup.totalLabel, value: fmtValue(leftGroup.total) } : { kind: 'space', label: '', value: '' });
+            rightRows.push(hasRight ? { kind: 'subtotal', label: rightGroup.totalLabel, value: fmtValue(rightGroup.total) } : { kind: 'space', label: '', value: '' });
+            leftRows.push({ kind: 'space', label: '', value: '' });
+            rightRows.push({ kind: 'space', label: '', value: '' });
+        }
+
+        leftRows.push({ kind: 'grand', label: leftTotalLabel, value: fmtValue(leftTotalValue) });
+        rightRows.push({ kind: 'grand', label: rightTotalLabel, value: fmtValue(rightTotalValue) });
+        return { leftRows, rightRows };
+    };
+
+    const alignedScreen = buildAlignedSectionRows({
+        leftSectionLabel: 'ASSETS',
+        leftGroups: reportData?.assetGroups || [],
+        leftTotalLabel: 'TOTAL ASSETS',
+        leftTotalValue: totals.totalAssets,
+        rightSectionLabel: 'LIABILITIES',
+        rightGroups: reportData?.liabilityGroups || [],
+        rightTotalLabel: 'TOTAL LIABILITIES',
+        rightTotalValue: totals.totalLiabilities,
+        fmtValue: fmtCur
+    });
+
+    const equityRows = toScontroRows('EQUITY', reportData?.equityGroups || [], 'TOTAL EQUITY', totals.totalEquity);
+    const rightTailRows = [
+        { kind: 'space', label: '', value: '' },
+        ...equityRows,
+        { kind: 'grand', label: 'TOTAL LIABILITIES DAN EQUITY', value: fmtCur(totals.totalLiabilities + totals.totalEquity) }
+    ];
+    const assetScontroRows = [
+        ...alignedScreen.leftRows,
+        ...Array.from({ length: rightTailRows.length }, () => ({ kind: 'space', label: '', value: '' }))
+    ];
+    const rightScontroRows = [
+        ...alignedScreen.rightRows,
+        ...rightTailRows
+    ];
+    const scontroMaxRows = Math.max(assetScontroRows.length, rightScontroRows.length);
+
+    const renderScontroCell = (row) => {
+        if (!row) return <td className="px-4 py-2" colSpan={2} />;
+        if (row.kind === 'space') return <td className="px-4 py-2" colSpan={2} />;
+        if (row.kind === 'section') {
+            return (
+                <td colSpan={2} className="px-4 py-2.5 border-b border-dark-border/40 bg-dark-surface/20">
+                    <span className="text-sm font-extrabold text-white tracking-wider">{row.label}</span>
+                </td>
+            );
+        }
+        if (row.kind === 'group') {
+            return (
+                <td colSpan={2} className="px-6 py-2.5 bg-dark-surface/10">
+                    <span className="text-xs font-extrabold text-white tracking-wide">{row.label}</span>
+                </td>
+            );
+        }
+        if (row.kind === 'subtotal') {
+            return (
+                <>
+                    <td className="px-6 py-2.5 text-right text-xs font-bold text-silver-light">{row.label}</td>
+                    <td className="scontro-amount-cell px-4 py-2.5 text-right text-xs font-bold text-silver-light font-mono whitespace-nowrap">{row.value}</td>
+                </>
+            );
+        }
+        if (row.kind === 'grand') {
+            return (
+                <>
+                    <td className="px-6 py-3 text-right text-sm font-extrabold text-accent-orange">{row.label}</td>
+                    <td className="scontro-amount-cell px-4 py-3 text-right text-sm font-extrabold text-accent-orange font-mono whitespace-nowrap">{row.value}</td>
+                </>
+            );
+        }
+        return (
+            <>
+                <td
+                    className={`px-8 py-2 text-xs text-right ${row.isCalculated ? 'italic text-silver-dark cursor-default font-semibold' : 'text-silver-light cursor-pointer hover:text-accent-orange font-bold'}`}
+                    onClick={() => {
+                        if (!row.accId || row.isCalculated) return;
+                        handleAccountClick(row.accId);
+                    }}
+                >
+                    {row.label}
+                </td>
+                <td className="scontro-amount-cell px-4 py-1.5 text-right text-xs text-silver-light font-mono whitespace-nowrap">{row.value}</td>
+            </>
+        );
+    };
 
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold gradient-text flex items-center gap-2">
-                        <BarChart2 className="w-8 h-8" /> Balance Sheet — Big
+                        <Scale className="w-8 h-8" />
+                        Balance Sheet
                     </h1>
-                    <p className="text-silver-dark mt-1">Neraca keuangan Big module</p>
+                    <p className="text-silver-dark mt-1">Financial Position — Per {asOfLabel}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button variant="secondary" icon={RefreshCw} onClick={fetchBS}>Refresh</Button>
+                    <Button variant="secondary" icon={RefreshCw} onClick={fetchBalanceSheet}>Refresh</Button>
                     <button onClick={exportToExcel}
                         className="flex items-center gap-2 px-3 py-2 bg-dark-surface text-green-400 hover:bg-dark-card smooth-transition rounded-lg border border-dark-border text-xs">
                         <FileSpreadsheet className="w-4 h-4" /> Excel
@@ -179,44 +658,152 @@ const BigBalanceSheet = () => {
                 </div>
             </div>
 
-            <div className="glass-card p-4 rounded-xl flex items-center gap-4">
-                <div>
-                    <label className="block text-xs text-silver-dark uppercase mb-1">Per Tanggal</label>
-                    <input type="date" value={asOf}
-                        onChange={e => setAsOf(e.target.value)}
-                        className="bg-dark-surface border border-dark-border rounded px-2 py-1 text-silver-light text-sm" />
+            <div className="flex flex-col md:flex-row gap-4">
+                <div className="glass-card p-4 rounded-lg flex items-center gap-4 flex-1">
+                    <Calendar className="w-5 h-5 text-accent-orange" />
+                    <div>
+                        <label className="block text-xs text-silver-dark uppercase mb-1">As of Date</label>
+                        <input type="date" value={asOfDate}
+                            onChange={(e) => setAsOfDate(e.target.value)}
+                            className="bg-dark-bg border border-dark-border rounded px-3 py-1 text-silver-light text-sm" />
+                    </div>
+                    <div className="flex gap-2 ml-auto">
+                        <button onClick={() => setAsOfDate(new Date().toISOString().split('T')[0])}
+                            className="px-3 py-1 bg-accent-orange text-white rounded text-xs hover:bg-accent-orange/80 smooth-transition">
+                            Today
+                        </button>
+                        <button onClick={() => setAsOfDate(new Date(new Date().getFullYear(), 11, 31).toISOString().split('T')[0])}
+                            className="px-3 py-1 bg-dark-surface border border-dark-border rounded text-xs text-silver-light hover:bg-dark-card smooth-transition">
+                            Year End
+                        </button>
+                    </div>
                 </div>
-                <div className={`ml-auto px-4 py-2 rounded-lg border ${isBalanced ? 'border-green-500 text-green-400' : 'border-red-500 text-red-400'} text-sm font-bold`}>
-                    {isBalanced ? 'BALANCED ✓' : 'OUT OF BALANCE ✗'}
+
+                <div className="flex gap-3">
+                    <div className="glass-card p-3 rounded-lg border-l-4 border-green-500 min-w-[180px]">
+                        <p className="text-[10px] text-silver-dark uppercase">Total Assets</p>
+                        <p className="text-lg font-bold text-green-400 font-mono">{fmtCur(totals.totalAssets)}</p>
+                    </div>
+                    <div className="glass-card p-3 rounded-lg border-l-4 border-red-500 min-w-[180px]">
+                        <p className="text-[10px] text-silver-dark uppercase">Total Liabilities</p>
+                        <p className="text-lg font-bold text-red-400 font-mono">{fmtCur(totals.totalLiabilities)}</p>
+                    </div>
+                    <div className="glass-card p-3 rounded-lg border-l-4 border-blue-500 min-w-[180px]">
+                        <p className="text-[10px] text-silver-dark uppercase">Total Equity</p>
+                        <p className="text-lg font-bold text-blue-400 font-mono">{fmtCur(totals.totalEquity)}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div className="glass-card p-3 rounded-lg flex items-center gap-3">
+                <span className="text-xs text-silver-dark uppercase tracking-wide">Table Mode</span>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => setTableMode('scontro')}
+                        className={`px-3 py-1.5 rounded text-xs border smooth-transition ${
+                            tableMode === 'scontro'
+                                ? 'bg-accent-orange text-white border-accent-orange'
+                                : 'bg-dark-surface text-silver-light border-dark-border hover:bg-dark-card'
+                        }`}
+                    >
+                        Scontro
+                    </button>
+                    <button
+                        onClick={() => setTableMode('stafel')}
+                        className={`px-3 py-1.5 rounded text-xs border smooth-transition ${
+                            tableMode === 'stafel'
+                                ? 'bg-accent-orange text-white border-accent-orange'
+                                : 'bg-dark-surface text-silver-light border-dark-border hover:bg-dark-card'
+                        }`}
+                    >
+                        Stafel
+                    </button>
                 </div>
             </div>
 
             {loading ? (
-                <div className="glass-card p-12 text-center text-silver-dark rounded-xl">Memuat data...</div>
-            ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Left: Assets */}
-                    <div>
-                        <h2 className="text-silver-light font-semibold mb-3 uppercase tracking-wider text-xs">ASET</h2>
-                        <Section title="Aset" items={data.assets} total={totalAssets} color="text-blue-400" />
-                        <div className="glass-card rounded-xl border-2 border-blue-500 px-4 py-4 flex justify-between items-center">
-                            <span className="text-blue-400 font-bold">TOTAL ASET</span>
-                            <span className="text-2xl font-bold font-mono text-blue-400">{fmtIDR(totalAssets)}</span>
-                        </div>
-                    </div>
+                <div className="glass-card p-12 rounded-lg text-center text-silver-dark">Loading balance sheet...</div>
+            ) : reportData ? (
+                tableMode === 'stafel' ? (
+                    <div className="glass-card rounded-lg overflow-hidden border border-dark-border/50">
+                        {renderSectionBlock('ASSETS', reportData.assetGroups, 'TOTAL ASSETS', totals.totalAssets)}
+                        <div className="border-t-2 border-dark-border/40 mx-4" />
 
-                    {/* Right: Liabilities + Equity */}
-                    <div>
-                        <h2 className="text-silver-light font-semibold mb-3 uppercase tracking-wider text-xs">KEWAJIBAN & EKUITAS</h2>
-                        <Section title="Kewajiban (Liabilities)" items={data.liabilities} total={totalLiabilities} color="text-red-400" />
-                        <Section title="Ekuitas (Equity)" items={data.equity} total={totalEquity} color="text-purple-400" />
-                        <div className={`glass-card rounded-xl border-2 px-4 py-4 flex justify-between items-center ${isBalanced ? 'border-green-500' : 'border-red-500'}`}>
-                            <span className={`font-bold ${isBalanced ? 'text-green-400' : 'text-red-400'}`}>TOTAL KEWAJIBAN + EKUITAS</span>
-                            <span className={`text-2xl font-bold font-mono ${isBalanced ? 'text-green-400' : 'text-red-400'}`}>{fmtIDR(totalLE)}</span>
+                        <div className="mt-4" />
+                        {renderSectionBlock('LIABILITIES', reportData.liabilityGroups, 'TOTAL LIABILITIES', totals.totalLiabilities)}
+                        <div className="border-t-2 border-dark-border/40 mx-4" />
+
+                        <div className="mt-4" />
+                        <SectionHeader label="EQUITY" />
+                        {renderGroupedSection(reportData.equityGroups)}
+                        <div className="flex justify-between items-center py-[3px] pl-8 pr-4 text-sm mt-2">
+                            <span className="text-silver-dark italic">LABA / RUGI Per {asOfLabel}</span>
+                            <span className="font-mono text-silver-light text-xs min-w-[160px] text-right italic">{fmtCur(
+                                (() => {
+                                    const niAcc = reportData.equity.find((account) => account.id === 'net-income');
+                                    return niAcc ? niAcc.balance : 0;
+                                })()
+                            )}</span>
+                        </div>
+                        <div className="h-4" />
+
+                        <GrandTotal label="TOTAL EQUITY" value={totals.totalEquity} />
+                        <div className="border-t-2 border-dark-border/40 mx-4" />
+
+                        <div className="py-4 pr-4 mt-2 mb-2 flex justify-end items-center bg-dark-surface/30">
+                            <span className="text-base font-extrabold text-accent-orange mr-6 tracking-wide">TOTAL LIABILITIES DAN EQUITY</span>
+                            <div className="min-w-[160px] text-right">
+                                <span className="font-mono text-base font-extrabold text-accent-orange">{fmtCur(totals.totalLiabilities + totals.totalEquity)}</span>
+                                <div className="flex flex-col gap-[2px] mt-1 ml-auto" style={{ width: '160px' }}>
+                                    <div className="border-t border-accent-orange/60" />
+                                    <div className="border-t-2 border-accent-orange/60" />
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                ) : (
+                    <div className="glass-card rounded-lg overflow-hidden border border-dark-border/50">
+                        <div className="px-4 py-2 text-[11px] text-silver-dark border-b border-dark-border/40">
+                            Mode Scontro: sisi kiri ASSETS dan sisi kanan LIABILITIES + EQUITY ditampilkan berdampingan.
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="balance-sheet-scontro-table w-full min-w-[1200px] text-sm table-auto">
+                                <colgroup>
+                                    <col style={{ width: 'auto' }} />
+                                    <col style={{ width: '220px' }} />
+                                    <col style={{ width: '12px' }} />
+                                    <col style={{ width: 'auto' }} />
+                                    <col style={{ width: '220px' }} />
+                                </colgroup>
+                                <thead>
+                                    <tr className="border-b border-dark-border/40 bg-transparent">
+                                        <th className="px-4 py-2.5 text-left text-xs text-white font-extrabold tracking-[1px] uppercase bg-[#0f6fb8]" colSpan={2}>ASSETS</th>
+                                        <th className="scontro-divider" />
+                                        <th className="px-4 py-2.5 text-left text-xs text-white font-extrabold tracking-[1px] uppercase bg-[#0f6fb8]" colSpan={2}>LIABILITIES & EQUITY</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {Array.from({ length: scontroMaxRows }).map((_, index) => {
+                                        const left = assetScontroRows[index];
+                                        const right = rightScontroRows[index];
+                                        return (
+                                            <tr key={`scontro-row-${index}`} className="border-b border-dark-border/20 last:border-b-0 align-top">
+                                                {renderScontroCell(left)}
+                                                <td className="scontro-divider" />
+                                                {renderScontroCell(right)}
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )
+            ) : null}
+
+            <div className="text-center text-xs text-silver-dark mt-6 italic">
+                * Click on an account to view its transactions in the General Ledger. "LABA / RUGI PERIODE BERJALAN" is auto-calculated from Revenue minus Expenses.
+            </div>
         </div>
     );
 };
