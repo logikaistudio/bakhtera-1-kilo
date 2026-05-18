@@ -389,12 +389,93 @@ const BlinkApproval = () => {
                 histErr = histRes.error;
                 historyData = histRes.data || [];
             }
+
+            // Fetch cancellation activity directly from operational tables.
+            // This keeps History tab complete without changing other menu flows.
+            const [cancelShipRes, cancelPoRes, cancelInvRes, cancelQuotRes] = await Promise.all([
+                supabase
+                    .from('blink_shipments')
+                    .select('id, job_number, so_number, updated_at, created_at, rejection_reason')
+                    .eq('status', 'cancelled'),
+                supabase
+                    .from('blink_purchase_orders')
+                    .select('id, po_number, updated_at, created_at, rejection_reason')
+                    .eq('status', 'cancelled'),
+                supabase
+                    .from('blink_invoices')
+                    .select('id, invoice_number, updated_at, created_at, rejection_reason')
+                    .eq('status', 'cancelled'),
+                supabase
+                    .from('blink_quotations')
+                    .select('id, quotation_number, job_number, updated_at, created_at, rejection_reason')
+                    .eq('status', 'cancelled')
+            ]);
+
+            const cancellationLogs = [];
+
+            if (!cancelShipRes.error) {
+                cancellationLogs.push(...(cancelShipRes.data || []).map((row) => ({
+                    id: `cancel-shipment-${row.id}`,
+                    approved_at: row.updated_at || row.created_at || new Date().toISOString(),
+                    document_number: row.job_number || row.so_number || '-',
+                    document_type: 'shipment',
+                    approver: 'System',
+                    status: 'cancelled',
+                    reason: row.rejection_reason || 'Cancelled from shipment workflow',
+                    module: 'blink_operations'
+                })));
+            }
+
+            if (!cancelPoRes.error) {
+                cancellationLogs.push(...(cancelPoRes.data || []).map((row) => ({
+                    id: `cancel-po-${row.id}`,
+                    approved_at: row.updated_at || row.created_at || new Date().toISOString(),
+                    document_number: row.po_number || '-',
+                    document_type: 'po',
+                    approver: 'System',
+                    status: 'cancelled',
+                    reason: row.rejection_reason || 'Cancelled from purchase order workflow',
+                    module: 'blink_operations'
+                })));
+            }
+
+            if (!cancelInvRes.error) {
+                cancellationLogs.push(...(cancelInvRes.data || []).map((row) => ({
+                    id: `cancel-invoice-${row.id}`,
+                    approved_at: row.updated_at || row.created_at || new Date().toISOString(),
+                    document_number: row.invoice_number || '-',
+                    document_type: 'invoice',
+                    approver: 'System',
+                    status: 'cancelled',
+                    reason: row.rejection_reason || 'Cancelled from invoice workflow',
+                    module: 'blink_sales'
+                })));
+            }
+
+            if (!cancelQuotRes.error) {
+                cancellationLogs.push(...(cancelQuotRes.data || []).map((row) => ({
+                    id: `cancel-quotation-${row.id}`,
+                    approved_at: row.updated_at || row.created_at || new Date().toISOString(),
+                    document_number: row.quotation_number || row.job_number || '-',
+                    document_type: 'quotation',
+                    approver: 'System',
+                    status: 'cancelled',
+                    reason: row.rejection_reason || 'Cancelled from quotation workflow',
+                    module: 'blink_sales'
+                })));
+            }
+
+            const combinedHistory = [...historyData, ...cancellationLogs].sort((a, b) => {
+                const aDate = new Date(a.approved_at || a.created_at || 0).getTime();
+                const bDate = new Date(b.approved_at || b.created_at || 0).getTime();
+                return bDate - aDate;
+            });
                 
             if (histErr) {
                 console.error('❌ Error fetching approval history:', histErr);
             } else {
-                console.log('✅ Blink approval history loaded:', historyData.length, 'records');
-                setHistoryLogs(historyData);
+                console.log('✅ Blink approval history loaded:', combinedHistory.length, 'records');
+                setHistoryLogs(combinedHistory);
             }
 
 
@@ -962,18 +1043,34 @@ const BlinkApproval = () => {
                                     {historyLogs.map(log => (
                                         <tr key={log.id} className="hover:bg-gray-50/50 transition-colors">
                                             <td className="px-6 py-4 text-gray-600">
-                                                {new Date(log.approved_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                {new Date(log.approved_at || log.created_at || Date.now()).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                             </td>
                                             <td className="px-6 py-4 font-medium text-gray-900">{log.document_number}</td>
                                             <td className="px-6 py-4 text-gray-600 capitalize">{String(log.document_type || '-').replace('_', ' ')}</td>
                                             <td className="px-6 py-4 text-gray-600">{log.approver}</td>
                                             <td className="px-6 py-4">
-                                                <span className={`px-3 py-1 rounded-full font-medium text-xs border ${
-                                                    log.status === 'approved' ? statusConfig.approved.bg + ' ' + statusConfig.approved.text + ' ' + statusConfig.approved.border :
-                                                    statusConfig.rejected.bg + ' ' + statusConfig.rejected.text + ' ' + statusConfig.rejected.border
-                                                }`}>
-                                                    {log.status === 'approved' ? 'Approved' : 'Rejected'}
-                                                </span>
+                                                {(() => {
+                                                    const historyStatus = String(log.status || '').toLowerCase();
+                                                    const historyStatusConfig = {
+                                                        approved: statusConfig.approved,
+                                                        rejected: statusConfig.rejected,
+                                                        cancelled: {
+                                                            bg: 'bg-gray-100',
+                                                            text: 'text-gray-700',
+                                                            border: 'border-gray-300',
+                                                        }
+                                                    };
+                                                    const badge = historyStatusConfig[historyStatus] || statusConfig.draft;
+                                                    const label = historyStatus
+                                                        ? historyStatus.charAt(0).toUpperCase() + historyStatus.slice(1)
+                                                        : 'Unknown';
+
+                                                    return (
+                                                        <span className={`px-3 py-1 rounded-full font-medium text-xs border ${badge.bg} ${badge.text} ${badge.border}`}>
+                                                            {label}
+                                                        </span>
+                                                    );
+                                                })()}
                                             </td>
                                             <td className="px-6 py-4 text-gray-500 truncate max-w-[200px]" title={log.reason || '-'}>
                                                 {log.reason ? <span className="text-red-500 italic">{log.reason}</span> : '-'}
