@@ -579,14 +579,14 @@ const InvoiceManagement = () => {
             return;
         }
 
-        // FIX: Warn if non-IDR currency has exchange_rate = 1 (likely forgot to set rate)
+        // FIX: Warn if non-IDR currency has exchange_rate = 1 (user likely forgot to set it)
         const selectedCurrencyCheck = formData.billing_currency || 'IDR';
         if (selectedCurrencyCheck !== 'IDR') {
             const rateCheck = parseFloat(formData.exchange_rate) || 0;
-            if (rateCheck <= 1) {
+            if (rateCheck === 1) {
                 const proceed = window.confirm(
                     `⚠️ Perhatian: Kurs ${selectedCurrencyCheck} saat ini adalah ${rateCheck}.\n\n` +
-                    `Nilai kurs terlihat tidak wajar untuk mata uang non-IDR. ` +
+                    `Nilai kurs belum disesuaikan untuk mata uang non-IDR. ` +
                     `Pastikan kurs sudah benar (contoh: USD → 16000).\n\n` +
                     `Lanjutkan tetap membuat invoice dengan kurs ${rateCheck}?`
                 );
@@ -597,13 +597,12 @@ const InvoiceManagement = () => {
         const normalizeRate = (value) => {
             const parsed = Number(value);
             if (!Number.isFinite(parsed) || parsed <= 0) return 1;
-            return Number(parsed.toFixed(6));
+            return Number(parsed.toFixed(8)); // Ganti ke 8 desimal agar nilai di bawah 1 tidak kehilangan presisi
         };
 
         try {
             // 1. Validate duplicates for the same SO / shipment reference.
-            // FIX: Invoice manual dengan MATA UANG BERBEDA dari SO auto-generate SELALU diizinkan.
-            // Hanya blokir jika: sama currency DAN sama exchange_rate (benar-benar duplikat).
+            // Memperketat: Hanya boleh 1 invoice untuk kombinasi kurs (rate) + mata uang yang sama.
             if (formData.job_number) {
                 const { data: allInvoices, error: allCheckError } = await supabase
                     .from('blink_invoices')
@@ -619,46 +618,34 @@ const InvoiceManagement = () => {
                 const selectedCurrency = formData.billing_currency || 'IDR';
                 const selectedRate = selectedCurrency === 'IDR' ? 1 : normalizeRate(formData.exchange_rate || 1);
 
-                // FIX: Cari invoice yang relevan dengan shipment/SO yang sama.
-                // Jika tidak ada shipment_id maupun so_number yang cocok, berarti tidak ada invoice sebelumnya → izinkan.
+                // Cari invoice yang relevan dengan shipment/SO yang sama.
                 const relevantInvoices = (allInvoices || []).filter(inv => {
                     if (selectedShipmentId && inv.shipment_id) return inv.shipment_id === selectedShipmentId;
                     if (selectedSoNumber && inv.so_number) return inv.so_number === selectedSoNumber;
-                    // Jika keduanya null, jangan blokir (invoice standalone yang berbeda)
                     return false;
                 });
 
-                // Hanya cek duplikat untuk currency yang SAMA
+                // Cari invoice dengan currency yang sama
                 const sameCurrencyInvoices = relevantInvoices.filter(inv => (inv.currency || 'IDR') === selectedCurrency);
 
                 if (sameCurrencyInvoices.length > 0) {
                     const hasSameRate = sameCurrencyInvoices.some(inv => {
                         const existingRate = (inv.currency || 'IDR') === 'IDR' ? 1 : normalizeRate(inv.exchange_rate || 1);
-                        return existingRate === selectedRate;
+                        return Math.abs(existingRate - selectedRate) < 0.00000001; // Presisi perbandingan float desimal
                     });
 
                     if (hasSameRate) {
                         const duplicateInv = sameCurrencyInvoices.find(inv => {
                             const existingRate = (inv.currency || 'IDR') === 'IDR' ? 1 : normalizeRate(inv.exchange_rate || 1);
-                            return existingRate === selectedRate;
+                            return Math.abs(existingRate - selectedRate) < 0.00000001;
                         });
                         alert(
-                            `Tidak bisa membuat invoice: Invoice ${selectedCurrency} dengan kurs yang sama sudah ada (${duplicateInv?.invoice_number || '-'}) untuk SO/Job ${formData.so_number || formData.job_number}.\n\n` +
-                            `Gunakan kurs yang berbeda untuk invoice beda kurs.`
-                        );
-                        return;
-                    }
-
-                    if (sameCurrencyInvoices.length >= 2) {
-                        alert(
-                            `Tidak bisa membuat invoice: Batas invoice ${selectedCurrency} untuk SO/Job ini sudah tercapai (maks. 2 kurs berbeda per mata uang).`
+                            `Tidak bisa membuat invoice: Invoice dengan mata uang ${selectedCurrency} dan kurs ${selectedRate} sudah terdaftar (${duplicateInv?.invoice_number || '-'}) untuk SO/Job ini.\n\n` +
+                            `Hanya diperbolehkan maksimal 1 invoice untuk setiap nilai kurs.`
                         );
                         return;
                     }
                 }
-
-                // FIX: Hapus batasan 2 currency per SO — invoice manual beda currency SELALU diizinkan
-                // karena ini adalah fitur sah untuk penagihan multi-currency (misal SO dalam USD + invoice manual IDR).
             }
 
             const { subtotal, taxAmount, total, cogsSubtotal, grossProfit, profitMargin } = calculateTotals();
@@ -2231,10 +2218,18 @@ const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFor
                                 value={formData.billing_currency}
                                 onChange={(e) => {
                                     const newCurrency = e.target.value;
+                                    let defaultRate = 1;
+                                    if (newCurrency !== 'IDR') {
+                                        if (selectedQuotation && (selectedQuotation.currency === newCurrency || selectedQuotation.billing_currency === newCurrency)) {
+                                            defaultRate = selectedQuotation.exchange_rate || selectedQuotation.exchangeRate || 1;
+                                        } else if (selectedShipment && (selectedShipment.currency === newCurrency || selectedShipment.billing_currency === newCurrency)) {
+                                            defaultRate = selectedShipment.exchange_rate || selectedShipment.exchangeRate || 1;
+                                        }
+                                    }
                                     setFormData(prev => ({
                                         ...prev,
                                         billing_currency: newCurrency,
-                                        exchange_rate: newCurrency === 'IDR' ? 1 : (prev.exchange_rate || 1)
+                                        exchange_rate: newCurrency === 'IDR' ? 1 : (defaultRate || prev.exchange_rate || 1)
                                     }));
                                 }}
                                 className="w-full px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
