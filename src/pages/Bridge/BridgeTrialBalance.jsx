@@ -16,6 +16,12 @@ const BridgeTrialBalance = () => {
     const [loading, setLoading] = useState(true);
     const [balances, setBalances] = useState([]);
     const [totals, setTotals] = useState({ opening: 0, debit: 0, credit: 0, closing: 0 });
+    const [unclassifiedAccounts, setUnclassifiedAccounts] = useState([]);
+    const [duplicateEntries, setDuplicateEntries] = useState([]);
+    const [typeSummaries, setTypeSummaries] = useState({});
+    const [arSummary, setArSummary] = useState({ count: 0, opening: 0, debit: 0, credit: 0, closing: 0 });
+    const [apSummary, setApSummary] = useState({ count: 0, opening: 0, debit: 0, credit: 0, closing: 0 });
+    const [suspiciousAccounts, setSuspiciousAccounts] = useState([]);
 
     // Default: Current Year
     const today = new Date();
@@ -29,6 +35,7 @@ const BridgeTrialBalance = () => {
     useEffect(() => {
         fetchTrialBalance();
     }, [dateRange]);
+
 
     const fetchTrialBalance = async () => {
         try {
@@ -58,7 +65,24 @@ const BridgeTrialBalance = () => {
             if (r2.error) throw r2.error;
 
             const combined = [...(r1.data || []), ...(r2.data || [])];
-            
+
+            // Deteksi duplikasi berdasarkan nilai, tanggal, dan akun
+            const entryKeyMap = new Map();
+            const duplicates = [];
+            combined.forEach(r => {
+                const key = `${r.account_code || ''}|${r.coa_id || ''}|${r.debit || 0}|${r.credit || 0}|${r.entry_date}`;
+                if (entryKeyMap.has(key)) {
+                    duplicates.push({
+                        id1: entryKeyMap.get(key).id,
+                        id2: r.id,
+                        ...r
+                    });
+                } else {
+                    entryKeyMap.set(key, r);
+                }
+            });
+            setDuplicateEntries(duplicates);
+
             // Deduplicate by id only (original entries are unique)
             const uniqueMap = new Map();
             combined.forEach(r => {
@@ -67,7 +91,6 @@ const BridgeTrialBalance = () => {
                 } else {
                     // If duplicate found, merge the values (in case of different sources)
                     const existing = uniqueMap.get(r.id);
-                    // Keep the entry with coa_id if available
                     if (!existing.coa_id && r.coa_id) {
                         uniqueMap.set(r.id, r);
                     }
@@ -102,6 +125,7 @@ const BridgeTrialBalance = () => {
                 return value;
             };
 
+            const unclassified = [];
             entries.forEach(e => {
                 // Match by ID first, fallback to code
                 let targetId = e.coa_id || accCodeMap[e.account_code];
@@ -122,6 +146,7 @@ const BridgeTrialBalance = () => {
                             closing: 0
                         };
                     }
+                    unclassified.push(accMap[targetId]);
                 }
 
                 const acc = accMap[targetId];
@@ -144,12 +169,22 @@ const BridgeTrialBalance = () => {
                     acc.creditPeriod += credit;
                 }
             });
+            setUnclassifiedAccounts(unclassified);
 
             // Calculate Closing
             let totalOpening = 0;
             let totalDebit = 0;
             let totalCredit = 0;
             let totalClosing = 0;
+
+            const isHeader = (a) => {
+                if (!a) return false;
+                // treat explicit level <=2 as header
+                if (a.level && !isNaN(parseInt(a.level, 10)) && parseInt(a.level, 10) <= 2) return true;
+                // patterns like 4-00-000... or 4-02-000-0-1-00
+                if (a.code && (/^\d-\d{2}-000/.test(a.code) || /^\d-00-000/.test(a.code) || /-000($|[-_])/.test(a.code))) return true;
+                return false;
+            };
 
             const processed = Object.values(accMap)
                 .map(acc => {
@@ -171,8 +206,49 @@ const BridgeTrialBalance = () => {
 
                     return acc;
                 })
-                .filter(acc => acc.opening !== 0 || acc.debitPeriod !== 0 || acc.creditPeriod !== 0) // Hide zero balance accounts
-                .sort((a, b) => a.code.localeCompare(b.code)); // Sort strictly by Account Code
+                // Hide header/group accounts and zero-activity accounts. Also skip accounts explicitly marked not for TB
+                .filter(acc => {
+                    if (!acc) return false;
+                    if (acc.is_trial_balance === false) return false;
+                    if (isHeader(acc)) return false;
+                    return acc.opening !== 0 || acc.debitPeriod !== 0 || acc.creditPeriod !== 0;
+                })
+                .sort((a, b) => (a.code || '').localeCompare(b.code || ''));
+
+            // --- Diagnostics: compute summaries by type, AR/AP and suspicious accounts ---
+            const typeMap = {};
+            let ar = { count: 0, opening: 0, debit: 0, credit: 0, closing: 0 };
+            let ap = { count: 0, opening: 0, debit: 0, credit: 0, closing: 0 };
+            const suspicious = [];
+
+            processed.forEach(acc => {
+                const t = acc.type || 'UNKNOWN';
+                if (!typeMap[t]) typeMap[t] = { count: 0, opening: 0, debit: 0, credit: 0, closing: 0 };
+                typeMap[t].count += 1;
+                typeMap[t].opening += acc.opening || 0;
+                typeMap[t].debit += acc.debitPeriod || 0;
+                typeMap[t].credit += acc.creditPeriod || 0;
+                typeMap[t].closing += acc.closing || 0;
+
+                // AR / AP detection via explicit flags or by type
+                if (acc.is_ar) {
+                    ar.count += 1; ar.opening += acc.opening || 0; ar.debit += acc.debitPeriod || 0; ar.credit += acc.creditPeriod || 0; ar.closing += acc.closing || 0;
+                }
+                if (acc.is_ap) {
+                    ap.count += 1; ap.opening += acc.opening || 0; ap.debit += acc.debitPeriod || 0; ap.credit += acc.creditPeriod || 0; ap.closing += acc.closing || 0;
+                }
+
+                // Suspicious: name contains 'discount' or 'diskon' but type is REVENUE or not COGS
+                const nameLower = (acc.name || '').toLowerCase();
+                if ((nameLower.includes('discount') || nameLower.includes('diskon') || nameLower.includes('discount air') || nameLower.includes('air')) && acc.type !== 'COGS' && acc.type !== 'COST') {
+                    suspicious.push({ id: acc.id, code: acc.code, name: acc.name, type: acc.type, closing: acc.closing });
+                }
+            });
+
+            setTypeSummaries(typeMap);
+            setArSummary(ar);
+            setApSummary(ap);
+            setSuspiciousAccounts(suspicious);
 
             // Set balances
             setBalances(processed);
@@ -437,6 +513,68 @@ const BridgeTrialBalance = () => {
                 </div>
             </div>
 
+            {unclassifiedAccounts.length > 0 && (
+                <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 mb-4 rounded">
+                    <strong>Warning:</strong> Ada akun <b>Unclassified/Unmapped</b> yang terisi. Mohon cek mapping COA dan jurnal!
+                    <ul className="mt-2 text-xs">
+                        {unclassifiedAccounts.map(acc => (
+                            <li key={acc.id}>{acc.code} - {acc.name}</li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+            {duplicateEntries.length > 0 && (
+                <div className="bg-red-100 border-l-4 border-red-500 text-red-800 p-4 mb-4 rounded">
+                    <strong>Warning:</strong> Ditemukan potensi <b>duplikasi jurnal</b> berdasarkan akun, nilai, dan tanggal yang sama. Mohon audit data jurnal!
+                    <ul className="mt-2 text-xs">
+                        {duplicateEntries.slice(0, 10).map((dup, idx) => (
+                            <li key={idx}>ID {dup.id1} & {dup.id2} | Akun: {dup.account_code || '-'} | Debit: {dup.debit} | Kredit: {dup.credit} | Tanggal: {dup.entry_date}</li>
+                        ))}
+                        {duplicateEntries.length > 10 && <li>Dan {duplicateEntries.length - 10} duplikasi lainnya...</li>}
+                    </ul>
+                </div>
+            )}
+            {/* Diagnostics summary for AR/AP and suspicious accounts */}
+            {Object.keys(typeSummaries || {}).length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div className="glass-card p-3 rounded">
+                        <div className="text-xs text-silver-dark font-semibold">Type Summary</div>
+                        <div className="text-sm mt-2">
+                            {Object.entries(typeSummaries).map(([t, v]) => (
+                                <div key={t} className="flex justify-between text-xs py-1">
+                                    <span>{t}</span>
+                                    <span className="font-mono">{(v.closing || 0).toLocaleString('id-ID')}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="glass-card p-3 rounded">
+                        <div className="text-xs text-silver-dark font-semibold">Accounts Receivable (AR)</div>
+                        <div className="text-sm mt-2">
+                            <div className="flex justify-between text-xs py-1"><span>Count</span><span className="font-mono">{arSummary.count}</span></div>
+                            <div className="flex justify-between text-xs py-1"><span>Closing</span><span className="font-mono">{(arSummary.closing || 0).toLocaleString('id-ID')}</span></div>
+                        </div>
+                    </div>
+                    <div className="glass-card p-3 rounded">
+                        <div className="text-xs text-silver-dark font-semibold">Accounts Payable (AP)</div>
+                        <div className="text-sm mt-2">
+                            <div className="flex justify-between text-xs py-1"><span>Count</span><span className="font-mono">{apSummary.count}</span></div>
+                            <div className="flex justify-between text-xs py-1"><span>Closing</span><span className="font-mono">{(apSummary.closing || 0).toLocaleString('id-ID')}</span></div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {suspiciousAccounts.length > 0 && (
+                <div className="bg-indigo-50 border-l-4 border-indigo-400 text-indigo-800 p-4 mb-4 rounded">
+                    <strong>Notice:</strong> Ditemukan akun dengan nama terkait discount/air yang tidak diklasifikasikan sebagai COGS.
+                    <ul className="mt-2 text-xs">
+                        {suspiciousAccounts.map(acc => (
+                            <li key={acc.id}>{acc.code} - {acc.name} — type: {acc.type} — balance: {(acc.closing || 0).toLocaleString('id-ID')}</li>
+                        ))}
+                    </ul>
+                </div>
+            )}
             {loading ? (
                 <div className="p-12 text-center text-silver-dark border border-dark-border rounded-lg bg-dark-surface/30">Loading financial data...</div>
             ) : (

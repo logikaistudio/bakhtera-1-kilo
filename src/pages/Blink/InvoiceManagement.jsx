@@ -536,12 +536,13 @@ const InvoiceManagement = () => {
         }));
     };
     const calculateTotals = () => {
+        const rate = parseFloat(formData.exchange_rate) > 0 ? parseFloat(formData.exchange_rate) : 1;
         const subtotal = formData.invoice_items.reduce((sum, item) => {
             let itemVal = item.amount || 0;
             const itemCurr = item.currency || formData.billing_currency;
             if (itemCurr !== formData.billing_currency) {
-                if (formData.billing_currency === 'IDR' && itemCurr !== 'IDR') itemVal *= (formData.exchange_rate || 1);
-                else if (formData.billing_currency !== 'IDR' && itemCurr === 'IDR') itemVal /= (formData.exchange_rate || 1);
+                if (formData.billing_currency === 'IDR' && itemCurr !== 'IDR') itemVal *= rate;
+                else if (formData.billing_currency !== 'IDR' && itemCurr === 'IDR') itemVal /= rate;
                 // simplified mapping for USD/SGD vs IDR assuming IDR is base for non-matching ones except same
             }
             return sum + itemVal;
@@ -551,8 +552,8 @@ const InvoiceManagement = () => {
             let itemTax = Number(item.tax_amount) || 0;
             const itemCurr = item.currency || formData.billing_currency;
             if (itemCurr !== formData.billing_currency) {
-                if (formData.billing_currency === 'IDR' && itemCurr !== 'IDR') itemTax *= (formData.exchange_rate || 1);
-                else if (formData.billing_currency !== 'IDR' && itemCurr === 'IDR') itemTax /= (formData.exchange_rate || 1);
+                if (formData.billing_currency === 'IDR' && itemCurr !== 'IDR') itemTax *= rate;
+                else if (formData.billing_currency !== 'IDR' && itemCurr === 'IDR') itemTax /= rate;
             }
             return sum + itemTax;
         }, 0);
@@ -597,16 +598,16 @@ const InvoiceManagement = () => {
         const normalizeRate = (value) => {
             const parsed = Number(value);
             if (!Number.isFinite(parsed) || parsed <= 0) return 1;
-            return Number(parsed.toFixed(8)); // Ganti ke 8 desimal agar nilai di bawah 1 tidak kehilangan presisi
+            return parsed; // Kembalikan nilai mentah tanpa dibulatkan agar nilai di atas 0 tetap digunakan apa adanya
         };
 
         try {
             // 1. Validate duplicates for the same SO / shipment reference.
-            // Memperketat: Hanya boleh 1 invoice untuk kombinasi kurs (rate) + mata uang yang sama.
+            // Memperketat: Hanya boleh 1 invoice per mata uang (currency) untuk SO/Job yang sama.
             if (formData.job_number) {
                 const { data: allInvoices, error: allCheckError } = await supabase
                     .from('blink_invoices')
-                    .select('id, invoice_number, status, currency, exchange_rate, shipment_id, so_number, created_at')
+                    .select('id, invoice_number, status, currency, exchange_rate, shipment_id, so_number, job_number, created_at')
                     .eq('job_number', formData.job_number)
                     .not('invoice_number', 'ilike', '%-RB')
                     .neq('status', 'cancelled');
@@ -616,12 +617,12 @@ const InvoiceManagement = () => {
                 const selectedShipmentId = formData.shipment_id || selectedShipment?.id || null;
                 const selectedSoNumber = formData.so_number || selectedShipment?.so_number || null;
                 const selectedCurrency = formData.billing_currency || 'IDR';
-                const selectedRate = selectedCurrency === 'IDR' ? 1 : normalizeRate(formData.exchange_rate || 1);
 
                 // Cari invoice yang relevan dengan shipment/SO yang sama.
                 const relevantInvoices = (allInvoices || []).filter(inv => {
-                    if (selectedShipmentId && inv.shipment_id) return inv.shipment_id === selectedShipmentId;
-                    if (selectedSoNumber && inv.so_number) return inv.so_number === selectedSoNumber;
+                    if (formData.job_number && inv.job_number === formData.job_number) return true;
+                    if (selectedShipmentId && inv.shipment_id === selectedShipmentId) return true;
+                    if (selectedSoNumber && inv.so_number === selectedSoNumber) return true;
                     return false;
                 });
 
@@ -629,22 +630,12 @@ const InvoiceManagement = () => {
                 const sameCurrencyInvoices = relevantInvoices.filter(inv => (inv.currency || 'IDR') === selectedCurrency);
 
                 if (sameCurrencyInvoices.length > 0) {
-                    const hasSameRate = sameCurrencyInvoices.some(inv => {
-                        const existingRate = (inv.currency || 'IDR') === 'IDR' ? 1 : normalizeRate(inv.exchange_rate || 1);
-                        return Math.abs(existingRate - selectedRate) < 0.00000001; // Presisi perbandingan float desimal
-                    });
-
-                    if (hasSameRate) {
-                        const duplicateInv = sameCurrencyInvoices.find(inv => {
-                            const existingRate = (inv.currency || 'IDR') === 'IDR' ? 1 : normalizeRate(inv.exchange_rate || 1);
-                            return Math.abs(existingRate - selectedRate) < 0.00000001;
-                        });
-                        alert(
-                            `Tidak bisa membuat invoice: Invoice dengan mata uang ${selectedCurrency} dan kurs ${selectedRate} sudah terdaftar (${duplicateInv?.invoice_number || '-'}) untuk SO/Job ini.\n\n` +
-                            `Hanya diperbolehkan maksimal 1 invoice untuk setiap nilai kurs.`
-                        );
-                        return;
-                    }
+                    const duplicateInv = sameCurrencyInvoices[0];
+                    alert(
+                        `Tidak bisa membuat invoice: Invoice dengan mata uang ${selectedCurrency} sudah terdaftar sebelumnya (${duplicateInv.invoice_number || '-'}) untuk SO/Job ini.\n\n` +
+                        `Hanya diperbolehkan maksimal 1 invoice untuk setiap mata uang.`
+                    );
+                    return;
                 }
             }
 
@@ -676,7 +667,7 @@ const InvoiceManagement = () => {
                 cargo_details: formData.cargo_details || null,
                 invoice_items: formData.invoice_items,
                 currency: formData.billing_currency || 'IDR',
-                exchange_rate: (formData.billing_currency || 'IDR') === 'IDR' ? 1 : (formData.exchange_rate || 1),
+                exchange_rate: (formData.billing_currency || 'IDR') === 'IDR' ? 1 : (parseFloat(formData.exchange_rate) > 0 ? parseFloat(formData.exchange_rate) : 1),
                 subtotal: subtotal,
                 tax_rate: formData.tax_rate,
                 tax_amount: taxAmount,
@@ -826,6 +817,43 @@ const InvoiceManagement = () => {
         e.preventDefault();
         
         try {
+            // Validate duplicates for the same SO / shipment reference.
+            if (formData.job_number) {
+                const { data: allInvoices, error: allCheckError } = await supabase
+                    .from('blink_invoices')
+                    .select('id, invoice_number, status, currency, exchange_rate, shipment_id, so_number, job_number, created_at')
+                    .eq('job_number', formData.job_number)
+                    .not('invoice_number', 'ilike', '%-RB')
+                    .neq('status', 'cancelled');
+
+                if (allCheckError) throw allCheckError;
+
+                const selectedShipmentId = formData.shipment_id || selectedShipment?.id || null;
+                const selectedSoNumber = formData.so_number || selectedShipment?.so_number || null;
+                const selectedCurrency = formData.billing_currency || 'IDR';
+
+                // Cari invoice yang relevan dengan shipment/SO yang sama, mengecualikan invoice yang sedang diedit.
+                const relevantInvoices = (allInvoices || []).filter(inv => {
+                    if (inv.id === editInvoiceId) return false;
+                    if (formData.job_number && inv.job_number === formData.job_number) return true;
+                    if (selectedShipmentId && inv.shipment_id === selectedShipmentId) return true;
+                    if (selectedSoNumber && inv.so_number === selectedSoNumber) return true;
+                    return false;
+                });
+
+                // Cari invoice dengan currency yang sama
+                const sameCurrencyInvoices = relevantInvoices.filter(inv => (inv.currency || 'IDR') === selectedCurrency);
+
+                if (sameCurrencyInvoices.length > 0) {
+                    const duplicateInv = sameCurrencyInvoices[0];
+                    alert(
+                        `Tidak bisa memperbarui invoice: Invoice dengan mata uang ${selectedCurrency} sudah terdaftar sebelumnya (${duplicateInv.invoice_number || '-'}) untuk SO/Job ini.\n\n` +
+                        `Hanya diperbolehkan maksimal 1 invoice untuk setiap mata uang.`
+                    );
+                    return;
+                }
+            }
+
             const { subtotal, taxAmount, total, cogsSubtotal, grossProfit, profitMargin } = calculateTotals();
             
             const currentInvoice = invoices.find(inv => inv.id === editInvoiceId);
@@ -840,7 +868,7 @@ const InvoiceManagement = () => {
                 invoice_date: formData.invoice_date,
                 due_date: formData.due_date,
                 currency: formData.billing_currency,
-                exchange_rate: formData.billing_currency === 'IDR' ? 1 : (formData.exchange_rate || 1),
+                exchange_rate: formData.billing_currency === 'IDR' ? 1 : (parseFloat(formData.exchange_rate) > 0 ? parseFloat(formData.exchange_rate) : 1),
                 payment_bank_id: formData.payment_bank_id || null,
                 invoice_items: formData.invoice_items,
                 cogs_items: formData.cogs_items || [],
@@ -1776,6 +1804,8 @@ const InvoiceManagement = () => {
                 showCreateModal && (
                     <InvoiceCreateModal
                         isEditing={isEditingInvoice}
+                        editInvoiceId={editInvoiceId}
+                        invoices={invoices}
                         quotations={quotations}
                         shipments={shipments}
                         formData={formData}
@@ -1915,12 +1945,29 @@ const InvoiceManagement = () => {
 };
 
 // Invoice Create Modal Component  
-const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFormData, selectedQuotation, selectedShipment,
+const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotations, shipments, formData, setFormData, selectedQuotation, selectedShipment,
     referenceType, setReferenceType, handleQuotationSelect, handleShipmentSelect, handlePaymentTermsChange,
     addInvoiceItem, removeInvoiceItem, updateInvoiceItem, calculateTotals, handleGlobalTaxRateChange,
     handleCreateInvoice, formatCurrency, onClose, bankAccounts, revenueAccounts }) => {
 
     const { subtotal, taxAmount, total, cogsSubtotal, grossProfit, profitMargin } = calculateTotals();
+
+    const getUsedCurrenciesForSelectedJob = () => {
+        const targetJobNumber = formData.job_number;
+        const targetShipmentId = formData.shipment_id;
+        const targetSoNumber = formData.so_number;
+        if (!targetJobNumber && !targetShipmentId && !targetSoNumber) return [];
+        const activeInvoicesForJob = invoices.filter(inv => {
+            const matchesJob = targetJobNumber && inv.job_number === targetJobNumber;
+            const matchesShipment = targetShipmentId && inv.shipment_id === targetShipmentId;
+            const matchesSo = targetSoNumber && inv.so_number === targetSoNumber;
+            return (matchesJob || matchesShipment || matchesSo) &&
+                inv.status !== 'cancelled' &&
+                (!isEditing || inv.id !== editInvoiceId) &&
+                !inv.invoice_number.toUpperCase().endsWith('-RB');
+        });
+        return activeInvoicesForJob.map(inv => inv.currency || 'IDR');
+    };
 
     // Local UI state for COA dropdowns within the modal
     const [coaSearchMapInv, setCoaSearchMapInv] = useState({});    // { [itemIndex]: searchTerm }
@@ -2235,11 +2282,30 @@ const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFor
                                 className="w-full px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
                                 required
                             >
-                                <option value="IDR">IDR (Rupiah)</option>
-                                <option value="USD">USD (US Dollar)</option>
-                                <option value="SGD">SGD (Singapore Dollar)</option>
-                                <option value="EUR">EUR (Euro)</option>
-                                <option value="RMB">RMB (Chinese Yuan)</option>
+                                {(() => {
+                                    const usedCurrencies = getUsedCurrenciesForSelectedJob();
+                                    const options = [
+                                        { value: 'IDR', label: 'IDR (Rupiah)' },
+                                        { value: 'USD', label: 'USD (US Dollar)' },
+                                        { value: 'SGD', label: 'SGD (Singapore Dollar)' },
+                                        { value: 'EUR', label: 'EUR (Euro)' },
+                                        { value: 'RMB', label: 'RMB (Chinese Yuan)' }
+                                    ];
+                                    const filteredOptions = options.filter(opt => !usedCurrencies.includes(opt.value));
+                                    // Ensure the current selected currency is visible even if it's in usedCurrencies (e.g., when editing or first selected)
+                                    if (formData.billing_currency && !filteredOptions.some(opt => opt.value === formData.billing_currency)) {
+                                        const originalOpt = options.find(opt => opt.value === formData.billing_currency) || {
+                                            value: formData.billing_currency,
+                                            label: formData.billing_currency
+                                        };
+                                        filteredOptions.push(originalOpt);
+                                    }
+                                    return filteredOptions.map(opt => (
+                                        <option key={opt.value} value={opt.value}>
+                                            {opt.label}
+                                        </option>
+                                    ));
+                                })()}
                             </select>
                         </div>
 
@@ -2253,27 +2319,27 @@ const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFor
                             <input
                                 type="number"
                                 value={formData.exchange_rate}
-                                onChange={(e) => setFormData(prev => ({ ...prev, exchange_rate: parseFloat(e.target.value) || 1 }))}
+                                onChange={(e) => setFormData(prev => ({ ...prev, exchange_rate: e.target.value }))}
                                 className={`w-full px-2.5 py-1.5 bg-dark-surface border rounded-lg text-silver-light ${
-                                    formData.billing_currency !== 'IDR' && parseFloat(formData.exchange_rate) <= 1
-                                        ? 'border-yellow-500 ring-1 ring-yellow-500/40'
+                                    formData.billing_currency !== 'IDR' && parseFloat(formData.exchange_rate) <= 0
+                                        ? 'border-red-500 ring-1 ring-red-500/40'
                                         : 'border-dark-border'
                                 }`}
                                 disabled={formData.billing_currency === 'IDR'}
                                 min="0.000001"
-                                step="0.01"
+                                step="any"
                                 placeholder="e.g., 16000"
                             />
                             <p className={`text-xs mt-1 ${
-                                formData.billing_currency !== 'IDR' && parseFloat(formData.exchange_rate) <= 1
-                                    ? 'text-yellow-400'
+                                formData.billing_currency !== 'IDR' && parseFloat(formData.exchange_rate) <= 0
+                                    ? 'text-red-400'
                                     : 'text-silver-dark'
                             }`}>
                                 {formData.billing_currency === 'IDR'
                                     ? 'Tidak diperlukan untuk IDR'
-                                    : parseFloat(formData.exchange_rate) <= 1
-                                        ? `⚠️ Kurs ${formData.billing_currency} terlihat tidak wajar. Contoh USD: 16000`
-                                        : `1 ${formData.billing_currency} = Rp ${Number(formData.exchange_rate).toLocaleString('id-ID')}`
+                                    : parseFloat(formData.exchange_rate) <= 0
+                                        ? `⚠️ Kurs rate harus lebih besar dari 0`
+                                        : `1 ${formData.billing_currency} = Rp ${Number(formData.exchange_rate || 1).toLocaleString('id-ID')}`
                                 }
                             </p>
                         </div>

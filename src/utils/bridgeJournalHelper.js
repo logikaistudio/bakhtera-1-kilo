@@ -111,13 +111,12 @@ export async function journalEntriesHasColumn(columnName) {
 export async function resolveCOA({ codes = [], prefixes = [], type, nameHint, coaList } = {}) {
     const list = coaList || await getAllCOA();
 
-    // 1. Exact code match only
+    // PATCH: Hanya izinkan resolve COA berdasarkan id atau code yang valid
     for (const code of codes) {
         const found = list.find(c => c.code === code && c.is_active !== false);
         if (found) return found;
     }
-
-    // No fallback by name, prefix, or fuzzy matching — require explicit COA
+    // Tidak ada fallback ke nameHint, prefix, atau fuzzy match
     return null;
 }
 
@@ -125,8 +124,11 @@ export async function resolveCOA({ codes = [], prefixes = [], type, nameHint, co
 
 /** Piutang Usaha (AR) — ASSET, code 1-01-400 */
 export async function resolveARAccount(coaList) {
+    const list = coaList || await getAllCOA();
+    // Exclude parent/group accounts (level 1 or 2) — must be leaf-level account
+    const leafCandidates = list.filter(c => c.is_active !== false && (c.level == null || Number(c.level) >= 3));
     return resolveCOA({
-        coaList,
+        coaList: leafCandidates,
         codes: ['1-01-400-0-1-00', '1-01-401-0-1-00', '1200', '1-03-100'],
         prefixes: ['1-01-4', '1-01-40', '12'],
         type: 'ASSET',
@@ -194,8 +196,11 @@ export async function resolveBankAccount(coaList, selectedBank = null) {
 
 /** Hutang Usaha (AP) — LIABILITY, code 2-01-100 */
 export async function resolveAPAccount(coaList) {
+    const list = coaList || await getAllCOA();
+    // Exclude parent/group accounts (level 1 or 2) — must be leaf-level account
+    const leafCandidates = list.filter(c => c.is_active !== false && (c.level == null || Number(c.level) >= 3));
     return resolveCOA({
-        coaList,
+        coaList: leafCandidates,
         codes: ['2-01-100-0-1-00', '2-01-101-0-1-00', '2100', '2000'],
         prefixes: ['2-01-1', '2-01-10', '2-01'],
         type: 'LIABILITY',

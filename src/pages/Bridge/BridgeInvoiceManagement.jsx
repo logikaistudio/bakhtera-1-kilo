@@ -43,6 +43,8 @@ const BridgeInvoiceManagement = () => {
     const [selectedShipment, setSelectedShipment] = useState(null);
     const [referenceType, setReferenceType] = useState('quotation'); // 'quotation' or 'so'
     const [revenueAccounts, setRevenueAccounts] = useState([]);
+    const [coaSearchMapInv, setCoaSearchMapInv] = useState({});    // { [itemIndex]: searchTerm }
+    const [coaDropdownMapInv, setCoaDropdownMapInv] = useState({}); // { [itemIndex]: boolean open }
     const [confirmSubmitAction, setConfirmSubmitAction] = useState(null);
     const [successSubmitMsg, setSuccessSubmitMsg] = useState('');
     const [isEditingInvoice, setIsEditingInvoice] = useState(false);
@@ -89,6 +91,7 @@ const BridgeInvoiceManagement = () => {
         partially_paid: { label: 'Partial Payment', color: 'bg-yellow-500/20 text-yellow-400', icon: DollarSign },
         paid: { label: 'Paid', color: 'bg-green-500/20 text-green-400', icon: CheckCircle },
         overdue: { label: 'Overdue', color: 'bg-red-500/20 text-red-400', icon: AlertCircle },
+        rejected: { label: 'Rejected', color: 'bg-red-500/20 text-red-400', icon: XCircle },
         cancelled: { label: 'Cancelled', color: 'bg-gray-500/20 text-gray-400', icon: XCircle },
         unpaid: { label: 'Unpaid', color: 'bg-orange-500/20 text-orange-400', icon: Clock },
         manager_approval: { label: 'Manager Approval', color: 'bg-yellow-500/20 text-yellow-400', icon: Clock }
@@ -122,10 +125,13 @@ const BridgeInvoiceManagement = () => {
 
     const fetchRevenueAccounts = async () => {
         try {
+            // Use code PREFIX (4xx = Revenue) not type='REVENUE' to ensure all
+            // revenue accounts appear, consistent with P&L classification logic.
             const { data, error } = await supabase
                 .from('bridge_coa')
                 .select('*')
-                .eq('type', 'REVENUE')
+                .like('code', '4%')
+                .neq('is_active', false)
                 .order('code');
             if (!error && data) {
                 setRevenueAccounts(data);
@@ -246,7 +252,7 @@ const BridgeInvoiceManagement = () => {
                 },
                 invoice_items: quotation.service_items && quotation.service_items.length > 0
                     ? quotation.service_items.map(item => {
-                        const acc = revenueAccounts.find(a => a.code === item.itemCode);
+                        const acc = (typeof revenueAccounts !== 'undefined' && revenueAccounts) ? revenueAccounts.find(a => a.code === item.itemCode) : null;
                         return {
                             item_name: acc?.name || item.itemCode || item.name || item.service_name || 'Item',
                             description: item.description || item.name || '',
@@ -316,47 +322,67 @@ const BridgeInvoiceManagement = () => {
                     volume: shipment.volume,
                     commodity: shipment.commodity
                 },
-                invoice_items: shipment.selling_items && shipment.selling_items.length > 0
-                    ? shipment.selling_items.map(item => {
-                        const acc = revenueAccounts.find(a => a.code === item.itemCode);
-                        return {
-                            item_name: acc?.name || item.itemCode || item.name || item.service_name || 'Item',
-                            description: item.description || item.name || '',
-                            qty: parseFloat(item.quantity) || parseFloat(item.qty) || 1,
-                            unit: item.unit || 'Job',
-                            rate: parseFloat(item.unitPrice) || parseFloat(item.price) || parseFloat(item.rate) || 0,
-                            amount: parseFloat(item.amount) || parseFloat(item.total) || 
-                                ((parseFloat(item.quantity) || 1) * (parseFloat(item.unitPrice) || parseFloat(item.price) || parseFloat(item.rate) || 0)),
-                            tax_amount: typeof item.tax_amount !== 'undefined' ? Number(item.tax_amount) : 0,
-                            tax_rate: typeof item.tax_rate !== 'undefined' ? Number(item.tax_rate) : 0,
-                            currency: item.currency || shipment.currency || 'IDR',
-                            coa_id: acc?.id || item.coa_id || null,
-                            coa_code: acc?.code || item.itemCode || item.coa_code || null
-                        };
-                    })
-                    : [{
+                // Bug Fix #1 & #5: Use selling_items OR service_items (whichever is populated).
+                // coa_id is taken directly from item.coa_id — do NOT rely on itemCode lookup
+                // which never existed on flattened items from SalesQuotation flattenItems().
+                invoice_items: (() => {
+                    const srcItems = (shipment.selling_items && shipment.selling_items.length > 0)
+                        ? shipment.selling_items
+                        : (shipment.service_items && shipment.service_items.length > 0)
+                            ? shipment.service_items
+                            : null;
+
+                    if (srcItems) {
+                        return srcItems.map(item => {
+                            // coa_id is authoritative from the item itself.
+                            // Only look up revenueAccounts if coa_id is missing.
+                            const accById = (typeof revenueAccounts !== 'undefined' && revenueAccounts && item.coa_id) ? revenueAccounts.find(a => a.id === item.coa_id) : null;
+                            const accByCode = !accById && (typeof revenueAccounts !== 'undefined' && revenueAccounts && item.itemCode) ? revenueAccounts.find(a => a.code === item.itemCode) : null;
+                            const acc = accById || accByCode;
+                            return {
+                                item_name: acc?.name || item.item_name || item.description || item.name || item.service_name || 'Item',
+                                description: item.description || item.name || '',
+                                qty: parseFloat(item.qty) || parseFloat(item.quantity) || 1,
+                                unit: item.unit || 'Job',
+                                rate: parseFloat(item.rate) || parseFloat(item.unitPrice) || parseFloat(item.price) || 0,
+                                amount: parseFloat(item.amount) || parseFloat(item.total) ||
+                                    ((parseFloat(item.qty) || parseFloat(item.quantity) || 1) * (parseFloat(item.rate) || parseFloat(item.unitPrice) || 0)),
+                                tax_amount: typeof item.tax_amount !== 'undefined' ? Number(item.tax_amount) : 0,
+                                tax_rate: typeof item.tax_rate !== 'undefined' ? Number(item.tax_rate) : 0,
+                                currency: item.currency || shipment.currency || 'IDR',
+                                // Direct coa_id takes priority - this is the key fix
+                                coa_id: item.coa_id || acc?.id || null,
+                                coa_code: item.coa_code || acc?.code || item.itemCode || null
+                            };
+                        });
+                    }
+                    return [{
                         item_name: (shipment.service_type || 'Freight').toUpperCase(),
                         description: `${(shipment.service_type || 'Freight').toUpperCase()} - ${shipment.origin} to ${shipment.destination}`,
                         qty: 1,
                         unit: 'Shipment',
                         rate: shipment.quoted_amount || 0,
                         amount: shipment.quoted_amount || 0,
-                        tax_amount: 0
-                    }],
+                        tax_amount: 0,
+                        coa_id: null
+                    }];
+                })(),
                 // Extract COGS from shipment buying_items and old cogs JSON
                 cogs_items: (() => {
                     const extractedItems = [];
-                    // 1. From Buying Items
+                    // 1. From Buying Items — Bug Fix #3: carry coa_id so COGS journals post
+                    //    to the correct specific HPP account (e.g. 5-01-003 THC), not the default.
                     if (shipment.buying_items && Array.isArray(shipment.buying_items)) {
                         shipment.buying_items.forEach(item => {
                             extractedItems.push({
-                                description: item.description || item.name || 'Cost Item',
-                                qty: item.quantity || item.qty || 1,
+                                description: item.description || item.item_name || item.name || 'Cost Item',
+                                qty: item.qty || item.quantity || 1,
                                 unit: item.unit || 'Job',
-                                rate: item.unitPrice || item.rate || item.price || 0,
-                                amount: item.total || item.amount || 0,
+                                rate: item.rate || item.unitPrice || item.price || 0,
+                                amount: item.amount || item.total || 0,
                                 vendor: item.vendor || item.supplier || '',
-                                currency: item.currency || shipment.currency || 'IDR'
+                                currency: item.currency || shipment.currency || 'IDR',
+                                coa_id: item.coa_id || null  // ← Key fix: preserve COA mapping
                             });
                         });
                     }
@@ -476,7 +502,7 @@ const BridgeInvoiceManagement = () => {
 
             // Auto-map COA if item_name changes
             if (field === 'item_name') {
-                const acc = revenueAccounts.find(a => a.name === value || a.code === value);
+                const acc = (typeof revenueAccounts !== 'undefined' && revenueAccounts) ? revenueAccounts.find(a => a.name === value || a.code === value) : null;
                 if (acc) {
                     items[index].coa_id = acc.id;
                     items[index].coa_code = acc.code;
@@ -510,12 +536,13 @@ const BridgeInvoiceManagement = () => {
         }));
     };
     const calculateTotals = () => {
+        const rate = parseFloat(formData.exchange_rate) > 0 ? parseFloat(formData.exchange_rate) : 1;
         const subtotal = formData.invoice_items.reduce((sum, item) => {
             let itemVal = item.amount || 0;
             const itemCurr = item.currency || formData.billing_currency;
             if (itemCurr !== formData.billing_currency) {
-                if (formData.billing_currency === 'IDR' && itemCurr !== 'IDR') itemVal *= (formData.exchange_rate || 1);
-                else if (formData.billing_currency !== 'IDR' && itemCurr === 'IDR') itemVal /= (formData.exchange_rate || 1);
+                if (formData.billing_currency === 'IDR' && itemCurr !== 'IDR') itemVal *= rate;
+                else if (formData.billing_currency !== 'IDR' && itemCurr === 'IDR') itemVal /= rate;
                 // simplified mapping for USD/SGD vs IDR assuming IDR is base for non-matching ones except same
             }
             return sum + itemVal;
@@ -525,8 +552,8 @@ const BridgeInvoiceManagement = () => {
             let itemTax = Number(item.tax_amount) || 0;
             const itemCurr = item.currency || formData.billing_currency;
             if (itemCurr !== formData.billing_currency) {
-                if (formData.billing_currency === 'IDR' && itemCurr !== 'IDR') itemTax *= (formData.exchange_rate || 1);
-                else if (formData.billing_currency !== 'IDR' && itemCurr === 'IDR') itemTax /= (formData.exchange_rate || 1);
+                if (formData.billing_currency === 'IDR' && itemCurr !== 'IDR') itemTax *= rate;
+                else if (formData.billing_currency !== 'IDR' && itemCurr === 'IDR') itemTax /= rate;
             }
             return sum + itemTax;
         }, 0);
@@ -553,32 +580,61 @@ const BridgeInvoiceManagement = () => {
             return;
         }
 
+        // FIX: Warn if non-IDR currency has exchange_rate = 1 (user likely forgot to set it)
+        const selectedCurrencyCheck = formData.billing_currency || 'IDR';
+        if (selectedCurrencyCheck !== 'IDR') {
+            const rateCheck = parseFloat(formData.exchange_rate) || 0;
+            if (rateCheck === 1) {
+                const proceed = window.confirm(
+                    `⚠️ Perhatian: Kurs ${selectedCurrencyCheck} saat ini adalah ${rateCheck}.\n\n` +
+                    `Nilai kurs belum disesuaikan untuk mata uang non-IDR. ` +
+                    `Pastikan kurs sudah benar (contoh: USD → 16000).\n\n` +
+                    `Lanjutkan tetap membuat invoice dengan kurs ${rateCheck}?`
+                );
+                if (!proceed) return;
+            }
+        }
+
+        const normalizeRate = (value) => {
+            const parsed = Number(value);
+            if (!Number.isFinite(parsed) || parsed <= 0) return 1;
+            return parsed; // Kembalikan nilai mentah tanpa dibulatkan agar nilai di atas 0 tetap digunakan apa adanya
+        };
+
         try {
-            // 1. Check if active invoice already exists for this job + currency combination
-            // Check by job_number ensures no duplicates per job, instead of just checking quotation/shipment IDs
+            // 1. Validate duplicates for the same SO / shipment reference.
+            // Memperketat: Hanya boleh 1 invoice per mata uang (currency) untuk SO/Job yang sama.
             if (formData.job_number) {
                 const { data: allInvoices, error: allCheckError } = await supabase
                     .from('bridge_invoices')
-                    .select('id, invoice_number, status, currency')
+                    .select('id, invoice_number, status, currency, exchange_rate, shipment_id, so_number, job_number, created_at')
                     .eq('job_number', formData.job_number)
+                    .not('invoice_number', 'ilike', '%-RB')
                     .neq('status', 'cancelled');
 
                 if (allCheckError) throw allCheckError;
 
+                const selectedShipmentId = formData.shipment_id || selectedShipment?.id || null;
+                const selectedSoNumber = formData.so_number || selectedShipment?.so_number || null;
                 const selectedCurrency = formData.billing_currency || 'IDR';
-                const existingCurrencyInvoices = (allInvoices || []).filter(inv => inv.currency === selectedCurrency);
 
-                if (existingCurrencyInvoices.length > 0) {
-                    const activeInv = existingCurrencyInvoices[0];
-                    alert(`Cannot create invoice: An active ${selectedCurrency} invoice (${activeInv.invoice_number}) already exists for Job ${formData.job_number}.\n\nNote: You can create a maximum of 2 invoices per job (1 IDR + 1 USD). Please cancel the existing invoice first if you need to create a replacement.`);
-                    return;
-                }
+                // Cari invoice yang relevan dengan shipment/SO yang sama.
+                const relevantInvoices = (allInvoices || []).filter(inv => {
+                    if (formData.job_number && inv.job_number === formData.job_number) return true;
+                    if (selectedShipmentId && inv.shipment_id === selectedShipmentId) return true;
+                    if (selectedSoNumber && inv.so_number === selectedSoNumber) return true;
+                    return false;
+                });
 
-                const existingCurrencies = [...new Set((allInvoices || []).map(inv => inv.currency))];
+                // Cari invoice dengan currency yang sama
+                const sameCurrencyInvoices = relevantInvoices.filter(inv => (inv.currency || 'IDR') === selectedCurrency);
 
-                // If there are already 2 currencies and this is a new one, block it
-                if (existingCurrencies.length >= 2 && !existingCurrencies.includes(selectedCurrency)) {
-                    alert(`Cannot create invoice: This job already has invoices in ${existingCurrencies.join(' and ')}.\n\nMaximum 2 currencies (IDR and USD) are allowed per job.`);
+                if (sameCurrencyInvoices.length > 0) {
+                    const duplicateInv = sameCurrencyInvoices[0];
+                    alert(
+                        `Tidak bisa membuat invoice: Invoice dengan mata uang ${selectedCurrency} sudah terdaftar sebelumnya (${duplicateInv.invoice_number || '-'}) untuk SO/Job ini.\n\n` +
+                        `Hanya diperbolehkan maksimal 1 invoice untuk setiap mata uang.`
+                    );
                     return;
                 }
             }
@@ -611,6 +667,7 @@ const BridgeInvoiceManagement = () => {
                 cargo_details: formData.cargo_details || null,
                 invoice_items: formData.invoice_items,
                 currency: formData.billing_currency || 'IDR',
+                exchange_rate: (formData.billing_currency || 'IDR') === 'IDR' ? 1 : (parseFloat(formData.exchange_rate) > 0 ? parseFloat(formData.exchange_rate) : 1),
                 subtotal: subtotal,
                 tax_rate: formData.tax_rate,
                 tax_amount: taxAmount,
@@ -760,6 +817,43 @@ const BridgeInvoiceManagement = () => {
         e.preventDefault();
         
         try {
+            // Validate duplicates for the same SO / shipment reference.
+            if (formData.job_number) {
+                const { data: allInvoices, error: allCheckError } = await supabase
+                    .from('bridge_invoices')
+                    .select('id, invoice_number, status, currency, exchange_rate, shipment_id, so_number, job_number, created_at')
+                    .eq('job_number', formData.job_number)
+                    .not('invoice_number', 'ilike', '%-RB')
+                    .neq('status', 'cancelled');
+
+                if (allCheckError) throw allCheckError;
+
+                const selectedShipmentId = formData.shipment_id || selectedShipment?.id || null;
+                const selectedSoNumber = formData.so_number || selectedShipment?.so_number || null;
+                const selectedCurrency = formData.billing_currency || 'IDR';
+
+                // Cari invoice yang relevan dengan shipment/SO yang sama, mengecualikan invoice yang sedang diedit.
+                const relevantInvoices = (allInvoices || []).filter(inv => {
+                    if (inv.id === editInvoiceId) return false;
+                    if (formData.job_number && inv.job_number === formData.job_number) return true;
+                    if (selectedShipmentId && inv.shipment_id === selectedShipmentId) return true;
+                    if (selectedSoNumber && inv.so_number === selectedSoNumber) return true;
+                    return false;
+                });
+
+                // Cari invoice dengan currency yang sama
+                const sameCurrencyInvoices = relevantInvoices.filter(inv => (inv.currency || 'IDR') === selectedCurrency);
+
+                if (sameCurrencyInvoices.length > 0) {
+                    const duplicateInv = sameCurrencyInvoices[0];
+                    alert(
+                        `Tidak bisa memperbarui invoice: Invoice dengan mata uang ${selectedCurrency} sudah terdaftar sebelumnya (${duplicateInv.invoice_number || '-'}) untuk SO/Job ini.\n\n` +
+                        `Hanya diperbolehkan maksimal 1 invoice untuk setiap mata uang.`
+                    );
+                    return;
+                }
+            }
+
             const { subtotal, taxAmount, total, cogsSubtotal, grossProfit, profitMargin } = calculateTotals();
             
             const currentInvoice = invoices.find(inv => inv.id === editInvoiceId);
@@ -774,6 +868,7 @@ const BridgeInvoiceManagement = () => {
                 invoice_date: formData.invoice_date,
                 due_date: formData.due_date,
                 currency: formData.billing_currency,
+                exchange_rate: formData.billing_currency === 'IDR' ? 1 : (parseFloat(formData.exchange_rate) > 0 ? parseFloat(formData.exchange_rate) : 1),
                 payment_bank_id: formData.payment_bank_id || null,
                 invoice_items: formData.invoice_items,
                 cogs_items: formData.cogs_items || [],
@@ -810,6 +905,52 @@ const BridgeInvoiceManagement = () => {
                 .eq('id', editInvoiceId);
 
             if (error) throw error;
+            
+            // Sync AR transaction if it exists
+            await supabase
+                .from('bridge_ar_transactions')
+                .update({
+                    original_amount: total,
+                    outstanding_amount: total,
+                    due_date: formData.due_date,
+                    currency: formData.billing_currency
+                })
+                .eq('invoice_id', editInvoiceId);
+                
+            // Sync big AR transaction if it exists
+            await supabase
+                .from('big_ar_transactions')
+                .update({
+                    original_amount: total,
+                    outstanding_amount: total,
+                    due_date: formData.due_date
+                })
+                .eq('invoice_id', editInvoiceId);
+
+            // Delete old journal entries so they can be recreated with new amounts
+            // Bug Fix #4: capture delete result so failures are visible in console
+            const { error: delInvJournalErr } = await supabase
+                .from('bridge_journal_entries')
+                .delete()
+                .eq('reference_id', editInvoiceId)
+                .in('reference_type', ['ar', 'blink_invoice']);
+            if (delInvJournalErr) {
+                console.warn('[Invoice Update] ⚠️ Failed to delete old journal entries:', delInvJournalErr.message);
+            } else {
+                console.log('[Invoice Update] ✅ Old journal entries deleted for Invoice:', editInvoiceId);
+            }
+                
+            // Re-create journal entries for the updated invoice
+            const { data: updatedInv } = await supabase
+                .from('bridge_invoices')
+                .select('*')
+                .eq('id', editInvoiceId)
+                .single();
+                
+            if (updatedInv && updatedInv.status === 'unpaid') {
+                const coaList = await getAllCOA();
+                await createInvoiceJournal({ invoice: updatedInv, coaList });
+            }
             
             await fetchInvoices();
             setShowCreateModal(false);
@@ -1384,9 +1525,9 @@ const BridgeInvoiceManagement = () => {
 
         if (!matchesSearch) return false;
 
-        // Default: hide cancelled unless explicitly filtered
+        // Default: hide cancelled and rejected unless explicitly filtered
         if (filter === 'all') {
-            return inv.status !== 'cancelled';
+            return inv.status !== 'cancelled' && inv.status !== 'rejected';
         }
 
         // Status filter
@@ -1394,8 +1535,8 @@ const BridgeInvoiceManagement = () => {
         return inv.status === filter;
     });
 
-    // Calculate summary stats excluding draft, manager_approval and cancelled
-    const activeInvoices = invoices.filter(inv => !['draft', 'manager_approval', 'cancelled'].includes(inv.status));
+    // Calculate summary stats excluding draft, manager_approval, cancelled, and rejected
+    const activeInvoices = invoices.filter(inv => !['draft', 'manager_approval', 'cancelled', 'rejected'].includes(inv.status));
     const totalRevenue = activeInvoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
     const totalOutstanding = activeInvoices.reduce((sum, inv) => sum + (inv.outstanding_amount || 0), 0);
     const overdueCount = activeInvoices.filter(inv => inv.status === 'overdue').length;
@@ -1523,7 +1664,7 @@ const BridgeInvoiceManagement = () => {
                     </Button>
                     {canCreate('bridge_invoices') && (
                         <Button onClick={() => setShowCreateModal(true)} icon={Plus}>
-                            Buat Invoice Baru
+                            Generate Invoice (Beda Kurs)
                         </Button>
                     )}
                 </div>
@@ -1663,6 +1804,8 @@ const BridgeInvoiceManagement = () => {
                 showCreateModal && (
                     <InvoiceCreateModal
                         isEditing={isEditingInvoice}
+                        editInvoiceId={editInvoiceId}
+                        invoices={invoices}
                         quotations={quotations}
                         shipments={shipments}
                         formData={formData}
@@ -1802,28 +1945,41 @@ const BridgeInvoiceManagement = () => {
 };
 
 // Invoice Create Modal Component  
-const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFormData, selectedQuotation, selectedShipment,
+const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotations, shipments, formData, setFormData, selectedQuotation, selectedShipment,
     referenceType, setReferenceType, handleQuotationSelect, handleShipmentSelect, handlePaymentTermsChange,
     addInvoiceItem, removeInvoiceItem, updateInvoiceItem, calculateTotals, handleGlobalTaxRateChange,
     handleCreateInvoice, formatCurrency, onClose, bankAccounts, revenueAccounts }) => {
 
     const { subtotal, taxAmount, total, cogsSubtotal, grossProfit, profitMargin } = calculateTotals();
 
-    // Blend quotations and shipments into single list
-    const blendedReferences = [
-        ...quotations.map(q => ({
-            id: q.id,
-            type: 'quotation',
-            label: `[QUOTATION] ${q.quotationNumber || q.quotation_number} - ${q.customerName || q.customer_name} (${q.origin} → ${q.destination})`,
-            data: q
-        })),
-        ...shipments.map(s => ({
-            id: s.id,
-            type: 'shipment',
-            label: `[SO] ${s.so_number || s.job_number} - ${s.customer} (${s.origin} → ${s.destination})`,
-            data: s
-        }))
-    ];
+    const getUsedCurrenciesForSelectedJob = () => {
+        const targetJobNumber = formData.job_number;
+        const targetShipmentId = formData.shipment_id;
+        const targetSoNumber = formData.so_number;
+        if (!targetJobNumber && !targetShipmentId && !targetSoNumber) return [];
+        const activeInvoicesForJob = invoices.filter(inv => {
+            const matchesJob = targetJobNumber && inv.job_number === targetJobNumber;
+            const matchesShipment = targetShipmentId && inv.shipment_id === targetShipmentId;
+            const matchesSo = targetSoNumber && inv.so_number === targetSoNumber;
+            return (matchesJob || matchesShipment || matchesSo) &&
+                inv.status !== 'cancelled' &&
+                (!isEditing || inv.id !== editInvoiceId) &&
+                !inv.invoice_number.toUpperCase().endsWith('-RB');
+        });
+        return activeInvoicesForJob.map(inv => inv.currency || 'IDR');
+    };
+
+    // Local UI state for COA dropdowns within the modal
+    const [coaSearchMapInv, setCoaSearchMapInv] = useState({});    // { [itemIndex]: searchTerm }
+    const [coaDropdownMapInv, setCoaDropdownMapInv] = useState({}); // { [itemIndex]: boolean open }
+
+    // SO only (quotation option removed)
+    const blendedReferences = shipments.map(s => ({
+        id: s.id,
+        type: 'shipment',
+        label: `[SO] ${s.so_number || s.job_number} - ${s.customer} (${s.origin} → ${s.destination})`,
+        data: s
+    }));
 
     const handleReferenceSelect = (e) => {
         const selectedId = e.target.value;
@@ -1849,7 +2005,7 @@ const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFor
                             {isEditing ? 'Edit Invoice' : 'Create New Invoice'}
                         </h2>
                         <p className="text-silver-dark text-sm mt-1">
-                            {isEditing ? 'Make changes to the invoice details' : 'Draft a new invoice from Quotation or SO'}
+                            {isEditing ? 'Make changes to the invoice details' : 'Draft a new invoice from Sales Order (SO)'}
                         </p>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-dark-surface rounded-full smooth-transition text-silver-dark hover:text-silver-light">
@@ -1862,15 +2018,15 @@ const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFor
                     {!isEditing && (
                         <div className="glass-card p-4 rounded-lg">
                             <label className="block text-[11px] font-semibold text-silver-light mb-1.5">
-                                Referensi (Quotation / SO) <span className="text-red-400">*</span>
+                                Referensi (Sales Order) <span className="text-red-400">*</span>
                             </label>
                             <select
-                                value={formData.quotation_id || formData.shipment_id || ''}
+                                value={formData.shipment_id || formData.quotation_id || ''}
                                 onChange={handleReferenceSelect}
                                 className="w-full px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded text-silver-light text-[11px]"
                                 required
                             >
-                                <option value="">-- Pilih Quotation atau Sales Order --</option>
+                                <option value="">-- Pilih Sales Order --</option>
                                 {blendedReferences.map(ref => (
                                     <option key={`${ref.type}-${ref.id}`} value={ref.id}>
                                         {ref.label}
@@ -1882,7 +2038,7 @@ const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFor
                     )}
 
                     {/* Existing Invoices Indicator */}
-                    {selectedQuotation && (
+                    {(selectedShipment || selectedQuotation) && (
                         <ExistingInvoicesIndicator jobNumber={formData.job_number} />
                     )}
 
@@ -1902,7 +2058,7 @@ const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFor
                             </div>
 
                             <div className="glass-card p-2 rounded-lg">
-                                <h3 className="text-[11px] font-semibold text-accent-orange mb-1.5">Informasi {selectedQuotation ? 'Quotation' : 'SO'}</h3>
+                                <h3 className="text-[11px] font-semibold text-accent-orange mb-1.5">Informasi SO</h3>
                                 <div className="space-y-1 text-[11px]">
                                     <div><span className="text-silver-dark">Route:</span> <span className="text-silver-light">{formData.origin} → {formData.destination}</span></div>
                                     <div><span className="text-silver-dark">Service:</span> <span className="text-silver-light">{formData.service_type?.toUpperCase()}</span></div>
@@ -2109,39 +2265,82 @@ const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFor
                                 value={formData.billing_currency}
                                 onChange={(e) => {
                                     const newCurrency = e.target.value;
+                                    let defaultRate = 1;
+                                    if (newCurrency !== 'IDR') {
+                                        if (selectedQuotation && (selectedQuotation.currency === newCurrency || selectedQuotation.billing_currency === newCurrency)) {
+                                            defaultRate = selectedQuotation.exchange_rate || selectedQuotation.exchangeRate || 1;
+                                        } else if (selectedShipment && (selectedShipment.currency === newCurrency || selectedShipment.billing_currency === newCurrency)) {
+                                            defaultRate = selectedShipment.exchange_rate || selectedShipment.exchangeRate || 1;
+                                        }
+                                    }
                                     setFormData(prev => ({
                                         ...prev,
                                         billing_currency: newCurrency,
-                                        exchange_rate: newCurrency === 'IDR' ? 1 : (prev.exchange_rate || 1)
+                                        exchange_rate: newCurrency === 'IDR' ? 1 : (defaultRate || prev.exchange_rate || 1)
                                     }));
                                 }}
                                 className="w-full px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
                                 required
                             >
-                                <option value="IDR">IDR (Rupiah)</option>
-                                <option value="USD">USD (US Dollar)</option>
-                                <option value="SGD">SGD (Singapore Dollar)</option>
-                                <option value="EUR">EUR (Euro)</option>
-                                <option value="RMB">RMB (Chinese Yuan)</option>
+                                {(() => {
+                                    const usedCurrencies = getUsedCurrenciesForSelectedJob();
+                                    const options = [
+                                        { value: 'IDR', label: 'IDR (Rupiah)' },
+                                        { value: 'USD', label: 'USD (US Dollar)' },
+                                        { value: 'SGD', label: 'SGD (Singapore Dollar)' },
+                                        { value: 'EUR', label: 'EUR (Euro)' },
+                                        { value: 'RMB', label: 'RMB (Chinese Yuan)' }
+                                    ];
+                                    const filteredOptions = options.filter(opt => !usedCurrencies.includes(opt.value));
+                                    // Ensure the current selected currency is visible even if it's in usedCurrencies (e.g., when editing or first selected)
+                                    if (formData.billing_currency && !filteredOptions.some(opt => opt.value === formData.billing_currency)) {
+                                        const originalOpt = options.find(opt => opt.value === formData.billing_currency) || {
+                                            value: formData.billing_currency,
+                                            label: formData.billing_currency
+                                        };
+                                        filteredOptions.push(originalOpt);
+                                    }
+                                    return filteredOptions.map(opt => (
+                                        <option key={opt.value} value={opt.value}>
+                                            {opt.label}
+                                        </option>
+                                    ));
+                                })()}
                             </select>
                         </div>
 
                         <div>
                             <label className="block text-[11px] font-semibold text-silver-light mb-1">
-                                Kurs Rate (USD to IDR)
+                                Kurs Rate ({formData.billing_currency || 'USD'} ke IDR)
+                                {formData.billing_currency !== 'IDR' && (
+                                    <span className="text-red-400 ml-1">*</span>
+                                )}
                             </label>
                             <input
                                 type="number"
                                 value={formData.exchange_rate}
-                                onChange={(e) => setFormData(prev => ({ ...prev, exchange_rate: parseFloat(e.target.value) || 1 }))}
-                                className="w-full px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
+                                onChange={(e) => setFormData(prev => ({ ...prev, exchange_rate: e.target.value }))}
+                                className={`w-full px-2.5 py-1.5 bg-dark-surface border rounded-lg text-silver-light ${
+                                    formData.billing_currency !== 'IDR' && parseFloat(formData.exchange_rate) <= 0
+                                        ? 'border-red-500 ring-1 ring-red-500/40'
+                                        : 'border-dark-border'
+                                }`}
                                 disabled={formData.billing_currency === 'IDR'}
-                                min="1"
-                                step="0.01"
+                                min="0.000001"
+                                step="any"
                                 placeholder="e.g., 16000"
                             />
-                            <p className="text-xs text-silver-dark mt-1">
-                                {formData.billing_currency === 'IDR' ? 'Tidak diperlukan untuk IDR' : 'Masukkan nilai tukar USD ke IDR'}
+                            <p className={`text-xs mt-1 ${
+                                formData.billing_currency !== 'IDR' && parseFloat(formData.exchange_rate) <= 0
+                                    ? 'text-red-400'
+                                    : 'text-silver-dark'
+                            }`}>
+                                {formData.billing_currency === 'IDR'
+                                    ? 'Tidak diperlukan untuk IDR'
+                                    : parseFloat(formData.exchange_rate) <= 0
+                                        ? `⚠️ Kurs rate harus lebih besar dari 0`
+                                        : `1 ${formData.billing_currency} = Rp ${Number(formData.exchange_rate || 1).toLocaleString('id-ID')}`
+                                }
                             </p>
                         </div>
                     </div>
@@ -2205,12 +2404,12 @@ const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFor
                             </button>
                         </div>
 
-                        <div className="overflow-x-auto">
+                        <div className="overflow-visible pb-40">
                             <table className="w-full">
                                 <thead className="bg-accent-orange">
                                     <tr>
                                         <th className="px-2 py-2 text-center text-xs text-white w-10 font-normal">No</th>
-                                        <th className="px-2 py-2 text-left text-xs text-white min-w-[150px] font-normal">Item</th>
+                                        <th className="px-2 py-2 text-left text-xs text-white min-w-[200px] font-normal">Item (COA)</th>
                                         <th className="px-2 py-2 text-left text-xs text-white min-w-[200px] font-normal">Description</th>
                                         <th className="px-2 py-2 text-center text-xs text-white w-24 font-normal">Qty</th>
                                         <th className="px-2 py-2 text-center text-xs text-white w-24 font-normal">Unit</th>
@@ -2227,14 +2426,64 @@ const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFor
                                         <tr key={index} className="hover:bg-dark-surface/50 smooth-transition">
                                             <td className="px-2 py-2 text-center text-silver-light text-xs">{index + 1}</td>
                                             <td className="px-3 py-2">
-                                                <input
-                                                    type="text"
-                                                    value={item.item_name}
-                                                    onChange={(e) => updateInvoiceItem(index, 'item_name', e.target.value)}
-                                                    className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm"
-                                                    placeholder="Nama Item (e.g. THL, Freight)"
-                                                    required
-                                                />
+                                                {/* COA Revenue Dropdown Picker */}
+                                                <div className="relative">
+                                                    <div
+                                                        className="w-full px-2 py-1.5 bg-white border border-gray-300 rounded cursor-pointer flex justify-between items-center text-sm shadow-sm"
+                                                        onClick={() => setCoaDropdownMapInv(prev => ({ ...prev, [index]: !prev[index] }))}
+                                                    >
+                                                        <span className={item.item_name ? 'text-black font-semibold truncate text-xs' : 'text-gray-500 text-xs'}>
+                                                            {item.item_name || 'Pilih COA...'}
+                                                        </span>
+                                                        <span className="text-black text-xs ml-1">▼</span>
+                                                    </div>
+                                                    {coaDropdownMapInv[index] && (
+                                                        <div className="absolute z-50 top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-2xl max-h-52 flex flex-col w-full min-w-[280px]">
+                                                            <div className="p-2 border-b border-gray-200">
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="Cari kode / nama akun revenue..."
+                                                                    value={coaSearchMapInv[index] || ''}
+                                                                    onChange={e => setCoaSearchMapInv(prev => ({ ...prev, [index]: e.target.value }))}
+                                                                    className="w-full px-2 py-1.5 bg-gray-50 border border-gray-300 rounded text-black text-xs focus:outline-none focus:border-blue-500"
+                                                                    autoFocus
+                                                                />
+                                                            </div>
+                                                            <div className="overflow-y-auto flex-1">
+                                                                {(() => {
+                                                                    const q = (coaSearchMapInv[index] || '').toLowerCase();
+                                                                    const filtered = q
+                                                                        ? revenueAccounts.filter(a =>
+                                                                            a.name?.toLowerCase().includes(q) ||
+                                                                            a.code?.toLowerCase().includes(q))
+                                                                        : revenueAccounts;
+                                                                    return filtered.slice(0, 50).length === 0
+                                                                        ? <div className="px-3 py-2 text-black text-xs">Tidak ditemukan</div>
+                                                                        : filtered.slice(0, 50).map(acc => (
+                                                                            <button
+                                                                                type="button"
+                                                                                key={acc.id}
+                                                                                onClick={() => {
+                                                                                    updateInvoiceItem(index, 'item_name', acc.name);
+                                                                                    updateInvoiceItem(index, 'coa_id', acc.id);
+                                                                                    updateInvoiceItem(index, 'coa_code', acc.code);
+                                                                                    setCoaDropdownMapInv(prev => ({ ...prev, [index]: false }));
+                                                                                    setCoaSearchMapInv(prev => ({ ...prev, [index]: '' }));
+                                                                                }}
+                                                                                className={`w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors text-xs border-b border-gray-100 last:border-0 ${item.coa_id === acc.id ? 'bg-blue-50 text-blue-700 font-bold' : 'text-black font-medium'}`}
+                                                                            >
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <span className="font-mono text-gray-500 text-[10px] w-20 shrink-0">{acc.code}</span>
+                                                                                    <span className="flex-1 truncate">{acc.name}</span>
+                                                                                    <span className="text-[9px] px-1.5 py-0.5 rounded font-bold shrink-0 bg-green-100 text-green-700">REV</span>
+                                                                                </div>
+                                                                            </button>
+                                                                        ));
+                                                                })()}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className="px-3 py-2">
                                                 <input
@@ -3667,9 +3916,10 @@ const ExistingInvoicesIndicator = ({ jobNumber }) => {
             try {
                 const { data, error } = await supabase
                     .from('bridge_invoices')
-                    .select('invoice_number, currency, status, total_amount, created_at')
+                    .select('invoice_number, currency, status, total_amount, exchange_rate, created_at')
                     .eq('job_number', jobNumber)
                     .neq('status', 'cancelled')
+                    .not('invoice_number', 'ilike', '%-RB')
                     .order('created_at', { ascending: false });
 
                 if (error) throw error;
@@ -3702,7 +3952,7 @@ const ExistingInvoicesIndicator = ({ jobNumber }) => {
                         Existing Invoices for Job {jobNumber}
                     </h4>
                     <p className="text-[10px] text-silver-dark mb-2">
-                        Maximum 2 invoices allowed: 1 IDR + 1 USD
+                        Beda kurs aktif: invoice baru per mata uang harus menggunakan kurs yang berbeda
                     </p>
                 </div>
             </div>
@@ -3722,6 +3972,7 @@ const ExistingInvoicesIndicator = ({ jobNumber }) => {
                         <div className="text-[9px] text-silver-dark space-y-0.5">
                             <div className="font-mono text-green-400">{idrInvoice.invoice_number}</div>
                             <div>Rp {idrInvoice.total_amount?.toLocaleString('id-ID')}</div>
+                            <div>Kurs: {Number(idrInvoice.exchange_rate || 1).toLocaleString('id-ID')}</div>
                             <div className="text-[8px] opacity-70">{idrInvoice.status}</div>
                         </div>
                     ) : (
@@ -3743,6 +3994,7 @@ const ExistingInvoicesIndicator = ({ jobNumber }) => {
                         <div className="text-[9px] text-silver-dark space-y-0.5">
                             <div className="font-mono text-green-400">{usdInvoice.invoice_number}</div>
                             <div>${usdInvoice.total_amount?.toLocaleString('id-ID')}</div>
+                            <div>Kurs: {Number(usdInvoice.exchange_rate || 1).toLocaleString('id-ID')}</div>
                             <div className="text-[8px] opacity-70">{usdInvoice.status}</div>
                         </div>
                     ) : (

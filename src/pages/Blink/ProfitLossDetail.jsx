@@ -81,27 +81,41 @@ const ProfitLossDetail = () => {
             const combined = [...(r1.data || []), ...(r2.data || [])];
             const entries = [...new Map(combined.map(r => [r.id, r])).values()];
 
-            const coaMap = {};
-            const accCodeMap = {};
+            const idToCode = {};
+            const coaMapByCode = {};
             const codeToMeta = {};
             (coaData || []).forEach(coa => {
-                coaMap[coa.id] = { ...coa, amount: 0, currentMonthAmount: 0, prevMonthAmount: 0, ytdAmount: 0 };
                 if (coa.code) {
-                    accCodeMap[coa.code] = coa.id;
-                    codeToMeta[coa.code] = coa;
+                    const codeStr = String(coa.code).trim();
+                    idToCode[coa.id] = codeStr;
+                    codeToMeta[codeStr] = coa;
+                    if (!coaMapByCode[codeStr]) {
+                        coaMapByCode[codeStr] = { ...coa, code: codeStr, amount: 0, currentMonthAmount: 0, prevMonthAmount: 0, ytdAmount: 0 };
+                    }
                 }
             });
 
             const toIDR = (v, cur, rate) => {
                 if (!v) return 0;
-                return cur && cur !== 'IDR' && rate > 1 ? v * rate : v;
+                const numRate = Number(rate);
+                return cur && cur !== 'IDR' && numRate > 1 ? v * numRate : v;
             };
 
             entries.forEach(e => {
-                const targetId = e.coa_id || accCodeMap[e.account_code];
-                if (!targetId) return;
-                const acc = coaMap[targetId];
+                let code = null;
+                if (e.coa_id && idToCode[e.coa_id]) {
+                    code = idToCode[e.coa_id];
+                } else if (e.account_code) {
+                    const accCodeStr = String(e.account_code).trim();
+                    if (coaMapByCode[accCodeStr]) {
+                        code = accCodeStr;
+                    }
+                }
+                
+                if (!code) return;
+                const acc = coaMapByCode[code];
                 if (!acc) return;
+
                 const debit = toIDR(e.debit, e.currency, e.exchange_rate);
                 const credit = toIDR(e.credit, e.currency, e.exchange_rate);
                 let val = 0;
@@ -113,7 +127,7 @@ const ProfitLossDetail = () => {
                 if (mKey.startsWith(String(targetYear)) && mKey <= currentMonthCol) acc.ytdAmount += val;
             });
 
-                        const all = Object.values(coaMap);
+            const all = Object.values(coaMapByCode);
             const valid = a => a.currentMonthAmount !== 0 || a.prevMonthAmount !== 0 || a.ytdAmount !== 0;
             const revenue = all.filter(a => a.type === 'REVENUE' && valid(a)).sort((a, b) => a.code.localeCompare(b.code));
             const cogs = all.filter(a => ['COGS', 'COST', 'DIRECT_COST'].includes(a.type) && valid(a)).sort((a, b) => a.code.localeCompare(b.code));

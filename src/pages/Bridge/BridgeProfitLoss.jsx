@@ -8,25 +8,20 @@ import {
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 
-const ensureArray = (value) => Array.isArray(value) ? value : [];
-
 const BridgeProfitLoss = () => {
     const navigate = useNavigate();
     const { companySettings } = useData();
     const currentYear = new Date().getFullYear();
-    const [dateRange, setDateRange] = useState({
-        startDate: `${currentYear}-01-01`,
-        endDate: `${currentYear}-12-31`
-    });
+    const [selectedMonth, setSelectedMonth] = useState(`${currentYear}-${String(new Date().getMonth() + 1).padStart(2, '0')}`);
     const [loading, setLoading] = useState(true);
     const [taxRate, setTaxRate] = useState(22);
-    const [reportMonths, setReportMonths] = useState([]);
+    const reportMonths = ['current', 'previous', 'ytd'];
     const [reportData, setReportData] = useState({
-        revenue: [],
-        cogs: [],
-        expenses: [],
-        other_income: [],
-        other_expense: [],
+        revenue: { groups: [], total: 0 },
+        cogs: { groups: [], total: 0 },
+        expenses: { groups: [], total: 0 },
+        other_income: { groups: [], total: 0 },
+        other_expense: { groups: [], total: 0 },
     });
     const [totals, setTotals] = useState({
         totalRevenue: 0, totalCOGS: 0, grossProfit: 0,
@@ -40,7 +35,7 @@ const BridgeProfitLoss = () => {
         revenue: true, cogs: true, expenses: true, other_income: true, other_expense: true
     });
 
-    useEffect(() => { fetchReportData(); }, [dateRange]);
+    useEffect(() => { fetchReportData(); }, [selectedMonth]);
 
     useEffect(() => {
         if (totals.netIncomeBeforeTax !== undefined) {
@@ -55,9 +50,17 @@ const BridgeProfitLoss = () => {
     const toggleSection = (s) =>
         setExpandedSections(prev => ({ ...prev, [s]: !prev[s] }));
 
+    const getMonthName = (offset) => {
+        const [y, mm] = selectedMonth.split('-');
+        const date = new Date(parseInt(y, 10), parseInt(mm, 10) - 1 + offset, 1);
+        return date.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+    };
+
     const mLabel = (m) => {
-        const [y, mm] = m.split('-');
-        return new Date(parseInt(y), parseInt(mm) - 1, 1).toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+        if (m === 'current') return getMonthName(0);
+        if (m === 'previous') return getMonthName(-1);
+        if (m === 'ytd') return 'YTD';
+        return m;
     };
 
     const fetchReportData = async () => {
@@ -67,17 +70,21 @@ const BridgeProfitLoss = () => {
                 .from('bridge_coa').select('*').order('code', { ascending: true });
             if (coaError) throw coaError;
 
-            // Build month list (Jan to Dec of the selected year)
-            const d1 = new Date(dateRange.startDate + 'T00:00:00');
-            const targetYear = d1.getFullYear();
-            const monthsList = [];
-            for (let i = 1; i <= 12; i++) {
-                monthsList.push(`${targetYear}-${String(i).padStart(2, '0')}`);
+            const [year, month] = selectedMonth.split('-');
+            const targetYear = parseInt(year, 10);
+            const targetMonth = parseInt(month, 10);
+            let prevYear = targetYear;
+            let prevMonth = targetMonth - 1;
+            if (prevMonth === 0) {
+                prevMonth = 12;
+                prevYear -= 1;
             }
-
+            const prevMonthKey = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+            // BUG FIX #2: Query dari awal tahun (1 Jan) agar YTD akurat
             const queryStart = `${targetYear}-01-01`;
-            const queryEnd = `${targetYear}-12-31`;
+            const queryEnd = `${targetYear}-${String(targetMonth).padStart(2, '0')}-${String(new Date(targetYear, targetMonth, 0).getDate()).padStart(2, '0')}`;
 
+            // BUG FIX #2: Ambil juga entri yang menggunakan account_code (coa_id = null)
             const [r1, r2] = await Promise.all([
                 supabase.from('bridge_journal_entries')
                     .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate')
@@ -90,113 +97,164 @@ const BridgeProfitLoss = () => {
             ]);
             if (r1.error) throw r1.error;
             if (r2.error) throw r2.error;
-
             const combined = [...(r1.data || []), ...(r2.data || [])];
             const entries = [...new Map(combined.map(r => [r.id, r])).values()];
 
-            const coaMap = {};
-            const accCodeMap = {};
+            const idToCode = {};
+            const coaMapByCode = {};
             const codeToMeta = {};
             (coaData || []).forEach(coa => {
-                const byMonth = {};
-                monthsList.forEach(m => byMonth[m] = 0);
-                coaMap[coa.id] = { ...coa, amount: 0, byMonth };
                 if (coa.code) {
-                    accCodeMap[coa.code] = coa.id;
-                    codeToMeta[coa.code] = coa;
+                    const codeStr = String(coa.code).trim();
+                    idToCode[coa.id] = codeStr;
+                    codeToMeta[codeStr] = coa;
+                    if (!coaMapByCode[codeStr]) {
+                        const byMonth = { current: 0, previous: 0, ytd: 0 };
+                        coaMapByCode[codeStr] = { ...coa, code: codeStr, amount: 0, byMonth };
+                    }
                 }
             });
 
+            // BUG FIX #1: Perbaiki logika konversi kurs
+            // Sebelumnya: numRate > 1 — gagal jika rate = null/0/1
+            // Sekarang: cukup pastikan currency bukan IDR dan rate valid (> 0)
             const toIDR = (v, cur, rate) => {
                 if (!v) return 0;
-                return cur && cur !== 'IDR' && rate > 1 ? v * rate : v;
+                const numRate = Number(rate);
+                if (cur && cur !== 'IDR' && numRate > 0) return v * numRate;
+                return v;
             };
 
+            const getCodePrefix = (code) => code ? String(code).trim().charAt(0) : null;
+
             entries.forEach(e => {
-                const targetId = e.coa_id || accCodeMap[e.account_code];
-                if (!targetId) return;
-                const acc = coaMap[targetId];
+                // Resolusi akun: prioritaskan coa_id, fallback ke account_code
+                let code = null;
+                if (e.coa_id && idToCode[e.coa_id]) {
+                    code = idToCode[e.coa_id];
+                } else if (e.account_code) {
+                    const accCodeStr = String(e.account_code).trim();
+                    if (coaMapByCode[accCodeStr]) code = accCodeStr;
+                }
+                if (!code) return;
+                const acc = coaMapByCode[code];
                 if (!acc) return;
+
                 const debit = toIDR(e.debit, e.currency, e.exchange_rate);
                 const credit = toIDR(e.credit, e.currency, e.exchange_rate);
+                const prefix = getCodePrefix(acc.code);
                 let val = 0;
-                if (['REVENUE', 'OTHER_INCOME'].includes(acc.type)) val = (credit - debit);
-                else if (['EXPENSE', 'COGS', 'COST', 'DIRECT_COST', 'OTHER_EXPENSE'].includes(acc.type)) val = (debit - credit);
+                if (prefix === '4' || prefix === '7' || prefix === '8') {
+                    val = (credit - debit);
+                } else {
+                    val = (debit - credit);
+                }
                 acc.amount += val;
                 const mKey = e.entry_date?.substring(0, 7);
-                if (mKey && acc.byMonth && acc.byMonth[mKey] !== undefined) acc.byMonth[mKey] += val;
+                if (!mKey) return;
+                if (mKey === selectedMonth) acc.byMonth.current += val;
+                if (mKey === prevMonthKey) acc.byMonth.previous += val;
+                if (mKey.startsWith(`${targetYear}-`) && mKey <= selectedMonth) acc.byMonth.ytd += val;
             });
 
-            // ── Account Classification by Code Prefix ─────────────────────────────
-            // Rule: code prefix takes priority over `type` field
-            //   4-xx → REVENUE
-            //   5-xx → COGS / Direct Cost
-            //   6-xx → Administrasi & General Expenses (even if type=OTHER_EXPENSE)
-            //   7-xx & 8-xx → Other Income / Other Expense
-            const getCodePrefix = (code) => code ? code.charAt(0) : null;
+            const all = Object.values(coaMapByCode);
 
-            const all = Object.values(coaMap);
+            const groupByParent = (accounts) => {
+                const groups = {};
+                const orphans = [];
+                accounts.forEach(acc => {
+                    const parent = acc.parent_code;
+                    // If an account has itself as a parent, treat it as an orphan to avoid duplicate rendering
+                    if (parent && String(parent).trim() !== String(acc.code).trim()) {
+                        if (!groups[parent]) {
+                            groups[parent] = { parentCode: parent, items: [] };
+                        }
+                        groups[parent].items.push(acc);
+                    } else {
+                        orphans.push(acc);
+                    }
+                });
+                return { groups, orphans };
+            };
+
+            const buildGroupedData = (accounts) => {
+                const { groups, orphans } = groupByParent(accounts);
+                const result = [];
+                orphans.forEach(acc => result.push({ item: acc, isParent: false }));
+                Object.values(groups).forEach(g => {
+                    const totalAmount = g.items.reduce((s, i) => s + (i.byMonth?.ytd || 0), 0);
+                    const byMonthTotal = {};
+                    reportMonths.forEach(m => {
+                        byMonthTotal[m] = g.items.reduce((s, i) => s + (i.byMonth?.[m] || 0), 0);
+                    });
+                    result.push({
+                        parent: {
+                            code: g.parentCode,
+                            name: g.items[0]?.name?.split(' - ')[0] || g.parentCode,
+                            amount: totalAmount,
+                            byMonth: byMonthTotal
+                        },
+                        items: g.items,
+                        isParent: true
+                    });
+                });
+                return result;
+            };
 
             const revenue = all.filter(a => {
                 const prefix = getCodePrefix(a.code);
-                if (prefix === '4') return a.amount !== 0;
-                if (['5','6','7','8'].includes(prefix)) return false;
-                return a.type === 'REVENUE' && a.amount !== 0;
+                return prefix === '4' && a.amount !== 0;
             }).sort((a, b) => a.code.localeCompare(b.code));
 
             const cogs = all.filter(a => {
                 const prefix = getCodePrefix(a.code);
-                if (prefix === '5') return a.amount !== 0;
-                if (['4','6','7','8'].includes(prefix)) return false;
-                return ['COGS', 'COST', 'DIRECT_COST'].includes(a.type) && a.amount !== 0;
+                return prefix === '5' && a.amount !== 0;
             }).sort((a, b) => a.code.localeCompare(b.code));
 
             // Code 6 → Administrasi & General Expenses
             const expenses = all.filter(a => {
                 const prefix = getCodePrefix(a.code);
-                if (prefix === '6') return a.amount !== 0;
-                if (['4','5','7','8'].includes(prefix)) return false;
-                return a.type === 'EXPENSE' && a.amount !== 0;
+                return prefix === '6' && a.amount !== 0;
             }).sort((a, b) => a.code.localeCompare(b.code));
 
-            // Code 7 & 8 → Other Income (REVENUE / OTHER_INCOME type)
+            // Code 7 & 8 → Other Income (ALL 7xx and 8xx accounts go here)
             const other_income = all.filter(a => {
                 const prefix = getCodePrefix(a.code);
-                if (prefix === '7' || prefix === '8') {
-                    return (a.type === 'REVENUE' || a.type === 'OTHER_INCOME') && a.amount !== 0;
-                }
-                return a.type === 'OTHER_INCOME' && a.amount !== 0;
+                return (prefix === '7' || prefix === '8') && a.amount !== 0;
             }).sort((a, b) => a.code.localeCompare(b.code));
 
-            // Code 7 & 8 → Other Expense (OTHER_EXPENSE type)
+            // Other Expense: Only non-7/8 accounts with OTHER_EXPENSE type
             const other_expense = all.filter(a => {
                 const prefix = getCodePrefix(a.code);
-                if (prefix === '7' || prefix === '8') {
-                    return a.type === 'OTHER_EXPENSE' && a.amount !== 0;
-                }
+                if (prefix === '7' || prefix === '8') return false;
                 if (prefix === '6') return false;
                 return a.type === 'OTHER_EXPENSE' && a.amount !== 0;
             }).sort((a, b) => a.code.localeCompare(b.code));
 
-            const totalRevenue = revenue.reduce((s, a) => s + a.amount, 0);
-            const totalCOGS = cogs.reduce((s, a) => s + a.amount, 0);
+            const groupedRevenue = buildGroupedData(revenue);
+            const groupedCogs = buildGroupedData(cogs);
+            const groupedExpenses = buildGroupedData(expenses);
+            const groupedOtherIncome = buildGroupedData(other_income);
+            const groupedOtherExpense = buildGroupedData(other_expense);
+
+            const totalRevenue = revenue.reduce((s, a) => s + (a.byMonth?.ytd || 0), 0);
+            const totalCOGS = cogs.reduce((s, a) => s + (a.byMonth?.ytd || 0), 0);
             const grossProfit = totalRevenue - totalCOGS;
-            const totalExpenses = expenses.reduce((s, a) => s + a.amount, 0);
+            const totalExpenses = expenses.reduce((s, a) => s + (a.byMonth?.ytd || 0), 0);
             const operatingProfit = grossProfit - totalExpenses;
-            const totalOtherIncome = other_income.reduce((s, a) => s + a.amount, 0);
-            const totalOtherExpense = other_expense.reduce((s, a) => s + a.amount, 0);
+            const totalOtherIncome = other_income.reduce((s, a) => s + (a.byMonth?.ytd || 0), 0);
+            const totalOtherExpense = other_expense.reduce((s, a) => s + (a.byMonth?.ytd || 0), 0);
             const otherNet = totalOtherIncome - totalOtherExpense;
             const netIncomeBeforeTax = operatingProfit + otherNet;
             const taxAmount = netIncomeBeforeTax > 0 ? netIncomeBeforeTax * (taxRate / 100) : 0;
             const netIncomeAfterTax = netIncomeBeforeTax - taxAmount;
 
-            setReportMonths(monthsList);
             setReportData({
-                revenue,
-                cogs,
-                expenses,
-                other_income,
-                other_expense,
+                revenue: groupedRevenue,
+                cogs: groupedCogs,
+                expenses: groupedExpenses,
+                other_income: groupedOtherIncome,
+                other_expense: groupedOtherExpense,
             });
             setTotals({ totalRevenue, totalCOGS, grossProfit, totalExpenses, operatingProfit, totalOtherIncome, totalOtherExpense, otherNet, netIncomeBeforeTax, taxAmount, netIncomeAfterTax });
         } catch (error) {
@@ -213,8 +271,11 @@ const BridgeProfitLoss = () => {
         return neg ? `(${s})` : s;
     };
 
-    const periodYear = new Date(dateRange.startDate).getFullYear();
-    const period = `Periode: 1 Januari ${periodYear} - 31 Desember ${periodYear}`;
+    const [selY, selM] = selectedMonth.split('-');
+    const firstDate = new Date(parseInt(selY, 10), parseInt(selM, 10) - 1, 1);
+    const lastDate = new Date(parseInt(selY, 10), parseInt(selM, 10), 0);
+    const formatDate = (d) => d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    const period = `Periode: ${formatDate(firstDate)} - ${formatDate(lastDate)}`;
 
     // ── Export Excel ─────────────────────────────────────────────────
     const handleExportExcel = () => {
@@ -267,42 +328,45 @@ const BridgeProfitLoss = () => {
                 { v: total, t: 'n', s: { numFmt: '#,##0', font: { bold: true, color: { rgb: color } }, fill: { fgColor: { rgb: 'F1F5F9' } } } }
             ]);
         };
-        const mSum = (accounts, m) => ensureArray(accounts).reduce((sum, account) => sum + (account.byMonth?.[m] || 0), 0);
+        const mSum = (groups, m) => groups.reduce((s, g) => s + g.items.reduce((ss, a) => ss + (a.byMonth?.[m] || 0), 0), 0);
 
         const renderGroupsToExcel = (sectionData) => {
-            ensureArray(sectionData).forEach(item => addItem(item.name, item.byMonth, item.amount));
+            sectionData.groups.forEach(group => {
+                if (group.parent) addParent(group.parent.name, group.parent.code, group.parent.byMonth, group.items.reduce((s, a) => s + a.amount, 0));
+                group.items.forEach(item => addItem(item.name, item.byMonth, item.amount));
+            });
         };
 
         addSection('INCOME');
         renderGroupsToExcel(reportData.revenue);
-            addTotal('TOTAL SALES INCOME', m => mSum(reportData.revenue, m), totals.totalRevenue, '16A34A');
+        addTotal('TOTAL SALES INCOME', m => mSum(reportData.revenue.groups, m), totals.totalRevenue, '16A34A');
         rows.push([{ v: '' }]);
 
         addSection('COST OF GOOD SOLD');
         renderGroupsToExcel(reportData.cogs);
-            addTotal('TOTAL COST OF GOOD SOLD', m => mSum(reportData.cogs, m), totals.totalCOGS);
+        addTotal('TOTAL COST OF GOOD SOLD', m => mSum(reportData.cogs.groups, m), totals.totalCOGS);
         rows.push([{ v: '' }]);
 
-            addTotal('TOTAL OPERATION INCOME (GROSS PROFIT)', m => mSum(reportData.revenue, m) - mSum(reportData.cogs, m), totals.grossProfit, '1D4ED8');
+        addTotal('TOTAL OPERATION INCOME (GROSS PROFIT)', m => mSum(reportData.revenue.groups, m) - mSum(reportData.cogs.groups, m), totals.grossProfit, '1D4ED8');
         rows.push([{ v: '' }]);
 
         addSection('ADMINISTRASI & GENERAL EXPENSES');
         renderGroupsToExcel(reportData.expenses);
-            addTotal('TOTAL ADMINISTRASI & GENERAL EXPENSES', m => mSum(reportData.expenses, m), totals.totalExpenses, 'DC2626');
+        addTotal('TOTAL ADMINISTRASI & GENERAL EXPENSES', m => mSum(reportData.expenses.groups, m), totals.totalExpenses, 'DC2626');
         rows.push([{ v: '' }]);
 
         addSection('OTHER INCOME / EXPENSES');
-        if (ensureArray(reportData.other_income).length > 0) {
+        if (reportData.other_income && reportData.other_income.length > 0) {
             renderGroupsToExcel(reportData.other_income);
-            addTotal('TOTAL OTHER INCOME', m => mSum(reportData.other_income, m), totals.totalOtherIncome, '16A34A');
+            addTotal('TOTAL OTHER INCOME', m => mSum(reportData.other_income.groups, m), totals.totalOtherIncome, '16A34A');
         }
-        if (ensureArray(reportData.other_expense).length > 0) {
+        if (reportData.other_expense && reportData.other_expense.length > 0) {
             renderGroupsToExcel(reportData.other_expense);
-            addTotal('TOTAL OTHER EXPENSES', m => -mSum(reportData.other_expense, m), -totals.totalOtherExpense, 'DC2626');
+            addTotal('TOTAL OTHER EXPENSES', m => -mSum(reportData.other_expense.groups, m), -totals.totalOtherExpense, 'DC2626');
         }
         rows.push([{ v: '' }]);
 
-        addTotal('TOTAL OTHER INCOME / EXPENSES', m => mSum(reportData.other_income, m) - mSum(reportData.other_expense, m), totals.otherNet);
+        addTotal('TOTAL OTHER INCOME / EXPENSES', m => mSum(reportData.other_income.groups, m) - mSum(reportData.other_expense.groups, m), totals.otherNet);
         addTotal('TOTAL NET INCOME BEFORE TAX', null, totals.netIncomeBeforeTax, '1D4ED8');
         rows.push([
             { v: `CORPORATE INCOME TAX (${taxRate}%)`, s: { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: 'DC2626' } } } },
@@ -322,7 +386,8 @@ const BridgeProfitLoss = () => {
         ws['!merges'] = kopMergeIndices.map(r => ({ s: { r, c: 0 }, e: { r, c: nCols - 1 } }));
 
         XLSX.utils.book_append_sheet(wb, ws, 'Profit & Loss');
-        XLSX.writeFile(wb, `ProfitLoss_${dateRange.startDate}_${dateRange.endDate}.xlsx`);
+        // BUG FIX #3: 'dateRange' tidak terdefinisi, gunakan selectedMonth sebagai nama file
+        XLSX.writeFile(wb, `ProfitLoss_${selectedMonth}.xlsx`);
     };
 
     // ── Export PDF ───────────────────────────────────────────────────
@@ -334,7 +399,7 @@ const BridgeProfitLoss = () => {
             const s = Math.abs(v).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
             return neg ? `<span style="color:#dc2626">(${s})</span>` : s;
         };
-        const mSum = (accounts, m) => ensureArray(accounts).reduce((sum, account) => sum + (account.byMonth?.[m] || 0), 0);
+        const mSum = (groups, m) => groups.reduce((s, g) => s + g.items.reduce((ss, a) => ss + (a.byMonth?.[m] || 0), 0), 0);
 
         const thStyle = 'padding:4px 8px;text-align:right;font-size:10px;background:#0070BB;color:#fff;border:1px solid #0060AA;white-space:nowrap';
         const thDescStyle = 'padding:4px 8px;text-align:left;font-size:10px;background:#0070BB;color:#fff;border:1px solid #0060AA;min-width:200px';
@@ -343,6 +408,13 @@ const BridgeProfitLoss = () => {
 
         const sectionRow = (label) =>
             `<tr><td colspan="${reportMonths.length + 2}" style="padding:5px 8px;font-size:10px;font-weight:800;text-transform:uppercase;background:#E2E8F0;color:#334155;letter-spacing:.06em">${label}</td></tr>`;
+
+        const parentRow = (name, code, byMonth, total) =>
+            `<tr style="background:#FEF9C3">
+                <td style="padding:3px 8px 3px 24px;font-size:10px;font-weight:700;color:#713F12">${name} <span style="font-weight:400;color:#92400E">(${code})</span></td>
+                ${reportMonths.map(m => `<td style="padding:3px 8px;text-align:right;font-size:10px;font-family:monospace;color:#713F12">${fmtAmt(byMonth?.[m] || 0)}</td>`).join('')}
+                <td style="padding:3px 8px;text-align:right;font-size:10px;font-weight:700;font-family:monospace;color:#713F12">${fmtAmt(total)}</td>
+            </tr>`;
 
         const itemRow = (name, byMonth, total) =>
             `<tr>
@@ -359,26 +431,29 @@ const BridgeProfitLoss = () => {
             </tr>`;
 
         const renderGroupsHTML = (sectionData) =>
-            ensureArray(sectionData).map(item => itemRow(item.name, item.byMonth, item.amount)).join('');
+            sectionData.groups.map(group => [
+                group.parent ? parentRow(group.parent.name, group.parent.code, group.parent.byMonth, group.items.reduce((s, a) => s + a.amount, 0)) : '',
+                ...group.items.map(item => itemRow(item.name, item.byMonth, item.amount))
+            ].join('')).join('');
 
         const tableHTML = `
         <table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif">
             ${headerRow}
             ${sectionRow('INCOME')}
             ${renderGroupsHTML(reportData.revenue)}
-            ${totalRow('TOTAL SALES INCOME', m => mSum(reportData.revenue, m), totals.totalRevenue, '#DCFCE7', '#15803D')}
+            ${totalRow('TOTAL SALES INCOME', m => mSum(reportData.revenue.groups, m), totals.totalRevenue, '#DCFCE7', '#15803D')}
             ${sectionRow('COST OF GOOD SOLD')}
             ${renderGroupsHTML(reportData.cogs)}
-            ${totalRow('TOTAL COST OF GOOD SOLD', m => mSum(reportData.cogs, m), totals.totalCOGS)}
-            ${totalRow('TOTAL OPERATION INCOME (GROSS PROFIT)', m => mSum(reportData.revenue, m) - mSum(reportData.cogs, m), totals.grossProfit, '#DBEAFE', '#1D4ED8')}
+            ${totalRow('TOTAL COST OF GOOD SOLD', m => mSum(reportData.cogs.groups, m), totals.totalCOGS)}
+            ${totalRow('TOTAL OPERATION INCOME (GROSS PROFIT)', m => mSum(reportData.revenue.groups, m) - mSum(reportData.cogs.groups, m), totals.grossProfit, '#DBEAFE', '#1D4ED8')}
             ${sectionRow('ADMINISTRASI & GENERAL EXPENSES')}
             ${renderGroupsHTML(reportData.expenses)}
-            ${totalRow('TOTAL ADMINISTRASI & GENERAL EXPENSES', m => mSum(reportData.expenses, m), totals.totalExpenses, '#FEE2E2', '#DC2626')}
+            ${totalRow('TOTAL ADMINISTRASI & GENERAL EXPENSES', m => mSum(reportData.expenses.groups, m), totals.totalExpenses, '#FEE2E2', '#DC2626')}
             ${sectionRow('OTHER INCOME / EXPENSES')}
-            ${ensureArray(reportData.other_income).length > 0 ? renderGroupsHTML(reportData.other_income) + totalRow('TOTAL OTHER INCOME', m => mSum(reportData.other_income, m), totals.totalOtherIncome, '#DCFCE7', '#15803D', true) : ''}
-            ${ensureArray(reportData.other_expense).length > 0 ? renderGroupsHTML(reportData.other_expense) + totalRow('TOTAL OTHER EXPENSES', m => -mSum(reportData.other_expense, m), -totals.totalOtherExpense, '#FEE2E2', '#DC2626', true) : ''}
+            ${reportData.other_income && reportData.other_income.length > 0 ? renderGroupsHTML(reportData.other_income) + totalRow('TOTAL OTHER INCOME', m => mSum(reportData.other_income.groups, m), totals.totalOtherIncome, '#DCFCE7', '#15803D', true) : ''}
+            ${reportData.other_expense && reportData.other_expense.length > 0 ? renderGroupsHTML(reportData.other_expense) + totalRow('TOTAL OTHER EXPENSES', m => -mSum(reportData.other_expense.groups, m), -totals.totalOtherExpense, '#FEE2E2', '#DC2626', true) : ''}
             <tr><td colspan="${reportMonths.length + 2}" style="padding:4px 0;border-top:2px solid #94A3B8"></td></tr>
-            ${totalRow('TOTAL OTHER INCOME / EXPENSES', m => mSum(reportData.other_income, m) - mSum(reportData.other_expense, m), totals.otherNet)}
+            ${totalRow('TOTAL OTHER INCOME / EXPENSES', m => mSum(reportData.other_income.groups, m) - mSum(reportData.other_expense.groups, m), totals.otherNet)}
             ${totalRow('TOTAL NET INCOME BEFORE TAX', null, totals.netIncomeBeforeTax, '#EFF6FF', '#1D4ED8')}
             <tr style="background:#FEE2E2">
                 <td style="padding:4px 8px;font-size:10px;font-weight:700;color:#DC2626">CORPORATE INCOME TAX (${taxRate}%)</td>
@@ -433,7 +508,7 @@ const BridgeProfitLoss = () => {
 
     const ItemRow = ({ item }) => (
         <div
-            onClick={() => navigate('/bridge/finance/general-ledger', { state: { preSelectedAccount: item.id } })}
+            onClick={() => navigate('/blink/finance/general-ledger', { state: { preSelectedAccount: item.id } })}
             className="flex items-center border-b border-gray-100 dark:border-dark-border/20 hover:bg-gray-50 dark:hover:bg-dark-surface/40 cursor-pointer group"
         >
             <div className={`w-[140px] flex-shrink-0 pl-4 pr-2 py-2 flex items-center`}>
@@ -453,9 +528,35 @@ const BridgeProfitLoss = () => {
         </div>
     );
 
-    const renderSection = (accounts, sectionKey) => {
-        if (!accounts || accounts.length === 0) return <div className="px-6 py-2 text-[11px] text-silver-dark italic">No data</div>;
-        return accounts.map(item => <ItemRow key={item.id} item={item} />);
+    const renderSection = (groupedData, sectionKey) => {
+        if (!groupedData || groupedData.length === 0) return <div className="px-6 py-2 text-[11px] text-silver-dark italic">No data</div>;
+        
+        return groupedData.map((group, idx) => {
+            if (group.isParent) {
+                return (
+                    <div key={`parent-${group.parent.code}`}>
+                        <div className="flex items-center bg-slate-50 dark:bg-transparent border-b border-slate-200 dark:border-dark-border/30">
+                            <div className="w-[140px] flex-shrink-0 pl-4 pr-2 py-2 flex items-center">
+                                <span className="text-[11px] text-slate-600 dark:text-silver-dark font-bold font-mono whitespace-nowrap">{group.parent.code}</span>
+                            </div>
+                            <div className="text-[12px] text-slate-700 dark:text-silver-light font-bold flex-1 min-w-[300px] px-2 py-2 whitespace-nowrap" title={group.parent.name}>
+                                {group.parent.name}
+                            </div>
+                            <div className="flex items-center flex-shrink-0 pr-2">
+                                {reportMonths.map(m => (
+                                    <div key={m} className={`flex items-center justify-end text-[11px] font-mono text-slate-600 dark:text-silver-dark font-bold ${colW} px-1`} title={fmt(group.parent.byMonth?.[m] || 0)}>
+                                        {fmt(group.parent.byMonth?.[m] || 0)}
+                                    </div>
+                                ))}
+                                <div className={`flex items-center justify-end text-[12px] font-mono text-slate-700 dark:text-silver-light font-bold ${totalW} px-1`} title={fmt(group.parent.amount)}>{fmt(group.parent.amount)}</div>
+                            </div>
+                        </div>
+                        {group.items.map(item => <ItemRow key={item.id} item={item} />)}
+                    </div>
+                );
+            }
+            return <ItemRow key={group.item.id} item={group.item} />;
+        });
     };
 
     const TotalRow = ({ label, amount, byMonthFn, highlight, thick, indent }) => {
@@ -465,18 +566,17 @@ const BridgeProfitLoss = () => {
             red: 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-400',
         };
         const cls = highlight ? colors[highlight] : 'bg-slate-50 dark:bg-transparent border-slate-200 dark:border-dark-border/30 text-slate-800 dark:text-silver-light';
-        const valCls = highlight ? '' : (amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-silver-light');
         return (
             <div className={`flex items-center border-y ${cls} ${thick ? 'border-t-2' : ''}`}>
                 <div className="w-[140px] flex-shrink-0 px-2 py-2"></div>
                 <div className={`text-[12px] font-bold uppercase flex-1 min-w-[300px] px-2 py-2 whitespace-nowrap ${indent ? 'pl-6' : ''}`} title={label}>{label}</div>
                 <div className="flex items-center flex-shrink-0 pr-2">
                     {reportMonths.map(m => (
-                        <div key={m} className={`flex items-center justify-end text-[11px] font-bold font-mono ${colW} px-1 py-2`} title={fmt(byMonthFn ? byMonthFn(m) : 0)}>
+                        <div key={m} className={`flex items-center justify-end text-[11px] font-bold font-mono ${colW} px-1 py-2 ${highlight ? '' : 'text-slate-600 dark:text-silver-dark'}`} title={fmt(byMonthFn ? byMonthFn(m) : 0)}>
                             {byMonthFn ? fmt(byMonthFn(m)) : ''}
                         </div>
                     ))}
-                    <div className={`flex items-center justify-end text-[12px] font-bold font-mono ${totalW} px-1 py-2 ${valCls}`} title={fmt(amount)}>{fmt(amount)}</div>
+                    <div className={`flex items-center justify-end text-[12px] font-bold font-mono ${totalW} px-1 py-2 ${highlight ? '' : 'text-slate-800 dark:text-silver-light'}`} title={fmt(amount)}>{fmt(amount)}</div>
                 </div>
             </div>
         );
@@ -498,12 +598,9 @@ const BridgeProfitLoss = () => {
                     <div className="flex items-center px-2 border-r border-gray-200 dark:border-dark-border/50">
                         <Calendar className="w-3 h-3 text-gray-500 dark:text-silver-dark mr-2" />
                         <span className="text-xs text-gray-500 dark:text-silver-dark mr-2">Periode:</span>
-                        <input type="number" value={new Date(dateRange.startDate).getFullYear()}
-                            onChange={e => {
-                                const y = e.target.value;
-                                setDateRange({ startDate: `${y}-01-01`, endDate: `${y}-12-31` });
-                            }}
-                            className="bg-transparent border-none text-xs text-slate-800 dark:text-white focus:ring-0 p-0 w-20" />
+                        <input type="month" value={selectedMonth}
+                            onChange={e => setSelectedMonth(e.target.value)}
+                            className="bg-transparent border-none text-xs text-slate-800 dark:text-white focus:ring-0 p-0 w-32" />
                     </div>
                     <button onClick={fetchReportData} className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded transition-colors" title="Refresh">
                         <RefreshCw className={`w-4 h-4 text-slate-600 dark:text-silver-light ${loading ? 'animate-spin' : ''}`} />
@@ -522,12 +619,12 @@ const BridgeProfitLoss = () => {
                     {/* Export buttons */}
                     <div className="flex items-center gap-1 border-l border-gray-200 dark:border-dark-border/50 pl-2 ml-1">
                         <button onClick={handleExportExcel}
-                            className="p-1.5 hover:bg-green-100 dark:hover:bg-green-900/20 rounded transition-colors text-green-600 dark:text-green-400"
+                            className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded transition-colors text-slate-600 dark:text-silver-light"
                             title="Export Excel (dengan kop surat)">
                             <FileSpreadsheet className="w-4 h-4" />
                         </button>
                         <button onClick={handleExportPDF}
-                            className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/20 rounded transition-colors text-red-500 dark:text-red-400"
+                            className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded transition-colors text-slate-600 dark:text-silver-light"
                             title="Export PDF / Cetak">
                             <Printer className="w-4 h-4" />
                         </button>
@@ -541,23 +638,22 @@ const BridgeProfitLoss = () => {
                     <div className="w-max min-w-full">
                         {/* Title */}
                         <div className="text-center py-4 border-b border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface/40">
-                            <h2 className="text-base font-extrabold text-red-600 dark:text-red-500 tracking-widest uppercase">Profit & Loss</h2>
+                            <h2 className="text-base font-extrabold text-slate-800 dark:text-silver-light tracking-widest uppercase">Profit & Loss</h2>
                             <p className="text-xs text-slate-500 dark:text-silver-dark mt-1">{period}</p>
                         </div>
 
-                {/* Column header — putih di atas biru agar terlihat jelas */}
-                <div className="flex items-center" style={{ background: '#0070BB' }}>
-                    <div className="text-[11px] font-bold uppercase tracking-wider w-[140px] flex-shrink-0 pl-4 pr-2 py-2.5" style={{ color: '#FFFFFF' }}>Code</div>
-                    <div className="text-[11px] font-bold uppercase tracking-wider flex-1 min-w-[300px] px-2 py-2.5" style={{ color: '#FFFFFF' }}>Description</div>
-                    <div className="flex items-center flex-shrink-0 pr-2">
-                        {reportMonths.map(m => (
-                            <div key={m} className={`flex items-center justify-end text-[11px] font-bold uppercase ${colW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>
-                                {mLabel(m)}
+                        <div className="flex items-center bg-slate-100 dark:bg-dark-surface/70 border-b border-slate-200 dark:border-dark-border">
+                            <div className="text-[11px] font-bold uppercase tracking-wider w-[140px] flex-shrink-0 pl-4 pr-2 py-2.5 text-slate-800 dark:text-silver-light">Code</div>
+                            <div className="text-[11px] font-bold uppercase tracking-wider flex-1 min-w-[300px] px-2 py-2.5 text-slate-800 dark:text-silver-light">Description</div>
+                            <div className="flex items-center flex-shrink-0 pr-2">
+                                {reportMonths.map(m => (
+                                    <div key={m} className={`flex items-center justify-end text-[11px] font-bold uppercase ${colW} px-1 py-2.5 text-slate-800 dark:text-silver-light`}>
+                                        {mLabel(m)}
+                                    </div>
+                                ))}
+                                <div className={`flex items-center justify-end text-[11px] font-bold uppercase ${totalW} px-1 py-2.5 text-slate-800 dark:text-silver-light`}>Total</div>
                             </div>
-                        ))}
-                        <div className={`flex items-center justify-end text-[11px] font-bold uppercase ${totalW} px-1 py-2.5`} style={{ color: '#FFFFFF' }}>Total</div>
-                    </div>
-                </div>
+                        </div>
 
                 {loading ? (
                     <div className="p-12 text-center text-slate-500 dark:text-silver-dark">Loading data...</div>
@@ -567,20 +663,26 @@ const BridgeProfitLoss = () => {
                         <SectionLabel label="INCOME" />
                         {renderSection(reportData.revenue, 'revenue')}
                         <TotalRow label="Total Sales Income" amount={totals.totalRevenue} highlight="green"
-                            byMonthFn={m => reportData.revenue.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0)} />
+                            byMonthFn={m => reportData.revenue.reduce((s, g) => {
+                                if (g.isParent) return s + (g.parent?.byMonth?.[m] || 0);
+                                return s + (g.item?.byMonth?.[m] || 0);
+                            }, 0)} />
 
                         {/* ── COST OF GOOD SOLD ── */}
                         <SectionLabel label="Cost of Good Sold" />
                         {renderSection(reportData.cogs, 'cogs')}
                         <TotalRow label="Total Cost of Good Sold" amount={totals.totalCOGS}
-                            byMonthFn={m => reportData.cogs.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0)} />
+                            byMonthFn={m => reportData.cogs.reduce((s, g) => {
+                                if (g.isParent) return s + (g.parent?.byMonth?.[m] || 0);
+                                return s + (g.item?.byMonth?.[m] || 0);
+                            }, 0)} />
 
                         {/* ── GROSS PROFIT ── */}
                         <TotalRow label="Total Operation Income ( Gross Profit )"
                             amount={totals.grossProfit}
                             byMonthFn={m => {
-                                const mRev = reportData.revenue.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0);
-                                const mCogs = reportData.cogs.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0);
+                                const mRev = reportData.revenue.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
+                                const mCogs = reportData.cogs.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
                                 return mRev - mCogs;
                             }}
                             highlight={totals.grossProfit >= 0 ? 'blue' : 'red'} thick />
@@ -589,39 +691,48 @@ const BridgeProfitLoss = () => {
                         <SectionLabel label="Administrasi & General Expenses" />
                         {renderSection(reportData.expenses, 'expenses')}
                         <TotalRow label="Total Administrasi & General Expenses" amount={totals.totalExpenses}
-                            byMonthFn={m => reportData.expenses.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0)} />
+                            byMonthFn={m => reportData.expenses.reduce((s, g) => {
+                                if (g.isParent) return s + (g.parent?.byMonth?.[m] || 0);
+                                return s + (g.item?.byMonth?.[m] || 0);
+                            }, 0)} />
 
                         {/* ── OTHER INCOME / EXPENSES ── */}
                         <SectionLabel label="Other Income / Expenses" />
-                        {ensureArray(reportData.other_income).length > 0 && (
+                        {reportData.other_income && reportData.other_income.length > 0 && (
                             <>
                                 {renderSection(reportData.other_income, 'other_income')}
                                 <TotalRow label="Total Other Income" amount={totals.totalOtherIncome} indent
-                                    byMonthFn={m => reportData.other_income.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0)} />
+                                    byMonthFn={m => reportData.other_income.reduce((s, g) => {
+                                if (g.isParent) return s + (g.parent?.byMonth?.[m] || 0);
+                                return s + (g.item?.byMonth?.[m] || 0);
+                            }, 0)} />
                             </>
                         )}
-                        {ensureArray(reportData.other_expense).length > 0 && (
+                        {reportData.other_expense && reportData.other_expense.length > 0 && (
                             <>
                                 {renderSection(reportData.other_expense, 'other_expense')}
                                 <TotalRow label="Total Other Expenses" amount={-totals.totalOtherExpense} indent
-                                    byMonthFn={m => -reportData.other_expense.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0)} />
+                                    byMonthFn={m => -reportData.other_expense.reduce((s, g) => {
+                                if (g.isParent) return s + (g.parent?.byMonth?.[m] || 0);
+                                return s + (g.item?.byMonth?.[m] || 0);
+                            }, 0)} />
                             </>
                         )}
 
                         {/* ── Summary ── */}
                         <div className="border-t-2 border-slate-300 dark:border-dark-border mt-1">
                             <TotalRow label="Total Other Income / Expenses" amount={totals.otherNet} byMonthFn={m => {
-                                const mOI = reportData.other_income.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0);
-                                const mOE = reportData.other_expense.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0);
+                                const mOI = reportData.other_income.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
+                                const mOE = reportData.other_expense.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
                                 return mOI - mOE;
                             }} />
                             <TotalRow label="Total Net Income Before Tax" amount={totals.netIncomeBeforeTax}
                                 byMonthFn={m => {
-                                    const mRev = reportData.revenue.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0);
-                                    const mCogs = reportData.cogs.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0);
-                                    const mExp = reportData.expenses.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0);
-                                    const mOI = reportData.other_income.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0);
-                                    const mOE = reportData.other_expense.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0);
+                                    const mRev = reportData.revenue.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
+                                    const mCogs = reportData.cogs.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
+                                    const mExp = reportData.expenses.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
+                                    const mOI = reportData.other_income.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
+                                    const mOE = reportData.other_expense.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
                                     return mRev - mCogs - mExp + mOI - mOE;
                                 }}
                                 highlight="blue" />
@@ -634,11 +745,11 @@ const BridgeProfitLoss = () => {
                                 </span>
                                 <div className="flex items-center flex-shrink-0 pr-2">
                                     {reportMonths.map(m => {
-                                        const mRev = reportData.revenue.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0);
-                                        const mCogs = reportData.cogs.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0);
-                                        const mExp = reportData.expenses.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0);
-                                        const mOI = reportData.other_income.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0);
-                                        const mOE = reportData.other_expense.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0);
+                                        const mRev = reportData.revenue.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
+                                        const mCogs = reportData.cogs.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
+                                        const mExp = reportData.expenses.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
+                                        const mOI = reportData.other_income.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
+                                        const mOE = reportData.other_expense.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
                                         const mNet = mRev - mCogs - mExp + mOI - mOE;
                                         const mTax = mNet > 0 ? mNet * (taxRate / 100) : 0;
                                         return (
@@ -655,11 +766,11 @@ const BridgeProfitLoss = () => {
 
                             <TotalRow label="Total Net Income After Tax" amount={totals.netIncomeAfterTax}
                                 byMonthFn={m => {
-                                    const mRev = reportData.revenue.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0);
-                                    const mCogs = reportData.cogs.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0);
-                                    const mExp = reportData.expenses.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0);
-                                    const mOI = reportData.other_income.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0);
-                                    const mOE = reportData.other_expense.reduce((s, a) => s + (a.byMonth?.[m] || 0), 0);
+                                    const mRev = reportData.revenue.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
+                                    const mCogs = reportData.cogs.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
+                                    const mExp = reportData.expenses.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
+                                    const mOI = reportData.other_income.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
+                                    const mOE = reportData.other_expense.reduce((s, g) => s + (g.isParent ? (g.parent?.byMonth?.[m] || 0) : (g.item?.byMonth?.[m] || 0)), 0);
                                     const mNet = mRev - mCogs - mExp + mOI - mOE;
                                     const mTax = mNet > 0 ? mNet * (taxRate / 100) : 0;
                                     return mNet - mTax;
