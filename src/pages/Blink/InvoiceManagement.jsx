@@ -579,6 +579,21 @@ const InvoiceManagement = () => {
             return;
         }
 
+        // FIX: Warn if non-IDR currency has exchange_rate = 1 (likely forgot to set rate)
+        const selectedCurrencyCheck = formData.billing_currency || 'IDR';
+        if (selectedCurrencyCheck !== 'IDR') {
+            const rateCheck = parseFloat(formData.exchange_rate) || 0;
+            if (rateCheck <= 1) {
+                const proceed = window.confirm(
+                    `⚠️ Perhatian: Kurs ${selectedCurrencyCheck} saat ini adalah ${rateCheck}.\n\n` +
+                    `Nilai kurs terlihat tidak wajar untuk mata uang non-IDR. ` +
+                    `Pastikan kurs sudah benar (contoh: USD → 16000).\n\n` +
+                    `Lanjutkan tetap membuat invoice dengan kurs ${rateCheck}?`
+                );
+                if (!proceed) return;
+            }
+        }
+
         const normalizeRate = (value) => {
             const parsed = Number(value);
             if (!Number.isFinite(parsed) || parsed <= 0) return 1;
@@ -587,7 +602,8 @@ const InvoiceManagement = () => {
 
         try {
             // 1. Validate duplicates for the same SO / shipment reference.
-            // A new invoice is allowed only when its exchange rate differs from the existing SO-generated invoice.
+            // FIX: Invoice manual dengan MATA UANG BERBEDA dari SO auto-generate SELALU diizinkan.
+            // Hanya blokir jika: sama currency DAN sama exchange_rate (benar-benar duplikat).
             if (formData.job_number) {
                 const { data: allInvoices, error: allCheckError } = await supabase
                     .from('blink_invoices')
@@ -603,12 +619,16 @@ const InvoiceManagement = () => {
                 const selectedCurrency = formData.billing_currency || 'IDR';
                 const selectedRate = selectedCurrency === 'IDR' ? 1 : normalizeRate(formData.exchange_rate || 1);
 
+                // FIX: Cari invoice yang relevan dengan shipment/SO yang sama.
+                // Jika tidak ada shipment_id maupun so_number yang cocok, berarti tidak ada invoice sebelumnya → izinkan.
                 const relevantInvoices = (allInvoices || []).filter(inv => {
-                    if (selectedShipmentId) return inv.shipment_id === selectedShipmentId;
-                    if (selectedSoNumber) return inv.so_number === selectedSoNumber;
-                    return true;
+                    if (selectedShipmentId && inv.shipment_id) return inv.shipment_id === selectedShipmentId;
+                    if (selectedSoNumber && inv.so_number) return inv.so_number === selectedSoNumber;
+                    // Jika keduanya null, jangan blokir (invoice standalone yang berbeda)
+                    return false;
                 });
 
+                // Hanya cek duplikat untuk currency yang SAMA
                 const sameCurrencyInvoices = relevantInvoices.filter(inv => (inv.currency || 'IDR') === selectedCurrency);
 
                 if (sameCurrencyInvoices.length > 0) {
@@ -623,28 +643,22 @@ const InvoiceManagement = () => {
                             return existingRate === selectedRate;
                         });
                         alert(
-                            `Cannot create invoice: invoice ${selectedCurrency} dengan kurs yang sama sudah ada (${duplicateInv?.invoice_number || '-'}) untuk SO/Job ${formData.so_number || formData.job_number}.\n\n` +
-                            `Gunakan kurs yang berbeda untuk fitur Generate Invoice (Beda Kurs).`
+                            `Tidak bisa membuat invoice: Invoice ${selectedCurrency} dengan kurs yang sama sudah ada (${duplicateInv?.invoice_number || '-'}) untuk SO/Job ${formData.so_number || formData.job_number}.\n\n` +
+                            `Gunakan kurs yang berbeda untuk invoice beda kurs.`
                         );
                         return;
                     }
 
                     if (sameCurrencyInvoices.length >= 2) {
                         alert(
-                            `Cannot create invoice: batas invoice ${selectedCurrency} untuk SO/Job ini sudah tercapai.\n\n` +
-                            `Hanya diperbolehkan 1 invoice auto-generate + 1 invoice beda kurs per mata uang.`
+                            `Tidak bisa membuat invoice: Batas invoice ${selectedCurrency} untuk SO/Job ini sudah tercapai (maks. 2 kurs berbeda per mata uang).`
                         );
                         return;
                     }
                 }
 
-                const existingCurrencies = [...new Set(relevantInvoices.map(inv => inv.currency || 'IDR'))];
-
-                // If there are already 2 currencies and this is a new one, block it
-                if (existingCurrencies.length >= 2 && !existingCurrencies.includes(selectedCurrency)) {
-                    alert(`Cannot create invoice: This SO/Job already has invoices in ${existingCurrencies.join(' and ')}.\n\nMaximum 2 currencies are allowed per SO/Job.`);
-                    return;
-                }
+                // FIX: Hapus batasan 2 currency per SO — invoice manual beda currency SELALU diizinkan
+                // karena ini adalah fitur sah untuk penagihan multi-currency (misal SO dalam USD + invoice manual IDR).
             }
 
             const { subtotal, taxAmount, total, cogsSubtotal, grossProfit, profitMargin } = calculateTotals();
@@ -2236,20 +2250,36 @@ const InvoiceCreateModal = ({ isEditing, quotations, shipments, formData, setFor
 
                         <div>
                             <label className="block text-[11px] font-semibold text-silver-light mb-1">
-                                Kurs Rate (USD to IDR)
+                                Kurs Rate ({formData.billing_currency || 'USD'} ke IDR)
+                                {formData.billing_currency !== 'IDR' && (
+                                    <span className="text-red-400 ml-1">*</span>
+                                )}
                             </label>
                             <input
                                 type="number"
                                 value={formData.exchange_rate}
                                 onChange={(e) => setFormData(prev => ({ ...prev, exchange_rate: parseFloat(e.target.value) || 1 }))}
-                                className="w-full px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
+                                className={`w-full px-2.5 py-1.5 bg-dark-surface border rounded-lg text-silver-light ${
+                                    formData.billing_currency !== 'IDR' && parseFloat(formData.exchange_rate) <= 1
+                                        ? 'border-yellow-500 ring-1 ring-yellow-500/40'
+                                        : 'border-dark-border'
+                                }`}
                                 disabled={formData.billing_currency === 'IDR'}
-                                min="1"
+                                min="0.000001"
                                 step="0.01"
                                 placeholder="e.g., 16000"
                             />
-                            <p className="text-xs text-silver-dark mt-1">
-                                {formData.billing_currency === 'IDR' ? 'Tidak diperlukan untuk IDR' : 'Masukkan nilai tukar USD ke IDR'}
+                            <p className={`text-xs mt-1 ${
+                                formData.billing_currency !== 'IDR' && parseFloat(formData.exchange_rate) <= 1
+                                    ? 'text-yellow-400'
+                                    : 'text-silver-dark'
+                            }`}>
+                                {formData.billing_currency === 'IDR'
+                                    ? 'Tidak diperlukan untuk IDR'
+                                    : parseFloat(formData.exchange_rate) <= 1
+                                        ? `⚠️ Kurs ${formData.billing_currency} terlihat tidak wajar. Contoh USD: 16000`
+                                        : `1 ${formData.billing_currency} = Rp ${Number(formData.exchange_rate).toLocaleString('id-ID')}`
+                                }
                             </p>
                         </div>
                     </div>

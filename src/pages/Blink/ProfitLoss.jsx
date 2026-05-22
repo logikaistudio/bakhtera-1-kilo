@@ -80,38 +80,66 @@ const ProfitLoss = () => {
                 prevYear -= 1;
             }
             const prevMonthKey = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
-            const queryStart = `${prevYear}-${String(prevMonth).padStart(2, '0')}-01`;
+            // BUG FIX #2: Query dari awal tahun (1 Jan) agar YTD akurat
+            const queryStart = `${targetYear}-01-01`;
             const queryEnd = `${targetYear}-${String(targetMonth).padStart(2, '0')}-${String(new Date(targetYear, targetMonth, 0).getDate()).padStart(2, '0')}`;
 
-            const res = await supabase.from('blink_journal_entries')
-                .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate')
-                .not('coa_id', 'is', null)
-                .gte('entry_date', queryStart).lte('entry_date', queryEnd);
-            if (res.error) throw res.error;
-            const entries = [...new Map((res.data || []).map(r => [r.id, r])).values()];
+            // BUG FIX #2: Ambil juga entri yang menggunakan account_code (coa_id = null)
+            const [r1, r2] = await Promise.all([
+                supabase.from('blink_journal_entries')
+                    .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate')
+                    .not('coa_id', 'is', null)
+                    .gte('entry_date', queryStart).lte('entry_date', queryEnd),
+                supabase.from('blink_journal_entries')
+                    .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate')
+                    .is('coa_id', null)
+                    .gte('entry_date', queryStart).lte('entry_date', queryEnd)
+            ]);
+            if (r1.error) throw r1.error;
+            if (r2.error) throw r2.error;
+            const combined = [...(r1.data || []), ...(r2.data || [])];
+            const entries = [...new Map(combined.map(r => [r.id, r])).values()];
 
-            const coaMap = {};
+            const idToCode = {};
+            const coaMapByCode = {};
             const codeToMeta = {};
             (coaData || []).forEach(coa => {
-                const byMonth = { current: 0, previous: 0, ytd: 0 };
-                coaMap[coa.id] = { ...coa, amount: 0, byMonth };
                 if (coa.code) {
-                    codeToMeta[coa.code] = coa;
+                    const codeStr = String(coa.code).trim();
+                    idToCode[coa.id] = codeStr;
+                    codeToMeta[codeStr] = coa;
+                    if (!coaMapByCode[codeStr]) {
+                        const byMonth = { current: 0, previous: 0, ytd: 0 };
+                        coaMapByCode[codeStr] = { ...coa, code: codeStr, amount: 0, byMonth };
+                    }
                 }
             });
 
+            // BUG FIX #1: Perbaiki logika konversi kurs
+            // Sebelumnya: numRate > 1 — gagal jika rate = null/0/1
+            // Sekarang: cukup pastikan currency bukan IDR dan rate valid (> 0)
             const toIDR = (v, cur, rate) => {
                 if (!v) return 0;
-                return cur && cur !== 'IDR' && rate > 1 ? v * rate : v;
+                const numRate = Number(rate);
+                if (cur && cur !== 'IDR' && numRate > 0) return v * numRate;
+                return v;
             };
 
-            const getCodePrefix = (code) => code ? code.charAt(0) : null;
+            const getCodePrefix = (code) => code ? String(code).trim().charAt(0) : null;
 
             entries.forEach(e => {
-                const targetId = e.coa_id; // only use explicit coa_id
-                if (!targetId) return;
-                const acc = coaMap[targetId];
-                if (!acc) return; // skip if coa_id doesn't exist in master
+                // Resolusi akun: prioritaskan coa_id, fallback ke account_code
+                let code = null;
+                if (e.coa_id && idToCode[e.coa_id]) {
+                    code = idToCode[e.coa_id];
+                } else if (e.account_code) {
+                    const accCodeStr = String(e.account_code).trim();
+                    if (coaMapByCode[accCodeStr]) code = accCodeStr;
+                }
+                if (!code) return;
+                const acc = coaMapByCode[code];
+                if (!acc) return;
+
                 const debit = toIDR(e.debit, e.currency, e.exchange_rate);
                 const credit = toIDR(e.credit, e.currency, e.exchange_rate);
                 const prefix = getCodePrefix(acc.code);
@@ -129,14 +157,15 @@ const ProfitLoss = () => {
                 if (mKey.startsWith(`${targetYear}-`) && mKey <= selectedMonth) acc.byMonth.ytd += val;
             });
 
-            const all = Object.values(coaMap);
+            const all = Object.values(coaMapByCode);
 
             const groupByParent = (accounts) => {
                 const groups = {};
                 const orphans = [];
                 accounts.forEach(acc => {
                     const parent = acc.parent_code;
-                    if (parent) {
+                    // If an account has itself as a parent, treat it as an orphan to avoid duplicate rendering
+                    if (parent && String(parent).trim() !== String(acc.code).trim()) {
                         if (!groups[parent]) {
                             groups[parent] = { parentCode: parent, items: [] };
                         }
@@ -357,7 +386,8 @@ const ProfitLoss = () => {
         ws['!merges'] = kopMergeIndices.map(r => ({ s: { r, c: 0 }, e: { r, c: nCols - 1 } }));
 
         XLSX.utils.book_append_sheet(wb, ws, 'Profit & Loss');
-        XLSX.writeFile(wb, `ProfitLoss_${dateRange.startDate}_${dateRange.endDate}.xlsx`);
+        // BUG FIX #3: 'dateRange' tidak terdefinisi, gunakan selectedMonth sebagai nama file
+        XLSX.writeFile(wb, `ProfitLoss_${selectedMonth}.xlsx`);
     };
 
     // ── Export PDF ───────────────────────────────────────────────────
