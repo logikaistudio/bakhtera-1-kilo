@@ -238,9 +238,11 @@ const TrialBalance = () => {
                     ap.count += 1; ap.opening += acc.opening || 0; ap.debit += acc.debitPeriod || 0; ap.credit += acc.creditPeriod || 0; ap.closing += acc.closing || 0;
                 }
 
-                // Suspicious: name contains 'discount' or 'diskon' but type is REVENUE or not COGS
+                // Suspicious: name contains 'discount' or 'diskon' but type is REVENUE
+                // NOTE: Cost-related accounts like "AIR FREIGHT" as REVENUE is correct (it's service income)
+                // Only flag ACTUAL discounts that are misclassified
                 const nameLower = (acc.name || '').toLowerCase();
-                if ((nameLower.includes('discount') || nameLower.includes('diskon') || nameLower.includes('discount air') || nameLower.includes('air')) && acc.type !== 'COGS' && acc.type !== 'COST') {
+                if ((nameLower.includes('discount') || nameLower.includes('diskon')) && acc.type === 'REVENUE') {
                     suspicious.push({ id: acc.id, code: acc.code, name: acc.name, type: acc.type, closing: acc.closing });
                 }
             });
@@ -277,11 +279,15 @@ const TrialBalance = () => {
         return val.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     };
 
-    // Helper to format money with Parenthesis if negative (Credit)
+    // Helper to get color class for negative values (red instead of parentheses)
+    const getAmountColor = (val) => {
+        return val < 0 ? 'text-red-500 dark:text-red-400' : '';
+    };
+
+    // Helper to format money with color for negative (Credit) - no parentheses
     const formatBalance = (val) => {
         if (!val && val !== 0) return '-';
-        const formatted = Math.abs(val).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-        return val < 0 ? `(${formatted})` : formatted;
+        return Math.abs(val).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     };
 
     const formatExportCurrency = (val) => {
@@ -567,7 +573,7 @@ const TrialBalance = () => {
 
             {suspiciousAccounts.length > 0 && (
                 <div className="bg-indigo-50 border-l-4 border-indigo-400 text-indigo-800 p-4 mb-4 rounded">
-                    <strong>Notice:</strong> Ditemukan akun dengan nama terkait discount/air yang tidak diklasifikasikan sebagai COGS.
+                    <strong>Notice:</strong> Ditemukan akun dengan keyword "discount/diskon" yang diklasifikasikan sebagai REVENUE. Harap verifikasi klasifikasi akun ini.
                     <ul className="mt-2 text-xs">
                         {suspiciousAccounts.map(acc => (
                             <li key={acc.id}>{acc.code} - {acc.name} — type: {acc.type} — balance: {(acc.closing || 0).toLocaleString('id-ID')}</li>
@@ -627,7 +633,7 @@ const TrialBalance = () => {
                                                 <td className={`px-4 py-2 text-right font-mono align-top ${acc.creditPeriod !== 0 ? 'text-orange-400' : 'text-silver-dark opacity-50'}`}>
                                                     {formatCurrency(acc.creditPeriod)}
                                                 </td>
-                                                <td className={`px-4 py-2 text-right font-mono font-medium align-top ${acc.closing < 0 ? 'text-red-400' : acc.closing > 0 ? 'text-emerald-400' : 'text-silver-dark'}`}>
+                                                <td className={`px-4 py-2 text-right font-mono font-medium align-top ${acc.closing < 0 ? 'text-red-400' : acc.closing > 0 ? 'text-emerald-400' : 'text-silver-dark'} ${getAmountColor(acc.closing)}`}>
                                                     {formatBalance(acc.closing)}
                                                 </td>
                                             </tr>
@@ -638,10 +644,10 @@ const TrialBalance = () => {
                             <tfoot className="bg-[#0070BB]/10 border-t-2 border-[#0070BB] font-bold">
                                 <tr>
                                     <td colSpan="3" className="px-4 py-3 text-right uppercase tracking-wider text-silver-light">GRAND TOTAL</td>
-                                    <td className="px-4 py-3 text-right font-mono text-silver-light">{formatBalance(totals.opening)}</td>
+                                    <td className={`px-4 py-3 text-right font-mono text-silver-light ${getAmountColor(totals.opening)}`}>{formatBalance(totals.opening)}</td>
                                     <td className="px-4 py-3 text-right font-mono text-blue-400">{formatCurrency(totals.debit)}</td>
                                     <td className="px-4 py-3 text-right font-mono text-orange-400">{formatCurrency(totals.credit)}</td>
-                                    <td className={`px-4 py-3 text-right font-mono ${totals.closing !== 0 ? (Math.abs(totals.closing) > 1 ? 'text-red-400' : 'text-emerald-400') : 'text-silver-light'}`}>
+                                    <td className={`px-4 py-3 text-right font-mono ${totals.closing !== 0 ? (Math.abs(totals.closing) > 1 ? 'text-red-400' : 'text-emerald-400') : 'text-silver-light'} ${getAmountColor(totals.closing)}`}>
                                         {formatBalance(totals.closing)}
                                     </td>
                                 </tr>
@@ -651,7 +657,7 @@ const TrialBalance = () => {
                 </div>
             )}
             <div className="text-center text-xs text-silver-dark mt-6 italic bg-dark-surface/30 p-4 rounded border border-white/5">
-                Note: Values in parentheses ( ) represent Credit-normal balances (Liabilities / Equity / Revenue). Total Debit and Credit movements must always be balanced.
+                Note: Credit-normal balances (Liabilities / Equity / Revenue) are displayed in <span className="text-red-400 font-semibold">red color</span>. Total Debit and Credit movements must always be balanced.
             </div>
         </div>
     );
