@@ -168,9 +168,13 @@ const ProfitLossDetail = () => {
 
     const fmt = (amount) => {
         if (!amount || amount === 0) return '';
-        const neg = amount < 0;
         const s = Math.abs(amount).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-        return neg ? `(${s})` : s;
+        return s;
+    };
+
+    const getAmountColor = (amount) => {
+        if (!amount || amount === 0) return '';
+        return amount < 0 ? 'text-red-600 dark:text-red-400' : '';
     };
 
     const [selY, selM] = selectedMonth.split('-');
@@ -205,9 +209,9 @@ const ProfitLossDetail = () => {
                 {item.name}
             </div>
             <div className="flex items-center flex-shrink-0 pr-2">
-                <div className={`flex items-center justify-end text-[11px] font-mono text-slate-500 dark:text-silver-light ${totalW} px-1`} title={fmt(item.currentMonthAmount)}>{fmt(item.currentMonthAmount)}</div>
-                <div className={`flex items-center justify-end text-[11px] font-mono text-slate-500 dark:text-silver-light ${totalW} px-1`} title={fmt(item.prevMonthAmount)}>{fmt(item.prevMonthAmount)}</div>
-                <div className={`flex items-center justify-end text-[12px] font-bold font-mono text-slate-800 dark:text-silver-light ${totalW} px-1`} title={fmt(item.ytdAmount)}>{fmt(item.ytdAmount)}</div>
+                <div className={`flex items-center justify-end text-[11px] font-mono text-slate-500 dark:text-silver-light ${getAmountColor(item.currentMonthAmount)} ${totalW} px-1`} title={fmt(item.currentMonthAmount)}>{fmt(item.currentMonthAmount)}</div>
+                <div className={`flex items-center justify-end text-[11px] font-mono text-slate-500 dark:text-silver-light ${getAmountColor(item.prevMonthAmount)} ${totalW} px-1`} title={fmt(item.prevMonthAmount)}>{fmt(item.prevMonthAmount)}</div>
+                <div className={`flex items-center justify-end text-[12px] font-bold font-mono text-slate-800 dark:text-silver-light ${getAmountColor(item.ytdAmount)} ${totalW} px-1`} title={fmt(item.ytdAmount)}>{fmt(item.ytdAmount)}</div>
             </div>
         </div>
     );

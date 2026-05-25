@@ -266,9 +266,13 @@ const ProfitLoss = () => {
 
     const fmt = (amount) => {
         if (!amount || amount === 0) return '';
-        const neg = amount < 0;
         const s = Math.abs(amount).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-        return neg ? `(${s})` : s;
+        return s;
+    };
+
+    const getAmountColor = (amount) => {
+        if (!amount || amount === 0) return '';
+        return amount < 0 ? 'text-red-600 dark:text-red-400' : '';
     };
 
     const [selY, selM] = selectedMonth.split('-');
@@ -518,12 +522,15 @@ const ProfitLoss = () => {
                 {item.name}
             </div>
             <div className="flex items-center flex-shrink-0 pr-2">
-                {reportMonths.map(m => (
-                    <div key={m} className={`flex items-center justify-end text-[11px] font-mono text-slate-500 dark:text-silver-dark ${colW} px-1`} title={fmt(item.byMonth?.[m] || 0)}>
-                        {fmt(item.byMonth?.[m] || 0)}
-                    </div>
-                ))}
-                <div className={`flex items-center justify-end text-[12px] font-mono text-slate-800 dark:text-silver-light ${totalW} px-1`} title={fmt(item.amount)}>{fmt(item.amount)}</div>
+                {reportMonths.map(m => {
+                    const val = item.byMonth?.[m] || 0;
+                    return (
+                        <div key={m} className={`flex items-center justify-end text-[11px] font-mono text-slate-500 dark:text-silver-dark ${getAmountColor(val)} ${colW} px-1`} title={fmt(val)}>
+                            {fmt(val)}
+                        </div>
+                    );
+                })}
+                <div className={`flex items-center justify-end text-[12px] font-mono text-slate-800 dark:text-silver-light ${getAmountColor(item.amount)} ${totalW} px-1`} title={fmt(item.amount)}>{fmt(item.amount)}</div>
             </div>
         </div>
     );
@@ -543,12 +550,15 @@ const ProfitLoss = () => {
                                 {group.parent.name}
                             </div>
                             <div className="flex items-center flex-shrink-0 pr-2">
-                                {reportMonths.map(m => (
-                                    <div key={m} className={`flex items-center justify-end text-[11px] font-mono text-slate-600 dark:text-silver-dark font-bold ${colW} px-1`} title={fmt(group.parent.byMonth?.[m] || 0)}>
-                                        {fmt(group.parent.byMonth?.[m] || 0)}
-                                    </div>
-                                ))}
-                                <div className={`flex items-center justify-end text-[12px] font-mono text-slate-700 dark:text-silver-light font-bold ${totalW} px-1`} title={fmt(group.parent.amount)}>{fmt(group.parent.amount)}</div>
+                                {reportMonths.map(m => {
+                                    const val = group.parent.byMonth?.[m] || 0;
+                                    return (
+                                        <div key={m} className={`flex items-center justify-end text-[11px] font-mono text-slate-600 dark:text-silver-dark font-bold ${getAmountColor(val)} ${colW} px-1`} title={fmt(val)}>
+                                            {fmt(val)}
+                                        </div>
+                                    );
+                                })}
+                                <div className={`flex items-center justify-end text-[12px] font-mono text-slate-700 dark:text-silver-light font-bold ${getAmountColor(group.parent.amount)} ${totalW} px-1`} title={fmt(group.parent.amount)}>{fmt(group.parent.amount)}</div>
                             </div>
                         </div>
                         {group.items.map(item => <ItemRow key={item.id} item={item} />)}
@@ -571,12 +581,15 @@ const ProfitLoss = () => {
                 <div className="w-[140px] flex-shrink-0 px-2 py-2"></div>
                 <div className={`text-[12px] font-bold uppercase flex-1 min-w-[300px] px-2 py-2 whitespace-nowrap ${indent ? 'pl-6' : ''}`} title={label}>{label}</div>
                 <div className="flex items-center flex-shrink-0 pr-2">
-                    {reportMonths.map(m => (
-                        <div key={m} className={`flex items-center justify-end text-[11px] font-bold font-mono ${colW} px-1 py-2 ${highlight ? '' : 'text-slate-600 dark:text-silver-dark'}`} title={fmt(byMonthFn ? byMonthFn(m) : 0)}>
-                            {byMonthFn ? fmt(byMonthFn(m)) : ''}
-                        </div>
-                    ))}
-                    <div className={`flex items-center justify-end text-[12px] font-bold font-mono ${totalW} px-1 py-2 ${highlight ? '' : 'text-slate-800 dark:text-silver-light'}`} title={fmt(amount)}>{fmt(amount)}</div>
+                    {reportMonths.map(m => {
+                        const val = byMonthFn ? byMonthFn(m) : 0;
+                        return (
+                            <div key={m} className={`flex items-center justify-end text-[11px] font-bold font-mono ${getAmountColor(val)} ${colW} px-1 py-2 ${highlight ? '' : 'text-slate-600 dark:text-silver-dark'}`} title={fmt(val)}>
+                                {fmt(val)}
+                            </div>
+                        );
+                    })}
+                    <div className={`flex items-center justify-end text-[12px] font-bold font-mono ${getAmountColor(amount)} ${totalW} px-1 py-2 ${highlight ? '' : 'text-slate-800 dark:text-silver-light'}`} title={fmt(amount)}>{fmt(amount)}</div>
                 </div>
             </div>
         );
