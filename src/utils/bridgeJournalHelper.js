@@ -493,31 +493,21 @@ async function checkDuplicateEntries(rows) {
     const duplicates = [];
     
     for (const row of rows) {
-        const { coa_id, account_code, debit, credit, entry_date } = row;
+        const { account_code, debit, credit, entry_date } = row;
         
-        // Build query for duplicate check
-        let query = supabase
+        // bridge_journal_entries uses account_code as primary account identifier
+        if (!account_code) continue;
+        
+        const query = supabase
             .from('bridge_journal_entries')
-            .select('id, entry_date, debit, credit, coa_id, account_code');
+            .select('id, entry_date, debit, credit, account_code')
+            .eq('account_code', account_code)
+            .eq('debit', debit || 0)
+            .eq('credit', credit || 0);
         
-        // Match by either coa_id or account_code
-        if (coa_id) {
-            query = query.eq('coa_id', coa_id);
-        } else if (account_code) {
-            query = query.eq('account_code', account_code);
-        } else {
-            continue; // Skip if neither coa_id nor account_code
-        }
-        
-        // Match by debit and credit
-        query = query.eq('debit', debit || 0).eq('credit', credit || 0);
-        
-        // Match by date
-        if (entry_date) {
-            query = query.eq('entry_date', entry_date);
-        }
-        
-        const { data: existing, error } = await query;
+        const { data: existing, error } = entry_date
+            ? await query.eq('entry_date', entry_date)
+            : await query;
         
         if (error) {
             console.warn('[Journal] Duplicate check error:', error);
@@ -528,7 +518,7 @@ async function checkDuplicateEntries(rows) {
             duplicates.push({
                 newEntry: row,
                 existing: existing[0],
-                reason: `Duplicate: ${account_code || coa_id} | Debit: ${debit} | Credit: ${credit} | Date: ${entry_date}`
+                reason: `Duplicate: ${account_code} | Debit: ${debit} | Credit: ${credit} | Date: ${entry_date}`
             });
         }
     }
