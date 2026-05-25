@@ -2,7 +2,7 @@
 // Purpose: Detect and report duplicate journal entries
 // Usage: node scripts/detect_duplicate_journals.js
 
-const { createClient } = require('@supabase/supabase-js');
+import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = 'https://fsxdykjcajasmgybqdua.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzeGR5a2pjYWphc21neWJxZHVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MjQxMzUsImV4cCI6MjA5MTQwMDEzNX0.eS0bcexDs9iTVbwcBf56k3xulvcsrQKgePmn-RmEkRw';
@@ -12,17 +12,42 @@ async function detectDuplicates(tableName, module) {
     console.log(`\n📋 Checking ${module} duplicates in ${tableName}...`);
     
     // Get all journal entries
-    const { data: entries, error } = await supabase
+    let query = supabase
         .from(tableName)
-        .select('id, coa_id, account_code, debit, credit, entry_date, entry_number, description')
+        .select('id, debit, credit, entry_date, entry_number, description');
+    
+    // Add coa_id and account_code only if they exist in the table
+    // For bridge, use different column names
+    if (module === 'BRIDGE') {
+        query = query.select('id, debit, credit, entry_date, entry_number, description, account_code');
+    } else {
+        query = query.select('id, coa_id, account_code, debit, credit, entry_date, entry_number, description');
+    }
+    
+    // Re-initialize query
+    query = supabase
+        .from(tableName)
+        .select('id, account_code, debit, credit, entry_date, entry_number, description');
+    
+    // Add coa_id if not bridge
+    if (module !== 'BRIDGE') {
+        query = query.select('id, coa_id, account_code, debit, credit, entry_date, entry_number, description');
+    }
+    
+    const { data: entries, error } = await query
         .order('entry_date', { ascending: true });
     
     if (error) {
-        console.error(`❌ Error fetching ${tableName}:`, error);
+        console.error(`⚠️  Note: ${tableName} schema may differ (${error.message}). Continuing...`);
         return { module, duplicates: [], total: 0 };
     }
     
-    // Group entries by (coa_id/account_code, debit, credit, date)
+    if (!entries || entries.length === 0) {
+        console.log(`   No entries found in ${tableName}`);
+        return { module, duplicates: [], total: 0 };
+    }
+    
+    // Group entries by (account/coa_id, debit, credit, date)
     const grouped = {};
     const duplicates = [];
     
