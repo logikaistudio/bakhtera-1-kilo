@@ -14,29 +14,27 @@ WHERE b1.id IN (
     WHERE b2.id NOT IN (
         SELECT MIN(id)
         FROM public.blink_journal_entries
-        WHERE (coa_id, account_code, debit, credit, DATE(entry_date)) IN (
-            SELECT coa_id, account_code, debit, credit, DATE(entry_date)
+        WHERE (coa_id, debit, credit, DATE(entry_date)) IN (
+            SELECT coa_id, debit, credit, DATE(entry_date)
             FROM public.blink_journal_entries
-            GROUP BY coa_id, account_code, debit, credit, DATE(entry_date)
+            GROUP BY coa_id, debit, credit, DATE(entry_date)
             HAVING COUNT(*) > 1
         )
-        GROUP BY coa_id, account_code, debit, credit, DATE(entry_date)
+        GROUP BY coa_id, debit, credit, DATE(entry_date)
     )
-    AND (b2.coa_id, b2.account_code, b2.debit, b2.credit, DATE(b2.entry_date)) IN (
-        SELECT coa_id, account_code, debit, credit, DATE(entry_date)
+    AND (b2.coa_id, b2.debit, b2.credit, DATE(b2.entry_date)) IN (
+        SELECT coa_id, debit, credit, DATE(entry_date)
         FROM public.blink_journal_entries
-        GROUP BY coa_id, account_code, debit, credit, DATE(entry_date)
+        GROUP BY coa_id, debit, credit, DATE(entry_date)
         HAVING COUNT(*) > 1
     )
 );
 
--- Add unique constraint to prevent future duplicates
+-- Add unique index to prevent future duplicates
 -- Using functional index with DATE for more flexibility with timestamps
-ALTER TABLE public.blink_journal_entries
-ADD CONSTRAINT unique_blink_journal_entry 
-UNIQUE (
-    COALESCE(coa_id, -1),
-    COALESCE(account_code, ''),
+CREATE UNIQUE INDEX IF NOT EXISTS unique_blink_journal_entry 
+ON public.blink_journal_entries (
+    coa_id,
     debit,
     credit,
     DATE(entry_date)
@@ -54,28 +52,26 @@ WHERE b1.id IN (
     WHERE b2.id NOT IN (
         SELECT MIN(id)
         FROM public.bridge_journal_entries
-        WHERE (coa_id, account_code, debit, credit, DATE(entry_date)) IN (
-            SELECT coa_id, account_code, debit, credit, DATE(entry_date)
+        WHERE (coa_id, debit, credit, DATE(entry_date)) IN (
+            SELECT coa_id, debit, credit, DATE(entry_date)
             FROM public.bridge_journal_entries
-            GROUP BY coa_id, account_code, debit, credit, DATE(entry_date)
+            GROUP BY coa_id, debit, credit, DATE(entry_date)
             HAVING COUNT(*) > 1
         )
-        GROUP BY coa_id, account_code, debit, credit, DATE(entry_date)
+        GROUP BY coa_id, debit, credit, DATE(entry_date)
     )
-    AND (b2.coa_id, b2.account_code, b2.debit, b2.credit, DATE(b2.entry_date)) IN (
-        SELECT coa_id, account_code, debit, credit, DATE(entry_date)
+    AND (b2.coa_id, b2.debit, b2.credit, DATE(b2.entry_date)) IN (
+        SELECT coa_id, debit, credit, DATE(entry_date)
         FROM public.bridge_journal_entries
-        GROUP BY coa_id, account_code, debit, credit, DATE(entry_date)
+        GROUP BY coa_id, debit, credit, DATE(entry_date)
         HAVING COUNT(*) > 1
     )
 );
 
--- Add unique constraint to prevent future duplicates
-ALTER TABLE public.bridge_journal_entries
-ADD CONSTRAINT unique_bridge_journal_entry 
-UNIQUE (
-    COALESCE(coa_id, -1),
-    COALESCE(account_code, ''),
+-- Add unique index to prevent future duplicates
+CREATE UNIQUE INDEX IF NOT EXISTS unique_bridge_journal_entry 
+ON public.bridge_journal_entries (
+    coa_id,
     debit,
     credit,
     DATE(entry_date)
@@ -88,25 +84,23 @@ UNIQUE (
 -- Verify no duplicates remain in Blink
 SELECT 
     coa_id, 
-    account_code, 
     debit, 
     credit, 
     DATE(entry_date) as entry_date,
     COUNT(*) as duplicate_count
 FROM public.blink_journal_entries
-GROUP BY coa_id, account_code, debit, credit, DATE(entry_date)
+GROUP BY coa_id, debit, credit, DATE(entry_date)
 HAVING COUNT(*) > 1;
 
 -- Verify no duplicates remain in Bridge
 SELECT 
     coa_id, 
-    account_code, 
     debit, 
     credit, 
     DATE(entry_date) as entry_date,
     COUNT(*) as duplicate_count
 FROM public.bridge_journal_entries
-GROUP BY coa_id, account_code, debit, credit, DATE(entry_date)
+GROUP BY coa_id, debit, credit, DATE(entry_date)
 HAVING COUNT(*) > 1;
 
 -- Summary
