@@ -6,7 +6,8 @@ import { TrendingUp, RefreshCw, FileSpreadsheet, Printer } from 'lucide-react';
 import { useData } from '../../../context/DataContext';
 import { printReport } from '../../../utils/printPDF';
 
-const fmtIDR = (v) => v != null ? 'Rp ' + Number(v).toLocaleString('id-ID') : 'Rp 0';\nconst getAmountColor = (amount) => amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-silver-light';
+const fmtIDR = (v) => v != null ? 'Rp ' + Number(v).toLocaleString('id-ID') : 'Rp 0';
+const getAmountColor = (amount) => amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-silver-light';
 const ensureArray = (value) => Array.isArray(value) ? value : [];
 
 const BigProfitLoss = () => {
