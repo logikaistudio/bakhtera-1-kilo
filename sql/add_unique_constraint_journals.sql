@@ -7,27 +7,18 @@
 -- =====================================================
 
 -- First, identify and delete existing duplicates (keep the oldest one)
-DELETE FROM public.blink_journal_entries b1
-WHERE b1.id IN (
-    SELECT b2.id
-    FROM public.blink_journal_entries b2
-    WHERE b2.id NOT IN (
-        SELECT MIN(id)
+DELETE FROM public.blink_journal_entries
+WHERE id IN (
+    SELECT id FROM (
+        SELECT 
+            id,
+            ROW_NUMBER() OVER (
+                PARTITION BY coa_id, debit, credit, DATE(entry_date) 
+                ORDER BY entry_date ASC
+            ) as rn
         FROM public.blink_journal_entries
-        WHERE (coa_id, debit, credit, DATE(entry_date)) IN (
-            SELECT coa_id, debit, credit, DATE(entry_date)
-            FROM public.blink_journal_entries
-            GROUP BY coa_id, debit, credit, DATE(entry_date)
-            HAVING COUNT(*) > 1
-        )
-        GROUP BY coa_id, debit, credit, DATE(entry_date)
-    )
-    AND (b2.coa_id, b2.debit, b2.credit, DATE(b2.entry_date)) IN (
-        SELECT coa_id, debit, credit, DATE(entry_date)
-        FROM public.blink_journal_entries
-        GROUP BY coa_id, debit, credit, DATE(entry_date)
-        HAVING COUNT(*) > 1
-    )
+    ) t
+    WHERE rn > 1
 );
 
 -- Add unique index to prevent future duplicates
@@ -45,27 +36,18 @@ ON public.blink_journal_entries (
 -- =====================================================
 
 -- First, identify and delete existing duplicates (keep the oldest one)
-DELETE FROM public.bridge_journal_entries b1
-WHERE b1.id IN (
-    SELECT b2.id
-    FROM public.bridge_journal_entries b2
-    WHERE b2.id NOT IN (
-        SELECT MIN(id)
+DELETE FROM public.bridge_journal_entries
+WHERE id IN (
+    SELECT id FROM (
+        SELECT 
+            id,
+            ROW_NUMBER() OVER (
+                PARTITION BY coa_id, debit, credit, DATE(entry_date) 
+                ORDER BY entry_date ASC
+            ) as rn
         FROM public.bridge_journal_entries
-        WHERE (coa_id, debit, credit, DATE(entry_date)) IN (
-            SELECT coa_id, debit, credit, DATE(entry_date)
-            FROM public.bridge_journal_entries
-            GROUP BY coa_id, debit, credit, DATE(entry_date)
-            HAVING COUNT(*) > 1
-        )
-        GROUP BY coa_id, debit, credit, DATE(entry_date)
-    )
-    AND (b2.coa_id, b2.debit, b2.credit, DATE(b2.entry_date)) IN (
-        SELECT coa_id, debit, credit, DATE(entry_date)
-        FROM public.bridge_journal_entries
-        GROUP BY coa_id, debit, credit, DATE(entry_date)
-        HAVING COUNT(*) > 1
-    )
+    ) t
+    WHERE rn > 1
 );
 
 -- Add unique index to prevent future duplicates
