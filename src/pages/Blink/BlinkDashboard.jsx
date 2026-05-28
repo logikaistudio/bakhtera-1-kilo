@@ -454,8 +454,8 @@ const BlinkDashboard = () => {
                     supabase.from('blink_purchase_orders').select('*', { count: 'exact', head: true }),
                     supabase.from('blink_shipments').select('*', { count: 'exact', head: true }).not('status', 'in', '("completed","delivered")'),
                     supabase.from('blink_invoices').select('total_amount, created_at, status'),
-                    supabase.from('blink_invoices').select('id, invoice_number, customer_name, invoice_date, due_date, outstanding_amount, total_amount, status').order('created_at', { ascending: false }).limit(20),
-                    supabase.from('blink_purchase_orders').select('id, po_number, vendor_name, po_date, payment_terms, outstanding_amount, total_amount, status').order('created_at', { ascending: false }).limit(20)
+                    supabase.from('blink_invoices').select('id, invoice_number, customer_name, invoice_date, due_date, outstanding_amount, total_amount, status').gt('outstanding_amount', 0).order('created_at', { ascending: false }).limit(20),
+                    supabase.from('blink_purchase_orders').select('id, po_number, vendor_name, po_date, payment_terms, outstanding_amount, total_amount, status').gt('outstanding_amount', 0).order('created_at', { ascending: false }).limit(20)
                 ]);
 
                 // Calculate Revenue and Trend
