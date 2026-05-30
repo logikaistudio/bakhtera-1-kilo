@@ -9,6 +9,7 @@ import {
     Building, CreditCard, Banknote, History
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { getCurrencySummary, getAgingByCurrency, formatCurrencySummary } from '../../utils/multiCurrencyHelper';
 
 // AP Payment Record Modal Component
 const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
@@ -945,25 +946,37 @@ const AccountsPayable = () => {
             : `Rp ${numValue.toLocaleString('id-ID')}`;
     };
 
-    // Calculate metrics - more comprehensive
-    const totalAPAmount = apTransactions.reduce((sum, ap) => sum + (ap.original_amount || 0), 0);
-    const totalPaidAmount = apTransactions.reduce((sum, ap) => sum + (ap.paid_amount || 0), 0);
-    const totalOutstanding = apTransactions.reduce((sum, ap) => sum + (ap.outstanding_amount || 0), 0);
-    const overdueCount = apTransactions.filter(ap => ap.status === 'overdue' && ap.outstanding_amount > 0).length;
-    const dueSoon = apTransactions.filter(ap => {
-        const daysUntilDue = Math.ceil((new Date(ap.due_date) - new Date()) / (1000 * 60 * 60 * 24));
-        return daysUntilDue <= 7 && daysUntilDue >= 0 && ap.outstanding_amount > 0;
-    }).reduce((sum, ap) => sum + ap.outstanding_amount, 0);
-    const current30 = apTransactions.filter(ap => ap.aging_bucket === '0-30' && ap.outstanding_amount > 0).reduce((sum, ap) => sum + ap.outstanding_amount, 0);
-    const aged90Plus = apTransactions.filter(ap => ap.aging_bucket === '90+' && ap.outstanding_amount > 0).reduce((sum, ap) => sum + ap.outstanding_amount, 0);
+    // Calculate metrics with currency breakdown
+    const apSummary = getCurrencySummary(apTransactions, 'original_amount');
+    const paidSummary = getCurrencySummary(apTransactions, 'paid_amount');
+    const outstandingSummary = getCurrencySummary(apTransactions, 'outstanding_amount');
+    const agingByCurrency = getAgingByCurrency(apTransactions);
 
-    // Aging summary
-    const agingSummary = {
-        '0-30': apTransactions.filter(ap => ap.aging_bucket === '0-30' && ap.outstanding_amount > 0).reduce((sum, ap) => sum + ap.outstanding_amount, 0),
-        '31-60': apTransactions.filter(ap => ap.aging_bucket === '31-60' && ap.outstanding_amount > 0).reduce((sum, ap) => sum + ap.outstanding_amount, 0),
-        '61-90': apTransactions.filter(ap => ap.aging_bucket === '61-90' && ap.outstanding_amount > 0).reduce((sum, ap) => sum + ap.outstanding_amount, 0),
-        '90+': apTransactions.filter(ap => ap.aging_bucket === '90+' && ap.outstanding_amount > 0).reduce((sum, ap) => sum + ap.outstanding_amount, 0),
-    };
+    // Format currency summaries
+    const apFormatted = formatCurrencySummary(apSummary);
+    const paidFormatted = formatCurrencySummary(paidSummary);
+    const outstandingFormatted = formatCurrencySummary(outstandingSummary);
+
+    // Overdue calculations by currency
+    const overdueByStatus = getCurrencySummary(
+        apTransactions.filter(ap => ap.status === 'overdue' && ap.outstanding_amount > 0),
+        'outstanding_amount'
+    );
+    const overdueFormatted = formatCurrencySummary(overdueByStatus);
+    const overdueCount = apTransactions.filter(ap => ap.status === 'overdue' && ap.outstanding_amount > 0).length;
+
+    // Due soon (next 7 days)
+    const dueSoonByStatus = getCurrencySummary(
+        apTransactions.filter(ap => {
+            const daysUntilDue = Math.ceil((new Date(ap.due_date) - new Date()) / (1000 * 60 * 60 * 24));
+            return daysUntilDue <= 7 && daysUntilDue >= 0 && ap.outstanding_amount > 0;
+        }),
+        'outstanding_amount'
+    );
+    const dueSoonFormatted = formatCurrencySummary(dueSoonByStatus);
+
+    // For total outstanding calculation (used in aging bar)
+    const totalOutstanding = outstandingSummary.IDR.amount + outstandingSummary.USD.amount;
 
     const filteredAP = apTransactions.filter(ap => {
         const matchesFilter = filter === 'all' || ap.aging_bucket === filter || ap.status === filter;
@@ -1047,64 +1060,134 @@ const AccountsPayable = () => {
                 <Button onClick={handleExportXLS} icon={Download}>Export to Excel</Button>
             </div>
 
-            {/* Summary Cards - Compact */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {/* Summary Cards - Currency Breakdown */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* Total AP Amount */}
                 <div className="glass-card p-4 rounded-lg">
-                    <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark">Total AP Amount</p>
+                    <div className="flex items-center justify-between mb-3">
+                        <p className="text-xs text-silver-dark font-semibold">Total AP Payable</p>
                         <DollarSign className="w-4 h-4 text-blue-400" />
                     </div>
-                    <p className="text-xl font-bold text-blue-400">{formatCurrency(totalAPAmount)}</p>
-                    <p className="text-xs text-silver-dark">{apTransactions.length} transactions</p>
+                    <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                            <span className="text-sm text-silver-light">IDR:</span>
+                            <p className="text-lg font-bold text-blue-400">{apFormatted.IDR}</p>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-sm text-silver-light">USD:</span>
+                            <p className="text-lg font-bold text-yellow-400">{apFormatted.USD}</p>
+                        </div>
+                    </div>
+                    <p className="text-xs text-silver-dark mt-2">{apTransactions.length} transactions</p>
                 </div>
 
+                {/* Total Paid */}
                 <div className="glass-card p-4 rounded-lg">
-                    <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark">Total Paid</p>
+                    <div className="flex items-center justify-between mb-3">
+                        <p className="text-xs text-silver-dark font-semibold">Total Paid</p>
                         <CheckCircle className="w-4 h-4 text-green-400" />
                     </div>
-                    <p className="text-xl font-bold text-green-400">{formatCurrency(totalPaidAmount)}</p>
-                    <p className="text-xs text-silver-dark">{apTransactions.filter(ap => ap.status === 'paid').length} paid</p>
+                    <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                            <span className="text-sm text-silver-light">IDR:</span>
+                            <p className="text-lg font-bold text-green-400">{paidFormatted.IDR}</p>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-sm text-silver-light">USD:</span>
+                            <p className="text-lg font-bold text-green-300">{paidFormatted.USD}</p>
+                        </div>
+                    </div>
+                    <p className="text-xs text-silver-dark mt-2">{apTransactions.filter(ap => ap.status === 'paid').length} paid</p>
                 </div>
 
+                {/* Outstanding Balance */}
                 <div className="glass-card p-4 rounded-lg">
-                    <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark">Outstanding Balance</p>
+                    <div className="flex items-center justify-between mb-3">
+                        <p className="text-xs text-silver-dark font-semibold">Outstanding Balance</p>
                         <AlertCircle className="w-4 h-4 text-red-400" />
                     </div>
-                    <p className="text-xl font-bold text-red-400">{formatCurrency(totalOutstanding)}</p>
-                    <p className="text-xs text-silver-dark">{apTransactions.filter(ap => ap.outstanding_amount > 0).length} unpaid</p>
+                    <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                            <span className="text-sm text-silver-light">IDR:</span>
+                            <p className="text-lg font-bold text-red-400">{outstandingFormatted.IDR}</p>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-sm text-silver-light">USD:</span>
+                            <p className="text-lg font-bold text-red-300">{outstandingFormatted.USD}</p>
+                        </div>
+                    </div>
+                    <p className="text-xs text-silver-dark mt-2">{apTransactions.filter(ap => ap.outstanding_amount > 0).length} unpaid</p>
                 </div>
 
+                {/* Overdue & Due Soon */}
                 <div className="glass-card p-4 rounded-lg">
-                    <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark">Overdue</p>
+                    <div className="flex items-center justify-between mb-3">
+                        <p className="text-xs text-silver-dark font-semibold">Overdue</p>
                         <Clock className="w-4 h-4 text-orange-400" />
                     </div>
-                    <p className="text-xl font-bold text-orange-400">{overdueCount}</p>
-                    <p className="text-xs text-silver-dark">{formatCurrency(apTransactions.filter(ap => ap.status === 'overdue').reduce((sum, ap) => sum + ap.outstanding_amount, 0))}</p>
+                    <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                            <span className="text-sm text-silver-light">IDR:</span>
+                            <p className="text-lg font-bold text-orange-400">{overdueFormatted.IDR}</p>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-sm text-silver-light">USD:</span>
+                            <p className="text-lg font-bold text-orange-300">{overdueFormatted.USD}</p>
+                        </div>
+                    </div>
+                    <p className="text-xs text-silver-dark mt-2">{overdueCount} transactions</p>
                 </div>
             </div>
 
-            {/* Aging Analysis - Compact */}
+            {/* Aging Analysis - By Currency */}
             <div className="glass-card p-4 rounded-lg">
-                <h2 className="text-sm font-bold text-silver-light mb-3">Aging Analysis</h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {Object.entries(agingSummary).map(([bucket, amount]) => (
-                        <div key={bucket} className="bg-dark-surface p-3 rounded-lg">
-                            <p className="text-xs text-silver-dark">{bucket} Days</p>
-                            <p className="text-lg font-bold text-silver-light">{formatCurrency(amount)}</p>
-                            <div className="mt-1 h-1.5 bg-dark-card rounded-full overflow-hidden">
-                                <div
-                                    className={`h-full ${bucket === '0-30' ? 'bg-blue-400' :
-                                        bucket === '31-60' ? 'bg-yellow-400' :
+                <h2 className="text-sm font-bold text-silver-light mb-3">Aging Analysis (Outstanding by Currency)</h2>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {/* IDR Aging */}
+                    <div className="space-y-3">
+                        <p className="text-xs font-semibold text-blue-400">IDR Outstanding</p>
+                        {Object.entries(agingByCurrency).map(([bucket, data]) => (
+                            <div key={`idr-${bucket}`}>
+                                <div className="flex justify-between mb-1">
+                                    <span className="text-xs text-silver-dark">{bucket} Days</span>
+                                    <span className="text-sm font-semibold text-blue-300">Rp {formatCurrency(data.IDR)}</span>
+                                </div>
+                                <div className="h-1.5 bg-dark-card rounded-full overflow-hidden">
+                                    <div
+                                        className={`h-full ${
+                                            bucket === '0-30' ? 'bg-green-400' :
+                                            bucket === '31-60' ? 'bg-yellow-400' :
                                             bucket === '61-90' ? 'bg-orange-400' : 'bg-red-400'
                                         }`}
-                                    style={{ width: `${totalAPAmount > 0 ? (amount / totalAPAmount) * 100 : 0}%` }}
-                                />
+                                        style={{ width: `${outstandingSummary.IDR.amount > 0 ? (data.IDR / outstandingSummary.IDR.amount) * 100 : 0}%` }}
+                                    />
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
+
+                    {/* USD Aging */}
+                    <div className="space-y-3">
+                        <p className="text-xs font-semibold text-yellow-400">USD Outstanding</p>
+                        {Object.entries(agingByCurrency).map(([bucket, data]) => (
+                            <div key={`usd-${bucket}`}>
+                                <div className="flex justify-between mb-1">
+                                    <span className="text-xs text-silver-dark">{bucket} Days</span>
+                                    <span className="text-sm font-semibold text-yellow-300">$ {formatCurrency(data.USD)}</span>
+                                </div>
+                                <div className="h-1.5 bg-dark-card rounded-full overflow-hidden">
+                                    <div
+                                        className={`h-full ${
+                                            bucket === '0-30' ? 'bg-green-400' :
+                                            bucket === '31-60' ? 'bg-yellow-400' :
+                                            bucket === '61-90' ? 'bg-orange-400' : 'bg-red-400'
+                                        }`}
+                                        style={{ width: `${outstandingSummary.USD.amount > 0 ? (data.USD / outstandingSummary.USD.amount) * 100 : 0}%` }}
+                                    />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
 
