@@ -324,3 +324,162 @@ INSERT INTO blink_invoices (
 --    - Outstanding: Rp 13,875,000
 --    - Status: Terlambat (Overdue)
 --    - Aging: 0-30 days (2+ days overdue as of 2026-01-02)
+
+-- =====================================================
+-- SAMPLE AP DATA: Purchase Orders for Testing Dashboard
+-- =====================================================
+
+-- PO 1: PT Cargo Indonesia (30% Paid - Currency: IDR)
+INSERT INTO blink_purchase_orders (
+    po_number,
+    vendor_name,
+    vendor_email,
+    vendor_phone,
+    po_date,
+    payment_terms,
+    origin_city,
+    destination_city,
+    service_type,
+    weight,
+    volume,
+    quantity,
+    cargo_type,
+    total_amount,
+    paid_amount,
+    outstanding_amount,
+    currency,
+    exchange_rate,
+    status,
+    notes
+) VALUES (
+    'PO-2026-001',
+    'PT Cargo Indonesia',
+    'sales@cargo-id.co.id',
+    '+62-21-5555999',
+    '2026-04-15',
+    'NET 30',
+    'Surabaya',
+    'Jakarta',
+    'Sea Freight - LCL',
+    8500.00,
+    12.50,
+    2,
+    'Raw Materials',
+    85000000.00,
+    25000000.00,
+    60000000.00,
+    'IDR',
+    1.0,
+    'outstanding'
+) ON CONFLICT DO NOTHING;
+
+-- PO 2: Global Shipping Inc (50% Paid - Currency: USD)
+INSERT INTO blink_purchase_orders (
+    po_number,
+    vendor_name,
+    vendor_email,
+    vendor_phone,
+    po_date,
+    payment_terms,
+    origin_city,
+    destination_city,
+    service_type,
+    weight,
+    volume,
+    quantity,
+    cargo_type,
+    total_amount,
+    paid_amount,
+    outstanding_amount,
+    currency,
+    exchange_rate,
+    status,
+    notes
+) VALUES (
+    'PO-2026-002',
+    'Global Shipping Inc',
+    'billing@globalship.com',
+    '+1-201-5554321',
+    '2026-03-20',
+    'NET 15',
+    'Singapore',
+    'Jakarta',
+    'Air Freight',
+    2000.00,
+    3.80,
+    1,
+    'Electronics',
+    8500.00,
+    4250.00,
+    4250.00,
+    'USD',
+    16000.0,
+    'outstanding'
+) ON CONFLICT DO NOTHING;
+
+-- PO 3: PT Logistics Utama (Overdue - No Payment - Currency: IDR)
+INSERT INTO blink_purchase_orders (
+    po_number,
+    vendor_name,
+    vendor_email,
+    vendor_phone,
+    po_date,
+    payment_terms,
+    origin_city,
+    destination_city,
+    service_type,
+    weight,
+    volume,
+    quantity,
+    cargo_type,
+    total_amount,
+    paid_amount,
+    outstanding_amount,
+    currency,
+    exchange_rate,
+    status,
+    notes
+) VALUES (
+    'PO-2025-098',
+    'PT Logistics Utama',
+    'finance@logistik-utama.co.id',
+    '+62-31-5558888',
+    '2025-11-20',
+    'NET 30',
+    'Medan',
+    'Jakarta',
+    'Ground Transport',
+    15000.00,
+    35.00,
+    3,
+    'General Cargo',
+    125000000.00,
+    0.00,
+    125000000.00,
+    'IDR',
+    1.0,
+    'overdue'
+) ON CONFLICT DO NOTHING;
+
+-- =====================================================
+-- EXPECTED RESULTS IN AP DASHBOARD MONITORING
+-- =====================================================
+
+-- AP Report should show:
+-- 1. PT Logistics Utama (OVERDUE - Most Urgent)
+--    - AP Number: PO-2025-098
+--    - Outstanding: Rp 125,000,000 IDR
+--    - Due Date: 2025-12-20 (60+ days overdue as of 2026-01-02)
+--    - Status: Overdue
+
+-- 2. PT Cargo Indonesia
+--    - AP Number: PO-2026-001
+--    - Outstanding: Rp 60,000,000 IDR
+--    - Due Date: 2026-05-15 (43 days remaining)
+--    - Status: Current
+
+-- 3. Global Shipping Inc
+--    - AP Number: PO-2026-002
+--    - Outstanding: $ 4,250 USD (Rp 68,000,000 at rate 16,000)
+--    - Due Date: 2026-04-04 (27 days remaining)
+--    - Status: Current

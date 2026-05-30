@@ -443,14 +443,7 @@ const BlinkDashboard = () => {
         const fetchDashboardData = async () => {
             try {
                 // Fetch basic counts and recent data
-                const [
-                    { count: invCount },
-                    { count: poCount },
-                    { count: activeShipmentsCount },
-                    { data: invoices },
-                    { data: unpaidInvoices },
-                    { data: unpaidPOs }
-                ] = await Promise.all([
+                const results = await Promise.all([
                     supabase.from('blink_invoices').select('*', { count: 'exact', head: true }),
                     supabase.from('blink_purchase_orders').select('*', { count: 'exact', head: true }),
                     supabase.from('blink_shipments').select('*', { count: 'exact', head: true }).not('status', 'in', '("completed","delivered")'),
@@ -458,6 +451,26 @@ const BlinkDashboard = () => {
                     supabase.from('blink_invoices').select('id, invoice_number, customer_name, invoice_date, due_date, outstanding_amount, total_amount, status, currency, exchange_rate').gt('outstanding_amount', 0).order('created_at', { ascending: false }).limit(20),
                     supabase.from('blink_purchase_orders').select('id, po_number, vendor_name, po_date, payment_terms, outstanding_amount, total_amount, status, currency, exchange_rate').gt('outstanding_amount', 0).order('created_at', { ascending: false }).limit(20)
                 ]);
+
+                // Extract results with error checking
+                const invCount = results[0]?.count ?? 0;
+                const poCount = results[1]?.count ?? 0;
+                const activeShipmentsCount = results[2]?.count ?? 0;
+                const invoices = results[3]?.data ?? [];
+                const unpaidInvoices = results[4]?.data ?? [];
+                const unpaidPOs = results[5]?.data ?? [];
+
+                // Debug logging
+                console.log('[Dashboard] Fetch Results:', {
+                    invCount,
+                    poCount,
+                    activeShipmentsCount,
+                    invoicesTotal: invoices.length,
+                    unpaidInvoicesCount: unpaidInvoices.length,
+                    unpaidPOsCount: unpaidPOs.length
+                });
+                if (unpaidInvoices.length > 0) console.log('[Dashboard] Unpaid Invoices:', unpaidInvoices);
+                if (unpaidPOs.length > 0) console.log('[Dashboard] Unpaid POs:', unpaidPOs);
 
                 // Calculate Revenue and Trend
                 let totalRev = 0;
@@ -502,11 +515,11 @@ const BlinkDashboard = () => {
                 const revenueTrend = lastMonthRev === 0 ? 100 : ((currentMonthRev - lastMonthRev) / lastMonthRev) * 100;
                 
                 setStats({
-                    totalInvoices: invCount || 0,
+                    totalInvoices: invCount ?? 0,
                     invoicesTrend: 12.5, // Mocked positive trend for aesthetic
-                    purchaseOrders: poCount || 0,
+                    purchaseOrders: poCount ?? 0,
                     ordersTrend: -4.2, // Mocked negative trend
-                    activeShipments: activeShipmentsCount || 0,
+                    activeShipments: activeShipmentsCount ?? 0,
                     shipmentsTrend: 8.1,
                     totalRevenue: totalRev,
                     revenueTrend: revenueTrend,
@@ -515,24 +528,24 @@ const BlinkDashboard = () => {
                 
                 // Process Aging AR/AP
                 let agingList = [];
-                (unpaidInvoices || []).forEach(inv => {
-                    let due = new Date(inv.due_date || inv.invoice_date);
+                (unpaidInvoices ?? []).forEach(inv => {
+                    let due = new Date(inv.due_date ?? inv.invoice_date);
                     let days = Math.floor((now - due) / (1000 * 60 * 60 * 24));
                     agingList.push({
                         id: inv.id,
                         type: 'AR',
                         doc_number: inv.invoice_number,
                         partner: inv.customer_name,
-                        due_date: inv.due_date || inv.invoice_date,
-                        amount: inv.outstanding_amount || inv.total_amount,
-                        currency: inv.currency || 'IDR',
-                        exchange_rate: inv.exchange_rate || 1,
+                        due_date: inv.due_date ?? inv.invoice_date,
+                        amount: inv.outstanding_amount ?? inv.total_amount ?? 0,
+                        currency: inv.currency ?? 'IDR',
+                        exchange_rate: inv.exchange_rate ?? 1,
                         days_overdue: days,
                         status: inv.status
                     });
                 });
 
-                (unpaidPOs || []).forEach(po => {
+                (unpaidPOs ?? []).forEach(po => {
                     let due = new Date(po.po_date);
                     if (po.payment_terms && po.payment_terms.includes('30')) {
                         due.setDate(due.getDate() + 30);
@@ -544,20 +557,32 @@ const BlinkDashboard = () => {
                         doc_number: po.po_number,
                         partner: po.vendor_name,
                         due_date: due.toISOString().split('T')[0],
-                        amount: po.outstanding_amount || po.total_amount,
-                        currency: po.currency || 'IDR',
-                        exchange_rate: po.exchange_rate || 1,
+                        amount: po.outstanding_amount ?? po.total_amount ?? 0,
+                        currency: po.currency ?? 'IDR',
+                        exchange_rate: po.exchange_rate ?? 1,
                         days_overdue: days,
                         status: po.status
                     });
                 });
 
+                // Debug aging list
+                console.log('[Dashboard] Aging List Total:', agingList.length, agingList);
+
                 // Sort by most overdue
                 agingList.sort((a, b) => b.days_overdue - a.days_overdue);
-                setAgingData(agingList.slice(0, 6));
+                const finalAgingData = agingList.slice(0, 6);
+                console.log('[Dashboard] Final Aging Data (6 items):', finalAgingData);
+                setAgingData(finalAgingData);
 
             } catch (error) {
-                console.error("Error fetching dashboard data:", error);
+                console.error("[Dashboard] Error fetching dashboard data:", error);
+                console.error("[Dashboard] Error details:", {
+                    message: error.message,
+                    hint: error.hint,
+                    details: error.details
+                });
+                // Set empty aging data on error to prevent UI crash
+                setAgingData([]);
             } finally {
                 setLoading(false);
             }
