@@ -448,8 +448,16 @@ const BlinkDashboard = () => {
                     supabase.from('blink_purchase_orders').select('*', { count: 'exact', head: true }),
                     supabase.from('blink_shipments').select('*', { count: 'exact', head: true }).not('status', 'in', '("completed","delivered")'),
                     supabase.from('blink_invoices').select('total_amount, created_at, status'),
-                    supabase.from('blink_invoices').select('id, invoice_number, customer_name, invoice_date, due_date, outstanding_amount, total_amount, status, currency, exchange_rate').gt('outstanding_amount', 0).order('created_at', { ascending: false }).limit(20),
-                    supabase.from('blink_purchase_orders').select('id, po_number, vendor_name, po_date, payment_terms, outstanding_amount, total_amount, status, currency, exchange_rate').gt('outstanding_amount', 0).order('created_at', { ascending: false }).limit(20)
+                    // AR: use status filter — outstanding_amount may be null in older rows
+                    supabase.from('blink_invoices').select('id, invoice_number, customer_name, invoice_date, due_date, outstanding_amount, total_amount, paid_amount, status, currency, exchange_rate')
+                        .not('status', 'in', '("draft","cancelled","paid")')
+                        .gt('total_amount', 0)
+                        .order('invoice_date', { ascending: false }).limit(20),
+                    // AP: outstanding_amount is in blink_ap_transactions, not blink_purchase_orders
+                    supabase.from('blink_ap_transactions').select('id, ap_number, po_number, vendor_name, bill_date, due_date, outstanding_amount, original_amount, paid_amount, status, currency, exchange_rate')
+                        .not('status', 'in', '("paid","cancelled")')
+                        .gt('original_amount', 0)
+                        .order('bill_date', { ascending: false }).limit(20)
                 ]);
 
                 // Extract results with error checking
@@ -529,6 +537,11 @@ const BlinkDashboard = () => {
                 // Process Aging AR/AP
                 let agingList = [];
                 (unpaidInvoices ?? []).forEach(inv => {
+                    // Compute outstanding: use stored value or fall back to total - paid
+                    const outstanding = (inv.outstanding_amount != null)
+                        ? inv.outstanding_amount
+                        : Math.max(0, (inv.total_amount || 0) - (inv.paid_amount || 0));
+                    if (outstanding <= 0) return; // skip fully paid
                     let due = new Date(inv.due_date ?? inv.invoice_date);
                     let days = Math.floor((now - due) / (1000 * 60 * 60 * 24));
                     agingList.push({
@@ -537,7 +550,7 @@ const BlinkDashboard = () => {
                         doc_number: inv.invoice_number,
                         partner: inv.customer_name,
                         due_date: inv.due_date ?? inv.invoice_date,
-                        amount: inv.outstanding_amount ?? inv.total_amount ?? 0,
+                        amount: outstanding,
                         currency: inv.currency ?? 'IDR',
                         exchange_rate: inv.exchange_rate ?? 1,
                         days_overdue: days,
@@ -545,23 +558,25 @@ const BlinkDashboard = () => {
                     });
                 });
 
-                (unpaidPOs ?? []).forEach(po => {
-                    let due = new Date(po.po_date);
-                    if (po.payment_terms && po.payment_terms.includes('30')) {
-                        due.setDate(due.getDate() + 30);
-                    }
+                (unpaidPOs ?? []).forEach(ap => {
+                    // blink_ap_transactions fields
+                    const outstanding = (ap.outstanding_amount != null)
+                        ? ap.outstanding_amount
+                        : Math.max(0, (ap.original_amount || 0) - (ap.paid_amount || 0));
+                    if (outstanding <= 0) return; // skip fully paid
+                    let due = new Date(ap.due_date || ap.bill_date);
                     let days = Math.floor((now - due) / (1000 * 60 * 60 * 24));
                     agingList.push({
-                        id: po.id,
+                        id: ap.id,
                         type: 'AP',
-                        doc_number: po.po_number,
-                        partner: po.vendor_name,
-                        due_date: due.toISOString().split('T')[0],
-                        amount: po.outstanding_amount ?? po.total_amount ?? 0,
-                        currency: po.currency ?? 'IDR',
-                        exchange_rate: po.exchange_rate ?? 1,
+                        doc_number: ap.ap_number || ap.po_number,
+                        partner: ap.vendor_name,
+                        due_date: ap.due_date || ap.bill_date,
+                        amount: outstanding,
+                        currency: ap.currency ?? 'IDR',
+                        exchange_rate: ap.exchange_rate ?? 1,
                         days_overdue: days,
-                        status: po.status
+                        status: ap.status
                     });
                 });
 
