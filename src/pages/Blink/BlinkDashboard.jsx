@@ -450,7 +450,7 @@ const BlinkDashboard = () => {
                     supabase.from('blink_invoices').select('total_amount, created_at, status'),
                     // AR: explicit list of statuses that represent active/unpaid invoices
                     supabase.from('blink_invoices')
-                        .select('id, invoice_number, customer_name, invoice_date, due_date, outstanding_amount, total_amount, paid_amount, status, currency, exchange_rate')
+                        .select('id, invoice_number, customer_name, invoice_date, due_date, outstanding_amount, total_amount, paid_amount, status, currency')
                         .in('status', ['unpaid', 'overdue', 'partially_paid', 'submitted', 'manager_approval', 'sent'])
                         .order('invoice_date', { ascending: false }).limit(20),
                     // AP: query blink_ap_transactions (populated when PO is approved)
@@ -578,7 +578,7 @@ const BlinkDashboard = () => {
                         due_date: inv.due_date ?? inv.invoice_date,
                         amount: outstanding,
                         currency: inv.currency ?? 'IDR',
-                        exchange_rate: inv.exchange_rate ?? 1,
+                        exchange_rate: 1,
                         days_overdue: days,
                         status: inv.status
                     });
