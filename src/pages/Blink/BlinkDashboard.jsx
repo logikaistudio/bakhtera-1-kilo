@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadialBarChart, RadialBar, Legend, Cell } from 'recharts';
+import { getCurrencySymbol, formatCurrency } from '../../utils/currencyFormatter';
 
 // ─── Table definitions with order of deletion (child → parent) ───────────────
 const BLINK_TABLES = [
@@ -454,8 +455,8 @@ const BlinkDashboard = () => {
                     supabase.from('blink_purchase_orders').select('*', { count: 'exact', head: true }),
                     supabase.from('blink_shipments').select('*', { count: 'exact', head: true }).not('status', 'in', '("completed","delivered")'),
                     supabase.from('blink_invoices').select('total_amount, created_at, status'),
-                    supabase.from('blink_invoices').select('id, invoice_number, customer_name, invoice_date, due_date, outstanding_amount, total_amount, status').gt('outstanding_amount', 0).order('created_at', { ascending: false }).limit(20),
-                    supabase.from('blink_purchase_orders').select('id, po_number, vendor_name, po_date, payment_terms, outstanding_amount, total_amount, status').gt('outstanding_amount', 0).order('created_at', { ascending: false }).limit(20)
+                    supabase.from('blink_invoices').select('id, invoice_number, customer_name, invoice_date, due_date, outstanding_amount, total_amount, status, currency, exchange_rate').gt('outstanding_amount', 0).order('created_at', { ascending: false }).limit(20),
+                    supabase.from('blink_purchase_orders').select('id, po_number, vendor_name, po_date, payment_terms, outstanding_amount, total_amount, status, currency, exchange_rate').gt('outstanding_amount', 0).order('created_at', { ascending: false }).limit(20)
                 ]);
 
                 // Calculate Revenue and Trend
@@ -524,6 +525,8 @@ const BlinkDashboard = () => {
                         partner: inv.customer_name,
                         due_date: inv.due_date || inv.invoice_date,
                         amount: inv.outstanding_amount || inv.total_amount,
+                        currency: inv.currency || 'IDR',
+                        exchange_rate: inv.exchange_rate || 1,
                         days_overdue: days,
                         status: inv.status
                     });
@@ -542,6 +545,8 @@ const BlinkDashboard = () => {
                         partner: po.vendor_name,
                         due_date: due.toISOString().split('T')[0],
                         amount: po.outstanding_amount || po.total_amount,
+                        currency: po.currency || 'IDR',
+                        exchange_rate: po.exchange_rate || 1,
                         days_overdue: days,
                         status: po.status
                     });
@@ -566,6 +571,15 @@ const BlinkDashboard = () => {
         return `IDR ${val.toLocaleString('id-ID')}`;
     };
 
+    // Format currency with symbol and amount
+    const formatCurrencyAmount = (amount, currency = 'IDR') => {
+        if (!amount) return `${getCurrencySymbol(currency || 'IDR')} 0`;
+        const formatted = formatCurrency(amount);
+        const symbol = getCurrencySymbol(currency || 'IDR');
+        return `${symbol} ${formatted}`;
+    };
+
+    // Legacy formatIDR for backward compatibility
     const formatIDR = (val) => {
         if (!val) return 'IDR 0';
         return `IDR ${val.toLocaleString('id-ID')}`;
@@ -780,7 +794,12 @@ const BlinkDashboard = () => {
                                                 {item.partner || '-'}
                                             </td>
                                             <td className="px-6 py-4 font-semibold text-slate-800">
-                                                {formatIDR(item.amount)}
+                                                <div className="flex items-center gap-1">
+                                                    <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${item.currency === 'USD' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                        {item.currency}
+                                                    </span>
+                                                    <span>{formatCurrencyAmount(item.amount, item.currency)}</span>
+                                                </div>
                                             </td>
                                             <td className="px-6 py-4 text-slate-500">
                                                 {new Date(item.due_date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
