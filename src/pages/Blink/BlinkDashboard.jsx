@@ -448,37 +448,63 @@ const BlinkDashboard = () => {
                     supabase.from('blink_purchase_orders').select('*', { count: 'exact', head: true }),
                     supabase.from('blink_shipments').select('*', { count: 'exact', head: true }).not('status', 'in', '("completed","delivered")'),
                     supabase.from('blink_invoices').select('total_amount, created_at, status'),
-                    // AR: use status filter — outstanding_amount may be null in older rows
-                    supabase.from('blink_invoices').select('id, invoice_number, customer_name, invoice_date, due_date, outstanding_amount, total_amount, paid_amount, status, currency, exchange_rate')
-                        .not('status', 'in', '("draft","cancelled","paid")')
-                        .gt('total_amount', 0)
+                    // AR: explicit list of statuses that represent active/unpaid invoices
+                    supabase.from('blink_invoices')
+                        .select('id, invoice_number, customer_name, invoice_date, due_date, outstanding_amount, total_amount, paid_amount, status, currency, exchange_rate')
+                        .in('status', ['unpaid', 'overdue', 'partially_paid', 'submitted', 'manager_approval', 'sent'])
                         .order('invoice_date', { ascending: false }).limit(20),
-                    // AP: outstanding_amount is in blink_ap_transactions, not blink_purchase_orders
-                    supabase.from('blink_ap_transactions').select('id, ap_number, po_number, vendor_name, bill_date, due_date, outstanding_amount, original_amount, paid_amount, status, currency, exchange_rate')
-                        .not('status', 'in', '("paid","cancelled")')
-                        .gt('original_amount', 0)
+                    // AP: query blink_ap_transactions (populated when PO is approved)
+                    supabase.from('blink_ap_transactions')
+                        .select('id, ap_number, po_number, vendor_name, bill_date, due_date, outstanding_amount, original_amount, paid_amount, status, currency, exchange_rate')
+                        .in('status', ['outstanding', 'overdue', 'partial'])
                         .order('bill_date', { ascending: false }).limit(20)
                 ]);
 
-                // Extract results with error checking
+                // Extract results — log errors per-query for diagnosis
                 const invCount = results[0]?.count ?? 0;
                 const poCount = results[1]?.count ?? 0;
                 const activeShipmentsCount = results[2]?.count ?? 0;
                 const invoices = results[3]?.data ?? [];
+                if (results[3]?.error) console.warn('[Dashboard] blink_invoices revenue query error:', results[3].error.message);
+
                 const unpaidInvoices = results[4]?.data ?? [];
-                const unpaidPOs = results[5]?.data ?? [];
+                if (results[4]?.error) console.warn('[Dashboard] AR query error:', results[4].error.message);
+
+                let unpaidPOs = results[5]?.data ?? [];
+                if (results[5]?.error) {
+                    console.warn('[Dashboard] blink_ap_transactions error (will fallback):', results[5].error.message);
+                    // Fallback: read from blink_purchase_orders for approved POs
+                    const { data: poFallback } = await supabase
+                        .from('blink_purchase_orders')
+                        .select('id, po_number, vendor_name, po_date, payment_terms, total_amount, paid_amount, currency, exchange_rate, status')
+                        .in('status', ['approved', 'received'])
+                        .order('po_date', { ascending: false }).limit(20);
+                    unpaidPOs = (poFallback || []).map(po => {
+                        let daysToAdd = 30;
+                        const m = String(po.payment_terms || 'NET 30').match(/\d+/);
+                        if (m) daysToAdd = parseInt(m[0], 10);
+                        const due = new Date(po.po_date);
+                        due.setDate(due.getDate() + daysToAdd);
+                        return {
+                            ...po,
+                            ap_number: `AP-${po.po_number}`,
+                            bill_date: po.po_date,
+                            due_date: due.toISOString().split('T')[0],
+                            original_amount: po.total_amount,
+                            outstanding_amount: Math.max(0, (po.total_amount || 0) - (po.paid_amount || 0)),
+                            status: 'outstanding'
+                        };
+                    });
+                }
 
                 // Debug logging
                 console.log('[Dashboard] Fetch Results:', {
-                    invCount,
-                    poCount,
-                    activeShipmentsCount,
+                    invCount, poCount, activeShipmentsCount,
                     invoicesTotal: invoices.length,
                     unpaidInvoicesCount: unpaidInvoices.length,
-                    unpaidPOsCount: unpaidPOs.length
+                    unpaidPOsCount: unpaidPOs.length,
+                    unpaidInvoiceStatuses: unpaidInvoices.map(i => i.status),
                 });
-                if (unpaidInvoices.length > 0) console.log('[Dashboard] Unpaid Invoices:', unpaidInvoices);
-                if (unpaidPOs.length > 0) console.log('[Dashboard] Unpaid POs:', unpaidPOs);
 
                 // Calculate Revenue and Trend
                 let totalRev = 0;
