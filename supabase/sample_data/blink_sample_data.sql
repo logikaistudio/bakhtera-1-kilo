@@ -1,5 +1,14 @@
+-- ⚠️  WARNING: DO NOT RUN ON PRODUCTION DATABASE ⚠️
+-- This file inserts FAKE/TEST data directly into production tables.
+-- Running this will cause:
+--   1. Extreme AR aging (150+ days overdue) from backdated invoices
+--   2. Illegal PO status values ('outstanding','overdue') not recognized by app
+--   3. Corrupt AR/AP dashboard metrics
+--
+-- If accidentally run, use: supabase/sample_data/cleanup_sample_data.sql
+-- =========================================================================
 -- Sample Data for BLINK Module: AR/AP Dashboard Testing
--- Run this in Supabase SQL Editor to populate test data
+-- Run this ONLY on a staging/local environment
 
 -- ============================================
 -- INVOICES (AR) - Direct insert without FK deps
