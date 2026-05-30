@@ -939,7 +939,7 @@ const BridgeAccountsPayable = () => {
     };
 
     const formatCurrency = (value, currency = 'IDR') => {
-        const numValue = value || 0;
+        const numValue = Number(value || 0);
         return currency === 'USD'
             ? `$${numValue.toLocaleString('id-ID')}`
             : `Rp ${numValue.toLocaleString('id-ID')}`;

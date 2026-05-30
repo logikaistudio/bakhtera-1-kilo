@@ -1241,9 +1241,10 @@ const BridgePurchaseOrder = () => {
     };
 
     const formatCurrency = (value, currency = 'IDR') => {
+        const numValue = Number(value || 0);
         return currency === 'USD'
-            ? `$${value.toLocaleString('id-ID')} `
-            : `Rp ${value.toLocaleString('id-ID')} `;
+            ? `$${numValue.toLocaleString('id-ID')} `
+            : `Rp ${numValue.toLocaleString('id-ID')} `;
     };
 
     const filteredPOs = pos.filter(po => {
