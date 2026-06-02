@@ -160,10 +160,10 @@ export const generateBLPrintHTML = (blData) => {
 
         .doc-watermark {
             position: absolute;
-            top: 42%;
+            top: 58%;
             left: 50%;
             transform: translate(-50%, -50%) rotate(-30deg);
-            font-size: 43pt;
+            font-size: 22pt;
             font-weight: 900;
             color: rgba(234, 88, 12, 0.13);
             z-index: 0;
