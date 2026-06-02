@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Search, Building2, User, ChevronDown } from 'lucide-react';
 
@@ -24,61 +24,72 @@ const PartnerPicker = ({
     onPartnerLoad
 }) => {
     const [partners, setPartners] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [isOpen, setIsOpen] = useState(false);
     const [selectedPartner, setSelectedPartner] = useState(null);
+    const searchDebounce = useRef(null);
 
+    // Load selected partner by ID on mount / value change
     useEffect(() => {
-        fetchPartners();
-    }, [roleFilter]);
-
-    useEffect(() => {
-        if (value && partners.length > 0) {
-            const partner = partners.find(p => p.id === value);
-            setSelectedPartner(partner);
-            if (partner && onPartnerLoad) {
-                onPartnerLoad(partner);
-            }
+        if (!value) return;
+        const existing = partners.find(p => p.id === value);
+        if (existing) {
+            setSelectedPartner(existing);
+            if (onPartnerLoad) onPartnerLoad(existing);
+        } else {
+            // Fetch specific partner by ID if not in current list
+            supabase
+                .from('blink_business_partners')
+                .select('*')
+                .eq('id', value)
+                .single()
+                .then(({ data }) => {
+                    if (data) {
+                        setSelectedPartner(data);
+                        if (onPartnerLoad) onPartnerLoad(data);
+                    }
+                });
         }
-    }, [value, partners]);
+    }, [value]);
 
-    const fetchPartners = async () => {
+    // Server-side search: fetch when searchTerm changes (debounced)
+    useEffect(() => {
+        if (!isOpen) return;
+        if (searchDebounce.current) clearTimeout(searchDebounce.current);
+        searchDebounce.current = setTimeout(() => {
+            fetchPartners(searchTerm);
+        }, 300);
+        return () => clearTimeout(searchDebounce.current);
+    }, [searchTerm, isOpen, roleFilter]);
+
+    // When dropdown opens, do initial fetch
+    useEffect(() => {
+        if (isOpen) fetchPartners('');
+    }, [isOpen]);
+
+    const fetchPartners = async (search) => {
         try {
             setLoading(true);
-            console.log('🔍 PartnerPicker: Fetching partners with roleFilter:', roleFilter);
-
             let query = supabase
                 .from('blink_business_partners')
                 .select('*')
                 .eq('status', 'active');
 
-            // Apply role filter
             if (roleFilter !== 'all') {
-                const roleColumn = `is_${roleFilter}`;
-                console.log('🔍 PartnerPicker: Applying filter:', roleColumn, '= true');
-                query = query.eq(roleColumn, true);
+                query = query.eq(`is_${roleFilter}`, true);
             }
 
-            const { data, error } = await query.order('partner_name');
-
-            if (error) {
-                console.error('❌ PartnerPicker: Error fetching partners:', error);
-                console.error('Error details:', {
-                    message: error.message,
-                    details: error.details,
-                    hint: error.hint,
-                    code: error.code
-                });
-                throw error;
+            if (search && search.trim().length > 0) {
+                query = query.ilike('partner_name', `%${search.trim()}%`);
             }
 
-            console.log('✅ PartnerPicker: Successfully fetched', data?.length || 0, 'partners');
+            const { data, error } = await query.order('partner_name').limit(200);
+
+            if (error) throw error;
             setPartners(data || []);
         } catch (error) {
-            console.error('❌ PartnerPicker: Catch block error:', error);
-            // Show user-friendly error
-            alert(`Failed to load partners: ${error.message}\n\nPlease check:\n1. Database connection\n2. Table 'blink_business_partners' exists\n3. RLS policies are configured`);
+            console.error('❌ PartnerPicker: Error fetching partners:', error);
         } finally {
             setLoading(false);
         }
@@ -102,17 +113,7 @@ const PartnerPicker = ({
         return name.split(/\r?\n/)[0].trim();
     };
 
-    const filteredPartners = partners.filter(p => {
-        const displayName = cleanName(p.partner_name);
-        const search = searchTerm.toLowerCase();
-        return (
-            !searchTerm ||
-            displayName.toLowerCase().includes(search) ||
-            p.partner_name?.toLowerCase().includes(search) ||
-            p.partner_code?.toLowerCase().includes(search) ||
-            p.email?.toLowerCase().includes(search)
-        );
-    });
+    const filteredPartners = partners;
 
     const sizeClasses = {
         sm: 'text-xs py-1.5 px-2',
