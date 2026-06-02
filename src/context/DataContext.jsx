@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { fileToBase64, validateImage } from '../utils/validateImage';
 
 const DataContext = createContext();
 
@@ -2851,31 +2852,21 @@ export const DataProvider = ({ children }) => {
 
     const uploadCompanyLogo = async (file) => {
         try {
-            const fileName = `logo-${Date.now()}.${file.name.split('.').pop()}`;
-            const filePath = `${fileName}`;
+            // Validate file
+            const validation = validateImage(file);
+            if (!validation.isValid) {
+                throw new Error(validation.errors.join('\n'));
+            }
 
-            // Upload to Supabase Storage
-            const { data, error } = await supabase.storage
-                .from('company-logos')
-                .upload(filePath, file, {
-                    cacheControl: '3600',
-                    upsert: true
-                });
+            // Convert to base64 and store directly in DB (no Storage bucket needed)
+            const base64 = await fileToBase64(file);
 
-            if (error) throw error;
-
-            // Get public URL
-            const { data: { publicUrl } } = supabase.storage
-                .from('company-logos')
-                .getPublicUrl(filePath);
-
-            // Update company settings with new logo URL
             await updateCompanySettings({
                 ...companySettings,
-                logo_url: publicUrl
+                logo_url: base64
             });
 
-            return publicUrl;
+            return base64;
         } catch (error) {
             console.error('Error uploading logo:', error);
             throw error;
