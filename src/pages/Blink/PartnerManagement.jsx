@@ -31,7 +31,7 @@ const PartnerManagement = () => {
         country: 'Indonesia',
         tax_id: '',
         // Roles
-        is_customer: false,
+        is_customer: true,
         is_vendor: false,
         is_agent: false,
         is_transporter: false,
@@ -141,7 +141,7 @@ const PartnerManagement = () => {
             postal_code: '',
             country: 'Indonesia',
             tax_id: '',
-            is_customer: false,
+            is_customer: true,
             is_vendor: false,
             is_agent: false,
             is_transporter: false,
