@@ -609,7 +609,7 @@ const BalanceSheet = () => {
         if (row.kind === 'section') {
             return (
                 <td colSpan={2} className="px-4 py-2.5 border-b border-dark-border/40 bg-dark-surface/20">
-                    <span className="text-sm font-extrabold text-white tracking-wider">{row.label}</span>
+                    <span className="text-sm font-extrabold text-black tracking-wider">{row.label}</span>
                 </td>
             );
         }
@@ -617,7 +617,7 @@ const BalanceSheet = () => {
         if (row.kind === 'group') {
             return (
                 <td colSpan={2} className="px-6 py-2.5 bg-dark-surface/10">
-                    <span className="text-xs font-extrabold text-white tracking-wide">{row.label}</span>
+                    <span className="text-xs font-extrabold text-black tracking-wide">{row.label}</span>
                 </td>
             );
         }
@@ -625,8 +625,8 @@ const BalanceSheet = () => {
         if (row.kind === 'subtotal') {
             return (
                 <>
-                    <td className="px-6 py-2.5 text-right text-xs font-bold text-silver-light">{row.label}</td>
-                    <td className="scontro-amount-cell px-4 py-2.5 text-right text-xs font-bold text-silver-light font-mono whitespace-nowrap">{row.value}</td>
+                    <td className="px-6 py-2.5 text-right text-xs font-bold text-black">{row.label}</td>
+                    <td className="scontro-amount-cell px-4 py-2.5 text-right text-xs font-bold text-black font-mono whitespace-nowrap">{row.value}</td>
                 </>
             );
         }
@@ -643,7 +643,7 @@ const BalanceSheet = () => {
         return (
             <>
                 <td
-                    className={`px-8 py-2 text-xs text-right ${row.isCalculated ? 'italic text-silver-dark cursor-default font-semibold' : 'text-silver-light cursor-pointer hover:text-accent-orange font-bold'}`}
+                    className={`px-8 py-2 text-xs text-right ${row.isCalculated ? 'italic text-gray-500 cursor-default font-semibold' : 'text-black cursor-pointer hover:text-accent-orange font-bold'}`}
                     onClick={() => {
                         if (!row.accId || row.isCalculated) return;
                         handleAccountClick(row.accId);
@@ -651,7 +651,7 @@ const BalanceSheet = () => {
                 >
                     {row.label}
                 </td>
-                <td className="scontro-amount-cell px-4 py-1.5 text-right text-xs text-silver-light font-mono whitespace-nowrap">{row.value}</td>
+                <td className="scontro-amount-cell px-4 py-1.5 text-right text-xs text-black font-mono whitespace-nowrap">{row.value}</td>
             </>
         );
     };
@@ -814,7 +814,7 @@ const BalanceSheet = () => {
                     </div>
                 ) : (
                     <div className="glass-card rounded-lg overflow-hidden border border-dark-border/50">
-                        <div className="px-4 py-2 text-[11px] text-silver-dark border-b border-dark-border/40">
+                        <div className="px-4 py-2 text-[11px] text-black border-b border-dark-border/40">
                             Mode Scontro: sisi kiri ASSETS dan sisi kanan LIABILITIES + EQUITY ditampilkan berdampingan.
                         </div>
                         <div className="overflow-x-auto">
