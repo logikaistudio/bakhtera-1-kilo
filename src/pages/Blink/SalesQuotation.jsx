@@ -1010,6 +1010,7 @@ const SalesQuotation = () => {
                     so_number: newShipment.soNumber,
                     quotation_id: quotation.id,
                     customer: newShipment.customer,
+                    customer_id: quotation.customerId || null,
                     sales_person: newShipment.salesPerson,
                     quotation_type: newShipment.quotationType,
                     quotation_date: newShipment.quotationDate,
@@ -1023,6 +1024,8 @@ const SalesQuotation = () => {
                     quoted_amount: newShipment.quotedAmount,
                     currency: quotation.currency || 'USD',
                     exchange_rate: quotation.currency === 'IDR' ? 1 : (quotation.exchange_rate || 16000),
+                    incoterm: quotation.incoterm || null,
+                    payment_terms: quotation.paymentTerms || null,
                     status: newShipment.status,
                     created_from: 'sales_order',
 
@@ -1628,6 +1631,9 @@ const SalesQuotation = () => {
                         </div>
                     </div>
 
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-700">Selling Price / Service Items <span className="text-gray-400 font-normal">(Opsional — dapat diisi kemudian)</span></span>
+                    </div>
                     <GroupedServiceItemManager
                         items={formData.serviceItems}
                         onChange={(newGroups) => {
@@ -1656,6 +1662,9 @@ const SalesQuotation = () => {
 
                     {/* Cost Breakdown */}
                     <div className="mt-8 border-t border-gray-200 pt-8">
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-gray-700">Cost Breakdown <span className="text-gray-400 font-normal">(Opsional — dapat diisi kemudian)</span></span>
+                        </div>
                         <GroupedServiceItemManager
                             items={formData.costItems}
                             onChange={(newGroups) => {

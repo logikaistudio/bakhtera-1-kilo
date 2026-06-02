@@ -314,6 +314,12 @@ const GroupedServiceItemManager = ({
                 </div>
             )}
 
+            {groups.length === 0 && readOnly && (
+                <div className="text-center py-6 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                    <p className="text-sm text-gray-400 italic">Belum ada item — dapat ditambahkan saat edit quotation.</p>
+                </div>
+            )}
+
             {groups.map((group, groupIndex) => {
                 // Group totals
                 let groupTotalIdr = 0;
