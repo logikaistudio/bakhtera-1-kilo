@@ -648,7 +648,7 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                                             value={targetForm.sales_name}
                                             onChange={e => setTargetForm(f => ({ ...f, sales_name: e.target.value }))}
                                             placeholder="Contoh: Budi Santoso"
-                                            className="w-full bg-dark-card border border-dark-border rounded-lg px-3 py-2 text-silver-light text-sm focus:outline-none focus:border-accent-orange"
+                                            className="w-full bg-dark-card border border-dark-border rounded-lg px-3 py-2 text-white placeholder:text-gray-500 text-sm focus:outline-none focus:border-accent-orange"
                                         />
                                     </div>
                                     <div>
@@ -659,7 +659,7 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                                             value={targetForm.division}
                                             onChange={e => setTargetForm(f => ({ ...f, division: e.target.value }))}
                                             placeholder="Contoh: Sea Freight"
-                                            className="w-full bg-dark-card border border-dark-border rounded-lg px-3 py-2 text-silver-light text-sm focus:outline-none focus:border-accent-orange"
+                                            className="w-full bg-dark-card border border-dark-border rounded-lg px-3 py-2 text-white placeholder:text-gray-500 text-sm focus:outline-none focus:border-accent-orange"
                                         />
                                         <datalist id="division-suggestions">
                                             <option value="Sea Freight" />
@@ -676,7 +676,7 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                                             value={targetForm.yearly_target}
                                             onChange={e => setTargetForm(f => ({ ...f, yearly_target: e.target.value }))}
                                             placeholder="Contoh: 1000000000"
-                                            className="w-full bg-dark-card border border-dark-border rounded-lg px-3 py-2 text-silver-light text-sm focus:outline-none focus:border-accent-orange"
+                                            className="w-full bg-dark-card border border-dark-border rounded-lg px-3 py-2 text-white placeholder:text-gray-500 text-sm focus:outline-none focus:border-accent-orange"
                                         />
                                         {targetForm.yearly_target && Number(targetForm.yearly_target) > 0 && (
                                             <p className="text-xs text-silver-dark mt-1">
