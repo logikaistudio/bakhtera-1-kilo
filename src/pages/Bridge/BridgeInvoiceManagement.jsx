@@ -1072,6 +1072,7 @@ const BridgeInvoiceManagement = () => {
                         
                         /* Header */
                         .header-row { display: flex; justify-content: space-between; margin-bottom: 20px; align-items: flex-start; }
+                        .company-logo img { max-height: 64px; max-width: 160px; object-fit: contain; display: block; }
                         .company-logo h1 { margin: 0; font-size: 24px; font-weight: bold; font-style: italic; color: #000; }
                         .company-logo p { margin: 0; font-size: 9px; letter-spacing: 3px; color: #555; text-transform: uppercase; }
                         .company-address { text-align: right; font-size: 10px; line-height: 1.4; color: #333; }
@@ -1169,8 +1170,10 @@ const BridgeInvoiceManagement = () => {
                         <!-- Header -->
                         <div class="header-row">
                             <div class="company-logo">
-                                <h1>${companySettings?.company_name?.split(' ')[0] || 'FREIGHT'}ONE</h1>
-                                <p>LOGISTICS SOLUTIONS</p>
+                                ${companySettings?.logo_url
+                                    ? `<img src="${companySettings.logo_url}" alt="Logo" />`
+                                    : `<h1>${companySettings?.company_name?.split(' ')[0] || 'FREIGHT'}ONE</h1><p>LOGISTICS SOLUTIONS</p>`
+                                }
                             </div>
                             <div class="company-address">
                                 <strong>${companySettings?.company_name || 'PT. Freight One Indonesia'}</strong><br>
@@ -3665,11 +3668,17 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
 
                         {/* Header */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', alignItems: 'flex-start' }}>
-                            <div className="company-logo">
-                                <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', fontStyle: 'italic', color: '#000' }}>
-                                    {companySettings?.company_name?.split(' ')[0] || 'FREIGHT'}ONE
-                                </h1>
-                                <p style={{ margin: 0, fontSize: '8px', letterSpacing: '3px', color: '#555', textTransform: 'uppercase' }}>LOGISTICS SOLUTIONS</p>
+                            <div>
+                                {companySettings?.logo_url ? (
+                                    <img src={companySettings.logo_url} alt="Logo" style={{ maxHeight: '64px', maxWidth: '160px', objectFit: 'contain', display: 'block' }} />
+                                ) : (
+                                    <>
+                                        <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', fontStyle: 'italic', color: '#000' }}>
+                                            {companySettings?.company_name?.split(' ')[0] || 'FREIGHT'}ONE
+                                        </h1>
+                                        <p style={{ margin: 0, fontSize: '8px', letterSpacing: '3px', color: '#555', textTransform: 'uppercase' }}>LOGISTICS SOLUTIONS</p>
+                                    </>
+                                )}
                             </div>
                             <div style={{ textAlign: 'right', fontSize: '9px', lineHeight: '1.4', color: '#333' }}>
                                 <strong>{companySettings?.company_name || 'PT. Freight One Indonesia'}</strong><br />
