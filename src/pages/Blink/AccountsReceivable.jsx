@@ -19,6 +19,7 @@ const AccountsReceivable = () => {
     const [selectedAR, setSelectedAR] = useState(null);
     const [showEditModal, setShowEditModal] = useState(false);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [viewMode, setViewMode] = useState('flat'); // 'flat' | 'grouped'
 
     useEffect(() => {
         fetchARTransactions();
@@ -357,110 +358,184 @@ const AccountsReceivable = () => {
                 </div>
             </div>
 
-            {/* Search - Full Width */}
-            <div className="w-full">
-                <div className="relative">
+            {/* Controls */}
+            <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
                     <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                     <input
                         type="text"
-                        placeholder="Search AR number, invoice, or customer..."
+                        placeholder="Search AR number, invoice, atau customer..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-12 pr-4 py-3 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-base"
                     />
                 </div>
-            </div>
-
-            {/* AR Table */}
-            <div className="glass-card rounded-lg overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                        <thead className="bg-accent-orange">
-                            <tr>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">AR Number</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Invoice #</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Customer</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Date</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Due Date</th>
-                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">Original</th>
-                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">Paid</th>
-                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">Outstanding</th>
-                                <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap">Aging</th>
-                                <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-dark-border">
-                            {filteredAR.length === 0 ? (
-                                <tr>
-                                    <td colSpan="10" className="px-3 py-8 text-center">
-                                        <FileText className="w-10 h-10 text-silver-dark mx-auto mb-2" />
-                                        <p className="text-silver-dark text-sm">No AR transactions found.</p>
-                                    </td>
-                                </tr>
-                            ) : (
-                                filteredAR.map((ar) => (
-                                    <tr
-                                        key={ar.id}
-                                        onClick={() => {
-                                            setSelectedAR(ar);
-                                            setShowEditModal(true);
-                                        }}
-                                        className="hover:bg-dark-surface smooth-transition cursor-pointer"
-                                    >
-                                        <td className="px-3 py-2 whitespace-nowrap">
-                                            <span className="font-medium text-accent-orange">{ar.ar_number}</span>
-                                        </td>
-                                        <td className="px-3 py-2 whitespace-nowrap">
-                                            <span className="text-silver-light">{ar.invoice_number}</span>
-                                        </td>
-                                        <td className="px-3 py-2 whitespace-nowrap">
-                                            <span className="text-silver-light">{ar.customer_name}</span>
-                                        </td>
-                                        <td className="px-3 py-2 whitespace-nowrap">
-                                            <span className="text-silver-dark">{ar.transaction_date}</span>
-                                        </td>
-                                        <td className="px-3 py-2 whitespace-nowrap">
-                                            <span className={`${ar.status === 'overdue' ? 'text-red-400 font-semibold' : 'text-silver-dark'}`}>
-                                                {ar.due_date}
-                                            </span>
-                                        </td>
-                                        <td className="px-3 py-2 text-right whitespace-nowrap">
-                                            <span className="text-silver-light">{formatCurrency(ar.original_amount, ar.currency)}</span>
-                                        </td>
-                                        <td className="px-3 py-2 text-right whitespace-nowrap">
-                                            <span className="text-green-400">{formatCurrency(ar.paid_amount, ar.currency)}</span>
-                                        </td>
-                                        <td className="px-3 py-2 text-right whitespace-nowrap">
-                                            <span className="font-semibold text-yellow-400">{formatCurrency(ar.outstanding_amount, ar.currency)}</span>
-                                        </td>
-                                        <td className="px-3 py-2 text-center whitespace-nowrap">
-                                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ar.aging_bucket === '0-30' ? 'bg-green-500/20 text-green-400' :
-                                                ar.aging_bucket === '31-60' ? 'bg-yellow-500/20 text-yellow-400' :
-                                                    ar.aging_bucket === '61-90' ? 'bg-orange-500/20 text-orange-400' :
-                                                        'bg-red-500/20 text-red-400'
-                                                }`}>
-                                                {ar.aging_bucket}
-                                            </span>
-                                        </td>
-                                        <td className="px-3 py-2 text-center whitespace-nowrap">
-                                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ar.status === 'paid' ? 'bg-green-500/20 text-green-400' :
-                                                ar.status === 'partial' ? 'bg-yellow-500/20 text-yellow-400' :
-                                                    ar.status === 'overdue' ? 'bg-red-500/20 text-red-400' :
-                                                        'bg-blue-500/20 text-blue-400'
-                                                }`}>
-                                                {ar.status === 'paid' ? 'Lunas' :
-                                                    ar.status === 'partial' ? 'Sebagian' :
-                                                        ar.status === 'overdue' ? 'Terlambat' :
-                                                            'Belum Bayar'}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => setViewMode('flat')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${viewMode === 'flat' ? 'bg-accent-orange text-white' : 'bg-dark-surface border border-dark-border text-silver-light hover:bg-dark-card'}`}
+                    >
+                        <FileText className="w-4 h-4" />
+                        Per Transaksi
+                    </button>
+                    <button
+                        onClick={() => setViewMode('grouped')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${viewMode === 'grouped' ? 'bg-accent-orange text-white' : 'bg-dark-surface border border-dark-border text-silver-light hover:bg-dark-card'}`}
+                    >
+                        <Users className="w-4 h-4" />
+                        Per Customer
+                    </button>
                 </div>
             </div>
+
+            {/* AR Tables — IDR & USD Separated */}
+            {['IDR', 'USD'].map(currency => {
+                const currRows = filteredAR.filter(ar =>
+                    currency === 'IDR' ? ar.currency !== 'USD' : ar.currency === 'USD'
+                );
+                if (currRows.length === 0) return null;
+
+                const fmtAmt = (v) => currency === 'USD'
+                    ? `$ ${Number(v).toLocaleString('id-ID')}`
+                    : `Rp ${Number(v).toLocaleString('id-ID')}`;
+
+                // Totals
+                const totOrig = currRows.reduce((s, r) => s + (r.original_amount || 0), 0);
+                const totPaid = currRows.reduce((s, r) => s + (r.paid_amount || 0), 0);
+                const totOut  = currRows.reduce((s, r) => s + (r.outstanding_amount || 0), 0);
+
+                // Grouping
+                const groups = viewMode === 'grouped'
+                    ? [...new Set(currRows.map(r => r.customer_name || 'Unknown'))]
+                        .sort()
+                        .map(name => {
+                            const items = currRows.filter(r => (r.customer_name || 'Unknown') === name);
+                            return {
+                                name,
+                                items,
+                                subOrig: items.reduce((s, r) => s + (r.original_amount || 0), 0),
+                                subPaid: items.reduce((s, r) => s + (r.paid_amount || 0), 0),
+                                subOut:  items.reduce((s, r) => s + (r.outstanding_amount || 0), 0),
+                            };
+                        })
+                    : null;
+
+                const agingColor = { '0-30': 'text-green-400 bg-green-500/20', '31-60': 'text-yellow-400 bg-yellow-500/20', '61-90': 'text-orange-400 bg-orange-500/20', '90+': 'text-red-400 bg-red-500/20' };
+                const statusColor = { paid: 'text-green-400 bg-green-500/20', partial: 'text-yellow-400 bg-yellow-500/20', overdue: 'text-red-400 bg-red-500/20', current: 'text-blue-400 bg-blue-500/20' };
+                const statusLabel = { paid: 'Lunas', partial: 'Sebagian', overdue: 'Terlambat', current: 'Belum Bayar' };
+
+                const COL_COUNT = 10;
+
+                const renderRow = (ar) => (
+                    <tr
+                        key={ar.id}
+                        onClick={() => { setSelectedAR(ar); setShowEditModal(true); }}
+                        className="hover:bg-dark-surface smooth-transition cursor-pointer"
+                    >
+                        <td className="px-3 py-2 whitespace-nowrap font-medium text-accent-orange">{ar.ar_number}</td>
+                        <td className="px-3 py-2 whitespace-nowrap text-silver-light">{ar.invoice_number}</td>
+                        <td className="px-3 py-2 whitespace-nowrap text-silver-light">{ar.customer_name}</td>
+                        <td className="px-3 py-2 whitespace-nowrap text-silver-dark">{ar.transaction_date}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                            <span className={ar.status === 'overdue' ? 'text-red-400 font-semibold' : 'text-silver-dark'}>{ar.due_date}</span>
+                        </td>
+                        <td className="px-3 py-2 text-right whitespace-nowrap text-silver-light">{fmtAmt(ar.original_amount)}</td>
+                        <td className="px-3 py-2 text-right whitespace-nowrap text-green-400">{fmtAmt(ar.paid_amount)}</td>
+                        <td className="px-3 py-2 text-right whitespace-nowrap font-semibold text-yellow-400">{fmtAmt(ar.outstanding_amount)}</td>
+                        <td className="px-3 py-2 text-center whitespace-nowrap">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${agingColor[ar.aging_bucket] || 'text-silver-dark'}`}>{ar.aging_bucket}</span>
+                        </td>
+                        <td className="px-3 py-2 text-center whitespace-nowrap">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColor[ar.status] || 'text-gray-400 bg-gray-500/20'}`}>
+                                {statusLabel[ar.status] || ar.status}
+                            </span>
+                        </td>
+                    </tr>
+                );
+
+                return (
+                    <div key={currency} className="glass-card rounded-lg overflow-hidden">
+                        {/* Table Header */}
+                        <div className={`px-5 py-3 flex items-center justify-between border-b border-dark-border ${currency === 'IDR' ? 'bg-blue-900/30' : 'bg-yellow-900/20'}`}>
+                            <div className="flex items-center gap-3">
+                                <span className={`text-base font-bold ${currency === 'IDR' ? 'text-blue-300' : 'text-yellow-300'}`}>
+                                    Tabel AR — {currency}
+                                </span>
+                                <span className="text-xs text-silver-dark">{currRows.length} transaksi</span>
+                            </div>
+                            <div className="flex gap-6 text-sm">
+                                <div className="text-right">
+                                    <p className="text-xs text-silver-dark">Total Piutang</p>
+                                    <p className={`font-bold ${currency === 'IDR' ? 'text-blue-300' : 'text-yellow-300'}`}>{fmtAmt(totOrig)}</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-xs text-silver-dark">Sudah Bayar</p>
+                                    <p className="font-bold text-green-400">{fmtAmt(totPaid)}</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-xs text-silver-dark">Outstanding</p>
+                                    <p className="font-bold text-red-400">{fmtAmt(totOut)}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead className="bg-accent-orange">
+                                    <tr>
+                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">AR Number</th>
+                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Invoice #</th>
+                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Customer</th>
+                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Tgl Transaksi</th>
+                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Jatuh Tempo</th>
+                                        <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">Original</th>
+                                        <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">Dibayar</th>
+                                        <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">Outstanding</th>
+                                        <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap">Aging</th>
+                                        <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-dark-border">
+                                    {currRows.length === 0 ? (
+                                        <tr><td colSpan={COL_COUNT} className="px-3 py-8 text-center text-silver-dark">Tidak ada data {currency}</td></tr>
+                                    ) : viewMode === 'flat' ? (
+                                        currRows.map(renderRow)
+                                    ) : (
+                                        groups.map(group => (
+                                            <React.Fragment key={group.name}>
+                                                {/* Customer Header Row */}
+                                                <tr className="bg-dark-surface/70 border-b-2 border-accent-orange/30">
+                                                    <td colSpan={5} className="px-3 py-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <Users className="w-3.5 h-3.5 text-accent-orange" />
+                                                            <span className="font-semibold text-silver-light text-sm">{group.name}</span>
+                                                            <span className="text-xs text-silver-dark">({group.items.length} transaksi)</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-3 py-2 text-right text-sm font-semibold text-silver-light">{fmtAmt(group.subOrig)}</td>
+                                                    <td className="px-3 py-2 text-right text-sm font-semibold text-green-400">{fmtAmt(group.subPaid)}</td>
+                                                    <td className="px-3 py-2 text-right text-sm font-semibold text-yellow-400">{fmtAmt(group.subOut)}</td>
+                                                    <td colSpan={2} className="px-3 py-2 text-center text-xs text-silver-dark">Sub Total</td>
+                                                </tr>
+                                                {group.items.map(renderRow)}
+                                            </React.Fragment>
+                                        ))
+                                    )}
+                                    {/* Grand Total Row */}
+                                    <tr className="bg-dark-surface font-bold border-t-2 border-accent-orange/50">
+                                        <td colSpan={5} className="px-3 py-3 text-sm text-silver-light">
+                                            GRAND TOTAL {currency} ({currRows.length} transaksi)
+                                        </td>
+                                        <td className="px-3 py-3 text-right text-sm text-silver-light">{fmtAmt(totOrig)}</td>
+                                        <td className="px-3 py-3 text-right text-sm text-green-400">{fmtAmt(totPaid)}</td>
+                                        <td className="px-3 py-3 text-right text-sm text-red-400">{fmtAmt(totOut)}</td>
+                                        <td colSpan={2} />
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                );
+            })}
             {/* AR Detail Modal */}
             {showEditModal && selectedAR && (
                 <ARDetailModal
