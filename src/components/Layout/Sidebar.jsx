@@ -259,6 +259,9 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                 { path: '/big/finance/trial-balance', label: 'Trial Balance', menuCode: 'big_finance', indent: true },
                 { path: '/big/finance/profit-loss', label: 'Profit & Loss', menuCode: 'big_finance', indent: true },
                 { path: '/big/finance/balance-sheet', label: 'Balance Sheet', menuCode: 'big_finance', indent: true },
+                // Master
+                { type: 'divider', label: '🗂️ Master' },
+                { path: '/big/finance/coa', label: 'COA Master', menuCode: 'big_coa', indent: true },
             ]
         },
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import {
-    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+    LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
     ResponsiveContainer, Legend
 } from 'recharts';
 import {
@@ -186,9 +186,6 @@ const FreightDashboard = () => {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-4xl font-bold gradient-text mb-2">Dashboard Bakhtera-1</h1>
-                    <p className="text-silver-dark">
-                        Ringkasan platform manajemen terintegrasi · Tahun {currentYear}
-                    </p>
                 </div>
                 <button
                     onClick={fetchAllData}
@@ -297,7 +294,7 @@ const FreightDashboard = () => {
                     </h2>
                 </div>
                 <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={monthlyData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                    <LineChart data={monthlyData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                         <XAxis
                             dataKey="month"
@@ -321,11 +318,11 @@ const FreightDashboard = () => {
                             formatter={(v, name) => [`Rp ${Number(v).toLocaleString('id-ID')}`, name]}
                         />
                         <Legend wrapperStyle={{ color: '#9ca3af', fontSize: 12 }} />
-                        <Bar dataKey="Total" fill="#6366f1" radius={[3, 3, 0, 0]} />
-                        <Bar dataKey="Blink" fill="#60a5fa" radius={[3, 3, 0, 0]} />
-                        <Bar dataKey="Bridge" fill="#a78bfa" radius={[3, 3, 0, 0]} />
-                        <Bar dataKey="Big" fill="#fb923c" radius={[3, 3, 0, 0]} />
-                    </BarChart>
+                        <Line type="monotone" dataKey="Total" stroke="#6366f1" strokeWidth={2.5} dot={{ r: 3, fill: '#6366f1' }} activeDot={{ r: 5 }} />
+                        <Line type="monotone" dataKey="Blink" stroke="#60a5fa" strokeWidth={2} dot={{ r: 3, fill: '#60a5fa' }} activeDot={{ r: 5 }} />
+                        <Line type="monotone" dataKey="Bridge" stroke="#a78bfa" strokeWidth={2} dot={{ r: 3, fill: '#a78bfa' }} activeDot={{ r: 5 }} />
+                        <Line type="monotone" dataKey="Big" stroke="#fb923c" strokeWidth={2} dot={{ r: 3, fill: '#fb923c' }} activeDot={{ r: 5 }} />
+                    </LineChart>
                 </ResponsiveContainer>
             </div>
 

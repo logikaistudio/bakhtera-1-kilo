@@ -101,6 +101,7 @@ import BigTrialBalance from './pages/Big/Finance/BigTrialBalance';
 import BigProfitLoss from './pages/Big/Finance/BigProfitLoss';
 import BigBalanceSheet from './pages/Big/Finance/BigBalanceSheet';
 import BigCompanySettings from './pages/Big/CompanySettings'; // New
+import BigCodeOfAccount from './pages/Big/Finance/BigCodeOfAccount';
 
 // Pabean Module
 import PabeanDashboard from './pages/Bridge/Pabean/PabeanDashboard';
@@ -239,6 +240,8 @@ function App() {
                     <Route path="/big/costs" element={<ProtectedRoute menuCode="big_costs"><BigCosts /></ProtectedRoute>} />
                     <Route path="/big/operations/costs" element={<ProtectedRoute menuCode="big_costs"><BigCosts /></ProtectedRoute>} />
 
+                    {/* Big Finance — Master COA */}
+                    <Route path="/big/finance/coa" element={<ProtectedRoute menuCode="big_coa"><BigCodeOfAccount /></ProtectedRoute>} />
                     {/* Big Finance — Transaksi */}
                     <Route path="/big/finance/invoices" element={<ProtectedRoute menuCode="big_finance"><BigInvoices /></ProtectedRoute>} />
                     <Route path="/big/finance/po" element={<ProtectedRoute menuCode="big_finance"><BigPurchaseOrder /></ProtectedRoute>} />

@@ -580,6 +580,7 @@ const COAMaster = () => {
                 code: formData.code,
                 name: formData.name,
                 type: formData.type,
+                job_type: formData.job_type || null,
                 description: formData.description,
                 parent_code: formData.parent_code || null,
                 level: parseInt(formData.level) || 1,
@@ -589,6 +590,7 @@ const COAMaster = () => {
                 is_ar: formData.is_ar,
                 is_ap: formData.is_ap,
                 is_cashflow: formData.is_cashflow,
+                is_active: formData.is_active ?? true,
             };
 
             if (isEditing) {

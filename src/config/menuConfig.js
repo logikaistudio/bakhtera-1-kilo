@@ -116,6 +116,7 @@ export const APP_MENUS = {
             // ─── Finance ───
             { code: 'big_invoices', label: 'Invoice', group: 'Finance', path: '/big/finance/invoices' },
             { code: 'big_ar', label: 'Piutang (AR)', group: 'Finance', path: '/big/finance/ar' },
+            { code: 'big_coa', label: 'COA Master', group: 'Finance', path: '/big/finance/coa' },
             // ─── Master Data ───
             { code: 'big_settings', label: 'Pengaturan Modul', group: 'Master Data', path: '/big/master/settings' },
         ],
