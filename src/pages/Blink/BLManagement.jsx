@@ -41,6 +41,10 @@ const BLManagement = () => {
     const [shipments, setShipments] = useState([]);
     const [selectedQuotationId, setSelectedQuotationId] = useState(null);
 
+    // Print options
+    const [printWatermark, setPrintWatermark] = useState('ORIGINAL');
+    const [printReleaseType, setPrintReleaseType] = useState('');
+
     useEffect(() => {
         fetchBLs();
         fetchQuotations();
@@ -409,7 +413,7 @@ const BLManagement = () => {
 
     const handlePrintBL = (bl) => {
         try {
-            printBLCertificate(bl);
+            printBLCertificate({ ...bl, watermark: printWatermark || null, releaseType: printReleaseType || null });
         } catch (error) {
             console.error('Print error:', error);
             alert('Failed to print BL');
@@ -452,7 +456,7 @@ const BLManagement = () => {
                 blCollect: editForm.collect,
                 blShippedOnBoardDate: editForm.shippedOnBoardDate,
             };
-            printBLCertificate(printData);
+            printBLCertificate({ ...printData, watermark: printWatermark || null, releaseType: printReleaseType || null });
         } catch (error) {
             console.error('Print Preview error:', error);
             alert('Failed to print preview');
@@ -1429,7 +1433,32 @@ const BLManagement = () => {
                                         : '* Use status action buttons above to change document status.'
                                     }
                                 </span>
-                                <div className="flex gap-3">
+                                <div className="flex items-center gap-3">
+                                    {/* Print Options */}
+                                    <div className="flex items-center gap-2 border border-dark-border rounded px-3 py-1.5 bg-dark-surface">
+                                        <span className="text-xs text-silver-dark whitespace-nowrap">Watermark:</span>
+                                        <select
+                                            value={printWatermark}
+                                            onChange={(e) => setPrintWatermark(e.target.value)}
+                                            className="text-xs bg-transparent text-silver-light border-none outline-none cursor-pointer"
+                                        >
+                                            <option value="">— None —</option>
+                                            <option value="ORIGINAL">ORIGINAL</option>
+                                            <option value="COPY NON-NEGOTIABLE">COPY NON-NEGOTIABLE</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex items-center gap-2 border border-dark-border rounded px-3 py-1.5 bg-dark-surface">
+                                        <span className="text-xs text-silver-dark whitespace-nowrap">Status:</span>
+                                        <select
+                                            value={printReleaseType}
+                                            onChange={(e) => setPrintReleaseType(e.target.value)}
+                                            className="text-xs bg-transparent text-silver-light border-none outline-none cursor-pointer"
+                                        >
+                                            <option value="">— None —</option>
+                                            <option value="TELEX RELEASE">TELEX RELEASE</option>
+                                            <option value="SURRENDER">SURRENDER</option>
+                                        </select>
+                                    </div>
                                     <Button
                                         variant="secondary"
                                         icon={Printer}

@@ -54,7 +54,11 @@ export const generateBLPrintHTML = (blData) => {
         collect: blData.blCollect || blData.collect || '',
         shippedOnBoardDate: blData.blShippedOnBoardDate || blData.shippedOnBoardDate || '',
 
-        mode: blData.blType || 'MBL'
+        mode: blData.blType || 'MBL',
+
+        // Print options
+        watermark: blData.watermark || null,
+        releaseType: blData.releaseType || null,
     };
 
     return `
@@ -166,6 +170,35 @@ export const generateBLPrintHTML = (blData) => {
             pointer-events: none;
         }
 
+        .doc-watermark {
+            position: absolute;
+            top: 42%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-30deg);
+            font-size: 54pt;
+            font-weight: 900;
+            color: rgba(234, 88, 12, 0.13);
+            z-index: 0;
+            white-space: nowrap;
+            pointer-events: none;
+            letter-spacing: 6px;
+            border: 10px solid rgba(234, 88, 12, 0.10);
+            padding: 8px 20px;
+        }
+
+        .release-stamp {
+            display: inline-block;
+            margin-top: 6px;
+            border: 2px solid #ea580c;
+            color: #ea580c;
+            font-size: 7.5pt;
+            font-weight: bold;
+            padding: 2px 8px;
+            letter-spacing: 1.5px;
+            transform: rotate(-3deg);
+            background: rgba(234, 88, 12, 0.05);
+        }
+
         .print-btn {
             position: fixed; top: 20px; right: 20px;
             padding: 12px 24px; background: #2563eb; color: white;
@@ -217,6 +250,7 @@ export const generateBLPrintHTML = (blData) => {
     <!-- PAGE 1: BILL OF LADING -->
     <div class="page">
         <div class="carrier-watermark">BAKHTERA</div>
+        ${d.watermark ? `<div class="doc-watermark">${d.watermark}</div>` : ''}
 
         <div class="container">
             
@@ -258,8 +292,10 @@ export const generateBLPrintHTML = (blData) => {
                     <span class="label">Forwarding Agent References</span>
                     <div class="value small-text">${d.agentRefs}</div>
                     <div class="header-logo">
+                        <div style="font-size: 7pt; color: #555; font-weight: 600; letter-spacing: 1.5px; margin-bottom: 3px; text-transform: uppercase;">Ocean Bill of Lading</div>
                         BAKHTERA FREIGHT<br>
                         <span style="font-size: 9pt; font-weight: normal;">INTERNATIONAL LOGISTICS</span>
+                        ${d.releaseType ? `<br><span class="release-stamp">${d.releaseType}</span>` : ''}
                     </div>
                 </div>
             </div>
