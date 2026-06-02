@@ -1303,6 +1303,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                     payment_terms: editedShipment.paymentTerms || editedShipment.payment_terms || null,
                     // Sales info
                     sales_person: editedShipment.salesPerson || null,
+                    trade_direction: editedShipment.trade_direction || null,
                     notes: editedShipment.notes || null,
                     // Booking & Dates fields - convert empty strings to null
                     etd: dates.etd || null,
@@ -1728,6 +1729,19 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                         onChange={(e) => setEditedShipment({ ...editedShipment, salesPerson: e.target.value })}
                                                         className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light"
                                                     />
+                                                </div>
+                                                <div>
+                                                    <label className="text-silver-dark text-xs">Arah Pengiriman</label>
+                                                    <select
+                                                        value={editedShipment.trade_direction || ''}
+                                                        onChange={(e) => setEditedShipment({ ...editedShipment, trade_direction: e.target.value || null })}
+                                                        className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light"
+                                                    >
+                                                        <option value="">-- Pilih --</option>
+                                                        <option value="import">Import</option>
+                                                        <option value="export">Export</option>
+                                                        <option value="domestic">Domestik</option>
+                                                    </select>
                                                 </div>
                                                 <div>
                                                     <label className="text-silver-dark text-xs">Incoterm</label>

@@ -39,7 +39,7 @@ const SalesAchievement = () => {
     const [targetList, setTargetList] = useState([]);       // raw DB rows
     const [monthlyPaid, setMonthlyPaid] = useState({});     // { sales_name: amount in current month }
     const [showTargetModal, setShowTargetModal] = useState(false);
-    const [targetForm, setTargetForm] = useState({ sales_name: '', yearly_target: '' });
+    const [targetForm, setTargetForm] = useState({ sales_name: '', yearly_target: '', division: 'Umum' });
     const [editingTargetId, setEditingTargetId] = useState(null);
     const [isSavingTarget, setIsSavingTarget] = useState(false);
 
@@ -62,7 +62,7 @@ const SalesAchievement = () => {
             if (error) throw error;
             setTargetList(data || []);
             const map = {};
-            (data || []).forEach(t => { map[t.sales_name] = t.yearly_target; });
+            (data || []).forEach(t => { map[t.sales_name] = { yearly_target: t.yearly_target, division: t.division || 'Umum' }; });
             setSalesTargets(map);
         } catch (err) {
             console.error('Error fetching sales targets:', err);
@@ -81,13 +81,13 @@ const SalesAchievement = () => {
             if (editingTargetId) {
                 const { error } = await supabase
                     .from('blink_sales_targets')
-                    .update({ sales_name: name, yearly_target: target, updated_at: new Date().toISOString() })
+                    .update({ sales_name: name, yearly_target: target, division: targetForm.division.trim() || 'Umum', updated_at: new Date().toISOString() })
                     .eq('id', editingTargetId);
                 if (error) throw error;
             } else {
                 const { error } = await supabase
                     .from('blink_sales_targets')
-                    .insert([{ sales_name: name, yearly_target: target }]);
+                    .insert([{ sales_name: name, yearly_target: target, division: targetForm.division.trim() || 'Umum' }]);
                 if (error) throw error;
             }
             setTargetForm({ sales_name: '', yearly_target: '' });
@@ -102,7 +102,7 @@ const SalesAchievement = () => {
 
     const handleEditTarget = (row) => {
         setEditingTargetId(row.id);
-        setTargetForm({ sales_name: row.sales_name, yearly_target: String(row.yearly_target) });
+        setTargetForm({ sales_name: row.sales_name, yearly_target: String(row.yearly_target), division: row.division || 'Umum' });
     };
 
     const handleDeleteTarget = async (id) => {
@@ -260,7 +260,7 @@ const SalesAchievement = () => {
     const handlePrintTXT = () => {
         if (!selectedSalesPerson) return;
 
-        const yearlyTarget = salesTargets[selectedSalesPerson.name] || 0;
+        const yearlyTarget = salesTargets[selectedSalesPerson.name]?.yearly_target || 0;
         const monthlyTarget = yearlyTarget / 12;
         const totalPercent = yearlyTarget > 0 ? (selectedSalesPerson.paidValue / yearlyTarget) * 100 : 0;
         const paymentPercent = selectedSalesPerson.totalValue > 0 ? (selectedSalesPerson.paidValue / selectedSalesPerson.totalValue) * 100 : 0;
@@ -490,101 +490,127 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                                         Belum ada data sales person
                                     </td>
                                 </tr>
-                            ) : (
-                                salesPersonData.map((sp, index) => {
-                                    const yearlyTarget = salesTargets[sp.name] || 0;
-                                    const monthlyTarget = yearlyTarget > 0 ? yearlyTarget / 12 : 0;
-                                    const yearlyPct = yearlyTarget > 0 ? Math.min((sp.paidValue / yearlyTarget) * 100, 100) : 0;
-                                    const monthlyPct = monthlyTarget > 0 ? Math.min((sp.monthlyPaidValue / monthlyTarget) * 100, 100) : 0;
-                                    const totalPct = yearlyTarget > 0 ? (sp.paidValue / yearlyTarget) * 100 : 0;
+                            ) : (() => {
+                                // Group by division
+                                const groups = {};
+                                salesPersonData.forEach(sp => {
+                                    const div = salesTargets[sp.name]?.division || 'Umum';
+                                    if (!groups[div]) groups[div] = [];
+                                    groups[div].push(sp);
+                                });
+                                const divGroups = Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
 
-                                    const barColor = (pct) =>
-                                        pct >= 100 ? 'from-green-500 to-emerald-600' :
-                                        pct >= 75  ? 'from-blue-500 to-cyan-600' :
-                                        pct >= 50  ? 'from-yellow-500 to-orange-500' :
-                                                     'from-red-500 to-pink-600';
+                                const barColor = (pct) =>
+                                    pct >= 100 ? 'from-green-500 to-emerald-600' :
+                                    pct >= 75  ? 'from-blue-500 to-cyan-600' :
+                                    pct >= 50  ? 'from-yellow-500 to-orange-500' :
+                                                 'from-red-500 to-pink-600';
 
-                                    const badgeColor = totalPct >= 100 ? 'bg-green-500/20 text-green-400' :
-                                                       totalPct >= 75  ? 'bg-blue-500/20 text-blue-400' :
-                                                       totalPct >= 50  ? 'bg-yellow-500/20 text-yellow-400' :
-                                                                         'bg-red-500/20 text-red-400';
+                                return divGroups.map(([divName, members]) => {
+                                    const divTargetTotal = members.reduce((s, sp) => s + (salesTargets[sp.name]?.yearly_target || 0), 0);
+                                    const divAnnual = members.reduce((s, sp) => s + sp.paidValue, 0);
+                                    const divMonthly = members.reduce((s, sp) => s + sp.monthlyPaidValue, 0);
 
                                     return (
-                                        <tr
-                                            key={index}
-                                            onClick={() => { setSelectedSalesPerson(sp); setShowDetailModal(true); }}
-                                            className="hover:bg-dark-surface/50 transition-colors cursor-pointer"
-                                        >
-                                            {/* Nama */}
-                                            <td className="px-4 py-4">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-accent-orange to-orange-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
-                                                        {sp.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                                        <React.Fragment key={divName}>
+                                            {/* Division Header Row */}
+                                            <tr className="bg-dark-surface/80">
+                                                <td colSpan={5} className="px-4 py-2.5">
+                                                    <div className="flex items-center justify-between flex-wrap gap-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <Users className="w-4 h-4 text-accent-orange" />
+                                                            <span className="text-sm font-bold text-accent-orange uppercase tracking-wide">{divName}</span>
+                                                            <span className="text-xs text-silver-dark">({members.length} sales)</span>
+                                                        </div>
+                                                        <div className="flex gap-5 text-xs">
+                                                            <span className="text-silver-dark">Target: <span className="text-silver-light font-semibold">{fmtIDR(divTargetTotal)}</span></span>
+                                                            <span className="text-silver-dark">Tahunan: <span className="text-green-400 font-semibold">{fmtIDR(divAnnual)}</span></span>
+                                                            <span className="text-silver-dark">Bulan Ini: <span className="text-blue-400 font-semibold">{fmtIDR(divMonthly)}</span></span>
+                                                        </div>
                                                     </div>
-                                                    <div>
-                                                        <p className="text-sm font-semibold text-silver-light">{sp.name}</p>
-                                                        <p className="text-xs text-silver-dark">{sp.totalQuotations} quot · {sp.convertedQuotations} SO</p>
-                                                    </div>
-                                                </div>
-                                            </td>
-
-                                            {/* Target/Tahun */}
-                                            <td className="px-4 py-4 text-right">
-                                                {yearlyTarget > 0 ? (
-                                                    <div>
-                                                        <p className="text-sm font-semibold text-silver-light">{fmtIDR(yearlyTarget)}</p>
-                                                        <p className="text-xs text-silver-dark">{fmtIDR(Math.round(monthlyTarget))}/bln</p>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-xs text-silver-dark italic">Belum diset</span>
-                                                )}
-                                            </td>
-
-                                            {/* Pencapaian Tahunan */}
-                                            <td className="px-4 py-4">
-                                                <div className="space-y-1 min-w-[160px]">
-                                                    <div className="flex justify-between text-xs">
-                                                        <span className="text-silver-light font-medium">{fmtIDR(sp.paidValue)}</span>
-                                                        <span className={`font-semibold ${yearlyPct >= 100 ? 'text-green-400' : yearlyPct >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
-                                                            {yearlyTarget > 0 ? `${((sp.paidValue / yearlyTarget) * 100).toFixed(1)}%` : '—'}
-                                                        </span>
-                                                    </div>
-                                                    <div className="relative h-2 bg-dark-surface rounded-full overflow-hidden">
-                                                        <div className={`absolute inset-y-0 left-0 bg-gradient-to-r ${barColor(yearlyPct)} rounded-full transition-all duration-500`}
-                                                            style={{ width: `${yearlyPct}%` }} />
-                                                    </div>
-                                                </div>
-                                            </td>
-
-                                            {/* Bulan Berjalan */}
-                                            <td className="px-4 py-4">
-                                                <div className="space-y-1 min-w-[160px]">
-                                                    <div className="flex justify-between text-xs">
-                                                        <span className="text-silver-light font-medium">{fmtIDR(sp.monthlyPaidValue)}</span>
-                                                        <span className={`font-semibold ${monthlyPct >= 100 ? 'text-green-400' : monthlyPct >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
-                                                            {monthlyTarget > 0 ? `${((sp.monthlyPaidValue / monthlyTarget) * 100).toFixed(1)}%` : '—'}
-                                                        </span>
-                                                    </div>
-                                                    <div className="relative h-2 bg-dark-surface rounded-full overflow-hidden">
-                                                        <div className={`absolute inset-y-0 left-0 bg-gradient-to-r ${barColor(monthlyPct)} rounded-full transition-all duration-500`}
-                                                            style={{ width: `${monthlyPct}%` }} />
-                                                    </div>
-                                                </div>
-                                            </td>
-
-                                            {/* % Target */}
-                                            <td className="px-4 py-4 text-center">
-                                                <div className="flex flex-col items-center gap-1">
-                                                    <span className={`px-3 py-1 rounded-lg text-sm font-bold ${badgeColor}`}>
-                                                        {yearlyTarget > 0 ? `${totalPct.toFixed(1)}%` : '—'}
-                                                    </span>
-                                                    {totalPct >= 100 && <Award className="w-4 h-4 text-yellow-400" />}
-                                                </div>
-                                            </td>
-                                        </tr>
+                                                </td>
+                                            </tr>
+                                            {/* Member Rows */}
+                                            {members.map((sp, index) => {
+                                                const yearlyTarget = salesTargets[sp.name]?.yearly_target || 0;
+                                                const monthlyTarget = yearlyTarget > 0 ? yearlyTarget / 12 : 0;
+                                                const yearlyPct = yearlyTarget > 0 ? Math.min((sp.paidValue / yearlyTarget) * 100, 100) : 0;
+                                                const monthlyPct = monthlyTarget > 0 ? Math.min((sp.monthlyPaidValue / monthlyTarget) * 100, 100) : 0;
+                                                const totalPct = yearlyTarget > 0 ? (sp.paidValue / yearlyTarget) * 100 : 0;
+                                                const badgeColor = totalPct >= 100 ? 'bg-green-500/20 text-green-400' :
+                                                                   totalPct >= 75  ? 'bg-blue-500/20 text-blue-400' :
+                                                                   totalPct >= 50  ? 'bg-yellow-500/20 text-yellow-400' :
+                                                                                     'bg-red-500/20 text-red-400';
+                                                return (
+                                                    <tr
+                                                        key={index}
+                                                        onClick={() => { setSelectedSalesPerson(sp); setShowDetailModal(true); }}
+                                                        className="hover:bg-dark-surface/50 transition-colors cursor-pointer"
+                                                    >
+                                                        <td className="px-4 py-4 pl-8">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-accent-orange to-orange-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                                                                    {sp.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-sm font-semibold text-silver-light">{sp.name}</p>
+                                                                    <p className="text-xs text-silver-dark">{sp.totalQuotations} quot · {sp.convertedQuotations} SO</p>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-4 text-right">
+                                                            {yearlyTarget > 0 ? (
+                                                                <div>
+                                                                    <p className="text-sm font-semibold text-silver-light">{fmtIDR(yearlyTarget)}</p>
+                                                                    <p className="text-xs text-silver-dark">{fmtIDR(Math.round(monthlyTarget))}/bln</p>
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-xs text-silver-dark italic">Belum diset</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-4">
+                                                            <div className="space-y-1 min-w-[160px]">
+                                                                <div className="flex justify-between text-xs">
+                                                                    <span className="text-silver-light font-medium">{fmtIDR(sp.paidValue)}</span>
+                                                                    <span className={`font-semibold ${yearlyPct >= 100 ? 'text-green-400' : yearlyPct >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
+                                                                        {yearlyTarget > 0 ? `${((sp.paidValue / yearlyTarget) * 100).toFixed(1)}%` : '—'}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="relative h-2 bg-dark-surface rounded-full overflow-hidden">
+                                                                    <div className={`absolute inset-y-0 left-0 bg-gradient-to-r ${barColor(yearlyPct)} rounded-full transition-all duration-500`}
+                                                                        style={{ width: `${yearlyPct}%` }} />
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-4">
+                                                            <div className="space-y-1 min-w-[160px]">
+                                                                <div className="flex justify-between text-xs">
+                                                                    <span className="text-silver-light font-medium">{fmtIDR(sp.monthlyPaidValue)}</span>
+                                                                    <span className={`font-semibold ${monthlyPct >= 100 ? 'text-green-400' : monthlyPct >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
+                                                                        {monthlyTarget > 0 ? `${((sp.monthlyPaidValue / monthlyTarget) * 100).toFixed(1)}%` : '—'}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="relative h-2 bg-dark-surface rounded-full overflow-hidden">
+                                                                    <div className={`absolute inset-y-0 left-0 bg-gradient-to-r ${barColor(monthlyPct)} rounded-full transition-all duration-500`}
+                                                                        style={{ width: `${monthlyPct}%` }} />
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-4 text-center">
+                                                            <div className="flex flex-col items-center gap-1">
+                                                                <span className={`px-3 py-1 rounded-lg text-sm font-bold ${badgeColor}`}>
+                                                                    {yearlyTarget > 0 ? `${totalPct.toFixed(1)}%` : '—'}
+                                                                </span>
+                                                                {totalPct >= 100 && <Award className="w-4 h-4 text-yellow-400" />}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </React.Fragment>
                                     );
-                                })
-                            )}
+                                });
+                            })()}
                         </tbody>
                     </table>
                 </div>
@@ -614,7 +640,7 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                                 <h3 className="text-sm font-semibold text-silver-light">
                                     {editingTargetId ? 'Edit Target' : 'Tambah Target Baru'}
                                 </h3>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                     <div>
                                         <label className="block text-xs text-silver-dark mb-1">Nama Sales *</label>
                                         <input
@@ -624,6 +650,24 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                                             placeholder="Contoh: Budi Santoso"
                                             className="w-full bg-dark-card border border-dark-border rounded-lg px-3 py-2 text-silver-light text-sm focus:outline-none focus:border-accent-orange"
                                         />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs text-silver-dark mb-1">Divisi</label>
+                                        <input
+                                            type="text"
+                                            list="division-suggestions"
+                                            value={targetForm.division}
+                                            onChange={e => setTargetForm(f => ({ ...f, division: e.target.value }))}
+                                            placeholder="Contoh: Sea Freight"
+                                            className="w-full bg-dark-card border border-dark-border rounded-lg px-3 py-2 text-silver-light text-sm focus:outline-none focus:border-accent-orange"
+                                        />
+                                        <datalist id="division-suggestions">
+                                            <option value="Sea Freight" />
+                                            <option value="Air Freight" />
+                                            <option value="Land Transport" />
+                                            <option value="Customs" />
+                                            <option value="Umum" />
+                                        </datalist>
                                     </div>
                                     <div>
                                         <label className="block text-xs text-silver-dark mb-1">Target / Tahun (Rp) *</label>
@@ -665,6 +709,7 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                                         <thead className="bg-dark-surface">
                                             <tr>
                                                 <th className="px-3 py-2 text-left text-xs font-bold text-silver uppercase">Nama Sales</th>
+                                                <th className="px-3 py-2 text-left text-xs font-bold text-silver uppercase">Divisi</th>
                                                 <th className="px-3 py-2 text-right text-xs font-bold text-silver uppercase">Target / Tahun</th>
                                                 <th className="px-3 py-2 text-right text-xs font-bold text-silver uppercase">Target / Bulan</th>
                                                 <th className="px-3 py-2 text-center text-xs font-bold text-silver uppercase">Aksi</th>
@@ -674,6 +719,9 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                                             {targetList.map(row => (
                                                 <tr key={row.id} className="hover:bg-dark-surface/30">
                                                     <td className="px-3 py-3 text-silver-light font-medium">{row.sales_name}</td>
+                                                    <td className="px-3 py-3">
+                                                        <span className="px-2 py-0.5 bg-accent-orange/20 text-accent-orange rounded text-xs font-medium">{row.division || 'Umum'}</span>
+                                                    </td>
                                                     <td className="px-3 py-3 text-right text-silver-light">{fmtIDR(row.yearly_target)}</td>
                                                     <td className="px-3 py-3 text-right text-silver-dark">{fmtIDR(Math.round(row.yearly_target / 12))}</td>
                                                     <td className="px-3 py-3">
@@ -711,11 +759,11 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                                     Detail Pencapaian — {selectedSalesPerson.name}
                                 </h2>
                                 <div className="flex gap-4 mt-1 text-sm text-silver-dark">
-                                    {salesTargets[selectedSalesPerson.name] > 0 && (
+                                    {salesTargets[selectedSalesPerson.name]?.yearly_target > 0 && (
                                         <>
-                                            <span>Target: {fmtIDR(salesTargets[selectedSalesPerson.name])}/thn</span>
+                                            <span>Target: {fmtIDR(salesTargets[selectedSalesPerson.name]?.yearly_target)}/thn</span>
                                             <span>·</span>
-                                            <span>Tahunan: {fmtIDR(selectedSalesPerson.paidValue)} ({((selectedSalesPerson.paidValue / salesTargets[selectedSalesPerson.name]) * 100).toFixed(1)}%)</span>
+                                            <span>Tahunan: {fmtIDR(selectedSalesPerson.paidValue)} ({((selectedSalesPerson.paidValue / salesTargets[selectedSalesPerson.name]?.yearly_target) * 100).toFixed(1)}%)</span>
                                             <span>·</span>
                                             <span>Bulan ini: {fmtIDR(selectedSalesPerson.monthlyPaidValue)}</span>
                                         </>

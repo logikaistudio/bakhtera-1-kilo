@@ -438,6 +438,16 @@ const BlinkDashboard = () => {
     });
     const [revenueData, setRevenueData] = useState([]);
     const [agingData, setAgingData] = useState([]);
+    const [shipmentStats, setShipmentStats] = useState({
+        total: 0,
+        import: { count: 0, revenue: 0 },
+        export: { count: 0, revenue: 0 },
+        domestic: { count: 0, revenue: 0 },
+        sea: { count: 0, revenue: 0 },
+        air: { count: 0, revenue: 0 },
+        land: { count: 0, revenue: 0 },
+        untagged: 0,
+    });
 
     useEffect(() => {
         const fetchDashboardData = async () => {
@@ -457,7 +467,10 @@ const BlinkDashboard = () => {
                     supabase.from('blink_ap_transactions')
                         .select('id, ap_number, po_number, vendor_name, bill_date, due_date, outstanding_amount, original_amount, paid_amount, status, currency, exchange_rate')
                         .in('status', ['outstanding', 'overdue', 'partial'])
-                        .order('bill_date', { ascending: false }).limit(20)
+                        .order('bill_date', { ascending: false }).limit(20),
+                    // Shipments for import/export breakdown
+                    supabase.from('blink_shipments')
+                        .select('trade_direction, service_type, quoted_amount, currency')
                 ]);
 
                 // Extract results — log errors per-query for diagnosis
@@ -614,6 +627,22 @@ const BlinkDashboard = () => {
                 const finalAgingData = agingList.slice(0, 6);
                 console.log('[Dashboard] Final Aging Data (6 items):', finalAgingData);
                 setAgingData(finalAgingData);
+
+                // Process shipment import/export/service breakdown
+                const allShipments = results[6]?.data ?? [];
+                const USD_RATE = 15000;
+                const toIDR = (s) => s.currency === 'USD' ? (s.quoted_amount || 0) * USD_RATE : (s.quoted_amount || 0);
+                const calcGroup = (arr) => ({ count: arr.length, revenue: arr.reduce((sum, s) => sum + toIDR(s), 0) });
+                setShipmentStats({
+                    total: allShipments.length,
+                    import:   calcGroup(allShipments.filter(s => s.trade_direction === 'import')),
+                    export:   calcGroup(allShipments.filter(s => s.trade_direction === 'export')),
+                    domestic: calcGroup(allShipments.filter(s => s.trade_direction === 'domestic')),
+                    sea:      calcGroup(allShipments.filter(s => s.service_type === 'sea')),
+                    air:      calcGroup(allShipments.filter(s => s.service_type === 'air')),
+                    land:     calcGroup(allShipments.filter(s => s.service_type === 'land')),
+                    untagged: allShipments.filter(s => !s.trade_direction).length,
+                });
 
             } catch (error) {
                 console.error("[Dashboard] Error fetching dashboard data:", error);
@@ -816,6 +845,56 @@ const BlinkDashboard = () => {
                         <p className="text-lg font-bold text-slate-800">{formatCurrency(stats.totalRevenue)}</p>
                         <p className="text-xs text-slate-500">Total Pendapatan (YTD)</p>
                     </div>
+                </div>
+            </div>
+
+            {/* Import / Export & Service Breakdown */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Trade Direction */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                    <div className="flex items-center gap-2 mb-5">
+                        <Ship className="w-5 h-5 text-blue-600" />
+                        <h3 className="text-base font-bold text-slate-800">Arah Pengiriman (Import / Export)</h3>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                        {[
+                            { label: 'Import', data: shipmentStats.import, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
+                            { label: 'Export', data: shipmentStats.export, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+                            { label: 'Domestik', data: shipmentStats.domestic, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
+                        ].map(({ label, data, color, bg, border }) => (
+                            <div key={label} className={`${bg} border ${border} rounded-xl p-4 text-center`}>
+                                <p className={`text-2xl font-extrabold ${color}`}>{data.count}</p>
+                                <p className="text-xs font-semibold text-slate-500 mt-0.5">{label}</p>
+                                <p className={`text-xs font-medium ${color} mt-2`}>{formatCurrency(data.revenue)}</p>
+                            </div>
+                        ))}
+                    </div>
+                    {shipmentStats.untagged > 0 && (
+                        <p className="mt-4 text-xs text-slate-400 text-center">{shipmentStats.untagged} shipment belum ditag arah pengiriman</p>
+                    )}
+                </div>
+
+                {/* Service Type */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                    <div className="flex items-center gap-2 mb-5">
+                        <BarChart3 className="w-5 h-5 text-purple-600" />
+                        <h3 className="text-base font-bold text-slate-800">Moda Angkutan</h3>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                        {[
+                            { label: 'Sea Freight', icon: Ship, data: shipmentStats.sea, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
+                            { label: 'Air Freight', icon: Plane, data: shipmentStats.air, color: 'text-sky-600', bg: 'bg-sky-50', border: 'border-sky-100' },
+                            { label: 'Land / Truck', icon: Truck, data: shipmentStats.land, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' },
+                        ].map(({ label, icon: Icon, data, color, bg, border }) => (
+                            <div key={label} className={`${bg} border ${border} rounded-xl p-4 text-center`}>
+                                <Icon className={`w-5 h-5 ${color} mx-auto mb-1`} />
+                                <p className={`text-2xl font-extrabold ${color}`}>{data.count}</p>
+                                <p className="text-xs font-semibold text-slate-500 mt-0.5">{label}</p>
+                                <p className={`text-xs font-medium ${color} mt-2`}>{formatCurrency(data.revenue)}</p>
+                            </div>
+                        ))}
+                    </div>
+                    <p className="mt-4 text-xs text-slate-400 text-center">Total {shipmentStats.total} shipment</p>
                 </div>
             </div>
 

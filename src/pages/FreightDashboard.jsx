@@ -6,7 +6,7 @@ import {
 } from 'recharts';
 import {
     TrendingUp, Percent, Calendar, AlertTriangle,
-    DollarSign, Loader2, RefreshCw
+    DollarSign, Loader2, RefreshCw, Ship, Plane, Truck
 } from 'lucide-react';
 
 const MONTHS_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
@@ -55,16 +55,46 @@ const FreightDashboard = () => {
     const [bigRevenue, setBigRevenue] = useState(0);
     const [monthlyData, setMonthlyData] = useState([]);
     const [agingData, setAgingData] = useState([]);
+    const [shipmentBreakdown, setShipmentBreakdown] = useState({
+        import:   { count: 0, revenue: 0 },
+        export:   { count: 0, revenue: 0 },
+        domestic: { count: 0, revenue: 0 },
+        sea:      { count: 0, revenue: 0 },
+        air:      { count: 0, revenue: 0 },
+        land:     { count: 0, revenue: 0 },
+        untagged: 0,
+        total: 0,
+    });
 
     useEffect(() => { fetchAllData(); }, []);
 
     const fetchAllData = async () => {
         setLoading(true);
         try {
-            await Promise.all([fetchRevenue(), fetchAging()]);
+            await Promise.all([fetchRevenue(), fetchAging(), fetchShipmentBreakdown()]);
         } finally {
             setLoading(false);
         }
+    };
+
+    const fetchShipmentBreakdown = async () => {
+        const { data } = await supabase
+            .from('blink_shipments')
+            .select('trade_direction, service_type, quoted_amount, currency');
+        const rows = data || [];
+        const USD_RATE = 15000;
+        const toIDR = (s) => s.currency === 'USD' ? (s.quoted_amount || 0) * USD_RATE : (s.quoted_amount || 0);
+        const calc = (arr) => ({ count: arr.length, revenue: arr.reduce((sum, s) => sum + toIDR(s), 0) });
+        setShipmentBreakdown({
+            import:   calc(rows.filter(r => r.trade_direction === 'import')),
+            export:   calc(rows.filter(r => r.trade_direction === 'export')),
+            domestic: calc(rows.filter(r => r.trade_direction === 'domestic')),
+            sea:      calc(rows.filter(r => r.service_type === 'sea')),
+            air:      calc(rows.filter(r => r.service_type === 'air')),
+            land:     calc(rows.filter(r => r.service_type === 'land')),
+            untagged: rows.filter(r => !r.trade_direction).length,
+            total: rows.length,
+        });
     };
 
     const fetchRevenue = async () => {
@@ -324,6 +354,57 @@ const FreightDashboard = () => {
                         <Line type="monotone" dataKey="Big" stroke="#fb923c" strokeWidth={2} dot={{ r: 3, fill: '#fb923c' }} activeDot={{ r: 5 }} />
                     </LineChart>
                 </ResponsiveContainer>
+            </div>
+
+            {/* ── Import / Export & Moda Angkutan (Blink) ────────────────────── */}
+            <div className="glass-card p-6 rounded-lg">
+                <div className="flex items-center gap-3 mb-5">
+                    <Ship className="w-5 h-5 text-blue-400" />
+                    <h2 className="text-xl font-bold text-silver-light">Volume Pengiriman Blink</h2>
+                    <span className="text-xs text-silver-dark ml-1">(berdasarkan arah &amp; moda angkutan)</span>
+                </div>
+                <div className="grid grid-cols-2 gap-6">
+                    {/* Arah Pengiriman */}
+                    <div>
+                        <p className="text-xs text-silver-dark uppercase tracking-wide font-medium mb-3">Arah Pengiriman</p>
+                        <div className="grid grid-cols-3 gap-3">
+                            {[
+                                { label: 'Import', data: shipmentBreakdown.import, color: 'text-blue-400', dot: 'bg-blue-400', bg: 'bg-blue-500/10' },
+                                { label: 'Export', data: shipmentBreakdown.export, color: 'text-emerald-400', dot: 'bg-emerald-400', bg: 'bg-emerald-500/10' },
+                                { label: 'Domestik', data: shipmentBreakdown.domestic, color: 'text-amber-400', dot: 'bg-amber-400', bg: 'bg-amber-500/10' },
+                            ].map(({ label, data, color, dot, bg }) => (
+                                <div key={label} className={`${bg} rounded-lg p-3 text-center`}>
+                                    <div className={`w-2 h-2 rounded-full ${dot} mx-auto mb-2`} />
+                                    <p className={`text-xl font-bold ${color}`}>{data.count}</p>
+                                    <p className="text-xs text-silver-dark mt-0.5">{label}</p>
+                                    <p className={`text-xs font-medium ${color} mt-1.5`}>{fmtIDR(data.revenue)}</p>
+                                </div>
+                            ))}
+                        </div>
+                        {shipmentBreakdown.untagged > 0 && (
+                            <p className="mt-3 text-xs text-silver-dark text-center">{shipmentBreakdown.untagged} shipment belum ditag</p>
+                        )}
+                    </div>
+                    {/* Moda Angkutan */}
+                    <div>
+                        <p className="text-xs text-silver-dark uppercase tracking-wide font-medium mb-3">Moda Angkutan</p>
+                        <div className="grid grid-cols-3 gap-3">
+                            {[
+                                { label: 'Sea', icon: Ship, data: shipmentBreakdown.sea, color: 'text-blue-400', bg: 'bg-blue-500/10' },
+                                { label: 'Air', icon: Plane, data: shipmentBreakdown.air, color: 'text-sky-400', bg: 'bg-sky-500/10' },
+                                { label: 'Land', icon: Truck, data: shipmentBreakdown.land, color: 'text-orange-400', bg: 'bg-orange-500/10' },
+                            ].map(({ label, icon: Icon, data, color, bg }) => (
+                                <div key={label} className={`${bg} rounded-lg p-3 text-center`}>
+                                    <Icon className={`w-4 h-4 ${color} mx-auto mb-2`} />
+                                    <p className={`text-xl font-bold ${color}`}>{data.count}</p>
+                                    <p className="text-xs text-silver-dark mt-0.5">{label}</p>
+                                    <p className={`text-xs font-medium ${color} mt-1.5`}>{fmtIDR(data.revenue)}</p>
+                                </div>
+                            ))}
+                        </div>
+                        <p className="mt-3 text-xs text-silver-dark text-center">Total {shipmentBreakdown.total} shipment</p>
+                    </div>
+                </div>
             </div>
 
             {/* ── AR / AP Aging Table ──────────────────────────────────────────── */}
