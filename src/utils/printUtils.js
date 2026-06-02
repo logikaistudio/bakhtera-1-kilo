@@ -158,32 +158,18 @@ export const generateBLPrintHTML = (blData) => {
             border-right: none;
         }
 
-        .carrier-watermark {
-            position: absolute;
-            top: 45%;
-            left: 50%;
-            transform: translate(-50%, -50%) rotate(-45deg);
-            font-size: 72pt;
-            color: rgba(0,0,0,0.04);
-            z-index: 0;
-            white-space: nowrap;
-            pointer-events: none;
-        }
-
         .doc-watermark {
             position: absolute;
             top: 42%;
             left: 50%;
             transform: translate(-50%, -50%) rotate(-30deg);
-            font-size: 54pt;
+            font-size: 43pt;
             font-weight: 900;
             color: rgba(234, 88, 12, 0.13);
             z-index: 0;
             white-space: nowrap;
             pointer-events: none;
-            letter-spacing: 6px;
-            border: 10px solid rgba(234, 88, 12, 0.10);
-            padding: 8px 20px;
+            letter-spacing: 4px;
         }
 
         .release-stamp {
@@ -249,7 +235,6 @@ export const generateBLPrintHTML = (blData) => {
     
     <!-- PAGE 1: BILL OF LADING -->
     <div class="page">
-        <div class="carrier-watermark">BAKHTERA</div>
         ${d.watermark ? `<div class="doc-watermark">${d.watermark}</div>` : ''}
 
         <div class="container">
