@@ -165,7 +165,7 @@ export const generateBLPrintHTML = (blData) => {
             transform: translate(-50%, -50%) rotate(-30deg);
             font-size: 22pt;
             font-weight: 900;
-            color: rgba(234, 88, 12, 0.13);
+            color: rgba(254, 90, 29, 0.13);
             z-index: 0;
             white-space: nowrap;
             pointer-events: none;
@@ -278,8 +278,8 @@ export const generateBLPrintHTML = (blData) => {
                     <div class="value small-text">${d.agentRefs}</div>
                     <div class="header-logo">
                         <div style="font-size: 7pt; color: #555; font-weight: 600; letter-spacing: 1.5px; margin-bottom: 3px; text-transform: uppercase;">Ocean Bill of Lading</div>
-                        BAKHTERA FREIGHT<br>
-                        <span style="font-size: 9pt; font-weight: normal;">INTERNATIONAL LOGISTICS</span>
+                        BAKHTERA<br>
+                        <span style="font-size: 9pt; font-weight: normal;">FREIGHT WORLDWIDE</span>
                         ${d.releaseType ? `<br><span class="release-stamp">${d.releaseType}</span>` : ''}
                     </div>
                 </div>
@@ -439,7 +439,7 @@ export const generateBLPrintHTML = (blData) => {
                 </div>
                  <div class="col" style="width: 50%; padding: 8px;">
                      <span class="label">Signed for the Carrier</span>
-                     <div style="font-weight: bold; margin-top: 4px;">BAKHTERA FREIGHT FORWARDER</div>
+                     <div style="font-weight: bold; margin-top: 4px;">BAKHTERA FREIGHT WORLDWIDE</div>
                      <div style="font-size: 7pt;">AS CARRIER</div>
                      <br><br>
                      <div style="font-size: 6pt; color: #666;">
