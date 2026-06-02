@@ -820,8 +820,15 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
         // Additional costs from array
         const additionalTotal = (cogsData.additionalCosts || []).reduce((sum, item) => sum + parseVal(item.amount), 0);
 
-        // Buying items total
-        const buyingTotal = (buyingItems || []).reduce((sum, item) => sum + parseVal(item.amount), 0);
+        // Buying items total — convert per-item currency to IDR if needed
+        const rate = parseFloat(exchangeRate) || 0;
+        const buyingTotal = (buyingItems || []).reduce((sum, item) => {
+            const amount = parseVal(item.amount);
+            if ((item.currency || 'IDR') === 'USD' && rate > 0) {
+                return sum + amount * rate;
+            }
+            return sum + amount;
+        }, 0);
 
         return baseCOGS + additionalTotal + buyingTotal;
     };
@@ -2584,7 +2591,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                         <div className="glass-card p-6 rounded-lg mt-6">
                                             <div className="flex items-center justify-between mb-4">
                                                 <h4 className="font-semibold text-silver-light">
-                                                    Actual Costs (COGS) - {cogsCurrency}
+                                                    Actual Costs (COGS)
                                                 </h4>
                                                 {isEditingCOGS && (
                                                     <Button
@@ -2595,6 +2602,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                                 description: '',
                                                                 qty: 1,
                                                                 unit: 'Job',
+                                                                currency: 'IDR',
                                                                 rate: 0,
                                                                 amount: 0,
                                                                 coa_id: null
@@ -2617,6 +2625,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                             <th className="px-2 py-2 text-left text-xs text-white min-w-[280px] font-normal">Description</th>
                                                             <th className="px-2 py-2 text-center text-xs text-white min-w-[110px] font-normal">Qty</th>
                                                             <th className="px-2 py-2 text-center text-xs text-white min-w-[110px] font-normal">Unit</th>
+                                                            <th className="px-2 py-2 text-center text-xs text-white min-w-[90px] font-normal">Curr</th>
                                                             <th className="px-2 py-2 text-right text-xs text-white min-w-[150px] font-normal">Price</th>
                                                             <th className="px-2 py-2 text-right text-xs text-white min-w-[150px] font-normal">Total</th>
                                                             {isEditingCOGS && <th className="px-2 py-2 text-center text-xs text-white min-w-[60px] font-normal">Aksi</th>}
@@ -2625,7 +2634,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                     <tbody className="divide-y divide-dark-border">
                                                         {buyingItems.length === 0 && (
                                                             <tr>
-                                                                <td colSpan={isEditingCOGS ? 9 : 8} className="text-center py-6 text-silver-dark text-sm">
+                                                                <td colSpan={isEditingCOGS ? 10 : 9} className="text-center py-6 text-silver-dark text-sm">
                                                                     Belum ada rincian biaya aktual.
                                                                 </td>
                                                             </tr>
@@ -2708,6 +2717,48 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                                         <span className="text-silver-light text-sm">{item.unit}</span>
                                                                     )}
                                                                 </td>
+                                                                <td className="px-3 py-2 text-center">
+                                                                    {isEditingCOGS ? (
+                                                                        <select
+                                                                            value={item.currency || 'IDR'}
+                                                                            onChange={(e) => {
+                                                                                const updated = [...buyingItems];
+                                                                                updated[index].currency = e.target.value;
+                                                                                setBuyingItems(updated);
+                                                                            }}
+                                                                            className="w-full px-1 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm text-center"
+                                                                        >
+                                                                            <option value="IDR">IDR</option>
+                                                                            <option value="USD">USD</option>
+                                                                        </select>
+                                                                    ) : (
+                                                                        <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                                                                            (item.currency || 'IDR') === 'USD' ? 'bg-blue-500/20 text-blue-400' : 'bg-green-500/20 text-green-400'
+                                                                        }`}>
+                                                                            {item.currency || 'IDR'}
+                                                                        </span>
+                                                                    )}
+                                                                </td>
+                                                                <td className="px-3 py-2 text-center">
+                                                                    {isEditingCOGS ? (
+                                                                        <select
+                                                                            value={item.currency || 'IDR'}
+                                                                            onChange={(e) => {
+                                                                                const updated = [...buyingItems];
+                                                                                updated[index].currency = e.target.value;
+                                                                                setBuyingItems(updated);
+                                                                            }}
+                                                                            className="w-full px-1 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm text-center"
+                                                                        >
+                                                                            <option value="IDR">IDR</option>
+                                                                            <option value="USD">USD</option>
+                                                                        </select>
+                                                                    ) : (
+                                                                        <span className={`text-xs font-bold px-2 py-0.5 rounded ${(item.currency || 'IDR') === 'USD' ? 'bg-blue-500/20 text-blue-400' : 'bg-green-500/20 text-green-400'}`}>
+                                                                            {item.currency || 'IDR'}
+                                                                        </span>
+                                                                    )}
+                                                                </td>
                                                                 <td className="px-3 py-2 text-right">
                                                                     {isEditingCOGS ? (
                                                                         <input
@@ -2730,8 +2781,13 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                                 </td>
                                                                 <td className="px-2 py-2 text-right">
                                                                     <span className="text-silver-light text-sm font-medium">
-                                                                        {parseFloat(item.amount || 0).toLocaleString('id-ID')}
+                                                                        {(item.currency || 'IDR') === 'USD' ? '$' : 'Rp '}{parseFloat(item.amount || 0).toLocaleString('id-ID')}
                                                                     </span>
+                                                                    {(item.currency || 'IDR') === 'USD' && exchangeRate && parseFloat(exchangeRate) > 0 && (
+                                                                        <div className="text-xs text-silver-dark mt-0.5">
+                                                                            ≈ Rp {(parseFloat(item.amount || 0) * parseFloat(exchangeRate)).toLocaleString('id-ID')}
+                                                                        </div>
+                                                                    )}
                                                                 </td>
                                                                 {isEditingCOGS && (
                                                                     <td className="px-2 py-2 text-center">
