@@ -1232,10 +1232,22 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
     };
 
     const getShipmentType = () => {
-        if (shipment.quotationType) {
-            return shipment.quotationType === 'RG' ? 'Regular' : 'Non-Regular';
+        const qt = shipment?.quotationType || shipment?.quotation_type;
+        if (qt) {
+            if (qt === 'RG') return 'Regular';
+            if (qt === 'PJ') return 'Project';
+            if (qt === 'EV') return 'Event';
+            if (qt === 'NR' || qt === 'non-regular') return 'Non-Regular';
+            if (qt === 'urgent') return 'Urgent';
+            return qt;
         }
-        return shipment.type === 'regular' ? 'Regular' : 'Non-Regular';
+        const t = shipment?.type || '';
+        if (t === 'regular') return 'Regular';
+        if (t === 'project') return 'Project';
+        if (t === 'event') return 'Event';
+        if (t === 'non-regular') return 'Non-Regular';
+        if (t === 'urgent') return 'Urgent';
+        return 'Regular';
     };
 
     const handleCreateBL = () => {

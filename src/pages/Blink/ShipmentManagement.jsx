@@ -5,6 +5,7 @@ import SellingBuyingDetailModal from '../../components/Blink/SellingBuyingDetail
 import { Ship, Plus, MapPin, Filter, Search, Download, X, ShoppingCart, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { getQuotationTypeLabel } from '../../utils/orderTypeDetection';
 import { useAuth } from '../../context/AuthContext';
 
 const ShipmentManagement = () => {
@@ -159,6 +160,8 @@ const ShipmentManagement = () => {
         const qt = shipment.quotationType || shipment.quotation_type;
         if (qt) {
             if (qt === 'RG') return 'regular';
+            if (qt === 'PJ') return 'project';
+            if (qt === 'EV') return 'event';
             if (qt === 'NR' || qt === 'non-regular' || qt === 'Non-Regular') return 'non-regular';
             if (qt === 'urgent' || qt === 'Urgent') return 'urgent';
             return 'non-regular'; // Default for unknown quotationType
@@ -166,9 +169,23 @@ const ShipmentManagement = () => {
         // Otherwise use existing type field (backward compatibility)
         const t = shipment.type || '';
         if (t === 'regular') return 'regular';
+        if (t === 'project') return 'project';
+        if (t === 'event') return 'event';
         if (t === 'non-regular') return 'non-regular';
         if (t === 'urgent') return 'urgent';
         return 'regular'; // Default fallback
+    };
+
+    // Provide badge label and color for a shipment type
+    const getShipmentBadge = (shipment) => {
+        const t = getShipmentType(shipment);
+        const label = t === 'non-regular' ? 'Non-Regular' : t.charAt(0).toUpperCase() + t.slice(1);
+        const colorClass = t === 'regular' ? 'bg-blue-500/20 text-blue-400'
+            : t === 'project' ? 'bg-indigo-500/20 text-indigo-400'
+            : t === 'event' ? 'bg-emerald-500/20 text-emerald-400'
+            : t === 'urgent' ? 'bg-red-500/20 text-red-400'
+            : 'bg-orange-500/20 text-orange-400';
+        return { label, colorClass };
     };
 
     // Filter shipments berdasarkan type, status, service, and search
@@ -689,6 +706,8 @@ const ShipmentManagement = () => {
                 {[
                     { value: 'all', label: 'Semua' },
                     { value: 'regular', label: 'Regular' },
+                    { value: 'project', label: 'Project' },
+                    { value: 'event', label: 'Event' },
                     { value: 'non-regular', label: 'Non-Regular' },
                     { value: 'urgent', label: 'Urgent' }
                 ].map((tab) => (
@@ -706,7 +725,7 @@ const ShipmentManagement = () => {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div className="glass-card p-4 rounded-lg">
                     <p className="text-xs text-silver-dark">Total Shipments</p>
                     <p className="text-2xl font-bold text-silver-light mt-1">{shipments.length}</p>
@@ -718,15 +737,21 @@ const ShipmentManagement = () => {
                     </p>
                 </div>
                 <div className="glass-card p-4 rounded-lg">
-                    <p className="text-xs text-silver-dark">Non-Regular</p>
-                    <p className="text-2xl font-bold text-orange-400 mt-1">
-                        {shipments.filter(s => getShipmentType(s) === 'non-regular').length}
+                    <p className="text-xs text-silver-dark">Project</p>
+                    <p className="text-2xl font-bold text-indigo-400 mt-1">
+                        {shipments.filter(s => getShipmentType(s) === 'project').length}
                     </p>
                 </div>
                 <div className="glass-card p-4 rounded-lg">
-                    <p className="text-xs text-silver-dark">In Transit</p>
-                    <p className="text-2xl font-bold text-purple-400 mt-1">
-                        {shipments.filter(s => s.status === 'in_transit').length}
+                    <p className="text-xs text-silver-dark">Event</p>
+                    <p className="text-2xl font-bold text-emerald-400 mt-1">
+                        {shipments.filter(s => getShipmentType(s) === 'event').length}
+                    </p>
+                </div>
+                <div className="glass-card p-4 rounded-lg">
+                    <p className="text-xs text-silver-dark">Non-Regular</p>
+                    <p className="text-2xl font-bold text-orange-400 mt-1">
+                        {shipments.filter(s => getShipmentType(s) === 'non-regular').length}
                     </p>
                 </div>
             </div>
@@ -777,12 +802,14 @@ const ShipmentManagement = () => {
                                             </div>
                                         </td>
                                         <td className="px-4 py-3">
-                                            <span className={`px-2 py-1 rounded text-xs ${getShipmentType(ship) === 'regular'
-                                                ? 'bg-blue-500/20 text-blue-400'
-                                                : 'bg-orange-500/20 text-orange-400'
-                                                }`}>
-                                                {getShipmentType(ship) === 'regular' ? 'Regular' : 'Non-Regular'}
-                                            </span>
+                                            {(() => {
+                                                const b = getShipmentBadge(ship);
+                                                return (
+                                                    <span className={`px-2 py-1 rounded text-xs ${b.colorClass}`}>
+                                                        {b.label}
+                                                    </span>
+                                                );
+                                            })()}
                                         </td>
                                         <td className="px-4 py-3 capitalize text-silver-light">
                                             {ship.serviceType}
