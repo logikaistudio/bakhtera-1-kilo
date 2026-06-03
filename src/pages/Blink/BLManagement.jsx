@@ -109,9 +109,11 @@ const BLManagement = () => {
                     }
                     return baseDesc;
                 })(),
-                grossWeight: selectedBL.blGrossWeightText || (selectedBL.grossWeight ? `${selectedBL.grossWeight} KGS` : ''),
-                measurement: selectedBL.blMeasurementText || (selectedBL.measurement ? `${selectedBL.measurement} CBM` : ''),
-                totalPackages: selectedBL.blTotalPackagesText || (() => {
+                numberOfPackages: selectedBL.blNumberOfPackages || (() => {
+                    const conts = selectedBL.containers || [];
+                    return conts.length || 1;
+                })(),
+                totalPackagesInWords: selectedBL.blTotalPackagesInWords || (() => {
                     const conts = selectedBL.containers || [];
                     const n = conts.length || 1;
                     const words = ['', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE', 'TEN'];
@@ -119,8 +121,8 @@ const BLManagement = () => {
                     const types = [...new Set(conts.map(c => c.containerType).filter(Boolean))];
                     return `SAY: ${word} (${n}) CONTAINER${n > 1 ? 'S' : ''} ONLY${types.length ? ' (' + types.join(', ') + ')' : ''}`;
                 })(),
-
-                // Footer
+                grossWeight: selectedBL.blGrossWeightText || (selectedBL.grossWeight ? `${selectedBL.grossWeight} KGS` : ''),
+                measurement: selectedBL.blMeasurementText || (selectedBL.measurement ? `${selectedBL.measurement} CBM` : ''),
                 freightPayableAt: selectedBL.blFreightPayableAt || 'DESTINATION',
                 numberOfOriginals: selectedBL.blNumberOfOriginals || 'THREE (3)',
                 issuedPlace: selectedBL.blIssuedPlace || 'JAKARTA, INDONESIA',
@@ -198,7 +200,7 @@ const BLManagement = () => {
                 blDescriptionPackages: ship.bl_description_packages,
                 blGrossWeightText: ship.bl_gross_weight_text,
                 blMeasurementText: ship.bl_measurement_text,
-                blTotalPackagesText: ship.bl_total_packages_text,
+                blTotalPackagesInWords: ship.bl_total_packages_in_words,
 
                 blFreightPayableAt: ship.bl_freight_payable_at,
                 blNumberOfOriginals: ship.bl_number_of_originals,
@@ -446,7 +448,8 @@ const BLManagement = () => {
                 blDescriptionPackages: editForm.descriptionPackages,
                 blGrossWeightText: editForm.grossWeight,
                 blMeasurementText: editForm.measurement,
-                blTotalPackagesText: editForm.totalPackages,
+                blNumberOfPackages: editForm.numberOfPackages,
+                blTotalPackagesInWords: editForm.totalPackagesInWords,
                 blFreightPayableAt: editForm.freightPayableAt,
                 blNumberOfOriginals: editForm.numberOfOriginals,
                 blIssuedPlace: editForm.issuedPlace,
@@ -528,7 +531,8 @@ const BLManagement = () => {
                 bl_description_packages: editForm.descriptionPackages || null,
                 bl_gross_weight_text: editForm.grossWeight || null,
                 bl_measurement_text: editForm.measurement || null,
-                bl_total_packages_text: editForm.totalPackages || null,
+                bl_number_of_packages: editForm.numberOfPackages || null,
+                bl_total_packages_in_words: editForm.totalPackagesInWords || null,
                 bl_freight_payable_at: editForm.freightPayableAt || null,
                 bl_number_of_originals: editForm.numberOfOriginals || null,
                 bl_issued_place: editForm.issuedPlace || null,
@@ -685,7 +689,8 @@ const BLManagement = () => {
             measurement: ship.measure
                 ? `${ship.measure} CBM`
                 : (ship.volume || ship.cbm ? `${ship.volume || ship.cbm} CBM` : prev.measurement),
-            totalPackages: ship.packages || packagesText || prev.totalPackages,
+            totalPackagesInWords: ship.packages || packagesText || prev.totalPackagesInWords,
+            numberOfPackages: ship.containers?.length || prev.numberOfPackages || 1,
 
             // === TYPE OF MOVE ===
             typeOfMove: typeOfMove || prev.typeOfMove,
@@ -1344,7 +1349,10 @@ const BLManagement = () => {
                                                 </div>
                                             </div>
                                             <div className="mt-4">
-                                                {renderInput('Total Packages Text', 'totalPackages', 'text', 'SAY: ONE CONTAINER ONLY')}
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    {renderInput('No. of Pkgs (Qty)', 'numberOfPackages', 'text', 'e.g. 1')}
+                                                    {renderInput('Total Packages (In Words)', 'totalPackagesInWords', 'text', 'SAY: ONE CONTAINER ONLY')}
+                                                </div>
                                             </div>
                                         </div>
                                         <div className="col-span-4">

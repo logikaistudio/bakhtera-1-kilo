@@ -36,7 +36,8 @@ export const generateBLPrintHTML = (blData) => {
         containerNo: blData.containerNumber || '',
         sealNo: blData.sealNumber || '',
         marks: blData.blMarksNumbers || blData.marksNumbers || blData.containerNumber || 'N/M',
-        pkgs: blData.blTotalPackagesText || blData.totalPackages || '1 CONTAINER',
+        numberOfPackages: blData.blNumberOfPackages || blData.numberOfPackages || '1',
+        totalPackagesInWords: blData.blTotalPackagesInWords || blData.totalPackagesInWords || 'SAY: ONE (1) CONTAINER ONLY',
         description: blData.blDescriptionPackages || blData.descriptionPackages || blData.cargoDescription || 'GENERAL CARGO',
         weight: blData.blGrossWeightText || blData.grossWeight || '',
         measurement: blData.blMeasurementText || blData.measurement || '',
@@ -165,7 +166,7 @@ export const generateBLPrintHTML = (blData) => {
             transform: translate(-50%, -50%) rotate(-30deg);
             font-size: 22pt;
             font-weight: 900;
-            color: rgba(254, 90, 29, 0.13);
+            color: rgba(254, 90, 29, 0.8);
             z-index: 0;
             white-space: nowrap;
             pointer-events: none;
@@ -377,7 +378,7 @@ export const generateBLPrintHTML = (blData) => {
                                 </div>
                             </td>
                              <td style="text-align: center;">
-                                <div class="value">${d.pkgs}</div>
+                                <div class="value">${d.numberOfPackages}</div>
                             </td>
                             <td>
                                 <div class="value" style="font-weight: bold;">${d.description}</div>
@@ -399,7 +400,7 @@ export const generateBLPrintHTML = (blData) => {
                      <span class="label">Total Number of Packages (In Words)</span>
                 </div>
                 <div class="col" style="width: 70%;">
-                     <div class="value-bold" style="text-transform: uppercase;">${d.pkgs}</div>
+                     <div class="value-bold" style="text-transform: uppercase;">${d.totalPackagesInWords}</div>
                 </div>
             </div>
 
