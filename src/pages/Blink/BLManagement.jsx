@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { exportBLCertificateToExcel, exportSellingBuyingReport } from '../../utils/excelExport';
 import { printBLCertificate } from '../../utils/printUtils';
+import { validateSOType, formatSOType, getSOTypeDescription } from '../../utils/orderTypeDetection';
 import { useAuth } from '../../context/AuthContext';
 
 const BLManagement = () => {
@@ -28,6 +29,7 @@ const BLManagement = () => {
     const [error, setError] = useState(null);
     const [selectedBL, setSelectedBL] = useState(null);
     const [showEditModal, setShowEditModal] = useState(false);
+    const [soTypeValidation, setSOTypeValidation] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
 
     // Edit Form State
@@ -178,6 +180,20 @@ const BLManagement = () => {
             }
         }
     }, [selectedBL]);
+
+    // Validate SO type based on editForm origin/destination
+    useEffect(() => {
+        if (!editForm || !editForm.origin) return;
+
+        const validation = validateSOType({
+            origin: editForm.origin,
+            destination: editForm.destination,
+            trade_direction: editForm.trade_direction || selectedBL?.trade_direction,
+            quotationType: selectedBL?.quotationType
+        });
+
+        setSOTypeValidation(validation);
+    }, [editForm.origin, editForm.destination, editForm.trade_direction, selectedBL?.trade_direction, selectedBL?.quotationType]);
 
     const fetchBLs = async () => {
         try {
@@ -984,6 +1000,15 @@ const BLManagement = () => {
                                         JOB: {selectedBL.jobNumber} | TYPE: {selectedBL.blType}
                                         {selectedBL.soNumber && <> | SO: {selectedBL.soNumber}</>}
                                     </p>
+                                    {soTypeValidation?.actualSOType && (
+                                        <p className={`text-xs font-semibold px-2 py-1 rounded ${
+                                            soTypeValidation.isValid 
+                                                ? 'bg-green-500/20 text-green-600 dark:text-green-400' 
+                                                : 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
+                                        }`}>
+                                            SO Type: {soTypeValidation.actualSOType}
+                                        </p>
+                                    )}
                                     <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusConfig[normalizeBLStatus(editForm.status || selectedBL.status)]?.color || 'bg-gray-500/20 text-gray-400'}`}>
                                         {(() => { const IconComp = statusConfig[normalizeBLStatus(editForm.status || selectedBL.status)]?.icon; return IconComp ? <IconComp className="w-3 h-3" /> : null; })()}
                                         {statusConfig[normalizeBLStatus(editForm.status || selectedBL.status)]?.label || normalizeBLStatus(editForm.status || selectedBL.status)}
