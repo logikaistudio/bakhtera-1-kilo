@@ -51,6 +51,40 @@ const BLManagement = () => {
         fetchShipments();
     }, []);
 
+    // Refetch shipments when BL is selected (to get latest container data)
+    useEffect(() => {
+        if (selectedBL) {
+            fetchShipments();
+        }
+    }, [selectedBL?.id]);
+
+    // Sync selected BL with latest shipment data (containers, etc)
+    useEffect(() => {
+        if (!selectedBL || !shipments || shipments.length === 0) return;
+
+        // Try to find matching shipment by container match or SO number
+        const matchingShipment = shipments.find(ship => {
+            if (!ship.containers || ship.containers.length === 0) return false;
+            
+            const blContainers = selectedBL.containers || [];
+            if (blContainers.length === 0) return false;
+
+            // Match if any container number matches
+            return ship.containers.some(shipCont =>
+                blContainers.some(blCont => blCont.containerNumber === shipCont.containerNumber)
+            );
+        });
+
+        // If found matching shipment with updated containers, update selectedBL
+        if (matchingShipment && matchingShipment.containers) {
+            const updatedBL = {
+                ...selectedBL,
+                containers: matchingShipment.containers,
+            };
+            setSelectedBL(updatedBL);
+        }
+    }, [shipments]);
+
     // Initialize edit form when selectedBL changes
     useEffect(() => {
         if (selectedBL) {
