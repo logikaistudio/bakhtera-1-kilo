@@ -3,6 +3,12 @@ import { supabase } from '../../lib/supabase';
 import Modal from '../Common/Modal';
 import Button from '../Common/Button';
 import {
+    detectTradeDirection,
+    validateSOType,
+    formatSOType,
+    getSOTypeDescription
+} from '../../utils/orderTypeDetection';
+import {
     Ship,
     Edit,
     Trash,
@@ -36,6 +42,8 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
     const [isEditing, setIsEditing] = useState(false);
     const [isEditingCOGS, setIsEditingCOGS] = useState(false);
     const [editedShipment, setEditedShipment] = useState(shipment || {});
+    const [soTypeValidation, setSOTypeValidation] = useState(null);
+    const [showSOTypeFix, setShowSOTypeFix] = useState(false);
 
     // PO Generation state — Multi-vendor support
     const [showPOVendorModal, setShowPOVendorModal] = useState(false);
@@ -449,7 +457,32 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
         }
     }, [shipment]);
 
+    // Auto-detect and validate SO type based on origin/destination
+    useEffect(() => {
+        if (!editedShipment) return;
 
+        const validation = validateSOType({
+            origin: editedShipment.origin,
+            destination: editedShipment.destination,
+            trade_direction: editedShipment.trade_direction,
+            quotationType: editedShipment.quotationType || editedShipment.quotation_type
+        });
+
+        setSOTypeValidation(validation);
+        setShowSOTypeFix(!validation.isValid); // Show fix button if validation fails
+    }, [editedShipment.origin, editedShipment.destination, editedShipment.trade_direction, editedShipment.quotationType, editedShipment.quotation_type]);
+
+    // Auto-fix: Update trade_direction based on detected origin/destination
+    const handleAutoFixSOType = () => {
+        const detectedDirection = detectTradeDirection(editedShipment.origin, editedShipment.destination);
+        if (detectedDirection) {
+            setEditedShipment({
+                ...editedShipment,
+                trade_direction: detectedDirection
+            });
+            setShowSOTypeFix(false);
+        }
+    };
 
     if (!shipment) return null;
 
@@ -1742,13 +1775,50 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                     <select
                                                         value={editedShipment.trade_direction || ''}
                                                         onChange={(e) => setEditedShipment({ ...editedShipment, trade_direction: e.target.value || null })}
-                                                        className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light"
+                                                        className={`w-full mt-1 px-2 py-1 bg-dark-surface border rounded text-silver-light ${
+                                                            soTypeValidation?.isValid ? 'border-dark-border' : 'border-red-500/50'
+                                                        }`}
                                                     >
                                                         <option value="">-- Pilih --</option>
                                                         <option value="import">Import</option>
                                                         <option value="export">Export</option>
                                                         <option value="domestic">Domestik</option>
                                                     </select>
+
+                                                    {/* SO Type Validation Indicator */}
+                                                    {soTypeValidation && !soTypeValidation.isValid && (
+                                                        <div className="mt-2 p-2 bg-red-500/10 border border-red-500/30 rounded text-xs text-red-300">
+                                                            <div className="flex gap-2 items-start">
+                                                                <div className="flex-1">
+                                                                    <p className="font-semibold mb-1">SO Type Mismatch</p>
+                                                                    {soTypeValidation.issues.map((issue, idx) => (
+                                                                        <p key={idx} className="text-xs mb-1">• {issue}</p>
+                                                                    ))}
+                                                                </div>
+                                                                <button
+                                                                    onClick={handleAutoFixSOType}
+                                                                    className="mt-1 px-2 py-1 bg-amber-600/50 hover:bg-amber-600 rounded text-xs font-semibold whitespace-nowrap"
+                                                                >
+                                                                    Auto Fix
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {/* SO Type Display */}
+                                                    {soTypeValidation?.actualSOType && (
+                                                        <div className="mt-2 text-xs">
+                                                            <span className="text-silver-dark">SO Type: </span>
+                                                            <span className={`font-semibold ${
+                                                                soTypeValidation.isValid ? 'text-green-400' : 'text-amber-400'
+                                                            }`}>
+                                                                {soTypeValidation.actualSOType}
+                                                            </span>
+                                                            <span className="text-silver-dark text-xs ml-1">
+                                                                ({getSOTypeDescription(soTypeValidation.actualSOType)})
+                                                            </span>
+                                                        </div>
+                                                    )}
                                                 </div>
                                                 <div>
                                                     <label className="text-silver-dark text-xs">Incoterm</label>
@@ -1791,6 +1861,22 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                     <div className="flex justify-between">
                                                         <span className="text-silver-dark">Payment Terms:</span>
                                                         <span className="text-silver-light">{shipment.paymentTerms || shipment.payment_terms}</span>
+                                                    </div>
+                                                )}
+                                                {(shipment.trade_direction) && (
+                                                    <div className="flex justify-between">
+                                                        <span className="text-silver-dark">Trade Direction:</span>
+                                                        <span className="text-silver-light font-medium capitalize">{shipment.trade_direction}</span>
+                                                    </div>
+                                                )}
+                                                {soTypeValidation?.actualSOType && (
+                                                    <div className="flex justify-between">
+                                                        <span className="text-silver-dark">SO Type:</span>
+                                                        <span className={`font-semibold ${
+                                                            soTypeValidation.isValid ? 'text-green-400' : 'text-amber-400'
+                                                        }`}>
+                                                            {soTypeValidation.actualSOType}
+                                                        </span>
                                                     </div>
                                                 )}
                                             </>
