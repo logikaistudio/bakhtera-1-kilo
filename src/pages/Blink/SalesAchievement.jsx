@@ -648,7 +648,7 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                                             value={targetForm.sales_name}
                                             onChange={e => setTargetForm(f => ({ ...f, sales_name: e.target.value }))}
                                             placeholder="Contoh: Budi Santoso"
-                                            className="w-full bg-dark-card border border-dark-border rounded-lg px-3 py-2 text-white placeholder:text-gray-500 text-sm focus:outline-none focus:border-accent-orange"
+                                            className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-black placeholder:text-gray-400 text-sm focus:outline-none focus:border-accent-orange"
                                         />
                                     </div>
                                     <div>
@@ -659,7 +659,7 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                                             value={targetForm.division}
                                             onChange={e => setTargetForm(f => ({ ...f, division: e.target.value }))}
                                             placeholder="Contoh: Sea Freight"
-                                            className="w-full bg-dark-card border border-dark-border rounded-lg px-3 py-2 text-white placeholder:text-gray-500 text-sm focus:outline-none focus:border-accent-orange"
+                                            className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-black placeholder:text-gray-400 text-sm focus:outline-none focus:border-accent-orange"
                                         />
                                         <datalist id="division-suggestions">
                                             <option value="Sea Freight" />
@@ -676,7 +676,7 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                                             value={targetForm.yearly_target}
                                             onChange={e => setTargetForm(f => ({ ...f, yearly_target: e.target.value }))}
                                             placeholder="Contoh: 1000000000"
-                                            className="w-full bg-dark-card border border-dark-border rounded-lg px-3 py-2 text-white placeholder:text-gray-500 text-sm focus:outline-none focus:border-accent-orange"
+                                            className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-black placeholder:text-gray-400 text-sm focus:outline-none focus:border-accent-orange"
                                         />
                                         {targetForm.yearly_target && Number(targetForm.yearly_target) > 0 && (
                                             <p className="text-xs text-silver-dark mt-1">
@@ -718,12 +718,10 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                                         <tbody className="divide-y divide-dark-border">
                                             {targetList.map(row => (
                                                 <tr key={row.id} className="hover:bg-dark-surface/30">
-                                                    <td className="px-3 py-3 text-silver-light font-medium">{row.sales_name}</td>
-                                                    <td className="px-3 py-3">
-                                                        <span className="px-2 py-0.5 bg-accent-orange/20 text-accent-orange rounded text-xs font-medium">{row.division || 'Umum'}</span>
-                                                    </td>
-                                                    <td className="px-3 py-3 text-right text-silver-light">{fmtIDR(row.yearly_target)}</td>
-                                                    <td className="px-3 py-3 text-right text-silver-dark">{fmtIDR(Math.round(row.yearly_target / 12))}</td>
+                                                    <td className="px-3 py-3 text-black font-medium">{row.sales_name}</td>
+                                                    <td className="px-3 py-3 text-black">{row.division || 'Umum'}</td>
+                                                    <td className="px-3 py-3 text-right text-black">{fmtIDR(row.yearly_target)}</td>
+                                                    <td className="px-3 py-3 text-right text-black">{fmtIDR(Math.round(row.yearly_target / 12))}</td>
                                                     <td className="px-3 py-3">
                                                         <div className="flex justify-center gap-2">
                                                             <button onClick={() => handleEditTarget(row)}
