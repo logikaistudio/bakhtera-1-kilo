@@ -180,10 +180,13 @@ const ShipmentManagement = () => {
     const getShipmentBadge = (shipment) => {
         const t = getShipmentType(shipment);
         const label = t === 'non-regular' ? 'Non-Regular' : t.charAt(0).toUpperCase() + t.slice(1);
+        // Hide colored badge for 'non-regular' and 'urgent' per UX request;
+        // render them as plain text instead.
+        if (t === 'non-regular' || t === 'urgent') return { label, colorClass: '' };
+
         const colorClass = t === 'regular' ? 'bg-blue-500/20 text-blue-400'
             : t === 'project' ? 'bg-indigo-500/20 text-indigo-400'
             : t === 'event' ? 'bg-emerald-500/20 text-emerald-400'
-            : t === 'urgent' ? 'bg-red-500/20 text-red-400'
             : 'bg-orange-500/20 text-orange-400';
         return { label, colorClass };
     };
@@ -707,9 +710,7 @@ const ShipmentManagement = () => {
                     { value: 'all', label: 'Semua' },
                     { value: 'regular', label: 'Regular' },
                     { value: 'project', label: 'Project' },
-                    { value: 'event', label: 'Event' },
-                    { value: 'non-regular', label: 'Non-Regular' },
-                    { value: 'urgent', label: 'Urgent' }
+                    { value: 'event', label: 'Event' }
                 ].map((tab) => (
                     <button
                         key={tab.value}
@@ -725,7 +726,7 @@ const ShipmentManagement = () => {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="glass-card p-4 rounded-lg">
                     <p className="text-xs text-silver-dark">Total Shipments</p>
                     <p className="text-2xl font-bold text-silver-light mt-1">{shipments.length}</p>
@@ -746,12 +747,6 @@ const ShipmentManagement = () => {
                     <p className="text-xs text-silver-dark">Event</p>
                     <p className="text-2xl font-bold text-emerald-400 mt-1">
                         {shipments.filter(s => getShipmentType(s) === 'event').length}
-                    </p>
-                </div>
-                <div className="glass-card p-4 rounded-lg">
-                    <p className="text-xs text-silver-dark">Non-Regular</p>
-                    <p className="text-2xl font-bold text-orange-400 mt-1">
-                        {shipments.filter(s => getShipmentType(s) === 'non-regular').length}
                     </p>
                 </div>
             </div>
@@ -804,6 +799,10 @@ const ShipmentManagement = () => {
                                         <td className="px-4 py-3">
                                             {(() => {
                                                 const b = getShipmentBadge(ship);
+                                                if (!b.colorClass) {
+                                                    // Render as plain text when colorClass is empty
+                                                    return <span className="text-sm text-silver-dark">{b.label}</span>;
+                                                }
                                                 return (
                                                     <span className={`px-2 py-1 rounded text-xs ${b.colorClass}`}>
                                                         {b.label}
