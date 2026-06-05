@@ -130,19 +130,10 @@ const SalesRevenue = () => {
             }
             setMonthlyTrend(monthlyData);
 
-            // Sales type distribution - Regular, Project (OP), Non-Regular
-            // Calculate non-regular revenue from other quotation types
-            const nonRegularShipments = paidShipments.filter(s =>
-                s.quotation_type !== 'RG' && s.quotation_type !== 'OP'
-            );
-            const nonRegularRevenue = nonRegularShipments.reduce((sum, s) =>
-                sum + convertToIDR(s.quoted_amount || 0, s.currency), 0
-            );
-
+            // Sales type distribution - Regular and Project only
             setSalesTypeDistribution([
                 { name: 'Regular Sales', value: regularRevenue, color: '#3b82f6' },
-                { name: 'Project Sales', value: operationRevenue, color: '#f59e0b' },
-                { name: 'Non-Regular Sales', value: nonRegularRevenue, color: '#8b5cf6' }
+                { name: 'Project Sales', value: operationRevenue, color: '#f59e0b' }
             ]);
 
             // Top customers by revenue

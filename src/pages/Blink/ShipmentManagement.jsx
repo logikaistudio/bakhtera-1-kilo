@@ -162,27 +162,21 @@ const ShipmentManagement = () => {
             if (qt === 'RG') return 'regular';
             if (qt === 'PJ') return 'project';
             if (qt === 'EV') return 'event';
-            if (qt === 'NR' || qt === 'non-regular' || qt === 'Non-Regular') return 'non-regular';
-            if (qt === 'urgent' || qt === 'Urgent') return 'urgent';
-            return 'non-regular'; // Default for unknown quotationType
+            // Unknown/legacy codes treated as 'regular'
+            return 'regular';
         }
         // Otherwise use existing type field (backward compatibility)
         const t = shipment.type || '';
         if (t === 'regular') return 'regular';
         if (t === 'project') return 'project';
         if (t === 'event') return 'event';
-        if (t === 'non-regular') return 'non-regular';
-        if (t === 'urgent') return 'urgent';
         return 'regular'; // Default fallback
     };
 
     // Provide badge label and color for a shipment type
     const getShipmentBadge = (shipment) => {
         const t = getShipmentType(shipment);
-        const label = t === 'non-regular' ? 'Non-Regular' : t.charAt(0).toUpperCase() + t.slice(1);
-        // Hide colored badge for 'non-regular' and 'urgent' per UX request;
-        // render them as plain text instead.
-        if (t === 'non-regular' || t === 'urgent') return { label, colorClass: '' };
+        const label = t.charAt(0).toUpperCase() + t.slice(1);
 
         const colorClass = t === 'regular' ? 'bg-blue-500/20 text-blue-400'
             : t === 'project' ? 'bg-indigo-500/20 text-indigo-400'
@@ -612,7 +606,7 @@ const ShipmentManagement = () => {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold gradient-text">Shipment Management</h1>
-                    <p className="text-silver-dark mt-1">Kelola semua pengiriman regular dan non-regular</p>
+                            <p className="text-silver-dark mt-1">Kelola semua pengiriman</p>
                 </div>
                 <div className="flex gap-2">
                     <Button

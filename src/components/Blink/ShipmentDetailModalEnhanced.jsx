@@ -1237,16 +1237,13 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
             if (qt === 'RG') return 'Regular';
             if (qt === 'PJ') return 'Project';
             if (qt === 'EV') return 'Event';
-            if (qt === 'NR' || qt === 'non-regular') return 'Non-Regular';
-            if (qt === 'urgent') return 'Urgent';
-            return qt;
+            // Any other/legacy values now treated as 'Regular' by default
+            return 'Regular';
         }
         const t = shipment?.type || '';
         if (t === 'regular') return 'Regular';
         if (t === 'project') return 'Project';
         if (t === 'event') return 'Event';
-        if (t === 'non-regular') return 'Non-Regular';
-        if (t === 'urgent') return 'Urgent';
         return 'Regular';
     };
 
