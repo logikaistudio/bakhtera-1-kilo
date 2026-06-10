@@ -161,7 +161,7 @@ const ShipmentManagement = () => {
         if (qt) {
             if (qt === 'RG') return 'regular';
             if (qt === 'PJ') return 'project';
-            if (qt === 'EV') return 'event';
+            if (qt.startsWith('EV')) return 'event';
             // Unknown/legacy codes treated as 'regular'
             return 'regular';
         }

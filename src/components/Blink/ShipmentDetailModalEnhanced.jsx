@@ -1236,7 +1236,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
         if (qt) {
             if (qt === 'RG') return 'Regular';
             if (qt === 'PJ') return 'Project';
-            if (qt === 'EV') return 'Event';
+            if (qt.startsWith('EV')) return 'Event';
             // Any other/legacy values now treated as 'Regular' by default
             return 'Regular';
         }
@@ -2233,12 +2233,17 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                     </div>
                                                     <div className="flex items-center gap-2">
                                                         {update.status && (
-                                                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${update.status === 'delivered' ? 'bg-green-500/20 text-green-400' :
-                                                                update.status === 'in_transit' ? 'bg-blue-500/20 text-blue-400' :
+                                                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${['delivered', 'arrived'].includes(update.status) ? 'bg-green-500/20 text-green-400' :
+                                                                ['in_transit', 'pickup'].includes(update.status) ? 'bg-blue-500/20 text-blue-400' :
+                                                                update.status === 'preparation' ? 'bg-orange-500/20 text-orange-400' :
                                                                     'bg-yellow-500/20 text-yellow-400'
                                                                 }`}>
                                                                 {update.status === 'in_transit' ? 'In Transit' :
-                                                                    update.status === 'delivered' ? 'Delivered' : 'Pending'}
+                                                                    update.status === 'delivered' ? 'Delivered' :
+                                                                    update.status === 'arrived' ? 'Arrived at User' :
+                                                                    update.status === 'pickup' ? 'Pickup' :
+                                                                    update.status === 'preparation' ? 'Preparation' :
+                                                                    'Pending'}
                                                             </span>
                                                         )}
                                                         <span className="text-xs text-silver-dark">{new Date(update.timestamp).toLocaleString('id-ID')}</span>
@@ -3090,7 +3095,10 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                             className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
                         >
                             <option value="pending">Pending</option>
+                            <option value="preparation">Preparation</option>
+                            <option value="pickup">Pickup</option>
                             <option value="in_transit">In Transit</option>
+                            <option value="arrived">Arrived</option>
                             <option value="delivered">Delivered</option>
                         </select>
                     </div>

@@ -1226,7 +1226,10 @@ const QuotationManagement = () => {
                             >
                                 <option value="RG">Regular (RG)</option>
                                 <option value="PJ">Project (PJ)</option>
-                                <option value="EV">Event (EV)</option>
+                                <option value="EV_ENT">Event Entertaint & Concert</option>
+                                <option value="EV_AUTO">Event Automotive</option>
+                                <option value="EV_KEK">Event KEK</option>
+                                <option value="EV_FAIR">Event Fair & Excebition</option>
                             </select>
                         </div>
                         <div>
@@ -1714,7 +1717,7 @@ const QuotationManagement = () => {
                                 <p className="text-gray-900 font-medium">
                                     {viewingQuotation.quotationType === 'RG' && 'Regular'}
                                     {viewingQuotation.quotationType === 'PJ' && 'Project'}
-                                    {viewingQuotation.quotationType === 'EV' && 'Event'}
+                                    {viewingQuotation.quotationType?.startsWith('EV') && 'Event'}
                                     {viewingQuotation.quotationType === 'CM' && 'Event'}
                                     {!viewingQuotation.quotationType && 'Regular'}
                                 </p>

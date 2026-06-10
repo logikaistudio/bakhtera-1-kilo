@@ -62,6 +62,10 @@ export function getQuotationTypeLabel(quotationType) {
     const typeMap = {
         'RG': 'Regular',
         'PJ': 'Project',
+        'EV_ENT': 'Event Entertaint & Concert',
+        'EV_AUTO': 'Event Automotive',
+        'EV_KEK': 'Event KEK',
+        'EV_FAIR': 'Event Fair & Excebition',
         'EV': 'Event'
     };
     return typeMap[quotationType] || quotationType || 'Regular';
@@ -160,7 +164,10 @@ export function getSOTypeOptions() {
     const quotationTypes = [
         { code: 'RG', label: 'Regular' },
         { code: 'PJ', label: 'Project' },
-        { code: 'EV', label: 'Event' }
+        { code: 'EV_ENT', label: 'Event Entertaint & Concert' },
+        { code: 'EV_AUTO', label: 'Event Automotive' },
+        { code: 'EV_KEK', label: 'Event KEK' },
+        { code: 'EV_FAIR', label: 'Event Fair & Excebition' }
     ];
 
     return directions.flatMap(dir =>
