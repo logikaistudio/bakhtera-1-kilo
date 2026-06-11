@@ -660,8 +660,8 @@ const QuotationManagement = () => {
                     <td>${item.name || item.description}</td>
                     <td style="text-align: center;">${item.quantity || 1}</td>
                     <td style="text-align: center;">${item.unit || 'Job'}</td>
-                    <td style="text-align: right;">${formatCurrency(item.unitPrice || item.price, quotation.currency)}</td>
-                    <td style="text-align: right;">${formatCurrency(item.total || ((item.quantity || 1) * (item.unitPrice || 0)), quotation.currency)}</td>
+                    <td style="text-align: right;">${formatCurrency(parseFloat(item.unitPrice || item.price || 0), quotation.currency)}</td>
+                    <td style="text-align: right;">${formatCurrency(item.amount || item.total || ((item.quantity || 1) * (item.unitPrice || 0)), quotation.currency)}</td>
                 </tr>
             `).join('');
 
@@ -1623,7 +1623,7 @@ const QuotationManagement = () => {
                                     size="sm"
                                     variant="outline"
                                     icon={FileText}
-                                    onClick={() => handlePrintQuotation(viewingQuotation)}
+                                    onClick={() => handlePrintQuotation(isEditingQuotation ? editedQuotation : viewingQuotation)}
                                 >
                                     Print
                                 </Button>
@@ -2092,9 +2092,9 @@ const QuotationManagement = () => {
                     </div>
                 </Modal>
             )}
-            {showPrintPreview && viewingQuotation && (
+            {showPrintPreview && (isEditingQuotation ? editedQuotation : viewingQuotation) && (
                 <QuotationPrintPreviewModal
-                    quotation={viewingQuotation}
+                    quotation={isEditingQuotation ? editedQuotation : viewingQuotation}
                     onClose={() => setShowPrintPreview(false)}
                     onPrint={handlePrintQuotation}
                     companySettings={companySettings}
@@ -2252,7 +2252,7 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {(quotation.serviceItems || quotation.service_items || []).map((item, index) => {
-                                    const amount = item.total || ((item.quantity || 1) * (item.unitPrice || 0));
+                                    const amount = item.amount || item.total || ((item.quantity || 1) * (item.unitPrice || 0));
                                     return (
                                         <tr key={index}>
                                             <td className="py-0.5 pl-4 text-slate-400 font-mono text-[10px]">{index + 1}</td>

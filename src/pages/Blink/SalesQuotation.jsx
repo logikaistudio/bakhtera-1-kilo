@@ -1758,7 +1758,7 @@ const SalesQuotation = () => {
                                     size="sm"
                                     variant="outline"
                                     icon={FileText}
-                                    onClick={() => handlePrintQuotation(viewingQuotation)}
+                                    onClick={() => handlePrintQuotation(isEditingQuotation ? editedQuotation : viewingQuotation)}
                                 >
                                     Print
                                 </Button>
@@ -2212,9 +2212,9 @@ const SalesQuotation = () => {
                     </div>
                 </Modal>
             )}
-            {showPrintPreview && viewingQuotation && (
+            {showPrintPreview && (isEditingQuotation ? editedQuotation : viewingQuotation) && (
                 <QuotationPrintPreviewModal
-                    quotation={viewingQuotation}
+                    quotation={isEditingQuotation ? editedQuotation : viewingQuotation}
                     onClose={() => setShowPrintPreview(false)}
                     onPrint={handlePrintQuotation}
                     companySettings={companySettings}
@@ -2233,6 +2233,18 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
         return currency === 'USD'
             ? `$${(value || 0).toLocaleString('id-ID')}`
             : `Rp ${(value || 0).toLocaleString('id-ID')}`;
+    };
+
+    const normalizeItems = (items) => {
+        let normalized = [];
+        items.forEach(groupOrItem => {
+            if (groupOrItem.items) {
+                normalized = normalized.concat(groupOrItem.items);
+            } else {
+                normalized.push(groupOrItem);
+            }
+        });
+        return normalized;
     };
 
     return (
@@ -2371,8 +2383,8 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {(quotation.serviceItems || quotation.service_items || []).map((item, index) => {
-                                    const amount = item.total || ((item.quantity || 1) * (item.unitPrice || 0));
+                                {normalizeItems(quotation.serviceItems || quotation.service_items || []).map((item, index) => {
+                                    const amount = item.amount || item.total || ((item.quantity || 1) * (item.unitPrice || 0));
                                     return (
                                         <tr key={index}>
                                             <td className="py-0.5 pl-4 text-slate-400 font-mono text-[10px]">{index + 1}</td>
