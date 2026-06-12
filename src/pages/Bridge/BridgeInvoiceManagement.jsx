@@ -1023,9 +1023,12 @@ const BridgeInvoiceManagement = () => {
                 let rawDesc = String(item.description || item.item_name || '');
                 // Split by <br/>, remove duplicates, and join
                 let parts = rawDesc.split(/<br\s*\/?>/i).map(p => p.trim()).filter(Boolean);
-                if (item.item_name && !parts.includes(item.item_name.trim())) {
-                    parts.unshift(`<b>${item.item_name.trim()}</b>`);
+                
+                // If parts is empty after filtering (meaning description was empty), fallback to item_name
+                if (parts.length === 0 && item.item_name) {
+                    parts.push(`<b>${item.item_name.trim()}</b>`);
                 }
+                
                 let uniqueParts = [...new Set(parts)];
                 let finalDesc = uniqueParts.join('<br/>');
 

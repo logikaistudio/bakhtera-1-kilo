@@ -857,6 +857,7 @@ const QuotationManagement = () => {
                     // Cost breakdown
                     service_items: quotation.serviceItems || [],
                     selling_items: quotation.serviceItems || [],
+                    buying_items: quotation.costItems || [],
                     notes: quotation.notes || '',
                     // === AUTO-CREATE BL/AWB DRAFT ===
                     bl_number: blNumber,

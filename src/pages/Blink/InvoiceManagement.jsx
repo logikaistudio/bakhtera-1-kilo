@@ -449,8 +449,8 @@ const InvoiceManagement = () => {
                 consignee: shipment.consignee_name || shipment.customer || '',
                 vessel_name: shipment.vessel_name || '',
                 voyage_number: shipment.voyage_number || '',
-                ocean_bl: shipment.mbl_number || '',
-                house_bl: shipment.hbl_number || '',
+                ocean_bl: shipment.mbl || shipment.mawb || shipment.bl_number || shipment.awb_number || shipment.mbl_number || '',
+                house_bl: shipment.hbl || shipment.hawb || shipment.hbl_number || '',
                 etd: shipment.etd || '',
                 eta: shipment.eta || '',
                 containers: shipment.container_number || '',
@@ -1023,9 +1023,12 @@ const InvoiceManagement = () => {
                 let rawDesc = String(item.description || item.item_name || '');
                 // Split by <br/>, remove duplicates, and join
                 let parts = rawDesc.split(/<br\s*\/?>/i).map(p => p.trim()).filter(Boolean);
-                if (item.item_name && !parts.includes(item.item_name.trim())) {
-                    parts.unshift(`<b>${item.item_name.trim()}</b>`);
+                
+                // If parts is empty after filtering (meaning description was empty), fallback to item_name
+                if (parts.length === 0 && item.item_name) {
+                    parts.push(`<b>${item.item_name.trim()}</b>`);
                 }
+                
                 let uniqueParts = [...new Set(parts)];
                 let finalDesc = uniqueParts.join('<br/>');
 
@@ -1233,8 +1236,8 @@ const InvoiceManagement = () => {
                             <div class="grid-4">
                                 <div class="shipment-cell"><label>ORIGIN (POL)</label><span>${safeStr(invoice.origin)}</span></div>
                                 <div class="shipment-cell"><label>DESTINATION (POD)</label><span>${safeStr(invoice.destination)}</span></div>
-                                <div class="shipment-cell"><label>MASTER BL</label><span>${safeStr(invoice.ocean_bl || invoice.bl_awb_number)}</span></div>
-                                <div class="shipment-cell"><label>HOUSE BL</label><span>${safeStr(invoice.house_bl)}</span></div>
+                                <div class="shipment-cell"><label>${(invoice.service_type || '').toLowerCase().includes('air') ? 'MAWB' : 'MASTER BL'}</label><span>${safeStr(invoice.ocean_bl || invoice.bl_awb_number)}</span></div>
+                                <div class="shipment-cell"><label>${(invoice.service_type || '').toLowerCase().includes('air') ? 'HAWB' : 'HOUSE BL'}</label><span>${safeStr(invoice.house_bl)}</span></div>
                             </div>
 
                             <div class="grid-4">
@@ -3748,8 +3751,8 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1.5fr', borderBottom: '1px solid #ccc' }}>
                                 <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>ORIGIN (POL)</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeStr(invoice.origin)}</span></div>
                                 <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>DESTINATION (POD)</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeStr(invoice.destination)}</span></div>
-                                <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>MASTER BL</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeStr(invoice.ocean_bl || invoice.bl_awb_number)}</span></div>
-                                <div style={{ padding: '3px 6px' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>HOUSE BL</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeStr(invoice.house_bl)}</span></div>
+                                <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>{(invoice.service_type || '').toLowerCase().includes('air') ? 'MAWB' : 'MASTER BL'}</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeStr(invoice.ocean_bl || invoice.bl_awb_number)}</span></div>
+                                <div style={{ padding: '3px 6px' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>{(invoice.service_type || '').toLowerCase().includes('air') ? 'HAWB' : 'HOUSE BL'}</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeStr(invoice.house_bl)}</span></div>
                             </div>
 
                             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1.5fr', borderBottom: '1px solid #ccc' }}>

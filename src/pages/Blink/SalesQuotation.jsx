@@ -977,6 +977,7 @@ const SalesQuotation = () => {
                         rate: finalAmt / (parseFloat(item.quantity) || 1), // Standardized rate
                         amount: finalAmt, // Standardized amount in baseCurrency
                         coa_id: item.coa_id || null,
+                        vendor: item.vendor || item.supplier || '',
                         // Metadata for Audit Trail
                         original_currency: originalCurrency,
                         original_amount: originalAmt,

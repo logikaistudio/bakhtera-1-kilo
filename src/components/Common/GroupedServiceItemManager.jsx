@@ -219,8 +219,19 @@ const GroupedServiceItemManager = ({
                         if (field === 'quantity' || field === 'unitPrice' || field === 'currency') {
                             const qty = field === 'quantity' ? parseFloat(value) || 0 : parseFloat(item.quantity) || 0;
                             let priceStr = field === 'unitPrice' ? value.toString() : item.unitPrice.toString();
-                            // Handle formatting: remove dots, change comma to dot, or just parse
-                            const price = parseFloat(priceStr.replace(/\./g, '').replace(/,/g, '.')) || 0;
+                            
+                            let price = 0;
+                            // Need to handle both the newly selected currency and existing currency correctly
+                            const currencyToUse = field === 'currency' ? value : item.currency;
+                            
+                            if (currencyToUse === 'IDR') {
+                                // IDR: remove dots (thousand separator), change comma to dot (decimal separator)
+                                price = parseFloat(priceStr.replace(/\./g, '').replace(/,/g, '.')) || 0;
+                            } else {
+                                // USD: remove commas (thousand separator), keep dot as decimal
+                                price = parseFloat(priceStr.replace(/,/g, '')) || 0;
+                            }
+                            
                             updatedItem.amount = qty * price;
                             if (field === 'unitPrice') {
                                 updatedItem.unitPrice = price; // Store numeric
@@ -274,7 +285,7 @@ const GroupedServiceItemManager = ({
         if (decimals > 0) {
              return parseFloat(num).toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
         }
-        return parseInt(num).toLocaleString('en-US');
+        return parseInt(num).toLocaleString('id-ID');
     };
 
     const { totalIdr, totalUsd } = calculateGrandTotals();

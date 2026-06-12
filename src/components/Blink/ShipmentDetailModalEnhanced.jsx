@@ -81,7 +81,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
             try {
                 const { count: poCount } = await supabase.from('blink_purchase_orders').select('*', { count: 'exact', head: true }).eq('shipment_id', shipment.id);
                 const { count: invCount } = await supabase.from('blink_invoices').select('*', { count: 'exact', head: true }).eq('shipment_id', shipment.id);
-                
+
                 setLinkedDocs({
                     hasPO: poCount > 0,
                     hasInvoice: invCount > 0
@@ -566,7 +566,8 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                         unit: item.unit || 'Job',
                         unit_price: parseFloat(item.rate) || val,
                         amount: val,
-                        coa_id: item.coa_id || null
+                        coa_id: item.coa_id || null,
+                        vendor: item.vendor || null
                     });
                 }
             });
@@ -599,9 +600,9 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
 
             const totalAmount = poItemsRaw.reduce((sum, i) => sum + (i.amount || 0), 0);
 
-            // Initialize vendor map — all items start unassigned
+            // Initialize vendor map — use vendor from item if available, otherwise unassigned
             const initMap = {};
-            poItemsRaw.forEach((_, idx) => { initMap[idx] = ''; });
+            poItemsRaw.forEach((item, idx) => { initMap[idx] = item.vendor || ''; });
             setPoItemVendorMap(initMap);
 
             // Store pending items and show vendor selection modal
@@ -666,7 +667,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
 
                 const items = vendorGroups[vid];
                 const total = items.reduce((sum, it) => sum + (it.amount || 0), 0);
-                
+
                 // Clean items to ensure JSON serializable (remove any undefined/circular refs)
                 const cleanItems = items.map(item => ({
                     item_name: String(item.item_name || ''),
@@ -677,7 +678,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                     amount: Number(item.amount) || 0,
                     coa_id: item.coa_id || null
                 }));
-                
+
                 const poNumber = vendorIds.length === 1
                     ? basePONumber
                     : `${basePONumber}-${suffixes[i]}`;
@@ -1784,9 +1785,8 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                     <select
                                                         value={editedShipment.trade_direction || ''}
                                                         onChange={(e) => setEditedShipment({ ...editedShipment, trade_direction: e.target.value || null })}
-                                                        className={`w-full mt-1 px-2 py-1 bg-dark-surface border rounded text-silver-light ${
-                                                            soTypeValidation?.isValid ? 'border-dark-border' : 'border-red-500/50'
-                                                        }`}
+                                                        className={`w-full mt-1 px-2 py-1 bg-dark-surface border rounded text-silver-light ${soTypeValidation?.isValid ? 'border-dark-border' : 'border-red-500/50'
+                                                            }`}
                                                     >
                                                         <option value="">-- Pilih --</option>
                                                         <option value="import">Import</option>
@@ -1818,9 +1818,8 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                     {soTypeValidation?.actualSOType && (
                                                         <div className="mt-2 text-xs">
                                                             <span className="text-silver-dark">SO Type: </span>
-                                                            <span className={`font-semibold ${
-                                                                soTypeValidation.isValid ? 'text-green-400' : 'text-amber-400'
-                                                            }`}>
+                                                            <span className={`font-semibold ${soTypeValidation.isValid ? 'text-green-400' : 'text-amber-400'
+                                                                }`}>
                                                                 {soTypeValidation.actualSOType}
                                                             </span>
                                                             <span className="text-silver-dark text-xs ml-1">
@@ -1881,9 +1880,8 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                 {soTypeValidation?.actualSOType && (
                                                     <div className="flex justify-between">
                                                         <span className="text-silver-dark">SO Type:</span>
-                                                        <span className={`font-semibold ${
-                                                            soTypeValidation.isValid ? 'text-green-400' : 'text-amber-400'
-                                                        }`}>
+                                                        <span className={`font-semibold ${soTypeValidation.isValid ? 'text-green-400' : 'text-amber-400'
+                                                            }`}>
                                                             {soTypeValidation.actualSOType}
                                                         </span>
                                                     </div>
@@ -2235,15 +2233,15 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                         {update.status && (
                                                             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${['delivered', 'arrived'].includes(update.status) ? 'bg-green-500/20 text-green-400' :
                                                                 ['in_transit', 'pickup'].includes(update.status) ? 'bg-blue-500/20 text-blue-400' :
-                                                                update.status === 'preparation' ? 'bg-orange-500/20 text-orange-400' :
-                                                                    'bg-yellow-500/20 text-yellow-400'
+                                                                    update.status === 'preparation' ? 'bg-orange-500/20 text-orange-400' :
+                                                                        'bg-yellow-500/20 text-yellow-400'
                                                                 }`}>
                                                                 {update.status === 'in_transit' ? 'In Transit' :
                                                                     update.status === 'delivered' ? 'Delivered' :
-                                                                    update.status === 'arrived' ? 'Arrived at User' :
-                                                                    update.status === 'pickup' ? 'Pickup' :
-                                                                    update.status === 'preparation' ? 'Preparation' :
-                                                                    'Pending'}
+                                                                        update.status === 'arrived' ? 'Arrived at User' :
+                                                                            update.status === 'pickup' ? 'Pickup' :
+                                                                                update.status === 'preparation' ? 'Preparation' :
+                                                                                    'Pending'}
                                                             </span>
                                                         )}
                                                         <span className="text-xs text-silver-dark">{new Date(update.timestamp).toLocaleString('id-ID')}</span>
@@ -2832,9 +2830,8 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                                             <option value="USD">USD</option>
                                                                         </select>
                                                                     ) : (
-                                                                        <span className={`text-xs font-bold px-2 py-0.5 rounded ${
-                                                                            (item.currency || 'IDR') === 'USD' ? 'bg-blue-500/20 text-blue-400' : 'bg-green-500/20 text-green-400'
-                                                                        }`}>
+                                                                        <span className={`text-xs font-bold px-2 py-0.5 rounded ${(item.currency || 'IDR') === 'USD' ? 'bg-blue-500/20 text-blue-400' : 'bg-green-500/20 text-green-400'
+                                                                            }`}>
                                                                             {item.currency || 'IDR'}
                                                                         </span>
                                                                     )}
