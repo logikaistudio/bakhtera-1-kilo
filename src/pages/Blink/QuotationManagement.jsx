@@ -692,10 +692,16 @@ const QuotationManagement = () => {
                     </style>
                 </head>
                 <body>
-                     <div class="header">
-                        <div>
-                            <div class="title">QUOTATION</div>
-                            <div style="margin-top: 5px; font-size: 16px;">${quotation.quotationNumber || quotation.quotation_number}</div>
+                     <div class="header" style="align-items: flex-start;">
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                            ${companySettings?.logo_url
+                                ? `<img src="${companySettings.logo_url}" alt="Logo" style="max-height: 64px; max-width: 160px; object-fit: contain;" />`
+                                : `<div style="font-size: 24px; font-weight: bold; font-style: italic;">${companySettings?.company_name?.split(' ')[0] || 'FREIGHT'}ONE</div><div style="font-size: 9px; letter-spacing: 3px; color: #555;">LOGISTICS SOLUTIONS</div>`
+                            }
+                            <div style="margin-top: 15px;">
+                                <div class="title">QUOTATION</div>
+                                <div style="margin-top: 5px; font-size: 16px;">${quotation.quotationNumber || quotation.quotation_number}</div>
+                            </div>
                         </div>
                         <div style="text-align: right;">
                             <div>Date: ${new Date(quotation.quotationDate || quotation.created_at).toLocaleDateString('id-ID')}</div>
