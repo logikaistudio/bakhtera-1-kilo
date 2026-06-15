@@ -3399,6 +3399,12 @@ export const DataProvider = ({ children }) => {
         businessPartners, // NEW: Unified partner management
         bridgeBusinessPartners, // Bridge-specific partners
         finance,
+        companySettings,
+        bankAccounts,
+        bridgeSettings,
+        bridgeBankAccounts,
+        bigSettings,
+        bigBankAccounts,
 
         // Module-specific data
         shipments,
