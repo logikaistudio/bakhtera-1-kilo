@@ -10,8 +10,8 @@ import { useAuth } from '../../context/AuthContext';
 const BridgeCompanySettings = () => {
     const { canEdit, canCreate, canDelete } = useAuth();
     const {
-        companySettings: bridgeSettings, // Blink Settings (default)
-        bankAccounts: bridgeBankAccounts, // Blink Bank Accounts (default)
+        bridgeSettings,
+        bridgeBankAccounts,
         updateCompanySettings,
         addBankAccount,
         updateBankAccount,
