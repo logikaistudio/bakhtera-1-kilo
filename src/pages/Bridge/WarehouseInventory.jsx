@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Warehouse, Search, Download, X, Edit2, Save, XCircle, ArrowRightLeft, Upload, FileText, Trash2, ExternalLink, AlertCircle, CheckCircle, Box, MapPin, LogOut } from 'lucide-react';
+import { Warehouse, Search, Download, X, Edit2, Save, XCircle, ArrowRightLeft, Upload, FileText, Trash2, ExternalLink, AlertCircle, CheckCircle, Box, MapPin, LogOut, Plus, Paperclip } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
+import { LOCATION_OPTIONS, DEFAULT_LOCATION } from '../../constants/locationOptions';
 import Button from '../../components/Common/Button';
 import { exportToCSV } from '../../utils/exportCSV';
 import { calculateDaysDifference, getAgingStatus } from '../../utils/agingCalculator';
@@ -14,16 +15,19 @@ const WarehouseInventory = () => {
     const hasDelete = canDelete('bridge_inventory');
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    const { quotations, updateQuotation, addMutationLog, mutationLogs = [], deleteMutationLog, updateInventoryStock, outboundTransactions = [], updateItemCheckout, requestApproval } = useData();
+    const { quotations, updateQuotation, addMutationLog, mutationLogs = [], deleteMutationLog, updateInventoryStock, outboundTransactions = [], updateItemCheckout, requestApproval, isExhibitionLocation, getExhibitionLocation } = useData();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedPengajuan, setSelectedPengajuan] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
     const [editData, setEditData] = useState(null);
+    // Tambahan: State untuk jam masuk (entryTime) saat edit
+    const [entryTime, setEntryTime] = useState('');
 
     // Mutation modal states
     const [showMutationModal, setShowMutationModal] = useState(false);
     const [mutationData, setMutationData] = useState(null);
     const [mutationDocuments, setMutationDocuments] = useState([]);
+    const [activeDocumentRow, setActiveDocumentRow] = useState(null); // { pkgIndex, itemIdx }
     const fileInputRef = useRef(null);
 
     // Filter only approved INBOUND pengajuan (these are in warehouse inventory)
@@ -66,7 +70,18 @@ const WarehouseInventory = () => {
     const countPackagesAndItems = (pengajuan) => {
         const packages = pengajuan.packages || [];
         const packageCount = packages.length;
-        const itemCount = packages.reduce((sum, pkg) => sum + (pkg.items?.length || 0), 0);
+        const itemCount = packages.reduce((sum, pkg) => {
+            const uniqueItems = new Set();
+            let pkgSum = 0;
+            (pkg.items || []).forEach((item, idx) => {
+                const identifier = item._originalItemIdx !== undefined ? item._originalItemIdx : idx;
+                if (!uniqueItems.has(identifier)) {
+                    uniqueItems.add(identifier);
+                    pkgSum += Number(item.quantity || 0);
+                }
+            });
+            return sum + pkgSum;
+        }, 0);
         return { packageCount, itemCount };
     };
 
@@ -97,6 +112,16 @@ const WarehouseInventory = () => {
     const handleRowClick = (pengajuan) => {
         setSelectedPengajuan(pengajuan);
         setEditData(JSON.parse(JSON.stringify(pengajuan)));
+        // Ambil jam dari approvedDate jika ada, format ke HH:mm
+        let jam = '';
+        const dateStr = pengajuan.approvedDate || pengajuan.approved_date;
+        if (dateStr) {
+            try {
+                const d = new Date(dateStr);
+                jam = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+            } catch {}
+        }
+        setEntryTime(jam);
         setIsEditing(false);
         setShowMutationModal(false);
     };
@@ -112,19 +137,53 @@ const WarehouseInventory = () => {
 
     const handleStartEdit = () => {
         if (!hasEdit) return;
+        // Saat mulai edit, pastikan entryTime diisi dari data
+        let jam = entryTime;
+        if (!jam && editData) {
+            const dateStr = editData.approvedDate || editData.approved_date;
+            if (dateStr) {
+                try {
+                    const d = new Date(dateStr);
+                    jam = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                } catch {}
+            }
+        }
+        setEntryTime(jam);
         setIsEditing(true);
     };
 
     const handleCancelEdit = () => {
         setEditData(JSON.parse(JSON.stringify(selectedPengajuan)));
+        // Reset entryTime ke data awal
+        let jam = '';
+        const dateStr = selectedPengajuan?.approvedDate || selectedPengajuan?.approved_date;
+        if (dateStr) {
+            try {
+                const d = new Date(dateStr);
+                jam = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+            } catch {}
+        }
+        setEntryTime(jam);
         setIsEditing(false);
     };
 
     const handleSaveEdit = async () => {
         try {
+            let approvedDateISO = editData.approvedDate || editData.approved_date || editData.submissionDate || editData.submission_date || new Date().toISOString();
+            if ((editData.approvedDate || editData.approved_date || editData.submissionDate || editData.submission_date) && entryTime) {
+                let dateObj = new Date(editData.approvedDate || editData.approved_date || editData.submissionDate || editData.submission_date);
+                if (isNaN(dateObj.getTime())) dateObj = new Date();
+                const [hours, minutes] = entryTime.split(':');
+                dateObj.setHours(parseInt(hours, 10));
+                dateObj.setMinutes(parseInt(minutes, 10));
+                approvedDateISO = dateObj.toISOString();
+            }
+
             // Sanitize: Remove temporary mutation fields before saving
             const cleanedData = {
                 ...editData,
+                approvedDate: approvedDateISO,
+                approved_date: approvedDateISO,
                 packages: (editData.packages || []).map(pkg => ({
                     ...pkg,
                     items: (pkg.items || []).map(item => {
@@ -149,7 +208,7 @@ const WarehouseInventory = () => {
                 editData?.customer?.name || editData?.customer_name ||
                 editData?.companyName || editData?.company_name || '-';
 
-            (editData.packages || []).forEach((pkg, pkgIdx) => {
+                    (editData.packages || []).forEach((pkg, pkgIdx) => {
                 (pkg.items || []).forEach((item, itemIdx) => {
                     const outQty = item.mutationOutQty || 0;
                     const inQty = item.mutationInQty || 0;
@@ -162,8 +221,8 @@ const WarehouseInventory = () => {
 
                     // Process outbound mutation (Gudang -> Pameran)
                     if (outQty > 0 && outQty <= inWarehouse) {
-                        // Strict data flow: Manual Out = Pameran
-                        const destinationLocation = 'Pameran';
+                        // Per-item location if specified, else header fallback
+                        const destinationLocation = item.mutationLocation || editData.mutationLocation || DEFAULT_LOCATION;
                         mutations.push({
                             pengajuanId: qId,
                             pengajuanNumber: qNumber,
@@ -202,7 +261,7 @@ const WarehouseInventory = () => {
                             totalStock: item.quantity,
                             mutatedQty: inQty,
                             remainingStock: inWarehouse + inQty,
-                            origin: 'Pameran',
+                            origin: item.mutationLocation || editData.mutationLocation || DEFAULT_LOCATION,
                             destination: 'warehouse',
                             condition: item.condition || 'Baik',
                             // Use per-item In details
@@ -243,8 +302,9 @@ const WarehouseInventory = () => {
                     }
                 }
                 alert(`Data berhasil disimpan! ${mutations.length} mutasi diproses.`);
-
-                // Create approval request for monitoring
+                // Auto-navigate to Goods Movement page after inline mutations
+                navigate(`/bridge/goods-movement?pengajuan=${encodeURIComponent(qNumber)}`);
+                handleCloseDetail();
                 if (requestApproval) {
                     const userName = user?.full_name || user?.username || 'User';
                     const userId = user?.id || null;
@@ -266,7 +326,8 @@ const WarehouseInventory = () => {
                 alert('Data berhasil disimpan!');
             }
 
-            setSelectedPengajuan(editData);
+            // Update selectedPengajuan dengan data baru (approvedDate sudah update)
+            setSelectedPengajuan({ ...editData, approvedDate: approvedDateISO, approved_date: approvedDateISO });
             setIsEditing(false);
         } catch (error) {
             console.error('❌ Gagal menyimpan data:', error);
@@ -353,13 +414,15 @@ const WarehouseInventory = () => {
     const handleFileUpload = async (e) => {
         const files = Array.from(e.target.files);
         const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
-        const maxFiles = 8;
+        const currentDocs = activeDocumentRow && mutationData?.packages[activeDocumentRow.pkgIndex]?.items[activeDocumentRow.itemIdx]?.mutationDocuments || [];
+        const maxFiles = 5;
 
-        if (mutationDocuments.length + files.length > maxFiles) {
-            alert(`Maksimal ${maxFiles} file. Anda sudah memiliki ${mutationDocuments.length} file.`);
+        if (currentDocs.length + files.length > maxFiles) {
+            alert(`Maksimal ${maxFiles} file. Anda sudah memiliki ${currentDocs.length} file.`);
             return;
         }
 
+        const newDocs = [];
         for (const file of files) {
             if (!allowedTypes.includes(file.type)) {
                 alert(`Format file "${file.name}" tidak didukung. Gunakan JPG, PNG, atau PDF.`);
@@ -368,15 +431,19 @@ const WarehouseInventory = () => {
 
             const result = await compressImage(file, 3000);
             if (result) {
-                setMutationDocuments(prev => [...prev, {
+                newDocs.push({
                     id: Date.now() + Math.random(),
                     name: file.name,
                     type: file.type,
                     title: '',
                     data: result.data,
                     size: result.size
-                }]);
+                });
             }
+        }
+
+        if (newDocs.length > 0 && activeDocumentRow) {
+            handleMutationItemChange(activeDocumentRow.pkgIndex, activeDocumentRow.itemIdx, 'mutationDocuments', [...currentDocs, ...newDocs]);
         }
 
         // Reset file input
@@ -426,22 +493,100 @@ const WarehouseInventory = () => {
             mutationDate: new Date().toISOString().split('T')[0],
             mutationTime: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
             mutationPic: '',
-            mutationLocation: 'Pameran', // Default location
+            mutationLocation: DEFAULT_LOCATION, // Default location (header fallback)
             packages: (pengajuanToProcess.packages || []).map(pkg => ({
                 ...pkg,
-                items: (pkg.items || []).map(item => {
+                // Expand items into multiple rows: one warehouse row + one row per outstanding destination
+                items: (pkg.items || []).flatMap((item, originalItemIdx) => {
+                    const rows = [];
                     const status = getIndividualItemStatus(item.itemCode, pkg.packageNumber);
                     // inWarehouse = max allowed for OUTBOUND (Mutasi) - includes official outbound deduction
                     const inWarehouse = (item.quantity || 0) - (status.totalDeducted || status.atPameran);
 
-                    return {
+                    const pengajuanNumberLocal = pengajuanToProcess.quotationNumber || pengajuanToProcess.quotation_number;
+                    const relatedMutations = (mutationLogs || []).filter(m =>
+                        (m.pengajuanId === pengajuanToProcess.id || normalize(m.pengajuanNumber) === normalize(pengajuanNumberLocal)) &&
+                        normalize(m.itemCode) === normalize(item.itemCode) &&
+                        (pkg.packageNumber ? normalize(m.packageNumber) === normalize(pkg.packageNumber) : true)
+                    );
+
+                    // Group by destination (exclude warehouse/gudang)
+                    const destGroups = {};
+                    relatedMutations.forEach(m => {
+                        const dest = (m.destination || '').toString().trim();
+                        if (!dest) return;
+                        if (['warehouse', 'gudang'].includes(dest.toLowerCase())) return;
+                        const key = dest.toLowerCase();
+                        destGroups[key] = destGroups[key] || { destination: dest, sent: 0, returned: 0 };
+                        destGroups[key].sent += parseInt(m.mutatedQty || 0);
+                    });
+
+                    // Count returns from each destination back to warehouse
+                    relatedMutations.forEach(m => {
+                        const origin = (m.origin || '').toString().trim();
+                        const dest = (m.destination || '').toString().trim();
+                        // If this mutation's destination is warehouse and origin matches a tracked dest, count as returned
+                        if ((dest || '').toLowerCase() === 'warehouse' || (dest || '').toLowerCase() === 'gudang') {
+                            const key = (origin || '').toLowerCase();
+                            if (destGroups[key]) destGroups[key].returned += parseInt(m.mutatedQty || 0);
+                        }
+                    });
+
+                    // Determine a safe non-Gudang default location for outbound warehouse rows
+                    const safeExhibitionLoc = (() => {
+                        const exhibLoc = getExhibitionLocation ? getExhibitionLocation() : null;
+                        // Ensure the exhibition location is not Gudang
+                        if (exhibLoc && String(exhibLoc).toLowerCase() !== 'gudang') return exhibLoc;
+                        // Fallback: pick first non-Gudang option from LOCATION_OPTIONS
+                        const nonGudang = LOCATION_OPTIONS.find(opt => opt.value.toLowerCase() !== 'gudang');
+                        return nonGudang ? nonGudang.value : 'Hall 1';
+                    })();
+
+                    rows.push({
                         ...item,
+                        _originalItem: item.itemCode,
+                        _originalItemIdx: originalItemIdx,
+                        _replicaIndex: 'warehouse',
+                        mutationLocation: safeExhibitionLoc,
                         inWarehouse: Math.max(0, inWarehouse),
-                        atPameran: status.atPameran, // max allowed for RETURN (Remutasi)
+                        atPameran: 0,
+                        maxMutationQty: Math.max(0, inWarehouse),
+                        maxRemutationQty: 0,
                         mutationQty: 0,
                         remutationQty: 0,
-                        mutationCondition: 'Baik'
-                    };
+                        mutationCondition: 'Baik',
+                        mutationDate: new Date().toISOString().split('T')[0],
+                        mutationTime: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+                        mutationPic: '',
+                        mutationDocuments: []
+                    });
+
+                    // 2) For each destination with outstanding qty, create a remutation row
+                    Object.values(destGroups).forEach(g => {
+                        const qtyAtDest = Math.max(0, (g.sent || 0) - (g.returned || 0));
+                        if (qtyAtDest <= 0) return;
+                        rows.push({
+                            ...item,
+                            _originalItem: item.itemCode,
+                            _originalItemIdx: originalItemIdx,
+                            _replicaIndex: g.destination,
+                            // Default destination for returning from outside is Gudang
+                            mutationLocation: 'Gudang',
+                            inWarehouse: 0,
+                            atPameran: qtyAtDest,
+                            maxMutationQty: 0,
+                            maxRemutationQty: qtyAtDest,
+                            mutationQty: 0,
+                            remutationQty: 0,
+                            mutationCondition: 'Baik',
+                            mutationDate: new Date().toISOString().split('T')[0],
+                            mutationTime: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+                            mutationPic: '',
+                            mutationDocuments: []
+                        });
+                    });
+
+                    return rows;
                 })
             }))
         };
@@ -519,10 +664,61 @@ const WarehouseInventory = () => {
         if (!newData.packages[pkgIndex].items) newData.packages[pkgIndex].items = [];
         if (!newData.packages[pkgIndex].items[itemIndex]) return;
 
+        // When mutationLocation changes, recalculate max values based on new location
+        if (field === 'mutationLocation') {
+            const item = newData.packages[pkgIndex].items[itemIndex];
+            const newLocation = value;
+            const isToGudang = String(newLocation).toLowerCase() === 'gudang';
+            const isToOutbound = String(newLocation).toLowerCase() === 'outbound';
+            const isToExhibition = isExhibitionLocation ? isExhibitionLocation(newLocation) : String(newLocation).toLowerCase().includes('hall');
+
+            // Recalculate max values based on new location
+            if (isToGudang) {
+                // Going back to Gudang - max is what's at exhibition
+                item.maxMutationQty = 0;
+                item.maxRemutationQty = item.atPameran || 0;
+            } else if (isToOutbound || isToExhibition) {
+                // Going to Outbound or Exhibition - max is what's in warehouse
+                item.maxMutationQty = item.inWarehouse || 0;
+                item.maxRemutationQty = 0;
+            }
+            // Reset qty values when location changes
+            item.mutationQty = 0;
+            item.remutationQty = 0;
+        }
+
         // Validate mutation qty doesn't exceed remaining stock
         if (field === 'mutationQty') {
             const item = newData.packages[pkgIndex].items[itemIndex];
-            const maxQty = item.maxMutationQty || item.remainingStock || item.quantity || 0;
+            
+            // Check max based on other identical items
+            const isWarehouseRow = String(item._replicaIndex).startsWith('warehouse');
+            let sumOtherMutations = 0;
+            if (isWarehouseRow) {
+                newData.packages[pkgIndex].items.forEach((otherItem, otherIdx) => {
+                    if (otherIdx !== itemIndex && otherItem._originalItemIdx === item._originalItemIdx && String(otherItem._replicaIndex).startsWith('warehouse')) {
+                        sumOtherMutations += (parseInt(otherItem.mutationQty) || 0);
+                    }
+                });
+            }
+
+            const isToGudang = String(item.mutationLocation || 'Gudang').toLowerCase() === 'gudang';
+            const maxMutasiBase = item.inWarehouse || 0;
+            const maxRemutasi = item.atPameran || 0;
+
+            const maxMutasi = isWarehouseRow
+                ? Math.max(0, maxMutasiBase - sumOtherMutations)
+                : (isToGudang ? maxRemutasi : Math.max(0, maxMutasiBase - sumOtherMutations));
+
+            if (value !== '' && value > maxMutasi) {
+                value = maxMutasi;
+            }
+        }
+
+        // Validate remutation qty doesn't exceed stock at exhibition
+        if (field === 'remutationQty') {
+            const item = newData.packages[pkgIndex].items[itemIndex];
+            const maxQty = item.maxRemutationQty || item.atPameran || 0;
             value = Math.min(Math.max(0, parseInt(value) || 0), maxQty);
         }
 
@@ -530,8 +726,67 @@ const WarehouseInventory = () => {
         setMutationData(newData);
     };
 
+    const handleAddMultiMutation = (pkgIndex, itemIndex) => {
+        const newData = { ...mutationData };
+        if (!newData.packages) newData.packages = [];
+        const pkg = newData.packages[pkgIndex];
+        if (!pkg) return;
+        if (!pkg.items) pkg.items = [];
+        
+        const baseItem = pkg.items[itemIndex];
+        if (!baseItem) return;
+
+        // Find the last index of rows belonging to this original item
+        let lastIdx = itemIndex;
+        for (let i = itemIndex; i < pkg.items.length; i++) {
+            if (pkg.items[i]._originalItemIdx === baseItem._originalItemIdx) {
+                lastIdx = i;
+            } else {
+                break;
+            }
+        }
+
+        const newRow = {
+            ...baseItem,
+            _replicaIndex: `warehouse_multi_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+            mutationLocation: getExhibitionLocation() || LOCATION_OPTIONS.find(opt => opt.value.toLowerCase() !== 'gudang')?.value || 'Hall 1',
+            mutationQty: 0,
+            remutationQty: 0,
+            mutationCondition: 'Baik',
+            notes: ''
+        };
+
+        // Insert new row after the last row of this item
+        pkg.items.splice(lastIdx + 1, 0, newRow);
+        setMutationData(newData);
+    };
+
+    const handleRemoveMultiMutation = (pkgIndex, itemIndex) => {
+        const newData = { ...mutationData };
+        newData.packages[pkgIndex].items.splice(itemIndex, 1);
+        setMutationData(newData);
+    };
+
     const handleSaveMutation = async () => {
         try {
+            // Check if any item is going to Outbound - require approved Pengajuan Barang Keluar
+            const hasOutbound = mutationData?.packages?.some(pkg => 
+                pkg.items?.some(item => String(item.mutationLocation || '').toLowerCase() === 'outbound')
+            );
+
+            if (hasOutbound) {
+                // Check if there's an approved outbound pengajuan for this quotation
+                const outboundApproved = outboundTransactions?.some(o => 
+                    o.quotation_id === (mutationData?.id || selectedPengajuan?.id) &&
+                    (o.status === 'approved' || o.document_status === 'approved')
+                );
+                
+                if (!outboundApproved) {
+                    alert('❌ Tidak bisa melakukan outbound. Pengajuan Barang Keluar belum disetujui.\n\nSilakan buat dan setujui pengajuan barang keluar terlebih dahulu.');
+                    return;
+                }
+            }
+
             const mutations = [];
             console.log('📋 Processing mutation data...');
             console.log('📦 mutationData:', mutationData);
@@ -600,13 +855,43 @@ const WarehouseInventory = () => {
 
                 (pkg.items || []).forEach((item, itemIdx) => {
                     const mutationQty = item.mutationQty || 0;
-                    const remutationQty = item.remutationQty || 0;
+                    if (mutationQty <= 0) return;
+
                     const bcNum = selectedPengajuan?.bcDocumentNumber || selectedPengajuan?.bc_document_number ||
                         mutationData?.bcDocumentNumber || mutationData?.bc_document_number;
+                    const destinationLocation = item.mutationLocation || mutationData.mutationLocation || DEFAULT_LOCATION;
+                    const isToGudang = String(destinationLocation).toLowerCase() === 'gudang';
 
-                    // 1. Process Outbound Mutation (Warehouse -> Selected Location)
-                    if (mutationQty > 0 && mutationQty <= item.inWarehouse) {
-                        const destinationLocation = mutationData.mutationLocation || 'Pameran';
+                    if (isToGudang) {
+                        // Process Return Mutation (Pameran -> Warehouse)
+                        const originLocation = item._replicaIndex !== 'warehouse' ? item._replicaIndex : 'Pameran';
+                        mutations.push({
+                            pengajuanId: qId,
+                            pengajuanNumber: qNumber,
+                            pengajuan_number: qNumber, // Robust fallback
+                            bcDocumentNumber: bcNum,
+                            packageNumber: pkg.packageNumber,
+                            itemCode: item.itemCode,
+                            itemName: item.name || item.itemName,
+                            hsCode: item.hsCode,
+                            sender: senderName, // Added for Pabean Barang Mutasi
+                            totalStock: item.quantity,
+                            mutatedQty: mutationQty,
+                            remainingStock: (item.inWarehouse || 0) + mutationQty, // Logic balik gudang
+                            origin: originLocation,
+                            destination: 'warehouse',
+                            condition: item.mutationCondition,
+                            date: item.mutationDate,
+                            time: item.mutationTime,
+                            pic: item.mutationPic,
+                            remarks: item.notes || `Kembali ke Gudang`,
+                            documents: (item.mutationDocuments || []).map(d => ({ title: d.title, name: d.name, type: d.type, data: d.data })),
+                            _pkgIndex: pkgIdx,
+                            _itemIndex: itemIdx,
+                            _type: 'inbound'
+                        });
+                    } else {
+                        // Process Outbound Mutation (Warehouse -> Selected Location)
                         mutations.push({
                             pengajuanId: qId,
                             pengajuanNumber: qNumber,
@@ -623,43 +908,14 @@ const WarehouseInventory = () => {
                             origin: 'warehouse',
                             destination: destinationLocation,
                             condition: item.mutationCondition,
-                            date: mutationData.mutationDate,
-                            time: mutationData.mutationTime,
-                            pic: mutationData.mutationPic,
+                            date: item.mutationDate,
+                            time: item.mutationTime,
+                            pic: item.mutationPic,
                             remarks: item.notes || `Mutasi ke ${destinationLocation}`,
-                            documents: mutationDocuments.map(d => ({ title: d.title, name: d.name, type: d.type })),
+                            documents: (item.mutationDocuments || []).map(d => ({ title: d.title, name: d.name, type: d.type, data: d.data })),
                             _pkgIndex: pkgIdx,
                             _itemIndex: itemIdx,
                             _type: 'outbound'
-                        });
-                    }
-
-                    // 2. Process Return Mutation (Pameran -> Warehouse)
-                    if (remutationQty > 0 && remutationQty <= item.atPameran) {
-                        mutations.push({
-                            pengajuanId: qId,
-                            pengajuanNumber: qNumber,
-                            pengajuan_number: qNumber, // Robust fallback
-                            bcDocumentNumber: bcNum,
-                            packageNumber: pkg.packageNumber,
-                            itemCode: item.itemCode,
-                            itemName: item.name || item.itemName,
-                            hsCode: item.hsCode,
-                            sender: senderName, // Added for Pabean Barang Mutasi
-                            totalStock: item.quantity,
-                            mutatedQty: remutationQty,
-                            remainingStock: (item.inWarehouse || 0) + remutationQty, // Logic balik gudang
-                            origin: 'Pameran',
-                            destination: 'warehouse',
-                            condition: item.mutationCondition,
-                            date: mutationData.mutationDate,
-                            time: mutationData.mutationTime,
-                            pic: mutationData.mutationPic,
-                            remarks: item.notes || `Kembali ke Gudang`,
-                            documents: mutationDocuments.map(d => ({ title: d.title, name: d.name, type: d.type })),
-                            _pkgIndex: pkgIdx,
-                            _itemIndex: itemIdx,
-                            _type: 'inbound'
                         });
                     }
                 });
@@ -759,7 +1015,7 @@ const WarehouseInventory = () => {
                                 pic: m.pic
                             })),
                             totalItems: mutations.length,
-                            location: mutationData.mutationLocation || 'Pameran'
+                            location: mutationData.mutationLocation || DEFAULT_LOCATION
                         },
                         `Mutasi ${mutations.length} item: ${mutationSummary}`,
                         userName,
@@ -860,12 +1116,13 @@ const WarehouseInventory = () => {
                 totalItems += itemQty;
                 const itemName = item.name || item.itemName;
 
-                // 1. Find outbound MUTATIONS (e.g. Pameran)
+                // 1. Find outbound MUTATIONS (semua lokasi non-warehouse/gudang)
                 const mutationsOut = mutationLogs.filter(m =>
                     (m.pengajuanId === pengajuanId || normalize(m.pengajuanNumber) === normalize(pengajuanNumber)) &&
                     normalize(m.itemCode) === normalize(item.itemCode) &&
                     normalize(m.packageNumber) === normalize(pkg.packageNumber) &&
                     (itemName ? (normalize(m.itemName) === normalize(itemName) || normalize(m.assetName) === normalize(itemName)) : true) &&
+                    (m.destination || '') &&
                     (m.destination || '').toLowerCase() !== 'warehouse' &&
                     (m.destination || '').toLowerCase() !== 'gudang'
                 );
@@ -896,14 +1153,13 @@ const WarehouseInventory = () => {
 
                 // Calculate totals
                 const totalMutationOut = mutationsOut.reduce((sum, m) => sum + (m.mutatedQty || 0), 0);
-                const totalOfficialOut = officialOutbound.reduce((sum, o) => sum + (o.quantity || 0), 0);
                 const totalReturned = returnMutations.reduce((sum, m) => sum + (m.mutatedQty || 0), 0);
 
-                // Net Pameran = Mutasi Keluar - Mutasi Balik
+                // Net barang di luar = keluar - kembali
                 const netAtPameran = Math.max(0, totalMutationOut - totalReturned);
 
-                // Remaining in Warehouse = Initial - (Net Pameran + Official Outbound)
-                const remainingInWarehouse = Math.max(0, itemQty - netAtPameran - totalOfficialOut);
+                // Remaining in Warehouse = Initial - Net di Luar (no double-count dari officialOutbound)
+                const remainingInWarehouse = Math.max(0, itemQty - netAtPameran);
 
                 itemsInWarehouse += remainingInWarehouse;
                 itemsAtPameran += netAtPameran;
@@ -919,44 +1175,46 @@ const WarehouseInventory = () => {
 
     // Helper to calculate item location status (per individual item)
     const getIndividualItemStatus = (itemCode, packageNumber, itemName) => {
-        if (!selectedPengajuan) return { atPameran: 0, totalOutbound: 0, totalReturned: 0, officialOutbound: 0 };
+        if (!selectedPengajuan) return { atPameran: 0, totalOutbound: 0, totalReturned: 0, officialOutbound: 0, totalDeducted: 0 };
 
         const pengajuanNumber = selectedPengajuan.quotationNumber || selectedPengajuan.quotation_number;
         const pengajuanId = selectedPengajuan.id;
 
-        // 1. MUTATIONS (Pameran etc)
+        // Helper: is this destination "outside" (non-warehouse, non-gudang)?
+        const isOutsideDestination = (dest) => {
+            if (!dest) return false;
+            const d = dest.toString().toLowerCase().trim();
+            return d !== 'warehouse' && d !== 'gudang';
+        };
+
+        // 1. MUTATIONS KELUAR (any destination that is not warehouse/gudang)
         const outboundMutations = mutationLogs.filter(m =>
             (m.pengajuanId === pengajuanId || normalize(m.pengajuanNumber) === normalize(pengajuanNumber)) &&
             normalize(m.itemCode) === normalize(itemCode) &&
             (packageNumber ? normalize(m.packageNumber) === normalize(packageNumber) : true) &&
-            (m.destination || '').toLowerCase() !== 'warehouse' &&
-            (m.destination || '').toLowerCase() !== 'gudang'
+            isOutsideDestination(m.destination)
         );
 
-        // 2. OFFICIAL OUTBOUND (freight_outbound)
-        // STRICT ISOLATION: Only match outbound if source reference explicitly points to THIS pengajuan
+        // 2. OFFICIAL OUTBOUND (freight_outbound) - used only for display/reporting, NOT for stock deduction
+        // to avoid double-counting with mutation logs
         const officialOutbound = outboundTransactions.filter(o => {
             const sourceRef = o.documents?.source_pengajuan_number || '';
             const docPackage = o.documents?.packageNumber;
 
-            // Item must match
             const isItemMatch = normalize(o.item_code) === normalize(itemCode);
             if (!isItemMatch) return false;
 
-            // STRICT Source Match: Must explicitly reference this pengajuan
             const matchSource = (normalize(sourceRef) === normalize(pengajuanNumber)) ||
                 (o.pengajuan_id === pengajuanId);
 
-            // Package match (optional, only if both have package info)
             const matchPackage = packageNumber && docPackage
                 ? normalize(docPackage) === normalize(packageNumber)
                 : true;
 
-            // STRICT: Must match source reference - no fallback to prevent data leakage between submissions
             return matchSource && matchPackage;
         });
 
-        // 3. RETURN MUTATIONS
+        // 3. RETURN MUTATIONS (destination = warehouse or gudang)
         const returnMutations = mutationLogs.filter(m =>
             (m.pengajuanId === pengajuanId || normalize(m.pengajuanNumber) === normalize(pengajuanNumber)) &&
             normalize(m.itemCode) === normalize(itemCode) &&
@@ -969,20 +1227,16 @@ const WarehouseInventory = () => {
         const totalOfficialOut = officialOutbound.reduce((sum, o) => sum + (parseInt(o.quantity) || 0), 0);
         const totalReturned = returnMutations.reduce((sum, m) => sum + (parseInt(m.mutatedQty) || 0), 0);
 
+        // Net barang di luar = semua keluar - semua kembali
         const netAtPameran = Math.max(0, totalMutationOut - totalReturned);
 
-        // Debug Log
-        if (totalOfficialOut > 0) {
-            console.log(`✅ [${itemCode}] STOCK ADJUSTED: -${totalOfficialOut} from Outbound`);
-        }
-
         return {
-            atPameran: netAtPameran,
-            totalOutbound: totalMutationOut,
-            totalOfficialOut: totalOfficialOut,
+            atPameran: netAtPameran,             // barang sedang di luar gudang (semua lokasi)
+            totalOutbound: totalMutationOut,      // total pernah keluar
+            totalOfficialOut: totalOfficialOut,   // untuk display saja
             totalReturned,
-            // Convenience total for deduction
-            totalDeducted: netAtPameran + totalOfficialOut
+            // Untuk deduction stok: hanya pakai net dari mutation logs (tidak double-count outbound transactions)
+            totalDeducted: netAtPameran
         };
     };
 
@@ -1272,7 +1526,14 @@ const WarehouseInventory = () => {
                                                     {isEditing ? <input type="date" value={editData.submissionDate || editData.submission_date || ''} onChange={(e) => setEditData({ ...editData, submissionDate: e.target.value })} className="px-1 py-0.5 text-xs border rounded" /> : formatDate(displayData.submissionDate || displayData.submission_date)}
                                                 </td>
                                                 <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center">
-                                                    {isEditing ? <input type="time" value={editData.entryTime || ''} onChange={(e) => setEditData({ ...editData, entryTime: e.target.value })} className="px-1 py-0.5 text-xs border rounded" /> : formatTime(displayData.approvedDate || displayData.approved_date)}
+                                                    {isEditing ? (
+                                                        <input
+                                                            type="time"
+                                                            value={entryTime || ''}
+                                                            onChange={e => setEntryTime(e.target.value)}
+                                                            className="px-1 py-0.5 text-xs border rounded"
+                                                        />
+                                                    ) : formatTime(displayData.approvedDate || displayData.approved_date)}
                                                 </td>
                                                 <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center font-bold">{countPackagesAndItems(displayData).packageCount}</td>
                                                 <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center font-bold">{countPackagesAndItems(displayData).itemCount}</td>
@@ -1341,7 +1602,7 @@ const WarehouseInventory = () => {
                                                     </div>
                                                     {locationInfo.itemsAtPameran > 0 && (
                                                         <div className="flex justify-between items-center">
-                                                            <span className="text-xs text-orange-600 dark:text-orange-400">🎪 Di Pameran:</span>
+                                                            <span className="text-xs text-orange-600 dark:text-orange-400">🎪 Di {getExhibitionLocation ? getExhibitionLocation() : DEFAULT_LOCATION}:</span>
                                                             <span className="text-xs font-bold text-orange-700 dark:text-orange-400">{locationInfo.itemsAtPameran}</span>
                                                         </div>
                                                     )}
@@ -1365,7 +1626,7 @@ const WarehouseInventory = () => {
                                                         {(() => {
                                                             // Calculate mutation frequencies
                                                             const toPameran = allMutations.filter(m =>
-                                                                (m.destination || '').toLowerCase() === 'pameran'
+                                                                (m.destination || '').toLowerCase() === DEFAULT_LOCATION.toLowerCase()
                                                             );
                                                             const toGudang = allMutations.filter(m =>
                                                                 (m.destination || '').toLowerCase() === 'gudang' ||
@@ -1373,14 +1634,14 @@ const WarehouseInventory = () => {
                                                             );
                                                             const toOther = allMutations.filter(m => {
                                                                 const dest = (m.destination || '').toLowerCase();
-                                                                return dest !== 'pameran' && dest !== 'gudang' && dest !== 'warehouse';
+                                                                return dest !== DEFAULT_LOCATION.toLowerCase() && dest !== 'gudang' && dest !== 'warehouse';
                                                             });
 
                                                             return (
                                                                 <div className="grid grid-cols-3 gap-2 pb-2 border-b border-gray-200 dark:border-dark-border">
                                                                     {/* Pameran Counter */}
                                                                     <div className="text-center">
-                                                                        <div className="text-[10px] text-orange-600 dark:text-orange-400 font-medium">Pameran</div>
+                                                                        <div className="text-[10px] text-orange-600 dark:text-orange-400 font-medium">{DEFAULT_LOCATION}</div>
                                                                         <div className="text-lg font-bold text-orange-700 dark:text-orange-300">{toPameran.length}x</div>
                                                                     </div>
                                                                     {/* Gudang Counter */}
@@ -1401,7 +1662,7 @@ const WarehouseInventory = () => {
                                                         <div className="space-y-2 max-h-20 overflow-y-auto">
                                                             {allMutations.slice(0, 3).map((mutation, idx) => {
                                                                 const dest = (mutation.destination || '').toLowerCase();
-                                                                const isPameran = dest === 'pameran';
+                                                                const isPameran = dest === DEFAULT_LOCATION.toLowerCase();
                                                                 const isGudang = dest === 'gudang' || dest === 'warehouse';
                                                                 const dotColor = isPameran ? 'bg-orange-500' : isGudang ? 'bg-green-500' : 'bg-purple-500';
 
@@ -1539,10 +1800,10 @@ const WarehouseInventory = () => {
                                                                             <span className="text-[10px] font-bold text-green-800 dark:text-green-300">{inWarehouse}</span>
                                                                         </div>
 
-                                                                        {/* Pameran */}
+                                                                        {/* Exhibition / Hall */}
                                                                         {itemStatus.atPameran > 0 && (
                                                                             <div className="flex items-center justify-between w-full min-w-[70px] bg-orange-50 dark:bg-orange-900/20 px-1.5 py-0.5 rounded border border-orange-100 dark:border-orange-800/50">
-                                                                                <span className="text-[10px] text-orange-700 dark:text-orange-400 font-medium">Pameran</span>
+                                                                                <span className="text-[10px] text-orange-700 dark:text-orange-400 font-medium">{DEFAULT_LOCATION}</span>
                                                                                 <span className="text-[10px] font-bold text-orange-800 dark:text-orange-300">{itemStatus.atPameran}</span>
                                                                             </div>
                                                                         )}
@@ -1563,16 +1824,20 @@ const WarehouseInventory = () => {
                                                                     <>
                                                                         {/* Keluar Cols */}
                                                                         <td className="px-1 py-0 text-xs text-center bg-red-50">
-                                                                            <select
+                                                                            <input
+                                                                                type="number"
+                                                                                min="0"
+                                                                                max={maxKeluar}
                                                                                 value={keluarQty}
-                                                                                onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'mutationOutQty', parseInt(e.target.value) || 0)}
-                                                                                className={`w-12 px-1 py-0 text-xs border rounded text-center ${maxKeluar > 0 ? 'border-red-300 bg-white' : 'border-gray-300 bg-gray-200'}`}
+                                                                                onChange={(e) => {
+                                                                                    let val = parseInt(e.target.value) || 0;
+                                                                                    if (val < 0) val = 0;
+                                                                                    if (val > maxKeluar) val = maxKeluar;
+                                                                                    handleItemChange(pkgIndex, itemIdx, 'mutationOutQty', val);
+                                                                                }}
+                                                                                className={`w-14 px-1 py-0 text-xs border rounded text-center ${maxKeluar > 0 ? 'border-red-300 bg-white' : 'border-gray-300 bg-gray-200 cursor-not-allowed'}`}
                                                                                 disabled={maxKeluar === 0}
-                                                                            >
-                                                                                {[...Array(maxKeluar + 1).keys()].map(n => (
-                                                                                    <option key={n} value={n}>{n}</option>
-                                                                                ))}
-                                                                            </select>
+                                                                            />
                                                                         </td>
                                                                         <td className="px-1 py-0 text-xs text-center bg-red-50">
                                                                             <input type="date" className="w-[85px] px-0.5 py-0 text-[10px] border border-red-200 rounded"
@@ -1598,16 +1863,20 @@ const WarehouseInventory = () => {
 
                                                                         {/* Kembali Cols */}
                                                                         <td className="px-1 py-0 text-xs text-center bg-blue-50">
-                                                                            <select
+                                                                            <input
+                                                                                type="number"
+                                                                                min="0"
+                                                                                max={maxKembali}
                                                                                 value={kembaliQty}
-                                                                                onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'mutationInQty', parseInt(e.target.value) || 0)}
-                                                                                className={`w-12 px-1 py-0 text-xs border rounded text-center ${maxKembali > 0 ? 'border-blue-300 bg-white' : 'border-gray-300 bg-gray-200'}`}
+                                                                                onChange={(e) => {
+                                                                                    let val = parseInt(e.target.value) || 0;
+                                                                                    if (val < 0) val = 0;
+                                                                                    if (val > maxKembali) val = maxKembali;
+                                                                                    handleItemChange(pkgIndex, itemIdx, 'mutationInQty', val);
+                                                                                }}
+                                                                                className={`w-14 px-1 py-0 text-xs border rounded text-center ${maxKembali > 0 ? 'border-blue-300 bg-white' : 'border-gray-300 bg-gray-200 cursor-not-allowed'}`}
                                                                                 disabled={maxKembali === 0}
-                                                                            >
-                                                                                {[...Array(maxKembali + 1).keys()].map(n => (
-                                                                                    <option key={n} value={n}>{n}</option>
-                                                                                ))}
-                                                                            </select>
+                                                                            />
                                                                         </td>
                                                                         <td className="px-1 py-0 text-xs text-center bg-blue-50">
                                                                             <input type="date" className="w-[85px] px-0.5 py-0 text-[10px] border border-blue-200 rounded"
@@ -1724,10 +1993,6 @@ const WarehouseInventory = () => {
                                                 <th className="px-2 py-1 text-center text-xs font-semibold text-white">Jml Pkg</th>
                                                 <th className="px-2 py-1 text-center text-xs font-semibold text-white">Jml Item</th>
                                                 <th className="px-2 py-1 text-center text-xs font-semibold text-white">PIC</th>
-                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700">Tgl Mutasi</th>
-                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700">Jam Mutasi</th>
-                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700">PIC Mutasi</th>
-                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700">Lokasi Mutasi</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -1739,26 +2004,7 @@ const WarehouseInventory = () => {
                                                 <td className="px-2 py-1 text-xs text-center font-bold">{countPackagesAndItems(mutationData).packageCount}</td>
                                                 <td className="px-2 py-1 text-xs text-center font-bold">{countPackagesAndItems(mutationData).itemCount}</td>
                                                 <td className="px-2 py-1 text-xs text-center">{mutationData.pic || '-'}</td>
-                                                <td className="px-2 py-1 text-xs text-center bg-red-50 dark:bg-red-900/10">
-                                                    <input type="date" value={mutationData.mutationDate || ''} onChange={(e) => setMutationData({ ...mutationData, mutationDate: e.target.value })} className="px-1 py-0.5 text-xs border border-red-300 rounded" />
-                                                </td>
-                                                <td className="px-2 py-1 text-xs text-center bg-red-50 dark:bg-red-900/10">
-                                                    <input type="time" value={mutationData.mutationTime || ''} onChange={(e) => setMutationData({ ...mutationData, mutationTime: e.target.value })} className="px-1 py-0.5 text-xs border border-red-300 rounded" />
-                                                </td>
-                                                <td className="px-2 py-1 text-xs text-center bg-red-50 dark:bg-red-900/10">
-                                                    <input type="text" value={mutationData.mutationPic || ''} onChange={(e) => setMutationData({ ...mutationData, mutationPic: e.target.value })} placeholder="PIC" className="w-20 px-1 py-0.5 text-xs border border-red-300 rounded text-center" />
-                                                </td>
-                                                <td className="px-2 py-1 text-xs text-center bg-red-50 dark:bg-red-900/10">
-                                                    <select
-                                                        value={mutationData.mutationLocation || 'Pameran'}
-                                                        onChange={(e) => setMutationData({ ...mutationData, mutationLocation: e.target.value })}
-                                                        className="px-2 py-0.5 text-xs border border-red-300 rounded text-center bg-white dark:bg-dark-card"
-                                                    >
-                                                        <option value="Gudang">Gudang</option>
-                                                        <option value="Pameran">Pameran</option>
-                                                        <option value="Outbound">Outbound</option>
-                                                    </select>
-                                                </td>
+                                                {/* Header-level mutation fields removed to move them to row level */}
                                             </tr>
                                         </tbody>
                                     </table>
@@ -1776,117 +2022,188 @@ const WarehouseInventory = () => {
                                             <table className="w-full">
                                                 <thead className="bg-accent-blue">
                                                     <tr>
-                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-8">No. Urut</th>
-                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-20">Kode Barang</th>
-                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-16">HS Code</th>
+                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-8">No.</th>
+                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-20">Kode Brg</th>
                                                         <th className="px-2 py-1 text-left text-xs font-semibold text-white">Item</th>
-                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white w-14">Jumlah</th>
-                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white w-14">Satuan</th>
-                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-20">Lokasi</th>
-                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-16">Kondisi</th>
+                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white w-14">Stok</th>
+                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-32">Tujuan/Lokasi</th>
                                                         {/* Mutation columns */}
-                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-24">Keluar Gudang</th>
-                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-blue-700 w-24">Kembali Gudang</th>
-                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-20">Sisa Gudang</th>
-                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-20">Kondisi</th>
-                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-full">Keterangan</th>
+                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-20">Mutasi</th>
+                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-16">Sisa</th>
+                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-24">Tgl</th>
+                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-20">Jam</th>
+                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-24">PIC</th>
+                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-24">Dokumen</th>
+                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-32">Keterangan</th>
+                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white w-14">Aksi</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-gray-200 dark:divide-dark-border">
                                                     {(pkg.items || []).map((item, itemIdx) => {
-                                                        // Logic berdasarkan lokasi mutasi yang dipilih
+                                                        // Logic berdasarkan lokasi mutasi yang dipilih (per-item preferred)
                                                         const isFullyMutated = item.inWarehouse === 0 && item.atPameran === 0;
-                                                        const mutationLocation = mutationData?.mutationLocation || 'Pameran';
+
+                                                        // Determine effective mutation location
+                                                        // For warehouse rows: prefer item.mutationLocation but NEVER fallback to Gudang
+                                                        const isWarehouseRow = String(item._replicaIndex).startsWith('warehouse');
+                                                        let mutationLocation = item.mutationLocation || '';
+                                                        if (!mutationLocation || (isWarehouseRow && String(mutationLocation).toLowerCase() === 'gudang')) {
+                                                            // Warehouse rows should always go OUT, default to a non-Gudang location
+                                                            const safeDefault = (() => {
+                                                                const exhibLoc = getExhibitionLocation ? getExhibitionLocation() : null;
+                                                                if (exhibLoc && String(exhibLoc).toLowerCase() !== 'gudang') return exhibLoc;
+                                                                const nonGudang = LOCATION_OPTIONS.find(opt => opt.value.toLowerCase() !== 'gudang');
+                                                                return nonGudang ? nonGudang.value : 'Hall 1';
+                                                            })();
+                                                            mutationLocation = isWarehouseRow ? safeDefault : (mutationData?.mutationLocation || DEFAULT_LOCATION);
+                                                        }
 
                                                         // Determine which direction is active based on selected location
-                                                        const isToGudang = mutationLocation === 'Gudang'; // Remutasi: Pameran -> Gudang
-                                                        const isToPameranOrOutbound = mutationLocation === 'Pameran' || mutationLocation === 'Outbound'; // Mutasi: Gudang -> Pameran/Outbound
+                                                        const isToGudang = String(mutationLocation).toLowerCase() === 'gudang'; // Remutasi: Exhibition -> Gudang
+                                                        const isToOutbound = String(mutationLocation).toLowerCase() === 'outbound';
+                                                        const isToExhibition = isExhibitionLocation ? isExhibitionLocation(mutationLocation) : !isToGudang && !isToOutbound;
 
                                                         // Calculate max values
-                                                        const maxMutasi = item.inWarehouse || 0; // Max bisa keluar dari gudang
-                                                        const maxRemutasi = item.atPameran || 0; // Max bisa balik dari pameran
+                                                        // For warehouse rows: always use inWarehouse as max (items going OUT)
+                                                        // For remutation rows (from exhibition back): use atPameran
+                                                        const maxMutasiBase = item.inWarehouse || 0;
+                                                        const maxRemutasi = item.atPameran || 0;
 
-                                                        // Outbound only available if stock in warehouse
-                                                        const canMutateToOutbound = mutationLocation === 'Outbound' && maxMutasi > 0;
-                                                        const canMutateToPameran = mutationLocation === 'Pameran' && maxMutasi > 0;
-                                                        const canRemutate = mutationLocation === 'Gudang' && maxRemutasi > 0;
+                                                        let sumOtherMutations = 0;
+                                                        if (isWarehouseRow) {
+                                                            (pkg.items || []).forEach((otherItem, otherIdx) => {
+                                                                if (otherIdx !== itemIdx && otherItem._originalItemIdx === item._originalItemIdx && String(otherItem._replicaIndex).startsWith('warehouse')) {
+                                                                    sumOtherMutations += (parseInt(otherItem.mutationQty) || 0);
+                                                                }
+                                                            });
+                                                        }
+
+                                                        // KEY FIX: For warehouse rows, maxMutasi is always based on inWarehouse (going OUT)
+                                                        // For non-warehouse rows (remutation/return), maxMutasi is based on atPameran (coming back)
+                                                        const maxMutasi = isWarehouseRow
+                                                            ? Math.max(0, maxMutasiBase - sumOtherMutations)
+                                                            : (isToGudang ? maxRemutasi : Math.max(0, maxMutasiBase - sumOtherMutations));
+
+                                                        const projectedStock = (isToGudang && !isWarehouseRow)
+                                                            ? (item.inWarehouse || 0) + (item.mutationQty || 0)
+                                                            : (item.inWarehouse || 0) - sumOtherMutations - (item.mutationQty || 0);
 
                                                         return (
                                                             <tr key={itemIdx} className={`hover:bg-gray-50 dark:hover:bg-dark-surface/50 ${isFullyMutated ? 'opacity-75 bg-gray-50' : ''}`}>
                                                                 <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{itemIdx + 1}</td>
                                                                 <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{item.itemCode || '-'}</td>
-                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{item.hsCode || '-'}</td>
                                                                 <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{item.name || item.itemName || '-'}</td>
-                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center">{item.quantity || 0}</td>
-                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center">{item.uom || 'pcs'}</td>
-                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{typeof item.location === 'string' ? item.location : (typeof item.location?.room === 'string' ? item.location.room : 'warehouse')}</td>
-                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{item.condition || 'Baik'}</td>
-
-                                                                {/* Mutation input (Gudang -> Pameran/Outbound) - Active when going TO Pameran/Outbound */}
-                                                                <td className={`px-2 py-0.5 text-xs text-center border-r border-red-100 dark:border-red-900/20 ${isToPameranOrOutbound ? 'bg-red-50 dark:bg-red-900/10' : 'bg-gray-100 dark:bg-gray-800'}`}>
-                                                                    <div className="flex flex-col items-center">
-                                                                        <select
-                                                                            value={item.mutationQty || 0}
-                                                                            onChange={(e) => handleMutationItemChange(pkgIndex, itemIdx, 'mutationQty', parseInt(e.target.value) || 0)}
-                                                                            className={`w-16 px-1 py-0.5 text-xs text-center border rounded focus:ring-1 ${isToPameranOrOutbound && maxMutasi > 0 ? 'border-red-300 focus:ring-red-500 bg-white' : 'border-gray-300 bg-gray-200 cursor-not-allowed'}`}
-                                                                            disabled={!isToPameranOrOutbound || maxMutasi === 0}
-                                                                        >
-                                                                            {[...Array(maxMutasi + 1).keys()].map(n => (
-                                                                                <option key={n} value={n}>{n}</option>
-                                                                            ))}
-                                                                        </select>
-                                                                        <span className={`text-[9px] mt-0.5 ${isToPameranOrOutbound ? 'text-red-500' : 'text-gray-400'}`}>
-                                                                            Stok: {maxMutasi}
-                                                                        </span>
-                                                                    </div>
+                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center">
+                                                                    {isToGudang ? item.atPameran : item.inWarehouse} {item.uom || 'pcs'}
+                                                                </td>
+                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">
+                                                                    <select
+                                                                        value={mutationLocation}
+                                                                        onChange={(e) => handleMutationItemChange(pkgIndex, itemIdx, 'mutationLocation', e.target.value)}
+                                                                        className="w-full px-1 py-0.5 text-xs border rounded bg-white text-center"
+                                                                        disabled={!isWarehouseRow}
+                                                                    >
+                                                                        {/* For warehouse rows: show non-Gudang options only. For remutation: show Gudang only. */}
+                                                                        {LOCATION_OPTIONS.filter(opt => isWarehouseRow ? opt.value.toLowerCase() !== 'gudang' : opt.value.toLowerCase() === 'gudang').map(opt => (
+                                                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                                        ))}
+                                                                        {isWarehouseRow && <option value="Outbound">Outbound</option>}
+                                                                    </select>
                                                                 </td>
 
-                                                                {/* Remutation input (Pameran -> Gudang) - Active when going TO Gudang */}
-                                                                <td className={`px-2 py-0.5 text-xs text-center ${isToGudang ? 'bg-blue-50 dark:bg-blue-900/10' : 'bg-gray-100 dark:bg-gray-800'}`}>
+                                                                {/* Mutation input (Unified) */}
+                                                                <td className={`px-2 py-0.5 text-xs text-center border-r border-red-100 dark:border-red-900/20 bg-red-50 dark:bg-red-900/10`}>
                                                                     <div className="flex flex-col items-center">
-                                                                        <select
-                                                                            value={item.remutationQty || 0}
-                                                                            onChange={(e) => handleMutationItemChange(pkgIndex, itemIdx, 'remutationQty', parseInt(e.target.value) || 0)}
-                                                                            className={`w-16 px-1 py-0.5 text-xs text-center border rounded focus:ring-1 ${isToGudang && maxRemutasi > 0 ? 'border-blue-300 focus:ring-blue-500 bg-white' : 'border-gray-300 bg-gray-200 cursor-not-allowed'}`}
-                                                                            disabled={!isToGudang || maxRemutasi === 0}
-                                                                        >
-                                                                            {[...Array(maxRemutasi + 1).keys()].map(n => (
-                                                                                <option key={n} value={n}>{n}</option>
-                                                                            ))}
-                                                                        </select>
-                                                                        <span className={`text-[9px] mt-0.5 ${isToGudang ? 'text-blue-500' : 'text-gray-400'}`}>
-                                                                            Di Pameran: {maxRemutasi}
-                                                                        </span>
+                                                                        <input
+                                                                            type="number"
+                                                                            min="0"
+                                                                            max={maxMutasi}
+                                                                            value={item.mutationQty !== undefined ? item.mutationQty : 0}
+                                                                            onChange={(e) => {
+                                                                                const rawValue = e.target.value;
+                                                                                if (rawValue === '') {
+                                                                                    handleMutationItemChange(pkgIndex, itemIdx, 'mutationQty', '');
+                                                                                    return;
+                                                                                }
+                                                                                let val = parseInt(rawValue);
+                                                                                if (isNaN(val) || val < 0) val = 0;
+                                                                                if (val > maxMutasi) val = maxMutasi;
+                                                                                handleMutationItemChange(pkgIndex, itemIdx, 'mutationQty', val);
+                                                                            }}
+                                                                            className={`w-16 px-1 py-0.5 text-xs text-center border rounded focus:ring-1 ${maxMutasi > 0 ? 'border-red-300 focus:ring-red-500 bg-white' : 'border-gray-300 bg-gray-200 cursor-not-allowed'}`}
+                                                                            disabled={maxMutasi === 0}
+                                                                        />
+                                                                        <span className={`text-[9px] mt-0.5 text-red-500`}>Max: {maxMutasi}</span>
                                                                     </div>
                                                                 </td>
 
                                                                 {/* Total Saat Ini (Projected Warehouse Stock) */}
                                                                 <td className="px-2 py-0.5 text-xs text-center bg-red-50 dark:bg-red-900/10 font-bold text-gray-800 dark:text-gray-200">
-                                                                    {(item.inWarehouse || 0) - (item.mutationQty || 0) + (item.remutationQty || 0)}
+                                                                    {projectedStock}
                                                                 </td>
 
-                                                                {/* Condition */}
-                                                                <td className="px-2 py-0.5 text-xs text-center bg-red-50 dark:bg-red-900/10">
-                                                                    <select
-                                                                        value={item.mutationCondition || 'Baik'}
-                                                                        onChange={(e) => handleMutationItemChange(pkgIndex, itemIdx, 'mutationCondition', e.target.value)}
-                                                                        className="w-full px-1 py-0.5 text-xs border border-red-300 rounded bg-white text-center"
+                                                                {/* Tgl Mutasi */}
+                                                                <td className="px-1 py-0.5 text-xs text-center bg-red-50 dark:bg-red-900/10">
+                                                                    <input type="date" value={item.mutationDate || ''} onChange={(e) => handleMutationItemChange(pkgIndex, itemIdx, 'mutationDate', e.target.value)} className="w-full px-1 py-0.5 text-xs border border-red-300 rounded" />
+                                                                </td>
+                                                                
+                                                                {/* Jam Mutasi */}
+                                                                <td className="px-1 py-0.5 text-xs text-center bg-red-50 dark:bg-red-900/10">
+                                                                    <input type="time" value={item.mutationTime || ''} onChange={(e) => handleMutationItemChange(pkgIndex, itemIdx, 'mutationTime', e.target.value)} className="w-full px-1 py-0.5 text-xs border border-red-300 rounded" />
+                                                                </td>
+                                                                
+                                                                {/* PIC Mutasi */}
+                                                                <td className="px-1 py-0.5 text-xs text-center bg-red-50 dark:bg-red-900/10">
+                                                                    <input type="text" value={item.mutationPic || ''} onChange={(e) => handleMutationItemChange(pkgIndex, itemIdx, 'mutationPic', e.target.value)} placeholder="PIC" className="w-full px-1 py-0.5 text-xs border border-red-300 rounded" />
+                                                                </td>
+
+                                                                {/* Dokumen */}
+                                                                <td className="px-1 py-0.5 text-xs text-center bg-red-50 dark:bg-red-900/10">
+                                                                    <Button 
+                                                                        onClick={() => setActiveDocumentRow({ pkgIndex, itemIdx })} 
+                                                                        variant="secondary" 
+                                                                        className="!px-2 !py-0.5 !text-[10px] w-full flex justify-center"
                                                                     >
-                                                                        <option value="Baik">Baik</option>
-                                                                        <option value="Rusak">Rusak</option>
-                                                                        <option value="Cacat">Cacat</option>
-                                                                    </select>
+                                                                        <Paperclip className="w-3 h-3 mr-1" /> {(item.mutationDocuments || []).length}/5
+                                                                    </Button>
                                                                 </td>
 
                                                                 {/* Notes */}
-                                                                <td className="px-2 py-0.5 text-xs bg-red-50 dark:bg-red-900/10">
+                                                                <td className="px-1 py-0.5 text-xs bg-red-50 dark:bg-red-900/10">
                                                                     <input
                                                                         type="text"
                                                                         value={item.notes || ''}
                                                                         onChange={(e) => handleMutationItemChange(pkgIndex, itemIdx, 'notes', e.target.value)}
                                                                         className="w-full px-1 py-0.5 text-xs border border-red-300 rounded"
-                                                                        placeholder="Keterangan..."
+                                                                        placeholder="Ket..."
                                                                     />
+                                                                </td>
+                                                                
+                                                                {/* Aksi */}
+                                                                <td className="px-2 py-0.5 text-xs text-center border-l border-gray-200 dark:border-dark-border">
+                                                                    {String(item._replicaIndex).startsWith('warehouse') && !isFullyMutated && (
+                                                                        <div className="flex gap-1 justify-center">
+                                                                            {String(item._replicaIndex) === 'warehouse' ? (
+                                                                                <Button
+                                                                                    onClick={() => handleAddMultiMutation(pkgIndex, itemIdx)}
+                                                                                    variant="primary"
+                                                                                    className="!p-1"
+                                                                                    title="Tambah Lokasi Mutasi"
+                                                                                >
+                                                                                    <Plus className="w-3 h-3" />
+                                                                                </Button>
+                                                                            ) : (
+                                                                                <Button
+                                                                                    onClick={() => handleRemoveMultiMutation(pkgIndex, itemIdx)}
+                                                                                    variant="danger"
+                                                                                    className="!p-1"
+                                                                                    title="Hapus Baris"
+                                                                                >
+                                                                                    <Trash2 className="w-3 h-3" />
+                                                                                </Button>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
                                                                 </td>
                                                             </tr>
                                                         );
@@ -1897,54 +2214,79 @@ const WarehouseInventory = () => {
                                     </div>
                                 ))}
 
-                                {/* Document Upload Section */}
-                                <div className="border border-gray-200 dark:border-dark-border rounded-lg overflow-hidden mt-4">
-                                    <div className="bg-gray-100 dark:bg-dark-surface px-3 py-2 border-b border-gray-200 dark:border-dark-border flex justify-between items-center">
-                                        <span className="text-sm font-semibold text-gray-700 dark:text-silver-light">Dokumen Pendukung ({mutationDocuments.length}/8)</span>
-                                        <div>
-                                            <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".jpg,.jpeg,.png,.pdf" multiple className="hidden" />
-                                            <Button onClick={() => fileInputRef.current?.click()} variant="secondary" icon={Upload} className="text-xs" disabled={mutationDocuments.length >= 8}>
-                                                Upload Dokumen
-                                            </Button>
+                                {/* Document Upload Modal per Row */}
+                                {activeDocumentRow && (
+                                    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+                                        <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-gray-300 dark:border-dark-border">
+                                            <div className="bg-gray-100 dark:bg-dark-surface px-4 py-3 border-b border-gray-200 dark:border-dark-border flex justify-between items-center">
+                                                <div>
+                                                    <span className="text-base font-semibold text-gray-800 dark:text-silver-light">Dokumen Pendukung Mutasi</span>
+                                                    <p className="text-xs text-gray-500">
+                                                        Item: {mutationData?.packages[activeDocumentRow.pkgIndex]?.items[activeDocumentRow.itemIdx]?.itemName || mutationData?.packages[activeDocumentRow.pkgIndex]?.items[activeDocumentRow.itemIdx]?.name}
+                                                    </p>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".jpg,.jpeg,.png,.pdf" multiple className="hidden" />
+                                                    <Button onClick={() => fileInputRef.current?.click()} variant="secondary" icon={Upload} className="text-xs" disabled={(mutationData?.packages[activeDocumentRow.pkgIndex]?.items[activeDocumentRow.itemIdx]?.mutationDocuments || []).length >= 5}>
+                                                        Upload ({((mutationData?.packages[activeDocumentRow.pkgIndex]?.items[activeDocumentRow.itemIdx]?.mutationDocuments || [])).length}/5)
+                                                    </Button>
+                                                    <button onClick={() => setActiveDocumentRow(null)} className="p-1 hover:bg-gray-200 rounded text-gray-600">
+                                                        <X className="w-5 h-5" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div className="p-4 overflow-y-auto">
+                                                {!(mutationData?.packages[activeDocumentRow.pkgIndex]?.items[activeDocumentRow.itemIdx]?.mutationDocuments || []).length ? (
+                                                    <p className="text-sm text-gray-500 text-center py-8">Belum ada dokumen pendukung. Klik Upload untuk menambahkan (JPG, PNG, PDF - Max 3MB).</p>
+                                                ) : (
+                                                    <table className="w-full">
+                                                        <thead className="bg-gray-50 dark:bg-dark-surface">
+                                                            <tr>
+                                                                <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600 w-8">No</th>
+                                                                <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">Judul Dokumen</th>
+                                                                <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">Nama File</th>
+                                                                <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Tipe</th>
+                                                                <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Ukuran</th>
+                                                                <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600 w-12">Aksi</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-gray-200 dark:divide-dark-border">
+                                                            {(mutationData?.packages[activeDocumentRow.pkgIndex]?.items[activeDocumentRow.itemIdx]?.mutationDocuments || []).map((doc, idx) => (
+                                                                <tr key={doc.id}>
+                                                                    <td className="px-2 py-2 text-xs text-gray-700">{idx + 1}</td>
+                                                                    <td className="px-2 py-2 text-xs">
+                                                                        <input 
+                                                                            type="text" 
+                                                                            value={doc.title} 
+                                                                            onChange={(e) => {
+                                                                                const newDocs = [...(mutationData?.packages[activeDocumentRow.pkgIndex]?.items[activeDocumentRow.itemIdx]?.mutationDocuments || [])];
+                                                                                newDocs[idx] = { ...newDocs[idx], title: e.target.value };
+                                                                                handleMutationItemChange(activeDocumentRow.pkgIndex, activeDocumentRow.itemIdx, 'mutationDocuments', newDocs);
+                                                                            }} 
+                                                                            placeholder="Masukkan judul..." 
+                                                                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded" 
+                                                                        />
+                                                                    </td>
+                                                                    <td className="px-2 py-2 text-xs text-gray-700 flex items-center gap-1">
+                                                                        <FileText className="w-3 h-3" /> <span className="truncate max-w-[100px]">{doc.name}</span>
+                                                                    </td>
+                                                                    <td className="px-2 py-2 text-xs text-gray-500 text-center uppercase">{doc.type.split('/')[1]}</td>
+                                                                    <td className="px-2 py-2 text-xs text-gray-500 text-center">{(doc.size / 1024).toFixed(1)} KB</td>
+                                                                    <td className="px-2 py-2 text-center">
+                                                                        <button onClick={() => {
+                                                                            const newDocs = (mutationData?.packages[activeDocumentRow.pkgIndex]?.items[activeDocumentRow.itemIdx]?.mutationDocuments || []).filter(d => d.id !== doc.id);
+                                                                            handleMutationItemChange(activeDocumentRow.pkgIndex, activeDocumentRow.itemIdx, 'mutationDocuments', newDocs);
+                                                                        }} className="p-1 hover:bg-red-100 rounded text-red-500"><Trash2 className="w-4 h-4" /></button>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="p-3">
-                                        {mutationDocuments.length === 0 ? (
-                                            <p className="text-xs text-gray-500 text-center py-4">Belum ada dokumen pendukung. Klik Upload untuk menambahkan (JPG, PNG, PDF - Max 3MB).</p>
-                                        ) : (
-                                            <table className="w-full">
-                                                <thead className="bg-gray-50 dark:bg-dark-surface">
-                                                    <tr>
-                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-gray-600 w-8">No</th>
-                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-gray-600">Judul Dokumen</th>
-                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-gray-600">Nama File</th>
-                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-gray-600">Tipe</th>
-                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-gray-600">Ukuran</th>
-                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-gray-600 w-12">Aksi</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-gray-200 dark:divide-dark-border">
-                                                    {mutationDocuments.map((doc, idx) => (
-                                                        <tr key={doc.id}>
-                                                            <td className="px-2 py-1 text-xs text-gray-700">{idx + 1}</td>
-                                                            <td className="px-2 py-1 text-xs">
-                                                                <input type="text" value={doc.title} onChange={(e) => handleDocumentTitleChange(doc.id, e.target.value)} placeholder="Masukkan judul..." className="w-full px-2 py-1 text-xs border border-gray-300 rounded" />
-                                                            </td>
-                                                            <td className="px-2 py-1 text-xs text-gray-700 flex items-center gap-1">
-                                                                <FileText className="w-3 h-3" /> {doc.name}
-                                                            </td>
-                                                            <td className="px-2 py-1 text-xs text-gray-500 text-center uppercase">{doc.type.split('/')[1]}</td>
-                                                            <td className="px-2 py-1 text-xs text-gray-500 text-center">{(doc.size / 1024).toFixed(1)} KB</td>
-                                                            <td className="px-2 py-1 text-center">
-                                                                <button onClick={() => handleRemoveDocument(doc.id)} className="p-1 hover:bg-red-100 rounded text-red-500"><Trash2 className="w-3 h-3" /></button>
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        )}
-                                    </div>
-                                </div>
+                                )}
                             </div>
                         </div>
                     </div>

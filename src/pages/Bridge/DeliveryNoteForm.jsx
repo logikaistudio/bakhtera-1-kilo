@@ -349,7 +349,7 @@ const DeliveryNoteForm = ({ note, onClose, onSave, mode = 'create' }) => {
 
                         {formData.items.length === 0 ? (
                             <div className="text-center py-8 text-gray-500">
-                                Belum ada item. Klik "Tambah Item" atau load dari pengajuan.
+                                Belum ada item. Klik "Tambah Item" or load dari pengajuan.
                             </div>
                         ) : (
                             <div className="overflow-x-auto">

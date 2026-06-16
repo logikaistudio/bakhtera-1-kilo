@@ -95,8 +95,7 @@ const CodeOfAccount = () => {
                     .from('code_of_accounts')
                     .insert([{
                         ...form,
-                        master_code: form.master_code || null,
-                        is_active: true
+                        master_code: form.master_code || null
                     }]);
 
                 if (error) throw error;

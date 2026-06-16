@@ -543,55 +543,52 @@ const ApprovalManager = () => {
                         </div>
                     </div>
                 </div>
-            )
-            }
+            )}
 
             {/* ==================== Reject Modal ==================== */}
-            {
-                showRejectModal && selectedRequest && (
-                    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60]" onClick={() => setShowRejectModal(false)}>
-                        <div className="glass-card p-6 rounded-lg max-w-md w-full mx-4 border border-dark-border" onClick={(e) => e.stopPropagation()}>
-                            <h3 className="text-xl font-bold text-silver-light mb-4 flex items-center gap-2">
-                                <XCircle className="w-5 h-5 text-red-400" />
-                                Tolak Request
-                            </h3>
-                            <p className="text-silver-dark mb-4">
-                                Tolak request untuk {selectedRequest.type} <span className="text-accent-blue font-medium">{selectedRequest.entityName}</span>?
-                            </p>
-                            <div className="mb-4">
-                                <label className="block text-silver-light text-sm font-medium mb-2">
-                                    Alasan Penolakan <span className="text-red-400">*</span>
-                                </label>
-                                <textarea
-                                    value={rejectReason}
-                                    onChange={(e) => setRejectReason(e.target.value)}
-                                    placeholder="Masukkan alasan penolakan..."
-                                    className="w-full px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
-                                    rows={3}
-                                />
-                            </div>
-                            <div className="flex gap-3 justify-end">
-                                <button
-                                    onClick={() => {
-                                        setShowRejectModal(false);
-                                        setRejectReason('');
-                                    }}
-                                    className="px-4 py-2 bg-dark-surface text-silver-light rounded-lg hover:bg-dark-card transition-colors"
-                                >
-                                    Batal
-                                </button>
-                                <button
-                                    onClick={handleReject}
-                                    disabled={!rejectReason.trim()}
-                                    className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    Tolak
-                                </button>
-                            </div>
+            {showRejectModal && selectedRequest && (
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60]" onClick={() => setShowRejectModal(false)}>
+                    <div className="glass-card p-6 rounded-lg max-w-md w-full mx-4 border border-dark-border" onClick={(e) => e.stopPropagation()}>
+                        <h3 className="text-xl font-bold text-silver-light mb-4 flex items-center gap-2">
+                            <XCircle className="w-5 h-5 text-red-400" />
+                            Tolak Request
+                        </h3>
+                        <p className="text-silver-dark mb-4">
+                            Tolak request untuk {selectedRequest.type} <span className="text-accent-blue font-medium">{selectedRequest.entityName}</span>?
+                        </p>
+                        <div className="mb-4">
+                            <label className="block text-silver-light text-sm font-medium mb-2">
+                                Alasan Penolakan <span className="text-red-400">*</span>
+                            </label>
+                            <textarea
+                                value={rejectReason}
+                                onChange={(e) => setRejectReason(e.target.value)}
+                                placeholder="Masukkan alasan penolakan..."
+                                className="w-full px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
+                                rows={3}
+                            />
+                        </div>
+                        <div className="flex gap-3 justify-end">
+                            <button
+                                onClick={() => {
+                                    setShowRejectModal(false);
+                                    setRejectReason('');
+                                }}
+                                className="px-4 py-2 bg-dark-surface text-silver-light rounded-lg hover:bg-dark-card transition-colors"
+                            >
+                                Batal
+                            </button>
+                            <button
+                                onClick={handleReject}
+                                disabled={!rejectReason.trim()}
+                                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Tolak
+                            </button>
                         </div>
                     </div>
-                )
-            }
+                </div>
+            )}
         </div>
     );
 };

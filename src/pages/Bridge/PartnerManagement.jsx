@@ -14,6 +14,7 @@ const BridgePartnerManagement = () => {
     const hasEdit = canEdit('bridge_partners');
     const hasDelete = canDelete('bridge_partners');
     const [partners, setPartners] = useState([]);
+    const [selectedIds, setSelectedIds] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [roleFilter, setRoleFilter] = useState('all'); // 'all', 'customer', 'vendor', 'consignee', 'shipper'
@@ -110,21 +111,53 @@ const BridgePartnerManagement = () => {
         }
     };
 
+
     const handleDelete = async (partnerId) => {
         if (!hasDelete) return;
         if (!confirm('Yakin hapus mitra ini? Data transaksi terkait tidak akan terhapus.')) return;
-
         try {
             const { error } = await supabase
                 .from('bridge_business_partners')
                 .delete()
                 .eq('id', partnerId);
-
             if (error) throw error;
             alert('✅ Mitra berhasil dihapus');
             fetchPartners();
         } catch (error) {
             console.error('Error deleting partner:', error);
+            alert('❌ Gagal menghapus: ' + error.message);
+        }
+    };
+
+    // Multi-delete
+    const handleSelectRow = (id) => {
+        setSelectedIds((prev) =>
+            prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id]
+        );
+    };
+
+    const handleSelectAll = () => {
+        if (selectedIds.length === filteredPartners.length) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(filteredPartners.map((p) => p.id));
+        }
+    };
+
+    const handleMultiDelete = async () => {
+        if (!hasDelete || selectedIds.length === 0) return;
+        if (!confirm(`Yakin hapus ${selectedIds.length} mitra terpilih? Data transaksi terkait tidak akan terhapus.`)) return;
+        try {
+            const { error } = await supabase
+                .from('bridge_business_partners')
+                .delete()
+                .in('id', selectedIds);
+            if (error) throw error;
+            alert(`✅ ${selectedIds.length} mitra berhasil dihapus`);
+            setSelectedIds([]);
+            fetchPartners();
+        } catch (error) {
+            console.error('Error multi-deleting partners:', error);
             alert('❌ Gagal menghapus: ' + error.message);
         }
     };
@@ -246,6 +279,15 @@ const BridgePartnerManagement = () => {
                         <Download className="w-4 h-4" />
                         Export CSV
                     </button>
+                    {hasDelete && (
+                        <Button
+                            onClick={handleMultiDelete}
+                            disabled={selectedIds.length === 0}
+                            className={`bg-red-500/20 text-red-400 hover:bg-red-500/30 ${selectedIds.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                            Hapus Terpilih ({selectedIds.length})
+                        </Button>
+                    )}
                     {hasCreate && (
                         <Button onClick={() => setShowModal(true)} icon={Plus}>
                             Tambah Mitra Baru
@@ -327,6 +369,13 @@ const BridgePartnerManagement = () => {
                     <table className="w-full">
                         <thead className="bg-accent-orange">
                             <tr>
+                                <th className="px-4 py-3 text-center text-xs font-bold text-white uppercase">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedIds.length === filteredPartners.length && filteredPartners.length > 0}
+                                        onChange={handleSelectAll}
+                                    />
+                                </th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">Kode</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">Nama Mitra</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">Kontak</th>
@@ -336,7 +385,7 @@ const BridgePartnerManagement = () => {
                         <tbody className="divide-y divide-dark-border">
                             {filteredPartners.length === 0 ? (
                                 <tr>
-                                    <td colSpan="4" className="px-4 py-8 text-center text-silver-dark">
+                                    <td colSpan="5" className="px-4 py-8 text-center text-silver-dark">
                                         {searchTerm || roleFilter !== 'all' ? 'Tidak ada mitra yang cocok' : 'Belum ada mitra. Klik "Tambah Mitra Baru"'}
                                     </td>
                                 </tr>
@@ -345,12 +394,23 @@ const BridgePartnerManagement = () => {
                                     <tr
                                         key={partner.id}
                                         className={`hover:bg-dark-surface/50 transition-colors ${hasEdit ? 'cursor-pointer' : ''}`}
-                                        onClick={() => hasEdit && handleEdit(partner)}
+                                        onClick={(e) => {
+                                            // Only trigger edit if not clicking checkbox
+                                            if (e.target.type !== 'checkbox' && hasEdit) handleEdit(partner);
+                                        }}
                                         onContextMenu={(e) => {
                                             e.preventDefault();
                                             hasDelete && handleDelete(partner.id);
                                         }}
                                     >
+                                        <td className="px-4 py-3 text-center">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedIds.includes(partner.id)}
+                                                onChange={() => handleSelectRow(partner.id)}
+                                                onClick={e => e.stopPropagation()}
+                                            />
+                                        </td>
                                         <td className="px-4 py-3 text-xs font-mono text-blue-400">{partner.partner_code || '-'}</td>
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-2">

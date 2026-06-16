@@ -68,7 +68,7 @@ const PabeanDashboard = () => {
 
                 {/* Stok */}
                 <div className="glass-card p-4 rounded-lg border-l-4 border-accent-green bg-dark-bg/40">
-                    <p className="text-xs font-semibold text-silver-dark uppercase tracking-wider mb-1">Stok Tersedia</p>
+                    <p className="text-xs font-semibold text-silver-dark uppercase tracking-wider mb-1">Barang di TPPB</p>
                     <p className={`text-2xl font-bold ${stock < 0 ? 'text-red-400' : 'text-accent-green'}`}>
                         {stock.toLocaleString('id-ID')}
                     </p>

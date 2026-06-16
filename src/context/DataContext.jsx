@@ -45,6 +45,7 @@ export const DataProvider = ({ children }) => {
     const [outboundTransactions, setOutboundTransactions] = useState([]);
     const [rejectTransactions, setRejectTransactions] = useState([]);
     const [bridgeBusinessPartners, setBridgeBusinessPartners] = useState([]); // Bridge-specific partners
+    const [locations, setLocations] = useState([]);
 
     // Activity Logs for audit tracking
     const [activityLogs, setActivityLogs] = useState([]);
@@ -525,6 +526,21 @@ export const DataProvider = ({ children }) => {
                     console.log(`✅ Loaded ${(approvalData || []).length} approval requests`);
                 }
 
+                // Load Locations table if available. Table name: 'locations'
+                try {
+                    const { data: locData, error: locError } = await supabase.from('locations').select('*');
+                    if (locError) {
+                        console.log('⚠️ locations table not found or error:', locError.message);
+                    } else if (locData) {
+                        // Normalize simple shape: { id, value, label, is_default }
+                        const mapped = locData.map(l => ({ id: l.id, value: l.value || l.code || l.name, label: l.label || l.name || l.value, is_default: l.is_default || l.is_exhibition || false }));
+                        setLocations(mapped);
+                        console.log(`✅ Loaded ${mapped.length} locations from DB`);
+                    }
+                } catch (err) {
+                    console.warn('⚠️ Failed to load locations table (ignored):', err.message || err);
+                }
+
                 // Load Company Settings
                 await fetchCompanySettings('blink');
                 await fetchCompanySettings('bridge');
@@ -755,6 +771,20 @@ export const DataProvider = ({ children }) => {
                 }
                 else if (payload.eventType === 'DELETE') {
                     setPendingApprovals(prev => prev.filter(item => item.id !== payload.old.id));
+                }
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'locations' }, (payload) => {
+                console.log('⚡ Realtime Locations Update:', payload);
+                if (payload.eventType === 'INSERT') {
+                    const l = payload.new;
+                    const mapped = { id: l.id, value: l.value || l.code || l.name, label: l.label || l.name || l.value, is_default: l.is_default || l.is_exhibition || false };
+                    setLocations(prev => [...prev, mapped]);
+                } else if (payload.eventType === 'UPDATE') {
+                    const l = payload.new;
+                    const mapped = { id: l.id, value: l.value || l.code || l.name, label: l.label || l.name || l.value, is_default: l.is_default || l.is_exhibition || false };
+                    setLocations(prev => prev.map(item => item.id === l.id ? mapped : item));
+                } else if (payload.eventType === 'DELETE') {
+                    setLocations(prev => prev.filter(item => item.id !== payload.old.id));
                 }
             })
             .subscribe();
@@ -1267,6 +1297,43 @@ export const DataProvider = ({ children }) => {
 
     const updateInboundTransaction = (id, updatedTransaction) => {
         setInboundTransactions(inboundTransactions.map(t => t.id === id ? { ...t, ...updatedTransaction } : t));
+    };
+
+    const updateInboundItem = async (inboundId, itemIndex, updates) => {
+        try {
+            const inbound = inboundTransactions.find(t => t.id === inboundId);
+            if (!inbound) throw new Error('Transaction not found');
+
+            const newItems = [...(inbound.items || [])];
+            if (itemIndex >= 0 && itemIndex < newItems.length) {
+                newItems[itemIndex] = { ...newItems[itemIndex], ...updates };
+            }
+
+            // Prepare payload for Supabase
+            // We need to fetch the current documents first to merge items back in
+            const { data: current, error: fetchErr } = await supabase.from('freight_inbound').select('documents').eq('id', inboundId).single();
+            if (fetchErr) throw fetchErr;
+
+            const docs = typeof current.documents === 'string' ? JSON.parse(current.documents) : (current.documents || {});
+            docs.items = newItems;
+
+            const { error: updateErr } = await supabase.from('freight_inbound').update({
+                documents: JSON.stringify(docs),
+                updated_at: new Date().toISOString()
+            }).eq('id', inboundId);
+
+            if (updateErr) throw updateErr;
+
+            // Update local state
+            setInboundTransactions(prev => prev.map(t => 
+                t.id === inboundId ? { ...t, items: newItems } : t
+            ));
+
+            return { success: true };
+        } catch (error) {
+            console.error('❌ Error updating inbound item:', error);
+            return { success: false, error: error.message };
+        }
     };
 
     const deleteInboundTransaction = (id) => {
@@ -3553,6 +3620,38 @@ export const DataProvider = ({ children }) => {
         updateBankAccount,
         deleteBankAccount,
         uploadCompanyLogo,
+
+        // Locations & Inbound item update
+        locations,
+        getExhibitionLocation: () => {
+            if (locations && locations.length) {
+                // Prefer an explicit exhibition flag first
+                const byExhibition = locations.find(l => !!l.is_exhibition);
+                if (byExhibition) return byExhibition.value;
+
+                // Fallback: find a 'Hall' label/value
+                const p = locations.find(l => (String(l.value || l.label || '').toLowerCase().includes('hall')));
+                if (p) return p.value;
+
+                // Final fallback: first non-default location (avoid returning Gudang if it's marked default)
+                const nonDefault = locations.find(l => !l.is_default);
+                if (nonDefault) return nonDefault.value;
+
+                return locations[0].value;
+            }
+            return 'Gudang'; // Default fallback
+        },
+        isExhibitionLocation: (val) => {
+            if (!val) return false;
+            const v = String(val).toLowerCase();
+            if (locations && locations.length) {
+                const found = locations.find(l => String(l.value).toLowerCase() === v || String(l.label).toLowerCase() === v);
+                if (found) return !!found.is_exhibition || String(found.value).toLowerCase().includes('hall') || String(found.label).toLowerCase().includes('hall');
+                return v.includes('hall') || v.includes('pameran');
+            }
+            return v.includes('hall') || v.includes('pameran');
+        },
+        updateInboundItem,
     };
 
     return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

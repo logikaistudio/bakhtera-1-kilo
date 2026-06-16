@@ -3,7 +3,7 @@ import { Plus, Package as PackageIcon, Trash2, Edit2, ChevronDown, ChevronRight,
 import Button from './Button';
 import PackageItemManager from './PackageItemManager';
 
-const PackageManager = ({ packages = [], onChange, itemMaster = [], readOnly = false }) => {
+const PackageManager = ({ packages = [], onChange, itemMaster = [], readOnly = false, defaultCurrency = 'IDR' }) => {
     const [expandedPackages, setExpandedPackages] = useState({});
     const [showPackageForm, setShowPackageForm] = useState(false);
     const [editingPackageId, setEditingPackageId] = useState(null);
@@ -242,6 +242,7 @@ const PackageManager = ({ packages = [], onChange, itemMaster = [], readOnly = f
                                     onChange={(items) => handleItemsChange(pkg.id, items)}
                                     itemMaster={itemMaster}
                                     readOnly={readOnly}
+                                    defaultCurrency={defaultCurrency}
                                 />
                             </div>
                         )}
@@ -253,4 +254,3 @@ const PackageManager = ({ packages = [], onChange, itemMaster = [], readOnly = f
 };
 
 export default PackageManager;
-

@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Search, Plus, Edit, Trash, Package, X } from 'lucide-react';
 
 const AssetInventory = () => {
-    const { canCreate, canEdit, canDelete } = useAuth();
+    const { canCreate, canEdit, canDelete, user } = useAuth();
     const [assets, setAssets] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -105,7 +105,10 @@ const AssetInventory = () => {
 
                 const { error } = await supabase
                     .from('bridge_assets')
-                    .update(updateData)
+                    .update({
+                        ...updateData,
+                        updated_by: user?.id
+                    })
                     .eq('id', id);
 
                 if (error) throw error;
@@ -113,7 +116,11 @@ const AssetInventory = () => {
                 if (!canCreate('bridge_asset_inventory')) return;
                 const { error } = await supabase
                     .from('bridge_assets')
-                    .insert([formData]);
+                    .insert([{
+                        ...formData,
+                        created_by: user?.id,
+                        updated_by: user?.id
+                    }]);
 
                 if (error) throw error;
             }

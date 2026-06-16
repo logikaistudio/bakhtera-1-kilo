@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { Plus, Edit2, Trash2, Search, Filter, FileText, Calendar, Box, Globe, CreditCard, Download, Printer } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, Filter, FileText, Calendar, Box, Globe, CreditCard, Download, Printer, Edit } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../../context/AuthContext';
 import Button from '../../components/Common/Button';
@@ -200,7 +199,6 @@ const AtaCarnet = () => {
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
-                {/* Add more filters if needed */}
             </div>
 
             {/* Table */}
@@ -217,6 +215,7 @@ const AtaCarnet = () => {
                                 <th className="px-4 py-3 text-right text-xs font-semibold text-silver uppercase tracking-wider min-w-[120px]">Qty / Value</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-silver uppercase tracking-wider min-w-[120px]">Destination</th>
                                 <th className="px-4 py-3 text-center text-xs font-semibold text-silver uppercase tracking-wider min-w-[100px]">Status</th>
+                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver uppercase tracking-wider min-w-[80px]">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border/50">
@@ -224,8 +223,7 @@ const AtaCarnet = () => {
                                 filteredList.map((item) => (
                                     <tr
                                         key={item.id}
-                                        className="hover:bg-dark-surface/50 transition-colors cursor-pointer"
-                                        onClick={() => handleRowClick(item)}
+                                        className="hover:bg-dark-surface/50 transition-colors"
                                     >
                                         <td className="px-4 py-3 text-silver-light text-sm font-medium whitespace-nowrap">{item.carnetNumber}</td>
                                         <td className="px-4 py-3">
@@ -251,11 +249,35 @@ const AtaCarnet = () => {
                                                 {item.status}
                                             </span>
                                         </td>
+                                        <td className="px-4 py-3">
+                                            <div className="flex items-center justify-center gap-2">
+                                                <button
+                                                    onClick={() => handleRowClick(item)}
+                                                    className="p-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 rounded transition-colors"
+                                                    title="Edit"
+                                                >
+                                                    <Edit className="w-4 h-4" />
+                                                </button>
+                                                {hasDelete && (
+                                                    <button
+                                                        onClick={() => {
+                                                            if (window.confirm('Are you sure you want to delete this Carnet document?')) {
+                                                                handleDelete(item.id);
+                                                            }
+                                                        }}
+                                                        className="p-1.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded transition-colors"
+                                                        title="Delete"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
                                     </tr>
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan="8" className="px-6 py-8 text-center text-silver-dark">
+                                    <td colSpan="9" className="px-6 py-8 text-center text-silver-dark">
                                         No ATA Carnet documents found.
                                     </td>
                                 </tr>

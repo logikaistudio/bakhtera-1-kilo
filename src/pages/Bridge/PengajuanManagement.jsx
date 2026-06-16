@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
+import { supabase } from '../../lib/supabase';
+import DocumentPreviewModal from '../../components/Common/DocumentPreviewModal';
 import { Plus, FileText, CheckCircle, Edit2, Download, Trash2, X, Warehouse, Package, ArrowRight, Save, Box, MapPin, ExternalLink, AlertCircle } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import Button from '../../components/Common/Button';
 import PackageManager from '../../components/Common/PackageManager';
 import DocumentUploadManager from '../../components/Common/DocumentUploadManager';
 import WarehouseItemSelectorModal from '../../components/Bridge/WarehouseItemSelectorModal';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { exportToCSV } from '../../utils/exportCSV';
 import { useAuth } from '../../context/AuthContext';
 
@@ -29,8 +31,18 @@ const PengajuanManagement = () => {
         mutationLogs = [],
         warehouseInventory = [],
         outboundTransactions = [], // Added for calculating already outbound stock
-        bridgeBusinessPartners = [] // NEW: Use Bridge Partners
+        bridgeBusinessPartners = [], // NEW: Use Bridge Partners
+        isExhibitionLocation // Moved to top level to avoid Rules of Hooks violation
     } = useData();
+
+    // Helper lists: prefer Bridge partners, fallback to old customers/vendors
+    const ownerList = (bridgeBusinessPartners && bridgeBusinessPartners.length > 0)
+        ? bridgeBusinessPartners.filter(p => p.is_customer)
+        : customers || [];
+
+    const shipperList = (bridgeBusinessPartners && bridgeBusinessPartners.length > 0)
+        ? bridgeBusinessPartners.filter(p => (p.is_shipper || p.is_vendor))
+        : vendors || [];
     const navigate = useNavigate();
     const [showForm, setShowForm] = useState(false);
     const [confirmDialog, setConfirmDialog] = useState({ show: false, quotationId: null });
@@ -44,8 +56,60 @@ const PengajuanManagement = () => {
     const [editablePackages, setEditablePackages] = useState([]); // NEW: Temporary packages for editing
     const [showDetailModal, setShowDetailModal] = useState(false); // NEW: Detail modal
     const [selectedPengajuan, setSelectedPengajuan] = useState(null); // NEW: Selected pengajuan for detail
+    const [previewDoc, setPreviewDoc] = useState(null);
+    const [showPreview, setShowPreview] = useState(false);
     const [showSplitViewModal, setShowSplitViewModal] = useState(false); // NEW: Split View Modal for item selection
     const [sourcePackagesForSplitView, setSourcePackagesForSplitView] = useState([]); // Source packages for split view
+    const [isViewOnly, setIsViewOnly] = useState(false); // NEW: View only mode for form
+
+    const [searchParams, setSearchParams] = useSearchParams();
+
+    // Handle closing detail modal and clearing URL params
+    const handleCloseDetailModal = () => {
+        setShowDetailModal(false);
+        if (searchParams.has('detail')) {
+            searchParams.delete('detail');
+            setSearchParams(searchParams, { replace: true });
+        }
+        // Also clear any history state if we came via navigate
+        if (window.history.replaceState) {
+            const url = new URL(window.location);
+            url.searchParams.delete('detail');
+            window.history.replaceState({}, '', url);
+        }
+    };
+
+    React.useEffect(() => {
+        const detailId = searchParams.get('detail');
+        if (detailId && quotations.length > 0) {
+            const p = quotations.find(q => q.pengajuanNumber === detailId || q.id === detailId || q.quotation_number === detailId);
+            if (p) {
+                setSelectedPengajuan(p);
+                setShowDetailModal(true);
+            }
+        }
+    }, [searchParams, quotations]);
+
+    // Helper: lookup full partner name from bridgeBusinessPartners
+    const getFullPartnerName = (input) => {
+        if (!input || input === '-') return '-';
+        const shortName = String(input).trim();
+        if (!shortName || shortName === '-') return '-';
+
+        const partner = (bridgeBusinessPartners || []).find(p => {
+            const pName = (p.partner_name || p.name || '').trim();
+            if (!pName) return false;
+            
+            const pNameLower = pName.toLowerCase();
+            const sNameLower = shortName.toLowerCase();
+            
+            return pNameLower === sNameLower || 
+                   pNameLower.includes(sNameLower) || 
+                   sNameLower.includes(pNameLower);
+        });
+        
+        return partner ? (partner.partner_name || partner.name) : shortName;
+    };
 
     const [editFormData, setEditFormData] = useState({
         bcDocumentNumber: '',
@@ -66,6 +130,7 @@ const PengajuanManagement = () => {
         shipper: '',
         origin: '',
         destination: '',
+        receiver: '',
         itemDate: '',  // Tanggal Masuk/Keluar Barang (conditional based on type)
         packages: [],
         documents: [],
@@ -89,85 +154,76 @@ const PengajuanManagement = () => {
         customsStatus: 'pending'
     });
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         console.log('🚀 handleSubmit called');
-        console.log('📋 Current formData:', formData);
-        console.log('📦 Packages:', formData.packages);
-        console.log('📦 Packages length:', formData.packages.length);
-
+        
         if (formData.packages.length === 0) {
-            console.error('❌ Validation failed: No packages');
-            alert('❌ VALIDASI GAGAL:\nHarap tambahkan minimal satu package!\n\nKlik "Tambah Package" terlebih dahulu.');
+            alert('❌ VALIDASI GAGAL:\nHarap tambahkan minimal satu package!');
             return;
         }
-
-        // Check if at least one package has items
-        console.log('🔍 Checking if packages have items...');
-        formData.packages.forEach((pkg, idx) => {
-            console.log(`  Package ${idx + 1} (${pkg.packageNumber}):`, pkg.items?.length || 0, 'items');
-        });
 
         const hasItems = formData.packages.some(pkg => pkg.items && pkg.items.length > 0);
         if (!hasItems) {
-            console.error('❌ Validation failed: No items in packages');
-            alert('❌ VALIDASI GAGAL:\nMinimal satu package harus berisi barang!\n\n1. Expand package dengan klik chevron\n2. Klik "Tambah Barang" dalam package\n3. Isi minimal nama barang');
+            alert('❌ VALIDASI GAGAL:\nMinimal satu package harus berisi barang!');
             return;
         }
 
-        console.log('✅ Validation passed - packages:', formData.packages.length, 'items:', formData.packages.reduce((sum, pkg) => sum + (pkg.items?.length || 0), 0));
-
         const pengajuanData = {
             ...formData,
-            date: formData.submissionDate || new Date().toISOString().split('T')[0],
+            date: formData.itemDate || formData.submissionDate || new Date().toISOString().split('T')[0],
+            submissionDate: formData.submissionDate || new Date().toISOString().split('T')[0],
             status: 'quotation',
-            documentStatus: 'pengajuan', // Default status
+            documentStatus: 'pengajuan',
             customsStatus: 'pending'
         };
 
         console.log('📝 Sending pengajuan data:', pengajuanData);
-        console.log('📝 Sending pengajuan data:', pengajuanData);
-        if (formData.id) {
-            updateQuotation(formData.id, pengajuanData);
-            console.log('✅ updateQuotation called');
-        } else {
-            addQuotation(pengajuanData);
-            console.log('✅ addQuotation called');
+        
+        try {
+            let result;
+            if (formData.id) {
+                result = await updateQuotation(formData.id, pengajuanData);
+            } else {
+                result = await addQuotation(pengajuanData);
+            }
+
+            if (result === false) return;
+
+            setFormData({
+                id: null,
+                submissionDate: new Date().toISOString().split('T')[0],
+                customer: '',
+                type: 'inbound',
+                bcDocType: '',
+                shipper: '',
+                origin: '',
+                destination: '',
+                receiver: '',
+                itemDate: '',
+                packages: [],
+                documents: [],
+                notes: '',
+                blNumber: '',
+                blDate: '',
+                invoiceNumber: '',
+                invoiceValue: '',
+                invoiceCurrency: 'IDR',
+                exchangeRate: '',
+                exchangeRateDate: '',
+                documentStatus: 'pengajuan',
+                bcDocumentNumber: '',
+                bcSupportingDocuments: [],
+                rejectionReason: '',
+                rejectionDate: '',
+                pic: '',
+                customsStatus: 'pending'
+            });
+            setShowForm(false);
+            console.log('✅ Form reset complete');
+        } catch (err) {
+            console.error('❌ Error in handleSubmit:', err);
         }
-
-        // Reset form
-        setFormData({
-            id: null,
-            submissionDate: new Date().toISOString().split('T')[0],
-            customer: '',
-            type: 'inbound',
-            bcDocType: '',
-
-            shipper: '',
-            origin: '',
-            destination: '',
-            itemDate: '',
-            packages: [],
-            documents: [],
-            notes: '',
-            blNumber: '',
-            blDate: '',
-            invoiceNumber: '',
-            invoiceValue: '',
-            invoiceCurrency: 'IDR',
-            exchangeRate: '',
-            exchangeRateDate: '',
-            documentStatus: 'pengajuan',
-            bcDocumentNumber: '',
-            bcSupportingDocuments: [],
-            rejectionReason: '',
-            rejectionDate: '',
-            pic: '',
-            customsStatus: 'pending'
-        });
-        setShowForm(false);
-        alert('Pengajuan berhasil dibuat!');
-        console.log('✅ Form reset complete');
     };
 
     const handleConfirm = (quotationId) => {
@@ -184,14 +240,16 @@ const PengajuanManagement = () => {
         setConfirmDialog({ show: false, quotationId: null });
     };
 
-    const handleFullEdit = (p) => {
-        if (!hasEdit) return;
+    const handleFullEdit = (p, forceViewOnly = false) => {
+        if (!hasEdit && !forceViewOnly) return;
         // Prevent editing if document is approved
         const docStatus = p.documentStatus || p.document_status || 'pengajuan';
-        if (docStatus === 'approved') {
-            alert('❌ Dokumen yang sudah approved tidak dapat diedit!\n\nAnda hanya dapat menghapus dokumen ini jika perlu.');
-            return;
+        if (docStatus === 'approved' && !forceViewOnly) {
+            const confirmed = window.confirm('⚠️ PERHATIAN:\nDokumen ini sudah berstatus Approved.\nApakah Anda yakin ingin mengedit data formulir ini?');
+            if (!confirmed) return;
         }
+
+        setIsViewOnly(forceViewOnly);
 
         setFormData({
             id: p.id,
@@ -202,6 +260,7 @@ const PengajuanManagement = () => {
             shipper: p.shipper,
             origin: p.origin || '',
             destination: p.destination || '',
+            receiver: p.receiver || '',
             itemDate: p.itemDate || '',
             packages: p.packages || [],
             documents: p.documents || [],
@@ -243,6 +302,105 @@ const PengajuanManagement = () => {
         setEditModal({ show: true, pengajuan });
     };
 
+    const handlePreviewDocument = async (doc) => {
+        try {
+            let src = null;
+
+            // Step 1: Check inline/base64 fileData FIRST (fastest, no network needed)
+            const raw = doc.fileData || doc.data || doc.base64 || null;
+            if (raw) {
+                if (typeof raw === 'string' && raw.startsWith('data:')) {
+                    src = raw;
+                } else if (typeof raw === 'string') {
+                    const cleaned = raw.replace(/\s+/g, '');
+                    const mime = doc.fileType
+                        ? (doc.fileType.startsWith('image/') || doc.fileType.startsWith('application/')
+                            ? doc.fileType
+                            : `image/${doc.fileType}`)
+                        : (doc.fileName && doc.fileName.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
+                    src = `data:${mime};base64,${cleaned}`;
+                }
+            }
+
+            // Step 2: Try storageKey via Supabase Storage (if no local data)
+            if (!src && doc.storageKey) {
+                const bucket = doc.bucket || 'bridge-documents';
+                try {
+                    const { data: signedData, error: signedErr } = await supabase.storage.from(bucket).createSignedUrl(doc.storageKey, 60);
+                    if (!signedErr && signedData) src = signedData.signedUrl || signedData.signedURL || null;
+                } catch (e) { /* ignore */ }
+                if (!src) {
+                    try {
+                        const { data, error } = await supabase.storage.from(bucket).getPublicUrl(doc.storageKey);
+                        if (!error && data) src = data.publicUrl || data.publicURL || null;
+                    } catch (e) { /* ignore */ }
+                }
+            }
+
+            // Step 3: Use direct URL as last resort (may fail if bucket is missing)
+            if (!src && doc.url) {
+                src = doc.url;
+            }
+
+            if (!src) {
+                alert('Tidak ada sumber dokumen untuk preview');
+                return;
+            }
+
+            setPreviewDoc({ ...doc, url: src });
+            setShowPreview(true);
+        } catch (err) {
+            console.error('Preview error', err);
+            alert('Gagal menyiapkan preview dokumen: ' + (err.message || err));
+        }
+    };
+
+    const handleDownloadDocument = async (doc) => {
+        try {
+            // Step 1: Prefer base64 fileData (no network needed)
+            let url = doc.fileData || doc.data || doc.base64 || null;
+            
+            // Step 2: Try storageKey
+            if (!url && doc.storageKey) {
+                const bucket = doc.bucket || 'bridge-documents';
+                try {
+                    const { data, error } = await supabase.storage.from(bucket).createSignedUrl(doc.storageKey, 60);
+                    if (!error) url = (data && (data.signedUrl || data.signedURL)) || null;
+                } catch (e) { /* ignore */ }
+            }
+            
+            // Step 3: Fall back to direct URL
+            if (!url) url = doc.url || null;
+            
+            if (!url) throw new Error('No URL available for download');
+
+            // If it's a data URI, download directly
+            if (url.startsWith('data:')) {
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = doc.name || doc.fileName || 'dokumen';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                return;
+            }
+
+            // Fetch blob then download
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const blob = await res.blob();
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = doc.name || doc.fileName || 'dokumen';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } catch (err) {
+            console.error('Download error', err);
+            alert('Gagal mengunduh dokumen: ' + err.message);
+        }
+    };
+
     const handleSaveEdit = async () => {
         const isOutbound = editModal.pengajuan.type === 'outbound';
 
@@ -277,6 +435,24 @@ const PengajuanManagement = () => {
 
         console.log('💾 Updating pengajuan:', editModal.pengajuan.id, editFormData);
 
+        // Calculate approvedDate with correct local time
+        let calculatedApprovedDate = editModal.pengajuan.approvedDate;
+        if (editFormData.documentStatus === 'approved') {
+            const dateObj = new Date(editFormData.manualDate || new Date().toISOString().split('T')[0]);
+            const now = new Date();
+            if (editModal.pengajuan.approvedDate) {
+                const old = new Date(editModal.pengajuan.approvedDate);
+                if (!isNaN(old.getTime())) {
+                    dateObj.setHours(old.getHours(), old.getMinutes(), old.getSeconds());
+                } else {
+                    dateObj.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+                }
+            } else {
+                dateObj.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+            }
+            calculatedApprovedDate = dateObj.toISOString();
+        }
+
         // Call update function from DataContext
         if (updateQuotation) {
             const updatedData = {
@@ -285,7 +461,7 @@ const PengajuanManagement = () => {
                 // Also update customs status when document is approved
                 customsStatus: editFormData.documentStatus === 'approved' ? 'approved' : editModal.pengajuan.customsStatus,
                 // USE MANUAL DATE FOR APPROVED DATE
-                approvedDate: editFormData.documentStatus === 'approved' ? (editFormData.manualDate || new Date().toISOString().split('T')[0]) : editModal.pengajuan.approvedDate,
+                approvedDate: calculatedApprovedDate,
                 approvedBy: editFormData.documentStatus === 'approved' ? 'Admin' : editModal.pengajuan.approvedBy
             };
 
@@ -303,48 +479,10 @@ const PengajuanManagement = () => {
                 if (packages.length > 0) {
                     let processedCount = 0;
 
-                    for (const pkg of packages) {
-                        const items = pkg.items || [];
-
-                        for (const item of items) {
-                            if (isOutbound) {
-                                // OUTBOUND: Saat approval, HANYA update status
-                                // Insert ke freight_outbound dilakukan di step terpisah (Proses Barang Keluar)
-                                // Ini sesuai flow: Approval → Konfirmasi Item Keluar → Insert freight_outbound
-                                console.log('📋 Outbound item approved, waiting for item exit confirmation');
-                                processedCount++;
-                            } else {
-                                // INBOUND TRANSACTION (existing logic)
-                                // Consistency fix: Use same robust property access
-                                const itemCodeIn = item.itemCode || item.item_code || `ITEM-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-                                const itemNameIn = item.itemName || item.item_name || item.name || 'Unknown Item';
-
-                                const transaction = {
-                                    assetId: itemCodeIn,
-                                    assetName: itemNameIn,
-                                    quantity: Number(item.quantity) || 0,
-                                    unit: item.uom || 'pcs',
-                                    value: (Number(item.price) || 0) * (Number(item.quantity) || 0),
-
-                                    customsDocType: editModal.pengajuan.bcDocType,
-                                    customsDocNumber: editFormData.bcDocumentNumber,
-                                    customsDocDate: editFormData.bcDocumentDate,
-
-                                    hsCode: item.hsCode || item.hs_code || '',
-                                    serialNumber: (processedCount + 1).toString(),
-                                    currency: editModal.pengajuan.invoiceCurrency || 'IDR',
-                                    receiptNumber: editModal.pengajuan.quotationNumber || editModal.pengajuan.quotation_number || editModal.pengajuan.id,
-
-                                    date: editFormData.manualDate || editFormData.bcDocumentDate || editModal.pengajuan.submissionDate || editModal.pengajuan.submission_date || editModal.pengajuan.date,
-                                    sender: editModal.pengajuan.shipper,
-                                    notes: `Auto-generated from Quotation ${editModal.pengajuan.quotationNumber || editModal.pengajuan.quotation_number || editModal.pengajuan.id}`
-                                };
-
-                                await addInboundTransaction(transaction);
-                            }
-                            processedCount++;
-                        }
-                    }
+                    // Removed redundant loop calling addInboundTransaction here.
+                    // DataContext's updateQuotation handles full insertion of grouped transactions, 
+                    // warehouse inventory, customs docs, and finance invoices automatically.
+                    processedCount = packages.reduce((sum, pkg) => sum + (pkg.items?.length || 0), 0);
 
                     if (processedCount > 0) {
                         if (!isOutbound) {
@@ -461,15 +599,14 @@ const PengajuanManagement = () => {
 
         const normalize = (str) => (str || '').toLowerCase().trim();
 
-        // Helper: Get stok di pameran for an item
+        // Helper: Get stok di exhibition (Halls) for an item
         const getPameranStock = (itemCode, packageNumber) => {
             // Mutations TO pameran (from warehouse to pameran/other)
             const toMutations = mutationLogs.filter(m =>
                 normalize(m.pengajuanNumber) === normalize(pengajuanNumber) &&
                 normalize(m.itemCode) === normalize(itemCode) &&
                 (packageNumber ? normalize(m.packageNumber) === normalize(packageNumber) : true) &&
-                normalize(m.destination) !== 'warehouse' &&
-                normalize(m.destination) !== 'gudang'
+                (m.destination || '') && (isExhibitionLocation ? isExhibitionLocation(m.destination) : ((m.destination || '').toLowerCase() !== 'warehouse' && (m.destination || '').toLowerCase() !== 'gudang'))
             );
 
             // Mutations BACK to warehouse (return from pameran)
@@ -574,6 +711,16 @@ const PengajuanManagement = () => {
     // Helper to normalize strings for robust comparison
     const normalize = (str) => (str || '').toLowerCase().trim();
 
+    // Helper to safely convert documents field to array (handles object, array, or null from DB JSONB)
+    const safeDocsArray = (docs) => {
+        if (!docs) return [];
+        if (Array.isArray(docs)) return docs;
+        // Object format: { files: [...], ... }
+        if (docs.files && Array.isArray(docs.files)) return docs.files;
+        // Fallback: unknown format
+        return [];
+    };
+
     // Helper to find mutation info for an item - used for Detail Inventaris modal
     const getItemMutationInfo = (itemCode, packageNumber, itemName, pengajuanId, pengajuanNumber) => {
         const mutations = mutationLogs.filter(m =>
@@ -605,8 +752,7 @@ const PengajuanManagement = () => {
             (m.pengajuanId === pengajuanId || normalize(m.pengajuanNumber) === normalize(pengajuanNumber)) &&
             normalize(m.itemCode) === normalize(itemCode) &&
             (packageNumber ? normalize(m.packageNumber) === normalize(packageNumber) : true) &&
-            (m.destination || '').toLowerCase() !== 'warehouse' &&
-            (m.destination || '').toLowerCase() !== 'gudang'
+            (m.destination || '') && (isExhibitionLocation ? isExhibitionLocation(m.destination) : ((m.destination || '').toLowerCase() !== 'warehouse' && (m.destination || '').toLowerCase() !== 'gudang'))
         );
 
         // Find all return mutations for this specific item
@@ -806,8 +952,6 @@ const PengajuanManagement = () => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    // Removed getCustomsStatusBadge - Status Bea Cukai column removed per user request
-
     // Export to CSV handler
     const handleExportCSV = () => {
         const columns = [
@@ -826,7 +970,13 @@ const PengajuanManagement = () => {
             { key: 'notes', header: 'Catatan' }
         ];
 
-        exportToCSV(quotations, 'Pendaftaran_TPPB', columns);
+        const mappedQuotations = quotations.map(q => ({
+            ...q,
+            customer: getFullPartnerName(q.customer),
+            shipper: getFullPartnerName(q.shipper)
+        }));
+
+        exportToCSV(mappedQuotations, 'Pendaftaran_TPPB', columns);
     };
 
     // Debug logging
@@ -840,7 +990,13 @@ const PengajuanManagement = () => {
                     <p className="text-silver-dark mt-1">Pengajuan Layanan TPPB & Tracking Status Bea Cukai</p>
                 </div>
                 {hasCreate && (
-                    <Button onClick={() => setShowForm(!showForm)} icon={Plus}>
+                    <Button 
+                        onClick={() => {
+                            setIsViewOnly(false);
+                            setShowForm(!showForm);
+                        }} 
+                        icon={Plus}
+                    >
                         {showForm ? 'Batal' : 'Buat Pengajuan Baru'}
                     </Button>
                 )}
@@ -976,7 +1132,7 @@ const PengajuanManagement = () => {
                                             <option value="">-- Pilih Pengajuan Masuk yang Approved --</option>
                                             {getApprovedInboundPengajuan().map(p => (
                                                 <option key={p.id} value={p.id}>
-                                                    {p.quotationNumber || p.quotation_number} - {p.customer} ({p.bcDocumentNumber || p.bc_document_number || 'No BC'})
+                                                    {p.quotationNumber || p.quotation_number} - {getFullPartnerName(p.customer)} ({p.bcDocumentNumber || p.bc_document_number || 'No BC'})
                                                 </option>
                                             ))}
                                         </select>
@@ -1035,7 +1191,7 @@ const PengajuanManagement = () => {
                                     className="w-full"
                                 >
                                     <option value="">-- Pilih Pelanggan --</option>
-                                    {bridgeBusinessPartners.filter(p => p.is_customer).map(p => (
+                                    {ownerList.map(p => (
                                         <option key={p.id} value={p.partner_name}>
                                             {p.partner_name}
                                         </option>
@@ -1055,7 +1211,7 @@ const PengajuanManagement = () => {
                                     className="w-full"
                                 >
                                     <option value="">-- Pilih Shipper --</option>
-                                    {bridgeBusinessPartners.filter(p => p.is_shipper || p.is_vendor).map(p => (
+                                    {shipperList.map(p => (
                                         <option key={p.id} value={p.partner_name}>
                                             {p.partner_name}
                                         </option>
@@ -1068,8 +1224,8 @@ const PengajuanManagement = () => {
                         </div>
                     </div>
 
-                    {/* Origin & Destination */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Origin, Destination & Receiver */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-silver mb-2">Asal</label>
                             <input
@@ -1090,6 +1246,22 @@ const PengajuanManagement = () => {
                                 placeholder="Negara/Kota tujuan"
                                 className="w-full"
                             />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-silver mb-2">
+                                Penerima {formData.type === 'outbound' && <span className="text-accent-orange">*</span>}
+                            </label>
+                            <input
+                                type="text"
+                                value={formData.receiver}
+                                onChange={(e) => setFormData({ ...formData, receiver: e.target.value })}
+                                placeholder="Nama penerima barang"
+                                className="w-full"
+                            />
+                            {formData.type === 'outbound' && (
+                                <p className="text-xs text-silver-dark mt-1">Nama penerima untuk pengajuan barang keluar</p>
+                            )}
                         </div>
                     </div>
 
@@ -1249,13 +1421,13 @@ const PengajuanManagement = () => {
                     )}
 
                     {/* Package Management - Nested structure */}
-                    {/* For outbound with source selected, show read-only or editable view */}
                     {(formData.type === 'inbound' || sourcePengajuanId) && (
                         <PackageManager
                             packages={formData.packages}
                             onChange={(packages) => setFormData({ ...formData, packages })}
                             itemMaster={itemMaster}
-                            readOnly={formData.type === 'outbound' && sourcePengajuanId} // Optional: make it read-only for outbound
+                            readOnly={formData.type === 'outbound' && sourcePengajuanId}
+                            defaultCurrency={formData.invoiceCurrency}
                         />
                     )}
 
@@ -1288,16 +1460,18 @@ const PengajuanManagement = () => {
 
                     <div className="flex justify-end gap-3">
                         <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>
-                            Batal
+                            {isViewOnly ? 'Tutup' : 'Batal'}
                         </Button>
-                        <Button type="submit" icon={Plus}>
-                            Buat Pengajuan
-                        </Button>
+                        {!isViewOnly && (
+                            <Button type="submit" icon={formData.id ? Save : Plus}>
+                                {formData.id ? 'Simpan Perubahan' : 'Buat Pengajuan'}
+                            </Button>
+                        )}
                     </div>
                 </form>
             )}
 
-            {/* Daftar Pengajuan - SPLIT INTO TWO TABLES - Only show when NOT editing/creating */}
+            {/* Daftar Pengajuan */}
             {!showForm && (
                 <>
                     {/* ==================== PENGAJUAN MASUK (INBOUND) ==================== */}
@@ -1331,7 +1505,7 @@ const PengajuanManagement = () => {
                                         <tr>
                                             <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">No. Pengajuan</th>
                                             <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Tanggal</th>
-                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Pemilik Barang</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap w-80">Pemilik Barang</th>
                                             <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Dokumen BC</th>
                                             <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Jumlah Barang</th>
                                             <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">No. Dokumen Pabean</th>
@@ -1351,7 +1525,10 @@ const PengajuanManagement = () => {
                                             return (
                                                 <tr
                                                     key={quot.id}
-                                                    onClick={() => handleEditPengajuan(quot)}
+                                                    onClick={() => {
+                                                        setSelectedPengajuan(quot);
+                                                        setShowDetailModal(true);
+                                                    }}
                                                     className="hover:bg-dark-surface smooth-transition cursor-pointer"
                                                 >
                                                     <td className="px-4 py-2 text-sm text-silver-light font-medium whitespace-nowrap">
@@ -1360,8 +1537,8 @@ const PengajuanManagement = () => {
                                                     <td className="px-4 py-2 text-sm text-silver-dark whitespace-nowrap">
                                                         {new Date(quot.submissionDate || quot.submission_date || quot.date).toLocaleDateString('id-ID')}
                                                     </td>
-                                                    <td className="px-4 py-2 text-sm text-silver whitespace-nowrap">
-                                                        {quot.customer}
+                                                    <td className="px-4 py-2 text-sm text-silver">
+                                                        <div className="line-clamp-2" title={getFullPartnerName(quot.customer)}>{getFullPartnerName(quot.customer)}</div>
                                                     </td>
                                                     <td className="px-4 py-2 text-sm text-silver whitespace-nowrap">
                                                         {quot.bcDocType || quot.bc_document_type || '-'}
@@ -1424,7 +1601,7 @@ const PengajuanManagement = () => {
                                         <tr>
                                             <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">No. Pengajuan</th>
                                             <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Tanggal</th>
-                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Pemilik Barang</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap w-80">Pemilik Barang</th>
                                             <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Dokumen BC</th>
                                             <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Jumlah Barang</th>
                                             <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">No. Dokumen Pabean</th>
@@ -1444,7 +1621,10 @@ const PengajuanManagement = () => {
                                             return (
                                                 <tr
                                                     key={quot.id}
-                                                    onClick={() => handleEditPengajuan(quot)}
+                                                    onClick={() => {
+                                                        setSelectedPengajuan(quot);
+                                                        setShowDetailModal(true);
+                                                    }}
                                                     className="hover:bg-dark-surface smooth-transition cursor-pointer"
                                                 >
                                                     <td className="px-4 py-2 text-sm text-silver-light font-medium whitespace-nowrap">
@@ -1453,8 +1633,8 @@ const PengajuanManagement = () => {
                                                     <td className="px-4 py-2 text-sm text-silver-dark whitespace-nowrap">
                                                         {new Date(quot.submissionDate || quot.submission_date || quot.date).toLocaleDateString('id-ID')}
                                                     </td>
-                                                    <td className="px-4 py-2 text-sm text-silver whitespace-nowrap">
-                                                        {quot.customer}
+                                                    <td className="px-4 py-2 text-sm text-silver">
+                                                        <div className="line-clamp-2" title={getFullPartnerName(quot.customer)}>{getFullPartnerName(quot.customer)}</div>
                                                     </td>
                                                     <td className="px-4 py-2 text-sm text-silver whitespace-nowrap">
                                                         {quot.bcDocType || quot.bc_document_type || '-'}
@@ -1512,6 +1692,225 @@ const PengajuanManagement = () => {
                 )
             }
 
+            {/* Detail Pengajuan Modal */}
+            {showDetailModal && selectedPengajuan && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 p-4">
+                    <div className="glass-card rounded-lg max-w-4xl w-full max-h-[85vh] overflow-hidden">
+                        {/* Header */}
+                        <div className="flex justify-between items-center p-4 border-b border-dark-border bg-accent-purple/10">
+                            <div>
+                                <h2 className="text-xl font-bold text-silver-light flex items-center gap-2">
+                                    <FileText className="w-5 h-5" />
+                                    Detail Pengajuan
+                                </h2>
+                                <p className="text-sm text-silver-dark mt-1">
+                                    {selectedPengajuan.quotationNumber || selectedPengajuan.quotation_number}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => handleCloseDetailModal()}
+                                className="text-silver-dark hover:text-silver p-1"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        {/* Body - Scrollable */}
+                        <div className="p-6 overflow-y-auto max-h-[60vh] space-y-6">
+                            {/* Info Grid */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs text-silver-dark font-medium">No. Pengajuan</label>
+                                    <p className="text-sm text-silver mt-1 font-semibold">
+                                        {selectedPengajuan.quotationNumber || selectedPengajuan.quotation_number}
+                                    </p>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-silver-dark font-medium">Tanggal Pengajuan</label>
+                                    <p className="text-sm text-silver mt-1">
+                                        {new Date(selectedPengajuan.submissionDate || selectedPengajuan.submission_date).toLocaleDateString('id-ID')}
+                                    </p>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-silver-dark font-medium">Pemilik Barang</label>
+                                    <p className="text-sm text-silver mt-1">{getFullPartnerName(selectedPengajuan.customer)}</p>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-silver-dark font-medium">Shipper</label>
+                                    <p className="text-sm text-silver mt-1">{getFullPartnerName(selectedPengajuan.shipper)}</p>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-silver-dark font-medium">Jenis Dokumen BC</label>
+                                    <p className="text-sm text-silver mt-1">{selectedPengajuan.bcDocType || selectedPengajuan.bc_document_type || '-'}</p>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-silver-dark font-medium">No. Dokumen Pabean</label>
+                                    <p className="text-sm text-accent-purple mt-1 font-semibold">
+                                        {selectedPengajuan.bcDocumentNumber || selectedPengajuan.bc_document_number || '-'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-silver-dark font-medium">Tujuan</label>
+                                    <p className="text-sm text-silver mt-1">{selectedPengajuan.destination || '-'}</p>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-silver-dark font-medium">Status Dokumen</label>
+                                    <p className="text-sm mt-1">
+                                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                                            (selectedPengajuan.documentStatus || selectedPengajuan.document_status) === 'approved'
+                                                ? 'bg-green-500/20 text-green-400'
+                                                : (selectedPengajuan.documentStatus || selectedPengajuan.document_status) === 'rejected'
+                                                ? 'bg-red-500/20 text-red-400'
+                                                : 'bg-yellow-500/20 text-yellow-400'
+                                        }`}>
+                                            {(selectedPengajuan.documentStatus || selectedPengajuan.document_status) === 'approved' ? 'Approved' :
+                                                (selectedPengajuan.documentStatus || selectedPengajuan.document_status) === 'rejected' ? 'Rejected' : 'Pengajuan'}
+                                        </span>
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Dokumen Pendukung Section */}
+                            <div>
+                                <h3 className="text-lg font-bold text-silver mb-3">📑 Dokumen Pendukung</h3>
+                                {[...safeDocsArray(selectedPengajuan.documents), ...(selectedPengajuan.bcSupportingDocuments || [])].length === 0 ? (
+                                    <p className="text-silver-dark text-sm">Tidak ada dokumen.</p>
+                                ) : (
+                                    <table className="w-full text-xs">
+                                        <thead>
+                                            <tr>
+                                                <th className="text-left">Nama</th>
+                                                <th className="text-left">Tanggal</th>
+                                                <th className="text-left">Aksi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {[...safeDocsArray(selectedPengajuan.documents), ...(selectedPengajuan.bcSupportingDocuments || [])].map((doc, idx) => (
+                                                <tr key={idx}>
+                                                    <td className="text-left">{doc.name || doc.fileName}</td>
+                                                    <td className="text-left">{doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleDateString('id-ID') : '-'}</td>
+                                                    <td className="text-left">
+                                                        <div className="flex items-center gap-2">
+                                                            <Button size="xs" onClick={() => handlePreviewDocument(doc)}>Preview</Button>
+                                                            <Button size="xs" variant="secondary" onClick={() => handleDownloadDocument(doc)}>Download</Button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                )}
+                            </div>
+
+                            {/* Packages Section */}
+                            <div>
+                                <h3 className="text-lg font-bold text-silver mb-3">📦 Detail Barang</h3>
+                                <div className="space-y-3">
+                                    {(selectedPengajuan.packages || []).map((pkg, pkgIdx) => (
+                                        <div key={pkgIdx} className="glass-card p-3 rounded-lg border border-dark-border">
+                                            <div className="font-semibold text-silver mb-2 text-sm">
+                                                Package: {pkg.packageNumber}
+                                            </div>
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-xs">
+                                                    <thead className="bg-dark-surface">
+                                                        <tr>
+                                                            <th className="px-2 py-1 text-left text-xs font-bold text-silver">Kode</th>
+                                                            <th className="px-2 py-1 text-left text-xs font-bold text-silver">Nama Item</th>
+                                                            <th className="px-2 py-1 text-center text-xs font-bold text-silver">Qty</th>
+                                                            <th className="px-2 py-1 text-center text-xs font-bold text-silver">Unit</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {(pkg.items || []).map((item, itemIdx) => (
+                                                            <tr key={itemIdx} className="border-t border-dark-border">
+                                                                <td className="px-2 py-1 text-xs font-mono text-silver">{item.itemCode}</td>
+                                                                <td className="px-2 py-1 text-xs text-silver">{item.name || item.itemName}</td>
+                                                                <td className="px-2 py-1 text-xs text-center text-silver font-bold">{item.quantity}</td>
+                                                                <td className="px-2 py-1 text-xs text-center text-silver">{item.uom || 'pcs'}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Summary */}
+                            <div className="glass-card p-4 bg-accent-purple/10 border-2 border-accent-purple rounded-lg">
+                                <div className="grid grid-cols-3 gap-4 text-sm">
+                                    <div>
+                                        <p className="text-xs text-silver-dark">Total Package</p>
+                                        <p className="text-lg font-bold text-accent-purple">
+                                            {selectedPengajuan.packages?.length || 0}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-silver-dark">Total Item</p>
+                                        <p className="text-lg font-bold text-accent-purple">
+                                            {selectedPengajuan.packages?.reduce((sum, pkg) => sum + (pkg.items?.length || 0), 0) || 0}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-silver-dark">Total Quantity</p>
+                                        <p className="text-lg font-bold text-accent-purple">
+                                            {selectedPengajuan.packages?.reduce((sum, pkg) => 
+                                                sum + pkg.items?.reduce((itemSum, item) => itemSum + (item.quantity || 0), 0), 0
+                                            ) || 0}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer - Action Buttons */}
+                        <div className="flex justify-between items-center gap-3 p-4 border-t border-dark-border bg-dark-surface">
+                            <Button 
+                                variant="secondary" 
+                                onClick={() => handleCloseDetailModal()}
+                            >
+                                Tutup
+                            </Button>
+                            <div className="flex gap-2">
+                                <Button
+                                    variant="secondary"
+                                    icon={FileText}
+                                    onClick={() => {
+                                        handleFullEdit(selectedPengajuan, false);
+                                        handleCloseDetailModal();
+                                    }}
+                                >
+                                    Edit Form
+                                </Button>
+                                <Button
+                                    variant="secondary"
+                                    icon={Trash2}
+                                    onClick={() => {  
+                                        setDeleteConfirmModal({ show: true, pengajuanId: selectedPengajuan.id });
+                                        handleCloseDetailModal();
+                                    }}
+                                    className="hover:bg-red-500/20 hover:text-red-400"
+                                >
+                                    Hapus
+                                </Button>
+                                <Button
+                                    variant="primary"
+                                    icon={Edit2}
+                                    onClick={() => {
+                                        handleEditPengajuan(selectedPengajuan);
+                                        handleCloseDetailModal();
+                                    }}
+                                >
+                                    Edit Status
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Edit Pengajuan Modal */}
             {
                 editModal.show && editModal.pengajuan && (
@@ -1539,7 +1938,7 @@ const PengajuanManagement = () => {
                                         </div>
                                         <div>
                                             <p className="text-silver-dark">Customer</p>
-                                            <p className="text-silver-light font-medium">{editModal.pengajuan.customer}</p>
+                                            <p className="text-silver-light font-medium">{getFullPartnerName(editModal.pengajuan.customer)}</p>
                                         </div>
                                         <div>
                                             <p className="text-silver-dark">BC Document</p>
@@ -1706,7 +2105,6 @@ const PengajuanManagement = () => {
                                 )}
 
                                 {/* Buttons */}
-                                {/* Buttons */}
                                 <div className="mt-8 flex justify-between items-center border-t border-dark-border pt-4">
                                     {hasDelete && (
                                         <Button
@@ -1738,18 +2136,23 @@ const PengajuanManagement = () => {
                                     {editModal.pengajuan.type === 'outbound' &&
                                         (editModal.pengajuan.documentStatus || editModal.pengajuan.document_status) === 'approved' &&
                                         (editModal.pengajuan.outboundStatus !== 'processed') && (
-                                            <Button
-                                                variant="primary"
-                                                onClick={() => {
-                                                    // Navigate to OutboundInventory to confirm item exit
-                                                    navigate('/bridge/outbound-inventory');
-                                                    setEditModal({ show: false, pengajuan: null });
-                                                }}
-                                                icon={Package}
-                                                className="bg-accent-orange hover:bg-accent-orange/80"
-                                            >
-                                                Proses Barang Keluar
-                                            </Button>
+                                                <Button
+                                                    variant="primary"
+                                                    onClick={() => {
+                                                        const status = (editModal.pengajuan.documentStatus || editModal.pengajuan.document_status);
+                                                        if (status !== 'approved') {
+                                                            alert('Proses outbound hanya dapat dilakukan jika pengajuan berstatus APPROVED');
+                                                            return;
+                                                        }
+                                                        // Navigate to OutboundInventory to confirm item exit
+                                                        navigate('/bridge/outbound-inventory');
+                                                        setEditModal({ show: false, pengajuan: null });
+                                                    }}
+                                                    icon={Package}
+                                                    className="bg-accent-orange hover:bg-accent-orange/80"
+                                                >
+                                                    Proses Barang Keluar
+                                                </Button>
                                         )}
 
                                     <div className="flex gap-3 mt-4 sm:mt-0 sm:ml-auto">
@@ -1792,6 +2195,11 @@ const PengajuanManagement = () => {
                     </div>
                 )
             }
+
+            {/* Document Preview Modal */}
+            {showPreview && previewDoc && (
+                <DocumentPreviewModal show={showPreview} doc={previewDoc} onClose={() => setShowPreview(false)} />
+            )}
 
             {/* Warehouse Selector Modal for Outbound */}
             {showWarehouseSelector && (
@@ -1844,7 +2252,7 @@ const PengajuanManagement = () => {
                                                             {pengajuan.quotationNumber || pengajuan.quotation_number}
                                                         </h4>
                                                         <p className="text-sm text-silver-dark mt-1">
-                                                            {pengajuan.customer} • {pengajuan.shipper || '-'}
+                                                            {getFullPartnerName(pengajuan.customer)} • {getFullPartnerName(pengajuan.shipper)}
                                                         </p>
                                                         <p className="text-xs text-silver-dark mt-1">
                                                             BC: {pengajuan.bcDocumentNumber || pengajuan.bc_document_number || '-'}

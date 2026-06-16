@@ -1,5 +1,6 @@
 import React from 'react';
 import { useData } from '../../context/DataContext';
+import { DEFAULT_LOCATION } from '../../constants/locationOptions';
 
 const BridgeOverview = () => {
     const {
@@ -27,7 +28,7 @@ const BridgeOverview = () => {
         }
     });
     const itemsInFair = Object.values(itemLocations).filter(m =>
-        m?.destination === 'pameran' || m?.position === 'pameran'
+        (m?.destination || '').toLowerCase() === DEFAULT_LOCATION.toLowerCase() || (m?.position || '').toLowerCase() === DEFAULT_LOCATION.toLowerCase()
     ).length;
 
     // Total inbound items - flatten and count all items from inbound transactions
@@ -60,7 +61,7 @@ const BridgeOverview = () => {
             value: itemsInWarehouse
         },
         {
-            title: 'Barang di Pameran',
+            title: `Barang di ${DEFAULT_LOCATION}`,
             value: itemsInFair
         },
         {

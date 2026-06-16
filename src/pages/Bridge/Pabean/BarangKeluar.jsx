@@ -1,48 +1,155 @@
 import React, { useState } from 'react';
-import { ArrowUpCircle, Search, Package, Download, FileSpreadsheet } from 'lucide-react';
+import { ArrowUpCircle, Search, Eye, Download, FileSpreadsheet } from 'lucide-react';
 import { useData } from '../../../context/DataContext';
 import Button from '../../../components/Common/Button';
-import { formatCurrency, getCurrencySymbol } from '../../../utils/currencyFormatter';
+import { formatCurrency } from '../../../utils/currencyFormatter';
 import { exportToCSV } from '../../../utils/exportCSV';
 import { exportToXLS } from '../../../utils/exportXLS';
+import { useNavigate } from 'react-router-dom';
 
 const BarangKeluar = () => {
-    const { inboundTransactions = [], companySettings, bridgeSettings } = useData();
+    const { outboundTransactions = [], quotations = [], bridgeBusinessPartners = [], companySettings, bridgeSettings } = useData();
     const [searchTerm, setSearchTerm] = useState('');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
-    const [selectedTransaction, setSelectedTransaction] = useState(null);
+    const navigate = useNavigate();
 
-    // Filter outbound transactions only
-    const outboundTransactions = inboundTransactions.filter(t => t.direction === 'outbound');
+    // Helper: lookup outbound quotation by pengajuanNumber to get BL/AWB info
+    const getQuotation = (pengajuanNumber) => quotations.find(
+        q => q.pengajuanNumber === pengajuanNumber ||
+             q.quotation_number === pengajuanNumber ||
+             q.id === pengajuanNumber
+    ) || null;
 
-    // Filter Transactions
-    const filteredTransactions = outboundTransactions.filter(t => {
-        const docDate = new Date(t.date);
+    // Merge: Outbound Transactions (Logs) + Approved Outbound Pengajuan (Plan)
+    const mergedTransactions = React.useMemo(() => {
+        const transMap = new Map();
+        
+        // 1. Add actual logs
+        outboundTransactions.forEach(t => {
+            const key = t.pengajuanNumber || t.pengajuan_number || t.id;
+            transMap.set(key, t);
+        });
+
+        // 2. Add approved outbound plans
+        quotations.filter(q => q.type === 'outbound' && (q.documentStatus === 'approved' || q.document_status === 'approved')).forEach(q => {
+            const key = q.pengajuanNumber || q.quotation_number || q.id;
+            if (!transMap.has(key)) {
+                transMap.set(key, {
+                    ...q,
+                    pengajuanNumber: q.pengajuanNumber || q.quotation_number,
+                    customsDocType: q.bcDocType || q.bc_document_type || 'BC 3.0',
+                    customsDocNumber: q.bcDocumentNumber || q.bc_document_number,
+                    customsDocDate: q.bcDocumentDate || q.bc_document_date || q.approvedDate || q.approved_date,
+                    date: q.submissionDate || q.submission_date || q.approvedDate || q.approved_date || q.date,
+                    receiver: q.receiver || q.destination || '-',
+                });
+            }
+        });
+
+        return Array.from(transMap.values());
+    }, [outboundTransactions, quotations]);
+
+    // Filter outbound transactions
+    const filteredTransactions = mergedTransactions.filter(t => {
+        const docDate = new Date(t.date || t.created_at || Date.now());
         const start = startDate ? new Date(startDate) : null;
         const end = endDate ? new Date(endDate) : null;
-
         if (end) end.setHours(23, 59, 59, 999);
 
         const matchesDate = (!start || docDate >= start) && (!end || docDate <= end);
         const matchesSearch = (
             (t.pengajuanNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
             (t.customsDocNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (t.destination || t.receiver || '').toLowerCase().includes(searchTerm.toLowerCase())
+            (t.customer || t.destination || t.receiver || '').toLowerCase().includes(searchTerm.toLowerCase())
         );
-
         return matchesDate && matchesSearch;
     });
 
-    // Helper: Calculate Total Value
-    const getTransactionTotal = (t) => {
-        return (t.items || []).reduce((sum, item) => sum + (Number(item.value) || 0), 0);
+    // Helper: lookup full partner name from bridgeBusinessPartners
+    const getFullPartnerName = (input) => {
+        if (!input || input === '-') return '-';
+        const shortName = String(input).trim();
+        if (!shortName) return '-';
+
+        const partner = (bridgeBusinessPartners || []).find(p => {
+            const pName = (p.partner_name || p.name || '').trim();
+            if (!pName) return false;
+            
+            const pNameLower = pName.toLowerCase();
+            const sNameLower = shortName.toLowerCase();
+            
+            return pNameLower === sNameLower || 
+                   pNameLower.includes(sNameLower) || 
+                   sNameLower.includes(pNameLower);
+        });
+        
+        return partner ? (partner.partner_name || partner.name) : shortName;
     };
 
-    // Helper: Calculate Total Qty
-    const getTransactionQty = (t) => {
-        return (t.items || []).reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
-    };
+    // Flatten: one row per item (same pattern as BarangMasuk)
+    const flatRows = filteredTransactions.flatMap((t, tIdx) => {
+        const quot = getQuotation(t.pengajuanNumber);
+        // BL/AWB dari quotation outbound
+        const blNumber = quot?.blNumber || quot?.bl_number || '-';
+        const blDate = quot?.blDate || quot?.bl_date || null;
+        const ownerName = getFullPartnerName(t.customer || quot?.customer || t.destination || t.receiver || '-');
+        const receiver = getFullPartnerName(quot?.receiver || t.receiver || t.customer || '-');
+
+        // Recreate flat items from quotation to get "live" data (fixes stale transaction logs)
+        const quotItems = (quot?.packages || []).flatMap((pkg) => 
+            (pkg.items || []).map(item => ({
+                itemCode: item.itemCode || item.item_code,
+                hsCode: item.hsCode || item.hs_code,
+                assetName: item.name || item.itemName || item.item_name,
+                unit: item.unit || item.uom,
+                quantity: item.quantity,
+                price: item.price,
+                currency: item.currency,
+                totalPrice: item.totalPrice || (Number(item.quantity) * Number(item.price))
+            }))
+        );
+
+        // Prioritize quotItems (Live) > t.items (Log) > t (Top-level Log fallback)
+        const items = quotItems.length > 0 ? quotItems : (t.items && t.items.length > 0 ? t.items : [{
+            itemCode: t.itemCode,
+            assetName: t.assetName,
+            goodsType: t.assetName,
+            unit: t.unit,
+            quantity: t.quantity,
+            value: t.value,
+        }]);
+
+        return items.map((item, itemIdx) => ({
+            _transaction: t,
+            _submissionSeqNo: itemIdx === 0 ? tIdx + 1 : '',        // Only show for first item
+            _itemSeqNo: itemIdx + 1,           // 1-based item sequence number within submission
+            blNumber,
+            blDate,
+            ownerName,
+            // transaction fields
+            pengajuanNumber: t.pengajuanNumber,
+            customsDocType: t.customsDocType,
+            customsDocNumber: t.customsDocNumber,
+            customsDocDate: t.customsDocDate,
+            receiver,
+            destination: t.destination || '-',
+            itemCurrency: item.currency || t.currency || t.invoiceCurrency || t.invoice_currency || 'IDR',
+            invoiceCurrency: t.invoiceCurrency || t.invoice_currency || t.currency || 'IDR',
+            // item-level fields
+            itemCode: item.itemCode || item.item_code || '-',
+            hsCode: item.hsCode || item.hs_code || '-',
+            itemName: item.assetName || item.goodsType || item.itemName || item.name || item.item_name || t.assetName || '-',
+            unit: item.unit || t.unit || '-',
+            quantity: Number(item.quantity) || 0,
+            value: Number(item.value) || 0,
+            // jumlahBarang = JML = kolom JML di PackageItemManager
+            jumlahBarang: Number(item.quantity) || 0,
+            nominalBarang: Number(item.price) || (Number(item.value) / (Number(item.quantity) || 1)) || 0,
+            // nilaiBarang = TOTAL = qty × price (kolom Total di PackageItemManager)
+            nilaiBarang: Number(item.totalPrice) || (Number(item.quantity) * Number(item.price)) || Number(item.value) || 0,
+        }));
+    });
 
     // Export Main Table to XLS
     const handleExportXLS = () => {
@@ -55,23 +162,30 @@ const BarangKeluar = () => {
         ];
 
         const xlsColumns = [
-            { header: 'No', key: 'no', width: 5, align: 'center' },
+            { header: 'No', key: '_submissionSeqNo', width: 5, align: 'center' },
+            { header: 'No Urut Item', key: '_itemSeqNo', width: 12, align: 'center' },
+            { header: 'No. Bukti Pengeluaran (BL/AWB)', key: 'blNumber', width: 28 },
+            { header: 'Tgl Bukti Pengeluaran', key: 'blDateStr', width: 18, align: 'center' },
             { header: 'No. Pengajuan', key: 'pengajuanNumber', width: 20 },
             { header: 'Jenis Dok', key: 'customsDocType', width: 10, align: 'center' },
             { header: 'No. Pabean', key: 'customsDocNumber', width: 20 },
-            { header: 'Tgl Dokumen', key: 'customsDocDate', width: 12, align: 'center' },
-            { header: 'Tujuan', key: 'destination', width: 25 },
-            { header: 'Jml Item', key: 'itemCount', width: 10, align: 'center' },
-            { header: 'Total Nilai', key: 'totalValue', width: 15, align: 'right' }
+            { header: 'Tgl Dokumen Pabean', key: 'customsDocDateStr', width: 16, align: 'center' },
+            { header: 'Nama Pemilik', key: 'ownerName', width: 28 },
+            { header: 'Penerima', key: 'receiver', width: 25 },
+            { header: 'Kode Barang', key: 'itemCode', width: 18 },
+            { header: 'Kode HS', key: 'hsCode', width: 18 },
+            { header: 'Nama Barang (Item)', key: 'itemName', width: 40 },
+            { header: 'Satuan', key: 'unit', width: 12 },
+            { header: 'Jml Barang', key: 'jumlahBarang', width: 14, align: 'right', summary: true },
+            { header: 'Kurs', key: 'itemCurrency', width: 10, align: 'center' },
+            { header: 'Nominal', key: 'nominalBarang', width: 15, align: 'right' },
+            { header: 'Nilai Barang', key: 'nilaiBarang', width: 16, align: 'right', summary: true },
         ];
 
-        const data = filteredTransactions.map((t, idx) => ({
-            ...t,
-            no: idx + 1,
-            customsDocDate: t.customsDocDate ? new Date(t.customsDocDate).toLocaleDateString('id-ID') : '-',
-            destination: t.destination || t.receiver || '-',
-            itemCount: t.items ? t.items.length : 0,
-            totalValue: formatCurrency(getTransactionTotal(t))
+        const data = flatRows.map(r => ({
+            ...r,
+            blDateStr: r.blDate ? new Date(r.blDate).toLocaleDateString('id-ID') : '-',
+            customsDocDateStr: r.customsDocDate ? new Date(r.customsDocDate).toLocaleDateString('id-ID') : '-',
         }));
 
         exportToXLS(data, 'Laporan_Barang_Keluar', headerRows, xlsColumns);
@@ -80,67 +194,33 @@ const BarangKeluar = () => {
     // Export Main Table to CSV
     const handleExportCSV = () => {
         const columns = [
+            { key: '_submissionSeqNo', header: 'No' },
+            { key: '_itemSeqNo', header: 'No Urut Item' },
+            { key: 'blNumber', header: 'No. Bukti Pengeluaran' },
+            { key: 'blDateStr', header: 'Tgl Bukti' },
             { key: 'pengajuanNumber', header: 'No. Pengajuan' },
             { key: 'customsDocType', header: 'Jenis Dok' },
             { key: 'customsDocNumber', header: 'No. Pabean' },
-            { key: 'date', header: 'Tgl Keluar' },
-            { key: 'destination', header: 'Tujuan' },
-            { key: 'totalItems', header: 'Jml Item' },
-            { key: 'totalValue', header: 'Total Nilai' }
+            { key: 'customsDocDateStr', header: 'Tgl Pabean' },
+            { key: 'ownerName', header: 'Nama Pemilik' },
+            { key: 'receiver', header: 'Penerima' },
+            { key: 'itemCode', header: 'Kode Barang' },
+            { key: 'hsCode', header: 'Kode HS' },
+            { key: 'itemName', header: 'Nama Barang (Item)' },
+            { key: 'unit', header: 'Satuan' },
+            { key: 'jumlahBarang', header: 'Jml Barang' },
+            { key: 'itemCurrency', header: 'Kurs' },
+            { key: 'nominalBarang', header: 'Nominal' },
+            { key: 'nilaiBarang', header: 'Nilai Barang' },
         ];
 
-        const data = filteredTransactions.map(t => ({
-            ...t,
-            date: new Date(t.date).toLocaleDateString('id-ID'),
-            destination: t.destination || t.receiver || '-',
-            totalItems: t.items?.length || 0,
-            totalValue: getTransactionTotal(t)
+        const data = flatRows.map(r => ({
+            ...r,
+            blDateStr: r.blDate ? new Date(r.blDate).toLocaleDateString('id-ID') : '-',
+            customsDocDateStr: r.customsDocDate ? new Date(r.customsDocDate).toLocaleDateString('id-ID') : '-',
         }));
 
         exportToCSV(data, 'Barang_Keluar', columns);
-    };
-
-    // Export Detail Modal to XLS
-    const handleModalExportXLS = () => {
-        if (!selectedTransaction) return;
-
-        const headerRows = [
-            { value: bridgeSettings?.company_name || companySettings?.company_name || 'PT. BAKHTERA FREIGHT WORLDWIDE', style: 'company' },
-            { value: bridgeSettings?.company_address || companySettings?.company_address || 'Jl. Contoh No. 123, Jakarta', style: 'normal' },
-            { value: `NPWP: ${bridgeSettings?.company_npwp || companySettings?.company_npwp || '-'}`, style: 'normal' },
-            { value: '', style: 'normal' },
-            { value: `DETAIL OUTBOUND: ${selectedTransaction.pengajuanNumber}`, style: 'title' },
-            { value: `No Pabean: ${selectedTransaction.customsDocNumber} | Tgl: ${selectedTransaction.customsDocDate ? new Date(selectedTransaction.customsDocDate).toLocaleDateString() : '-'}`, style: 'normal' }
-        ];
-
-        const xlsColumns = [
-            { header: 'No', key: 'noUrut', width: 5, align: 'center', render: (_, idx) => idx + 1 },
-            { header: 'Kode Barang', key: 'itemCode', width: 15 },
-            { header: 'HS Code', key: 'hsCode', width: 15 },
-            { header: 'Uraian Barang', key: 'assetName', width: 30 },
-            { header: 'Jml', key: 'quantity', width: 8, align: 'center', render: (i) => Number(i.quantity) || 0 },
-            { header: 'Sat', key: 'unit', width: 8, align: 'center' },
-            { header: 'Nilai Satuan', key: 'value', width: 15, align: 'right', render: (i) => formatCurrency(i.value) },
-            { header: 'Total Nilai', key: 'total', width: 15, align: 'right', render: (i) => formatCurrency(i.value) }
-        ];
-
-        exportToXLS(selectedTransaction.items || [], `Detail_Outbound_${selectedTransaction.pengajuanNumber}`, headerRows, xlsColumns);
-    };
-
-    // Export Detail Modal to CSV
-    const handleModalExportCSV = () => {
-        if (!selectedTransaction) return;
-
-        const columns = [
-            { key: 'itemCode', header: 'Kode Barang' },
-            { key: 'hsCode', header: 'HS Code' },
-            { key: 'assetName', header: 'Uraian Barang' },
-            { key: 'quantity', header: 'Jumlah' },
-            { key: 'unit', header: 'Satuan' },
-            { key: 'value', header: 'Nilai' }
-        ];
-
-        exportToCSV(selectedTransaction.items || [], `Detail_${selectedTransaction.pengajuanNumber}`, columns);
     };
 
     return (
@@ -148,7 +228,7 @@ const BarangKeluar = () => {
             {/* Header */}
             <div>
                 <h1 className="text-3xl font-bold gradient-text">Barang Keluar</h1>
-                <p className="text-silver-dark mt-1">Daftar Pengajuan Barang Keluar (Per Dokumen)</p>
+                <p className="text-silver-dark mt-1">Laporan Pengajuan Barang Keluar (Per Item)</p>
             </div>
 
             {/* Search & Stats */}
@@ -158,10 +238,10 @@ const BarangKeluar = () => {
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                         <input
                             type="text"
-                            placeholder="Cari No Pengajuan, No BC, atau Tujuan..."
+                            placeholder="Cari No Pengajuan, No BC, atau Pemilik..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
+                            className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-orange focus:outline-none"
                         />
                     </div>
                     <div className="flex gap-2">
@@ -170,7 +250,7 @@ const BarangKeluar = () => {
                                 type="date"
                                 value={startDate}
                                 onChange={(e) => setStartDate(e.target.value)}
-                                className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none text-sm"
+                                className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-orange focus:outline-none text-sm"
                             />
                         </div>
                         <div className="flex-1">
@@ -178,7 +258,7 @@ const BarangKeluar = () => {
                                 type="date"
                                 value={endDate}
                                 onChange={(e) => setEndDate(e.target.value)}
-                                className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none text-sm"
+                                className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-orange focus:outline-none text-sm"
                             />
                         </div>
                     </div>
@@ -190,23 +270,23 @@ const BarangKeluar = () => {
                 <div className="glass-card p-4 rounded-lg border border-red-500">
                     <p className="text-xs text-silver-dark">Barang Keluar</p>
                     <p className="text-2xl font-bold text-red-500">
-                        {filteredTransactions.reduce((sum, t) => sum + getTransactionQty(t), 0)}
+                        {flatRows.reduce((sum, r) => sum + (r.jumlahBarang || 0), 0).toLocaleString('id-ID')}
                     </p>
                 </div>
                 <div className="glass-card p-4 rounded-lg border border-accent-green">
-                    <p className="text-xs text-silver-dark">Total Nilai (Filtered)</p>
+                    <p className="text-xs text-silver-dark">Jumlah Total</p>
                     <p className="text-xl font-bold text-accent-green">
-                        {formatCurrency(filteredTransactions.reduce((sum, t) => sum + getTransactionTotal(t), 0))}
+                        {formatCurrency(flatRows.reduce((sum, r) => sum + (r.nilaiBarang || 0), 0))}
                     </p>
                 </div>
             </div>
 
-            {/* Main Table - Grouped by Pengajuan */}
+            {/* Main Table */}
             <div className="glass-card rounded-lg overflow-hidden">
                 <div className="p-4 border-b border-dark-border flex justify-between items-center">
                     <div className="flex items-center gap-2">
                         <ArrowUpCircle className="w-5 h-5 text-accent-orange" />
-                        <h2 className="text-lg font-semibold text-silver-light">Daftar Dokumen Keluar</h2>
+                        <h2 className="text-lg font-semibold text-silver-light">Daftar Dokumen Barang Keluar</h2>
                     </div>
                     <div className="flex gap-2">
                         <Button onClick={handleExportXLS} variant="success" icon={FileSpreadsheet} className="!py-1.5 !px-3 !text-xs">XLS</Button>
@@ -215,142 +295,91 @@ const BarangKeluar = () => {
                 </div>
 
                 <div className="overflow-x-auto">
-                    <table className="w-full">
-                        <thead className="bg-accent-orange/10">
+                    <table className="w-full text-xs">
+                        <thead className="bg-accent-orange/10 sticky top-0 z-10">
                             <tr>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver uppercase tracking-wider">No. Pengajuan</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver uppercase tracking-wider">Jenis Dok</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver uppercase tracking-wider">No. Pabean</th>
-                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver uppercase tracking-wider">Tgl Dok</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver uppercase tracking-wider">Tujuan</th>
-                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver uppercase tracking-wider">Jml Item</th>
-                                <th className="px-4 py-3 text-right text-xs font-semibold text-silver uppercase tracking-wider">Total Nilai</th>
+                                <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-8">No</th>
+                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-32">No. Bukti Pengeluaran</th>
+                                <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-24">Tgl Bukti</th>
+                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider" style={{ minWidth: '384px' }}>Nama Pemilik</th>
+                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-28">No. Pengajuan</th>
+                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-16">Jenis Dok</th>
+                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-24">No. Pabean</th>
+                                <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-22">Tgl Pabean</th>
+                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider" style={{ minWidth: '384px' }}>Penerima</th>
+                                <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-8">No Urut Item</th>
+                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-24">Kode Barang</th>
+                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-24">Kode HS</th>
+                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-36">Nama Barang</th>
+                                <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-14">Satuan</th>
+                                <th className="px-2 py-2 text-right text-xs font-semibold text-silver uppercase tracking-wider w-20">Jml Barang</th>
+                                <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-14">Kurs</th>
+                                <th className="px-2 py-2 text-right text-xs font-semibold text-silver uppercase tracking-wider w-24">Nominal</th>
+                                <th className="px-2 py-2 text-right text-xs font-semibold text-silver uppercase tracking-wider w-24">Nilai Barang</th>
+                                <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-20">Aksi</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
-                            {filteredTransactions.length === 0 ? (
+                            {flatRows.length === 0 ? (
                                 <tr>
-                                    <td colSpan="7" className="px-4 py-12 text-center text-silver-dark">
+                                    <td colSpan="15" className="px-4 py-12 text-center text-silver-dark">
                                         Tidak ada data yang ditemukan
                                     </td>
                                 </tr>
                             ) : (
-                                filteredTransactions.map((t, idx) => (
-                                    <tr key={idx} className="hover:bg-dark-surface/50 transition-colors cursor-pointer" onClick={() => setSelectedTransaction(t)}>
-                                        <td className="px-4 py-3 text-sm text-accent-orange font-medium">{t.pengajuanNumber || '-'}</td>
-                                        <td className="px-4 py-3 text-sm text-silver">{t.customsDocType || 'BC 3.0'}</td>
-                                        <td className="px-4 py-3 text-sm text-silver font-mono">{t.customsDocNumber || '-'}</td>
-                                        <td className="px-4 py-3 text-sm text-silver text-center">
-                                            {t.customsDocDate ? new Date(t.customsDocDate).toLocaleDateString('id-ID') : '-'}
+                                flatRows.map((row, idx) => (
+                                    <tr key={idx} className="hover:bg-dark-surface/50 transition-colors">
+                                        <td className="px-2 py-1.5 text-center font-bold text-white text-xs">{row._submissionSeqNo}</td>
+                                        <td className="px-2 py-1.5 text-accent-orange font-mono font-medium whitespace-nowrap text-xs max-w-[128px] truncate">
+                                            {row.blNumber !== '-' ? row.blNumber : <span className="text-silver-dark italic">-</span>}
                                         </td>
-                                        <td className="px-4 py-3 text-sm text-silver">{t.destination || t.receiver || '-'}</td>
-                                        <td className="px-4 py-3 text-sm text-silver text-center font-bold">{t.items ? t.items.length : 0}</td>
-                                        <td className="px-4 py-3 text-sm text-accent-green text-right font-medium">
-                                            {getCurrencySymbol(t.currency || 'IDR')} {formatCurrency(getTransactionTotal(t))}
+                                        <td className="px-2 py-1.5 text-center text-silver whitespace-nowrap text-xs">
+                                            {row.blDate ? new Date(row.blDate).toLocaleDateString('id-ID') : '-'}
+                                        </td>
+                                        <td className="px-2 py-1.5 text-silver font-medium text-xs">
+                                            <div className="line-clamp-2" title={row.ownerName}>{row.ownerName}</div>
+                                        </td>
+                                        <td className="px-2 py-1.5 text-silver-dark font-mono whitespace-nowrap text-xs">{row.pengajuanNumber || '-'}</td>
+                                        <td className="px-2 py-1.5 text-silver whitespace-nowrap text-xs">{row.customsDocType || 'BC 3.0'}</td>
+                                        <td className="px-2 py-1.5 text-silver font-mono whitespace-nowrap text-xs">{row.customsDocNumber || '-'}</td>
+                                        <td className="px-2 py-1.5 text-center text-silver whitespace-nowrap text-xs">
+                                            {row.customsDocDate ? new Date(row.customsDocDate).toLocaleDateString('id-ID') : '-'}
+                                        </td>
+                                        <td className="px-2 py-1.5 text-silver text-xs">
+                                            <div className="line-clamp-2" title={getFullPartnerName(row.receiver)}>{getFullPartnerName(row.receiver)}</div>
+                                        </td>
+                                        <td className="px-2 py-1.5 text-center text-silver text-xs">{row._itemSeqNo}</td>
+                                        <td className="px-2 py-1.5 text-silver font-mono whitespace-nowrap text-xs">{row.itemCode || '-'}</td>
+                                        <td className="px-2 py-1.5 text-silver font-mono whitespace-nowrap text-xs">{row.hsCode || '-'}</td>
+                                        <td className="px-2 py-1.5 text-silver-light text-xs max-w-[144px] truncate whitespace-nowrap">{row.itemName}</td>
+                                        <td className="px-2 py-1.5 text-center text-silver text-xs whitespace-nowrap">{row.unit || '-'}</td>
+                                        <td className="px-2 py-1.5 text-right text-silver-light font-medium text-xs whitespace-nowrap">
+                                            {row.jumlahBarang ? Number(row.jumlahBarang).toLocaleString('id-ID') : '-'}
+                                        </td>
+                                        <td className="px-2 py-1.5 text-center text-silver text-xs whitespace-nowrap">{row.itemCurrency}</td>
+                                        <td className="px-2 py-1.5 text-right text-silver-light font-medium text-xs whitespace-nowrap">
+                                            {row.nominalBarang ? Number(row.nominalBarang).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '-'}
+                                        </td>
+                                        <td className="px-2 py-1.5 text-right text-accent-orange font-medium text-xs whitespace-nowrap">
+                                            {row.nilaiBarang ? Number(row.nilaiBarang).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '-'}
+                                        </td>
+                                        <td className="px-2 py-1.5 text-center">
+                                            <button
+                                                onClick={() => navigate(`/bridge/pengajuan?detail=${encodeURIComponent(row.pengajuanNumber)}`)}
+                                                className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-accent-orange/10 hover:bg-accent-orange/20 text-accent-orange transition-colors text-xs font-medium whitespace-nowrap"
+                                                title="Lihat Detail Pengajuan"
+                                            >
+                                                <Eye className="w-3 h-3" />
+                                                <span>Detail</span>
+                                            </button>
                                         </td>
                                     </tr>
                                 ))
-                            )}
+							)}
                         </tbody>
                     </table>
                 </div>
             </div>
-
-            {/* Detail Modal - Clean White Style (Same as BarangMasuk) */}
-            {selectedTransaction && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
-                    <div className="bg-white dark:bg-dark-card rounded-xl w-full max-w-6xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-
-                        {/* Modal Header */}
-                        <div className="p-5 border-b border-gray-100 dark:border-dark-border flex justify-between items-start bg-white dark:bg-dark-card">
-                            <div>
-                                <h3 className="text-2xl font-bold text-gray-800 dark:text-white">Detail Barang Keluar</h3>
-                                <p className="text-sm text-gray-500 dark:text-silver-dark mt-1">{selectedTransaction.pengajuanNumber}</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Button onClick={handleModalExportXLS} variant="success" icon={FileSpreadsheet} className="text-xs">XLS</Button>
-                                <Button onClick={handleModalExportCSV} variant="secondary" icon={Download} className="text-xs">CSV</Button>
-                                <button onClick={() => setSelectedTransaction(null)} className="ml-2 p-2 hover:bg-gray-100 dark:hover:bg-dark-surface rounded-full transition-colors">
-                                    <span className="text-gray-400 hover:text-gray-600 text-xl">✕</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Data Info Card */}
-                        <div className="p-5 pb-0">
-                            <h4 className="flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-silver-light mb-3">
-                                <Package className="w-4 h-4" /> Data Dokumen
-                            </h4>
-                            <div className="bg-accent-orange text-white rounded-t-lg px-4 py-3 grid grid-cols-7 gap-4 text-xs font-semibold">
-                                <span className="col-span-2">NO. PENGAJUAN</span>
-                                <span>NO. PABEAN</span>
-                                <span>TGL DOKUMEN</span>
-                                <span>TGL KELUAR</span>
-                                <span className="text-center">JML ITEM</span>
-                                <span>TUJUAN</span>
-                            </div>
-                            <div className="bg-white dark:bg-dark-surface border border-t-0 border-gray-200 dark:border-dark-border rounded-b-lg px-4 py-3 grid grid-cols-7 gap-4 text-xs items-center text-gray-600 dark:text-silver">
-                                <span className="col-span-2 font-medium text-accent-orange">{selectedTransaction.pengajuanNumber}</span>
-                                <span>{selectedTransaction.customsDocNumber || '-'}</span>
-                                <span>{selectedTransaction.customsDocDate ? new Date(selectedTransaction.customsDocDate).toLocaleDateString('id-ID') : '-'}</span>
-                                <span>{selectedTransaction.date ? new Date(selectedTransaction.date).toLocaleDateString('id-ID') : '-'}</span>
-                                <span className="text-center font-bold">{selectedTransaction.items ? selectedTransaction.items.length : 0}</span>
-                                <span className="truncate">{selectedTransaction.destination || selectedTransaction.receiver || '-'}</span>
-                            </div>
-                        </div>
-
-                        {/* Detail Items Table */}
-                        <div className="flex-1 overflow-y-auto p-5">
-                            <h4 className="flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-silver-light mb-3">
-                                📝 Detail Item
-                            </h4>
-                            <div className="border border-gray-200 dark:border-dark-border rounded-lg overflow-hidden">
-                                <table className="w-full">
-                                    <thead className="bg-accent-orange text-white">
-                                        <tr>
-                                            <th className="px-4 py-2 text-center text-xs font-semibold w-12">NO.</th>
-                                            <th className="px-4 py-2 text-left text-xs font-semibold">KODE BRG</th>
-                                            <th className="px-4 py-2 text-left text-xs font-semibold">HS CODE</th>
-                                            <th className="px-4 py-2 text-left text-xs font-semibold">URAIAN BARANG</th>
-                                            <th className="px-4 py-2 text-center text-xs font-semibold">JUMLAH</th>
-                                            <th className="px-4 py-2 text-center text-xs font-semibold">SATUAN</th>
-                                            <th className="px-4 py-2 text-right text-xs font-semibold">NILAI</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100 dark:divide-dark-border bg-white dark:bg-dark-surface">
-                                        {(selectedTransaction.items || []).map((item, idx) => (
-                                            <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-                                                <td className="px-4 py-2.5 text-center text-xs text-gray-600 dark:text-silver">{idx + 1}</td>
-                                                <td className="px-4 py-2.5 text-xs text-gray-800 dark:text-silver-light font-medium">{item.itemCode || '-'}</td>
-                                                <td className="px-4 py-2.5 text-xs text-gray-600 dark:text-silver font-mono">{item.hsCode || '-'}</td>
-                                                <td className="px-4 py-2.5 text-xs text-gray-800 dark:text-silver-light">{item.assetName || item.itemName || item.goodsType || '-'}</td>
-                                                <td className="px-4 py-2.5 text-center text-xs font-bold text-gray-800 dark:text-white">{item.quantity || 0}</td>
-                                                <td className="px-4 py-2.5 text-center text-xs text-gray-600 dark:text-silver">{item.unit || 'pcs'}</td>
-                                                <td className="px-4 py-2.5 text-right text-xs text-gray-800 dark:text-white font-medium">
-                                                    {getCurrencySymbol(selectedTransaction.currency || 'IDR')} {formatCurrency(item.value)}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                    <tfoot className="bg-gray-50 dark:bg-white/5 border-t border-gray-200 dark:border-dark-border">
-                                        <tr>
-                                            <td colSpan="6" className="px-4 py-2 text-right text-xs font-bold text-gray-700 dark:text-silver">GRAND TOTAL:</td>
-                                            <td className="px-4 py-2 text-right text-xs font-bold text-accent-green">
-                                                {getCurrencySymbol(selectedTransaction.currency || 'IDR')} {formatCurrency(getTransactionTotal(selectedTransaction))}
-                                            </td>
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
-                        </div>
-
-                        {/* Footer */}
-                        <div className="p-4 border-t border-gray-100 dark:border-dark-border bg-gray-50 dark:bg-dark-surface/50 flex justify-end">
-                            <Button variant="secondary" onClick={() => setSelectedTransaction(null)}>Tutup</Button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

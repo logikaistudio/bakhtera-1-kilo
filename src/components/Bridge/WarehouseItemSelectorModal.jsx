@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { X, Package, Check, AlertCircle } from 'lucide-react';
 import { useData } from '../../context/DataContext';
+import { DEFAULT_LOCATION } from '../../constants/locationOptions';
 import Button from '../Common/Button';
 
 /**
@@ -23,7 +24,7 @@ const WarehouseItemSelectorModal = ({
     onApply,
     sourcePengajuanNumber = ''
 }) => {
-    const { mutationLogs = [] } = useData();
+    const { mutationLogs = [], isExhibitionLocation, getExhibitionLocation } = useData();
 
     // Local state for items with outbound quantity
     const [itemsData, setItemsData] = useState([]);
@@ -72,8 +73,7 @@ const WarehouseItemSelectorModal = ({
             normalize(m.pengajuanNumber) === normalize(sourcePengajuanNumber) &&
             normalize(m.itemCode) === normalize(itemCode) &&
             (packageNumber ? normalize(m.packageNumber) === normalize(packageNumber) : true) &&
-            (m.destination || '').toLowerCase() !== 'warehouse' &&
-            (m.destination || '').toLowerCase() !== 'gudang'
+            (m.destination || '') && (isExhibitionLocation ? isExhibitionLocation(m.destination) : ((m.destination || '').toLowerCase() !== 'warehouse' && (m.destination || '').toLowerCase() !== 'gudang'))
         );
 
         const returnMutations = mutationLogs.filter(m =>
@@ -173,7 +173,7 @@ const WarehouseItemSelectorModal = ({
                     <AlertCircle className="w-4 h-4 text-blue-400" />
                     <span className="text-xs text-blue-300">
                         Masukkan jumlah barang yang akan dikeluarkan pada kolom "Qty Keluar".
-                        Maksimum = Stok Tersedia (Stok Awal - Stok Pameran)
+                        Maksimum = Stok Tersedia (Stok Awal - Stok {DEFAULT_LOCATION})
                     </span>
                 </div>
 
@@ -185,7 +185,7 @@ const WarehouseItemSelectorModal = ({
                                 <th className="px-3 py-3 text-left text-xs font-bold text-silver-light uppercase">Package</th>
                                 <th className="px-3 py-3 text-left text-xs font-bold text-silver-light uppercase">Jenis Item</th>
                                 <th className="px-3 py-3 text-center text-xs font-bold text-silver-light uppercase bg-gray-700/50">Stok Awal</th>
-                                <th className="px-3 py-3 text-center text-xs font-bold text-orange-400 uppercase bg-orange-500/10">Stok Pameran</th>
+                                <th className="px-3 py-3 text-center text-xs font-bold text-orange-400 uppercase bg-orange-500/10">Stok {getExhibitionLocation ? getExhibitionLocation() : 'Pameran'}</th>
                                 <th className="px-3 py-3 text-center text-xs font-bold text-green-400 uppercase bg-green-500/10">Stok Tersedia</th>
                                 <th className="px-3 py-3 text-center text-xs font-bold text-accent-purple uppercase bg-accent-purple/10" style={{ minWidth: '100px' }}>Qty Keluar</th>
                                 <th className="px-3 py-3 text-center text-xs font-bold text-blue-400 uppercase bg-blue-500/10">Sisa Stok</th>

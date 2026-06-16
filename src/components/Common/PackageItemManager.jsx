@@ -4,7 +4,7 @@ import Button from './Button';
 import { useData } from '../../context/DataContext';
 import { formatCurrency, parseCurrency } from '../../utils/currencyFormatter';
 
-const PackageItemManager = ({ items = [], onChange, readOnly = false }) => {
+const PackageItemManager = ({ items = [], onChange, readOnly = false, defaultCurrency = 'IDR' }) => {
     const { itemMaster = [], hsCodes = [], addItemCode } = useData();
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
@@ -16,14 +16,22 @@ const PackageItemManager = ({ items = [], onChange, readOnly = false }) => {
         quantity: '',
         unit: 'pcs',
         price: '', // Nominal
-        currency: 'IDR',
+        currency: defaultCurrency,
         exchangeRate: '1',
-        totalPrice: '', // Calculated
+        totalPrice: '', // Calculated or manual
+        isManualTotal: false, // NEW: Toggle for manual total
         notes: ''
     });
 
     const unitOptions = ['pcs', 'kg', 'ton', 'm', 'm2', 'm3', 'set', 'box', 'roll', 'btl'];
     const currencyOptions = ['IDR', 'USD', 'EUR', 'SGD', 'CNY', 'JPY'];
+
+    // Sync currency with header default
+    useEffect(() => {
+        if (!editingId) {
+            setFormData(prev => ({ ...prev, currency: defaultCurrency }));
+        }
+    }, [defaultCurrency, editingId]);
 
     // Auto-fill Logic
     useEffect(() => {
@@ -39,6 +47,19 @@ const PackageItemManager = ({ items = [], onChange, readOnly = false }) => {
         }
     }, [formData.itemCode, itemMaster]);
 
+    // Auto-calculate Total Price
+    useEffect(() => {
+        if (!formData.isManualTotal) {
+            const qty = Number(formData.quantity) || 0;
+            const price = parseCurrency(formData.price) || 0;
+            const calculatedTotal = qty * price;
+            setFormData(prev => ({
+                ...prev,
+                totalPrice: calculatedTotal ? formatCurrency(calculatedTotal) : ''
+            }));
+        }
+    }, [formData.quantity, formData.price, formData.isManualTotal]);
+
     const calculateTotal = (qty, price) => {
         return (Number(qty) || 0) * (parseCurrency(price) || 0);
     };
@@ -53,7 +74,7 @@ const PackageItemManager = ({ items = [], onChange, readOnly = false }) => {
         const qty = Number(formData.quantity) || 0;
         const price = parseCurrency(formData.price) || 0;
         const rate = Number(formData.exchangeRate) || 1;
-        const total = qty * price;
+        const total = formData.isManualTotal ? (parseCurrency(formData.totalPrice) || 0) : (qty * price);
         const valueIDR = total * rate;
 
         // Auto-save new item code to database if manual and doesn't exist in master
@@ -85,6 +106,7 @@ const PackageItemManager = ({ items = [], onChange, readOnly = false }) => {
             price: price, // Store as number
             exchangeRate: rate,
             totalPrice: total,
+            isManualTotal: formData.isManualTotal,
             value: valueIDR
         };
 
@@ -99,11 +121,14 @@ const PackageItemManager = ({ items = [], onChange, readOnly = false }) => {
         setFormData(prev => ({
             ...prev,
             itemCode: '',
+            hsCode: '',
             name: '',
             quantity: '',
-            price: '', // Reset to empty string
+            price: '',
             totalPrice: '',
-            // Keep HS Code, Unit, Currency, Rate
+            isManualTotal: false,
+            notes: '',
+            currency: defaultCurrency
         }));
         // Don't close form automatically to allow rapid entry if adding new
         if (editingId) setShowForm(false);
@@ -111,16 +136,18 @@ const PackageItemManager = ({ items = [], onChange, readOnly = false }) => {
 
     const handleEdit = (item) => {
         if (readOnly) return;
+        const rawPrice = item.price || (item.value / item.quantity) || 0;
         setFormData({
             itemCode: item.itemCode || '',
             hsCode: item.hsCode || '',
             name: item.name,
             quantity: item.quantity,
             unit: item.unit || 'pcs',
-            price: formatCurrency(item.price || (item.value / item.quantity) || 0), // Format for input
+            price: rawPrice ? formatCurrency(rawPrice) : '', // Display as formatted string
             currency: item.currency || 'IDR',
             exchangeRate: item.exchangeRate || '1',
-            totalPrice: item.totalPrice || (item.quantity * item.price) || '',
+            totalPrice: item.totalPrice ? formatCurrency(item.totalPrice) : formatCurrency(item.quantity * rawPrice),
+            isManualTotal: item.isManualTotal || false,
             notes: item.notes || ''
         });
         setEditingId(item.id);
@@ -138,7 +165,7 @@ const PackageItemManager = ({ items = [], onChange, readOnly = false }) => {
         setEditingId(null);
         setManualItemCode(false); // Reset manual input mode
         setFormData({
-            itemCode: '', hscode: '', name: '', quantity: '', unit: 'pcs', price: '', currency: 'IDR', exchangeRate: '1', totalPrice: '', notes: ''
+            itemCode: '', hsCode: '', name: '', quantity: '', unit: 'pcs', price: '', currency: 'IDR', exchangeRate: '1', totalPrice: '', isManualTotal: false, notes: ''
         });
         setShowForm(false);
     };
@@ -203,11 +230,6 @@ const PackageItemManager = ({ items = [], onChange, readOnly = false }) => {
                                 </td>
                             </tr>
                         ))}
-
-                        {/* Input Row (Always visible or toggled?) - User asked for "Tambah Item" button. 
-                            Let's make the Input Row appear when requested or always at bottom for quick entry?
-                            Better: Have a dedicated "Add Row" button that reveals the row.
-                        */}
                     </tbody>
                 </table>
 
@@ -244,7 +266,7 @@ const PackageItemManager = ({ items = [], onChange, readOnly = false }) => {
                                         <option value="">Pilih...</option>
                                         {itemMaster.map(i => (
                                             <option key={i.id} value={i.itemCode}>
-                                                {i.itemCode} {i.itemType ? `- ${i.itemType}` : ''}
+                                                {i.itemCode}
                                             </option>
                                         ))}
                                     </select>
@@ -252,14 +274,17 @@ const PackageItemManager = ({ items = [], onChange, readOnly = false }) => {
                             </div>
                             <div className="md:col-span-2">
                                 <label className="text-xs text-silver-dark block mb-1">HS Code</label>
-                                <select
+                                <input
+                                    list="hsCodesList"
+                                    type="text"
                                     className="w-full text-sm p-2 bg-dark-bg border border-dark-border rounded focus:border-accent-blue"
                                     value={formData.hsCode}
                                     onChange={e => setFormData({ ...formData, hsCode: e.target.value })}
-                                >
-                                    <option value="">Optional...</option>
-                                    {hsCodes.map(h => <option key={h.id} value={h.hsCode}>{h.hsCode}</option>)}
-                                </select>
+                                    placeholder="Ketik atau pilih..."
+                                />
+                                <datalist id="hsCodesList">
+                                    {hsCodes.map(h => <option key={h.id} value={h.hsCode} />)}
+                                </datalist>
                             </div>
                             <div className="md:col-span-3">
                                 <label className="text-xs text-silver-dark block mb-1">Nama Item</label>
@@ -307,10 +332,51 @@ const PackageItemManager = ({ items = [], onChange, readOnly = false }) => {
                                 <label className="text-xs text-silver-dark block mb-1">Nominal (@)</label>
                                 <input
                                     type="text"
+                                    inputMode="numeric"
                                     className="w-full text-sm p-2 bg-dark-bg border border-dark-border rounded focus:border-accent-blue"
                                     value={formData.price}
-                                    onChange={e => setFormData({ ...formData, price: formatCurrency(e.target.value) })}
-                                    placeholder="0.00"
+                                    onChange={e => {
+                                        // Allow digits, dots, and commas while typing
+                                        const val = e.target.value.replace(/[^\d.,]/g, '');
+                                        setFormData({ ...formData, price: val });
+                                    }}
+                                    onBlur={e => {
+                                        // Auto-format on blur to standard IDR format
+                                        const num = parseCurrency(e.target.value);
+                                        setFormData({ ...formData, price: isNaN(num) || num === 0 ? '' : formatCurrency(num) });
+                                    }}
+                                    placeholder="0"
+                                />
+                            </div>
+                            <div className="md:col-span-2">
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="text-xs text-silver-dark">Total Nominal</label>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData({ ...formData, isManualTotal: !formData.isManualTotal })}
+                                        className="text-[10px] text-accent-blue hover:text-blue-400 transition-colors"
+                                    >
+                                        {formData.isManualTotal ? '✏️ Manual' : '🤖 Auto'}
+                                    </button>
+                                </div>
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    className={`w-full text-sm p-2 border rounded focus:border-accent-blue ${!formData.isManualTotal ? 'bg-gray-100/50 text-gray-500 border-gray-200 cursor-not-allowed' : 'bg-dark-bg border-dark-border'}`}
+                                    value={formData.totalPrice}
+                                    onChange={e => {
+                                        if (!formData.isManualTotal) return;
+                                        const val = e.target.value.replace(/[^\d.,]/g, '');
+                                        setFormData({ ...formData, totalPrice: val });
+                                    }}
+                                    onBlur={e => {
+                                        if (!formData.isManualTotal) return;
+                                        const num = parseCurrency(e.target.value);
+                                        setFormData({ ...formData, totalPrice: isNaN(num) || num === 0 ? '' : formatCurrency(num) });
+                                    }}
+                                    placeholder="0"
+                                    readOnly={!formData.isManualTotal}
+                                    title={!formData.isManualTotal ? "Dihitung otomatis (Jml x Nominal). Klik 'Auto' untuk ubah ke manual." : "Isi total secara manual"}
                                 />
                             </div>
 
@@ -348,4 +414,3 @@ const PackageItemManager = ({ items = [], onChange, readOnly = false }) => {
 };
 
 export default PackageItemManager;
-

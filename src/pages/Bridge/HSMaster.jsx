@@ -167,7 +167,7 @@ const HSMaster = () => {
                                     className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
                                     placeholder="Contoh: 8517.12.00"
                                     required
-                                />
+                               />
                             </div>
                             <div>
                                 <label className="block text-sm text-silver-light mb-2">Deskripsi</label>

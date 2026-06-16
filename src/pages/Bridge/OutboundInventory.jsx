@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Search, Download, Package, TrendingUp, Calendar, FileText, Eye, X, Edit, Trash2, RefreshCw, Send } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import Button from '../../components/Common/Button';
+import { DEFAULT_LOCATION } from '../../constants/locationOptions';
 import { exportToCSV } from '../../utils/exportCSV';
 import { createProcessOutboundHandler } from './handlers/processOutbound';
 import { calculateDaysDifference, getAgingStatus } from '../../utils/agingCalculator';
@@ -11,7 +12,7 @@ import { useAuth } from '../../context/AuthContext';
 const OutboundInventory = () => {
     const { canEdit, user } = useAuth();
     const hasEdit = canEdit('bridge_outbound');
-    const { quotations = [], addMutationLog, mutationLogs = [], updateQuotation, requestApproval } = useData();
+    const { quotations = [], addMutationLog, mutationLogs = [], updateQuotation, requestApproval, isExhibitionLocation, getExhibitionLocation } = useData();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedItem, setSelectedItem] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
@@ -61,7 +62,7 @@ const OutboundInventory = () => {
         }
     };
 
-    // Helper to calculate pameran stock for an item based on source pengajuan mutations
+    // Helper to calculate exhibition stock for an item based on source pengajuan mutations
     const getPameranStock = (sourcePengajuanNumber, itemCode, packageNumber) => {
         if (!sourcePengajuanNumber || !mutationLogs.length) return 0;
 
@@ -72,8 +73,7 @@ const OutboundInventory = () => {
             normalize(m.pengajuanNumber) === normalize(sourcePengajuanNumber) &&
             normalize(m.itemCode) === normalize(itemCode) &&
             (packageNumber ? normalize(m.packageNumber) === normalize(packageNumber) : true) &&
-            (m.destination || '').toLowerCase() !== 'warehouse' &&
-            (m.destination || '').toLowerCase() !== 'gudang'
+            (m.destination || '') && (isExhibitionLocation ? isExhibitionLocation(m.destination) : ((m.destination || '').toLowerCase() !== 'warehouse' && (m.destination || '').toLowerCase() !== 'gudang'))
         );
 
         // Find all return mutations (back to warehouse) for this item
@@ -850,7 +850,7 @@ const OutboundInventory = () => {
                                                             <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase w-20">HS CODE</th>
                                                             <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase">ITEM</th>
                                                             <th className="px-3 py-3 text-center text-xs font-bold text-white uppercase w-20">STOK AWAL</th>
-                                                            <th className="px-3 py-3 text-center text-xs font-bold text-white uppercase w-20 bg-orange-500">STOK PAMERAN</th>
+                                                            <th className="px-3 py-3 text-center text-xs font-bold text-white uppercase w-20 bg-orange-500">STOK {DEFAULT_LOCATION.toUpperCase()}</th>
                                                             <th className="px-3 py-3 text-center text-xs font-bold text-white uppercase w-20">SATUAN</th>
                                                             <th className="px-3 py-3 text-center text-xs font-bold text-white uppercase w-24 bg-red-600">JML KELUAR</th>
                                                             <th className="px-3 py-3 text-center text-xs font-bold text-white uppercase w-24 bg-green-600">SISA STOK</th>
@@ -916,7 +916,7 @@ const OutboundInventory = () => {
                                                                         {totalStock}
                                                                     </td>
 
-                                                                    {/* STOK PAMERAN (Exhibition Stock - Read Only) */}
+                                                                    {/* STOK (Exhibition) - STOK {DEFAULT_LOCATION} (Read Only) */}
                                                                     <td className="px-3 py-2 text-center bg-orange-50">
                                                                         <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-bold ${pameranStock > 0 ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-500'}`}>
                                                                             {pameranStock}

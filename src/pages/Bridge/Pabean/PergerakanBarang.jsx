@@ -1,47 +1,61 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Activity, Search, Package, ArrowDownCircle, Download, FileSpreadsheet } from 'lucide-react';
+import { Activity, Search, Package, ArrowDownCircle, Download, FileSpreadsheet, Edit2, Save, XCircle } from 'lucide-react';
 import { useData } from '../../../context/DataContext';
 import Button from '../../../components/Common/Button';
+import { DEFAULT_LOCATION } from '../../../constants/locationOptions';
 import { exportToCSV } from '../../../utils/exportCSV';
 import { exportToXLS } from '../../../utils/exportXLS';
 
 const PergerakanBarang = () => {
     const [searchParams] = useSearchParams();
-    const { inboundTransactions = [], quotations = [], mutationLogs = [], companySettings } = useData();
+    const { inboundTransactions = [], outboundTransactions = [], quotations = [], mutationLogs = [], companySettings, updateInboundItem } = useData();
+
+    // Approved INBOUND quotations (source of truth for Barang Masuk)
+    const inboundQuotations = useMemo(() => {
+        return quotations.filter(q =>
+            q.type === 'inbound' &&
+            (q.documentStatus === 'approved' || q.document_status === 'approved')
+        );
+    }, [quotations]);
+
+    // Approved OUTBOUND quotations (source of truth for Barang Keluar)
+    const outboundQuotationsAll = useMemo(() => {
+        return quotations.filter(q =>
+            q.type === 'outbound' &&
+            (q.documentStatus === 'approved' || q.document_status === 'approved')
+        );
+    }, [quotations]);
     const [searchTerm, setSearchTerm] = useState('');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [selectedItem, setSelectedItem] = useState(null);
+    
+    // Edit state
+    const [editingRow, setEditingRow] = useState(null); // 'inboundId-itemIdx'
+    const [editForm, setEditForm] = useState({ adjustment: 0, notes: '' });
 
-    // FLATTEN OUTBOUND TRANSACTIONS FROM QUOTATIONS (Source of Truth)
-    const outboundTransactions = useMemo(() => {
-        return quotations
-            .filter(q => q.type === 'outbound' && ['submitted', 'approved', 'processed'].includes(q.outbound_status || q.documentStatus || q.document_status))
-            .flatMap(q => {
-                return (q.packages || []).flatMap(pkg => {
-                    return (pkg.items || []).map(item => {
-                        const qty = item.outboundQuantity !== undefined ? Number(item.outboundQuantity) : (Number(item.quantity) || 0);
-                        if (qty <= 0) return null;
-
-                        return {
-                            id: `item-${q.id}-${item.itemCode}`,
-                            pengajuanNumber: q.quotationNumber || q.quotation_number,
-                            sourcePengajuanNumber: q.sourcePengajuanNumber || q.source_pengajuan_number,
-                            itemCode: item.itemCode || item.item_code,
-                            quantity: qty,
-                            // Ensure date and doc type are mapped for reconciliation table
-                            date: q.outbound_date || q.approvedDate || q.approved_date || q.date,
-                            // Format BC Doc Type: "BC 2.7 out" (simple format without description)
-                            bcDocType: `${(q.bcDocType || q.bc_document_type || 'BC 2.7').split('(')[0].trim()} out`,
-                            customsDocNumber: q.bcDocumentNumber || q.bc_document_number,
-                            // Add other necessary fields if used by logic
-                        };
-                    });
+    // FLATTEN items from ALL approved OUTBOUND quotations
+    const outboundQuotations = useMemo(() => {
+        return outboundQuotationsAll.flatMap(q => {
+            return (q.packages || []).flatMap(pkg => {
+                return (pkg.items || []).map(item => {
+                    const qty = item.outboundQuantity !== undefined ? Number(item.outboundQuantity) : (Number(item.quantity) || 0);
+                    if (qty <= 0) return null;
+                    return {
+                        id: `item-${q.id}-${item.itemCode}`,
+                        pengajuanNumber: q.quotationNumber || q.quotation_number,
+                        sourcePengajuanNumber: q.sourcePengajuanNumber || q.source_pengajuan_number,
+                        itemCode: item.itemCode || item.item_code,
+                        quantity: qty,
+                        date: q.outbound_date || q.approvedDate || q.approved_date || q.date,
+                        bcDocType: `${(q.bcDocType || q.bc_document_type || 'BC 2.7').split('(')[0].trim()} out`,
+                        customsDocNumber: q.bcDocumentNumber || q.bc_document_number,
+                    };
                 });
-            })
-            .filter(Boolean); // Remove nulls
-    }, [quotations]);
+            });
+        }).filter(Boolean);
+    }, [outboundQuotationsAll]);
 
     // Auto-filter based on URL parameter
     useEffect(() => {
@@ -65,97 +79,116 @@ const PergerakanBarang = () => {
         }
     };
 
-    // Prepare All Outbound Items (freight_outbound + mutationLogs)
-    // Matches logic in BarangKeluar.jsx
+    // Prepare All Outbound Items (freight_outbound + quotations + mutationLogs)
+    // Matches logic in BarangKeluar.jsx to prevent double counting
     const allOutboundItems = useMemo(() => {
-        // 1. From freight_outbound (Primary Source)
-        const primaryOutbound = outboundTransactions.map(t => ({
-            ...t,
-            itemCode: t.itemCode || t.item_code,
-            serialNumber: t.serialNumber || t.serial_number,
-            mutatedQty: Number(t.quantity) || 0,
-            date: t.date,
-            destination: t.destination,
-            bcDocType: t.bcDocType || t.customsDocType || t.customs_doc_type, // Prefer pre-formatted bcDocType
-            source: 'freight_outbound'
-        }));
+        const outMap = new Map();
 
-        // 2. From mutationLogs (Secondary - exclude Pameran/Warehouse)
-        const secondaryOutbound = mutationLogs.filter(log => {
-            const dest = (log.destination || '').toLowerCase();
-            return dest && dest !== 'warehouse' && dest !== 'gudang' && dest !== 'pameran';
-        }).map(log => ({
-            ...log,
-            source: 'mutation_log'
-        }));
-
-        return [...primaryOutbound, ...secondaryOutbound];
-    }, [outboundTransactions, mutationLogs]);
-
-    // Flatten Inbound items if they are grouped
-    const allInboundItems = useMemo(() => {
-        return inboundTransactions.flatMap(t => {
-            if (t.items && t.items.length > 0) {
-                return t.items.map((item, itemIdx) => ({
-                    ...t,
-                    ...item, // Flatten item details
-                    // Ensure essential IDs are preserved and fields are prioritized
-                    inboundId: t.id,
-                    // Strick Mapping: PREFER item level data. Do NOT fallback to 't' (header) easily for multi-item arrays.
-                    assetName: item.itemName || item.name || item.assetName || item.description,
-                    itemCode: item.itemCode || item.item_code || item.code, // Avoid t.itemCode fallback inside items loop
-                    originalQty: Number(item.quantity) || Number(item.qty) || 0,
-                    // Use actual sequence number from data
-                    noUrut: item.sequenceNumber || item.noUrut || (itemIdx + 1)
-                }));
-            }
-            return [{
-                ...t,
-                inboundId: t.id,
-                originalQty: Number(t.quantity) || 0,
-                noUrut: 1
+        // 1. From freight_outbound (Actual Outbound - Primary Source)
+        outboundTransactions.forEach((t, tIdx) => {
+            const items = Array.isArray(t.items) && t.items.length > 0 ? t.items : [{
+                itemCode: t.itemCode || t.item_code,
+                quantity: t.quantity || 0,
             }];
+            if (Array.isArray(items)) {
+                items.forEach((item, itemIdx) => {
+                    const key = `${t.pengajuanNumber || t.pengajuan_number}-${item.itemCode || item.item_code || t.itemCode}-${tIdx}-${itemIdx}`;
+                    outMap.set(key, {
+                        ...t,
+                        itemCode: item.itemCode || item.item_code || t.itemCode || t.item_code,
+                        serialNumber: t.serialNumber || t.serial_number,
+                        mutatedQty: Number(item.quantity) || Number(t.quantity) || 0,
+                        date: t.date || t.created_at,
+                        destination: t.destination || t.receiver,
+                        bcDocType: t.bcDocType || t.customsDocType || t.customs_doc_type,
+                        source: 'freight_outbound'
+                    });
+                });
+            }
         });
-    }, [inboundTransactions]);
+
+        // 2. From Quotations (Planned Outbound)
+        outboundQuotations.forEach((t, idx) => {
+            const pengajuanKey = t.pengajuanNumber || t.pengajuan_number;
+            // Prevent double counting if actual outbound already exists for this pengajuan
+            const hasActual = outboundTransactions.some(actual => (actual.pengajuanNumber || actual.pengajuan_number) === pengajuanKey);
+            
+            if (!hasActual) {
+                const key = `${pengajuanKey}-${t.itemCode || t.item_code}-plan-${idx}`;
+                outMap.set(key, {
+                    ...t,
+                    itemCode: t.itemCode || t.item_code,
+                    serialNumber: t.serialNumber || t.serial_number,
+                    mutatedQty: Number(t.quantity) || 0,
+                    date: t.date,
+                    destination: t.destination,
+                    bcDocType: t.bcDocType || t.customsDocType || t.customs_doc_type,
+                    source: 'freight_quotation'
+                });
+            }
+        });
+
+        return Array.from(outMap.values());
+    }, [outboundTransactions, outboundQuotations]);
+
+    // Flatten Inbound items from QUOTATIONS (Pengajuan Masuk yang approved)
+    // This is the source of truth: Barang Masuk = item dari Pengajuan Masuk approved
+    const allInboundItems = useMemo(() => {
+        return inboundQuotations.flatMap((q, qIdx) => {
+            const pengajuanNumber = q.quotationNumber || q.quotation_number;
+            return (q.packages || []).flatMap((pkg) =>
+                (pkg.items || []).map((item, itemIdx) => ({
+                    inboundId: q.id,
+                    submissionSeqNo: qIdx + 1,
+                    itemIdx: itemIdx,
+                    pengajuanNumber: pengajuanNumber,
+                    customsDocNumber: q.bcDocumentNumber || q.bc_document_number,
+                    customsDocType: q.bcDocType || q.bc_document_type,
+                    date: q.date || q.approvedDate || q.approved_date,
+                    assetName: item.itemName || item.name || item.assetName || item.description,
+                    itemCode: item.itemCode || item.item_code || item.code,
+                    originalQty: Number(item.quantity) || 0,
+                    unit: item.uom || item.unit || 'pcs',
+                    noUrut: itemIdx + 1,
+                    notes: item.notes || q.notes,
+                    customer: q.customer,
+                }))
+            );
+        });
+    }, [inboundQuotations]);
 
     // Calculation Logic: Map Inbound -> Calculate Outbound -> Result
-    // Simple: Mutasi = Barang Masuk - Barang Keluar for the SAME pengajuan
+    // RECONCILIATION: Mutasi = Barang Masuk (Pengajuan Inbound) - Barang Keluar (Pengajuan Outbound)
+    // Match outbound to inbound by: 1) sourcePengajuanNumber (explicit link) OR 2) matching itemCode
     const reconciliationData = useMemo(() => {
-        return allInboundItems.map(inbound => {
-            // Find Matching Outbound Items
-            // IMPORTANT: Primary match is by pengajuanNumber (source reference)
-            // Secondary match is by itemCode within the same pengajuan
+        // Pre-build a map: itemCode -> list of outbound items (qty summed per outbound quotation)
+        // This allows us to match any inbound item to outbound items by itemCode
+        const outboundByItemCode = new Map();
+        allOutboundItems.forEach(outItem => {
+            const code = (outItem.itemCode || '').trim().toLowerCase();
+            if (!code) return;
+            if (!outboundByItemCode.has(code)) outboundByItemCode.set(code, []);
+            outboundByItemCode.get(code).push(outItem);
+        });
 
+        return allInboundItems.map(inbound => {
             const inboundPengajuan = inbound.pengajuanNumber || inbound.pengajuan_number;
             const inboundItemCode = (inbound.itemCode || '').trim().toLowerCase();
 
-            const relatedOutbound = allOutboundItems.filter(outItem => {
-                // Get source pengajuan from outbound (this links back to which inbound it came from)
+            // Find all outbound records that match this inbound item
+            const candidateOutbound = outboundByItemCode.get(inboundItemCode) || [];
+
+            const relatedOutbound = candidateOutbound.filter(outItem => {
                 const outSourcePengajuan = outItem.sourcePengajuanNumber ||
                     outItem.source_pengajuan_number ||
                     (outItem.documents && (outItem.documents.source_pengajuan_number || outItem.documents.sourcePengajuanNumber));
 
-                const outItemCode = (outItem.itemCode || '').trim().toLowerCase();
-
-                // STRICT MATCHING: Source pengajuan MUST match inbound pengajuan
-                // This ensures we only count outbound items that came FROM this specific inbound
+                // If outbound explicitly references this inbound pengajuan → match
                 if (outSourcePengajuan) {
-                    // If outbound has source reference, it MUST match this inbound's pengajuan number
-                    if (outSourcePengajuan !== inboundPengajuan) {
-                        return false;
-                    }
-                } else if (outItem.source === 'mutation_log') {
-                    // For mutation logs without source ref, match by pengajuanNumber field
-                    const outPengajuan = outItem.pengajuanNumber || outItem.pengajuan_number;
-                    if (outPengajuan && outPengajuan !== inboundPengajuan) {
-                        return false;
-                    }
+                    return outSourcePengajuan === inboundPengajuan;
                 }
-
-                // Item code match (within the same pengajuan)
-                const matchCode = inboundItemCode && outItemCode && (outItemCode === inboundItemCode);
-
-                return matchCode;
+                // Otherwise: match by itemCode (already guaranteed by the map key)
+                return true;
             });
 
             // Calculate total outbound quantity
@@ -174,14 +207,17 @@ const PergerakanBarang = () => {
                 outboundDocTypes = [...new Set(relatedOutbound.map(item => item.bcDocType).filter(Boolean))];
             }
 
-            const balance = inbound.originalQty - totalOut;
+            const adjustment = Number(inbound.adjustment) || 0;
+            const balance = inbound.originalQty - totalOut + adjustment;
 
             return {
                 ...inbound,
                 qtyMasuk: inbound.originalQty,
                 qtyKeluar: totalOut,
+                qtyAdjustment: adjustment,
                 latestOutboundDate: latestOutboundDate,
                 qtySisa: balance,
+                keterangan: inbound.notes || inbound.remarks || '-',
                 // Ensure noUrut is preserved
                 noUrut: inbound.noUrut,
                 // New Fields for BC Types
@@ -190,6 +226,33 @@ const PergerakanBarang = () => {
             };
         });
     }, [allInboundItems, allOutboundItems]);
+
+    // Edit Handlers
+    const handleEdit = (item) => {
+        setEditingRow(`${item.inboundId}-${item.itemIdx}`);
+        setEditForm({
+            adjustment: item.qtyAdjustment || 0,
+            notes: item.keterangan === '-' ? '' : item.keterangan
+        });
+    };
+
+    const handleCancel = () => {
+        setEditingRow(null);
+        setEditForm({ adjustment: 0, notes: '' });
+    };
+
+    const handleSave = async (item) => {
+        const res = await updateInboundItem(item.inboundId, item.itemIdx, {
+            adjustment: Number(editForm.adjustment) || 0,
+            notes: editForm.notes
+        });
+
+        if (res.success) {
+            setEditingRow(null);
+        } else {
+            alert('Gagal menyimpan perubahan');
+        }
+    };
 
     // Filtering
     const filteredData = reconciliationData.filter(item => {
@@ -212,10 +275,11 @@ const PergerakanBarang = () => {
     // Export Handlers
     const handleExportCSV = () => {
         const columns = [
+            { key: 'submissionSeqNo', header: 'No' },
             { key: 'pengajuanNumber', header: 'No. Pengajuan' },
             { key: 'inboundDocType', header: 'Jenis BC Masuk' },
             { key: 'customsDocNumber', header: 'No. Pabean' },
-            { key: 'noUrut', header: 'No. Urut' },
+            { key: 'noUrut', header: 'No. Urut Item' },
             { key: 'date', header: 'Tgl. Masuk' },
             { key: 'outboundDocType', header: 'Jenis BC Keluar' },
             { key: 'latestOutboundDate', header: 'Tgl. Keluar' },
@@ -223,8 +287,10 @@ const PergerakanBarang = () => {
             { key: 'assetName', header: 'Nama Barang' },
             { key: 'qtyMasuk', header: 'Jml Masuk' },
             { key: 'qtyKeluar', header: 'Jml Keluar' },
+            { key: 'qtyAdjustment', header: 'Penyesuaian' },
             { key: 'qtySisa', header: 'Saldo Akhir' },
-            { key: 'unit', header: 'Satuan' }
+            { key: 'unit', header: 'Satuan' },
+            { key: 'keterangan', header: 'Keterangan' }
         ];
 
         // Ensure dates are formatted for export
@@ -247,11 +313,11 @@ const PergerakanBarang = () => {
             { value: 'Pabean - Mutasi Barang', style: 'title' }
         ];
         const xlsColumns = [
-            { header: 'No', key: 'no', width: 5, align: 'center' },
+            { header: 'No', key: 'submissionSeqNo', width: 5, align: 'center' },
             { header: 'No. Pengajuan', key: 'pengajuanNumber', width: 20 },
             { header: 'Kode BC Masuk', key: 'inboundDocType', width: 15, align: 'center' },
             { header: 'No. Pabean', key: 'customsDocNumber', width: 20 },
-            { header: 'No. Urut', key: 'noUrut', width: 8, align: 'center' },
+            { header: 'No. Urut Item', key: 'noUrut', width: 12, align: 'center' },
             { header: 'Tgl. Masuk', key: 'date', width: 12, align: 'center' },
             { header: 'Kode BC Keluar', key: 'outboundDocType', width: 15, align: 'center' },
             { header: 'Tgl. Keluar', key: 'latestOutboundDate', width: 12, align: 'center' },
@@ -260,12 +326,14 @@ const PergerakanBarang = () => {
             { header: 'Satuan', key: 'unit', width: 8, align: 'center' },
             { header: 'Jml Masuk', key: 'qtyMasuk', width: 12, align: 'center', summary: true },
             { header: 'Jml Keluar', key: 'qtyKeluar', width: 12, align: 'center', summary: true },
+            { header: 'Penyesuaian', key: 'qtyAdjustment', width: 12, align: 'center', summary: true },
             { header: 'Saldo Akhir', key: 'qtySisa', width: 12, align: 'center', summary: true },
+            { header: 'Keterangan', key: 'keterangan', width: 25 },
         ];
 
-        const exportData = filteredData.map((item, idx) => ({
+        const exportData = filteredData.map(item => ({
             ...item,
-            no: idx + 1,
+            submissionSeqNo: item.submissionSeqNo,
             noUrut: item.noUrut, // Explicitly include
             date: formatDate(item.date),
             latestOutboundDate: formatDate(item.latestOutboundDate)
@@ -282,7 +350,6 @@ const PergerakanBarang = () => {
                 <p className="text-silver-dark mt-1">Laporan Penghitungan Posisi Barang (Masuk - Keluar)</p>
             </div>
 
-            {/* Search & Stats */}
             {/* Search & Stats */}
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div className="md:col-span-2 glass-card p-4 rounded-lg flex flex-col gap-3">
@@ -326,7 +393,7 @@ const PergerakanBarang = () => {
                     </p>
                 </div>
 
-                {/* Total Keluar - NEW */}
+                {/* Total Keluar */}
                 <div className="glass-card p-4 rounded-lg border border-red-500">
                     <p className="text-xs text-silver-dark">Barang Keluar</p>
                     <p className="text-2xl font-bold text-red-500">
@@ -379,22 +446,23 @@ const PergerakanBarang = () => {
                                 <th className="px-3 py-1.5 text-left text-[11px] font-bold text-silver whitespace-nowrap">No. Pengajuan</th>
                                 <th className="px-3 py-1.5 text-center text-[11px] font-bold text-accent-cyan whitespace-nowrap">Kode BC Masuk</th>
                                 <th className="px-3 py-1.5 text-left text-[11px] font-bold text-silver whitespace-nowrap">No. Pabean</th>
-                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-silver whitespace-nowrap">No. Urut</th>
-                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-silver whitespace-nowrap">Tgl. Masuk</th>
-                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-accent-purple whitespace-nowrap">Kode BC Keluar</th>
                                 <th className="px-3 py-1.5 text-center text-[11px] font-bold text-silver whitespace-nowrap">Tgl. Keluar</th>
+                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-silver whitespace-nowrap">No. Urut Item</th>
                                 <th className="px-3 py-1.5 text-center text-[11px] font-bold text-silver whitespace-nowrap">Kode Barang</th>
                                 <th className="px-3 py-1.5 text-left text-[11px] font-bold text-silver whitespace-nowrap">Nama Barang</th>
                                 <th className="px-3 py-1.5 text-center text-[11px] font-bold text-silver whitespace-nowrap">Satuan</th>
                                 <th className="px-3 py-1.5 text-center text-[11px] font-bold text-silver whitespace-nowrap">Jml Masuk</th>
                                 <th className="px-3 py-1.5 text-center text-[11px] font-bold text-orange-400 whitespace-nowrap">Jml Keluar</th>
+                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-yellow-400 whitespace-nowrap">Penyesuaian</th>
                                 <th className="px-3 py-1.5 text-center text-[11px] font-bold text-green-400 whitespace-nowrap">Saldo Akhir</th>
+                                <th className="px-3 py-1.5 text-left text-[11px] font-bold text-silver whitespace-nowrap">Keterangan</th>
+                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-silver whitespace-nowrap">Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
                             {filteredData.length === 0 ? (
                                 <tr>
-                                    <td colSpan="14" className="px-4 py-12 text-center">
+                                    <td colSpan="15" className="px-4 py-12 text-center">
                                         <Package className="w-16 h-16 mx-auto mb-4 opacity-30 text-silver-dark" />
                                         <p className="text-lg text-silver-dark">Belum ada data</p>
                                     </td>
@@ -402,25 +470,76 @@ const PergerakanBarang = () => {
                             ) : (
                                 filteredData.map((item, idx) => (
                                     <tr key={idx} className="border-t border-dark-border hover:bg-dark-surface/50">
-                                        <td className="px-3 py-1 text-[11px] text-center text-silver-light whitespace-nowrap">{idx + 1}</td>
+                                        <td className="px-3 py-1 text-[11px] text-center text-silver-light whitespace-nowrap">{item.submissionSeqNo}</td>
                                         <td className="px-3 py-1 text-[11px] text-silver-light font-medium whitespace-nowrap">{item.pengajuanNumber || '-'}</td>
                                         <td className="px-3 py-1 text-[11px] text-center text-accent-cyan font-medium whitespace-nowrap">{item.inboundDocType || '-'}</td>
                                         <td className="px-3 py-1 text-[11px] text-silver-light whitespace-nowrap">{item.customsDocNumber || '-'}</td>
-                                        <td className="px-3 py-1 text-[11px] text-center text-silver-light whitespace-nowrap">{item.noUrut || '-'}</td>
-                                        <td className="px-3 py-1 text-[11px] text-center text-silver-light whitespace-nowrap">
-                                            {formatDate(item.date)}
-                                        </td>
-                                        <td className="px-3 py-1 text-[11px] text-center text-accent-purple font-medium whitespace-nowrap">{item.outboundDocType || '-'}</td>
                                         <td className="px-3 py-1 text-[11px] text-center text-silver-light whitespace-nowrap">
                                             {formatDate(item.latestOutboundDate)}
                                         </td>
+                                        <td className="px-3 py-1 text-[11px] text-center text-silver-light whitespace-nowrap">{item.noUrut || '-'}</td>
                                         <td className="px-3 py-1 text-[11px] text-silver-light font-mono whitespace-nowrap">{item.itemCode || '-'}</td>
                                         <td className="px-3 py-1 text-[11px] text-silver-light whitespace-nowrap truncate max-w-[200px]">{item.assetName}</td>
                                         <td className="px-3 py-1 text-[11px] text-center text-silver-light whitespace-nowrap">{item.unit || 'pcs'}</td>
                                         <td className="px-3 py-1 text-[11px] text-center text-silver-light font-semibold whitespace-nowrap">{item.qtyMasuk}</td>
                                         <td className="px-3 py-1 text-[11px] text-center text-orange-400 font-semibold whitespace-nowrap">{item.qtyKeluar}</td>
+                                        <td className="px-3 py-1 text-[11px] text-center text-yellow-400 font-semibold whitespace-nowrap">
+                                            {editingRow === `${item.inboundId}-${item.itemIdx}` ? (
+                                                <input
+                                                    type="number"
+                                                    value={editForm.adjustment}
+                                                    onChange={(e) => setEditForm({ ...editForm, adjustment: e.target.value })}
+                                                    className="w-16 px-1 py-0.5 bg-dark-bg border border-accent-blue rounded text-center text-xs"
+                                                />
+                                            ) : (
+                                                item.qtyAdjustment || 0
+                                            )}
+                                        </td>
                                         <td className={`px-3 py-1 text-[11px] text-center font-bold whitespace-nowrap ${item.qtySisa > 0 ? 'text-green-400' : 'text-silver-dark'}`}>
                                             {item.qtySisa}
+                                        </td>
+                                        <td className="px-3 py-1 text-[11px] text-left text-silver-dark whitespace-nowrap">
+                                            {editingRow === `${item.inboundId}-${item.itemIdx}` ? (
+                                                <input
+                                                    type="text"
+                                                    value={editForm.notes}
+                                                    onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                                                    className="w-full px-2 py-0.5 bg-dark-bg border border-accent-blue rounded text-xs"
+                                                    placeholder="Catatan..."
+                                                 />
+                                            ) : (
+                                                <div className="truncate max-w-[150px]" title={item.keterangan}>
+                                                    {item.keterangan}
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td className="px-3 py-1 text-center">
+                                            {editingRow === `${item.inboundId}-${item.itemIdx}` ? (
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <button
+                                                        onClick={() => handleSave(item)}
+                                                        className="p-1 text-accent-green hover:bg-accent-green/10 rounded-md transition-colors"
+                                                        title="Simpan"
+                                                    >
+                                                        <Save className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    <button
+                                                        onClick={handleCancel}
+                                                        className="p-1 text-red-400 hover:bg-red-400/10 rounded-md transition-colors"
+                                                        title="Batal"
+                                                    >
+                                                        <XCircle className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    onClick={() => handleEdit(item)}
+                                                    className="p-1 text-accent-blue hover:bg-accent-blue/10 rounded-md transition-colors"
+                                                    title="Edit Mutasi"
+                                                >
+                                                    <Edit2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
                                         </td>
                                     </tr>
                                 ))

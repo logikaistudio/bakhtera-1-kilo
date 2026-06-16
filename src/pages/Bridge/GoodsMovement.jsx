@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Package, Download, Trash2, ArrowUpRight, ArrowLeftRight } from 'lucide-react';
+import { Search, Package, Download, Trash2, ArrowUpRight, ArrowLeftRight, FileText } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import Button from '../../components/Common/Button';
@@ -13,9 +13,10 @@ const GoodsMovement = () => {
     const hasCreate = canCreate('bridge_movement');
     const hasEdit = canEdit('bridge_movement');
     const hasDelete = canDelete('bridge_movement');
-    const { mutationLogs = [], addMutationLog, updateMutationLog, updateInventoryStock, deleteMutationLog, companySettings, bridgeSettings } = useData();
+    const { mutationLogs = [], quotations = [], addMutationLog, updateMutationLog, updateInventoryStock, deleteMutationLog, companySettings, bridgeSettings, locations, getExhibitionLocation, isExhibitionLocation } = useData();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedLog, setSelectedLog] = useState(null);
+    const debugMode = (typeof window !== 'undefined') && new URLSearchParams(window.location.search).get('debug') === '1';
 
     // Filter mutation logs based on search
     const filteredLogs = mutationLogs.filter(log =>
@@ -25,16 +26,17 @@ const GoodsMovement = () => {
         log.pic?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    // Split logs into Pameran and Outbound
+    // Split logs into Exhibition (DEFAULT_LOCATION) and Outbound
+    const exhibitionLocation = getExhibitionLocation();
     const pameranLogs = filteredLogs.filter(log =>
-        (log.origin && log.origin.toLowerCase().includes('pameran')) ||
-        (log.destination && log.destination.toLowerCase().includes('pameran'))
+        (log.origin && (isExhibitionLocation ? isExhibitionLocation(log.origin) : (String(log.origin).toLowerCase().includes(String(exhibitionLocation).toLowerCase())))) ||
+        (log.destination && (isExhibitionLocation ? isExhibitionLocation(log.destination) : (String(log.destination).toLowerCase().includes(String(exhibitionLocation).toLowerCase()))))
     );
 
-    // Outbound logs are those that are NOT Pameran
+    // Outbound logs are those that are NOT exhibition location
     const outboundLogs = filteredLogs.filter(log =>
-        !((log.origin && log.origin.toLowerCase().includes('pameran')) ||
-            (log.destination && log.destination.toLowerCase().includes('pameran')))
+        !((log.origin && (isExhibitionLocation ? isExhibitionLocation(log.origin) : String(log.origin).toLowerCase().includes(String(exhibitionLocation).toLowerCase()))) ||
+            (log.destination && (isExhibitionLocation ? isExhibitionLocation(log.destination) : String(log.destination).toLowerCase().includes(String(exhibitionLocation).toLowerCase()))))
     );
 
     // Format location display
@@ -43,131 +45,7 @@ const GoodsMovement = () => {
         return `${capitalize(origin)} → ${capitalize(destination)}`;
     };
 
-    // Calculate remutation for a specific mutation log
-    const getRemutationInfo = (log) => {
-        const isOutbound = log.destination &&
-            log.destination.toLowerCase() !== 'warehouse' &&
-            log.destination.toLowerCase() !== 'gudang';
 
-        if (!isOutbound) {
-            return { totalRemutated: log.mutatedQty, sisaDiLokasi: 0, maxRemutation: 0, lastRemutationLog: log };
-        }
-
-        const relatedRemutations = mutationLogs.filter(m =>
-            m.pengajuanNumber === log.pengajuanNumber &&
-            m.itemCode === log.itemCode &&
-            (m.serialNumber || '') === (log.serialNumber || '') &&
-            m.id !== log.id &&
-            (m.destination?.toLowerCase() === 'warehouse' || m.destination?.toLowerCase() === 'gudang')
-        );
-        const totalRemutated = relatedRemutations.reduce((sum, r) => sum + (r.mutatedQty || 0), 0);
-
-        const lastRemutationLog = relatedRemutations.length > 0
-            ? relatedRemutations.sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date))[0]
-            : null;
-
-        const cappedRemutated = Math.min(totalRemutated, log.mutatedQty);
-        const sisaDiLokasi = Math.max(0, log.mutatedQty - cappedRemutated);
-        return { totalRemutated: cappedRemutated, sisaDiLokasi, maxRemutation: sisaDiLokasi, lastRemutationLog };
-    };
-
-    // Handle Remutation (Return to Warehouse)
-    const handleRemutation = async (log, targetQty, pic, remarks) => {
-        const { totalRemutated, maxRemutation: currentMaxRemutation, lastRemutationLog } = getRemutationInfo(log);
-        const delta = targetQty - totalRemutated;
-
-        const isOutbound = log.destination &&
-            log.destination.toLowerCase() !== 'warehouse' &&
-            log.destination.toLowerCase() !== 'gudang';
-
-        const remutationDate = document.getElementById('remutationDate')?.value || new Date().toISOString().split('T')[0];
-        const remutationTime = document.getElementById('remutationTime')?.value || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-
-        if (delta === 0) {
-            if (!lastRemutationLog) {
-                alert('Tidak ada data remutasi yang bisa diedit (belum ada remutasi sebelumnya).');
-                return false;
-            }
-            try {
-                const updates = {
-                    pic: pic,
-                    date: remutationDate,
-                    time: remutationTime,
-                    remarks: remarks
-                };
-                await updateMutationLog(lastRemutationLog.id, updates);
-                alert('Data remutasi berhasil diperbarui (Info PIC/Tanggal/Keterangan)');
-                setSelectedLog(null);
-                return true;
-            } catch (error) {
-                console.error('Error updating remutation metadata:', error);
-                alert('Gagal mengupdate data: ' + error.message);
-                return false;
-            }
-        }
-
-        if (targetQty < 0 || targetQty > log.mutatedQty) {
-            alert(`Total remutasi harus antara 0 dan ${log.mutatedQty}`);
-            return false;
-        }
-
-        if (!pic.trim()) {
-            alert('PIC Remutasi harus diisi');
-            return false;
-        }
-
-        if (delta < 0) {
-            const confirm = window.confirm(`Anda akan mengurangi jumlah remutasi sebanyak ${Math.abs(delta)} unit. Lanjutkan?`);
-            if (!confirm) return false;
-        }
-
-        try {
-            const mutationLocation = document.getElementById('mutationLocationSelect')?.value || (isOutbound ? 'outbound' : 'warehouse');
-            const storageLocation = document.getElementById('storageLocationInput')?.value || '';
-
-            const newMutation = {
-                pengajuanId: log.pengajuanId,
-                pengajuanNumber: log.pengajuanNumber,
-                bcDocumentNumber: log.bcDocumentNumber,
-                packageNumber: log.packageNumber,
-                itemCode: log.itemCode,
-                itemName: log.itemName,
-                serialNumber: log.serialNumber,
-                totalStock: log.totalStock,
-                origin: log.destination,
-                destination: 'Warehouse',
-                mutatedQty: delta,
-                remainingStock: (currentMaxRemutation - delta),
-                date: remutationDate,
-                time: remutationTime,
-                pic: pic,
-                remarks: remarks || (delta > 0 ? `Remutasi Tambahan: ${delta} unit` : `Koreksi Remutasi: ${delta} unit`),
-                condition: 'Baik',
-                uom: log.uom || 'pcs',
-                mutationLocation: mutationLocation,
-                storageLocation: storageLocation
-            };
-
-            await addMutationLog(newMutation);
-
-            await updateInventoryStock(
-                log.itemCode,
-                log.itemName,
-                delta,
-                log.uom || 'pcs',
-                delta > 0 ? 'remutation' : 'correction',
-                `REM-${Date.now()}`
-            );
-
-            alert('Data remutasi berhasil diperbarui!');
-            setSelectedLog(null);
-            return true;
-        } catch (error) {
-            console.error('Error processing remutation:', error);
-            alert('Gagal memproses remutasi: ' + error.message);
-            return false;
-        }
-    };
 
     // Delete Handler
     const handleDeleteRow = async (e, id) => {
@@ -196,14 +74,16 @@ const GoodsMovement = () => {
             { key: 'date', header: 'Tanggal' },
             { key: 'time', header: 'Jam' },
             { key: 'pic', header: 'PIC' },
-            { key: 'totalStock', header: 'Total Stock' },
+            { key: 'openingStock', header: 'Stok Awal' },
             { key: 'mutatedQty', header: 'Qty Mutasi' },
-            { key: 'remainingStock', header: 'Sisa Stock' },
+            { key: 'calculatedRemaining', header: 'Sisa Stock' },
             { key: 'origin', header: 'Dari' },
             { key: 'destination', header: 'Ke' },
             { key: 'remarks', header: 'Keterangan' }
         ];
-        exportToCSV(data, filename, columns);
+        // Export using running calculation so Stok Awal reflects prior remaining stock
+        const exportData = calculateRunningStock(data);
+        exportToCSV(exportData, filename, columns);
     };
 
     // Generic Export XLS
@@ -240,7 +120,7 @@ const GoodsMovement = () => {
             { header: 'Tanggal', key: 'date', width: 12, align: 'center', render: (i) => new Date(i.date).toLocaleDateString('id-ID') },
             { header: 'Jam', key: 'time', width: 10, align: 'center' },
             { header: 'PIC', key: 'pic', width: 15 },
-            { header: 'Stok Awal', key: 'totalStock', width: 10, align: 'center' },
+            { header: 'Stok Awal', key: 'openingStock', width: 10, align: 'center' },
             { header: 'Mutasi', key: 'mutatedQty', width: 10, align: 'center' },
             { header: 'Sisa', key: 'calculatedRemaining', width: 10, align: 'center' },
             { header: 'Dari', key: 'origin', width: 15 },
@@ -248,67 +128,79 @@ const GoodsMovement = () => {
             { header: 'Keterangan', key: 'remarks', width: 30 }
         ];
 
-        exportToXLS(data, filename, headerRows, xlsColumns);
+        // Export using running calculation so Stok Awal reflects prior remaining stock
+        const exportData = calculateRunningStock(data);
+        exportToXLS(exportData, filename, headerRows, xlsColumns);
     };
 
     // Helper: Calculate Running Stock Balance
     const calculateRunningStock = (logs) => {
-        // Deep copy to avoid mutating state directly
+        // Calculate running balances per unique item instance (itemCode + packageNumber + serialNumber)
         const sortedLogs = [...logs].sort((a, b) => {
             const dateA = new Date(a.createdAt || a.date);
             const dateB = new Date(b.createdAt || b.date);
             return dateA - dateB;
         });
 
-        const itemBalances = {}; // { itemCode: currentBalance }
-        const itemTotalRef = {}; // { itemCode: lastTotalStock }
+        const balances = {}; // key -> current balance
 
-        const processedLogs = sortedLogs.map(log => {
-            const itemCode = log.itemCode || 'unknown';
-            const totalStock = Number(log.totalStock) || 0;
+        const processed = sortedLogs.map(log => {
+            const key = `${log.itemCode || 'unknown'}||${log.packageNumber || ''}||${log.serialNumber || ''}`;
             const mutationQty = Number(log.mutatedQty) || 0;
 
-            const isOutbound = log.destination &&
-                log.destination.toLowerCase() !== 'warehouse' &&
-                log.destination.toLowerCase() !== 'gudang';
+            const isLeavingWarehouse = (log.origin || '').toLowerCase() === 'warehouse' || (log.origin || '').toLowerCase() === 'gudang';
+            const isReturningToWarehouse = (log.destination || '').toLowerCase() === 'warehouse' || (log.destination || '').toLowerCase() === 'gudang';
 
-            // Initialize if first time seeing this item
-            if (itemBalances[itemCode] === undefined) {
-                itemBalances[itemCode] = totalStock;
-                itemTotalRef[itemCode] = totalStock;
-            } else {
-                // Check if Total Stock changed (e.g. Purchase) and adjust balance
-                const diff = totalStock - itemTotalRef[itemCode];
-                if (diff !== 0) {
-                    itemBalances[itemCode] += diff;
-                    itemTotalRef[itemCode] = totalStock;
-                }
+            // If first time seeing this key, initialize from the earliest known totalStock for this log
+            if (balances[key] === undefined) {
+                balances[key] = Number(log.totalStock) || 0;
             }
 
-            // Apply mutation
-            if (isOutbound) {
-                itemBalances[itemCode] -= mutationQty;
-            } else {
-                // Inbound / Remutation
-                itemBalances[itemCode] += mutationQty;
-            }
+            // Opening stock for this log is the balance before applying this mutation
+            const openingStock = balances[key];
 
-            // Ensure non-negative (safety net)
-            // itemBalances[itemCode] = Math.max(0, itemBalances[itemCode]);
+            // Apply mutation sequentially
+            // If it returns to warehouse (remutasi), stock increases
+            if (isReturningToWarehouse) {
+                balances[key] += mutationQty;
+            } 
+            // If it leaves warehouse (mutasi to pameran or outbound), stock decreases
+            else if (isLeavingWarehouse) {
+                balances[key] -= mutationQty;
+            }
+            // If it's a mutation between two non-warehouse locations (e.g. Hall 1 to Hall 2), 
+            // it doesn't affect warehouse stock, but normally we only track warehouse stock here.
 
             return {
                 ...log,
-                calculatedRemaining: itemBalances[itemCode]
+                openingStock,
+                calculatedRemaining: balances[key]
             };
         });
 
-        // Return re-sorted by descending date for display (Newest First)
-        return processedLogs.sort((a, b) => {
-            const dateA = new Date(a.createdAt || a.date);
-            const dateB = new Date(b.createdAt || b.date);
-            return dateB - dateA;
-        });
+        // Return newest-first for display
+        return processed.sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date));
     };
+
+    // Precompute running balances and opening balances for all mutation logs
+    const { runningBalancesMap, openingBalancesMap } = (() => {
+        try {
+            const processed = calculateRunningStock(mutationLogs || []);
+            const runMap = {};
+            const openMap = {};
+            processed.forEach(p => {
+                if (p && p.id) {
+                    runMap[p.id] = p.calculatedRemaining;
+                    openMap[p.id] = (p.openingStock !== undefined && p.openingStock !== null) ? p.openingStock : Number(p.totalStock) || 0;
+                }
+            });
+            if (debugMode) console.log('Running balances computed for GoodsMovement:', { runMap, openMap });
+            return { runningBalancesMap: runMap, openingBalancesMap: openMap };
+        } catch (e) {
+            console.warn('Failed to compute running balances:', e);
+            return { runningBalancesMap: {}, openingBalancesMap: {} };
+        }
+    })();
 
     const renderTable = (data, title, icon, colorClass, emptyMessage) => (
         <div className="glass-card rounded-lg overflow-hidden mb-6">
@@ -352,75 +244,87 @@ const GoodsMovement = () => {
                     <table className="w-full">
                         <thead className={`${colorClass}/10`}>
                             <tr>
-                                <th className="px-4 py-3 text-left text-xs text-silver">No. Pengajuan</th>
-                                <th className="px-4 py-3 text-left text-xs text-silver">Kode Barang</th>
-                                <th className="px-4 py-3 text-left text-xs text-silver">Nama Item</th>
-                                <th className="px-4 py-3 text-center text-xs text-silver">Tanggal</th>
-                                <th className="px-4 py-3 text-left text-xs text-silver">PIC</th>
-                                <th className="px-4 py-3 text-center text-xs text-accent-blue">Stok Awal</th>
-                                <th className="px-4 py-3 text-center text-xs text-accent-orange">Mutasi</th>
-                                <th className="px-4 py-3 text-center text-xs text-accent-green">Remutasi</th>
-                                <th className="px-4 py-3 text-center text-xs text-accent-purple">Sisa Gudang</th>
-                                <th className="px-4 py-3 text-left text-xs text-silver">Lokasi</th>
-                                <th className="px-4 py-3 text-left text-xs text-silver">Keterangan</th>
-                                <th className="px-4 py-3 text-center text-xs text-silver">Aksi</th>
+                                <th className="px-3 py-3 text-left text-xs text-silver">No. Pengajuan</th>
+                                <th className="px-3 py-3 text-left text-xs text-silver">Kode Barang</th>
+                                <th className="px-3 py-3 text-left text-xs text-silver">Nama Item</th>
+                                <th className="px-3 py-3 text-center text-xs text-silver">Masuk Gudang (Tgl & Jam)</th>
+                                <th className="px-3 py-3 text-center text-xs text-silver">Waktu Mutasi (Tgl & Jam)</th>
+                                <th className="px-3 py-3 text-left text-xs text-silver">PIC Mutasi</th>
+                                <th className="px-3 py-3 text-center text-xs text-accent-blue">Stok Awal</th>
+                                <th className="px-3 py-3 text-center text-xs text-accent-orange">Mutasi</th>
+                                <th className="px-3 py-3 text-center text-xs text-accent-purple">Sisa Gudang</th>
+                                <th className="px-3 py-3 text-left text-xs text-silver">Lokasi</th>
+                                <th className="px-3 py-3 text-center text-xs text-silver">Dokumen</th>
+                                <th className="px-3 py-3 text-center text-xs text-silver">Aksi</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
                             {data.map((log, idx) => {
-                                const { totalRemutated } = getRemutationInfo(log);
+                                const pengajuan = quotations.find(q => q.quotationNumber === log.pengajuanNumber || q.quotation_number === log.pengajuanNumber);
+                                const masukDate = pengajuan ? (pengajuan.submissionDate || pengajuan.submission_date || pengajuan.date) : null;
+                                const masukTime = pengajuan ? (pengajuan.approvedDate || pengajuan.approved_date) : null;
+
                                 return (
                                     <tr
                                         key={log.id}
                                         className="hover:bg-dark-surface/50 cursor-pointer"
-                                        onClick={() => navigate(`/bridge/inventory?pengajuan=${encodeURIComponent(log.pengajuanNumber)}`)}
-                                        title="Klik untuk melihat detail inventaris di Gudang"
+                                        onClick={() => setSelectedLog(log)}
+                                        title="Klik untuk melihat rincian mutasi dan dokumen"
                                     >
-                                        <td className="px-4 py-3 text-sm text-silver-light">{log.pengajuanNumber}</td>
-                                        <td className="px-4 py-3 text-sm text-silver-light">{log.itemCode || '-'}</td>
-                                        <td className="px-4 py-3 text-sm text-silver-light">
+                                        <td className="px-3 py-3 text-sm text-silver-light">{log.pengajuanNumber}</td>
+                                        <td className="px-3 py-3 text-sm text-silver-light">{log.itemCode || '-'}</td>
+                                        <td className="px-3 py-3 text-sm text-silver-light">
                                             <div>{log.itemName}</div>
                                             {log.serialNumber && <div className="text-xs text-silver-dark">SN: {log.serialNumber}</div>}
                                         </td>
-                                        <td className="px-4 py-3 text-sm text-silver text-center">
-                                            {new Date(log.date).toLocaleDateString('id-ID')}
+                                        <td className="px-3 py-3 text-sm text-silver text-center">
+                                            <div>{masukDate ? new Date(masukDate).toLocaleDateString('id-ID') : '-'}</div>
+                                            <div className="text-xs text-silver-dark">{masukTime ? new Date(masukTime).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'}</div>
                                         </td>
-                                        <td className="px-4 py-3 text-sm text-silver-light">{log.pic}</td>
-                                        <td className="px-4 py-3 text-center">
-                                            <span className="text-sm text-accent-blue">{log.totalStock}</span>
+                                        <td className="px-3 py-3 text-sm text-silver text-center">
+                                            <div>{log.date ? new Date(log.date).toLocaleDateString('id-ID') : '-'}</div>
+                                            <div className="text-xs text-silver-dark">{log.time || '-'}</div>
                                         </td>
-                                        <td className="px-4 py-3 text-center">
+                                        <td className="px-3 py-3 text-sm text-silver-light">{log.pic || '-'}</td>
+                                        <td className="px-3 py-3 text-center">
+                                            <span className="text-sm text-accent-blue">{(openingBalancesMap && openingBalancesMap[log.id] !== undefined) ? openingBalancesMap[log.id] : (log.openingStock !== undefined ? log.openingStock : log.totalStock)}</span>
+                                        </td>
+                                        <td className="px-3 py-3 text-center">
                                             <span className="text-sm text-accent-orange">{log.mutatedQty}</span>
                                         </td>
-                                        <td className="px-4 py-3 text-center">
-                                            <span className="text-sm text-accent-green">{totalRemutated}</span>
-                                        </td>
 
-                                        <td className="px-4 py-3 text-center">
+                                        <td className="px-3 py-3 text-center">
                                             <span className="text-sm text-accent-purple" title="Sisa stok di gudang saat transaksi">
                                                 {(() => {
-                                                    const isOutbound = log.destination &&
-                                                        log.destination.toLowerCase() !== 'warehouse' &&
-                                                        log.destination.toLowerCase() !== 'gudang';
+                                                    // Prefer runningBalancesMap (calculated from full mutation log history)
+                                                    if (runningBalancesMap[log.id] !== undefined) return runningBalancesMap[log.id];
 
-                                                    if (isOutbound) {
-                                                        return Number(log.totalStock) - Number(log.mutatedQty);
-                                                    } else {
-                                                        return (log.remainingStock !== undefined && log.remainingStock !== null)
-                                                            ? log.remainingStock
-                                                            : '-';
-                                                    }
+                                                    // Fallbacks (legacy): use explicit remainingStock or naive subtraction
+                                                    if (log.remainingStock !== undefined && log.remainingStock !== null) return log.remainingStock;
+                                                    const isOutbound = log.destination && !(isExhibitionLocation ? isExhibitionLocation(log.destination) : false) &&
+                                                        (log.destination || '').toLowerCase() !== 'warehouse' &&
+                                                        (log.destination || '').toLowerCase() !== 'gudang';
+                                                    if (isOutbound) return Number(log.totalStock) - Number(log.mutatedQty);
+                                                    return '-';
                                                 })()}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-3 text-sm text-silver">
+                                        <td className="px-3 py-3 text-sm text-silver">
                                             {formatLocation(log.origin, log.destination)}
                                         </td>
-                                        <td className="px-4 py-3 text-sm text-silver-dark max-w-xs truncate">
-                                            {log.remarks || '-'}
+                                        <td className="px-3 py-3 text-center">
+                                            {log.documents && log.documents.length > 0 ? (
+                                                <div className="flex justify-center">
+                                                    <span className="bg-sky-100 text-sky-700 px-2 py-1 rounded text-xs font-semibold flex items-center gap-1">
+                                                        <FileText className="w-3 h-3" /> {log.documents.length}
+                                                    </span>
+                                                </div>
+                                            ) : (
+                                                <span className="text-gray-400 text-xs">-</span>
+                                            )}
                                         </td>
                                         {hasDelete && (
-                                            <td className="px-4 py-3 text-center">
+                                            <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                                                 <button
                                                     onClick={(e) => handleDeleteRow(e, log.id)}
                                                     className="p-1.5 hover:bg-red-500/10 text-gray-500 hover:text-red-500 rounded-lg transition-colors"
@@ -442,6 +346,19 @@ const GoodsMovement = () => {
 
     return (
         <div className="p-6 space-y-6">
+            {debugMode && (
+                <div style={{position:'fixed',right:12,top:80,zIndex:60,width:420,maxHeight: '60vh',overflow:'auto',background:'#ffffffcc',backdropFilter:'blur(4px)',border:'1px solid #ccc',padding:10,borderRadius:6,fontSize:12}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                        <strong>DEBUG: GoodsMovement</strong>
+                        <span style={{fontSize:11,color:'#666'}}>{new Date().toLocaleTimeString()}</span>
+                    </div>
+                    <div><b>mutationLogs.length:</b> {mutationLogs?.length || 0}</div>
+                    <div><b>runningBalances (sample):</b></div>
+                    <pre style={{whiteSpace:'pre-wrap',maxHeight:200,overflow:'auto',background:'#f7f7f7',padding:6}}>{JSON.stringify(Object.entries(runningBalancesMap).slice(0,10),null,2)}</pre>
+                    <div><b>First 8 mutationLogs:</b></div>
+                    <pre style={{whiteSpace:'pre-wrap',maxHeight:220,overflow:'auto',background:'#f7f7f7',padding:6}}>{JSON.stringify((mutationLogs||[]).slice(0,8).map(m=>({id:m.id,date:m.date,totalStock:m.totalStock,mutatedQty:m.mutatedQty,origin:m.origin,destination:m.destination})),null,2)}</pre>
+                </div>
+            )}
             {/* Header */}
             <div>
                 <h1 className="text-3xl font-bold gradient-text">Pergerakan Barang</h1>
@@ -465,10 +382,10 @@ const GoodsMovement = () => {
             {/* Table 1: Pameran */}
             {renderTable(
                 pameranLogs,
-                "Aktivitas Pameran",
+                `Aktivitas ${exhibitionLocation || 'Pameran'}`,
                 <ArrowLeftRight className="w-5 h-5 text-accent-purple" />,
                 "bg-accent-purple",
-                "Belum ada aktivitas pameran"
+                `Belum ada aktivitas ${exhibitionLocation || 'Pameran'}`
             )}
 
             {/* Table 2: Outbound */}
@@ -483,7 +400,6 @@ const GoodsMovement = () => {
 
             {/* Detail Modal - Combined Edit & Mutation */}
             {selectedLog && (() => {
-                const { totalRemutated, sisaDiLokasi, maxRemutation, lastRemutationLog } = getRemutationInfo(selectedLog);
                 const isOutbound = selectedLog.destination &&
                     selectedLog.destination.toLowerCase() !== 'warehouse' &&
                     selectedLog.destination.toLowerCase() !== 'gudang';
@@ -502,21 +418,8 @@ const GoodsMovement = () => {
                                         onClick={() => setSelectedLog(null)}
                                         className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm font-medium flex items-center gap-1"
                                     >
-                                        ✕ Batal
+                                        ✕ Tutup
                                     </button>
-                                    {isOutbound && (hasCreate || hasEdit) && (
-                                        <button
-                                            onClick={() => {
-                                                const qty = parseInt(document.getElementById('remutationQty')?.value) || totalRemutated;
-                                                const pic = document.getElementById('remutationPIC')?.value || '';
-                                                const remarks = document.getElementById('remutationRemarks')?.value || '';
-                                                handleRemutation(selectedLog, qty, pic, remarks);
-                                            }}
-                                            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded text-sm font-medium flex items-center gap-1"
-                                        >
-                                            💾 Simpan Mutasi
-                                        </button>
-                                    )}
                                 </div>
                             </div>
 
@@ -546,41 +449,17 @@ const GoodsMovement = () => {
                                                 <td className="px-3 py-2 border border-gray-200 text-gray-600 text-center">{selectedLog.time}</td>
                                                 <td className="px-3 py-2 border border-gray-200 text-gray-600 text-center">{selectedLog.mutatedQty}</td>
                                                 <td className="px-3 py-2 border border-gray-200 text-gray-800">{selectedLog.pic}</td>
-                                                <td className="px-3 py-2 border border-gray-200 text-center">
-                                                    <input
-                                                        type="date"
-                                                        id="remutationDate"
-                                                        defaultValue={lastRemutationLog?.date || new Date().toISOString().split('T')[0]}
-                                                        className="w-full px-2 py-1 border border-sky-300 rounded text-sm bg-white"
-                                                    />
+                                                <td className="px-3 py-2 border border-gray-200 text-center text-gray-800">
+                                                    {selectedLog.date ? new Date(selectedLog.date).toLocaleDateString('id-ID') : '-'}
                                                 </td>
-                                                <td className="px-3 py-2 border border-gray-200 text-center">
-                                                    <input
-                                                        type="time"
-                                                        id="remutationTime"
-                                                        defaultValue={lastRemutationLog?.time || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false })}
-                                                        className="w-full px-2 py-1 border border-sky-300 rounded text-sm bg-white"
-                                                    />
+                                                <td className="px-3 py-2 border border-gray-200 text-center text-gray-800">
+                                                    {selectedLog.time || '-'}
                                                 </td>
-                                                <td className="px-3 py-2 border border-gray-200">
-                                                    <input
-                                                        type="text"
-                                                        id="remutationPIC"
-                                                        defaultValue={lastRemutationLog?.pic || ''}
-                                                        placeholder="Nama PIC"
-                                                        className="w-full px-2 py-1 border border-sky-300 rounded text-sm bg-white"
-                                                    />
+                                                <td className="px-3 py-2 border border-gray-200 text-gray-800">
+                                                    {selectedLog.pic || '-'}
                                                 </td>
-                                                <td className="px-3 py-2 border border-gray-200">
-                                                    <select
-                                                        id="mutationLocationSelect"
-                                                        defaultValue={selectedLog.mutationLocation || (isOutbound ? 'outbound' : 'warehouse')}
-                                                        className="w-full px-2 py-1 border border-sky-300 rounded text-sm bg-white capitalize"
-                                                    >
-                                                        <option value="warehouse">Warehouse</option>
-                                                        <option value="pameran">Pameran</option>
-                                                        <option value="outbound">Outbound</option>
-                                                    </select>
+                                                <td className="px-3 py-2 border border-gray-200 text-gray-800 capitalize">
+                                                    {selectedLog.destination || '-'}
                                                 </td>
                                             </tr>
                                         </tbody>
@@ -601,9 +480,7 @@ const GoodsMovement = () => {
                                                 <th className="px-2 py-2 text-left border-r border-sky-300 font-medium">LOKASI ASAL</th>
                                                 <th className="px-2 py-2 text-left border-r border-sky-300 font-medium">KONDISI</th>
                                                 <th className="px-2 py-2 text-center border-r border-sky-300 font-medium text-orange-200">JML MUTASI</th>
-                                                <th className="px-2 py-2 text-center border-r border-sky-300 font-medium text-green-200">JML REMUTASI</th>
-                                                <th className="px-2 py-2 text-center border-r border-sky-300 font-medium text-purple-200">SISA</th>
-                                                <th className="px-2 py-2 text-left border-r border-sky-300 font-medium text-cyan-200">LOKASI PENYIMPANAN</th>
+                                                <th className="px-2 py-2 text-center border-r border-sky-300 font-medium text-purple-200">SISA GUDANG</th>
                                                 <th className="px-2 py-2 text-left font-medium">KETERANGAN</th>
                                             </tr>
                                         </thead>
@@ -621,55 +498,64 @@ const GoodsMovement = () => {
                                                     <span className="text-orange-500 font-medium">{selectedLog.mutatedQty}</span>
                                                 </td>
                                                 <td className="px-2 py-2 border border-gray-200 text-center">
-                                                    {isOutbound ? (
-                                                        <input
-                                                            type="number"
-                                                            id="remutationQty"
-                                                            defaultValue={totalRemutated}
-                                                            min={0}
-                                                            max={selectedLog.mutatedQty}
-                                                            className="w-16 px-2 py-1 border border-sky-300 rounded text-sm text-center bg-white"
-                                                        />
-                                                    ) : (
-                                                        <span className="text-green-500 font-medium">{totalRemutated}</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-2 py-2 border border-gray-200 text-center">
-                                                    <span className="text-purple-500 font-medium">{sisaDiLokasi}</span>
+                                                    <span className="text-purple-500 font-medium">{selectedLog.remainingStock || '-'}</span>
                                                 </td>
                                                 <td className="px-2 py-2 border border-gray-200">
-                                                    <input
-                                                        type="text"
-                                                        id="storageLocationInput"
-                                                        defaultValue={selectedLog.storageLocation || ''}
-                                                        placeholder="Contoh: Rak A-1"
-                                                        className="w-full px-2 py-1 border border-sky-300 rounded text-sm bg-white"
-                                                    />
-                                                </td>
-                                                <td className="px-2 py-2 border border-gray-200">
-                                                    <input
-                                                        type="text"
-                                                        id="remutationRemarks"
-                                                        defaultValue={lastRemutationLog?.remarks || selectedLog.remarks || ''}
-                                                        placeholder="Keterangan"
-                                                        className="w-full px-2 py-1 border border-sky-300 rounded text-sm bg-white"
-                                                    />
+                                                    {selectedLog.remarks || '-'}
                                                 </td>
                                             </tr>
                                         </tbody>
                                     </table>
                                 </div>
 
+                                {/* Documents Section */}
+                                <div className="mt-6 border border-gray-200 bg-white rounded-lg p-4">
+                                    <h4 className="font-semibold text-gray-800 mb-3">Dokumen Pendukung Mutasi</h4>
+                                    {(!selectedLog.documents || selectedLog.documents.length === 0) ? (
+                                        <p className="text-sm text-gray-500">Tidak ada dokumen pendukung untuk mutasi ini.</p>
+                                    ) : (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                            {selectedLog.documents.map((doc, idx) => (
+                                                <div key={idx} className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow">
+                                                    {doc.type && doc.type.startsWith('image/') ? (
+                                                        <div className="aspect-video bg-gray-100 rounded mb-2 overflow-hidden flex items-center justify-center">
+                                                            <img 
+                                                                src={doc.data || doc.url} 
+                                                                alt={doc.title || doc.name} 
+                                                                className="object-contain w-full h-full cursor-pointer hover:scale-105 transition-transform"
+                                                                onClick={() => {
+                                                                    const win = window.open();
+                                                                    win.document.write(`<iframe src="${doc.data || doc.url}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    ) : (
+                                                        <div className="aspect-video bg-gray-100 rounded mb-2 flex flex-col items-center justify-center cursor-pointer"
+                                                            onClick={() => {
+                                                                const win = window.open();
+                                                                win.document.write(`<iframe src="${doc.data || doc.url}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+                                                            }}
+                                                        >
+                                                            <div className="w-12 h-12 text-gray-400 border-2 border-gray-300 rounded-lg flex items-center justify-center mb-1">
+                                                                <span className="text-xs font-bold uppercase">{doc.type ? doc.type.split('/')[1] : 'PDF'}</span>
+                                                            </div>
+                                                            <span className="text-[10px] text-gray-500 text-center px-2 underline">Buka Dokumen</span>
+                                                        </div>
+                                                    )}
+                                                    <div className="text-sm font-medium text-gray-800 truncate" title={doc.title || doc.name}>{doc.title || doc.name || `Dokumen ${idx + 1}`}</div>
+                                                    <div className="text-xs text-gray-500 truncate" title={doc.name}>{doc.name}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
                                 {/* Status Info */}
                                 <div className="mt-4 p-3 rounded-lg border bg-white">
-                                    {isOutbound && maxRemutation > 0 && (
-                                        <p className="text-blue-600 text-sm">ℹ️ Tersisa <strong>{maxRemutation}</strong> unit yang dapat diremutasi ke Warehouse</p>
-                                    )}
-                                    {isOutbound && maxRemutation === 0 && (
-                                        <p className="text-green-600 text-sm">✓ Semua item sudah diremutasi ke Warehouse</p>
-                                    )}
-                                    {!isOutbound && (
-                                        <p className="text-gray-600 text-sm">✓ Item ini adalah remutasi (sudah kembali ke Warehouse)</p>
+                                    {isOutbound ? (
+                                        <p className="text-blue-600 text-sm">ℹ️ Item ini telah dimutasi keluar (Outbound/Pameran)</p>
+                                    ) : (
+                                        <p className="text-gray-600 text-sm">✓ Item ini adalah remutasi (sudah kembali ke Gudang)</p>
                                     )}
                                 </div>
                             </div>
