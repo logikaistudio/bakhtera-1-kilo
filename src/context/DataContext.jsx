@@ -2019,7 +2019,6 @@ export const DataProvider = ({ children }) => {
             invoice_currency: quotation.invoiceCurrency || 'IDR',
             exchange_rate: quotation.exchangeRate ? Number(quotation.exchangeRate) : null,
             exchange_rate_date: quotation.exchangeRateDate || null,
-            item_date: quotation.itemDate || null,
 
             // Timestamps
             created_at: new Date().toISOString(),
@@ -2040,6 +2039,13 @@ export const DataProvider = ({ children }) => {
         }
 
         console.log('🔵 Inserting quotation with data:', newQuotation);
+
+        // Only include `item_date` if caller provided a non-empty value.
+        // This prevents Supabase/PostgREST schema cache errors when the DB
+        // schema does not include the optional `item_date` column.
+        if (quotation.itemDate !== undefined && quotation.itemDate !== null && quotation.itemDate !== '') {
+            newQuotation.item_date = quotation.itemDate;
+        }
 
         const { data, error } = await supabase
             .from('freight_quotations')
@@ -2412,7 +2418,9 @@ export const DataProvider = ({ children }) => {
         if (updatedData.exchangeRateDate !== undefined) dbUpdateData.exchange_rate_date = updatedData.exchangeRateDate || null;
         if (updatedData.blNumber !== undefined) dbUpdateData.bl_number = updatedData.blNumber;
         if (updatedData.blDate !== undefined) dbUpdateData.bl_date = updatedData.blDate || null;
-        if (updatedData.itemDate !== undefined) dbUpdateData.item_date = updatedData.itemDate || null;
+        if (updatedData.itemDate !== undefined && updatedData.itemDate !== null && updatedData.itemDate !== '') {
+            dbUpdateData.item_date = updatedData.itemDate;
+        }
 
         // Always update timestamp
         dbUpdateData.updated_at = new Date().toISOString();
