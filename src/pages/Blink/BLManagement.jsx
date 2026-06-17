@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { exportBLCertificateToExcel, exportSellingBuyingReport } from '../../utils/excelExport';
 import { printBLCertificate } from '../../utils/printUtils';
+import { useData } from '../../context/DataContext';
 import { validateSOType, formatSOType, getSOTypeDescription } from '../../utils/orderTypeDetection';
 import { useAuth } from '../../context/AuthContext';
 
@@ -46,6 +47,8 @@ const BLManagement = () => {
     // Print options
     const [printWatermark, setPrintWatermark] = useState('ORIGINAL');
     const [printReleaseType, setPrintReleaseType] = useState('');
+
+    const { companySettings } = useData();
 
     useEffect(() => {
         fetchBLs();
@@ -465,7 +468,7 @@ const BLManagement = () => {
 
     const handlePrintBL = (bl) => {
         try {
-            printBLCertificate({ ...bl, watermark: printWatermark || null, releaseType: printReleaseType || null });
+            printBLCertificate({ ...bl, logo_url: companySettings?.logo_url || '', watermark: printWatermark || null, releaseType: printReleaseType || null });
         } catch (error) {
             console.error('Print error:', error);
             alert('Failed to print BL');
@@ -509,7 +512,7 @@ const BLManagement = () => {
                 blCollect: editForm.collect,
                 blShippedOnBoardDate: editForm.shippedOnBoardDate,
             };
-            printBLCertificate({ ...printData, watermark: printWatermark || null, releaseType: printReleaseType || null });
+            printBLCertificate({ ...printData, logo_url: companySettings?.logo_url || '', watermark: printWatermark || null, releaseType: printReleaseType || null });
         } catch (error) {
             console.error('Print Preview error:', error);
             alert('Failed to print preview');

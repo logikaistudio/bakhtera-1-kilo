@@ -62,6 +62,8 @@ export const generateBLPrintHTML = (blData) => {
         releaseType: blData.releaseType || null,
     };
 
+    const coLogo = blData.logo_url || blData.company_logo || blData.companyLogo || '';
+
     return `
 <!DOCTYPE html>
 <html>
@@ -292,9 +294,15 @@ export const generateBLPrintHTML = (blData) => {
                     <span class="label">Forwarding Agent References</span>
                     <div class="value small-text">${d.agentRefs}</div>
                         <div class="header-logo">
-                        <div style="font-size: 7pt; color: #555; font-weight: 600; letter-spacing: 1.5px; margin-bottom: 3px; text-transform: uppercase;">Ocean Bill of Lading</div>
-                        <span class="company-main">BAKHTERA</span>
-                        <span class="company-sub">FREIGHT WORLDWIDE</span>
+                        ${coLogo ? `
+                            <div style="display:flex;align-items:center;justify-content:flex-end;">
+                                <img src="${coLogo}" alt="Logo" style="max-height:88px;max-width:180px;object-fit:contain;margin-left:12px;" />
+                            </div>
+                        ` : `
+                            <div style="font-size: 7pt; color: #555; font-weight: 600; letter-spacing: 1.5px; margin-bottom: 3px; text-transform: uppercase;">Ocean Bill of Lading</div>
+                            <span class="company-main">BAKHTERA</span>
+                            <span class="company-sub">FREIGHT WORLDWIDE</span>
+                        `}
                         ${d.releaseType ? `<br><span class="release-stamp">${d.releaseType}</span>` : ''}
                     </div>
                 </div>

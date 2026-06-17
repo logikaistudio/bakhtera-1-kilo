@@ -13,6 +13,7 @@ import {
     User
 } from 'lucide-react';
 import { printBLCertificate } from '../../utils/printUtils'; // We can reuse print logic or create printAWBUtils later
+import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 
 const AWBManagement = () => {
@@ -30,6 +31,8 @@ const AWBManagement = () => {
     const [editForm, setEditForm] = useState({});
     const [showShipperPicker, setShowShipperPicker] = useState(false);
     const [showConsigneePicker, setShowConsigneePicker] = useState(false);
+
+    const { companySettings } = useData();
 
     useEffect(() => {
         fetchAWBs();
@@ -212,6 +215,15 @@ const AWBManagement = () => {
                     .replace(/\n+/g, '\n').trim()
             }));
             setShowConsigneePicker(false);
+        }
+    };
+
+    const handlePrintAWB = (awb) => {
+        try {
+            printBLCertificate({ ...awb, logo_url: companySettings?.logo_url || '', watermark: awb.watermark || null, releaseType: awb.releaseType || null });
+        } catch (err) {
+            console.error('AWB print failed', err);
+            alert('Failed to print AWB');
         }
     };
 
