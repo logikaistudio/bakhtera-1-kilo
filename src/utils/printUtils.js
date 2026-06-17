@@ -130,8 +130,22 @@ export const generateBLPrintHTML = (blData) => {
         .header-logo {
             text-align: right;
             padding: 8px;
-            font-weight: bold;
-            font-size: 14pt;
+            font-weight: 800;
+            font-size: 18pt;
+            line-height: 1;
+        }
+        .header-logo .company-main {
+            display:block;
+            font-size: 20pt;
+            font-weight: 900;
+            letter-spacing: 1px;
+            margin-bottom: 2px;
+        }
+        .header-logo .company-sub {
+            display:block;
+            font-size: 10pt;
+            font-weight: 600;
+            color: #333;
         }
 
         /* TABLE PARTICULARS */
@@ -277,10 +291,10 @@ export const generateBLPrintHTML = (blData) => {
                 <div class="col" style="width: 50%;">
                     <span class="label">Forwarding Agent References</span>
                     <div class="value small-text">${d.agentRefs}</div>
-                    <div class="header-logo">
+                        <div class="header-logo">
                         <div style="font-size: 7pt; color: #555; font-weight: 600; letter-spacing: 1.5px; margin-bottom: 3px; text-transform: uppercase;">Ocean Bill of Lading</div>
-                        BAKHTERA<br>
-                        <span style="font-size: 9pt; font-weight: normal;">FREIGHT WORLDWIDE</span>
+                        <span class="company-main">BAKHTERA</span>
+                        <span class="company-sub">FREIGHT WORLDWIDE</span>
                         ${d.releaseType ? `<br><span class="release-stamp">${d.releaseType}</span>` : ''}
                     </div>
                 </div>

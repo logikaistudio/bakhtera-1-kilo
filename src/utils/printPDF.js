@@ -32,8 +32,8 @@ const PRINT_STYLES = `
     padding-bottom: 14px;
     border-bottom: 2px solid #0070BB;
   }
-  .report-header .company { font-size: 13px; font-weight: 700; color: #0f172a; }
-  .report-header .report-name { font-size: 18px; font-weight: 800; color: #0070BB; margin: 2px 0; }
+  .report-header .company { font-size: 16px; font-weight: 800; color: #0f172a; }
+  .report-header .report-name { font-size: 20px; font-weight: 900; color: #0070BB; margin: 2px 0; }
   .report-header .period { font-size: 10px; color: #64748b; }
   .report-header .meta { text-align: right; font-size: 9px; color: #94a3b8; line-height: 1.6; }
 
@@ -175,7 +175,7 @@ export const printReport = ({ reportName, company, companyInfo, period, bodyHTML
   const coLogo = co.logo_url || '';
 
   const logoHTML = coLogo
-    ? `<img src="${coLogo}" alt="Logo" style="max-height:56px;max-width:140px;object-fit:contain;" />`
+    ? `<img src="${coLogo}" alt="Logo" style="max-height:88px;max-width:220px;object-fit:contain;display:block;margin-right:12px;" />`
     : `<div style="width:48px;height:48px;background:#e2e8f0;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;">&#127968;</div>`;
 
   const coDetails = [
@@ -197,8 +197,8 @@ export const printReport = ({ reportName, company, companyInfo, period, bodyHTML
   <style>${PRINT_STYLES.replace('size: A4 landscape;', `size: ${pageSizeRule};`)}
     .report-header { border-bottom: 2px solid #0070BB; padding-bottom: 14px; margin-bottom:18px; display:flex; justify-content:space-between; align-items:flex-start; }
     .header-left { display:flex; align-items:flex-start; gap:14px; }
-    .header-company-name { font-size:15px; font-weight:800; color:#0f172a; margin-bottom:3px; }
-    .header-company-detail { font-size:8.5px; color:#64748b; line-height:1.7; }
+    .header-company-name { font-size:18px; font-weight:900; color:#0f172a; margin-bottom:3px; }
+    .header-company-detail { font-size:9px; color:#64748b; line-height:1.7; }
     .header-right { text-align:right; }
     .header-report-name { font-size:18px; font-weight:800; color:#0070BB; }
     .header-period { font-size:10px; color:#64748b; margin-top:2px; }

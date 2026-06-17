@@ -2412,9 +2412,9 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                     <header className="flex justify-between items-start mb-12">
                         <div>
                             {companySettings?.logo_url ? (
-                                <img src={companySettings.logo_url} alt="Logo" className="h-10 object-contain mb-4" />
+                                <img src={companySettings.logo_url} alt="Logo" className="h-16 w-auto object-contain mb-4" />
                             ) : (
-                                <h1 className="text-2xl font-bold tracking-tight text-slate-900 mb-2">PT. Bakhtera Freight Worldwide</h1>
+                                <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 mb-2">PT. Bakhtera Freight Worldwide</h1>
                             )}
                             <div className="text-sm text-slate-500 leading-relaxed max-w-xs">
                                 <p>{companySettings?.company_address}</p>
