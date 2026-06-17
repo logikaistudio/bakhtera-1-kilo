@@ -1035,6 +1035,11 @@ const SalesQuotation = () => {
             const { data: shipmentData, error } = await supabase
                 .from('blink_shipments')
                 .insert([{
+                    // Propagate shipper information from quotation
+                    shipper: quotation.shipper || quotation.shipper_name || quotation.customerName || null,
+                    shipper_name: quotation.shipper_name || quotation.shipper || quotation.customerName || null,
+                    shipper_id: quotation.shipper_id || null,
+                    quotation_shipper_name: quotation.shipper_name || null,
                     job_number: newShipment.jobNumber,
                     so_number: newShipment.soNumber,
                     quotation_id: quotation.id,
@@ -1259,7 +1264,12 @@ const SalesQuotation = () => {
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="font-semibold text-silver-light">
-                                                    {getCurrencySymbol(quote.currency)} {(quote.totalAmount || quote.total_amount || 0).toLocaleString('id-ID')}
+                                                    {(() => {
+                                                        const rate = quote.exchange_rate || quote.exchangeRate || 16000;
+                                                        const idr = quote.total_idr ?? (quote.totalAmount ? ((quote.currency === 'IDR') ? quote.totalAmount : quote.totalAmount * rate) : (quote.total_amount ? (quote.currency === 'IDR' ? quote.total_amount : quote.total_amount * rate) : 0));
+                                                        const usd = quote.total_usd ?? (quote.totalAmount ? ((quote.currency === 'USD') ? quote.totalAmount : (rate ? quote.totalAmount / rate : 0)) : (quote.total_amount ? ((quote.currency === 'USD') ? quote.total_amount : (rate ? quote.total_amount / rate : 0)) : 0));
+                                                        return quote.currency === 'USD' ? `${getCurrencySymbol('USD')} ${usd.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : `${getCurrencySymbol('IDR')} ${idr.toLocaleString('id-ID')}`;
+                                                    })()}
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3">
@@ -1659,12 +1669,12 @@ const SalesQuotation = () => {
                                 <div className="flex gap-6">
                                     <div>
                                         <p className="text-[10px] text-gray-400 mb-0.5">IDR</p>
-                                        <p className="text-lg font-bold text-orange-600">Rp {totalIDR.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
+                                        <p className="text-lg font-bold text-orange-600 break-words">Rp {totalIDR.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
                                     </div>
                                     {rate > 1 && (
                                         <div className="border-l border-orange-200 pl-6">
                                             <p className="text-[10px] text-gray-400 mb-0.5">USD (@ Rp {rate.toLocaleString('id-ID')})</p>
-                                            <p className="text-lg font-bold text-blue-600">$ {totalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                            <p className="text-lg font-bold text-blue-600 break-words">$ {totalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                                         </div>
                                     )}
                                 </div>
@@ -1679,22 +1689,42 @@ const SalesQuotation = () => {
                         items={formData.serviceItems}
                         onChange={(newGroups) => {
                             setFormData(prev => {
-                                // Calculate totalAmount automatically based on groups
-                                const total = newGroups.reduce((acc, group) => {
-                                    const groupRate = group.groupExchangeRate || prev.exchange_rate || 16000;
-                                    const groupTotal = (group.items || []).reduce((sum, item) => {
-                                        let usdAmt = 0; let idrAmt = 0;
-                                        const amt = parseFloat(item.amount) || 0;
-                                        if(item.currency === 'IDR'){
-                                            idrAmt = amt; usdAmt = amt / groupRate;
-                                        } else {
-                                            usdAmt = amt; idrAmt = amt * groupRate;
-                                        }
-                                        return sum + (prev.currency === 'IDR' ? idrAmt : usdAmt);
-                                    }, 0);
-                                    return acc + groupTotal;
-                                }, 0);
-                                return { ...prev, serviceItems: newGroups, totalAmount: total.toString() };
+                                        const parseAmountValue = (val, currency, groupRate) => {
+                                            if (val === null || val === undefined) return 0;
+                                            if (typeof val === 'number') return val;
+                                            const s = String(val).trim();
+                                            if (s === '') return 0;
+                                            try {
+                                                if (currency === 'IDR') {
+                                                    const cleaned = s.replace(/\./g, '').replace(/,/g, '.');
+                                                    const n = parseFloat(cleaned);
+                                                    return Number.isFinite(n) ? n : 0;
+                                                }
+                                                const cleaned = s.replace(/,/g, '');
+                                                const n = parseFloat(cleaned);
+                                                return Number.isFinite(n) ? n : 0;
+                                            } catch (e) {
+                                                return 0;
+                                            }
+                                        };
+
+                                        let totalIdr = 0;
+                                        let totalUsd = 0;
+                                        newGroups.forEach(group => {
+                                            const groupRate = group.groupExchangeRate || prev.exchange_rate || 16000;
+                                            (group.items || []).forEach(item => {
+                                                const amt = parseAmountValue(item.amount, item.currency, groupRate) || 0;
+                                                if (item.currency === 'IDR') {
+                                                    totalIdr = Number(totalIdr) + Number(amt);
+                                                    totalUsd = Number(totalUsd) + (groupRate ? (Number(amt) / Number(groupRate)) : 0);
+                                                } else {
+                                                    totalUsd = Number(totalUsd) + Number(amt);
+                                                    totalIdr = Number(totalIdr) + (Number(amt) * Number(groupRate || 1));
+                                                }
+                                            });
+                                        });
+                                const total = (prev.currency || 'IDR') === 'IDR' ? totalIdr : totalUsd;
+                                return { ...prev, serviceItems: newGroups, totalAmount: total, total_idr: totalIdr, total_usd: totalUsd };
                             });
                         }}
                         exchangeRate={formData.exchange_rate}
@@ -2100,27 +2130,63 @@ const SalesQuotation = () => {
                         </div>
 
                         <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-                            <p className="text-sm font-semibold text-gray-500 mb-3">Estimated Amount (otomatis dari item)</p>
+                            <p className="text-sm font-semibold text-gray-500 mb-3">Estimated Amount</p>
                             {(() => {
                                 const data = isEditingQuotation ? editedQuotation : viewingQuotation;
-                                const totalNum = parseFloat(data?.totalAmount || data?.total_amount) || 0;
                                 const rate = parseFloat(data?.exchange_rate || data?.exchangeRate) || 16000;
-                                const currency = data?.currency || 'IDR';
-                                const isIDR = currency === 'IDR';
-                                const totalIDR = isIDR ? totalNum : totalNum * rate;
-                                const totalUSD = isIDR ? (rate > 1 ? totalNum / rate : 0) : totalNum;
+
+                                const parseAmountValue = (val, currency) => {
+                                    if (val === null || val === undefined) return 0;
+                                    if (typeof val === 'number') return val;
+                                    const s = String(val).trim();
+                                    if (s === '') return 0;
+                                    try {
+                                        if (currency === 'IDR') {
+                                            const cleaned = s.replace(/\./g, '').replace(/,/g, '.');
+                                            const n = parseFloat(cleaned);
+                                            return Number.isFinite(n) ? n : 0;
+                                        }
+                                        const cleaned = s.replace(/,/g, '');
+                                        const n = parseFloat(cleaned);
+                                        return Number.isFinite(n) ? n : 0;
+                                    } catch (e) {
+                                        return 0;
+                                    }
+                                };
+
+                                const computeFromGroups = (groups) => {
+                                    let totalIdr = 0;
+                                    let totalUsd = 0;
+                                    (groups || []).forEach(g => {
+                                        const groupRate = g.groupExchangeRate || rate || 16000;
+                                        (g.items || []).forEach(item => {
+                                            const amt = parseAmountValue(item.amount, item.currency) || 0;
+                                            if (item.currency === 'IDR') {
+                                                totalIdr = Number(totalIdr) + Number(amt);
+                                                totalUsd = Number(totalUsd) + (groupRate ? (Number(amt) / Number(groupRate)) : 0);
+                                            } else {
+                                                totalUsd = Number(totalUsd) + Number(amt);
+                                                totalIdr = Number(totalIdr) + (Number(amt) * Number(groupRate || 1));
+                                            }
+                                        });
+                                    });
+                                    return { totalIdr, totalUsd };
+                                };
+
+                                // Always prefer live computation from groups for display
+                                const sourceGroups = isEditingQuotation ? (editedQuotation?.serviceItems || []) : (viewingQuotation?.serviceItems || []);
+                                const { totalIdr, totalUsd } = computeFromGroups(sourceGroups);
+
                                 return (
-                                    <div className="flex flex-wrap gap-4">
-                                        <div>
+                                    <div className="flex gap-4 items-stretch">
+                                        <div className="flex-1 max-w-[320px] p-3 bg-white/80 rounded-lg border border-orange-200">
                                             <p className="text-[10px] text-gray-400 mb-0.5">IDR</p>
-                                            <p className="text-2xl font-bold text-orange-600">Rp {totalIDR.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
+                                            <p className="text-2xl font-bold text-orange-600">Rp {Number(totalIdr || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
                                         </div>
-                                        {rate > 1 && (
-                                            <div className="border-l border-orange-200 pl-4">
-                                                <p className="text-[10px] text-gray-400 mb-0.5">USD (@ Rp {rate.toLocaleString('id-ID')})</p>
-                                                <p className="text-2xl font-bold text-blue-600">$ {totalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                                            </div>
-                                        )}
+                                        <div className="flex-1 max-w-[320px] p-3 bg-white/80 rounded-lg border border-orange-200 text-right">
+                                            <p className="text-[10px] text-gray-400 mb-0.5">USD (@ Rp {Number(rate).toLocaleString('id-ID')})</p>
+                                            <p className="text-2xl font-bold text-blue-600">{rate > 1 ? `$ ${Number(totalUsd || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}</p>
+                                        </div>
                                     </div>
                                 );
                             })()}
@@ -2133,21 +2199,43 @@ const SalesQuotation = () => {
                                     onChange={(newGroups) => {
                                         if (isEditingQuotation) {
                                             setEditedQuotation(prev => {
-                                                const total = newGroups.reduce((acc, group) => {
-                                                    const groupRate = group.groupExchangeRate || prev.exchange_rate || 16000;
-                                                    const groupTotal = (group.items || []).reduce((sum, item) => {
-                                                        let usdAmt = 0; let idrAmt = 0;
-                                                        const amt = parseFloat(item.amount) || 0;
-                                                        if(item.currency === 'IDR'){
-                                                            idrAmt = amt; usdAmt = amt / groupRate;
-                                                        } else {
-                                                            usdAmt = amt; idrAmt = amt * groupRate;
+                                                // Calculate accurate totals: sum item amounts converting by group rate
+                                                const parseAmountValue = (val, currency, groupRate) => {
+                                                    if (val === null || val === undefined) return 0;
+                                                    if (typeof val === 'number') return val;
+                                                    const s = String(val).trim();
+                                                    if (s === '') return 0;
+                                                    try {
+                                                        if (currency === 'IDR') {
+                                                            const cleaned = s.replace(/\./g, '').replace(/,/g, '.');
+                                                            const n = parseFloat(cleaned);
+                                                            return Number.isFinite(n) ? n : 0;
                                                         }
-                                                        return sum + (prev.currency === 'IDR' ? idrAmt : usdAmt);
-                                                    }, 0);
-                                                    return acc + groupTotal;
-                                                }, 0);
-                                                return { ...prev, serviceItems: newGroups, totalAmount: total };
+                                                        const cleaned = s.replace(/,/g, '');
+                                                        const n = parseFloat(cleaned);
+                                                        return Number.isFinite(n) ? n : 0;
+                                                    } catch (e) {
+                                                        return 0;
+                                                    }
+                                                };
+
+                                                let totalIdr = 0;
+                                                let totalUsd = 0;
+                                                newGroups.forEach(group => {
+                                                    const groupRate = group.groupExchangeRate || prev.exchange_rate || 16000;
+                                                    (group.items || []).forEach(item => {
+                                                        const amt = parseAmountValue(item.amount, item.currency, groupRate) || 0;
+                                                        if (item.currency === 'IDR') {
+                                                            totalIdr = Number(totalIdr) + Number(amt);
+                                                            totalUsd = Number(totalUsd) + (groupRate ? (Number(amt) / Number(groupRate)) : 0);
+                                                        } else {
+                                                            totalUsd = Number(totalUsd) + Number(amt);
+                                                            totalIdr = Number(totalIdr) + (Number(amt) * Number(groupRate || 1));
+                                                        }
+                                                    });
+                                                });
+                                                const total = (prev.currency || 'IDR') === 'IDR' ? totalIdr : totalUsd;
+                                                return { ...prev, serviceItems: newGroups, totalAmount: total, total_idr: totalIdr, total_usd: totalUsd };
                                             });
                                         }
                                     }}
@@ -2458,7 +2546,12 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                             <div className="w-64 bg-slate-50 p-6 rounded-lg">
                                 <div className="flex justify-between items-center mb-2">
                                     <span className="text-slate-500 text-sm">Subtotal</span>
-                                    <span className="font-mono text-slate-700">{formatCurrency(quotation.totalAmount || quotation.total_amount, quotation.currency)}</span>
+                                    {(() => {
+                                        const rate = quotation.exchange_rate || quotation.exchangeRate || 16000;
+                                        const idr = quotation.total_idr ?? (quotation.totalAmount ? ((quotation.currency === 'IDR') ? quotation.totalAmount : quotation.totalAmount * rate) : (quotation.total_amount ? (quotation.currency === 'IDR' ? quotation.total_amount : quotation.total_amount * rate) : 0));
+                                        const usd = quotation.total_usd ?? (quotation.totalAmount ? ((quotation.currency === 'USD') ? quotation.totalAmount : (rate ? quotation.totalAmount / rate : 0)) : (quotation.total_amount ? ((quotation.currency === 'USD') ? quotation.total_amount : (rate ? quotation.total_amount / rate : 0)) : 0));
+                                        return <span className="font-mono text-slate-700">{quotation.currency === 'USD' ? `$ ${usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `Rp ${idr.toLocaleString('id-ID')}`}</span>
+                                    })()}
                                 </div>
                                 <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-200">
                                     <span className="text-slate-500 text-sm">Tax (0%)</span>
@@ -2466,9 +2559,14 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                                 </div>
                                 <div className="flex justify-between items-center">
                                     <span className="font-bold text-slate-900">Total</span>
-                                    <span className="font-bold text-xl text-blue-600">
-                                        {formatCurrency(quotation.totalAmount || quotation.total_amount, quotation.currency)}
-                                    </span>
+                                        <span className="font-bold text-xl text-blue-600">
+                                            {(() => {
+                                                const rate = quotation.exchange_rate || quotation.exchangeRate || 16000;
+                                                const idr = quotation.total_idr ?? (quotation.totalAmount ? ((quotation.currency === 'IDR') ? quotation.totalAmount : quotation.totalAmount * rate) : (quotation.total_amount ? (quotation.currency === 'IDR' ? quotation.total_amount : quotation.total_amount * rate) : 0));
+                                                const usd = quotation.total_usd ?? (quotation.totalAmount ? ((quotation.currency === 'USD') ? quotation.totalAmount : (rate ? quotation.totalAmount / rate : 0)) : (quotation.total_amount ? ((quotation.currency === 'USD') ? quotation.total_amount : (rate ? quotation.total_amount / rate : 0)) : 0));
+                                                return quotation.currency === 'USD' ? `$ ${usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `Rp ${idr.toLocaleString('id-ID')}`;
+                                            })()}
+                                        </span>
                                 </div>
                             </div>
                         </div>

@@ -259,6 +259,27 @@ const GroupedServiceItemManager = ({
     };
 
     // Calculate totals over all groups
+    const parseAmountValue = (val, currency, groupRate) => {
+        if (val === null || val === undefined) return 0;
+        if (typeof val === 'number') return val;
+        const s = String(val).trim();
+        if (s === '') return 0;
+        try {
+            if (currency === 'IDR') {
+                // IDR formatted like 35.000.000 or 35.000.000,00 -> remove dots, treat comma as decimal
+                const cleaned = s.replace(/\./g, '').replace(/,/g, '.');
+                const n = parseFloat(cleaned);
+                return Number.isFinite(n) ? n : 0;
+            }
+            // USD or other: remove commas used as thousands separator
+            const cleaned = s.replace(/,/g, '');
+            const n = parseFloat(cleaned);
+            return Number.isFinite(n) ? n : 0;
+        } catch (e) {
+            return 0;
+        }
+    };
+
     const calculateGrandTotals = () => {
         let totalIdr = 0;
         let totalUsd = 0;
@@ -266,13 +287,13 @@ const GroupedServiceItemManager = ({
         groups.forEach(g => {
             const groupRate = g.groupExchangeRate || exchangeRate;
             (g.items || []).forEach(item => {
-                const amt = parseFloat(item.amount) || 0;
+                const amt = parseAmountValue(item.amount, item.currency, groupRate) || 0;
                 if (item.currency === 'IDR') {
-                    totalIdr += amt;
-                    totalUsd += amt / groupRate;
+                    totalIdr = Number(totalIdr) + Number(amt);
+                    totalUsd = Number(totalUsd) + (groupRate ? (Number(amt) / Number(groupRate)) : 0);
                 } else if (item.currency === 'USD') {
-                    totalUsd += amt;
-                    totalIdr += amt * groupRate;
+                    totalUsd = Number(totalUsd) + Number(amt);
+                    totalIdr = Number(totalIdr) + (Number(amt) * Number(groupRate || 1));
                 }
             });
         });
@@ -289,6 +310,15 @@ const GroupedServiceItemManager = ({
     };
 
     const { totalIdr, totalUsd } = calculateGrandTotals();
+
+    // Temporary debug logging to verify totals before and after changes
+    useEffect(() => {
+        try {
+            console.debug('[GroupedServiceItemManager] totals computed', { totalIdr, totalUsd, groupsLength: groups.length });
+        } catch (e) {
+            // ignore
+        }
+    }, [totalIdr, totalUsd, groups.length]);
 
     return (
         <div className="space-y-6">

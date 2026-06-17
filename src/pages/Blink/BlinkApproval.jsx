@@ -808,6 +808,11 @@ const BlinkApproval = () => {
 
                 // Auto-create Shipment — only use columns that exist in blink_shipments
                 const coreData = {
+                    // Propagate shipper from quotation for consistency
+                    shipper: quotationData.shipper || quotationData.shipper_name || quotationData.customer_name || '',
+                    shipper_name: quotationData.shipper_name || quotationData.shipper || quotationData.customer_name || '',
+                    shipper_id: quotationData.shipper_id || null,
+                    quotation_shipper_name: quotationData.shipper_name || null,
                     job_number: quotationData.job_number,
                     so_number: soNumber,
                     quotation_id: quotationData.id,

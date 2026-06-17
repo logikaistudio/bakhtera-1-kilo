@@ -284,6 +284,12 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                     // Merge quotation fields into editedShipment — only fill if field is currently empty/null
                     setEditedShipment(prev => ({
                         ...prev,
+                        // Auto-fill shipper fields from quotation when available
+                        shipper: prev.shipper || quotation.shipper || quotation.shipper_name || '',
+                        shipper_name: prev.shipper_name || quotation.shipper_name || quotation.shipper || '',
+                        shipperName: prev.shipperName || quotation.shipper_name || quotation.shipper || '',
+                        shipper_id: prev.shipper_id || quotation.shipper_id || null,
+                        shipper_address: prev.shipper_address || quotation.shipper_address || quotation.shipper_address || '',
                         customer: prev.customer || quotation.customer_name || '',
                         salesPerson: prev.salesPerson || quotation.sales_person || '',
                         origin: prev.origin || quotation.origin || '',
@@ -333,6 +339,28 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                 if (error) throw error;
                 setVendors(data || []);
                 console.log('🏢 Fetched vendor mitra:', data?.length || 0);
+
+                // If we have a linked quotation or existing editedShipment without shipper, try to default-select vendor
+                try {
+                    const qName = quotationData?.shipper_name || quotationData?.shipper || '';
+                    setEditedShipment(prev => {
+                        if (prev.shipper_name || prev.shipper || !qName) return prev;
+                        // Find matching vendor by name (case-insensitive)
+                        const matched = (data || []).find(v => (v.partner_name || '').toLowerCase() === (qName || '').toLowerCase());
+                        const address = matched ? [matched.address_line1, matched.address_line2, matched.city, matched.country].filter(Boolean).join(', ') : '';
+                        return {
+                            ...prev,
+                            shipper: qName,
+                            shipper_name: qName,
+                            shipperName: qName,
+                            shipper_id: matched?.id || prev.shipper_id || null,
+                            shipper_address: prev.shipper_address || address || ''
+                        };
+                    });
+                } catch (err) {
+                    // Non-fatal
+                    console.debug('Error auto-selecting vendor:', err?.message || err);
+                }
             } catch (error) {
                 console.error('Error fetching vendor mitra:', error);
             }

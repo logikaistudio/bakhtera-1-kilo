@@ -179,15 +179,22 @@ const BridgeInvoiceManagement = () => {
                 setQuotations([]);
                 return;
             }
-            // Map to consistent format
-            const mapped = (data || []).map(q => ({
-                ...q,
-                quotationNumber: q.quotation_number || q.quotationNumber,
-                customerName: q.customer_name || q.customerName,
-                jobNumber: q.job_number || q.jobNumber,
-                totalAmount: q.total_amount || q.totalAmount,
-                serviceType: q.service_type || q.serviceType
-            }));
+            // Map to consistent format and derive totals
+            const mapped = (data || []).map(q => {
+                const rate = q.exchange_rate || q.exchangeRate || 16000;
+                const totalIdr = q.total_idr ?? (q.total_amount ?? q.totalAmount ? ((q.currency === 'IDR') ? (q.total_amount ?? q.totalAmount) : ((q.total_amount ?? q.totalAmount) * rate)) : 0);
+                const totalUsd = q.total_usd ?? (q.total_amount ?? q.totalAmount ? ((q.currency === 'USD') ? (q.total_amount ?? q.totalAmount) : ((rate ? (q.total_amount ?? q.totalAmount) / rate : 0))) : 0);
+                return {
+                    ...q,
+                    quotationNumber: q.quotation_number || q.quotationNumber,
+                    customerName: q.customer_name || q.customerName,
+                    jobNumber: q.job_number || q.jobNumber,
+                    totalAmount: q.total_amount || q.totalAmount,
+                    total_idr: totalIdr,
+                    total_usd: totalUsd,
+                    serviceType: q.service_type || q.serviceType
+                };
+            });
             console.log(`✅ Loaded ${mapped.length} quotations for invoice creation`);
             setQuotations(mapped);
         } catch (error) {
@@ -273,8 +280,8 @@ const BridgeInvoiceManagement = () => {
                         description: `${(quotation.serviceType || quotation.service_type || 'Freight').toUpperCase()} - ${quotation.origin} to ${quotation.destination}`,
                         qty: 1,
                         unit: 'Job',
-                        rate: quotation.totalAmount || quotation.total_amount || 0,
-                        amount: quotation.totalAmount || quotation.total_amount || 0,
+                        rate: (quotation.billing_currency === 'IDR' || quotation.currency === 'IDR') ? (quotation.total_idr ?? (quotation.totalAmount || quotation.total_amount || 0)) : (quotation.total_usd ?? ((quotation.totalAmount || quotation.total_amount || 0) / (quotation.exchange_rate || quotation.exchangeRate || 16000))),
+                        amount: (quotation.billing_currency === 'IDR' || quotation.currency === 'IDR') ? (quotation.total_idr ?? (quotation.totalAmount || quotation.total_amount || 0)) : (quotation.total_usd ?? ((quotation.totalAmount || quotation.total_amount || 0) / (quotation.exchange_rate || quotation.exchangeRate || 16000))),
                         tax_amount: 0,
                         tax_rate: 0,
                         currency: quotation.currency || 'IDR'
