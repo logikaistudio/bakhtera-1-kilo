@@ -16,6 +16,31 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
+const formatInputAmount = (value, currency) => {
+    if (value === null || value === undefined || value === '') return '';
+    const valStr = value.toString();
+    
+    // If the user is currently typing a decimal point or trailing zero, don't format with toLocaleString to avoid cursor jump and losing the dot/zero
+    if (valStr.endsWith('.') || (valStr.includes('.') && valStr.endsWith('0'))) {
+        const parts = valStr.split('.');
+        const integerPart = parseFloat(parts[0]);
+        if (isNaN(integerPart)) return valStr;
+        const formattedInt = currency === 'IDR' 
+            ? integerPart.toLocaleString('id-ID') 
+            : integerPart.toLocaleString('en-US');
+        return formattedInt + '.' + parts[1];
+    }
+    
+    const num = parseFloat(valStr);
+    if (isNaN(num)) return valStr;
+    
+    if (currency === 'IDR') {
+        return Math.round(num).toLocaleString('id-ID');
+    } else {
+        return num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    }
+};
+
 const QuotationManagement = () => {
     const { user, canCreate, canEdit, canDelete, canView, canApprove, isAdmin } = useAuth();
     const navigate = useNavigate();
@@ -211,7 +236,7 @@ const QuotationManagement = () => {
             commodity: formData.commodity,
             currency: formData.currency,
             exchange_rate: formData.currency === 'IDR' ? 1 : (formData.exchange_rate || 16000),
-            total_amount: formData.totalAmount ? parseInt(formData.totalAmount.toString().replace(/\./g, '')) : 0,
+            total_amount: formData.totalAmount ? parseFloat(formData.totalAmount.toString()) : 0,
             status: status,
             notes: formData.notes,
             service_items: formData.serviceItems,
@@ -1510,11 +1535,19 @@ const QuotationManagement = () => {
                             </label>
                             <input
                                 type="text"
-                                value={formData.totalAmount ? parseInt(formData.totalAmount.toString().replace(/\./g, '')).toLocaleString('id-ID') : ''}
+                                value={formatInputAmount(formData.totalAmount, formData.currency)}
                                 onChange={(e) => {
-                                    const value = e.target.value.replace(/\./g, '');
-                                    if (value === '' || /^\d+$/.test(value)) {
-                                        setFormData({ ...formData, totalAmount: value });
+                                    const value = e.target.value;
+                                    if (formData.currency === 'IDR') {
+                                        const clean = value.replace(/\./g, '');
+                                        if (clean === '' || /^\d+$/.test(clean)) {
+                                            setFormData({ ...formData, totalAmount: clean });
+                                        }
+                                    } else {
+                                        const clean = value.replace(/,/g, '');
+                                        if (clean === '' || /^\d*\.?\d*$/.test(clean)) {
+                                            setFormData({ ...formData, totalAmount: clean });
+                                        }
                                     }
                                 }}
                                 placeholder="0"
@@ -1926,26 +1959,33 @@ const QuotationManagement = () => {
 
                         <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
                             <div className="flex justify-between items-start">
-                                <div>
-                                    <p className="text-sm text-gray-500 mb-1">Estimated Amount</p>
-                                    <div className="text-2xl font-bold text-orange-600">
-                                        {(isEditingQuotation ? editedQuotation?.currency : viewingQuotation.currency) === 'IDR' ? 'Rp ' : '$'}
-                                        {(isEditingQuotation
-                                            ? (editedQuotation?.totalAmount || 0)
-                                            : (viewingQuotation.totalAmount || viewingQuotation.total_amount || 0)
-                                        ).toLocaleString('id-ID')}
-                                    </div>
-                                    {isEditingQuotation && (
-                                        <input
-                                            type="number"
-                                            value={editedQuotation?.totalAmount || 0}
-                                            onChange={(e) => setEditedQuotation({ ...editedQuotation, totalAmount: parseFloat(e.target.value) || 0 })}
-                                            className="mt-2 w-full px-3 py-2 bg-white border border-gray-300 rounded text-gray-900 text-sm"
-                                            placeholder="Enter amount"
-                                        />
-                                    )}
+                                <div className="flex-1">
+                                    <p className="text-sm font-semibold text-gray-500 mb-3">Estimated Amount (otomatis dari item)</p>
+                                    {(() => {
+                                        const data = isEditingQuotation ? editedQuotation : viewingQuotation;
+                                        const totalNum = parseFloat(data?.totalAmount || data?.total_amount) || 0;
+                                        const rate = parseFloat(data?.exchange_rate || data?.exchangeRate) || 16000;
+                                        const currency = data?.currency || 'IDR';
+                                        const isIDR = currency === 'IDR';
+                                        const totalIDR = isIDR ? totalNum : totalNum * rate;
+                                        const totalUSD = isIDR ? (rate > 1 ? totalNum / rate : 0) : totalNum;
+                                        return (
+                                            <div className="flex flex-wrap gap-6">
+                                                <div>
+                                                    <p className="text-[10px] text-gray-400 mb-0.5">IDR</p>
+                                                    <p className="text-2xl font-bold text-orange-600">Rp {totalIDR.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
+                                                </div>
+                                                {rate > 1 && (
+                                                    <div className="border-l border-orange-200 pl-6">
+                                                        <p className="text-[10px] text-gray-400 mb-0.5">USD (@ Rp {rate.toLocaleString('id-ID')})</p>
+                                                        <p className="text-2xl font-bold text-blue-600">$ {totalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
-                                <div className="text-right">
+                                <div className="text-right ml-4">
                                     {isEditingQuotation ? (
                                         <div className="flex flex-col gap-2 items-end">
                                             <div className="flex items-center gap-2">
@@ -1998,7 +2038,17 @@ const QuotationManagement = () => {
                                     items={isEditingQuotation ? (editedQuotation?.serviceItems || []) : viewingQuotation.serviceItems}
                                     onChange={(items) => {
                                         if (isEditingQuotation) {
-                                            setEditedQuotation({ ...editedQuotation, serviceItems: items });
+                                            const rate = parseFloat(editedQuotation?.exchange_rate) || 16000;
+                                            const currency = editedQuotation?.currency || 'IDR';
+                                            const total = (items || []).reduce((sum, item) => {
+                                                const amt = parseFloat(item.amount) || 0;
+                                                if (item.currency === 'IDR') {
+                                                    return sum + (currency === 'IDR' ? amt : amt / rate);
+                                                } else {
+                                                    return sum + (currency === 'IDR' ? amt * rate : amt);
+                                                }
+                                            }, 0);
+                                            setEditedQuotation(prev => ({ ...prev, serviceItems: items, totalAmount: total }));
                                         }
                                     }}
                                     currency={isEditingQuotation ? (editedQuotation?.currency || 'IDR') : viewingQuotation.currency}
