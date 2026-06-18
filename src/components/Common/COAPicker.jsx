@@ -230,8 +230,8 @@ const COAPicker = ({
 
     // Size classes - smaller font for efficiency
     const sizeClasses = size === 'sm'
-        ? 'text-[11px] py-1 px-2'
-        : 'text-xs py-1.5 px-3';
+        ? 'text-[12px] py-2 px-3'
+        : 'text-sm py-2.5 px-4';
 
     // Get type color for badge
     const getTypeColor = (type) => {
@@ -256,6 +256,7 @@ const COAPicker = ({
                     ${sizeClasses} text-left transition-colors
                     ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-accent-blue cursor-pointer'}
                     ${isOpen ? 'border-accent-blue ring-1 ring-accent-blue/30' : ''}`}
+                style={{ minHeight: '48px' }}
             >
                 <span className={`break-words leading-tight ${selectedAccount ? 'text-silver-light' : 'text-silver-dark'}`}>
                     {loading ? (
@@ -282,7 +283,7 @@ const COAPicker = ({
             {/* Dropdown Panel - Light Theme for Better Visibility */}
             {isOpen && (
                 <div className="absolute z-[9999] mt-1 bg-white border border-gray-300 rounded-lg shadow-2xl 
-                    max-h-80 overflow-hidden animate-fadeIn flex flex-col" style={{ minWidth: '400px', width: 'max-content', maxWidth: '600px' }}>
+                    max-h-[520px] overflow-hidden animate-fadeIn flex flex-col" style={{ minWidth: '520px', width: 'max-content', maxWidth: '820px' }}>
 
                     {/* Search Input & Controls */}
                     <div className="p-3 border-b border-gray-200 bg-gray-50 flex gap-2 flex-shrink-0">
@@ -294,8 +295,8 @@ const COAPicker = ({
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 placeholder="Search kode atau nama akun..."
-                                className="w-full pl-9 pr-4 py-2 bg-white border border-gray-300 rounded-lg 
-                                    text-xs text-gray-800 placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
+                                className="w-full pl-9 pr-4 py-3 bg-white border border-gray-300 rounded-lg 
+                                    text-sm text-gray-800 placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
                             />
                         </div>
                         <button
@@ -366,9 +367,10 @@ const COAPicker = ({
                                                         key={acc.id}
                                                         type="button"
                                                         onClick={() => handleSelect(acc)}
-                                                        className={`w-full px-4 py-2 text-left hover:bg-blue-50 
+                                                        className={`w-full px-5 py-3 text-left hover:bg-blue-50 
                                                             transition-colors flex items-center gap-3 border-b border-gray-50 last:border-0
                                                             ${selectedAccount?.id === acc.id ? 'bg-blue-100/50' : 'bg-white'}`}
+                                                        style={{ minHeight: '56px' }}
                                                     >
                                                         <div className="flex flex-col items-start min-w-[32px] justify-center">
                                                             {acc.parent_code && (
