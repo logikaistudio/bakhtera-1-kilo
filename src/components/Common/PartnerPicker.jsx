@@ -141,7 +141,7 @@ const PartnerPicker = ({
                 className={`w-full border rounded-lg text-left flex items-center justify-between ${sizeClasses[size]} 
                 ${theme === 'light' ? 'border-gray-300' : 'bg-dark-surface border-dark-border text-silver-light'} 
                 ${!selectedPartner && theme !== 'light' ? 'text-silver-dark' : ''}`}
-                style={theme === 'light' ? { backgroundColor: '#ffffff', color: !selectedPartner ? '#9ca3af' : '#1f2937' } : {}}
+                style={theme === 'light' ? { backgroundColor: '#ffffff', color: !selectedPartner ? '#9ca3af' : '#1f2937', minHeight: '44px' } : {}}
             >
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                     {selectedPartner ? (
@@ -168,7 +168,7 @@ const PartnerPicker = ({
                 <div
                     className={`absolute z-50 mt-1 w-full border rounded-lg shadow-xl max-h-80 overflow-hidden 
                     ${theme === 'light' ? 'border-gray-300' : 'bg-dark-card border-dark-border'}`}
-                    style={theme === 'light' ? { backgroundColor: '#ffffff' } : {}}
+                    style={theme === 'light' ? { backgroundColor: '#ffffff', minWidth: '480px' } : {}}
                 >
                     {/* Search */}
                     <div
@@ -182,9 +182,9 @@ const PartnerPicker = ({
                                 placeholder="Search mitra..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className={`w-full pl-8 pr-3 py-1.5 border rounded text-sm outline-none
+                                className={`w-full pl-8 pr-3 py-2 border rounded text-sm outline-none
                                 ${theme === 'light' ? 'border-gray-300 focus:border-blue-500' : 'bg-dark-surface border-dark-border text-silver-light'}`}
-                                style={theme === 'light' ? { backgroundColor: '#f9fafb', color: '#1f2937' } : {}}
+                                style={theme === 'light' ? { backgroundColor: '#ffffff', color: '#1f2937' } : {}}
                                 autoFocus
                             />
                         </div>
@@ -199,15 +199,15 @@ const PartnerPicker = ({
                                 {searchTerm ? 'Tidak ditemukan' : 'Belum ada mitra'}
                             </div>
                         ) : (
-                            filteredPartners.map(partner => (
+                                filteredPartners.map(partner => (
                                 <button
                                     key={partner.id}
                                     type="button"
                                     onClick={() => handleSelect(partner)}
-                                    className={`w-full px-3 py-2 transition-colors text-left border-b last:border-0 
+                                    className={`w-full px-4 py-3 transition-colors text-left border-b last:border-0 
                                     ${theme === 'light' ? 'border-gray-100' : 'border-dark-border/50 hover:bg-dark-surface'}`}
                                     style={theme === 'light' ? { backgroundColor: '#ffffff' } : {}}
-                                    onMouseEnter={theme === 'light' ? (e) => { e.currentTarget.style.backgroundColor = '#eff6ff'; } : undefined}
+                                    onMouseEnter={theme === 'light' ? (e) => { e.currentTarget.style.backgroundColor = '#f3f4f6'; } : undefined}
                                     onMouseLeave={theme === 'light' ? (e) => { e.currentTarget.style.backgroundColor = '#ffffff'; } : undefined}
                                 >
                                     <div className="flex items-center gap-2">
