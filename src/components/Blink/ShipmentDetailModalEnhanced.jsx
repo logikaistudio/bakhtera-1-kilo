@@ -2790,7 +2790,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                 )}
                                             </div>
 
-                                            <div className="overflow-x-auto">
+                                            <div className="overflow-x-auto overflow-y-visible">
                                                 <table className="w-full">
                                                     <thead className="bg-accent-orange">
                                                         <tr>
