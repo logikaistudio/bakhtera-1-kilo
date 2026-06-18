@@ -2790,8 +2790,8 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                 )}
                                             </div>
 
-                                            <div className="overflow-x-auto overflow-y-visible">
-                                                <table className="w-full">
+                                            <div className="overflow-x-auto overflow-y-visible" style={{ minHeight: '360px' }}>
+                                                <table className="w-full" style={{ minHeight: '320px' }}>
                                                     <thead className="bg-accent-orange">
                                                         <tr>
                                                             <th className="px-2 py-2 text-center text-xs text-white w-10 font-normal">No</th>
