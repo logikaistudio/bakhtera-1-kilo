@@ -3,7 +3,7 @@ import { createInvoiceJournal, createCOGSJournal, createARPaymentJournal, getAll
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useData } from '../../context/DataContext';
-import { generateInvoiceNumber } from '../../utils/documentNumbers';
+import { generateInvoiceNumber, generateBridgeInvoiceNumber } from '../../utils/documentNumbers';
 import { getCurrencySymbol } from '../../utils/currencyFormatter';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
@@ -21,7 +21,7 @@ import InvoiceProfitSummary from '../../components/Bridge/InvoiceProfitSummary';
 const BridgeInvoiceManagement = () => {
     const navigate = useNavigate();
     const { canCreate, canEdit, canDelete, canApprove, user } = useAuth();
-    const { companySettings, bankAccounts } = useData();
+    const { companySettings, bankAccounts, quotations: ctxQuotations = [], shipments: ctxShipments = [] } = useData();
     const [invoices, setInvoices] = useState([]);
     const [quotations, setQuotations] = useState([]);
     const [shipments, setShipments] = useState([]);
@@ -99,10 +99,31 @@ const BridgeInvoiceManagement = () => {
 
     useEffect(() => {
         fetchInvoices();
-        fetchApprovedQuotations();
-        fetchShipments();
+        // Prefer data from DataContext (bridge pengajuan) if available
+        if (ctxQuotations && ctxQuotations.length > 0) {
+            console.log('Using quotations from DataContext (bridge pengajuan)');
+            setQuotations(ctxQuotations);
+        } else {
+            fetchApprovedQuotations();
+        }
+
+        if (ctxShipments && ctxShipments.length > 0) {
+            console.log('Using shipments from DataContext');
+            setShipments(ctxShipments);
+        } else {
+            fetchShipments();
+        }
         fetchRevenueAccounts();
     }, []);
+
+    // Keep local lists in sync with DataContext updates
+    useEffect(() => {
+        if (ctxQuotations && ctxQuotations.length > 0) setQuotations(ctxQuotations);
+    }, [ctxQuotations]);
+
+    useEffect(() => {
+        if (ctxShipments && ctxShipments.length > 0) setShipments(ctxShipments);
+    }, [ctxShipments]);
 
     useEffect(() => {
         if (financeMigrationRan || loading || invoices.length === 0) return;
@@ -651,7 +672,7 @@ const BridgeInvoiceManagement = () => {
             // 2. Generate unique invoice number (async)
             // If previous invocies were cancelled, this will auto-generate suffix (e.g. -1)
             const quotationNum = selectedQuotation?.quotation_number || selectedQuotation?.quotationNumber || formData.job_number;
-            const invoiceNumber = await generateInvoiceNumber(quotationNum);
+            const invoiceNumber = await generateBridgeInvoiceNumber(quotationNum);
 
             const newInvoice = {
                 invoice_number: invoiceNumber,
@@ -1591,69 +1612,7 @@ const BridgeInvoiceManagement = () => {
         }).catch(err => console.error("Failed to load export utility", err));
     };
 
-    // --- Dev Temp Migration ---
-    const [isMigrating, setIsMigrating] = useState(false);
-    const runMigration = async () => {
-        if (!confirm('Run auto-journal migration for historical invoices?')) return;
-        setIsMigrating(true);
-        try {
-            const { data: allInvoices, error: invError } = await supabase
-                .from('bridge_invoices')
-                .select('*')
-                .neq('status', 'draft')
-                .neq('status', 'cancelled');
-            if (invError) throw invError;
-
-            const { data: currentJournals, error: jeError } = await supabase
-                .from('bridge_journal_entries')
-                .select('reference_id')
-                .eq('reference_type', 'ar');
-            if (jeError) throw jeError;
-
-            const existingIds = new Set(currentJournals.map(je => je.reference_id));
-            const toMigrate = allInvoices
-                .filter(inv => !existingIds.has(inv.id))
-                .sort((a, b) => new Date(a.invoice_date) - new Date(b.invoice_date));
-
-            if (toMigrate.length === 0) {
-                alert('All invoices already migrated!');
-                setIsMigrating(false);
-                return;
-            }
-
-            let migratedCount = 0;
-            const coaList = await getAllCOA();
-
-            for (const inv of toMigrate) {
-                try {
-                    // Create detailed AR + Revenue journal
-                    await createInvoiceJournal({ invoice: inv, coaList });
-                    
-                    // Create detailed COGS + Inventory journal if applicable
-                    if (inv.cogs_subtotal > 0) {
-                        await createCOGSJournal({ 
-                            invoice: inv, 
-                            cogsAmount: inv.cogs_subtotal, 
-                            coaList 
-                        });
-                    }
-                    migratedCount++;
-                } catch (err) {
-                    console.error(`Failed to migrate invoice ${inv.invoice_number}:`, err);
-                }
-            }
-
-            if (migratedCount > 0) {
-                alert(`Successfully migrated ${migratedCount} invoices with detailed items!`);
-                await fetchInvoices();
-            }
-        } catch (error) {
-            console.error(error);
-            alert('Migration failed: ' + error.message);
-        } finally {
-            setIsMigrating(false);
-        }
-    };
+    // (migration helper removed)
 
     return (
         <div className="space-y-6">
@@ -1663,21 +1622,13 @@ const BridgeInvoiceManagement = () => {
                     <h1 className="text-3xl font-bold gradient-text">Invoice Management</h1>
                     <p className="text-silver-dark mt-1">Kelola invoice dan tracking pembayaran</p>
                 </div>
-                <div className="flex items-center gap-3">
-                    <Button
-                        onClick={runMigration}
-                        icon={PlaySquare}
-                        variant="secondary"
-                        disabled={isMigrating}
-                    >
-                        {isMigrating ? 'Migrating...' : 'Migrate Auto Journal'}
-                    </Button>
+                    <div className="flex items-center gap-3">
                     <Button onClick={handleExportXLS} variant="secondary" icon={Download}>
                         Export XLS
                     </Button>
                     {canCreate('bridge_invoices') && (
                         <Button onClick={() => setShowCreateModal(true)} icon={Plus}>
-                            Generate Invoice (Beda Kurs)
+                            Generate Invoice
                         </Button>
                     )}
                 </div>
@@ -1986,17 +1937,29 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
     const [coaSearchMapInv, setCoaSearchMapInv] = useState({});    // { [itemIndex]: searchTerm }
     const [coaDropdownMapInv, setCoaDropdownMapInv] = useState({}); // { [itemIndex]: boolean open }
 
-    // SO only (quotation option removed)
-    const blendedReferences = shipments.map(s => ({
-        id: s.id,
-        type: 'shipment',
-        label: `[SO] ${s.so_number || s.job_number} - ${s.customer} (${s.origin} → ${s.destination})`,
-        data: s
-    }));
+    // Blend both quotations and shipments so user can select either pengajuan (inbound/outbound) or shipment
+    const blendedReferences = [
+        // Quotations first
+        ...quotations.map(q => ({
+            id: q.id,
+            type: 'quotation',
+            combinedId: `quotation-${q.id}`,
+            label: `[PQ] ${q.quotationNumber || q.jobNumber || q.quotation_number || q.jobNumber || '-'} - ${q.customerName || q.customer_name || q.customer || '-'} (${q.origin || '-'} → ${q.destination || '-'})`,
+            data: q
+        })),
+        // Shipments (SO)
+        ...shipments.map(s => ({
+            id: s.id,
+            type: 'shipment',
+            combinedId: `shipment-${s.id}`,
+            label: `[SO] ${s.so_number || s.job_number || s.jobNumber || '-'} - ${s.customer || '-'} (${s.origin || '-'} → ${s.destination || '-'})`,
+            data: s
+        }))
+    ];
 
     const handleReferenceSelect = (e) => {
-        const selectedId = e.target.value;
-        const reference = blendedReferences.find(r => r.id === selectedId);
+        const selectedCombined = e.target.value;
+        const reference = blendedReferences.find(r => r.combinedId === selectedCombined);
 
         if (!reference) return;
 
@@ -2033,18 +1996,35 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                             <label className="block text-[11px] font-semibold text-silver-light mb-1.5">
                                 Referensi (Sales Order) <span className="text-red-400">*</span>
                             </label>
+                            <div className="text-[11px] text-silver-dark mb-2">
+                                <span className="mr-3">Pengajuan: <strong className="text-silver-light">{quotations.length}</strong></span>
+                                <span>Shipments: <strong className="text-silver-light">{shipments.length}</strong></span>
+                            </div>
                             <select
-                                value={formData.shipment_id || formData.quotation_id || ''}
+                                value={selectedQuotation ? `quotation-${selectedQuotation.id}` : (selectedShipment ? `shipment-${selectedShipment.id}` : '')}
                                 onChange={handleReferenceSelect}
                                 className="w-full px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded text-silver-light text-[11px]"
                                 required
                             >
-                                <option value="">-- Pilih Sales Order --</option>
-                                {blendedReferences.map(ref => (
-                                    <option key={`${ref.type}-${ref.id}`} value={ref.id}>
-                                        {ref.label}
-                                    </option>
-                                ))}
+                                <option value="">-- Pilih Sales Order / Pengajuan --</option>
+                                {quotations.length > 0 && (
+                                    <optgroup label={`Pengajuan (${quotations.length})`}>
+                                        {quotations.map(q => (
+                                            <option key={`quotation-${q.id}`} value={`quotation-${q.id}`}>
+                                                {`[PQ] ${q.quotationNumber || q.jobNumber || q.jobNumber || q.quotation_number || '-'} - ${q.customerName || q.customer_name || q.customer || '-'}`}
+                                            </option>
+                                        ))}
+                                    </optgroup>
+                                )}
+                                {shipments.length > 0 && (
+                                    <optgroup label={`Shipments (${shipments.length})`}>
+                                        {shipments.map(s => (
+                                            <option key={`shipment-${s.id}`} value={`shipment-${s.id}`}>
+                                                {`[SO] ${s.so_number || s.job_number || s.jobNumber || '-'} - ${s.customer || '-'}`}
+                                            </option>
+                                        ))}
+                                    </optgroup>
+                                )}
                             </select>
 
                         </div>
@@ -2417,20 +2397,20 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                             </button>
                         </div>
 
-                        <div className="overflow-visible pb-40">
-                            <table className="w-full">
+                        <div className="overflow-x-auto pb-40">
+                            <table className="min-w-[1100px] table-fixed w-full">
                                 <thead className="bg-accent-orange">
                                     <tr>
                                         <th className="px-2 py-2 text-center text-xs text-white w-10 font-normal">No</th>
                                         <th className="px-2 py-2 text-left text-xs text-white min-w-[200px] font-normal">Item (COA)</th>
                                         <th className="px-2 py-2 text-left text-xs text-white min-w-[200px] font-normal">Description</th>
-                                        <th className="px-2 py-2 text-center text-xs text-white w-24 font-normal">Qty</th>
-                                        <th className="px-2 py-2 text-center text-xs text-white w-24 font-normal">Unit</th>
-                                        <th className="px-2 py-2 text-center text-xs text-white w-16 font-normal">Curr</th>
+                                        <th className="px-2 py-2 text-center text-xs text-white w-32 font-normal">Qty</th>
+                                        <th className="px-2 py-2 text-center text-xs text-white w-28 font-normal">Unit</th>
+                                        <th className="px-2 py-2 text-center text-xs text-white w-20 font-normal">Curr</th>
                                         <th className="px-2 py-2 text-right text-xs text-white min-w-[140px] font-normal">Price</th>
                                         <th className="px-2 py-2 text-right text-xs text-white min-w-[80px] font-normal">Tax %</th>
-                                        <th className="px-2 py-2 text-right text-xs text-white min-w-[100px] font-normal">Tax Amt</th>
-                                        <th className="px-2 py-2 text-right text-xs text-white min-w-[100px] font-normal">Total</th>
+                                        <th className="px-2 py-2 text-right text-xs text-white min-w-[140px] font-normal">Tax Amt</th>
+                                        <th className="px-2 py-2 text-right text-xs text-white min-w-[160px] font-normal">Total</th>
                                         <th className="px-2 py-2 text-center text-xs text-white w-10 font-normal">Action</th>
                                     </tr>
                                 </thead>
@@ -2498,7 +2478,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                                     )}
                                                 </div>
                                             </td>
-                                            <td className="px-3 py-2">
+                                            <td className="px-3 py-2 min-w-[200px]">
                                                 <input
                                                     type="text"
                                                     value={item.description}
@@ -2508,7 +2488,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                                     required
                                                 />
                                             </td>
-                                            <td className="px-3 py-2">
+                                            <td className="px-3 py-2 w-32 text-center">
                                                 <input
                                                     type="number"
                                                     value={item.qty}
@@ -2519,7 +2499,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                                     required
                                                 />
                                             </td>
-                                            <td className="px-3 py-2">
+                                            <td className="px-3 py-2 w-28 text-center">
                                                 <input
                                                     type="text"
                                                     value={item.unit}
@@ -2529,7 +2509,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                                     required
                                                 />
                                             </td>
-                                            <td className="px-1 py-2">
+                                            <td className="px-3 py-2 w-20 text-center">
                                                 <select
                                                     value={item.currency || formData.billing_currency}
                                                     onChange={(e) => updateInvoiceItem(index, 'currency', e.target.value)}
@@ -2541,7 +2521,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                                     <option value="EUR">EUR</option>
                                                 </select>
                                             </td>
-                                            <td className="px-3 py-2">
+                                            <td className="px-3 py-2 text-right min-w-[140px]">
                                                 <input
                                                     type="number"
                                                     value={item.rate}
@@ -2552,8 +2532,8 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                                     required
                                                 />
                                             </td>
-                                            <td className="px-2 py-2">
-                                                <div className="flex items-center gap-1">
+                                            <td className="px-2 py-2 text-right min-w-[80px]">
+                                                <div className="flex items-center justify-end gap-1">
                                                     <input
                                                         type="number"
                                                         value={item.tax_rate ?? ''}
@@ -2567,10 +2547,10 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                                     <span className="text-silver-dark text-xs">%</span>
                                                 </div>
                                             </td>
-                                            <td className="px-2 py-2 text-right">
+                                            <td className="px-3 py-2 text-right min-w-[140px]">
                                                 <span className="text-silver-dark text-sm">{formatCurrency(item.tax_amount || 0, item.currency || formData.billing_currency)}</span>
                                             </td>
-                                            <td className="px-2 py-2 text-right">
+                                            <td className="px-3 py-2 text-right font-semibold min-w-[160px]">
                                                 <span className="text-silver-light text-sm">{formatCurrency(item.amount, item.currency || formData.billing_currency)}</span>
                                             </td>
                                             <td className="px-2 py-2 text-center">

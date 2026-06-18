@@ -1677,7 +1677,7 @@ const InvoiceManagement = () => {
                     </Button>
                     {canCreate('blink_invoices') && (
                         <Button onClick={() => setShowCreateModal(true)} icon={Plus}>
-                            Generate Invoice (Beda Kurs)
+                            Generate Invoice
                         </Button>
                     )}
                 </div>

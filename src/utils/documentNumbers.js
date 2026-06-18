@@ -185,6 +185,56 @@ export const generateInvoiceNumber = async (quotationNumber) => {
 };
 
 /**
+ * Generate Bridge Invoice Number from Quotation/Pengajuan Number (Async & Unique)
+ * Format: BRG-{quotationNumber} or BRG-INV-YYMM-XXXX when no quotationNumber
+ * Checks `bridge_invoices` for existing invoice numbers to avoid duplicates
+ */
+export const generateBridgeInvoiceNumber = async (quotationNumber) => {
+    let baseNumber;
+    if (!quotationNumber) {
+        const yymm = getYYMM();
+        baseNumber = `BRG-INV-${yymm}-0001`;
+    } else {
+        baseNumber = `BRG-${quotationNumber}`;
+    }
+
+    try {
+        const { data, error } = await supabase
+            .from('bridge_invoices')
+            .select('invoice_number')
+            .like('invoice_number', `${baseNumber}%`)
+            .order('invoice_number', { ascending: false });
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+            return baseNumber;
+        }
+
+        const exactMatch = data.find(d => d.invoice_number === baseNumber);
+        if (!exactMatch) return baseNumber;
+
+        let maxSuffix = 0;
+        data.forEach(row => {
+            const num = row.invoice_number;
+            if (num === baseNumber) return;
+
+            const suffixPart = num.replace(baseNumber + '-', '');
+            const suffixInt = parseInt(suffixPart);
+            if (!isNaN(suffixInt) && suffixInt > maxSuffix) {
+                maxSuffix = suffixInt;
+            }
+        });
+
+        return `${baseNumber}-${maxSuffix + 1}`;
+
+    } catch (error) {
+        console.error('Error generating bridge invoice number:', error);
+        return `${baseNumber}-${String(Date.now()).slice(-4)}`;
+    }
+};
+
+/**
  * Generate PO Number
  * Format: PO-BLKYYMM-XXXX
  * @returns {Promise<string>} Generated PO number
