@@ -2156,6 +2156,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                                 }}
                                                                 roleFilter="vendor"
                                                                 placeholder="Search vendor by name..."
+                                                                theme="light"
                                                                 onPartnerLoad={(partner) => {
                                                                     if (!partner) return;
                                                                     const address = [partner.address_line1, partner.address_line2, partner.city, partner.country].filter(Boolean).join(', ');
