@@ -2054,6 +2054,34 @@ export const DataProvider = ({ children }) => {
 
         if (error) {
             console.error('❌ Error adding quotation:', error);
+
+            // Fallback: some Supabase/PostgREST deployments may not have
+            // the optional `item_date` column in their schema cache yet.
+            // Detect that specific error and retry the insert without the
+            // `item_date` field so the UI still works on databases that
+            // haven't been migrated.
+            const msg = (error.message || '').toLowerCase();
+            if (msg.includes('item_date') && msg.includes('schema')) {
+                console.warn('⚠️ Schema cache missing item_date — retrying without it');
+                const safeQuotation = { ...newQuotation };
+                delete safeQuotation.item_date;
+                const { data: data2, error: error2 } = await supabase
+                    .from('freight_quotations')
+                    .insert([safeQuotation])
+                    .select();
+                if (error2) {
+                    console.error('❌ Retry without item_date failed:', error2);
+                    alert(`Failed to add quotation: ${error2.message}`);
+                    return;
+                }
+                // Continue using the retried result
+                if (data2 && data2[0]) {
+                    const created = data2[0];
+                    setQuotations(prev => [normalizeQuotation(created), ...prev]);
+                }
+                return;
+            }
+
             alert(`Failed to add quotation: ${error.message}`);
             return;
         }
@@ -2435,6 +2463,25 @@ export const DataProvider = ({ children }) => {
 
         if (updateError) {
             console.error('❌ Error updating quotation:', updateError);
+
+            // If the schema cache is missing `item_date`, retry without it
+            const msg = (updateError.message || '').toLowerCase();
+            if (msg.includes('item_date') && msg.includes('schema')) {
+                console.warn('⚠️ Schema cache missing item_date on update — retrying without it');
+                const safeUpdate = { ...dbUpdateData };
+                delete safeUpdate.item_date;
+                const { error: updateError2 } = await supabase
+                    .from('freight_quotations')
+                    .update(safeUpdate)
+                    .eq('id', quotationId);
+                if (updateError2) {
+                    console.error('❌ Retry update without item_date failed:', updateError2);
+                    alert(`Failed to update quotation: ${updateError2.message}`);
+                    return;
+                }
+                return;
+            }
+
             alert(`Failed to update quotation: ${updateError.message}`);
             return;
         }
