@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import COAPicker from '../Common/COAPicker';
+import PartnerPicker from '../Common/PartnerPicker';
 
 const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCancel, onViewAnalysis, canEditShipment = true, canCreatePO = true }) => {
     const navigate = useNavigate();
@@ -2146,33 +2147,52 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                 {/* Common fields for all service types */}
                                                 <div>
                                                     <label className="text-silver-dark text-xs">Shipper (Vendor)</label>
-                                                    <select
-                                                        value={editedShipment.shipper_name || editedShipment.shipperName || editedShipment.shipper || ''}
-                                                        onChange={(e) => {
-                                                            const selectedVendor = vendors.find(v => v.partner_name === e.target.value);
-                                                            const address = [
-                                                                selectedVendor?.address_line1,
-                                                                selectedVendor?.address_line2,
-                                                                selectedVendor?.city,
-                                                                selectedVendor?.country
-                                                            ].filter(Boolean).join(', ');
-                                                            setEditedShipment({
-                                                                ...editedShipment,
-                                                                shipper_name: e.target.value,
-                                                                shipperName: e.target.value,
-                                                                shipper: e.target.value,
-                                                                shipper_address: address || selectedVendor?.address_line1 || ''
-                                                            });
-                                                        }}
-                                                        className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light"
-                                                    >
-                                                        <option value="">Select Vendor...</option>
-                                                        {vendors.map(v => (
-                                                            <option key={v.id} value={v.partner_name}>
-                                                                {v.partner_name} {v.partner_code ? `(${v.partner_code})` : ''}
-                                                            </option>
-                                                        ))}
-                                                    </select>
+                                                    <div className="flex gap-2 items-center">
+                                                        <div className="flex-1">
+                                                            <PartnerPicker
+                                                                value={editedShipment.shipper_id || ''}
+                                                                onChange={(id) => {
+                                                                    setEditedShipment(prev => ({ ...prev, shipper_id: id }));
+                                                                }}
+                                                                roleFilter="vendor"
+                                                                placeholder="Search vendor by name..."
+                                                                onPartnerLoad={(partner) => {
+                                                                    if (!partner) return;
+                                                                    const address = [partner.address_line1, partner.address_line2, partner.city, partner.country].filter(Boolean).join(', ');
+                                                                    setEditedShipment(prev => ({
+                                                                        ...prev,
+                                                                        shipper: partner.partner_name,
+                                                                        shipper_name: partner.partner_name,
+                                                                        shipperName: partner.partner_name,
+                                                                        shipper_id: partner.id,
+                                                                        shipper_address: prev.shipper_address || address || ''
+                                                                    }));
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            className="px-3 py-1 bg-accent-orange text-white rounded text-xs"
+                                                            onClick={() => {
+                                                                // Quick apply quotation shipper (priority)
+                                                                const qName = (quotationData?.shipper_name || quotationData?.shipper || '').trim();
+                                                                if (!qName) {
+                                                                    alert('No shipper data found in linked quotation');
+                                                                    return;
+                                                                }
+                                                                setEditedShipment(prev => ({
+                                                                    ...prev,
+                                                                    shipper: qName,
+                                                                    shipper_name: qName,
+                                                                    shipperName: qName,
+                                                                    shipper_id: prev.shipper_id || null,
+                                                                    shipper_address: prev.shipper_address || quotationData?.shipper_address || ''
+                                                                }));
+                                                            }}
+                                                            title="Use shipper from quotation"
+                                                        >Use Quotation</button>
+                                                    </div>
+                                                    <div className="text-xs text-silver-dark mt-1">Or type to search vendor (server-side)</div>
                                                 </div>
                                             </>
                                         ) : (
