@@ -2763,7 +2763,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                         </div>
 
                                         {/* COGS Input Form */}
-                                        <div className="glass-card p-6 rounded-lg mt-6">
+                                        <div className="glass-card p-6 rounded-lg mt-6" style={{ minHeight: '520px' }}>
                                             <div className="flex items-center justify-between mb-4">
                                                 <h4 className="font-semibold text-silver-light">
                                                     Actual Costs (COGS)
