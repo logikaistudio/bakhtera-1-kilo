@@ -369,6 +369,34 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
         fetchVendors();
     }, [isOpen]);
 
+    // If vendors and quotationData become available at different times, ensure we attempt auto-selection
+    useEffect(() => {
+        if (!isOpen) return;
+        if (!quotationData || !vendors || vendors.length === 0) return;
+
+        try {
+            const qName = (quotationData.shipper_name || quotationData.shipper || '').trim();
+            if (!qName) return;
+
+            // Only auto-select when editedShipment does not already have shipper set
+            setEditedShipment(prev => {
+                if (prev.shipper_name || prev.shipper) return prev;
+                const matched = (vendors || []).find(v => (v.partner_name || '').toLowerCase().split('\n')[0].trim() === qName.toLowerCase());
+                const address = matched ? [matched.address_line1, matched.address_line2, matched.city, matched.country].filter(Boolean).join(', ') : '';
+                return {
+                    ...prev,
+                    shipper: qName,
+                    shipper_name: qName,
+                    shipperName: qName,
+                    shipper_id: matched?.id || prev.shipper_id || null,
+                    shipper_address: prev.shipper_address || address || ''
+                };
+            });
+        } catch (err) {
+            console.debug('Error in vendor auto-select effect:', err?.message || err);
+        }
+    }, [vendors, quotationData, isOpen]);
+
     // Sync voyage field with bookingData.voyageNumber
     useEffect(() => {
         if (bookingData.voyageNumber && bookingData.voyageNumber !== editedShipment.voyage) {
