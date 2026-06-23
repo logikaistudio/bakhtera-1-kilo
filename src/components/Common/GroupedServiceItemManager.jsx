@@ -9,7 +9,7 @@ const ItemPicker = ({ value, onChange, accounts, readOnly }) => {
     const [search, setSearch] = useState('');
     const ref = useRef(null);
 
-    const selected = accounts.find(acc => acc.code === value);
+    const selected = accounts.find(acc => acc.id === value || acc.code === value);
 
     useEffect(() => {
         const handler = (e) => {
@@ -72,7 +72,7 @@ const ItemPicker = ({ value, onChange, accounts, readOnly }) => {
                                 <button
                                     key={acc.id}
                                     type="button"
-                                    onClick={() => { onChange(acc.code); setIsOpen(false); }}
+                                    onClick={() => { onChange(acc.id, acc.code); setIsOpen(false); }}
                                     className={`w-full px-3 py-2 text-left rounded-md mb-0.5 transition-colors ${acc.code === value ? 'bg-blue-50 border border-blue-100' : 'hover:bg-gray-50 border border-transparent'}`}
                                 >
                                     <div className="flex flex-col gap-0.5">
@@ -190,6 +190,7 @@ const GroupedServiceItemManager = ({
     const addItemToGroup = (groupId) => {
         const newItem = {
             id: 'item-' + Date.now(),
+            coa_id: '',
             itemCode: '',
             description: '',
             quantity: 1,
@@ -486,8 +487,22 @@ const GroupedServiceItemManager = ({
 
                                                     <div className="min-w-0">
                                                         <ItemPicker 
-                                                            value={item.itemCode || ''} 
-                                                            onChange={(code) => updateItem(group.id, item.id, 'itemCode', code)} 
+                                                            value={item.coa_id || item.itemCode || ''} 
+                                                            onChange={(id, code) => {
+                                                                const updated = groups.map(g => {
+                                                                    if (g.id === group.id) {
+                                                                        const newItems = g.items.map(i => {
+                                                                            if (i.id === item.id) {
+                                                                                return { ...i, coa_id: id, itemCode: code };
+                                                                            }
+                                                                            return i;
+                                                                        });
+                                                                        return { ...g, items: newItems };
+                                                                    }
+                                                                    return g;
+                                                                });
+                                                                notifyChange(updated);
+                                                            }} 
                                                             accounts={accounts} 
                                                             readOnly={readOnly}
                                                         />

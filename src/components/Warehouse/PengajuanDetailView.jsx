@@ -439,7 +439,6 @@ const PengajuanDetailView = ({ pengajuan, onClose, onSubmitMutations, onUpdatePe
                                                                         <DocumentUploadManager
                                                                             documents={mutationData.documents || []}
                                                                             onChange={(docs) => updateMutation(itemId, 'documents', docs)}
-                                                                            maxFiles={10}
                                                                             maxSizeKB={100}
                                                                             label="Dokumen Pendukung"
                                                                         />

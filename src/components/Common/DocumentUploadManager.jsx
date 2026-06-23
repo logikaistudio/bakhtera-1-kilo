@@ -3,7 +3,7 @@ import { Upload, File, X, FileText, Image } from 'lucide-react';
 import Button from './Button';
 import { formatCurrency } from '../../utils/currencyFormatter';
 
-const DocumentUploadManager = ({ documents = [], onChange, maxFiles = 10, maxSizeKB = 200 }) => {
+const DocumentUploadManager = ({ documents = [], onChange, maxFiles = null, maxSizeKB = 200 }) => {
     const [documentName, setDocumentName] = useState('');
     const [uploading, setUploading] = useState(false);
 
@@ -36,7 +36,7 @@ const DocumentUploadManager = ({ documents = [], onChange, maxFiles = 10, maxSiz
         if (!file) return;
 
         // Check max files limit
-        if (documents.length >= maxFiles) {
+        if (maxFiles && documents.length >= maxFiles) {
             alert(`Maksimal ${maxFiles} dokumen.`);
             e.target.value = '';
             return;
@@ -107,7 +107,7 @@ const DocumentUploadManager = ({ documents = [], onChange, maxFiles = 10, maxSiz
                 <Upload className="w-5 h-5 text-accent-purple" />
                 <h3 className="text-lg font-semibold text-silver-light">Dokumen Pendukung</h3>
                 <span className="text-xs text-silver-dark">
-                    ({documents.length}/{maxFiles} dokumen, max {maxSizeKB}KB per file)
+                    ({documents.length}{maxFiles ? `/${maxFiles}` : ''} dokumen, max {maxSizeKB}KB per file)
                 </span>
             </div>
 
@@ -124,7 +124,7 @@ const DocumentUploadManager = ({ documents = [], onChange, maxFiles = 10, maxSiz
                             onChange={(e) => setDocumentName(e.target.value)}
                             placeholder="contoh: KTP Direktur, NPWP Perusahaan"
                             className="w-full"
-                            disabled={uploading || documents.length >= maxFiles}
+                            disabled={uploading || (maxFiles ? documents.length >= maxFiles : false)}
                         />
                     </div>
                     <div>
@@ -136,7 +136,7 @@ const DocumentUploadManager = ({ documents = [], onChange, maxFiles = 10, maxSiz
                             accept=".pdf,.jpg,.jpeg,.png"
                             onChange={handleFileSelect}
                             className="w-full"
-                            disabled={uploading || documents.length >= maxFiles}
+                            disabled={uploading || (maxFiles ? documents.length >= maxFiles : false)}
                         />
                     </div>
                 </div>
@@ -145,7 +145,7 @@ const DocumentUploadManager = ({ documents = [], onChange, maxFiles = 10, maxSiz
                         Mengupload dokumen...
                     </div>
                 )}
-                {documents.length >= maxFiles && (
+                {maxFiles && documents.length >= maxFiles && (
                     <div className="text-sm text-accent-orange">
                         ⚠️ Batas maksimal {maxFiles} dokumen tercapai
                     </div>
