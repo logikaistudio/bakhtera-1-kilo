@@ -453,8 +453,7 @@ const GroupedServiceItemManager = ({
                             {group.items && group.items.length > 0 ? (
                                 <div className="space-y-3">
                                     {/* Grid Header */}
-                                    <div className="hidden lg:grid grid-cols-[1.5fr_2fr_0.5fr_0.5fr_0.5fr_1fr_1fr_1fr_min-content] gap-3 px-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                                        <div>COA Account</div>
+                                    <div className="hidden lg:grid grid-cols-[3.5fr_0.5fr_0.5fr_0.5fr_1fr_1fr_1fr_min-content] gap-3 px-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
                                         <div>Description</div>
                                         <div className="text-right">Qty</div>
                                         <div className="text-center">Unit</div>
@@ -480,33 +479,10 @@ const GroupedServiceItemManager = ({
                                             }
 
                                             return (
-                                                <div key={item.id} className="grid grid-cols-1 lg:grid-cols-[1.5fr_2fr_0.5fr_0.5fr_0.5fr_1fr_1fr_1fr_min-content] gap-3 items-center p-3 lg:p-2 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-md transition-all group/row relative">
+                                                <div key={item.id} className="grid grid-cols-1 lg:grid-cols-[3.5fr_0.5fr_0.5fr_0.5fr_1fr_1fr_1fr_min-content] gap-3 items-center p-3 lg:p-2 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-md transition-all group/row relative">
                                                     
                                                     {/* Mobile Labels (Hidden on Desktop) */}
                                                     <div className="lg:hidden text-xs font-bold text-gray-400 uppercase mb-1">Item Details</div>
-
-                                                    <div className="min-w-0">
-                                                        <ItemPicker 
-                                                            value={item.coa_id || item.itemCode || ''} 
-                                                            onChange={(id, code) => {
-                                                                const updated = groups.map(g => {
-                                                                    if (g.id === group.id) {
-                                                                        const newItems = g.items.map(i => {
-                                                                            if (i.id === item.id) {
-                                                                                return { ...i, coa_id: id, itemCode: code };
-                                                                            }
-                                                                            return i;
-                                                                        });
-                                                                        return { ...g, items: newItems };
-                                                                    }
-                                                                    return g;
-                                                                });
-                                                                notifyChange(updated);
-                                                            }} 
-                                                            accounts={accounts} 
-                                                            readOnly={readOnly}
-                                                        />
-                                                    </div>
                                                     <div className="min-w-0">
                                                         <textarea
                                                             value={item.description}

@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import {
     CheckCircle, XCircle, Clock, FileText, User, Calendar, 
     ChevronRight, RefreshCw, AlertCircle, Check, MapPin, 
-    Ship, Activity
+    Ship, Activity, Plane, Truck, ShoppingBag, Receipt, Bell, Eye, X
 } from 'lucide-react';
 
 const isMissingTableError = (error) => {
@@ -74,6 +74,12 @@ const SalesBlinkApproval = () => {
                 typeColor: 'text-blue-500 bg-blue-50',
                 refNumber: sq.quotation_number,
                 partnerName: sq.customer_name || 'Unknown Customer',
+                customerName: sq.customer_name || 'Unknown Customer',
+                submittedBy: sq.sales_person || 'Sales Team',
+                serviceType: (sq.service_type || 'sea').toLowerCase(),
+                origin: sq.origin || '-',
+                destination: sq.destination || '-',
+                quotationType: sq.quotation_type || 'RG',
                 dueDate: '-',
                 amount: sq.revenue_amount || sq.total_revenue || sq.grand_total || 0,
                 costAmount: sq.cost_amount || sq.total_cost || 0,
@@ -192,15 +198,46 @@ const SalesBlinkApproval = () => {
         }).format(amount || 0);
     };
 
+    const serviceIcons = { sea: Ship, air: Plane, land: Truck, purchase: ShoppingBag, shipment: Ship, invoice: Receipt };
+    const isApprovalPending = (status) => ['submitted', 'manager_approval', 'pending', 'pending_approval'].includes(status);
+    const formatDate = (d) => d ? new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+    
+    const closeModal = () => {
+        setShowDetailModal(false);
+        setSelectedItem(null);
+        setShowRejectInput(false);
+        setRejectReason('');
+    };
+
+    const normalizeItems = (items) => {
+        let normalized = [];
+        (items || []).forEach(groupOrItem => {
+            if (groupOrItem.items) {
+                normalized = normalized.concat(groupOrItem.items);
+            } else {
+                normalized.push(groupOrItem);
+            }
+        });
+        return normalized;
+    };
+
+    const filtered = submissions;
+    const pendingCount = submissions.length;
+
     return (
-        <div className="p-6 max-w-7xl mx-auto space-y-6">
+        <div className="space-y-6">
+            {/* Header with Tabs */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center gap-2">
-                        <CheckCircle className="w-6 h-6 text-blue-600" />
-                        Sales Approval Center
-                    </h1>
-                    <p className="text-gray-500 text-sm mt-1">Review and approve sales quotations and marketing workflows.</p>
+                    <div className="flex items-center gap-3">
+                        <h1 style={{ color: '#111827' }} className="text-2xl font-bold flex items-center gap-2">
+                            <CheckCircle className="w-6 h-6 text-blue-600" />
+                            Sales Approval Center
+                        </h1>
+                    </div>
+                    <p style={{ color: '#4B5563' }} className="text-sm mt-1">
+                        Manage all sales quotation document submissions
+                    </p>
                 </div>
                 <div className="flex items-center gap-3 bg-white p-1 rounded-xl shadow-sm border border-gray-100">
                     <button
@@ -213,9 +250,9 @@ const SalesBlinkApproval = () => {
                     >
                         <Clock className="w-4 h-4" />
                         Pending Approvals
-                        {submissions.length > 0 && (
+                        {pendingCount > 0 && (
                             <span className={`px-2 py-0.5 rounded-full text-xs ${activeTab === 'pending' ? 'bg-white/20' : 'bg-blue-100 text-blue-600'}`}>
-                                {submissions.length}
+                                {pendingCount}
                             </span>
                         )}
                     </button>
@@ -227,7 +264,7 @@ const SalesBlinkApproval = () => {
                                 : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                             }`}
                     >
-                        <Activity className="w-4 h-4" />
+                        <FileText className="w-4 h-4" />
                         Approval History
                     </button>
                     <button
@@ -240,81 +277,123 @@ const SalesBlinkApproval = () => {
                 </div>
             </div>
 
+            {/* Non-approver warning */}
+            {!isApprover && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                        <p style={{ color: '#111827' }} className="text-sm font-semibold">Access Restricted</p>
+                        <p style={{ color: '#4B5563' }} className="text-sm mt-0.5">
+                            Only Manager/Admin can approve or reject submissions.
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {/* List */}
             {loading ? (
-                <div className="flex items-center justify-center h-64 bg-white/50 backdrop-blur-sm rounded-2xl border border-gray-100">
-                    <div className="flex flex-col items-center gap-3">
-                        <RefreshCw className="w-8 h-8 text-blue-500 animate-spin" />
-                        <p className="text-gray-500 font-medium">Checking documents...</p>
+                <div className="flex items-center justify-center py-16">
+                    <div className="text-center">
+                        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                        <p style={{ color: '#4B5563' }} className="text-sm">Loading data...</p>
                     </div>
                 </div>
             ) : activeTab === 'pending' ? (
-                /* PENDING TAB */
-                submissions.length === 0 ? (
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
-                        <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <CheckCircle className="w-10 h-10 text-green-500" />
-                        </div>
-                        <h3 className="text-lg font-bold text-gray-900 mb-2">Semua Bersih!</h3>
-                        <p className="text-gray-500">Tidak ada dokumen Sales yang menunggu persetujuan Anda saat ini.</p>
+                filtered.length === 0 ? (
+                    <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50">
+                        <Bell className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                        <p style={{ color: '#4B5563' }}>No submissions</p>
+                        <p style={{ color: '#9CA3AF' }} className="text-sm mt-1">All submissions have been processed</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {submissions.map((item) => {
-                            const ItemIcon = item.typeIcon;
-                            const statusStyle = statusConfig[item.status] || statusConfig.manager_approval;
+                <div className="space-y-3">
+                    {filtered.map(item => {
+                        const cfg = statusConfig[item.status] || statusConfig.manager_approval;
+                        const StatusIcon = cfg.icon;
+                        const SvcIcon = serviceIcons[item.serviceType] || FileText;
+                        const isPending = isApprovalPending(item.status);
 
-                            return (
-                                <div
-                                    key={item.id}
-                                    className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-all duration-200 group flex flex-col"
-                                >
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className={`p-2.5 rounded-xl ${item.typeColor} group-hover:scale-110 transition-transform`}>
-                                                <ItemIcon className="w-5 h-5" />
-                                            </div>
-                                            <div>
-                                                <p className="text-xs font-semibold text-gray-400 tracking-wider uppercase">{item.typeLabel}</p>
-                                                <h3 className="font-bold text-gray-900">{item.refNumber}</h3>
-                                            </div>
+                        return (
+                            <div
+                                key={item.id}
+                                onClick={() => { setSelectedItem(item); setShowDetailModal(true); setRejectReason(''); setShowRejectInput(false); }}
+                                className={`bg-white border rounded-xl p-4 cursor-pointer transition-all hover:shadow-md ${isPending ? 'border-yellow-300 shadow-sm' : 'border-gray-200'}`}
+                            >
+                                <div className="flex items-start gap-4">
+                                    {/* Icon badge */}
+                                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${isPending ? 'bg-yellow-100' : 'bg-gray-100'}`}>
+                                        <SvcIcon className={`w-5 h-5 ${isPending ? 'text-yellow-600' : 'text-gray-500'}`} />
+                                    </div>
+
+                                    {/* Info */}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="font-mono text-sm font-bold" style={{ color: '#0070BB' }}>{item.refNumber}</span>
+                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${cfg.bg} ${cfg.text} ${cfg.border}`}>
+                                                <StatusIcon className="w-3 h-3" />
+                                                {cfg.label}
+                                            </span>
+                                            {isPending && (
+                                                <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs rounded-full border border-yellow-200 font-semibold">
+                                                    ⚡ Action Needed
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        <p style={{ color: '#111827' }} className="font-medium mt-1 truncate">{item.customerName}</p>
+
+                                        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs" style={{ color: '#4B5563' }}>
+                                            <span className="flex items-center gap-1">
+                                                <User className="w-3 h-3" />
+                                                {item.submittedBy}
+                                            </span>
+                                            <span className="flex items-center gap-1">
+                                                <SvcIcon className="w-3 h-3" />
+                                                {item.serviceType?.toUpperCase()} · {item.origin} → {item.destination}
+                                            </span>
+                                            <span className="flex items-center gap-1">
+                                                <Calendar className="w-3 h-3" />
+                                                {formatDate(item.createdAt)}
+                                            </span>
                                         </div>
                                     </div>
 
-                                    <div className="space-y-3 flex-1">
-                                        <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl rounded-tr-none relative">
-                                            <div className="absolute -top-3 -right-3 w-6 h-6 bg-white rotate-45 transform" />
-                                            <div className="flex-1">
-                                                <p className="text-xs text-gray-500 mb-1">Customer / Partner</p>
-                                                <p className="font-semibold text-gray-900 line-clamp-1">{item.partnerName}</p>
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="flex justify-between items-end border-t border-gray-100 pt-3">
-                                            <div>
-                                                <p className="text-xs text-gray-500 mb-1">Revenue Value</p>
-                                                <p className="font-bold text-blue-600">
-                                                    {formatCurrency(item.amount, item.currency)}
-                                                </p>
-                                            </div>
-                                            <div>
-                                                <p className="text-xs text-gray-500 mb-1 text-right">Tanggal</p>
-                                                <p className="text-sm font-medium text-gray-700">
-                                                    {new Date(item.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                                </p>
-                                            </div>
-                                        </div>
+                                    {/* Amount */}
+                                    <div className="text-right flex-shrink-0">
+                                        <p style={{ color: '#111827' }} className="font-bold text-sm">{formatCurrency(item.amount, item.currency)}</p>
+                                        <ChevronRight className="w-4 h-4 text-gray-400 mt-2 ml-auto" />
                                     </div>
-
-                                    <button
-                                        onClick={() => { setSelectedItem(item); setShowDetailModal(true); }}
-                                        className="mt-5 w-full py-2.5 px-4 bg-gray-50 hover:bg-blue-50 text-gray-600 hover:text-blue-600 text-sm font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors border border-gray-100"
-                                    >
-                                        Review Detail <ChevronRight className="w-4 h-4" />
-                                    </button>
                                 </div>
-                            );
-                        })}
-                    </div>
+
+                                {/* Quick actions for pending */}
+                                {isPending && isApprover && (
+                                    <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100" onClick={e => e.stopPropagation()}>
+                                        <button
+                                            onClick={() => { setSelectedItem(item); setShowDetailModal(true); }}
+                                            className="flex items-center gap-1 px-3 py-1.5 bg-gray-50 text-gray-600 text-xs rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
+                                        >
+                                            <Eye className="w-3.5 h-3.5" /> View Details
+                                        </button>
+                                        <button
+                                            onClick={() => handleApprove(item)}
+                                            disabled={processing}
+                                            className="flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 text-xs rounded-lg border border-green-200 hover:bg-green-100 transition-colors disabled:opacity-50"
+                                        >
+                                            <Check className="w-3.5 h-3.5" /> Approve
+                                        </button>
+                                        <button
+                                            onClick={() => { setSelectedItem(item); setShowDetailModal(true); setShowRejectInput(true); }}
+                                            disabled={processing}
+                                            className="flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-700 text-xs rounded-lg border border-red-200 hover:bg-red-100 transition-colors disabled:opacity-50"
+                                        >
+                                            <X className="w-3.5 h-3.5" /> Reject
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
                 )
             ) : (
                 /* HISTORY TAB */
@@ -342,18 +421,34 @@ const SalesBlinkApproval = () => {
                                     {historyLogs.map(log => (
                                         <tr key={log.id} className="hover:bg-gray-50/50 transition-colors">
                                             <td className="px-6 py-4 text-gray-600">
-                                                {new Date(log.approved_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                {new Date(log.approved_at || log.created_at || Date.now()).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                             </td>
                                             <td className="px-6 py-4 font-medium text-gray-900">{log.document_number}</td>
-                                            <td className="px-6 py-4 text-gray-600">Sales Quotation</td>
+                                            <td className="px-6 py-4 text-gray-600 capitalize">Sales Quotation</td>
                                             <td className="px-6 py-4 text-gray-600">{log.approver}</td>
                                             <td className="px-6 py-4">
-                                                <span className={`px-3 py-1 rounded-full font-medium text-xs border ${
-                                                    log.status === 'approved' ? statusConfig.approved.bg + ' ' + statusConfig.approved.text + ' ' + statusConfig.approved.border :
-                                                    statusConfig.rejected.bg + ' ' + statusConfig.rejected.text + ' ' + statusConfig.rejected.border
-                                                }`}>
-                                                    {log.status === 'approved' ? 'Approved' : 'Rejected'}
-                                                </span>
+                                                {(() => {
+                                                    const historyStatus = String(log.status || '').toLowerCase();
+                                                    const historyStatusConfig = {
+                                                        approved: statusConfig.approved,
+                                                        rejected: statusConfig.rejected,
+                                                        cancelled: {
+                                                            bg: 'bg-gray-100',
+                                                            text: 'text-gray-700',
+                                                            border: 'border-gray-300',
+                                                        }
+                                                    };
+                                                    const badge = historyStatusConfig[historyStatus] || statusConfig.manager_approval;
+                                                    const label = historyStatus
+                                                        ? historyStatus.charAt(0).toUpperCase() + historyStatus.slice(1)
+                                                        : 'Unknown';
+
+                                                    return (
+                                                        <span className={`px-3 py-1 rounded-full font-medium text-xs border ${badge.bg} ${badge.text} ${badge.border}`}>
+                                                            {label}
+                                                        </span>
+                                                    );
+                                                })()}
                                             </td>
                                             <td className="px-6 py-4 text-gray-500 truncate max-w-[200px]" title={log.reason || '-'}>
                                                 {log.reason ? <span className="text-red-500 italic">{log.reason}</span> : '-'}
@@ -367,164 +462,156 @@ const SalesBlinkApproval = () => {
                 </div>
             )}
 
-            {/* DETAIL MODAL */}
+            {/* ── Detail Modal ──────────────────────────────────────── */}
             {showDetailModal && selectedItem && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={() => !processing && setShowDetailModal(false)} />
-                    <div className="bg-white rounded-2xl w-full max-w-2xl relative shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
-                        
-                        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 sticky top-0 z-10">
-                            <div className="flex items-center gap-3">
-                                <div className={`p-2 rounded-xl ${selectedItem.typeColor}`}>
-                                    <selectedItem.typeIcon className="w-5 h-5" />
-                                </div>
-                                <div>
-                                    <h2 className="text-lg font-bold text-gray-900">{selectedItem.refNumber}</h2>
-                                    <p className="text-xs text-gray-500 uppercase tracking-wider">{selectedItem.typeLabel} Review</p>
-                                </div>
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}>
+                    <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-200">
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                            <div>
+                                <h2 style={{ color: '#111827' }} className="text-lg font-bold">Submission Details</h2>
+                                <p style={{ color: '#4B5563' }} className="text-xs mt-0.5">{selectedItem.typeLabel} · {selectedItem.refNumber}</p>
                             </div>
-                            <button
-                                onClick={() => !processing && setShowDetailModal(false)}
-                                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                            >
-                                <XCircle className="w-6 h-6" />
+                            <button onClick={closeModal}
+                                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                                <X className="w-5 h-5" />
                             </button>
                         </div>
 
-                        <div className="p-6 overflow-y-auto w-full">
-                            <div className="grid grid-cols-2 gap-4 mb-6">
-                                <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                                    <p className="text-xs text-gray-500 mb-1">Customer</p>
-                                    <p className="font-semibold text-gray-900">{selectedItem.partnerName}</p>
-                                </div>
-                                <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                                    <p className="text-xs text-gray-500 mb-1 flex items-center gap-1"><Calendar className="w-3 h-3"/> Tanggal Dibuat</p>
-                                    <p className="font-semibold text-gray-900">
-                                        {new Date(selectedItem.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
-                                    </p>
-                                </div>
-                                <div className="p-4 bg-blue-50/50 rounded-xl border border-blue-100">
-                                    <p className="text-xs text-blue-600/70 mb-1">Total Revenue</p>
-                                    <p className="font-bold text-blue-700 text-lg">
-                                        {formatCurrency(selectedItem.amount, selectedItem.currency)}
-                                    </p>
-                                </div>
-                                <div className="p-4 bg-orange-50/50 rounded-xl border border-orange-100">
-                                    <p className="text-xs text-orange-600/70 mb-1">Total Cost Estimate</p>
-                                    <p className="font-bold text-orange-700 text-lg">
-                                        {formatCurrency(selectedItem.costAmount, selectedItem.currency)}
-                                    </p>
-                                </div>
+                        <div className="p-6 space-y-5">
+                            {/* Status badge */}
+                            {(() => {
+                                const cfg = statusConfig[selectedItem.status] || statusConfig.manager_approval;
+                                const StatusIcon = cfg.icon;
+                                return (
+                                    <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium border ${cfg.bg} ${cfg.text} ${cfg.border}`}>
+                                        <StatusIcon className="w-4 h-4" />
+                                        {cfg.label}
+                                    </span>
+                                );
+                            })()}
+
+                            {/* Info grid */}
+                            <div className="grid grid-cols-2 gap-3">
+                                {[
+                                    { label: 'Customer', value: selectedItem.customerName },
+                                    { label: 'Sales Person', value: selectedItem.submittedBy },
+                                    { label: 'Service Type', value: selectedItem.serviceType?.toUpperCase() },
+                                    { label: 'Quotation Type', value: selectedItem.quotationType },
+                                    { label: 'Origin', value: selectedItem.origin },
+                                    { label: 'Destination', value: selectedItem.destination },
+                                    { label: 'Commodity', value: selectedItem.commodity || '-' },
+                                    { label: 'Total Estimated', value: formatCurrency(selectedItem.amount, selectedItem.currency), highlight: true },
+                                    { label: 'Created At', value: formatDate(selectedItem.createdAt) },
+                                    { label: 'Updated At', value: formatDate(selectedItem.updatedAt) },
+                                ].map((f, i) => (
+                                    <div key={i} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                                        <p style={{ color: '#4B5563' }} className="text-xs mb-1">{f.label}</p>
+                                        <p className="text-sm font-medium" style={{ color: f.highlight ? '#EA580C' : '#111827' }}>{f.value}</p>
+                                    </div>
+                                ))}
                             </div>
 
-                            <div className="space-y-4">
-                                <h3 className="font-bold text-gray-900 flex items-center gap-2 pb-2 border-b border-gray-100">
-                                    <FileText className="w-4 h-4 text-gray-400" /> Revenue Items
-                                </h3>
-                                {selectedItem.serviceItems?.length > 0 ? (
-                                    <div className="bg-white border text-sm border-gray-200 rounded-xl overflow-hidden shadow-sm">
-                                        <table className="w-full text-left">
-                                            <thead className="bg-gray-50 border-b border-gray-200 text-xs text-gray-600">
+                            {/* Service items */}
+                            {selectedItem.serviceItems?.length > 0 && (
+                                <div>
+                                    <h3 style={{ color: '#111827' }} className="text-sm font-semibold mb-2">Revenue Breakdown</h3>
+                                    <div className="bg-white rounded-lg overflow-hidden border border-gray-200">
+                                        <table className="w-full text-sm">
+                                            <thead>
                                                 <tr>
-                                                    <th className="px-4 py-3 font-semibold w-1/2">Description</th>
-                                                    <th className="px-4 py-3 font-semibold text-right">Qty</th>
-                                                    <th className="px-4 py-3 font-semibold text-right">Price</th>
-                                                    <th className="px-4 py-3 font-semibold text-right">Total</th>
+                                                    <th className="text-left px-3 py-2 bg-gray-50">Description</th>
+                                                    <th className="text-right px-3 py-2 bg-gray-50">Qty</th>
+                                                    <th className="text-right px-3 py-2 bg-gray-50">Amount</th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="divide-y text-gray-600 divide-gray-100">
-                                                {selectedItem.serviceItems.map((st, i) => (
-                                                    <tr key={i} className="hover:bg-gray-50 text-sm">
-                                                        <td className="px-4 py-3 font-medium text-gray-900">
-                                                            {st.description || st.name}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-right">{st.quantity}</td>
-                                                        <td className="px-4 py-3 text-right">{formatCurrency(st.price || st.unit_price, selectedItem.currency)}</td>
-                                                        <td className="px-4 py-3 text-right font-medium text-gray-900">{formatCurrency(st.total || st.subtotal, selectedItem.currency)}</td>
-                                                    </tr>
-                                                ))}
+                                            <tbody>
+                                                {normalizeItems(selectedItem.serviceItems).map((si, i) => {
+                                                    const itemTotal = si.amount || si.total || si.subtotal || ((si.quantity || 1) * (si.price || si.unitPrice || si.unit_price || 0));
+                                                    return (
+                                                        <tr key={i} className="border-t border-gray-100">
+                                                            <td className="px-3 py-2">{si.description || si.name || '-'}</td>
+                                                            <td className="px-3 py-2 text-right">{si.quantity || 1}</td>
+                                                            <td className="px-3 py-2 text-right">{formatCurrency(itemTotal, selectedItem.currency)}</td>
+                                                        </tr>
+                                                    );
+                                                })}
                                             </tbody>
                                         </table>
                                     </div>
-                                ) : (
-                                    <p className="text-gray-500 text-sm italic py-2 bg-gray-50 text-center rounded-lg border border-gray-100">Belum ada rincian item / item kosong.</p>
-                                )}
-                            </div>
+                                </div>
+                            )}
 
+                            {/* Notes */}
                             {selectedItem.notes && (
-                                <div className="mt-6 p-4 bg-yellow-50 rounded-xl border border-yellow-100">
-                                    <p className="text-xs font-semibold text-yellow-800 mb-1 uppercase tracking-wider flex items-center gap-1">
-                                        <AlertCircle className="w-3 h-3"/> Notes
-                                    </p>
-                                    <p className="text-sm text-yellow-900 whitespace-pre-wrap">{selectedItem.notes}</p>
+                                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                                    <p style={{ color: '#4B5563' }} className="text-xs mb-1">Notes</p>
+                                    <p style={{ color: '#111827' }} className="text-sm">{selectedItem.notes}</p>
                                 </div>
                             )}
 
-                            {showRejectInput && (
-                                <div className="mt-6 p-4 border border-red-200 rounded-xl bg-red-50 animate-fade-in relative overflow-hidden">
-                                    <div className="absolute top-0 left-0 w-1 h-full bg-red-500" />
-                                    <label className="block text-sm font-semibold text-red-900 mb-2">Rejection Reason <span className="text-red-500">*</span></label>
-                                    <textarea
-                                        value={rejectReason}
-                                        onChange={(e) => setRejectReason(e.target.value)}
-                                        className="w-full text-sm p-3 border border-red-200 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-white"
-                                        rows="3"
-                                        placeholder="Pesan Anda untuk tim sales terkait alasan penolakan dokumen ini..."
-                                        autoFocus
-                                    />
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Approver Actions */}
-                        <div className="p-4 border-t border-gray-100 bg-gray-50/80 sticky bottom-0 z-10 flex items-center justify-between gap-4">
-                            {!isApprover ? (
-                                <div className="text-amber-600 bg-amber-50 px-4 py-2 border border-amber-200 rounded-lg text-sm flex gap-2 items-center w-full">
-                                    <AlertCircle className="w-4 h-4" />
-                                    Anda tidak memiliki hak akses sebagai Approver.
-                                </div>
-                            ) : (
-                                <>
-                                    {!showRejectInput ? (
-                                        <button
-                                            onClick={() => setShowRejectInput(true)}
-                                            disabled={processing}
-                                            className="px-6 py-2.5 text-sm font-semibold text-red-600 bg-red-50 hover:bg-red-100 hover:text-red-700 border border-red-200 rounded-xl transition-colors disabled:opacity-50"
-                                        >
-                                            Reject
-                                        </button>
-                                    ) : (
+                            {/* Reject textarea */}
+                            {showRejectInput && isApprover &&
+                                isApprovalPending(selectedItem.status) && (
+                                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-3">
+                                        <p className="text-sm font-semibold text-red-700">Rejection Reason</p>
+                                        <textarea
+                                            rows={3}
+                                            value={rejectReason}
+                                            onChange={e => setRejectReason(e.target.value)}
+                                            placeholder="Explain reason for rejection..."
+                                            className="w-full px-3 py-2 bg-white border border-red-300 rounded-lg text-sm resize-none focus:outline-none focus:border-red-500"
+                                            style={{ color: '#111827' }}
+                                        />
                                         <div className="flex gap-2">
-                                            <button
-                                                onClick={() => { setShowRejectInput(false); setRejectReason(''); }}
-                                                disabled={processing}
-                                                className="px-4 py-2.5 text-sm font-semibold text-gray-600 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl transition-colors"
-                                            >
+                                            <button onClick={() => setShowRejectInput(false)}
+                                                className="px-4 py-2 text-sm text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                                                 Cancel
                                             </button>
-                                            <button
-                                                onClick={() => handleReject(selectedItem)}
-                                                disabled={processing || !rejectReason.trim()}
-                                                className="px-6 py-2.5 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors flex items-center gap-2 disabled:opacity-50 shadow-sm"
-                                            >
-                                                {processing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
+                                            <button onClick={() => handleReject(selectedItem)} disabled={processing}
+                                                className="px-4 py-2 text-sm text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50">
+                                                {processing
+                                                    ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                    : <XCircle className="w-4 h-4" />
+                                                }
                                                 Confirm Reject
                                             </button>
                                         </div>
-                                    )}
+                                    </div>
+                                )}
 
-                                    <button
-                                        onClick={() => handleApprove(selectedItem)}
-                                        disabled={processing || showRejectInput}
-                                        className={`px-8 py-2.5 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 rounded-xl transition-colors flex items-center gap-2 shadow-sm ${
-                                            showRejectInput ? 'opacity-50 cursor-not-allowed' : ''
-                                        }`}
-                                    >
-                                        {processing && !showRejectInput ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                                        Approve Document
-                                    </button>
-                                </>
-                            )}
+                            {/* Approval action buttons */}
+                            {isApprover &&
+                                isApprovalPending(selectedItem.status) &&
+                                !showRejectInput && (
+                                    <div className="flex gap-3 pt-2 border-t border-gray-200">
+                                        <button onClick={() => setShowRejectInput(true)}
+                                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-50 text-red-700 border border-red-200 rounded-xl hover:bg-red-100 transition-colors text-sm font-medium">
+                                            <XCircle className="w-4 h-4" /> Reject
+                                        </button>
+                                        <button onClick={() => handleApprove(selectedItem)} disabled={processing}
+                                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-50 text-green-700 border border-green-200 rounded-xl hover:bg-green-100 transition-colors text-sm font-medium disabled:opacity-50">
+                                            {processing
+                                                ? <div className="w-4 h-4 border-2 border-green-400/40 border-t-green-600 rounded-full animate-spin" />
+                                                : <CheckCircle className="w-4 h-4" />
+                                            }
+                                            Approve
+                                        </button>
+                                    </div>
+                                )}
+
+                            {/* Link to quotation/PO page */}
+                            <button
+                                onClick={() => {
+                                    navigate('/blink/sales/quotations');
+                                    closeModal();
+                                }}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-gray-700 transition-colors"
+                            >
+                                <Eye className="w-4 h-4" />
+                                View in Quotation Page
+                                <ChevronRight className="w-4 h-4" />
+                            </button>
                         </div>
                     </div>
                 </div>

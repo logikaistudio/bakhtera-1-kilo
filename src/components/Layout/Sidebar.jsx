@@ -72,7 +72,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                 
                 // Fetch Sales Pending
                 const sqRes = await supabase.from('blink_sales_quotations').select('id', { count: 'exact', head: true }).eq('status', 'manager_approval');
-                setBlinkSalesPendingCount(sqRes.data ? (sqRes.count || 0) : 0);
+                setBlinkSalesPendingCount(sqRes.count || 0);
                 
             } catch (e) { /* silent */ }
         };

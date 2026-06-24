@@ -69,6 +69,8 @@ const SalesQuotation = () => {
         destination: '',
         serviceType: 'sea',
         cargoType: '',
+        containerSize: '',
+        containerCount: '',
         weight: '',
         volume: '',
         grossWeight: '',
@@ -141,6 +143,8 @@ const SalesQuotation = () => {
                 validUntil: q.valid_until || q.validUntil,
                 serviceType: q.service_type || q.serviceType,
                 cargoType: q.cargo_type || q.cargoType,
+                containerSize: q.container_size || q.containerSize || '',
+                containerCount: q.container_count || q.containerCount || '',
                 totalAmount: q.total_amount || q.totalAmount || 0,
                 serviceItems: q.service_items || q.serviceItems || [],
                 costItems: q.cost_items || q.costItems || [],
@@ -229,6 +233,8 @@ const SalesQuotation = () => {
             destination: formData.destination,
             service_type: formData.serviceType,
             cargo_type: formData.cargoType,
+            container_size: formData.containerSize || null,
+            container_count: formData.containerCount ? parseInt(formData.containerCount) : null,
             // Automatically set legacy weight to grossWeight if provided
             weight: formData.grossWeight ? parseFloat(formData.grossWeight) : (formData.weight ? parseFloat(formData.weight) : null),
             volume: formData.volume ? parseFloat(formData.volume) : null,
@@ -350,6 +356,8 @@ const SalesQuotation = () => {
                     destination: editedQuotation.destination,
                     service_type: editedQuotation.serviceType,
                     cargo_type: editedQuotation.cargoType,
+                    container_size: editedQuotation.containerSize || null,
+                    container_count: editedQuotation.containerCount ? parseInt(editedQuotation.containerCount) : null,
                     commodity: editedQuotation.commodity,
 
                     // Cargo details
@@ -965,6 +973,8 @@ const SalesQuotation = () => {
             destination: quotation.destination,
             serviceType: quotation.serviceType,
             cargoType: quotation.cargoType,
+            containerSize: quotation.containerSize,
+            containerCount: quotation.containerCount,
             weight: quotation.weight,
             volume: quotation.volume,
             commodity: quotation.commodity,
@@ -1038,11 +1048,11 @@ const SalesQuotation = () => {
                     // Propagate shipper information from quotation
                     shipper: quotation.shipper || quotation.shipper_name || quotation.customerName || null,
                     shipper_name: quotation.shipper_name || quotation.shipper || quotation.customerName || null,
-                    shipper_id: quotation.shipper_id || null,
                     quotation_shipper_name: quotation.shipper_name || null,
                     job_number: newShipment.jobNumber,
                     so_number: newShipment.soNumber,
                     quotation_id: quotation.id,
+                    sales_quotation_id: quotation.id,
                     customer: newShipment.customer,
                     customer_id: quotation.customerId || null,
                     sales_person: newShipment.salesPerson,
@@ -1465,20 +1475,53 @@ const SalesQuotation = () => {
                         </div>
                     </div>
 
-                    {/* Volume (Standalone) */}
-                    <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Volume (CBM)
-                        </label>
-                        <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={formData.volume}
-                            onChange={(e) => setFormData({ ...formData, volume: e.target.value })}
-                            placeholder="5.5"
-                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
-                        />
+                    {/* Volume & Container Info */}
+                    <div className="grid grid-cols-3 gap-4 mb-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Volume (CBM)
+                            </label>
+                            <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={formData.volume}
+                                onChange={(e) => setFormData({ ...formData, volume: e.target.value })}
+                                placeholder="5.5"
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Container Size
+                            </label>
+                            <select
+                                value={formData.containerSize}
+                                onChange={(e) => setFormData({ ...formData, containerSize: e.target.value })}
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
+                            >
+                                <option value="">Select...</option>
+                                <option value="20ft">20ft</option>
+                                <option value="40ft">40ft</option>
+                                <option value="40HC">40HC</option>
+                                <option value="45HC">45HC</option>
+                                <option value="LCL">LCL</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Container Count
+                            </label>
+                            <input
+                                type="number"
+                                min="0"
+                                value={formData.containerCount}
+                                onChange={(e) => setFormData({ ...formData, containerCount: e.target.value })}
+                                placeholder="1"
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
+                            />
+                        </div>
                     </div>
 
                     {/* Gross Weight, Net Weight & Measure */}
@@ -2081,16 +2124,47 @@ const SalesQuotation = () => {
                         <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
                             <h5 className="text-xs font-semibold text-gray-400 mb-3 uppercase tracking-wider">Cargo Details</h5>
 
-                            <div className="mb-3">
-                                <p className="text-xs text-gray-500 mb-1">Volume (CBM)</p>
-                                <input
-                                    type="number"
-                                    value={isEditingQuotation ? (editedQuotation?.volume || '') : (viewingQuotation.volume || '')}
-                                    onChange={(e) => setEditedQuotation({ ...editedQuotation, volume: e.target.value })}
-                                    disabled={!isEditingQuotation}
-                                    className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm disabled:bg-gray-100/50"
-                                    placeholder="-"
-                                />
+                            <div className="grid grid-cols-3 gap-3 mb-3">
+                                <div>
+                                    <p className="text-xs text-gray-500 mb-1">Volume (CBM)</p>
+                                    <input
+                                        type="number"
+                                        value={isEditingQuotation ? (editedQuotation?.volume || '') : (viewingQuotation.volume || '')}
+                                        onChange={(e) => setEditedQuotation({ ...editedQuotation, volume: e.target.value })}
+                                        disabled={!isEditingQuotation}
+                                        className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm disabled:bg-gray-100/50"
+                                        placeholder="-"
+                                    />
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 mb-1">Container Size</p>
+                                    <select
+                                        value={isEditingQuotation ? (editedQuotation?.containerSize || '') : (viewingQuotation.containerSize || '')}
+                                        onChange={(e) => setEditedQuotation({ ...editedQuotation, containerSize: e.target.value })}
+                                        disabled={!isEditingQuotation}
+                                        className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm disabled:bg-gray-100/50"
+                                    >
+                                        <option value="">Select...</option>
+                                        <option value="20ft">20ft</option>
+                                        <option value="40ft">40ft</option>
+                                        <option value="40HC">40HC</option>
+                                        <option value="45HC">45HC</option>
+                                        <option value="LCL">LCL</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 mb-1">Container Count</p>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        value={isEditingQuotation ? (editedQuotation?.containerCount || '') : (viewingQuotation.containerCount || '')}
+                                        onChange={(e) => setEditedQuotation({ ...editedQuotation, containerCount: e.target.value })}
+                                        disabled={!isEditingQuotation}
+                                        className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm disabled:bg-gray-100/50"
+                                        placeholder="-"
+                                    />
+                                </div>
                             </div>
                             <div className="grid grid-cols-3 gap-3">
                                 <div>
