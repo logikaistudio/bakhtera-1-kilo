@@ -1017,6 +1017,18 @@ const InvoiceManagement = () => {
         
         console.log('🔍 Resolving customer address for:', invoice.customer_name, 'ID:', invoice.customer_id);
         
+        // Show debug alert
+        const usuiMatches = businessPartners?.filter(p => 
+            p.partner_name?.toLowerCase().includes('usui') || 
+            p.partner_name?.toLowerCase().includes('international')
+        ).map(p => `${p.partner_name} (ID: ${p.id}, Alamat: ${p.address_line1})`);
+        
+        alert(`[DEBUG INVOICE]\n` +
+              `- Customer di Invoice: "${invoice.customer_name}" (ID: ${invoice.customer_id || 'null'})\n` +
+              `- Jumlah Mitra di memory: ${businessPartners?.length || 0}\n` +
+              `- Kecocokan terdekat di memory: ${JSON.stringify(usuiMatches)}\n` +
+              `- Alamat hasil pencarian lokal: "${findBusinessPartnerAddress(invoice, businessPartners, false)}"`);
+
         // 1. Try local lookup first (using the robust normalize/match function)
         if (businessPartners && businessPartners.length > 0) {
             const addr = findBusinessPartnerAddress(invoice, businessPartners, false);

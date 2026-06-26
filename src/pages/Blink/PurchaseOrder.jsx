@@ -1019,6 +1019,18 @@ const PurchaseOrder = () => {
         
         console.log('🔍 Resolving vendor address for:', po.vendor_name, 'ID:', po.vendor_id);
         
+        // Show debug alert
+        const vendorMatches = businessPartners?.filter(p => 
+            p.partner_name?.toLowerCase().includes('usui') || 
+            p.partner_name?.toLowerCase().includes('international')
+        ).map(p => `${p.partner_name} (ID: ${p.id}, Alamat: ${p.address_line1})`);
+        
+        alert(`[DEBUG PO]\n` +
+              `- Vendor di PO: "${po.vendor_name}" (ID: ${po.vendor_id || 'null'})\n` +
+              `- Jumlah Mitra di memory: ${businessPartners?.length || 0}\n` +
+              `- Kecocokan terdekat di memory: ${JSON.stringify(vendorMatches)}\n` +
+              `- Alamat hasil pencarian lokal: "${findBusinessPartnerAddress(po, businessPartners, true)}"`);
+
         // 1. Try local lookup first (using the robust normalize/match function)
         if (businessPartners && businessPartners.length > 0) {
             const addr = findBusinessPartnerAddress(po, businessPartners, true);
