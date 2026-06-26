@@ -131,9 +131,6 @@ const BridgeInvoiceManagement = () => {
             setFinanceMigrationRan(true);
             try {
                 const { migratedInvoices, migratedPOs } = await migrateBridgeFinancialRecords();
-                if ((migratedInvoices || migratedPOs) && window?.alert) {
-                    alert(`✅ Sinkronisasi Bridge finansial selesai: ${migratedInvoices} invoice, ${migratedPOs} PO dimigrasi ke Bridge journal.`);
-                }
                 if (migratedInvoices || migratedPOs) {
                     await fetchInvoices();
                 }

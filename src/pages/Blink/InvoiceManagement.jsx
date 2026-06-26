@@ -110,9 +110,6 @@ const InvoiceManagement = () => {
             setFinanceMigrationRan(true);
             try {
                 const { migratedInvoices, migratedPOs } = await migrateBlinkFinancialRecords();
-                if ((migratedInvoices || migratedPOs) && window?.alert) {
-                    alert(`✅ Sinkronisasi Blink finansial selesai: ${migratedInvoices} invoice, ${migratedPOs} PO dimigrasi ke Blink journal.`);
-                }
                 if (migratedInvoices || migratedPOs) {
                     await fetchInvoices();
                 }
@@ -1020,9 +1017,18 @@ const InvoiceManagement = () => {
         
         console.log('🔍 Resolving customer address for:', invoice.customer_name, 'ID:', invoice.customer_id);
         
+        // 1. Try local lookup first (using the robust normalize/match function)
+        if (businessPartners && businessPartners.length > 0) {
+            const addr = findBusinessPartnerAddress(invoice, businessPartners, false);
+            if (addr && addr.trim() !== '' && addr.trim() !== '-') {
+                console.log('✅ Found partner address in local context:', addr);
+                return { ...invoice, customer_address: addr };
+            }
+        }
+        
         let partnerData = null;
         
-        // Try by customer_id first
+        // 2. Try by customer_id first in database
         if (invoice.customer_id) {
             try {
                 const { data, error } = await supabase
@@ -1032,44 +1038,46 @@ const InvoiceManagement = () => {
                     .maybeSingle();
                 if (!error && data) {
                     partnerData = data;
-                    console.log('✅ Found partner by ID:', data.partner_name, 'address_line1:', data.address_line1);
+                    console.log('✅ Found partner by ID in DB:', data.partner_name, 'address_line1:', data.address_line1);
                 }
             } catch (err) {
                 console.warn('⚠️ Error matching by customer_id:', err.message);
             }
         }
         
-        // Fallback: try by exact name match
+        // 3. Fallback: robust term match query
         if (!partnerData && invoice.customer_name) {
             try {
-                const { data, error } = await supabase
-                    .from('blink_business_partners')
-                    .select('id, partner_name, address_line1, address')
-                    .ilike('partner_name', invoice.customer_name.trim())
-                    .limit(1);
-                if (!error && data && data.length > 0) {
-                    partnerData = data[0];
-                    console.log('✅ Found partner by exact name:', partnerData.partner_name, 'address_line1:', partnerData.address_line1);
+                // Get clean search term
+                const cleaned = String(invoice.customer_name)
+                    .replace(/\b(pt|cv|pd|tbk|ltd|co|corp|inc|gmbh)\b/gi, '')
+                    .replace(/[^a-z0-9\s]/gi, '')
+                    .trim();
+                const words = cleaned.split(/\s+/).filter(w => w.length > 2);
+                const searchTerm = words[0] || cleaned;
+
+                if (searchTerm) {
+                    console.log('🔍 Searching DB for term:', searchTerm);
+                    const { data, error } = await supabase
+                        .from('blink_business_partners')
+                        .select('id, partner_name, address_line1, address')
+                        .ilike('partner_name', `%${searchTerm}%`);
+                    
+                    if (!error && data && data.length > 0) {
+                        // Use local matching logic on the candidates returned
+                        const matchedAddress = findBusinessPartnerAddress(invoice, data, false);
+                        if (matchedAddress) {
+                            const match = data.find(p => {
+                                const addr = p.address_line1 || p.address;
+                                return addr === matchedAddress;
+                            });
+                            partnerData = match || data[0];
+                            console.log('✅ Found partner via robust search in DB:', partnerData.partner_name);
+                        }
+                    }
                 }
             } catch (err) {
-                console.warn('⚠️ Error matching by exact name:', err.message);
-            }
-        }
-        
-        // Fallback: try by partial name match
-        if (!partnerData && invoice.customer_name) {
-            try {
-                const { data, error } = await supabase
-                    .from('blink_business_partners')
-                    .select('id, partner_name, address_line1, address')
-                    .ilike('partner_name', `%${invoice.customer_name.trim()}%`)
-                    .limit(1);
-                if (!error && data && data.length > 0) {
-                    partnerData = data[0];
-                    console.log('✅ Found partner by partial name:', partnerData.partner_name, 'address_line1:', partnerData.address_line1);
-                }
-            } catch (err) {
-                console.warn('⚠️ Error matching by partial name:', err.message);
+                console.warn('⚠️ Error in robust name matching:', err.message);
             }
         }
         

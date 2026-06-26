@@ -1019,9 +1019,18 @@ const PurchaseOrder = () => {
         
         console.log('🔍 Resolving vendor address for:', po.vendor_name, 'ID:', po.vendor_id);
         
+        // 1. Try local lookup first (using the robust normalize/match function)
+        if (businessPartners && businessPartners.length > 0) {
+            const addr = findBusinessPartnerAddress(po, businessPartners, true);
+            if (addr && addr.trim() !== '' && addr.trim() !== '-') {
+                console.log('✅ Found vendor address in local context:', addr);
+                return { ...po, vendor_address: addr };
+            }
+        }
+        
         let partnerData = null;
         
-        // Try by vendor_id first
+        // 2. Try by vendor_id first in database
         if (po.vendor_id) {
             try {
                 const { data, error } = await supabase
@@ -1031,44 +1040,46 @@ const PurchaseOrder = () => {
                     .maybeSingle();
                 if (!error && data) {
                     partnerData = data;
-                    console.log('✅ Found vendor by ID:', data.partner_name, 'address_line1:', data.address_line1);
+                    console.log('✅ Found vendor by ID in DB:', data.partner_name, 'address_line1:', data.address_line1);
                 }
             } catch (err) {
                 console.warn('⚠️ Error matching vendor by ID:', err.message);
             }
         }
         
-        // Fallback: try by exact name match
+        // 3. Fallback: robust term match query
         if (!partnerData && po.vendor_name) {
             try {
-                const { data, error } = await supabase
-                    .from('blink_business_partners')
-                    .select('id, partner_name, address_line1, address')
-                    .ilike('partner_name', po.vendor_name.trim())
-                    .limit(1);
-                if (!error && data && data.length > 0) {
-                    partnerData = data[0];
-                    console.log('✅ Found vendor by exact name:', partnerData.partner_name);
+                // Get clean search term
+                const cleaned = String(po.vendor_name)
+                    .replace(/\b(pt|cv|pd|tbk|ltd|co|corp|inc|gmbh)\b/gi, '')
+                    .replace(/[^a-z0-9\s]/gi, '')
+                    .trim();
+                const words = cleaned.split(/\s+/).filter(w => w.length > 2);
+                const searchTerm = words[0] || cleaned;
+
+                if (searchTerm) {
+                    console.log('🔍 Searching DB for vendor term:', searchTerm);
+                    const { data, error } = await supabase
+                        .from('blink_business_partners')
+                        .select('id, partner_name, address_line1, address')
+                        .ilike('partner_name', `%${searchTerm}%`);
+                    
+                    if (!error && data && data.length > 0) {
+                        // Use local matching logic on the candidates returned
+                        const matchedAddress = findBusinessPartnerAddress(po, data, true);
+                        if (matchedAddress) {
+                            const match = data.find(p => {
+                                const addr = p.address_line1 || p.address;
+                                return addr === matchedAddress;
+                            });
+                            partnerData = match || data[0];
+                            console.log('✅ Found vendor via robust search in DB:', partnerData.partner_name);
+                        }
+                    }
                 }
             } catch (err) {
-                console.warn('⚠️ Error matching vendor by exact name:', err.message);
-            }
-        }
-        
-        // Fallback: try by partial name match
-        if (!partnerData && po.vendor_name) {
-            try {
-                const { data, error } = await supabase
-                    .from('blink_business_partners')
-                    .select('id, partner_name, address_line1, address')
-                    .ilike('partner_name', `%${po.vendor_name.trim()}%`)
-                    .limit(1);
-                if (!error && data && data.length > 0) {
-                    partnerData = data[0];
-                    console.log('✅ Found vendor by partial name:', partnerData.partner_name);
-                }
-            } catch (err) {
-                console.warn('⚠️ Error matching vendor by partial name:', err.message);
+                console.warn('⚠️ Error in robust vendor name matching:', err.message);
             }
         }
         
