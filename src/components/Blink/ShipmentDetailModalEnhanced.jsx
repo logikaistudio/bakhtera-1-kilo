@@ -284,7 +284,13 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
 
                     // Auto-populate buying items (COGS) from quotation if we don't have them yet
                     if (buyingItems.length === 0) {
-                        const rawCostItems = quotation.cost_items || quotation.costItems || [];
+                        let rawCostItems = quotation.cost_items || quotation.costItems || [];
+                        let isUsingServiceItemsAsFallback = false;
+                        if (rawCostItems.length === 0) {
+                            rawCostItems = quotation.service_items || quotation.serviceItems || [];
+                            isUsingServiceItemsAsFallback = true;
+                        }
+
                         const flatList = [];
                         rawCostItems.forEach(groupOrItem => {
                             const isGroup = groupOrItem.items !== undefined;
@@ -304,8 +310,9 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                     unit: item.unit || 'Job',
                                     rate: rate,
                                     amount: amount,
-                                    coa_id: item.coa_id || null,
-                                    _coa_code: item._coa_code || '',
+                                    // Reset COA if we are falling back from service items (which are revenue COA 4xx)
+                                    coa_id: isUsingServiceItemsAsFallback ? null : (item.coa_id || null),
+                                    _coa_code: isUsingServiceItemsAsFallback ? '' : (item._coa_code || ''),
                                     vendor: item.vendor || item.supplier || '',
                                     currency: item.currency || quotation.currency || 'IDR'
                                 });
