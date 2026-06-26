@@ -238,30 +238,37 @@ const PurchaseOrder = () => {
 
     const updatePOItem = (index, field, value) => {
         setFormData(prev => {
-            const items = [...prev.po_items];
-            items[index][field] = value;
+            const items = prev.po_items.map((item, idx) => {
+                if (idx !== index) return item;
+                const updatedItem = { ...item, [field]: value };
 
-            // Auto-calculate amount
-            if (field === 'qty' || field === 'unit_price') {
-                items[index].amount = items[index].qty * items[index].unit_price;
-            }
+                // Auto-calculate amount
+                if (field === 'qty' || field === 'unit_price') {
+                    const qty = parseFloat(field === 'qty' ? value : item.qty) || 0;
+                    const price = parseFloat(field === 'unit_price' ? value : item.unit_price) || 0;
+                    updatedItem.amount = qty * price;
+                }
 
-            // Auto-calculate tax_amount from tax_rate percentage
-            if (field === 'qty' || field === 'unit_price' || field === 'tax_rate') {
-                const rate = field === 'tax_rate' ? value : (items[index].tax_rate || 0);
-                items[index].tax_amount = items[index].amount * (rate / 100);
-            }
+                // Auto-calculate tax_amount from tax_rate percentage
+                if (field === 'qty' || field === 'unit_price' || field === 'tax_rate') {
+                    const amount = updatedItem.amount ?? (parseFloat(item.amount) || 0);
+                    const rate = parseFloat(field === 'tax_rate' ? value : item.tax_rate) || 0;
+                    updatedItem.tax_amount = amount * (rate / 100);
+                }
 
+                return updatedItem;
+            });
             return { ...prev, po_items: items };
         });
     };
 
     const handleGlobalTaxChange = (newRate) => {
+        const rate = parseFloat(newRate) || 0;
         setFormData(prev => {
             const items = prev.po_items.map(item => ({
                 ...item,
                 tax_rate: newRate,
-                tax_amount: (item.amount || 0) * (newRate / 100)
+                tax_amount: (item.amount || 0) * (rate / 100)
             }));
             return { ...prev, tax_rate: newRate, po_items: items };
         });
@@ -1895,7 +1902,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                             <input
                                 type="number"
                                 value={formData.exchange_rate}
-                                onChange={(e) => setFormData(prev => ({ ...prev, exchange_rate: parseFloat(e.target.value) || 1 }))}
+                                onChange={(e) => setFormData(prev => ({ ...prev, exchange_rate: e.target.value }))}
                                 className="w-full px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light disabled:opacity-40 disabled:cursor-not-allowed"
                                 disabled={formData.currency === 'IDR'}
                                 min="1"
@@ -1980,8 +1987,8 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                         min="0"
                                         max="100"
                                         step="0.01"
-                                        value={formData.tax_rate ?? 0}
-                                        onChange={(e) => handleGlobalTaxChange(parseFloat(e.target.value) || 0)}
+                                        value={formData.tax_rate ?? ''}
+                                        onChange={(e) => handleGlobalTaxChange(e.target.value)}
                                     />
                                     <span className="text-xs text-silver-dark">%</span>
                                 </div>
@@ -2096,8 +2103,8 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                             <input
                                                 type="number"
                                                 placeholder="0"
-                                                value={item.qty}
-                                                onChange={(e) => updatePOItem(index, 'qty', parseFloat(e.target.value) || 0)}
+                                                value={item.qty ?? ''}
+                                                onChange={(e) => updatePOItem(index, 'qty', e.target.value)}
                                                 className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm text-center focus:border-accent-orange outline-none"
                                                 min="0"
                                                 required
@@ -2109,8 +2116,8 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                                 <input
                                                     type="number"
                                                     placeholder="0"
-                                                    value={item.unit_price}
-                                                    onChange={(e) => updatePOItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                                                    value={item.unit_price ?? ''}
+                                                    onChange={(e) => updatePOItem(index, 'unit_price', e.target.value)}
                                                     className="w-full pl-8 pr-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm focus:border-accent-orange outline-none"
                                                     min="0"
                                                     required
@@ -2125,7 +2132,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                                     type="number"
                                                     placeholder="0"
                                                     value={item.tax_rate ?? ''}
-                                                    onChange={(e) => updatePOItem(index, 'tax_rate', parseFloat(e.target.value) || 0)}
+                                                    onChange={(e) => updatePOItem(index, 'tax_rate', e.target.value)}
                                                     className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm text-center focus:border-accent-orange outline-none"
                                                     min="0"
                                                     max="100"
