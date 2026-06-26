@@ -1017,18 +1017,6 @@ const InvoiceManagement = () => {
         
         console.log('🔍 Resolving customer address for:', invoice.customer_name, 'ID:', invoice.customer_id);
         
-        // Show debug alert
-        const usuiMatches = businessPartners?.filter(p => 
-            p.partner_name?.toLowerCase().includes('usui') || 
-            p.partner_name?.toLowerCase().includes('international')
-        ).map(p => `${p.partner_name} (ID: ${p.id}, Alamat: ${p.address_line1})`);
-        
-        alert(`[DEBUG INVOICE]\n` +
-              `- Customer di Invoice: "${invoice.customer_name}" (ID: ${invoice.customer_id || 'null'})\n` +
-              `- Jumlah Mitra di memory: ${businessPartners?.length || 0}\n` +
-              `- Kecocokan terdekat di memory: ${JSON.stringify(usuiMatches)}\n` +
-              `- Alamat hasil pencarian lokal: "${findBusinessPartnerAddress(invoice, businessPartners, false)}"`);
-
         // 1. Try local lookup first (using the robust normalize/match function)
         if (businessPartners && businessPartners.length > 0) {
             const addr = findBusinessPartnerAddress(invoice, businessPartners, false);
@@ -1045,7 +1033,7 @@ const InvoiceManagement = () => {
             try {
                 const { data, error } = await supabase
                     .from('blink_business_partners')
-                    .select('id, partner_name, address_line1, address')
+                    .select('id, partner_name, address_line1')
                     .eq('id', invoice.customer_id)
                     .maybeSingle();
                 if (!error && data) {
@@ -1072,7 +1060,7 @@ const InvoiceManagement = () => {
                     console.log('🔍 Searching DB for term:', searchTerm);
                     const { data, error } = await supabase
                         .from('blink_business_partners')
-                        .select('id, partner_name, address_line1, address')
+                        .select('id, partner_name, address_line1')
                         .ilike('partner_name', `%${searchTerm}%`);
                     
                     if (!error && data && data.length > 0) {
@@ -1080,7 +1068,7 @@ const InvoiceManagement = () => {
                         const matchedAddress = findBusinessPartnerAddress(invoice, data, false);
                         if (matchedAddress) {
                             const match = data.find(p => {
-                                const addr = p.address_line1 || p.address;
+                                const addr = p.address_line1;
                                 return addr === matchedAddress;
                             });
                             partnerData = match || data[0];
@@ -1094,7 +1082,7 @@ const InvoiceManagement = () => {
         }
         
         if (partnerData) {
-            const addr = partnerData.address_line1 || partnerData.address || '';
+            const addr = partnerData.address_line1 || '';
             console.log('📍 Resolved address:', addr);
             if (addr && addr.trim() && addr.trim() !== '-') {
                 return { ...invoice, customer_address: addr, _resolved_customer_id: partnerData.id };

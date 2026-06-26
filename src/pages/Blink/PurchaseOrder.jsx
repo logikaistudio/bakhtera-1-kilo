@@ -1019,18 +1019,6 @@ const PurchaseOrder = () => {
         
         console.log('🔍 Resolving vendor address for:', po.vendor_name, 'ID:', po.vendor_id);
         
-        // Show debug alert
-        const vendorMatches = businessPartners?.filter(p => 
-            p.partner_name?.toLowerCase().includes('usui') || 
-            p.partner_name?.toLowerCase().includes('international')
-        ).map(p => `${p.partner_name} (ID: ${p.id}, Alamat: ${p.address_line1})`);
-        
-        alert(`[DEBUG PO]\n` +
-              `- Vendor di PO: "${po.vendor_name}" (ID: ${po.vendor_id || 'null'})\n` +
-              `- Jumlah Mitra di memory: ${businessPartners?.length || 0}\n` +
-              `- Kecocokan terdekat di memory: ${JSON.stringify(vendorMatches)}\n` +
-              `- Alamat hasil pencarian lokal: "${findBusinessPartnerAddress(po, businessPartners, true)}"`);
-
         // 1. Try local lookup first (using the robust normalize/match function)
         if (businessPartners && businessPartners.length > 0) {
             const addr = findBusinessPartnerAddress(po, businessPartners, true);
@@ -1047,7 +1035,7 @@ const PurchaseOrder = () => {
             try {
                 const { data, error } = await supabase
                     .from('blink_business_partners')
-                    .select('id, partner_name, address_line1, address')
+                    .select('id, partner_name, address_line1')
                     .eq('id', po.vendor_id)
                     .maybeSingle();
                 if (!error && data) {
@@ -1074,7 +1062,7 @@ const PurchaseOrder = () => {
                     console.log('🔍 Searching DB for vendor term:', searchTerm);
                     const { data, error } = await supabase
                         .from('blink_business_partners')
-                        .select('id, partner_name, address_line1, address')
+                        .select('id, partner_name, address_line1')
                         .ilike('partner_name', `%${searchTerm}%`);
                     
                     if (!error && data && data.length > 0) {
@@ -1082,7 +1070,7 @@ const PurchaseOrder = () => {
                         const matchedAddress = findBusinessPartnerAddress(po, data, true);
                         if (matchedAddress) {
                             const match = data.find(p => {
-                                const addr = p.address_line1 || p.address;
+                                const addr = p.address_line1;
                                 return addr === matchedAddress;
                             });
                             partnerData = match || data[0];
@@ -1096,7 +1084,7 @@ const PurchaseOrder = () => {
         }
         
         if (partnerData) {
-            const addr = partnerData.address_line1 || partnerData.address || '';
+            const addr = partnerData.address_line1 || '';
             console.log('📍 Resolved vendor address:', addr);
             if (addr && addr.trim() && addr.trim() !== '-') {
                 return { ...po, vendor_address: addr, _resolved_vendor_id: partnerData.id };
