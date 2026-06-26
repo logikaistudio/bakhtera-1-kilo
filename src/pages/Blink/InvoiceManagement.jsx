@@ -21,7 +21,7 @@ import InvoiceProfitSummary from '../../components/Blink/InvoiceProfitSummary';
 const InvoiceManagement = () => {
     const navigate = useNavigate();
     const { canCreate, canEdit, canDelete, canApprove, user } = useAuth();
-    const { companySettings, bankAccounts } = useData();
+    const { companySettings, bankAccounts, businessPartners } = useData();
     const [invoices, setInvoices] = useState([]);
     const [quotations, setQuotations] = useState([]);
     const [shipments, setShipments] = useState([]);
@@ -244,6 +244,7 @@ const InvoiceManagement = () => {
                 job_number: quotation.jobNumber || quotation.job_number,
                 quotation_number: quotation.quotationNumber || quotation.quotation_number,
                 customer_name: quotation.customerName || quotation.customer_name,
+                customer_address: quotation.customerAddress || quotation.customer_address || '',
                 customer_id: quotation.customer_id || quotation.customerId,
                 customer_company: quotation.customerCompany || quotation.customer_company,
                 origin: quotation.origin,
@@ -317,6 +318,7 @@ const InvoiceManagement = () => {
                 job_number: shipment.job_number,
                 so_number: shipment.so_number,
                 customer_name: shipment.customer,
+                customer_address: shipment.customer_address || shipment.customerAddress || '',
                 customer_id: shipment.customer_id,
                 origin: shipment.origin,
                 destination: shipment.destination,
@@ -1204,7 +1206,12 @@ const InvoiceManagement = () => {
                             <div class="info-left">
                                 <div style="margin-bottom: 4px; font-weight: bold; font-size: 9px; color: #555;">BILL TO / CUSTOMER:</div>
                                 <div style="font-weight: bold; font-size: 12px; margin-bottom: 3px;">${invoice.customer_name}</div>
-                                <div style="margin-bottom: 3px; font-size: 10px;">${(invoice.customer_address || '').replace(/\n/g, '<br>')}</div>
+                                <div style="margin-bottom: 3px; font-size: 10px;">
+                                    ${(() => {
+                                        const addr = findBusinessPartnerAddress(invoice, businessPartners, false);
+                                        return addr && addr.trim() !== '-' ? String(addr).replace(/\n/g, '<br>') : '';
+                                    })()}
+                                </div>
                                 <div style="font-size: 10px;">Attn: ${invoice.customer_contact_name || invoice.customer_pic || '-'}</div>
                             </div>
                             <div class="info-right">
@@ -1909,6 +1916,7 @@ const InvoiceManagement = () => {
                         formatCurrency={formatCurrency}
                         companySettings={companySettings}
                         bankAccounts={bankAccounts}
+                        businessPartners={businessPartners}
                         onClose={() => {
                             setShowPrintPreview(false);
                             setPreviewInvoiceData(null);
@@ -2105,6 +2113,16 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                     onChange={(e) => setFormData(prev => ({ ...prev, consignee: e.target.value }))}
                                     className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-xs"
                                     placeholder="Consignee Name"
+                                />
+                            </div>
+                            <div className="col-span-1 md:col-span-4 lg:col-span-4">
+                                <label className="block text-[10px] text-silver-dark mb-1">Customer Address (Printed in Invoice)</label>
+                                <textarea
+                                    value={formData.customer_address || ''}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, customer_address: e.target.value }))}
+                                    className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-xs"
+                                    placeholder="Alamat Customer..."
+                                    rows="2"
                                 />
                             </div>
 
@@ -3478,7 +3496,7 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
 };
 
 // Print Preview Modal Component - Updated to match handlePrintInvoice layout
-const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companySettings, bankAccounts }) => {
+const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companySettings, bankAccounts, businessPartners }) => {
 
     // Helper for empty fields default
     const safeStr = (str) => str || '-';
@@ -3713,7 +3731,12 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                             <div style={{ width: '55%', paddingRight: '20px' }}>
                                 <div style={{ marginBottom: '4px', fontWeight: 'bold', fontSize: '9px', color: '#555' }}>BILL TO / CUSTOMER:</div>
                                 <div style={{ fontWeight: 'bold', fontSize: '12px', marginBottom: '3px' }}>{invoice.customer_name}</div>
-                                <div style={{ marginBottom: '3px', fontSize: '11px' }}>{(invoice.customer_address || '').split('\n').map((line, i) => <span key={i}>{line}<br /></span>)}</div>
+                                <div style={{ marginBottom: '3px', fontSize: '11px' }}>
+                                    {(() => {
+                                        const addr = findBusinessPartnerAddress(invoice, businessPartners, false);
+                                        return addr && addr.trim() !== '-' ? String(addr).split('\n').map((line, i) => <span key={i}>{line}<br /></span>) : null;
+                                    })()}
+                                </div>
                                 <div style={{ fontSize: '11px' }}>Attn: {invoice.customer_contact_name || invoice.customer_pic || '-'}</div>
                             </div>
                             <div style={{ width: '45%' }}>
@@ -4253,6 +4276,62 @@ const ReimbursementModal = ({ invoice, formatCurrency, revenueAccounts, onClose,
             </div>
         </Modal>
     );
+};
+
+// Helper to find a business partner's address by ID or robust name matching
+const findBusinessPartnerAddress = (doc, partners, isVendor = false) => {
+    if (!partners || !Array.isArray(partners)) {
+        return doc ? (isVendor ? doc.vendor_address : doc.customer_address) : '';
+    }
+
+    const docId = isVendor ? doc.vendor_id : doc.customer_id;
+    const docName = (isVendor ? doc.vendor_name : doc.customer_name) || '';
+
+    // 1. Match by ID (preferred, strictly typed or stringified)
+    if (docId) {
+        const match = partners.find(p => String(p.id) === String(docId));
+        if (match) {
+            const addr = match.address_line1 || match.address;
+            if (addr && addr.trim() !== '' && addr.trim() !== '-') {
+                return addr;
+            }
+        }
+    }
+
+    // Name normalization helper: strips common prefixes, suffixes, trims, and lowercases
+    const normalizeName = (name) => {
+        if (!name) return '';
+        return String(name)
+            .toLowerCase()
+            .replace(/\b(pt|cv|pd|tbk|ltd|co|corp|inc|gmbh)\b/gi, '')
+            .replace(/[^a-z0-9]/gi, '')
+            .trim();
+    };
+
+    const docNameNormalized = normalizeName(docName);
+
+    if (docNameNormalized) {
+        // 2. Exact normalized name match
+        let match = partners.find(p => normalizeName(p.partner_name) === docNameNormalized);
+        
+        // 3. Partial normalized name match (one contains the other)
+        if (!match) {
+            match = partners.find(p => {
+                const pNameNorm = normalizeName(p.partner_name);
+                return pNameNorm && (pNameNorm.includes(docNameNormalized) || docNameNormalized.includes(pNameNorm));
+            });
+        }
+
+        if (match) {
+            const addr = match.address_line1 || match.address;
+            if (addr && addr.trim() !== '' && addr.trim() !== '-') {
+                return addr;
+            }
+        }
+    }
+
+    // 4. Fallback to document address
+    return isVendor ? doc.vendor_address : doc.customer_address;
 };
 
 export default InvoiceManagement;

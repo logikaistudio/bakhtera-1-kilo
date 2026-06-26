@@ -52,7 +52,7 @@ const recordApprovalHistory = async (po, action, reason = null, approverName = '
 
 const BridgePurchaseOrder = () => {
     const { user, canCreate, canEdit, canDelete, canView, canApprove } = useAuth();
-    const { companySettings, businessPartners } = useData();
+    const { companySettings, bridgeBusinessPartners } = useData();
     const [pos, setPOs] = useState([]);
     const [vendors, setVendors] = useState([]);
     const [shipments, setShipments] = useState([]);
@@ -111,16 +111,16 @@ const BridgePurchaseOrder = () => {
 
     // Fallback: sync vendors from DataContext if Supabase query returns empty
     useEffect(() => {
-        if (vendors.length === 0 && businessPartners && businessPartners.length > 0) {
-            const vendorList = businessPartners.filter(
+        if (vendors.length === 0 && bridgeBusinessPartners && bridgeBusinessPartners.length > 0) {
+            const vendorList = bridgeBusinessPartners.filter(
                 p => p.is_vendor === true || p.is_vendor === 'true' || p.is_vendor === 1
             );
             if (vendorList.length > 0) {
-                console.log('[PO] Syncing vendors from DataContext businessPartners:', vendorList.length);
+                console.log('[PO] Syncing vendors from DataContext bridgeBusinessPartners:', vendorList.length);
                 setVendors(vendorList);
             }
         }
-    }, [businessPartners, vendors.length]);
+    }, [bridgeBusinessPartners, vendors.length]);
 
     const fetchPOs = async () => {
         try {
@@ -158,9 +158,9 @@ const BridgePurchaseOrder = () => {
             setVendors(vendorPartners);
         } catch (error) {
             console.error('Error fetching vendors:', error);
-            // Fallback: use DataContext businessPartners
-            if (businessPartners && businessPartners.length > 0) {
-                const fallback = businessPartners.filter(p => p.is_vendor === true || p.is_vendor === 'true' || p.is_vendor === 1);
+            // Fallback: use DataContext bridgeBusinessPartners
+            if (bridgeBusinessPartners && bridgeBusinessPartners.length > 0) {
+                const fallback = bridgeBusinessPartners.filter(p => p.is_vendor === true || p.is_vendor === 'true' || p.is_vendor === 1);
                 console.log('[PO] Using DataContext fallback vendors:', fallback.length);
                 setVendors(fallback);
             } else {
@@ -869,7 +869,13 @@ const BridgePurchaseOrder = () => {
                         <tr>
                             <td class="label">Vendor</td>
                             <td class="colon">:</td>
-                            <td class="value"><strong>${po.vendor_name || '-'}</strong></td>
+                            <td class="value">
+                                <strong>${po.vendor_name || '-'}</strong>
+                                ${(() => {
+                                    const addr = findBusinessPartnerAddress(po, bridgeBusinessPartners, true);
+                                    return addr && addr.trim() !== '-' ? '<br/>' + String(addr).replace(/\n/g, '<br/>') : '';
+                                })()}
+                            </td>
                         </tr>
                         <tr>
                             <td class="label">PO Date</td>
@@ -2700,6 +2706,62 @@ const POPaymentRecordModal = ({ po, formatCurrency, onClose, onSuccess }) => {
             </div>
         </Modal>
     );
+};
+
+// Helper to find a business partner's address by ID or robust name matching
+const findBusinessPartnerAddress = (doc, partners, isVendor = false) => {
+    if (!partners || !Array.isArray(partners)) {
+        return doc ? (isVendor ? doc.vendor_address : doc.customer_address) : '';
+    }
+
+    const docId = isVendor ? doc.vendor_id : doc.customer_id;
+    const docName = (isVendor ? doc.vendor_name : doc.customer_name) || '';
+
+    // 1. Match by ID (preferred, strictly typed or stringified)
+    if (docId) {
+        const match = partners.find(p => String(p.id) === String(docId));
+        if (match) {
+            const addr = match.address_line1 || match.address;
+            if (addr && addr.trim() !== '' && addr.trim() !== '-') {
+                return addr;
+            }
+        }
+    }
+
+    // Name normalization helper: strips common prefixes, suffixes, trims, and lowercases
+    const normalizeName = (name) => {
+        if (!name) return '';
+        return String(name)
+            .toLowerCase()
+            .replace(/\b(pt|cv|pd|tbk|ltd|co|corp|inc|gmbh)\b/gi, '')
+            .replace(/[^a-z0-9]/gi, '')
+            .trim();
+    };
+
+    const docNameNormalized = normalizeName(docName);
+
+    if (docNameNormalized) {
+        // 2. Exact normalized name match
+        let match = partners.find(p => normalizeName(p.partner_name) === docNameNormalized);
+        
+        // 3. Partial normalized name match (one contains the other)
+        if (!match) {
+            match = partners.find(p => {
+                const pNameNorm = normalizeName(p.partner_name);
+                return pNameNorm && (pNameNorm.includes(docNameNormalized) || docNameNormalized.includes(pNameNorm));
+            });
+        }
+
+        if (match) {
+            const addr = match.address_line1 || match.address;
+            if (addr && addr.trim() !== '' && addr.trim() !== '-') {
+                return addr;
+            }
+        }
+    }
+
+    // 4. Fallback to document address
+    return isVendor ? doc.vendor_address : doc.customer_address;
 };
 
 export default BridgePurchaseOrder;

@@ -147,7 +147,7 @@ const PurchaseOrder = () => {
             // (avoids boolean type mismatch issues with Supabase)
             const { data, error } = await supabase
                 .from('blink_business_partners')
-                .select('id, partner_name, partner_code, email, phone, is_vendor')
+                .select('id, partner_name, partner_code, email, phone, is_vendor, address_line1')
                 .order('partner_name');
 
             if (error) throw error;
@@ -305,7 +305,7 @@ const PurchaseOrder = () => {
                     vendor_name: vendor.partner_name,
                     vendor_email: vendor.email || '',
                     vendor_phone: vendor.phone || '',
-                    vendor_address: vendor.address || '',
+                    vendor_address: vendor.address_line1 || vendor.address || '',
                     po_number: await generatePONumber(), // Using centralized PO Number Generation
                     po_date: formData.po_date || new Date(),
                     delivery_date: formData.delivery_date || null,
@@ -869,7 +869,13 @@ const PurchaseOrder = () => {
                         <tr>
                             <td class="label">Vendor</td>
                             <td class="colon">:</td>
-                            <td class="value"><strong>${po.vendor_name || '-'}</strong></td>
+                            <td class="value">
+                                <strong>${po.vendor_name || '-'}</strong>
+                                ${(() => {
+                                     const addr = findBusinessPartnerAddress(po, businessPartners, true);
+                                     return addr && addr.trim() !== '-' ? '<br/>' + String(addr).replace(/\n/g, '<br/>') : '';
+                                 })()}
+                            </td>
                         </tr>
                         <tr>
                             <td class="label">PO Date</td>
@@ -2700,6 +2706,62 @@ const POPaymentRecordModal = ({ po, formatCurrency, onClose, onSuccess }) => {
             </div>
         </Modal>
     );
+};
+
+// Helper to find a business partner's address by ID or robust name matching
+const findBusinessPartnerAddress = (doc, partners, isVendor = false) => {
+    if (!partners || !Array.isArray(partners)) {
+        return doc ? (isVendor ? doc.vendor_address : doc.customer_address) : '';
+    }
+
+    const docId = isVendor ? doc.vendor_id : doc.customer_id;
+    const docName = (isVendor ? doc.vendor_name : doc.customer_name) || '';
+
+    // 1. Match by ID (preferred, strictly typed or stringified)
+    if (docId) {
+        const match = partners.find(p => String(p.id) === String(docId));
+        if (match) {
+            const addr = match.address_line1 || match.address;
+            if (addr && addr.trim() !== '' && addr.trim() !== '-') {
+                return addr;
+            }
+        }
+    }
+
+    // Name normalization helper: strips common prefixes, suffixes, trims, and lowercases
+    const normalizeName = (name) => {
+        if (!name) return '';
+        return String(name)
+            .toLowerCase()
+            .replace(/\b(pt|cv|pd|tbk|ltd|co|corp|inc|gmbh)\b/gi, '')
+            .replace(/[^a-z0-9]/gi, '')
+            .trim();
+    };
+
+    const docNameNormalized = normalizeName(docName);
+
+    if (docNameNormalized) {
+        // 2. Exact normalized name match
+        let match = partners.find(p => normalizeName(p.partner_name) === docNameNormalized);
+        
+        // 3. Partial normalized name match (one contains the other)
+        if (!match) {
+            match = partners.find(p => {
+                const pNameNorm = normalizeName(p.partner_name);
+                return pNameNorm && (pNameNorm.includes(docNameNormalized) || docNameNormalized.includes(pNameNorm));
+            });
+        }
+
+        if (match) {
+            const addr = match.address_line1 || match.address;
+            if (addr && addr.trim() !== '' && addr.trim() !== '-') {
+                return addr;
+            }
+        }
+    }
+
+    // 4. Fallback to document address
+    return isVendor ? doc.vendor_address : doc.customer_address;
 };
 
 export default PurchaseOrder;

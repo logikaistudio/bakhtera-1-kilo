@@ -3,7 +3,8 @@ import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { getAllUsers, createUser, updateUser, resetPassword, toggleUserActive, deleteUser } from '../../services/userService';
 import { generatePassword } from '../../services/passwordService';
-import { Users, Plus, Edit, Key, Ban, CheckCircle, Shield, RefreshCw, Trash2 } from 'lucide-react';
+import { Users, Plus, Edit, Key, Ban, CheckCircle, Shield, RefreshCw, Trash2, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 /**
  * User Management Page (Super Admin Only)
@@ -155,6 +156,34 @@ const UserManagement = () => {
         }
     };
 
+    const handleExportExcel = () => {
+        const exportData = users.map(u => {
+            const roleObj = availableRoles.find(r => r.id === u.user_level);
+            const roleLabel = roleObj ? roleObj.label : u.user_level;
+            
+            return {
+                'Nama Lengkap': u.full_name,
+                'User ID': u.username,
+                'Password': '*** (Terenkripsi)',
+                'Role': roleLabel
+            };
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(exportData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Data User');
+
+        const wscols = [
+            { wch: 30 }, // Nama Lengkap
+            { wch: 20 }, // User ID
+            { wch: 20 }, // Password
+            { wch: 20 }, // Role
+        ];
+        worksheet['!cols'] = wscols;
+
+        XLSX.writeFile(workbook, 'Data_User_Export.xlsx');
+    };
+
     const getRoleBadge = (level) => {
         const c = ROLE_COLORS[level] || getDefaultColor();
         const role = availableRoles.find(r => r.id === level);
@@ -197,6 +226,15 @@ const UserManagement = () => {
                         <RefreshCw style={{ width: 14, height: 14 }} />
                         Refresh
                     </button>
+                    {user?.user_level === 'super_admin' && (
+                        <button
+                            onClick={handleExportExcel}
+                            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 500 }}
+                        >
+                            <Download style={{ width: 14, height: 14 }} />
+                            Export Excel
+                        </button>
+                    )}
                     <button
                         onClick={handleCreateUser}
                         style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}
