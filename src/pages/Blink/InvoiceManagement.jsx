@@ -1018,43 +1018,70 @@ const InvoiceManagement = () => {
     const resolveInvoiceCustomerAddress = async (invoice) => {
         if (!invoice) return invoice;
         
-        // If invoice already has a valid address, keep it but still try to get from business partners
-        const existingAddr = invoice.customer_address;
+        console.log('🔍 Resolving customer address for:', invoice.customer_name, 'ID:', invoice.customer_id);
         
-        try {
-            let partnerData = null;
-            
-            // Try by customer_id first
-            if (invoice.customer_id) {
-                const { data } = await supabase
+        let partnerData = null;
+        
+        // Try by customer_id first
+        if (invoice.customer_id) {
+            try {
+                const { data, error } = await supabase
                     .from('blink_business_partners')
                     .select('id, partner_name, address_line1, address')
                     .eq('id', invoice.customer_id)
-                    .single();
-                partnerData = data;
+                    .maybeSingle();
+                if (!error && data) {
+                    partnerData = data;
+                    console.log('✅ Found partner by ID:', data.partner_name, 'address_line1:', data.address_line1);
+                }
+            } catch (err) {
+                console.warn('⚠️ Error matching by customer_id:', err.message);
             }
-            
-            // Fallback: try by name match
-            if (!partnerData && invoice.customer_name) {
-                const { data } = await supabase
+        }
+        
+        // Fallback: try by exact name match
+        if (!partnerData && invoice.customer_name) {
+            try {
+                const { data, error } = await supabase
+                    .from('blink_business_partners')
+                    .select('id, partner_name, address_line1, address')
+                    .ilike('partner_name', invoice.customer_name.trim())
+                    .limit(1);
+                if (!error && data && data.length > 0) {
+                    partnerData = data[0];
+                    console.log('✅ Found partner by exact name:', partnerData.partner_name, 'address_line1:', partnerData.address_line1);
+                }
+            } catch (err) {
+                console.warn('⚠️ Error matching by exact name:', err.message);
+            }
+        }
+        
+        // Fallback: try by partial name match
+        if (!partnerData && invoice.customer_name) {
+            try {
+                const { data, error } = await supabase
                     .from('blink_business_partners')
                     .select('id, partner_name, address_line1, address')
                     .ilike('partner_name', `%${invoice.customer_name.trim()}%`)
-                    .limit(1)
-                    .single();
-                partnerData = data;
-            }
-            
-            if (partnerData) {
-                const addr = partnerData.address_line1 || partnerData.address || '';
-                if (addr && addr.trim() && addr.trim() !== '-') {
-                    return { ...invoice, customer_address: addr, _resolved_customer_id: partnerData.id };
+                    .limit(1);
+                if (!error && data && data.length > 0) {
+                    partnerData = data[0];
+                    console.log('✅ Found partner by partial name:', partnerData.partner_name, 'address_line1:', partnerData.address_line1);
                 }
+            } catch (err) {
+                console.warn('⚠️ Error matching by partial name:', err.message);
             }
-        } catch (err) {
-            console.warn('Could not resolve customer address:', err.message);
         }
         
+        if (partnerData) {
+            const addr = partnerData.address_line1 || partnerData.address || '';
+            console.log('📍 Resolved address:', addr);
+            if (addr && addr.trim() && addr.trim() !== '-') {
+                return { ...invoice, customer_address: addr, _resolved_customer_id: partnerData.id };
+            }
+        }
+        
+        console.warn('❌ Could not resolve customer address for:', invoice.customer_name);
         return invoice;
     };
 
@@ -1253,10 +1280,7 @@ const InvoiceManagement = () => {
                                 <div style="margin-bottom: 4px; font-weight: bold; font-size: 9px; color: #555;">BILL TO / CUSTOMER:</div>
                                 <div style="font-weight: bold; font-size: 12px; margin-bottom: 3px;">${invoice.customer_name}</div>
                                 <div style="margin-bottom: 3px; font-size: 10px;">
-                                    ${(() => {
-                                        const addr = findBusinessPartnerAddress(invoice, businessPartners, false);
-                                        return addr && addr.trim() !== '-' ? String(addr).replace(/\n/g, '<br>') : '';
-                                    })()}
+                                    ${invoice.customer_address && invoice.customer_address.trim() && invoice.customer_address.trim() !== '-' ? String(invoice.customer_address).replace(/\n/g, '<br>') : ''}
                                 </div>
                                 <div style="font-size: 10px;">Attn: ${invoice.customer_contact_name || invoice.customer_pic || '-'}</div>
                             </div>

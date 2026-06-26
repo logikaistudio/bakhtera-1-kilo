@@ -871,10 +871,7 @@ const PurchaseOrder = () => {
                             <td class="colon">:</td>
                             <td class="value">
                                 <strong>${po.vendor_name || '-'}</strong>
-                                ${(() => {
-                                     const addr = findBusinessPartnerAddress(po, businessPartners, true);
-                                     return addr && addr.trim() !== '-' ? '<br/>' + String(addr).replace(/\n/g, '<br/>') : '';
-                                 })()}
+                                ${po.vendor_address && po.vendor_address.trim() && po.vendor_address.trim() !== '-' ? '<br/>' + String(po.vendor_address).replace(/\n/g, '<br/>') : ''}
                             </td>
                         </tr>
                         <tr>
@@ -1019,39 +1016,71 @@ const PurchaseOrder = () => {
     // Resolve vendor address from blink_business_partners by ID or name
     const resolveVendorAddress = async (po) => {
         if (!po) return po;
-        try {
-            let partnerData = null;
-            
-            // Try by vendor_id first
-            if (po.vendor_id) {
-                const { data } = await supabase
+        
+        console.log('🔍 Resolving vendor address for:', po.vendor_name, 'ID:', po.vendor_id);
+        
+        let partnerData = null;
+        
+        // Try by vendor_id first
+        if (po.vendor_id) {
+            try {
+                const { data, error } = await supabase
                     .from('blink_business_partners')
                     .select('id, partner_name, address_line1, address')
                     .eq('id', po.vendor_id)
-                    .single();
-                partnerData = data;
+                    .maybeSingle();
+                if (!error && data) {
+                    partnerData = data;
+                    console.log('✅ Found vendor by ID:', data.partner_name, 'address_line1:', data.address_line1);
+                }
+            } catch (err) {
+                console.warn('⚠️ Error matching vendor by ID:', err.message);
             }
-            
-            // Fallback: try by name match
-            if (!partnerData && po.vendor_name) {
-                const { data } = await supabase
+        }
+        
+        // Fallback: try by exact name match
+        if (!partnerData && po.vendor_name) {
+            try {
+                const { data, error } = await supabase
+                    .from('blink_business_partners')
+                    .select('id, partner_name, address_line1, address')
+                    .ilike('partner_name', po.vendor_name.trim())
+                    .limit(1);
+                if (!error && data && data.length > 0) {
+                    partnerData = data[0];
+                    console.log('✅ Found vendor by exact name:', partnerData.partner_name);
+                }
+            } catch (err) {
+                console.warn('⚠️ Error matching vendor by exact name:', err.message);
+            }
+        }
+        
+        // Fallback: try by partial name match
+        if (!partnerData && po.vendor_name) {
+            try {
+                const { data, error } = await supabase
                     .from('blink_business_partners')
                     .select('id, partner_name, address_line1, address')
                     .ilike('partner_name', `%${po.vendor_name.trim()}%`)
-                    .limit(1)
-                    .single();
-                partnerData = data;
-            }
-            
-            if (partnerData) {
-                const addr = partnerData.address_line1 || partnerData.address || '';
-                if (addr && addr.trim() && addr.trim() !== '-') {
-                    return { ...po, vendor_address: addr, _resolved_vendor_id: partnerData.id };
+                    .limit(1);
+                if (!error && data && data.length > 0) {
+                    partnerData = data[0];
+                    console.log('✅ Found vendor by partial name:', partnerData.partner_name);
                 }
+            } catch (err) {
+                console.warn('⚠️ Error matching vendor by partial name:', err.message);
             }
-        } catch (err) {
-            console.warn('Could not resolve vendor address:', err.message);
         }
+        
+        if (partnerData) {
+            const addr = partnerData.address_line1 || partnerData.address || '';
+            console.log('📍 Resolved vendor address:', addr);
+            if (addr && addr.trim() && addr.trim() !== '-') {
+                return { ...po, vendor_address: addr, _resolved_vendor_id: partnerData.id };
+            }
+        }
+        
+        console.warn('❌ Could not resolve vendor address for:', po.vendor_name);
         return po;
     };
 
