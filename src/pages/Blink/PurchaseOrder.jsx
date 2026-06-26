@@ -1016,18 +1016,63 @@ const PurchaseOrder = () => {
         }
     };
 
-    const handlePrintPO = (po) => {
+    // Resolve vendor address from blink_business_partners by ID or name
+    const resolveVendorAddress = async (po) => {
+        if (!po) return po;
+        try {
+            let partnerData = null;
+            
+            // Try by vendor_id first
+            if (po.vendor_id) {
+                const { data } = await supabase
+                    .from('blink_business_partners')
+                    .select('id, partner_name, address_line1, address')
+                    .eq('id', po.vendor_id)
+                    .single();
+                partnerData = data;
+            }
+            
+            // Fallback: try by name match
+            if (!partnerData && po.vendor_name) {
+                const { data } = await supabase
+                    .from('blink_business_partners')
+                    .select('id, partner_name, address_line1, address')
+                    .ilike('partner_name', `%${po.vendor_name.trim()}%`)
+                    .limit(1)
+                    .single();
+                partnerData = data;
+            }
+            
+            if (partnerData) {
+                const addr = partnerData.address_line1 || partnerData.address || '';
+                if (addr && addr.trim() && addr.trim() !== '-') {
+                    return { ...po, vendor_address: addr, _resolved_vendor_id: partnerData.id };
+                }
+            }
+        } catch (err) {
+            console.warn('Could not resolve vendor address:', err.message);
+        }
+        return po;
+    };
+
+    const handlePrintPO = async (po) => {
         // Print PO = langsung cetak (auto-trigger dialog)
-        try { buildPrintWindow(po, true); }
+        try {
+            const resolvedPO = await resolveVendorAddress(po);
+            buildPrintWindow(resolvedPO, true);
+        }
         catch (error) {
             console.error('Error printing PO:', error);
             alert('Gagal membuka print: ' + error.message);
         }
     };
 
-    const handlePrintPreviewPO = (po) => {
+    const handlePrintPreviewPO = async (po) => {
         // Print Preview = tampilkan dokumen saja, user cetak sendiri
-        try { buildPrintWindow(po, false); }
+        try {
+            const resolvedPO = await resolveVendorAddress(po);
+            buildPrintWindow(resolvedPO, false);
+        }
         catch (error) {
             console.error('Error print preview PO:', error);
             alert('Gagal membuka print preview: ' + error.message);

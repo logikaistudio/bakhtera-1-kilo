@@ -1014,7 +1014,53 @@ const InvoiceManagement = () => {
         return `${getCurrencySymbol(currency)} ${Number(value || 0).toLocaleString('id-ID')}`;
     };
 
-    const handlePrintInvoice = (invoice) => {
+    // Resolve customer address from business partners by ID or name
+    const resolveInvoiceCustomerAddress = async (invoice) => {
+        if (!invoice) return invoice;
+        
+        // If invoice already has a valid address, keep it but still try to get from business partners
+        const existingAddr = invoice.customer_address;
+        
+        try {
+            let partnerData = null;
+            
+            // Try by customer_id first
+            if (invoice.customer_id) {
+                const { data } = await supabase
+                    .from('blink_business_partners')
+                    .select('id, partner_name, address_line1, address')
+                    .eq('id', invoice.customer_id)
+                    .single();
+                partnerData = data;
+            }
+            
+            // Fallback: try by name match
+            if (!partnerData && invoice.customer_name) {
+                const { data } = await supabase
+                    .from('blink_business_partners')
+                    .select('id, partner_name, address_line1, address')
+                    .ilike('partner_name', `%${invoice.customer_name.trim()}%`)
+                    .limit(1)
+                    .single();
+                partnerData = data;
+            }
+            
+            if (partnerData) {
+                const addr = partnerData.address_line1 || partnerData.address || '';
+                if (addr && addr.trim() && addr.trim() !== '-') {
+                    return { ...invoice, customer_address: addr, _resolved_customer_id: partnerData.id };
+                }
+            }
+        } catch (err) {
+            console.warn('Could not resolve customer address:', err.message);
+        }
+        
+        return invoice;
+    };
+
+    const handlePrintInvoice = async (invoiceRaw) => {
+        // Resolve customer address from business partners first
+        const invoice = await resolveInvoiceCustomerAddress(invoiceRaw);
         try {
             const printWindow = window.open('', '_blank');
 
@@ -1873,8 +1919,9 @@ const InvoiceManagement = () => {
                             setShowViewModal(false);
                         }}
                         onPrint={() => handlePrintInvoice(selectedInvoice)}
-                        onPreview={() => {
-                            setPreviewInvoiceData(selectedInvoice);
+                        onPreview={async () => {
+                            const resolved = await resolveInvoiceCustomerAddress(selectedInvoice);
+                            setPreviewInvoiceData(resolved);
                             setShowPrintPreview(true);
                         }}
                         onSubmit={() => handleSubmitInvoice(selectedInvoice)}
