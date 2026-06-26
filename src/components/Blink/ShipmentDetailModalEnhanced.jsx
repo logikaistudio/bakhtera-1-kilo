@@ -282,6 +282,52 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                         setSellingItems(quotation.service_items || quotation.serviceItems || []);
                     }
 
+                    // Auto-populate buying items (COGS) from quotation if we don't have them yet
+                    if (buyingItems.length === 0) {
+                        const rawCostItems = quotation.cost_items || quotation.costItems || [];
+                        const flatList = [];
+                        rawCostItems.forEach(groupOrItem => {
+                            const isGroup = groupOrItem.items !== undefined;
+                            const groupName = isGroup ? (groupOrItem.groupName || 'General') : 'General';
+                            const subItems = isGroup ? groupOrItem.items : [groupOrItem];
+                            const groupRate = isGroup ? (groupOrItem.groupExchangeRate || quotation.exchange_rate || 16000) : (quotation.exchange_rate || 16000);
+
+                            subItems.forEach(item => {
+                                const qty = parseFloat(item.qty || item.quantity || 1);
+                                const rate = parseFloat(item.rate || item.unitPrice || item.price || 0);
+                                const amount = parseFloat(item.amount || item.total || 0) || (qty * rate);
+                                
+                                flatList.push({
+                                    id: item.id || `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                                    description: isGroup ? `[${groupName}] ${item.description || item.name || 'Item'}` : (item.description || item.name || 'Item'),
+                                    qty: qty,
+                                    unit: item.unit || 'Job',
+                                    rate: rate,
+                                    amount: amount,
+                                    coa_id: item.coa_id || null,
+                                    _coa_code: item._coa_code || '',
+                                    vendor: item.vendor || item.supplier || '',
+                                    currency: item.currency || quotation.currency || 'IDR'
+                                });
+                            });
+                        });
+
+                        const coaIds = flatList.map(i => i.coa_id).filter(Boolean);
+                        if (coaIds.length > 0) {
+                            supabase.from('finance_coa').select('id, code').in('id', coaIds).then(({ data: coaData }) => {
+                                const codeMap = {};
+                                (coaData || []).forEach(c => { codeMap[c.id] = c.code; });
+                                const enriched = flatList.map(item => ({
+                                    ...item,
+                                    _coa_code: item._coa_code || codeMap[item.coa_id] || ''
+                                }));
+                                setBuyingItems(enriched);
+                            });
+                        } else {
+                            setBuyingItems(flatList);
+                        }
+                    }
+
                     // Merge quotation fields into editedShipment — only fill if field is currently empty/null
                     setEditedShipment(prev => ({
                         ...prev,

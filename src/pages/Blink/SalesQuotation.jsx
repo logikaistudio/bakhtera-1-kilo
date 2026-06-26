@@ -248,6 +248,7 @@ const SalesQuotation = () => {
             status: status,
             notes: formData.notes,
             service_items: formData.serviceItems,
+            cost_items: formData.costItems,
             terms_and_conditions: formData.termsConditions,
             incoterm: formData.incoterm,
             payment_terms: formData.paymentTerms,
@@ -369,6 +370,7 @@ const SalesQuotation = () => {
                     // Pricing
                     total_amount: total,
                     service_items: editedQuotation.serviceItems || [],
+                    cost_items: editedQuotation.costItems || [],
 
                     // Additional details
                     incoterm: editedQuotation.incoterm,
@@ -661,6 +663,7 @@ const SalesQuotation = () => {
                 validity_days: parentQuotation.validityDays || 30,
                 notes: parentQuotation.notes,
                 service_items: parentQuotation.serviceItems,
+                cost_items: parentQuotation.costItems || [],
                 revision_number: nextRevisionNumber,
                 parent_quotation_id: parentQuotation.parent_quotation_id || parentQuotation.id,
                 revision_reason: parentQuotation.revision_reason,
