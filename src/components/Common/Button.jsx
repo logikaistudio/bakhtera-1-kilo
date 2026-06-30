@@ -9,7 +9,8 @@ const Button = ({
     icon: Icon,
     className = '',
     disabled = false,
-    type = 'button'
+    type = 'button',
+    ...rest
 }) => {
     const baseClasses = 'rounded-lg font-medium smooth-transition flex items-center justify-center gap-2';
 
@@ -37,6 +38,7 @@ const Button = ({
             disabled={disabled}
             type={type}
             className={`${baseClasses} ${variants[variant]} ${sizes[size]} ${disabledClasses} ${className}`}
+            {...rest}
         >
             {Icon && <Icon className="w-5 h-5" />}
             {children}

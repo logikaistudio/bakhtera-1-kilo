@@ -1868,12 +1868,28 @@ const SalesQuotation = () => {
                         >
                             Cancel
                         </Button>
-                        <Button type="submit">
+                        {/* formNoValidate: allows saving as draft even if required fields are empty */}
+                        <Button type="submit" formNoValidate>
                             Save as Draft
                         </Button>
                         <Button
                             type="button"
-                            onClick={(e) => handleSubmit(e, 'manager_approval')}
+                            onClick={(e) => {
+                                // Validate required fields before submitting for approval
+                                if (!formData.partnerId && !formData.customerName) {
+                                    alert('⚠️ Harap pilih Customer terlebih dahulu.');
+                                    return;
+                                }
+                                if (!formData.origin || !formData.destination) {
+                                    alert('⚠️ Harap isi Origin dan Destination.');
+                                    return;
+                                }
+                                if (!formData.serviceType) {
+                                    alert('⚠️ Harap pilih Service Type.');
+                                    return;
+                                }
+                                handleSubmit(e, 'manager_approval');
+                            }}
                         >
                             Submit for Manager Approval
                         </Button>

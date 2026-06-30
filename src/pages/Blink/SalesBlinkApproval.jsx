@@ -264,7 +264,8 @@ const SalesBlinkApproval = () => {
             setSelectedItem(null);
             fetchSubmissions();
 
-            alert(`✅ Sales Order ${soNumber} created & Shipment auto-created successfully!`);
+            alert(`✅ Sales Order ${soNumber} created & Shipment auto-created successfully!\n\n➡️ Navigating to Shipment Management...`);
+            setTimeout(() => navigate('/blink/shipments'), 1000);
         } catch (err) {
             alert('Failed to approve: ' + err.message);
         } finally {
