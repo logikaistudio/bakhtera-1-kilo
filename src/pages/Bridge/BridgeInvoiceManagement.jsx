@@ -1057,6 +1057,12 @@ const BridgeInvoiceManagement = () => {
                 // Strip COA prefix like "OI : ", "FR : ", etc. from each part
                 parts = parts.map(p => stripCoaPrefix(p)).filter(Boolean);
                 
+                // If parts has more than 1 item, the first item is the COA title (e.g. "Document Fee").
+                // We remove it to only show the actual item description.
+                if (parts.length > 1) {
+                    parts.shift();
+                }
+                
                 // If parts is empty after filtering (meaning description was empty), fallback to item_name
                 if (parts.length === 0 && item.item_name) {
                     parts.push(`<b>${stripCoaPrefix(item.item_name.trim())}</b>`);
@@ -3826,6 +3832,13 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                                                         }
                                                         let parts = rawDesc.split(/<br\s*\/?>/i).map(p => p.trim()).filter(Boolean);
                                                         let uniqueParts = [...new Set(parts.map(p => stripCoa(p)))];
+                                                        
+                                                        // If uniqueParts has more than 1 item, the first item is the COA title (e.g. "Document Fee").
+                                                        // We remove it to only show the actual item description.
+                                                        if (uniqueParts.length > 1) {
+                                                            uniqueParts.shift();
+                                                        }
+                                                        
                                                         return uniqueParts.map((part, i) => (
                                                             <div key={i} style={{ color: i === 0 ? '#000' : '#444', fontWeight: i === 0 ? 'bold' : 'normal' }}>
                                                                 {part}
