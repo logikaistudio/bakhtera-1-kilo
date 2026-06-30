@@ -2384,17 +2384,35 @@ const SalesQuotation = () => {
                                         </button>
                                     )}
                                 </div>
-                                <GroupedServiceItemManager
-                                    items={isEditingQuotation ? (editedQuotation?.costItems || []) : viewingQuotation.costItems}
-                                    onChange={(newGroups) => {
-                                        if (isEditingQuotation) {
-                                            setEditedQuotation(prev => ({ ...prev, costItems: newGroups }));
-                                        }
-                                    }}
-                                    exchangeRate={isEditingQuotation ? editedQuotation?.exchange_rate : viewingQuotation.exchange_rate}
-                                    readOnly={!isEditingQuotation}
-                                    coaType="COST"
-                                />
+                                {(() => {
+                                    // For view mode with no costItems (old data), show serviceItems as fallback read-only
+                                    const isViewMode = !isEditingQuotation;
+                                    const items = isEditingQuotation ? (editedQuotation?.costItems || []) : viewingQuotation.costItems;
+                                    const hasNoItems = !items || items.length === 0 || items.every(g => !g.items || g.items.length === 0);
+                                    const sourceItems = isViewMode && hasNoItems ? (viewingQuotation?.serviceItems || []) : items;
+                                    const isFallback = isViewMode && hasNoItems && sourceItems.length > 0;
+
+                                    return (
+                                        <>
+                                            {isFallback && (
+                                                <div className="mb-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-700">
+                                                    ℹ️ Data lama — menampilkan selling items sebagai referensi estimasi biaya. Edit quotation untuk mengatur cost breakdown.
+                                                </div>
+                                            )}
+                                            <GroupedServiceItemManager
+                                                items={sourceItems}
+                                                onChange={(newGroups) => {
+                                                    if (isEditingQuotation) {
+                                                        setEditedQuotation(prev => ({ ...prev, costItems: newGroups }));
+                                                    }
+                                                }}
+                                                exchangeRate={isEditingQuotation ? editedQuotation?.exchange_rate : viewingQuotation.exchange_rate}
+                                                readOnly={!isEditingQuotation}
+                                                coaType="COST"
+                                            />
+                                        </>
+                                    );
+                                })()}
                             </div>
 
                         {/* Terms & Conditions (View/Edit) */}
