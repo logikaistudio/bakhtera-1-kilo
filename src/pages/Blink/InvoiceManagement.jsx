@@ -3923,14 +3923,14 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                                                 <td style={{ borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textTransform: 'capitalize' }}>
                                                     {(() => {
                                                         const stripCoa = (str) => str.replace(/^[A-Z0-9\s]{1,10}\s*:\s*/g, '').trim();
-                                                        let rawDesc = String(item.description || item.item_name || '');
-                                                        let parts = rawDesc.split(/<br\s*\/?>/i).map(p => p.trim()).filter(Boolean);
-                                                        if (item.item_name && !parts.includes(item.item_name.trim())) {
-                                                            parts.unshift(item.item_name.trim());
+                                                        let rawDesc = String(item.description || '').trim();
+                                                        if (!rawDesc && item.item_name) {
+                                                            rawDesc = item.item_name.trim();
                                                         }
+                                                        let parts = rawDesc.split(/<br\s*\/?>/i).map(p => p.trim()).filter(Boolean);
                                                         let uniqueParts = [...new Set(parts.map(p => stripCoa(p)))];
                                                         return uniqueParts.map((part, i) => (
-                                                            <div key={i} style={{ color: i === 0 && item.item_name && part === stripCoa(item.item_name.trim()) ? '#000' : '#444', fontWeight: i === 0 && item.item_name && part === stripCoa(item.item_name.trim()) ? 'bold' : 'normal' }}>
+                                                            <div key={i} style={{ color: i === 0 ? '#000' : '#444', fontWeight: i === 0 ? 'bold' : 'normal' }}>
                                                                 {part}
                                                             </div>
                                                         ));
