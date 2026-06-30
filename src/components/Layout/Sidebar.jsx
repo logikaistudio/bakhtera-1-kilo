@@ -336,6 +336,41 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
         },
     ];
 
+    const hasBridgeAccess = () => {
+        if (canAccessPortal('bridge_dashboard')) return true;
+        return bridgeSubMenuItems.some(subItem => {
+            if (subItem.type === 'category') {
+                return subItem.items.some(menuItem => menuItem.menuCode && canAccessPortal(menuItem.menuCode));
+            }
+            return subItem.menuCode && canAccessPortal(subItem.menuCode);
+        });
+    };
+
+    const hasPabeanAccess = () => {
+        if (canAccessPortal('bridge_pabean')) return true;
+        return pabeanSubMenuItems.some(subItem => subItem.menuCode && canAccessPortal(subItem.menuCode));
+    };
+
+    const hasBlinkAccess = () => {
+        if (canAccessPortal('blink_dashboard')) return true;
+        return blinkSubMenuItems.some(subItem => {
+            if (subItem.type === 'category') {
+                return subItem.items.some(menuItem => menuItem.menuCode && canAccessPortal(menuItem.menuCode));
+            }
+            return subItem.menuCode && canAccessPortal(subItem.menuCode);
+        });
+    };
+
+    const hasBigAccess = () => {
+        if (canAccessPortal('big_dashboard')) return true;
+        return bigSubMenuItems.some(subItem => {
+            if (subItem.type === 'category') {
+                return subItem.items.some(menuItem => menuItem.menuCode && canAccessPortal(menuItem.menuCode));
+            }
+            return subItem.menuCode && canAccessPortal(subItem.menuCode);
+        });
+    };
+
     const MenuLink = ({ item, isMobile = false }) => (
         <Link
             to={item.path}
@@ -387,34 +422,57 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                         {mainMenuItems.map((item) => {
                             // Special handling for Bridge with submenu
                             if (item.path === '/bridge') {
-                                if (!canAccessPortal('bridge_dashboard')) return null;
+                                if (!hasBridgeAccess()) return null;
                                 const isExpanded = expandedSection === 'bridge';
                                 const isBridgeActive = location.pathname.startsWith('/bridge');
+                                const hasDashboardAccess = canAccessPortal('bridge_dashboard');
 
                                 return (
                                     <div key={item.path}>
                                         <div className="flex items-center gap-1" id="menu-bridge">
-                                            <Link
-                                                to={item.path}
-                                                onClick={() => {
-                                                    if (isMobile) setIsOpen(false);
-                                                    const isCurrentlyExpanded = expandedSection === 'bridge';
-                                                    setExpandedSection(isCurrentlyExpanded ? '' : 'bridge');
-                                                    if (!isCurrentlyExpanded) scrollToElement('menu-bridge');
-                                                }}
-                                                className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition text-sm ${isBridgeActive
-                                                    ? 'bg-white/20 text-white'
-                                                    : 'text-silver-dark hover:text-white hover:bg-white/10'
-                                                    }`}
-                                            >
-                                                <item.icon className="w-5 h-5 flex-shrink-0" />
-                                                <div className="flex-1 text-left">
-                                                    <div className="font-medium">{item.label}</div>
-                                                    <div className={`text-xs ${isBridgeActive ? 'text-white/70' : 'text-silver-dark'}`}>
-                                                        {item.subtitle}
+                                            {hasDashboardAccess ? (
+                                                <Link
+                                                    to={item.path}
+                                                    onClick={() => {
+                                                        if (isMobile) setIsOpen(false);
+                                                        const isCurrentlyExpanded = expandedSection === 'bridge';
+                                                        setExpandedSection(isCurrentlyExpanded ? '' : 'bridge');
+                                                        if (!isCurrentlyExpanded) scrollToElement('menu-bridge');
+                                                    }}
+                                                    className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition text-sm ${isBridgeActive
+                                                        ? 'bg-white/20 text-white'
+                                                        : 'text-silver-dark hover:text-white hover:bg-white/10'
+                                                        }`}
+                                                >
+                                                    <item.icon className="w-5 h-5 flex-shrink-0" />
+                                                    <div className="flex-1 text-left">
+                                                        <div className="font-medium">{item.label}</div>
+                                                        <div className={`text-xs ${isBridgeActive ? 'text-white/70' : 'text-silver-dark'}`}>
+                                                            {item.subtitle}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </Link>
+                                                </Link>
+                                            ) : (
+                                                <button
+                                                    onClick={() => {
+                                                        const isCurrentlyExpanded = expandedSection === 'bridge';
+                                                        setExpandedSection(isCurrentlyExpanded ? '' : 'bridge');
+                                                        if (!isCurrentlyExpanded) scrollToElement('menu-bridge');
+                                                    }}
+                                                    className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition text-sm text-left ${isBridgeActive
+                                                        ? 'bg-white/20 text-white'
+                                                        : 'text-silver-dark hover:text-white hover:bg-white/10'
+                                                        }`}
+                                                >
+                                                    <item.icon className="w-5 h-5 flex-shrink-0" />
+                                                    <div className="flex-1 text-left">
+                                                        <div className="font-medium">{item.label}</div>
+                                                        <div className="text-xs text-silver-dark">
+                                                            {item.subtitle}
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={() => {
                                                     const newState = isExpanded ? '' : 'bridge';
@@ -534,34 +592,57 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
 
                             // Special handling for Pabean with submenu
                             if (item.path === '/pabean') {
-                                if (!canAccessPortal('bridge_pabean')) return null;
+                                if (!hasPabeanAccess()) return null;
                                 const isExpanded = expandedSection === 'pabean';
                                 const isPabeanActive = location.pathname.startsWith('/pabean');
+                                const hasDashboardAccess = canAccessPortal('bridge_pabean');
 
                                 return (
                                     <div key={item.path}>
                                         <div className="flex items-center gap-1" id="menu-pabean">
-                                            <Link
-                                                to={item.path}
-                                                onClick={() => {
-                                                    if (isMobile) setIsOpen(false);
-                                                    const isCurrentlyExpanded = expandedSection === 'pabean';
-                                                    setExpandedSection(isCurrentlyExpanded ? '' : 'pabean');
-                                                    if (!isCurrentlyExpanded) scrollToElement('menu-pabean');
-                                                }}
-                                                className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition text-sm ${isPabeanActive
-                                                    ? 'bg-white/20 text-white'
-                                                    : 'text-silver-dark hover:text-white hover:bg-white/10'
-                                                    }`}
-                                            >
-                                                <item.icon className="w-5 h-5 flex-shrink-0" />
-                                                <div className="flex-1 text-left">
-                                                    <div className="font-medium">{item.label}</div>
-                                                    <div className={`text-xs ${isPabeanActive ? 'text-white/70' : 'text-silver-dark'}`}>
-                                                        {item.subtitle}
+                                            {hasDashboardAccess ? (
+                                                <Link
+                                                    to={item.path}
+                                                    onClick={() => {
+                                                        if (isMobile) setIsOpen(false);
+                                                        const isCurrentlyExpanded = expandedSection === 'pabean';
+                                                        setExpandedSection(isCurrentlyExpanded ? '' : 'pabean');
+                                                        if (!isCurrentlyExpanded) scrollToElement('menu-pabean');
+                                                    }}
+                                                    className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition text-sm ${isPabeanActive
+                                                        ? 'bg-white/20 text-white'
+                                                        : 'text-silver-dark hover:text-white hover:bg-white/10'
+                                                        }`}
+                                                >
+                                                    <item.icon className="w-5 h-5 flex-shrink-0" />
+                                                    <div className="flex-1 text-left">
+                                                        <div className="font-medium">{item.label}</div>
+                                                        <div className={`text-xs ${isPabeanActive ? 'text-white/70' : 'text-silver-dark'}`}>
+                                                            {item.subtitle}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </Link>
+                                                </Link>
+                                            ) : (
+                                                <button
+                                                    onClick={() => {
+                                                        const isCurrentlyExpanded = expandedSection === 'pabean';
+                                                        setExpandedSection(isCurrentlyExpanded ? '' : 'pabean');
+                                                        if (!isCurrentlyExpanded) scrollToElement('menu-pabean');
+                                                    }}
+                                                    className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition text-sm text-left ${isPabeanActive
+                                                        ? 'bg-white/20 text-white'
+                                                        : 'text-silver-dark hover:text-white hover:bg-white/10'
+                                                        }`}
+                                                >
+                                                    <item.icon className="w-5 h-5 flex-shrink-0" />
+                                                    <div className="flex-1 text-left">
+                                                        <div className="font-medium">{item.label}</div>
+                                                        <div className="text-xs text-silver-dark">
+                                                            {item.subtitle}
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={() => {
                                                     const newState = isExpanded ? '' : 'pabean';
@@ -606,34 +687,57 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
 
                             // Special handling for BIG with submenu
                             if (item.path === '/big') {
-                                if (!canAccessPortal('big_dashboard')) return null;
+                                if (!hasBigAccess()) return null;
                                 const isExpanded = expandedSection === 'big';
                                 const isBigActive = location.pathname.startsWith('/big');
+                                const hasDashboardAccess = canAccessPortal('big_dashboard');
 
                                 return (
                                     <div key={item.path}>
                                         <div className="flex items-center gap-1" id="menu-big">
-                                            <Link
-                                                to={item.path}
-                                                onClick={() => {
-                                                    if (isMobile) setIsOpen(false);
-                                                    const isCurrentlyExpanded = expandedSection === 'big';
-                                                    setExpandedSection(isCurrentlyExpanded ? '' : 'big');
-                                                    if (!isCurrentlyExpanded) scrollToElement('menu-big');
-                                                }}
-                                                className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition text-sm ${isBigActive
-                                                    ? 'text-silver-light'
-                                                    : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface'
-                                                    }`}
-                                            >
-                                                <item.icon className="w-5 h-5 flex-shrink-0" />
-                                                <div className="flex-1 text-left">
-                                                    <div className="font-medium">{item.label}</div>
-                                                    <div className={`text-xs ${isBigActive ? 'text-silver-dark' : 'text-silver-dark'}`}>
-                                                        {item.subtitle}
+                                            {hasDashboardAccess ? (
+                                                <Link
+                                                    to={item.path}
+                                                    onClick={() => {
+                                                        if (isMobile) setIsOpen(false);
+                                                        const isCurrentlyExpanded = expandedSection === 'big';
+                                                        setExpandedSection(isCurrentlyExpanded ? '' : 'big');
+                                                        if (!isCurrentlyExpanded) scrollToElement('menu-big');
+                                                    }}
+                                                    className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition text-sm ${isBigActive
+                                                        ? 'text-silver-light'
+                                                        : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface'
+                                                        }`}
+                                                >
+                                                    <item.icon className="w-5 h-5 flex-shrink-0" />
+                                                    <div className="flex-1 text-left">
+                                                        <div className="font-medium">{item.label}</div>
+                                                        <div className={`text-xs ${isBigActive ? 'text-silver-dark' : 'text-silver-dark'}`}>
+                                                            {item.subtitle}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </Link>
+                                                </Link>
+                                            ) : (
+                                                <button
+                                                    onClick={() => {
+                                                        const isCurrentlyExpanded = expandedSection === 'big';
+                                                        setExpandedSection(isCurrentlyExpanded ? '' : 'big');
+                                                        if (!isCurrentlyExpanded) scrollToElement('menu-big');
+                                                    }}
+                                                    className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition text-sm text-left ${isBigActive
+                                                        ? 'text-silver-light'
+                                                        : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface'
+                                                        }`}
+                                                >
+                                                    <item.icon className="w-5 h-5 flex-shrink-0" />
+                                                    <div className="flex-1 text-left">
+                                                        <div className="font-medium">{item.label}</div>
+                                                        <div className="text-xs text-silver-dark">
+                                                            {item.subtitle}
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={() => {
                                                     const newState = isExpanded ? '' : 'big';
@@ -752,34 +856,57 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
 
                             // Special handling for BLINK with submenu
                             if (item.path === '/blink') {
-                                if (!canAccessPortal('blink_dashboard')) return null;
+                                if (!hasBlinkAccess()) return null;
                                 const isExpanded = expandedSection === 'blink';
                                 const isBlinkActive = location.pathname.startsWith('/blink');
+                                const hasDashboardAccess = canAccessPortal('blink_dashboard');
 
                                 return (
                                     <div key={item.path}>
                                         <div className="flex items-center gap-1" id="menu-blink">
-                                            <Link
-                                                to={item.path}
-                                                onClick={() => {
-                                                    if (isMobile) setIsOpen(false);
-                                                    const isCurrentlyExpanded = expandedSection === 'blink';
-                                                    setExpandedSection(isCurrentlyExpanded ? '' : 'blink');
-                                                    if (!isCurrentlyExpanded) scrollToElement('menu-blink');
-                                                }}
-                                                className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition text-sm ${isBlinkActive
-                                                    ? 'text-silver-light'
-                                                    : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface'
-                                                    }`}
-                                            >
-                                                <item.icon className="w-5 h-5 flex-shrink-0" />
-                                                <div className="flex-1 text-left">
-                                                    <div className="font-medium">{item.label}</div>
-                                                    <div className={`text-xs ${isBlinkActive ? 'text-silver-dark' : 'text-silver-dark'}`}>
-                                                        {item.subtitle}
+                                            {hasDashboardAccess ? (
+                                                <Link
+                                                    to={item.path}
+                                                    onClick={() => {
+                                                        if (isMobile) setIsOpen(false);
+                                                        const isCurrentlyExpanded = expandedSection === 'blink';
+                                                        setExpandedSection(isCurrentlyExpanded ? '' : 'blink');
+                                                        if (!isCurrentlyExpanded) scrollToElement('menu-blink');
+                                                    }}
+                                                    className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition text-sm ${isBlinkActive
+                                                        ? 'text-silver-light'
+                                                        : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface'
+                                                        }`}
+                                                >
+                                                    <item.icon className="w-5 h-5 flex-shrink-0" />
+                                                    <div className="flex-1 text-left">
+                                                        <div className="font-medium">{item.label}</div>
+                                                        <div className={`text-xs ${isBlinkActive ? 'text-silver-dark' : 'text-silver-dark'}`}>
+                                                            {item.subtitle}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </Link>
+                                                </Link>
+                                            ) : (
+                                                <button
+                                                    onClick={() => {
+                                                        const isCurrentlyExpanded = expandedSection === 'blink';
+                                                        setExpandedSection(isCurrentlyExpanded ? '' : 'blink');
+                                                        if (!isCurrentlyExpanded) scrollToElement('menu-blink');
+                                                    }}
+                                                    className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition text-sm text-left ${isBlinkActive
+                                                        ? 'text-silver-light'
+                                                        : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface'
+                                                        }`}
+                                                >
+                                                    <item.icon className="w-5 h-5 flex-shrink-0" />
+                                                    <div className="flex-1 text-left">
+                                                        <div className="font-medium">{item.label}</div>
+                                                        <div className="text-xs text-silver-dark">
+                                                            {item.subtitle}
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={() => {
                                                     const newState = isExpanded ? '' : 'blink';

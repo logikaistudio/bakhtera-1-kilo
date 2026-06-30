@@ -949,21 +949,6 @@ const SalesQuotation = () => {
         const soNumber = generateSONumber(quotation.jobNumber || quotation.quotationNumber);
         console.log('📝 Generated SO Number:', soNumber);
 
-        // Update quotation status to converted via Supabase
-        try {
-            console.log('⏳ Updating quotation status to converted...');
-            const { error: updateError } = await supabase
-                .from('blink_sales_quotations')
-                .update({ status: 'converted' })
-                .eq('id', quotation.id);
-
-            if (updateError) throw updateError;
-        } catch (error) {
-            console.error('Error updating quotation status to converted:', error);
-            alert('Failed to update quotation status to converted: ' + error.message);
-            return; // Stop execution if status update fails
-        }
-
         // Auto-create Shipment in Operations
         const newShipment = {
             jobNumber: quotation.jobNumber, // Already mapped to camelCase
@@ -1045,6 +1030,7 @@ const SalesQuotation = () => {
             const blPrefix = isAirFreight ? 'AWB' : 'BL';
             const blNumber = `${blPrefix}-${soNumber}`;
 
+            console.log('⏳ Creating shipment in blink_shipments...');
             const { data: shipmentData, error } = await supabase
                 .from('blink_shipments')
                 .insert([{
@@ -1102,6 +1088,15 @@ const SalesQuotation = () => {
 
             if (error) throw error;
 
+            // Update quotation status to converted via Supabase ONLY after shipment is successfully created
+            console.log('⏳ Updating quotation status to converted...');
+            const { error: updateError } = await supabase
+                .from('blink_sales_quotations')
+                .update({ status: 'converted' })
+                .eq('id', quotation.id);
+
+            if (updateError) throw updateError;
+
             await fetchQuotations();
             setShowViewModal(false);
 
@@ -1114,8 +1109,8 @@ const SalesQuotation = () => {
             }, 1000);
 
         } catch (error) {
-            console.error('Error creating shipment:', error);
-            alert('SO created but shipment failed: ' + error.message);
+            console.error('Error creating shipment/SO:', error);
+            alert('Failed to create Sales Order & Shipment: ' + error.message);
         }
     };
 

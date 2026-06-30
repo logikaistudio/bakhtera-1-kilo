@@ -132,11 +132,130 @@ const SalesBlinkApproval = () => {
         try {
             setProcessing(true);
 
-            const { error } = await supabase
+            // Fetch quotation data
+            const { data: quotationData, error: fetchErr } = await supabase
                 .from('blink_sales_quotations')
-                .update({ status: 'approved', updated_at: new Date().toISOString() })
+                .select('*')
+                .eq('id', item.id)
+                .single();
+            if (fetchErr) throw fetchErr;
+
+            // Generate SO Number
+            const { generateSONumber } = await import('../../utils/documentNumbers');
+            const jobNumber = quotationData.job_number || quotationData.quotation_number;
+            const soNumber = generateSONumber(jobNumber);
+
+            // --- AUTO-FLATTENING WITH SMART CURRENCY CONVERSION ---
+            const baseCurrency = quotationData.currency || 'USD';
+            const baseExchangeRate = quotationData.exchange_rate || 16000;
+
+            const flattenItems = (groupedItems) => {
+                const flatList = [];
+                (groupedItems || []).forEach(groupOrItem => {
+                    const isGroup = groupOrItem.items !== undefined;
+                    const groupName = isGroup ? (groupOrItem.groupName || 'General') : 'General';
+                    const groupRate = isGroup ? (groupOrItem.groupExchangeRate || baseExchangeRate) : baseExchangeRate;
+                    const subItems = isGroup ? groupOrItem.items : [groupOrItem];
+
+                    subItems.forEach(flatItem => {
+                        const originalAmt = parseFloat(flatItem.amount) || 0;
+                        const originalCurrency = flatItem.currency || 'USD';
+                        let finalAmt = originalAmt;
+
+                        if (originalCurrency !== baseCurrency) {
+                            if (baseCurrency === 'IDR' && originalCurrency === 'USD') {
+                                finalAmt = originalAmt * groupRate;
+                            } else if (baseCurrency === 'USD' && originalCurrency === 'IDR') {
+                                finalAmt = originalAmt / groupRate;
+                            }
+                        }
+
+                        flatList.push({
+                            id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                            description: isGroup ? `[${groupName}] ${flatItem.description || flatItem.name || 'Item'}` : (flatItem.description || flatItem.name || 'Item'),
+                            qty: parseFloat(flatItem.quantity) || 1,
+                            unit: flatItem.unit || 'Job',
+                            rate: finalAmt / (parseFloat(flatItem.quantity) || 1),
+                            amount: finalAmt,
+                            coa_id: flatItem.coa_id || null,
+                            vendor: flatItem.vendor || flatItem.supplier || '',
+                            original_currency: originalCurrency,
+                            original_amount: originalAmt,
+                            exchange_rate_used: groupRate,
+                            group_name: groupName,
+                            item_name: flatItem.name || flatItem.description || 'Item'
+                        });
+                    });
+                });
+                return flatList;
+            };
+
+            const flatSellingItems = flattenItems(quotationData.service_items || []);
+            const flatBuyingItems = flattenItems(quotationData.cost_items || []);
+
+            const isAirFreight = (quotationData.service_type || '').toLowerCase() === 'air';
+            const blType = isAirFreight ? 'AWB' : 'MBL';
+            const blPrefix = isAirFreight ? 'AWB' : 'BL';
+            const blNumber = `${blPrefix}-${soNumber}`;
+
+            const coreData = {
+                shipper: quotationData.shipper || quotationData.shipper_name || quotationData.customer_name || '',
+                shipper_name: quotationData.shipper_name || quotationData.shipper || quotationData.customer_name || '',
+                quotation_shipper_name: quotationData.shipper_name || null,
+                job_number: quotationData.job_number,
+                so_number: soNumber,
+                sales_quotation_id: quotationData.id,
+                quotation_id: quotationData.id, // Fallback
+                customer: quotationData.customer_name || '',
+                customer_id: quotationData.partner_id || null,
+                sales_person: quotationData.sales_person || '',
+                quotation_type: quotationData.quotation_type || 'RG',
+                quotation_date: quotationData.quotation_date,
+                origin: quotationData.origin,
+                destination: quotationData.destination,
+                service_type: quotationData.service_type,
+                cargo_type: quotationData.cargo_type,
+                weight: quotationData.weight,
+                volume: quotationData.volume,
+                commodity: quotationData.commodity,
+                quoted_amount: quotationData.total_amount || 0,
+                currency: quotationData.currency || 'USD',
+                exchange_rate: quotationData.currency === 'IDR' ? 1 : (quotationData.exchange_rate || 16000),
+                status: 'pending',
+                created_from: 'sales_order',
+                service_items: flatSellingItems,
+                selling_items: flatSellingItems,
+                buying_items: flatBuyingItems,
+                notes: quotationData.notes || '',
+                gross_weight: quotationData.gross_weight || null,
+                net_weight: quotationData.net_weight || null,
+                measure: quotationData.measure || null,
+                packages: quotationData.quantity && quotationData.package_type
+                    ? `${quotationData.quantity} ${quotationData.package_type}`
+                    : (quotationData.package_type || null),
+                incoterm: quotationData.incoterm || null,
+                payment_terms: quotationData.payment_terms || null,
+                bl_number: blNumber,
+                bl_type: blType,
+                bl_status: 'draft',
+                bl_subject: `${(quotationData.service_type || 'SEA').toUpperCase()} Freight - ${quotationData.origin} to ${quotationData.destination}`,
+                bl_place_of_receipt: quotationData.origin || '',
+                bl_place_of_delivery: quotationData.destination || '',
+            };
+
+            console.log('⏳ Creating shipment in blink_shipments...');
+            const { error: shipErr } = await supabase
+                .from('blink_shipments')
+                .insert([coreData]);
+
+            if (shipErr) throw shipErr;
+
+            // Mark quotation as converted
+            const { error: updateErr } = await supabase
+                .from('blink_sales_quotations')
+                .update({ status: 'converted', updated_at: new Date().toISOString() })
                 .eq('id', item.id);
-            if (error) throw error;
+            if (updateErr) throw updateErr;
 
             await recordApprovalHistory(item, 'approved', null, user?.name || user?.email || 'Manager');
 
@@ -145,7 +264,7 @@ const SalesBlinkApproval = () => {
             setSelectedItem(null);
             fetchSubmissions();
 
-            alert(`✅ Sales Quotation ${item.refNumber} berhasil disetujui!`);
+            alert(`✅ Sales Order ${soNumber} created & Shipment auto-created successfully!`);
         } catch (err) {
             alert('Failed to approve: ' + err.message);
         } finally {
