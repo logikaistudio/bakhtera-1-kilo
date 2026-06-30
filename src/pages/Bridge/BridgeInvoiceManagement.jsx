@@ -1046,14 +1046,20 @@ const BridgeInvoiceManagement = () => {
             const safeDate = (date) => date ? new Date(date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
 
             // Generate items rows
+            const stripCoaPrefix = (str) => {
+                return str.replace(/^[A-Z0-9\s]{1,10}\s*:\s*/gm, '').trim();
+            };
             const itemsRows = invoice.invoice_items?.map((item, index) => {
                 let rawDesc = String(item.description || item.item_name || '');
                 // Split by <br/>, remove duplicates, and join
                 let parts = rawDesc.split(/<br\s*\/?>/i).map(p => p.trim()).filter(Boolean);
                 
+                // Strip COA prefix like "OI : ", "FR : ", etc. from each part
+                parts = parts.map(p => stripCoaPrefix(p)).filter(Boolean);
+                
                 // If parts is empty after filtering (meaning description was empty), fallback to item_name
                 if (parts.length === 0 && item.item_name) {
-                    parts.push(`<b>${item.item_name.trim()}</b>`);
+                    parts.push(`<b>${stripCoaPrefix(item.item_name.trim())}</b>`);
                 }
                 
                 let uniqueParts = [...new Set(parts)];
@@ -1110,7 +1116,8 @@ const BridgeInvoiceManagement = () => {
                         /* Invoice Title Bar */
                         .invoice-title-bar { 
                             border-top: 2px solid #000; border-bottom: 2px solid #000; 
-                            background-color: #ededed;
+                            background-color: #E65100;
+                            color: #ffffff;
                             padding: 6px 10px; margin-bottom: 20px; font-weight: bold; font-size: 16px; 
                             display: flex; justify-content: space-between; align-items: center;
                         }
@@ -1216,7 +1223,7 @@ const BridgeInvoiceManagement = () => {
                         <!-- Title -->
                         <div class="invoice-title-bar">
                             <span>TAX INVOICE ${invoice.invoice_number}</span>
-                             <span style="font-size: 10px; font-weight: normal; color: #555;">Page 1 of 1</span>
+                             <span style="font-size: 10px; font-weight: normal; color: rgba(255,255,255,0.8);">Page 1 of 1</span>
                         </div>
 
                         <!-- Top Info -->
