@@ -2258,8 +2258,126 @@ const SalesQuotation = () => {
                             </div>
                         </div>
 
-                        <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-                            <p className="text-sm font-semibold text-gray-500 mb-3">Estimated Amount</p>
+                        {/* Side-by-Side Selling & Buying items */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {/* Left Column: Selling Items (Revenue) */}
+                            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 flex flex-col">
+                                <h4 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wider">Selling Items (Revenue)</h4>
+                                <div className="flex-1">
+                                    <GroupedServiceItemManager
+                                        items={isEditingQuotation ? (editedQuotation?.serviceItems || []) : viewingQuotation.serviceItems}
+                                        onChange={(newGroups) => {
+                                            if (isEditingQuotation) {
+                                                setEditedQuotation(prev => {
+                                                    // Calculate accurate totals: sum item amounts converting by group rate
+                                                    const parseAmountValue = (val, currency, groupRate) => {
+                                                        if (val === null || val === undefined) return 0;
+                                                        if (typeof val === 'number') return val;
+                                                        const s = String(val).trim();
+                                                        if (s === '') return 0;
+                                                        try {
+                                                            if (currency === 'IDR') {
+                                                                const cleaned = s.replace(/\./g, '').replace(/,/g, '.');
+                                                                const n = parseFloat(cleaned);
+                                                                return Number.isFinite(n) ? n : 0;
+                                                            }
+                                                            const cleaned = s.replace(/,/g, '');
+                                                            const n = parseFloat(cleaned);
+                                                            return Number.isFinite(n) ? n : 0;
+                                                        } catch (e) {
+                                                            return 0;
+                                                        }
+                                                    };
+
+                                                    let totalIdr = 0;
+                                                    let totalUsd = 0;
+                                                    newGroups.forEach(group => {
+                                                        const groupRate = group.groupExchangeRate || prev.exchange_rate || 16000;
+                                                        (group.items || []).forEach(item => {
+                                                            const amt = parseAmountValue(item.amount, item.currency, groupRate) || 0;
+                                                            if (item.currency === 'IDR') {
+                                                                totalIdr = Number(totalIdr) + Number(amt);
+                                                                totalUsd = Number(totalUsd) + (groupRate ? (Number(amt) / Number(groupRate)) : 0);
+                                                            } else {
+                                                                totalUsd = Number(totalUsd) + Number(amt);
+                                                                totalIdr = Number(totalIdr) + (Number(amt) * Number(groupRate || 1));
+                                                            }
+                                                        });
+                                                    });
+                                                    const total = (prev.currency || 'IDR') === 'IDR' ? totalIdr : totalUsd;
+                                                    const next = { ...prev, serviceItems: newGroups, totalAmount: total, total_idr: totalIdr, total_usd: totalUsd };
+                                                    const hasCosts = prev.costItems && prev.costItems.some(g => g.items && g.items.length > 0);
+                                                    if (!hasCosts) {
+                                                        next.costItems = duplicateAsCostItems(newGroups);
+                                                    }
+                                                    return next;
+                                                });
+                                            }
+                                        }}
+                                        exchangeRate={isEditingQuotation ? editedQuotation?.exchange_rate : viewingQuotation.exchange_rate}
+                                        readOnly={!isEditingQuotation}
+                                        coaType="REVENUE"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Right Column: Cost Breakdown (Buying/COGS) */}
+                            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 flex flex-col">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h4 className="text-sm font-semibold text-gray-700 mb-0 uppercase tracking-wider">Cost Breakdown (Estimated Buying)</h4>
+                                    {isEditingQuotation && editedQuotation?.serviceItems && editedQuotation.serviceItems.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (confirm('Salin semua item penjualan ke estimasi cost breakdown? Ini akan menimpa cost breakdown saat ini.')) {
+                                                    setEditedQuotation(prev => ({
+                                                        ...prev,
+                                                        costItems: duplicateAsCostItems(prev.serviceItems)
+                                                    }));
+                                                }
+                                            }}
+                                            className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                                        >
+                                            📋 Salin dari Selling Items
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="flex-1">
+                                    {(() => {
+                                        // For view mode with no costItems (old data), show serviceItems as fallback read-only
+                                        const isViewMode = !isEditingQuotation;
+                                        const items = isEditingQuotation ? (editedQuotation?.costItems || []) : viewingQuotation.costItems;
+                                        const hasNoItems = !items || items.length === 0 || items.every(g => !g.items || g.items.length === 0);
+                                        const sourceItems = isViewMode && hasNoItems ? (viewingQuotation?.serviceItems || []) : items;
+                                        const isFallback = isViewMode && hasNoItems && sourceItems.length > 0;
+
+                                        return (
+                                            <>
+                                                {isFallback && (
+                                                    <div className="mb-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-700">
+                                                        ℹ️ Data lama — menampilkan selling items sebagai referensi estimasi biaya. Edit quotation untuk mengatur cost breakdown.
+                                                    </div>
+                                                )}
+                                                <GroupedServiceItemManager
+                                                    items={sourceItems}
+                                                    onChange={(newGroups) => {
+                                                        if (isEditingQuotation) {
+                                                            setEditedQuotation(prev => ({ ...prev, costItems: newGroups }));
+                                                        }
+                                                    }}
+                                                    exchangeRate={isEditingQuotation ? editedQuotation?.exchange_rate : viewingQuotation.exchange_rate}
+                                                    readOnly={!isEditingQuotation}
+                                                    coaType="COST"
+                                                />
+                                            </>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Combined Estimation & Margin Summary Card */}
+                        <div className="p-5 bg-gradient-to-r from-orange-500/10 via-amber-500/10 to-emerald-500/10 border border-orange-200/50 rounded-xl">
                             {(() => {
                                 const data = isEditingQuotation ? editedQuotation : viewingQuotation;
                                 const rate = parseFloat(data?.exchange_rate || data?.exchangeRate) || 16000;
@@ -2302,134 +2420,53 @@ const SalesQuotation = () => {
                                     return { totalIdr, totalUsd };
                                 };
 
-                                // Always prefer live computation from groups for display
-                                const sourceGroups = isEditingQuotation ? (editedQuotation?.serviceItems || []) : (viewingQuotation?.serviceItems || []);
-                                const { totalIdr, totalUsd } = computeFromGroups(sourceGroups);
+                                const sellingGroups = isEditingQuotation ? (editedQuotation?.serviceItems || []) : (viewingQuotation?.serviceItems || []);
+                                const selling = computeFromGroups(sellingGroups);
+
+                                const isViewMode = !isEditingQuotation;
+                                const costItems = isEditingQuotation ? (editedQuotation?.costItems || []) : viewingQuotation.costItems;
+                                const hasNoCostItems = !costItems || costItems.length === 0 || costItems.every(g => !g.items || g.items.length === 0);
+                                const buyingGroups = isViewMode && hasNoCostItems ? (viewingQuotation?.serviceItems || []) : costItems;
+                                const buying = computeFromGroups(buyingGroups);
+
+                                const marginIdr = selling.totalIdr - buying.totalIdr;
+                                const marginUsd = selling.totalUsd - buying.totalUsd;
+                                const marginPct = selling.totalIdr > 0 ? (marginIdr / selling.totalIdr) * 100 : 0;
 
                                 return (
-                                    <div className="flex gap-4 items-stretch">
-                                        <div className="flex-1 max-w-[320px] p-3 bg-white/80 rounded-lg border border-orange-200">
-                                            <p className="text-[10px] text-gray-400 mb-0.5">IDR</p>
-                                            <p className="text-2xl font-bold text-orange-600">Rp {Number(totalIdr || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+                                        {/* Selling Total */}
+                                        <div className="p-4 bg-white/70 backdrop-blur-sm rounded-lg border border-orange-200/40">
+                                            <p className="text-[10px] font-bold text-orange-600 uppercase tracking-wider mb-1">Total Selling (Revenue)</p>
+                                            <p className="text-xl font-bold text-orange-700">Rp {Number(selling.totalIdr || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
+                                            <p className="text-xs text-gray-500 font-semibold mt-1">
+                                                {rate > 1 ? `$ ${Number(selling.totalUsd || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                                            </p>
                                         </div>
-                                        <div className="flex-1 max-w-[320px] p-3 bg-white/80 rounded-lg border border-orange-200 text-right">
-                                            <p className="text-[10px] text-gray-400 mb-0.5">USD (@ Rp {Number(rate).toLocaleString('id-ID')})</p>
-                                            <p className="text-2xl font-bold text-blue-600">{rate > 1 ? `$ ${Number(totalUsd || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}</p>
+
+                                        {/* Buying Total */}
+                                        <div className="p-4 bg-white/70 backdrop-blur-sm rounded-lg border border-blue-200/40">
+                                            <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-1">Total Buying (COGS)</p>
+                                            <p className="text-xl font-bold text-blue-700">Rp {Number(buying.totalIdr || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
+                                            <p className="text-xs text-gray-500 font-semibold mt-1">
+                                                {rate > 1 ? `$ ${Number(buying.totalUsd || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                                            </p>
+                                        </div>
+
+                                        {/* Profit Margin */}
+                                        <div className="p-4 bg-white/80 backdrop-blur-sm rounded-lg border border-emerald-200">
+                                            <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1">Est. Profit Margin ({marginPct.toFixed(1)}%)</p>
+                                            <p className="text-xl font-bold text-emerald-700">
+                                                {marginIdr >= 0 ? '+' : ''} Rp {Number(marginIdr || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
+                                            </p>
+                                            <p className="text-xs text-gray-500 font-semibold mt-1">
+                                                {rate > 1 ? `${marginUsd >= 0 ? '+' : ''} $ ${Number(marginUsd || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                                            </p>
                                         </div>
                                     </div>
                                 );
                             })()}
                         </div>
-
-                        {/* Cost Breakdown */}
-                            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                                <GroupedServiceItemManager
-                                    items={isEditingQuotation ? (editedQuotation?.serviceItems || []) : viewingQuotation.serviceItems}
-                                    onChange={(newGroups) => {
-                                        if (isEditingQuotation) {
-                                            setEditedQuotation(prev => {
-                                                // Calculate accurate totals: sum item amounts converting by group rate
-                                                const parseAmountValue = (val, currency, groupRate) => {
-                                                    if (val === null || val === undefined) return 0;
-                                                    if (typeof val === 'number') return val;
-                                                    const s = String(val).trim();
-                                                    if (s === '') return 0;
-                                                    try {
-                                                        if (currency === 'IDR') {
-                                                            const cleaned = s.replace(/\./g, '').replace(/,/g, '.');
-                                                            const n = parseFloat(cleaned);
-                                                            return Number.isFinite(n) ? n : 0;
-                                                        }
-                                                        const cleaned = s.replace(/,/g, '');
-                                                        const n = parseFloat(cleaned);
-                                                        return Number.isFinite(n) ? n : 0;
-                                                    } catch (e) {
-                                                        return 0;
-                                                    }
-                                                };
-
-                                                let totalIdr = 0;
-                                                let totalUsd = 0;
-                                                newGroups.forEach(group => {
-                                                    const groupRate = group.groupExchangeRate || prev.exchange_rate || 16000;
-                                                    (group.items || []).forEach(item => {
-                                                        const amt = parseAmountValue(item.amount, item.currency, groupRate) || 0;
-                                                        if (item.currency === 'IDR') {
-                                                            totalIdr = Number(totalIdr) + Number(amt);
-                                                            totalUsd = Number(totalUsd) + (groupRate ? (Number(amt) / Number(groupRate)) : 0);
-                                                        } else {
-                                                            totalUsd = Number(totalUsd) + Number(amt);
-                                                            totalIdr = Number(totalIdr) + (Number(amt) * Number(groupRate || 1));
-                                                        }
-                                                    });
-                                                });
-                                                const total = (prev.currency || 'IDR') === 'IDR' ? totalIdr : totalUsd;
-                                                const next = { ...prev, serviceItems: newGroups, totalAmount: total, total_idr: totalIdr, total_usd: totalUsd };
-                                                const hasCosts = prev.costItems && prev.costItems.some(g => g.items && g.items.length > 0);
-                                                if (!hasCosts) {
-                                                    next.costItems = duplicateAsCostItems(newGroups);
-                                                }
-                                                return next;
-                                            });
-                                        }
-                                    }}
-                                    exchangeRate={isEditingQuotation ? editedQuotation?.exchange_rate : viewingQuotation.exchange_rate}
-                                    readOnly={!isEditingQuotation}
-                                    coaType="REVENUE"
-                                />
-                            </div>
-
-                            {/* Cost Breakdown */}
-                            <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h4 className="text-sm font-semibold text-gray-700 mb-0">Cost Breakdown (Estimated)</h4>
-                                    {isEditingQuotation && editedQuotation?.serviceItems && editedQuotation.serviceItems.length > 0 && (
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                if (confirm('Salin semua item penjualan ke estimasi cost breakdown? Ini akan menimpa cost breakdown saat ini.')) {
-                                                    setEditedQuotation(prev => ({
-                                                        ...prev,
-                                                        costItems: duplicateAsCostItems(prev.serviceItems)
-                                                    }));
-                                                }
-                                            }}
-                                            className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-                                        >
-                                            📋 Salin dari Selling Items
-                                        </button>
-                                    )}
-                                </div>
-                                {(() => {
-                                    // For view mode with no costItems (old data), show serviceItems as fallback read-only
-                                    const isViewMode = !isEditingQuotation;
-                                    const items = isEditingQuotation ? (editedQuotation?.costItems || []) : viewingQuotation.costItems;
-                                    const hasNoItems = !items || items.length === 0 || items.every(g => !g.items || g.items.length === 0);
-                                    const sourceItems = isViewMode && hasNoItems ? (viewingQuotation?.serviceItems || []) : items;
-                                    const isFallback = isViewMode && hasNoItems && sourceItems.length > 0;
-
-                                    return (
-                                        <>
-                                            {isFallback && (
-                                                <div className="mb-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-700">
-                                                    ℹ️ Data lama — menampilkan selling items sebagai referensi estimasi biaya. Edit quotation untuk mengatur cost breakdown.
-                                                </div>
-                                            )}
-                                            <GroupedServiceItemManager
-                                                items={sourceItems}
-                                                onChange={(newGroups) => {
-                                                    if (isEditingQuotation) {
-                                                        setEditedQuotation(prev => ({ ...prev, costItems: newGroups }));
-                                                    }
-                                                }}
-                                                exchangeRate={isEditingQuotation ? editedQuotation?.exchange_rate : viewingQuotation.exchange_rate}
-                                                readOnly={!isEditingQuotation}
-                                                coaType="COST"
-                                            />
-                                        </>
-                                    );
-                                })()}
-                            </div>
 
                         {/* Terms & Conditions (View/Edit) */}
                         <div className="p-4 bg-white rounded-lg border border-gray-200">
