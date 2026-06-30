@@ -3703,11 +3703,11 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                         {/* Invoice Title Bar */}
                         <div style={{
                             borderTop: '2px solid #000', borderBottom: '2px solid #000',
-                            backgroundColor: '#f0f0f0', padding: '8px 10px', marginBottom: '15px',
+                            backgroundColor: '#E65100', color: '#ffffff', padding: '8px 10px', marginBottom: '15px',
                             fontWeight: 'bold', fontSize: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
                         }}>
                             <span>TAX INVOICE {invoice.invoice_number}</span>
-                            <span style={{ fontSize: '10px', fontWeight: 'normal', color: '#555' }}>Page 1 of 1</span>
+                            <span style={{ fontSize: '10px', fontWeight: 'normal', color: 'rgba(255,255,255,0.8)' }}>Page 1 of 1</span>
                         </div>
 
                         {/* Top Info */}
@@ -3819,14 +3819,15 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                                                 </td>
                                                 <td style={{ borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textTransform: 'capitalize' }}>
                                                     {(() => {
+                                                        const stripCoa = (str) => str.replace(/^[A-Z0-9\s]{1,10}\s*:\s*/g, '').trim();
                                                         let rawDesc = String(item.description || item.item_name || '');
                                                         let parts = rawDesc.split(/<br\s*\/?>/i).map(p => p.trim()).filter(Boolean);
                                                         if (item.item_name && !parts.includes(item.item_name.trim())) {
                                                             parts.unshift(item.item_name.trim());
                                                         }
-                                                        let uniqueParts = [...new Set(parts)];
+                                                        let uniqueParts = [...new Set(parts.map(p => stripCoa(p)))];
                                                         return uniqueParts.map((part, i) => (
-                                                            <div key={i} style={{ color: i === 0 && item.item_name && part === item.item_name.trim() ? '#000' : '#444', fontWeight: i === 0 && item.item_name && part === item.item_name.trim() ? 'bold' : 'normal' }}>
+                                                            <div key={i} style={{ color: i === 0 && item.item_name && part === stripCoa(item.item_name.trim()) ? '#000' : '#444', fontWeight: i === 0 && item.item_name && part === stripCoa(item.item_name.trim()) ? 'bold' : 'normal' }}>
                                                                 {part}
                                                             </div>
                                                         ));
