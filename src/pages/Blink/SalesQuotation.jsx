@@ -42,6 +42,26 @@ const formatInputAmount = (value, currency) => {
     }
 };
 
+const duplicateAsCostItems = (serviceGroups) => {
+    return (serviceGroups || []).map(group => ({
+        id: `cost-group-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        groupName: group.groupName || 'General',
+        groupExchangeRate: group.groupExchangeRate,
+        items: (group.items || []).map(item => ({
+            id: `cost-item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            coa_id: '',
+            itemCode: item.itemCode || '',
+            description: item.description || '',
+            quantity: item.quantity || 1,
+            unit: item.unit || 'Unit',
+            currency: item.currency || 'IDR',
+            unitPrice: item.unitPrice || 0,
+            amount: item.amount || 0,
+            remarks: item.remarks || ''
+        }))
+    }));
+};
+
 const SalesQuotation = () => {
     const { user, canCreate, canEdit, canDelete, canApprove } = useAuth();
     const navigate = useNavigate();
@@ -1765,7 +1785,12 @@ const SalesQuotation = () => {
                                             });
                                         });
                                 const total = (prev.currency || 'IDR') === 'IDR' ? totalIdr : totalUsd;
-                                return { ...prev, serviceItems: newGroups, totalAmount: total, total_idr: totalIdr, total_usd: totalUsd };
+                                const next = { ...prev, serviceItems: newGroups, totalAmount: total, total_idr: totalIdr, total_usd: totalUsd };
+                                const hasCosts = prev.costItems && prev.costItems.some(g => g.items && g.items.length > 0);
+                                if (!hasCosts) {
+                                    next.costItems = duplicateAsCostItems(newGroups);
+                                }
+                                return next;
                             });
                         }}
                         exchangeRate={formData.exchange_rate}
@@ -1776,6 +1801,22 @@ const SalesQuotation = () => {
                     <div className="mt-8 border-t border-gray-200 pt-8">
                         <div className="flex items-center justify-between mb-2">
                             <span className="text-sm font-medium text-gray-700">Cost Breakdown <span className="text-gray-400 font-normal">(Opsional — dapat diisi kemudian)</span></span>
+                            {formData.serviceItems && formData.serviceItems.length > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (confirm('Salin semua item penjualan ke estimasi cost breakdown? Ini akan menimpa cost breakdown saat ini.')) {
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                costItems: duplicateAsCostItems(prev.serviceItems)
+                                            }));
+                                        }
+                                    }}
+                                    className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                                >
+                                    📋 Salin dari Selling Items
+                                </button>
+                            )}
                         </div>
                         <GroupedServiceItemManager
                             items={formData.costItems}
@@ -2307,7 +2348,12 @@ const SalesQuotation = () => {
                                                     });
                                                 });
                                                 const total = (prev.currency || 'IDR') === 'IDR' ? totalIdr : totalUsd;
-                                                return { ...prev, serviceItems: newGroups, totalAmount: total, total_idr: totalIdr, total_usd: totalUsd };
+                                                const next = { ...prev, serviceItems: newGroups, totalAmount: total, total_idr: totalIdr, total_usd: totalUsd };
+                                                const hasCosts = prev.costItems && prev.costItems.some(g => g.items && g.items.length > 0);
+                                                if (!hasCosts) {
+                                                    next.costItems = duplicateAsCostItems(newGroups);
+                                                }
+                                                return next;
                                             });
                                         }
                                     }}
@@ -2319,7 +2365,25 @@ const SalesQuotation = () => {
 
                             {/* Cost Breakdown */}
                             <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                                <h4 className="text-sm font-semibold text-gray-700 mb-4">Cost Breakdown (Estimated)</h4>
+                                <div className="flex items-center justify-between mb-4">
+                                    <h4 className="text-sm font-semibold text-gray-700 mb-0">Cost Breakdown (Estimated)</h4>
+                                    {isEditingQuotation && editedQuotation?.serviceItems && editedQuotation.serviceItems.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (confirm('Salin semua item penjualan ke estimasi cost breakdown? Ini akan menimpa cost breakdown saat ini.')) {
+                                                    setEditedQuotation(prev => ({
+                                                        ...prev,
+                                                        costItems: duplicateAsCostItems(prev.serviceItems)
+                                                    }));
+                                                }
+                                            }}
+                                            className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                                        >
+                                            📋 Salin dari Selling Items
+                                        </button>
+                                    )}
+                                </div>
                                 <GroupedServiceItemManager
                                     items={isEditingQuotation ? (editedQuotation?.costItems || []) : viewingQuotation.costItems}
                                     onChange={(newGroups) => {
