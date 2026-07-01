@@ -10,7 +10,7 @@ import { useAuth } from '../../context/AuthContext';
  * @param {boolean} requireSuperAdmin - Optional flag to require super admin access
  */
 export const ProtectedRoute = ({ children, menuCode, requireSuperAdmin = false }) => {
-    const { isAuthenticated, isSuperAdmin, canAccess, loading } = useAuth();
+    const { isAuthenticated, isSuperAdmin, canAccess, loading, user } = useAuth();
 
     // Show loading state while checking auth
     if (loading) {
@@ -24,6 +24,11 @@ export const ProtectedRoute = ({ children, menuCode, requireSuperAdmin = false }
     // Redirect to login if not authenticated
     if (!isAuthenticated()) {
         return <Navigate to="/login" replace />;
+    }
+
+    // Force password change if required
+    if (user?.requires_password_change && window.location.pathname !== '/change-password') {
+        return <Navigate to="/change-password" replace />;
     }
 
     // Check super admin requirement
