@@ -368,7 +368,7 @@ const CreateUserModal = ({ roles, onClose, onSuccess, createdBy }) => {
         password: '',
         portal_access: true,
         is_active: true,
-        requires_password_change: true
+        requires_password_change: false
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -475,7 +475,7 @@ const CreateUserModal = ({ roles, onClose, onSuccess, createdBy }) => {
                         </div>
                     </div>
 
-                    <div className="flex gap-4">
+                    <div className="flex flex-wrap gap-4">
                         <label className="flex items-center gap-2">
                             <input
                                 type="checkbox"
@@ -493,6 +493,15 @@ const CreateUserModal = ({ roles, onClose, onSuccess, createdBy }) => {
                                 className="rounded border-gray-300"
                             />
                             <span className="text-sm text-gray-700">Aktif</span>
+                        </label>
+                        <label className="flex items-center gap-2 w-full mt-1">
+                            <input
+                                type="checkbox"
+                                checked={formData.requires_password_change}
+                                onChange={(e) => setFormData({ ...formData, requires_password_change: e.target.checked })}
+                                className="rounded border-gray-300"
+                            />
+                            <span className="text-sm text-gray-700 font-medium text-red-600">Wajib ganti password saat login berikutnya</span>
                         </label>
                     </div>
 
@@ -665,7 +674,7 @@ const EditUserModal = ({ user: selectedUser, roles, onClose, onSuccess, updatedB
  * ============================================================================= */
 const ResetPasswordModal = ({ user: selectedUser, onClose, onSuccess, resetBy }) => {
     const [password, setPassword] = useState('');
-    const [requireChange, setRequireChange] = useState(true);
+    const [requireChange, setRequireChange] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
