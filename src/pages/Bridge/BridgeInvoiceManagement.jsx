@@ -1374,7 +1374,7 @@ const BridgeInvoiceManagement = () => {
                                     })()}
                                 </div>
                                 
-                                <div style="margin-top: 10px; font-style: italic;">
+                                <div style="margin-top: 10px; font-style: italic; white-space: pre-line;">
                                     <strong>Notes:</strong><br>
                                     ${safeStr(invoice.customer_notes)}
                                 </div>
@@ -3922,7 +3922,7 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                                     })()}
                                 </div>
 
-                                <div style={{ marginTop: '10px', fontStyle: 'italic' }}>
+                                <div style={{ marginTop: '10px', fontStyle: 'italic', whiteSpace: 'pre-line' }}>
                                     <strong>Notes:</strong><br />
                                     {safeStr(invoice.customer_notes)}
                                 </div>
