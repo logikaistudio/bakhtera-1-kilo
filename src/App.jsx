@@ -7,6 +7,7 @@ import { testSupabaseConnection, getSupabaseStatus } from './lib/supabase';
 
 // Auth Components
 import Login from './pages/Auth/Login';
+import ChangePassword from './pages/Auth/ChangePassword';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 
 // Admin Module  
@@ -139,6 +140,7 @@ function App() {
           <Routes>
             {/* Auth Route - No Layout */}
             <Route path="/login" element={<Login />} />
+            <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
 
             {/* App Routes - With Layout */}
             <Route path="/*" element={
