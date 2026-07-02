@@ -108,6 +108,7 @@ const SalesQuotation = () => {
         customerContact: '',
         customerEmail: '',
         customerPhone: '',
+        preparedBy: '',
         serviceItems: [],
         costItems: [],
         termsConditions: `1. All rates are subject to change without prior notice.
@@ -184,6 +185,7 @@ const SalesQuotation = () => {
                 customerContact: q.customer_contact_name,
                 customerEmail: q.customer_email,
                 customerPhone: q.customer_phone,
+                preparedBy: q.prepared_by || '',
                 termsConditions: q.terms_and_conditions || `1. All rates are subject to change without prior notice.
 2. Payment terms: Net 30 Days.
 3. Subject to space and equipment availability.
@@ -287,7 +289,8 @@ const SalesQuotation = () => {
             quantity: formData.quantity ? parseFloat(formData.quantity) : null,
             customer_contact_name: formData.customerContact,
             customer_email: formData.customerEmail,
-            customer_phone: formData.customerPhone
+            customer_phone: formData.customerPhone,
+            prepared_by: formData.preparedBy || null
         };
 
         try {
@@ -412,7 +415,8 @@ const SalesQuotation = () => {
 
                     // Notes
                     notes: editedQuotation.notes,
-                    terms_and_conditions: editedQuotation.termsConditions
+                    terms_and_conditions: editedQuotation.termsConditions,
+                    prepared_by: editedQuotation.preparedBy || null
                 })
                 .eq('id', editedQuotation.id);
 
@@ -441,6 +445,7 @@ const SalesQuotation = () => {
             customerCompany: '',
             customerAddress: '',
             salesPerson: '',
+            preparedBy: '',
             quotationType: 'RG',
             quotationDate: new Date().toISOString().split('T')[0],
             origin: '',
@@ -752,7 +757,7 @@ const SalesQuotation = () => {
     };
 
     // Print quotation handler
-    const handlePrintQuotation = (quotation, creatorName = '') => {
+    const handlePrintQuotation = (quotation, creatorName = '', approverName = '') => {
         try {
             const printWindow = window.open('', '_blank');
 
@@ -894,6 +899,8 @@ const SalesQuotation = () => {
                             <div><strong>Service:</strong> ${(quotation.serviceType || quotation.service_type || '-').toUpperCase()}</div>
                             <div><strong>Route:</strong> ${quotation.origin || '-'} → ${quotation.destination || '-'}</div>
                             <div><strong>Commodity:</strong> ${quotation.commodity || '-'}</div>
+                            <div><strong>Container:</strong> ${quotation.containerSize || quotation.container_size || '—'} / ${quotation.containerCount || quotation.container_count || '—'}</div>
+                            <div><strong>Incoterm:</strong> ${quotation.incoterm || '—'}</div>
                             <div><strong>Validity:</strong> ${quotation.validityDays || 30} Days</div>
                         </div>
                     </div>
@@ -961,7 +968,7 @@ const SalesQuotation = () => {
                                 <div>
                                     <div style="height: 60px; border-bottom: 1px solid #888; margin-bottom: 8px;"></div>
                                     <div style="font-size: 11px; font-weight: bold; color: #333;">Approved By</div>
-                                    <div style="font-size: 11px; color: #555; margin-top: 3px;">Management</div>
+                                    <div style="font-size: 11px; color: #111; font-weight: 600; margin-top: 3px;">${approverName || '______________________'}</div>
                                 </div>
                             </div>
                         </div>
@@ -1402,7 +1409,7 @@ const SalesQuotation = () => {
                         )}
                     </div>
 
-                    {/* Person in Charge Dropdown */}
+                    {/* Person in Charge */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                             Person in Charge <span className="text-red-400">*</span>
@@ -1410,6 +1417,20 @@ const SalesQuotation = () => {
                         <div className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-600 font-medium cursor-not-allowed">
                             {formData.salesPerson || user?.full_name || user?.username || 'Account Executive'}
                         </div>
+                    </div>
+
+                    {/* Nama Pembuat */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Nama Pembuat <span className="text-gray-400 font-normal text-xs">(akan tampil di dokumen cetak)</span>
+                        </label>
+                        <input
+                            type="text"
+                            value={formData.preparedBy}
+                            onChange={(e) => setFormData({ ...formData, preparedBy: e.target.value })}
+                            placeholder="Ketik nama lengkap pembuat quotation..."
+                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400"
+                        />
                     </div>
 
                     {/* Quotation Type & Date */}
@@ -2053,6 +2074,24 @@ const SalesQuotation = () => {
                                 </div>
                             </div>
                             <div>
+                                <p className="text-xs text-gray-500 font-medium mb-1">
+                                    Nama Pembuat <span className="text-gray-400 font-normal">(Prepared By)</span>
+                                </p>
+                                {isEditingQuotation ? (
+                                    <input
+                                        type="text"
+                                        value={editedQuotation?.preparedBy || ''}
+                                        onChange={(e) => setEditedQuotation({ ...editedQuotation, preparedBy: e.target.value })}
+                                        placeholder="Nama pembuat quotation..."
+                                        className="w-full px-2 py-1 bg-white border border-blue-300 rounded text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                    />
+                                ) : (
+                                    <p className="text-gray-900 font-medium text-sm min-h-[20px]">
+                                        {viewingQuotation.preparedBy || <span className="text-gray-400 italic">—</span>}
+                                    </p>
+                                )}
+                            </div>
+                            <div>
                                 <p className="text-xs text-gray-500 font-medium mb-1">Quotation Type</p>
                                 {isEditingQuotation ? (
                                     <select
@@ -2610,10 +2649,11 @@ const SalesQuotation = () => {
 };
 
 const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettings }) => {
-    const [creatorName, setCreatorName] = React.useState(quotation?.salesPerson || quotation?.sales_person || '');
+    const [creatorName, setCreatorName] = React.useState(quotation?.preparedBy || quotation?.prepared_by || quotation?.salesPerson || quotation?.sales_person || '');
+    const [approverName, setApproverName] = React.useState(quotation?.approvedBy || quotation?.approved_by || '');
 
     const handlePrint = () => {
-        window.print();
+        onPrint(quotation, creatorName, approverName);
     };
 
     const formatCurrency = (value, currency = 'IDR') => {
@@ -2652,7 +2692,7 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                     <h2 className="text-xl font-bold text-silver-light">Quotation Preview</h2>
                     <div className="flex gap-2 print:hidden">
                         <button
-                            onClick={() => onPrint(quotation, creatorName)}
+                            onClick={handlePrint}
                             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium text-sm"
                         >
                             <Download className="w-4 h-4" />
@@ -2720,16 +2760,29 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                                 </dl>
 
                                 {/* Nama Pembuat — manual input */}
-                                <div className="mt-5 pt-4 border-t border-slate-100 print:hidden">
-                                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Nama Pembuat *</label>
-                                    <input
-                                        type="text"
-                                        value={creatorName}
-                                        onChange={e => setCreatorName(e.target.value)}
-                                        placeholder="Ketik nama pembuat quotation..."
-                                        className="w-full text-sm px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-800 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
-                                    />
-                                    <p className="text-xs text-slate-400 mt-1">Nama akan muncul di kolom Prepared By saat dicetak.</p>
+                                <div className="mt-5 pt-4 border-t border-slate-100 print:hidden space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Nama Pembuat</label>
+                                        <input
+                                            type="text"
+                                            value={creatorName}
+                                            onChange={e => setCreatorName(e.target.value)}
+                                            placeholder="Ketik nama pembuat quotation..."
+                                            className="w-full text-sm px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-800 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
+                                        />
+                                        <p className="text-xs text-slate-400 mt-1">Nama akan muncul di kolom Prepared By saat dicetak.</p>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Nama Disetujui</label>
+                                        <input
+                                            type="text"
+                                            value={approverName}
+                                            onChange={e => setApproverName(e.target.value)}
+                                            placeholder="Ketik nama yang menyetujui atau kosongkan..."
+                                            className="w-full text-sm px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-800 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
+                                        />
+                                        <p className="text-xs text-slate-400 mt-1">Kosongkan jika ingin mencetak tanda tangan kosong.</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -2760,6 +2813,10 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                                     <span className="font-semibold text-slate-800">
                                         {quotation.quantity || '-'} {quotation.packageType || quotation.package_type || ''}
                                     </span>
+                                </div>
+                                <div>
+                                    <span className="block text-xs text-slate-400 mb-1">Container Count</span>
+                                    <span className="font-semibold text-slate-800">{quotation.containerCount || quotation.container_count || '—'}</span>
                                 </div>
                                 <div>
                                     <span className="block text-xs text-slate-400 mb-1">Incoterm</span>
@@ -2899,7 +2956,7 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                                 <div className="flex-1">
                                     <div className="h-20 border-b border-slate-300 mb-2"></div>
                                     <p className="font-semibold text-slate-900 text-sm">Approved By</p>
-                                    <p className="text-xs text-slate-500">Management</p>
+                                    <p className="text-xs text-slate-700 font-medium mt-0.5">{approverName || '___________________'}</p>
                                 </div>
                             </div>
                         </div>
