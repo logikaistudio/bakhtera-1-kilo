@@ -361,6 +361,23 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                 { path: '/bxpo/approvals', label: 'Approval Center', menuCode: 'bxpo_approval', showBadge: true },
             ]
         },
+
+        // Finance Category — shared with Blink, data tagged division='bxpo'
+        {
+            type: 'category', label: '💰 Finance', items: [
+                { path: '/blink/finance/invoices', label: 'Invoice', menuCode: 'blink_invoices' },
+                { path: '/blink/finance/purchase-orders', label: 'Purchase Order', menuCode: 'blink_purchase_order' },
+                { path: '/blink/finance/ar', label: 'Account Receivables (AR)', menuCode: 'blink_ar' },
+                { path: '/blink/finance/ap', label: 'Account Payables (AP)', menuCode: 'blink_ap' },
+                { path: '/blink/finance/auto-journal', label: 'Auto Jurnal', menuCode: 'blink_auto_journal' },
+                { path: '/blink/finance/general-journal', label: 'General Jurnal', menuCode: 'blink_journal' },
+                { path: '/blink/finance/general-ledger', label: 'General Ledger', menuCode: 'blink_ledger' },
+                { path: '/blink/finance/trial-balance', label: 'Trial Balance', menuCode: 'blink_trial_balance' },
+                { path: '/blink/finance/profit-loss', label: 'Profit & Loss (P&L)', menuCode: 'blink_pnl' },
+                { path: '/blink/finance/balance-sheet', label: 'Balance Sheet', menuCode: 'blink_balance_sheet' },
+                { path: '/blink/finance/exchange-rates', label: 'Kurs Referensi', menuCode: 'blink_exchange_rates' },
+            ]
+        },
     ];
 
     const hasBxpoAccess = () => {

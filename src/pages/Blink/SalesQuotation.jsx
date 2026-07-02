@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useData } from '../../context/DataContext';
 import { supabase } from '../../lib/supabase';
 import { getCurrencySymbol } from '../../utils/currencyFormatter';
@@ -1135,9 +1135,10 @@ const SalesQuotation = () => {
             const docLabel = isAirFreight ? 'AWB' : 'BL';
             alert(`✅ Sales Order ${soNumber} created with Job Number: ${quotation.jobNumber}\n📄 Draft ${docLabel} (${blNumber}) auto-generated\n\n➡️ Navigating to Sales Order Management...`);
 
-            // Navigate to shipments page
+            // Navigate to appropriate shipments page (BXPO or Blink)
+            const isBxpoPage = window.location.pathname.startsWith('/bxpo');
             setTimeout(() => {
-                navigate('/blink/shipments');
+                navigate(isBxpoPage ? '/bxpo/shipments' : '/blink/shipments');
             }, 1000);
 
         } catch (error) {

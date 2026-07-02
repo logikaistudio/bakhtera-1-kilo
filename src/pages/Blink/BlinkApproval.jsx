@@ -1094,7 +1094,8 @@ const BlinkApproval = () => {
                 fetchSubmissions();
 
                 alert(`✅ Quotation ${item.refNumber} disetujui!\n\n📦 Sales Order ${soNumber} berhasil dibuat.\n\n⚠️ Langkah berikutnya: Buka Sales Order Management → Submit for Approval → setelah disetujui manajer, tombol Generate PO & Invoice akan terbuka.`);
-                setTimeout(() => navigate('/blink/shipments'), 1000);
+                const isBxpoCtx = window.location.pathname.startsWith('/bxpo');
+                setTimeout(() => navigate(isBxpoCtx ? '/bxpo/shipments' : '/blink/shipments'), 1000);
                 return; // skip the generic alert below
             }
 
@@ -1678,12 +1679,19 @@ const BlinkApproval = () => {
                             {/* Link to quotation/PO page */}
                             <button
                                 onClick={() => {
+                                    // Finance is shared/global — always use /blink/finance/
                                     if (selectedItem?.type === 'po') {
                                         navigate('/blink/finance/purchase-orders');
                                     } else if (selectedItem?.type === 'invoice') {
                                         navigate('/blink/finance/invoices');
                                     } else {
-                                        navigate('/blink/operations/quotations');
+                                        // Sales & Ops routes are division-aware
+                                        const isBxpoPortal = window.location.pathname.startsWith('/bxpo');
+                                        if (selectedItem?.type === 'sales_quotation') {
+                                            navigate(isBxpoPortal ? '/bxpo/sales-quotations' : '/blink/sales-quotations');
+                                        } else {
+                                            navigate(isBxpoPortal ? '/bxpo/operations/quotations' : '/blink/operations/quotations');
+                                        }
                                     }
                                     closeModal();
                                 }}

@@ -3,7 +3,7 @@ import Button from '../../components/Common/Button';
 import ShipmentDetailModal from '../../components/Blink/ShipmentDetailModalEnhanced';
 import SellingBuyingDetailModal from '../../components/Blink/SellingBuyingDetailModal';
 import { Ship, Plus, MapPin, Filter, Search, Download, X, ShoppingCart, FileText } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { getQuotationTypeLabel } from '../../utils/orderTypeDetection';
 import { useAuth } from '../../context/AuthContext';
@@ -22,6 +22,10 @@ const ShipmentManagement = () => {
     const [showFilters, setShowFilters] = useState(false);
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
+    const location = useLocation();
+    // Detect if running in BXPO portal for permission & navigation context
+    const isBxpo = location.pathname.startsWith('/bxpo');
+    const poMenuCode = isBxpo ? 'bxpo_shipments' : 'blink_purchase_order'; // BXPO users have shipment access = can create PO
 
     // PO generation from list
     const [showListPOModal, setShowListPOModal] = useState(false);
@@ -251,7 +255,9 @@ const ShipmentManagement = () => {
 
     const handleGeneratePOFromList = async (ship, e) => {
         e.stopPropagation();
-        if (!canCreate('blink_purchase_order')) {
+        // Allow if user has access to either blink_purchase_order or bxpo_shipments (BXPO operators)
+        const hasPOAccess = canCreate('blink_purchase_order') || canCreate('bxpo_shipments') || canCreate(poMenuCode);
+        if (!hasPOAccess) {
             alert('Anda tidak memiliki hak akses untuk membuat PO.');
             return;
         }
@@ -407,6 +413,7 @@ const ShipmentManagement = () => {
 
             setShowListPOModal(false);
             alert(`✅ Purchase Order ${poNumber} generated successfully!`);
+            // Finance is global (shared between Blink & BXPO) — always navigate to /blink/finance
             navigate('/blink/finance/purchase-orders');
         } catch (error) {
             console.error('Error generating PO from list:', error);
@@ -831,8 +838,8 @@ const ShipmentManagement = () => {
                 onUpdate={handleUpdateShipment}
                 onCancel={handleCancelShipment}
                 onViewAnalysis={handleViewAnalysis}
-                canEditShipment={canEdit('blink_shipments')}
-                canCreatePO={canCreate('blink_purchase_order')}
+                canEditShipment={canEdit('blink_shipments') || canEdit('bxpo_shipments')}
+                canCreatePO={canCreate('blink_purchase_order') || canCreate('bxpo_shipments')}
             />
 
             {/* Selling Buying Analysis Modal */}
