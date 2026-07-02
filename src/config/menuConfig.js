@@ -74,7 +74,7 @@ export const APP_MENUS = {
             { code: 'blink_sales_approval', label: 'Sales Approval Center', group: 'Sales & Marketing', path: '/blink/sales-approvals' },
             // ─── Operations ───
             { code: 'blink_quotations', label: 'Quotation', group: 'Operations', path: '/blink/operations/quotations' },
-            { code: 'blink_shipments', label: 'Shipment Management', group: 'Operations', path: '/blink/shipments' },
+            { code: 'blink_shipments', label: 'Sales Order Management', group: 'Operations', path: '/blink/shipments' },
             { code: 'blink_bl', label: 'Document BL/AWB', group: 'Operations', path: '/blink/operations/bl' },
             { code: 'blink_tracking', label: 'Tracking & Monitoring', group: 'Operations', path: '/blink/operations/tracking' },
             { code: 'blink_awb', label: 'AWB Management', group: 'Operations', path: '/blink/operations/awb' },

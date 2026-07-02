@@ -117,7 +117,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
 
     const handleStatusChangeRequest = (toStatus) => {
         const msgs = {
-            manager_approval: 'Submit this shipment to Approval Center for Manager approval?',
+            manager_approval: 'Submit this sales order to Approval Center for Manager approval?',
             pending: 'Return status to Pending?',
         };
         setConfirmAction({
@@ -144,7 +144,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
             setCurrentStatus(toStatus);
             onUpdate({ ...shipment, status: toStatus }, true); // skipDbUpdate = true
             if (toStatus === 'manager_approval') {
-                setSuccessMsg('✅ Shipment berhasil dikirim! Manager dapat meninjau dan menyetujuinya di Approval Center.');
+                setSuccessMsg('✅ Sales Order berhasil dikirim! Manager dapat meninjau dan menyetujuinya di Approval Center.');
                 // Auto dismiss after 3 seconds if not closed manually
                 setTimeout(() => setSuccessMsg(''), 3000);
             }
@@ -180,7 +180,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
 
     // Delete shipment handler
     const handleDeleteShipment = async () => {
-        if (!confirm('Are you sure you want to delete this shipment? This action cannot be undone.')) {
+        if (!confirm('Are you sure you want to delete this sales order? This action cannot be undone.')) {
             return;
         }
 
@@ -192,12 +192,12 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
 
             if (error) throw error;
 
-            alert('✅ Shipment deleted successfully');
+            alert('✅ Sales Order deleted successfully');
             onClose(); // Close modal
             // Parent component should refresh the list
         } catch (error) {
             console.error('Error deleting shipment:', error);
-            alert('Failed to delete shipment: ' + error.message);
+            alert('Failed to delete sales order: ' + error.message);
         }
     };
 
@@ -1156,7 +1156,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                 invoiceItems = [{
                     description: `${(shipment.serviceType || 'Freight').toUpperCase()} - ${shipment.origin || ''} to ${shipment.destination || ''}`,
                     qty: 1,
-                    unit: 'Shipment',
+                    unit: 'Sales Order',
                     rate: subtotal,
                     amount: subtotal
                 }];
@@ -1292,7 +1292,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                 payment_bank_id: defaultBank?.id || null,
                 bank_account_id: defaultBank?.id || null,
                 bank_details: paymentBankData,
-                notes: `Generated from Shipment: ${shipment.jobNumber}`
+                notes: `Generated from Sales Order: ${shipment.jobNumber}`
             };
 
             const { data, error } = await supabase
@@ -1667,7 +1667,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                 </Modal>
             )}
 
-            <Modal isOpen={isOpen} onClose={onClose} title={`Shipment - ${shipment.jobNumber}`} size="large">
+            <Modal isOpen={isOpen} onClose={onClose} title={`Sales Order - ${shipment.jobNumber}`} size="large">
                 <div className="space-y-6">
                     {/* Header */}
                     <div className="flex items-center justify-between mb-6">
@@ -1718,7 +1718,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                         )
                                     )}
                                     {canCreatePO && currentStatus !== 'approved' && (
-                                        <span className="text-xs text-yellow-400 bg-yellow-500/10 border border-yellow-500/30 px-2 py-1 rounded" title="Shipment must be approved first">
+                                        <span className="text-xs text-yellow-400 bg-yellow-500/10 border border-yellow-500/30 px-2 py-1 rounded" title="Sales Order must be approved first">
                                             🔒 Approve to unlock PO
                                         </span>
                                     )}
@@ -1733,13 +1733,13 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                 variant="primary"
                                                 icon={Receipt}
                                                 onClick={handleGenerateInvoice}
-                                                title="Create Invoice from this Shipment"
+                                                title="Create Invoice from this Sales Order"
                                             >
                                                 Create Inv
                                             </Button>
                                         )
                                     ) : (
-                                        <span className="text-xs text-yellow-400 bg-yellow-500/10 border border-yellow-500/30 px-2 py-1 rounded" title="Shipment must be approved first">
+                                        <span className="text-xs text-yellow-400 bg-yellow-500/10 border border-yellow-500/30 px-2 py-1 rounded" title="Sales Order must be approved first">
                                             🔒 Approve to invoice
                                         </span>
                                     )}
@@ -1749,9 +1749,9 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                             variant="danger"
                                             icon={XCircle}
                                             onClick={() => onCancel(shipment.id)}
-                                            title="Batalkan shipment dan seluruh alur keuangan terkait"
+                                            title="Batalkan sales order dan seluruh alur keuangan terkait"
                                         >
-                                            Batal Shipment
+                                            Batal Sales Order
                                         </Button>
                                     )}
                                     <Button

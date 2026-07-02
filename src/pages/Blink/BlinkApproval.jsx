@@ -321,7 +321,7 @@ const BlinkApproval = () => {
             const mappedShipments = (shipments || []).map(s => ({
                 id: s.id,
                 type: 'shipment',
-                typeLabel: 'Shipment',
+                typeLabel: 'Sales Order',
                 refNumber: s.job_number || s.so_number || '-',
                 customerName: s.customer || '-',
                 submittedBy: s.sales_person || 'Operations',
@@ -878,7 +878,7 @@ const BlinkApproval = () => {
                 // Also fetch again just in case
                 fetchSubmissions();
 
-                alert(`✅ Quotation ${item.refNumber} disetujui!\n\n📦 Shipment ${soNumber} berhasil dibuat.\n\n⚠️ Langkah berikutnya: Buka Shipment Management → Submit for Approval → setelah disetujui manajer, tombol Generate PO & Invoice akan terbuka.`);
+                alert(`✅ Quotation ${item.refNumber} disetujui!\n\n📦 Sales Order ${soNumber} berhasil dibuat.\n\n⚠️ Langkah berikutnya: Buka Sales Order Management → Submit for Approval → setelah disetujui manajer, tombol Generate PO & Invoice akan terbuka.`);
                 setTimeout(() => navigate('/blink/shipments'), 1000);
                 return; // skip the generic alert below
             }

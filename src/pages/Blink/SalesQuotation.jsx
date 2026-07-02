@@ -1133,7 +1133,7 @@ const SalesQuotation = () => {
             setShowViewModal(false);
 
             const docLabel = isAirFreight ? 'AWB' : 'BL';
-            alert(`✅ Sales Order ${soNumber} created!\n\n📦 Shipment auto-created with Job Number: ${quotation.jobNumber}\n📄 Draft ${docLabel} (${blNumber}) auto-generated\n\n➡️ Navigating to Operations...`);
+            alert(`✅ Sales Order ${soNumber} created with Job Number: ${quotation.jobNumber}\n📄 Draft ${docLabel} (${blNumber}) auto-generated\n\n➡️ Navigating to Sales Order Management...`);
 
             // Navigate to shipments page
             setTimeout(() => {
@@ -1142,7 +1142,7 @@ const SalesQuotation = () => {
 
         } catch (error) {
             console.error('Error creating shipment/SO:', error);
-            alert('Failed to create Sales Order & Shipment: ' + error.message);
+            alert('Failed to create Sales Order: ' + error.message);
         }
     };
 

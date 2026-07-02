@@ -930,7 +930,7 @@ const QuotationManagement = () => {
             setShowViewModal(false);
 
             const docLabel = isAirFreight ? 'AWB' : 'BL';
-            alert(`✅ Sales Order ${soNumber} created!\n\n📦 Shipment auto-created with Job Number: ${quotation.jobNumber}\n📄 Draft ${docLabel} (${blNumber}) auto-generated\n\n➡️ Navigating to Operations...`);
+            alert(`✅ Sales Order ${soNumber} created with Job Number: ${quotation.jobNumber}\n📄 Draft ${docLabel} (${blNumber}) auto-generated\n\n➡️ Navigating to Sales Order Management...`);
 
             // Navigate to shipments page
             setTimeout(() => {

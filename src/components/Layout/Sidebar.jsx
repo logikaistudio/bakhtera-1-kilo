@@ -288,7 +288,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
         {
             type: 'category', label: '🚚 Operations', items: [
                 { path: '/blink/operations/quotations', label: 'Quotation', menuCode: 'blink_quotations' },
-                { path: '/blink/shipments', label: 'Shipment Management', menuCode: 'blink_shipments' },
+                { path: '/blink/shipments', label: 'Sales Order Management', menuCode: 'blink_shipments' },
                 { path: '/blink/operations/bl', label: 'BL/AWB Documents', menuCode: 'blink_bl' },
                 { path: '/blink/approvals', label: 'Approval Center', menuCode: 'blink_approval', showBadge: true },
             ]

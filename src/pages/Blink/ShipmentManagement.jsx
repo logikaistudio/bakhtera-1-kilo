@@ -218,7 +218,7 @@ const ShipmentManagement = () => {
     const handleExportToExcel = () => {
         import('../../utils/exportXLS').then(({ exportToXLS }) => {
             const headerRows = [
-                { value: 'SHIPMENT MANAGEMENT REPORT', style: 'title' },
+                { value: 'SALES ORDER MANAGEMENT REPORT', style: 'title' },
                 { value: `Report Date: ${new Date().toLocaleDateString('id-ID')}`, style: 'normal' },
                 ''
             ];
@@ -234,7 +234,7 @@ const ShipmentManagement = () => {
                 { header: 'Created Date', key: 'createdAt', width: 15 }
             ];
 
-            exportToXLS(filteredShipments, `Shipments_Report_${new Date().toISOString().split('T')[0]}`, headerRows, xlsColumns);
+            exportToXLS(filteredShipments, `Sales_Orders_Report_${new Date().toISOString().split('T')[0]}`, headerRows, xlsColumns);
         }).catch(err => console.error("Failed to load export utility", err));
     };
 
@@ -605,8 +605,8 @@ const ShipmentManagement = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text">Shipment Management</h1>
-                            <p className="text-silver-dark mt-1">Kelola semua pengiriman</p>
+                    <h1 className="text-3xl font-bold gradient-text">Sales Order Management</h1>
+                            <p className="text-silver-dark mt-1">Kelola semua sales order</p>
                 </div>
                 <div className="flex gap-2">
                     <Button
@@ -722,7 +722,7 @@ const ShipmentManagement = () => {
             {/* Stats */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="glass-card p-4 rounded-lg">
-                    <p className="text-xs text-silver-dark">Total Shipments</p>
+                    <p className="text-xs text-silver-dark">Total Sales Orders</p>
                     <p className="text-2xl font-bold text-silver-light mt-1">{shipments.length}</p>
                 </div>
                 <div className="glass-card p-4 rounded-lg">
@@ -750,13 +750,13 @@ const ShipmentManagement = () => {
                 <div className="glass-card rounded-lg p-12 text-center">
                     <Ship className="w-16 h-16 text-silver-dark mx-auto mb-4" />
                     <h3 className="text-xl font-semibold text-silver-light mb-2">
-                        No Shipments Found
+                        No Sales Orders Found
                     </h3>
                     <p className="text-silver-dark mb-4">
-                        Shipments are automatically created from confirmed Sales Orders
+                        Sales Orders are automatically created from confirmed Sales Quotations
                     </p>
                     <p className="text-sm text-silver-dark">
-                        Flow: Quotation → Sales Order → <span className="text-accent-orange font-semibold">Create Shipment</span>
+                        Flow: Quotation → <span className="text-accent-orange font-semibold">Sales Order</span>
                     </p>
                 </div>
             ) : (
@@ -820,7 +820,7 @@ const ShipmentManagement = () => {
                 </div>
             )}
 
-            {/* Shipment Detail Modal */}
+            {/* Sales Order Detail Modal */}
             <ShipmentDetailModal
                 isOpen={showDetailModal}
                 onClose={() => {
