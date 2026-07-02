@@ -2574,21 +2574,32 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
 
     const formatCurrency = (value, currency = 'IDR') => {
         return currency === 'USD'
-            ? `$${(value || 0).toLocaleString('id-ID')}`
+            ? `$ ${(value || 0).toLocaleString('id-ID')}`
             : `Rp ${(value || 0).toLocaleString('id-ID')}`;
     };
 
-    const normalizeItems = (items) => {
-        let normalized = [];
-        items.forEach(groupOrItem => {
-            if (groupOrItem.items) {
-                normalized = normalized.concat(groupOrItem.items);
+    const items = quotation.serviceItems || quotation.service_items || [];
+    
+    // Pre-calculate grand totals to avoid side-effects during render mapping
+    let computedGrandTotalIDR = 0;
+    let computedGrandTotalUSD = 0;
+    
+    items.forEach(group => {
+        const isGroup = group.items !== undefined;
+        const subItems = isGroup ? group.items : [group];
+        const currentGroupRate = group.groupExchangeRate || quotation.exchange_rate || 16000;
+        
+        subItems.forEach(item => {
+            const amt = parseFloat(item.amount) || 0;
+            if (item.currency === 'IDR') {
+                computedGrandTotalIDR += amt;
+                computedGrandTotalUSD += amt / currentGroupRate;
             } else {
-                normalized.push(groupOrItem);
+                computedGrandTotalUSD += amt;
+                computedGrandTotalIDR += amt * currentGroupRate;
             }
         });
-        return normalized;
-    };
+    });
 
     return (
         <Modal isOpen={true} onClose={onClose} maxWidth="max-w-5xl">
@@ -2715,34 +2726,72 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
 
                     {/* Pricing Table */}
                     <div className="mb-6">
-                        <table className="w-full text-xs leading-tight">
+                        <table className="w-full text-[11px] leading-tight">
                             <thead>
                                 <tr className="border-b border-slate-200">
-                                    <th className="text-left font-semibold text-slate-900 py-1 uppercase text-[10px] tracking-wider w-[5%] bg-slate-50 pl-4 rounded-l-md">No</th>
-                                    <th className="text-left font-semibold text-slate-900 py-1 uppercase text-[10px] tracking-wider w-[40%] bg-slate-50">Description</th>
-                                    <th className="text-right font-semibold text-slate-900 py-1 uppercase text-[10px] tracking-wider w-[10%] bg-slate-50">Qty</th>
-                                    <th className="text-right font-semibold text-slate-900 py-1 uppercase text-[10px] tracking-wider w-[15%] bg-slate-50">Unit Price</th>
-                                    <th className="text-right font-semibold text-slate-900 py-1 uppercase text-[10px] tracking-wider w-[15%] bg-slate-50 pr-4 rounded-r-md">Total ({quotation.currency})</th>
+                                    <th className="text-center font-semibold text-slate-900 py-1.5 uppercase text-[9px] tracking-wider w-[5%] bg-slate-50 pl-4 rounded-l-md">No</th>
+                                    <th className="text-left font-semibold text-slate-900 py-1.5 uppercase text-[9px] tracking-wider w-[35%] bg-slate-50">Description</th>
+                                    <th className="text-center font-semibold text-slate-900 py-1.5 uppercase text-[9px] tracking-wider w-[12%] bg-slate-50">Qty & Unit</th>
+                                    <th className="text-right font-semibold text-slate-900 py-1.5 uppercase text-[9px] tracking-wider w-[13%] bg-slate-50">Rate</th>
+                                    <th className="text-right font-semibold text-slate-900 py-1.5 uppercase text-[9px] tracking-wider w-[15%] bg-slate-50">Value (IDR)</th>
+                                    <th className="text-right font-semibold text-slate-900 py-1.5 uppercase text-[9px] tracking-wider w-[15%] bg-slate-50">Total (USD)</th>
+                                    <th className="text-center font-semibold text-slate-900 py-1.5 uppercase text-[9px] tracking-wider w-[10%] bg-slate-50 pr-4 rounded-r-md">Remarks</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {normalizeItems(quotation.serviceItems || quotation.service_items || []).map((item, index) => {
-                                    const amount = item.amount || item.total || ((item.quantity || 1) * (item.unitPrice || 0));
+                                {items.map((group, groupIndex) => {
+                                    const isGroup = group.items !== undefined;
+                                    const groupName = isGroup ? group.groupName : 'General Cargo';
+                                    const subItems = isGroup ? group.items : [group];
+                                    const currentGroupRate = group.groupExchangeRate || quotation.exchange_rate || 16000;
+
                                     return (
-                                        <tr key={index}>
-                                            <td className="py-0.5 pl-4 text-slate-400 font-mono text-[10px]">{index + 1}</td>
-                                            <td className="py-0.5 text-slate-800 font-medium capitalize">
-                                                {(item.name || item.description || '').toLowerCase()}
-                                                {item.notes && <p className="text-[10px] text-slate-400 capitalize">{(item.notes || '').toLowerCase()}</p>}
-                                            </td>
-                                            <td className="py-0.5 text-right text-slate-600">{item.quantity || 1} {item.unit || 'unit'}</td>
-                                            <td className="py-0.5 text-right text-slate-600 font-mono">
-                                                {formatCurrency(parseFloat(item.unitPrice || item.price || 0), quotation.currency).replace('Rp', '').replace('$', '')}
-                                            </td>
-                                            <td className="py-0.5 text-right text-slate-900 font-bold font-mono pr-4">
-                                                {formatCurrency(amount, quotation.currency)}
-                                            </td>
-                                        </tr>
+                                        <React.Fragment key={groupIndex}>
+                                            <tr className="bg-slate-50/70">
+                                                <td colSpan={7} className="py-2 pl-4 font-bold text-slate-800 text-[10px] uppercase">
+                                                    {groupName} (Rate: Rp {currentGroupRate.toLocaleString('id-ID')})
+                                                </td>
+                                            </tr>
+                                            {subItems.map((item, itemIndex) => {
+                                                const amt = parseFloat(item.amount) || 0;
+                                                let amtIDR = 0;
+                                                let amtUSD = 0;
+
+                                                if (item.currency === 'IDR') {
+                                                    amtIDR = amt;
+                                                    amtUSD = amt / currentGroupRate;
+                                                } else {
+                                                    amtUSD = amt;
+                                                    amtIDR = amt * currentGroupRate;
+                                                }
+
+                                                return (
+                                                    <tr key={item.id || itemIndex} className="hover:bg-slate-50/30">
+                                                        <td className="py-2 pl-4 text-slate-400 font-mono text-[10px] text-center">
+                                                            {groupIndex + 1}.{itemIndex + 1}
+                                                        </td>
+                                                        <td className="py-2 text-slate-800 font-medium capitalize">
+                                                            {(item.description || item.name || '-').toLowerCase()}
+                                                        </td>
+                                                        <td className="py-2 text-center text-slate-600">
+                                                            {item.quantity || 1} {item.unit || 'Unit'}
+                                                        </td>
+                                                        <td className="py-2 text-right text-slate-600 font-mono">
+                                                            {item.currency || 'USD'} {(parseFloat(item.unitPrice) || 0).toLocaleString('id-ID')}
+                                                        </td>
+                                                        <td className="py-2 text-right text-slate-600 font-mono">
+                                                            {amtIDR > 0 ? amtIDR.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '-'}
+                                                        </td>
+                                                        <td className="py-2 text-right text-slate-900 font-bold font-mono">
+                                                            {amtUSD > 0 ? amtUSD.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
+                                                        </td>
+                                                        <td className="py-2 text-center text-slate-500 pr-4 text-[10px]">
+                                                            {item.remarks || '-'}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </React.Fragment>
                                     );
                                 })}
                             </tbody>
@@ -2750,30 +2799,22 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
 
                         {/* Total Summary */}
                         <div className="flex justify-end mt-4">
-                            <div className="w-64 bg-slate-50 p-6 rounded-lg">
+                            <div className="w-80 bg-slate-900 text-white p-5 rounded-lg shadow-md">
                                 <div className="flex justify-between items-center mb-2">
-                                    <span className="text-slate-500 text-sm">Subtotal</span>
-                                    {(() => {
-                                        const rate = quotation.exchange_rate || quotation.exchangeRate || 16000;
-                                        const idr = quotation.total_idr ?? (quotation.totalAmount ? ((quotation.currency === 'IDR') ? quotation.totalAmount : quotation.totalAmount * rate) : (quotation.total_amount ? (quotation.currency === 'IDR' ? quotation.total_amount : quotation.total_amount * rate) : 0));
-                                        const usd = quotation.total_usd ?? (quotation.totalAmount ? ((quotation.currency === 'USD') ? quotation.totalAmount : (rate ? quotation.totalAmount / rate : 0)) : (quotation.total_amount ? ((quotation.currency === 'USD') ? quotation.total_amount : (rate ? quotation.total_amount / rate : 0)) : 0));
-                                        return <span className="font-mono text-slate-700">{quotation.currency === 'USD' ? `$ ${usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `Rp ${idr.toLocaleString('id-ID')}`}</span>
-                                    })()}
+                                    <span className="text-slate-400 text-xs">GRAND TOTAL (IDR):</span>
+                                    <span className="font-mono font-bold text-sm">IDR {computedGrandTotalIDR.toLocaleString('id-ID')}</span>
                                 </div>
-                                <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-200">
-                                    <span className="text-slate-500 text-sm">Tax (0%)</span>
-                                    <span className="font-mono text-slate-700">-</span>
+                                <div className="flex justify-between items-center mb-3">
+                                    <span className="text-slate-400 text-xs">GRAND TOTAL (USD):</span>
+                                    <span className="font-mono font-bold text-sm">USD {computedGrandTotalUSD.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="font-bold text-slate-900">Total</span>
-                                        <span className="font-bold text-xl text-blue-600">
-                                            {(() => {
-                                                const rate = quotation.exchange_rate || quotation.exchangeRate || 16000;
-                                                const idr = quotation.total_idr ?? (quotation.totalAmount ? ((quotation.currency === 'IDR') ? quotation.totalAmount : quotation.totalAmount * rate) : (quotation.total_amount ? (quotation.currency === 'IDR' ? quotation.total_amount : quotation.total_amount * rate) : 0));
-                                                const usd = quotation.total_usd ?? (quotation.totalAmount ? ((quotation.currency === 'USD') ? quotation.totalAmount : (rate ? quotation.totalAmount / rate : 0)) : (quotation.total_amount ? ((quotation.currency === 'USD') ? quotation.total_amount : (rate ? quotation.total_amount / rate : 0)) : 0));
-                                                return quotation.currency === 'USD' ? `$ ${usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `Rp ${idr.toLocaleString('id-ID')}`;
-                                            })()}
-                                        </span>
+                                <div className="flex justify-between items-center pt-3 border-t border-dashed border-slate-700">
+                                    <span className="font-bold text-slate-200 text-xs">ESTIMASI TOTAL ({quotation.currency}):</span>
+                                    <span className="font-bold text-base text-emerald-400 font-mono">
+                                        {quotation.currency === 'IDR'
+                                            ? `Rp ${computedGrandTotalIDR.toLocaleString('id-ID')}`
+                                            : `$ ${computedGrandTotalUSD.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                                    </span>
                                 </div>
                             </div>
                         </div>
