@@ -51,7 +51,7 @@ const SalesBlinkApproval = () => {
     const [showRejectInput, setShowRejectInput] = useState(false);
 
     // Is the user an approver? (Admin, Super Admin, Manager)
-    const isApprover = isSuperAdmin() || isAdmin() || user?.user_level === 'bridge_manager' || user?.user_level === 'manager';
+    const isApprover = isSuperAdmin() || isAdmin() || ['manager', 'blink_manager', 'bridge_manager'].includes(user?.user_level);
 
     const fetchSubmissions = async () => {
         try {
