@@ -91,6 +91,7 @@ const SalesQuotation = () => {
         cargoType: '',
         containerSize: '',
         containerCount: '',
+        offerType: '',
         weight: '',
         volume: '',
         grossWeight: '',
@@ -132,6 +133,22 @@ const SalesQuotation = () => {
         sea: Ship,
         air: Plane,
         land: Truck
+    };
+
+    const quotationOfferTypeOptions = ['Import', 'Export', 'Domestic', 'Custom Clearance'];
+
+    const canManageQuotation = (action) => {
+        const actionMap = {
+            create: canCreate,
+            edit: canEdit,
+            delete: canDelete,
+            approve: canApprove,
+        };
+
+        const permissionChecker = actionMap[action];
+        if (!permissionChecker) return false;
+
+        return permissionChecker('blink_sales_quotations') || permissionChecker('blink_sales');
     };
 
     // Fetch quotations from Supabase on mount
@@ -179,6 +196,7 @@ const SalesQuotation = () => {
                 netWeight: q.net_weight || q.netWeight,
                 measure: q.measure || q.measure,
                 incoterm: q.incoterm,
+                offerType: q.offer_type || q.offerType || '',
                 paymentTerms: q.payment_terms || 'Net 30 Days',
                 packageType: q.package_type,
                 quantity: q.quantity,
@@ -238,7 +256,7 @@ const SalesQuotation = () => {
 
     const handleSubmit = async (e, status = 'draft') => {
         e.preventDefault();
-        if (!canCreate('blink_sales')) {
+        if (!canManageQuotation('create')) {
             alert('Anda tidak memiliki hak akses untuk membuat quotation.');
             return;
         }
@@ -284,6 +302,7 @@ const SalesQuotation = () => {
             cost_items: formData.costItems,
             terms_and_conditions: formData.termsConditions,
             incoterm: formData.incoterm,
+            offer_type: formData.offerType ? formData.offerType.trim() : null,
             payment_terms: formData.paymentTerms,
             package_type: formData.packageType,
             quantity: formData.quantity ? parseFloat(formData.quantity) : null,
@@ -322,7 +341,7 @@ const SalesQuotation = () => {
 
 
     const handleManagerReject = async (quotationId, reason) => {
-        if (!canApprove('blink_sales')) {
+        if (!canManageQuotation('approve')) {
             alert('Anda tidak memiliki hak akses untuk me-reject quotation.');
             return;
         }
@@ -354,7 +373,7 @@ const SalesQuotation = () => {
     };
 
     const handleSaveEditedQuotation = async () => {
-        if (!canEdit('blink_sales')) {
+        if (!canManageQuotation('edit')) {
             alert('Anda tidak memiliki hak akses untuk menyimpan perubahan quotation.');
             return;
         }
@@ -408,6 +427,7 @@ const SalesQuotation = () => {
                     cost_items: editedQuotation.costItems || [],
 
                     // Additional details
+                    offer_type: editedQuotation.offerType ? editedQuotation.offerType.trim() : null,
                     incoterm: editedQuotation.incoterm,
                     payment_terms: editedQuotation.paymentTerms,
                     package_type: editedQuotation.packageType,
@@ -446,6 +466,7 @@ const SalesQuotation = () => {
             customerAddress: '',
             salesPerson: '',
             preparedBy: '',
+            offerType: '',
             quotationType: 'RG',
             quotationDate: new Date().toISOString().split('T')[0],
             origin: '',
@@ -525,7 +546,7 @@ const SalesQuotation = () => {
     };
 
     const handleDeleteQuotation = async (quotationId) => {
-        if (!canDelete('blink_sales')) {
+        if (!canManageQuotation('delete')) {
             alert('Anda tidak memiliki hak akses untuk menghapus quotation.');
             return;
         }
@@ -757,7 +778,7 @@ const SalesQuotation = () => {
     };
 
     // Print quotation handler
-    const handlePrintQuotation = (quotation, creatorName = '', approverName = '') => {
+const handlePrintQuotation = (quotation, creatorName = '', approverName = '', options = {}) => {
         try {
             const printWindow = window.open('', '_blank');
 
@@ -773,6 +794,9 @@ const SalesQuotation = () => {
             };
 
             const items = quotation.serviceItems || quotation.service_items || [];
+            const showGrandTotal = options.showGrandTotal !== false;
+            const showEstimatedTotal = options.showEstimatedTotal !== false;
+            const offerTypeTitle = quotation.offerType || quotation.offer_type || '';
             
             let grandTotalIDR = 0;
             let grandTotalUSD = 0;
@@ -815,7 +839,6 @@ const SalesQuotation = () => {
                         <tr>
                             <td style="text-align: center;">${groupIndex + 1}.${itemIndex + 1}</td>
                             <td>${item.description || item.name || '-'}</td>
-                            <td style="text-align: center;">${item.quantity || 1} ${item.unit || 'Unit'}</td>
                             <td style="text-align: right;">${item.currency || 'USD'} ${(parseFloat(item.unitPrice) || 0).toLocaleString('id-ID')}</td>
                             <td style="text-align: right; font-family: monospace;">${amtIDR > 0 ? amtIDR.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '-'}</td>
                             <td style="text-align: right; font-family: monospace;">${amtUSD > 0 ? amtUSD.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
@@ -867,7 +890,7 @@ const SalesQuotation = () => {
                                 : `<div style="font-size: 24px; font-weight: bold; font-style: italic;">${companySettings?.company_name?.split(' ')[0] || 'FREIGHT'}ONE</div><div style="font-size: 9px; letter-spacing: 3px; color: #555;">LOGISTICS SOLUTIONS</div>`
                             }
                             <div style="margin-top: 15px;">
-                                <div class="title">QUOTATION</div>
+                                <div class="title">${offerTypeTitle ? `${offerTypeTitle.toUpperCase()} QUOTATION` : 'QUOTATION'}</div>
                                 <div style="margin-top: 5px; font-size: 16px;">${quotation.quotationNumber || quotation.quotation_number}</div>
                             </div>
                         </div>
@@ -883,6 +906,7 @@ const SalesQuotation = () => {
                             <div>${(companySettings?.company_address || 'Jakarta, Indonesia').replace(/\n/g, '<br/>')}</div>
                             ${companySettings?.company_phone ? `<div>Tel: ${companySettings.company_phone}</div>` : ''}
                             ${companySettings?.company_email ? `<div>Email: ${companySettings.company_email}</div>` : ''}
+                            ${creatorName ? `<div>Created By: ${creatorName}</div>` : ''}
                         </div>
                         <div>
                             <h3 style="font-size: 12px; font-weight: bold; margin-bottom: 8px; color: #666; text-transform: uppercase; letter-spacing: 1px;">BILL TO:</h3>
@@ -890,6 +914,7 @@ const SalesQuotation = () => {
                             <div style="margin-top: 4px; color: #555; font-size: 11px;">${quotation.customerAddress || quotation.customer_address || ''}</div>
                             ${(quotation.customerContact || quotation.customer_contact_name || quotation.customerName || quotation.customer_name) ? `<div style="margin-top: 6px; font-size: 11px;"><span style="font-weight:bold; color:#333;">Attn:</span> ${quotation.customerContact || quotation.customer_contact_name || quotation.customerName || quotation.customer_name}</div>` : ''}
                             ${(quotation.customerEmail || quotation.customer_email) ? `<div style="font-size: 11px;"><span style="font-weight:bold; color:#333;">Email:</span> ${quotation.customerEmail || quotation.customer_email}</div>` : ''}
+                            ${creatorName ? `<div style="font-size: 11px;"><span style="font-weight:bold; color:#333;">Created By:</span> ${creatorName}</div>` : ''}
                             ${(quotation.customerPhone || quotation.customer_phone) ? `<div style="font-size: 11px;"><span style="font-weight:bold; color:#333;">Phone:</span> ${quotation.customerPhone || quotation.customer_phone}</div>` : ''}
                         </div>
                     </div>
@@ -899,6 +924,7 @@ const SalesQuotation = () => {
                             <div><strong>Service:</strong> ${(quotation.serviceType || quotation.service_type || '-').toUpperCase()}</div>
                             <div><strong>Route:</strong> ${quotation.origin || '-'} → ${quotation.destination || '-'}</div>
                             <div><strong>Commodity:</strong> ${quotation.commodity || '-'}</div>
+                            <div><strong>Jenis Penawaran:</strong> ${quotation.offerType || quotation.offer_type || '—'}</div>
                             <div><strong>Container:</strong> ${quotation.containerSize || quotation.container_size || '—'} / ${quotation.containerCount || quotation.container_count || '—'}</div>
                             <div><strong>Incoterm:</strong> ${quotation.incoterm || '—'}</div>
                             <div><strong>Validity:</strong> ${quotation.validityDays || 30} Days</div>
@@ -913,7 +939,6 @@ const SalesQuotation = () => {
                             <tr>
                                 <th style="width: 40px; text-align: center; font-size: 10px;">NO</th>
                                 <th style="font-size: 10px;">DESCRIPTION</th>
-                                <th style="width: 80px; text-align: center; font-size: 10px;">QTY & UNIT</th>
                                 <th style="width: 90px; text-align: right; font-size: 10px;">RATE</th>
                                 <th style="width: 110px; text-align: right; font-size: 10px;">VALUE (IDR)</th>
                                 <th style="width: 110px; text-align: right; font-size: 10px;">TOTAL (USD)</th>
@@ -925,31 +950,37 @@ const SalesQuotation = () => {
                         </tbody>
                     </table>
 
-                    <div style="display: flex; justify-content: flex-end;">
-                        <div style="background: #333; color: white; padding: 15px 25px; border-radius: 4px; display: inline-block;">
-                            <ul class="summary-list">
-                                <li>
-                                    <span>GRAND TOTAL (IDR):</span>
-                                    <span class="total-value">IDR ${grandTotalIDR.toLocaleString('id-ID')}</span>
-                                </li>
-                                <li style="margin-top: 8px;">
-                                    <span>GRAND TOTAL (USD):</span>
-                                    <span class="total-value">USD ${grandTotalUSD.toLocaleString('id-ID', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                                </li>
-                                <li style="margin-top: 8px; border-top: 1px dashed white; padding-top: 8px;">
-                                    <span><strong>ESTIMASI TOTAL (${quotation.currency}):</strong></span>
-                                    <span class="total-value">
-                                        <strong>
-                                            ${quotation.currency === 'IDR' 
-                                                ? 'Rp ' + grandTotalIDR.toLocaleString('id-ID')
-                                                : '$ ' + grandTotalUSD.toLocaleString('id-ID', {minimumFractionDigits: 2, maximumFractionDigits: 2})
-                                            }
-                                        </strong>
-                                    </span>
-                                </li>
-                            </ul>
+                    ${(showGrandTotal || showEstimatedTotal) ? `
+                        <div style="display: flex; justify-content: flex-end;">
+                            <div style="background: #333; color: white; padding: 15px 25px; border-radius: 4px; display: inline-block;">
+                                <ul class="summary-list">
+                                    ${showGrandTotal ? `
+                                    <li>
+                                        <span>GRAND TOTAL (IDR):</span>
+                                        <span class="total-value">IDR ${grandTotalIDR.toLocaleString('id-ID')}</span>
+                                    </li>
+                                    <li style="margin-top: 8px;">
+                                        <span>GRAND TOTAL (USD):</span>
+                                        <span class="total-value">USD ${grandTotalUSD.toLocaleString('id-ID', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                    </li>
+                                    ` : ''}
+                                    ${showEstimatedTotal ? `
+                                    <li style="margin-top: 8px; ${showGrandTotal ? 'border-top: 1px dashed white; padding-top: 8px;' : ''}">
+                                        <span><strong>ESTIMASI TOTAL (${quotation.currency}):</strong></span>
+                                        <span class="total-value">
+                                            <strong>
+                                                ${quotation.currency === 'IDR' 
+                                                    ? 'Rp ' + grandTotalIDR.toLocaleString('id-ID')
+                                                    : '$ ' + grandTotalUSD.toLocaleString('id-ID', {minimumFractionDigits: 2, maximumFractionDigits: 2})
+                                                }
+                                            </strong>
+                                        </span>
+                                    </li>
+                                    ` : ''}
+                                </ul>
+                            </div>
                         </div>
-                    </div>
+                    ` : ''}
 
                     <div style="margin-top: 50px; display: grid; grid-template-columns: 1fr 1fr; gap: 60px;">
                         <div>
@@ -995,7 +1026,7 @@ const SalesQuotation = () => {
 
     // Create SO from approved quotation
     const handleCreateSO = async (quotation) => { // Added async
-        if (!canApprove('blink_sales')) {
+        if (!canManageQuotation('approve')) {
             alert('Anda tidak memiliki hak akses untuk Approve & Create SO.');
             return;
         }
@@ -1194,7 +1225,7 @@ const SalesQuotation = () => {
                     <h1 className="text-3xl font-bold gradient-text">Sales Quotation</h1>
                     <p className="text-silver-dark mt-1">Manage quotations untuk customer</p>
                 </div>
-                {canCreate('blink_sales') && (
+                {canManageQuotation('create') && (
                     <Button onClick={() => setShowModal(true)} icon={Plus}>
                         New Quotation
                     </Button>
@@ -1259,6 +1290,7 @@ const SalesQuotation = () => {
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">Customer</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">Route</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">Service</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">Type</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">Amount</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">Valid Until</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">Status</th>
@@ -1326,6 +1358,11 @@ const SalesQuotation = () => {
                                                     <ServiceIcon className="w-4 h-4 text-silver-dark" />
                                                     <span className="text-silver-light capitalize">{quote.serviceType}</span>
                                                 </div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <span className="text-silver-light text-sm">
+                                                    {quote.offerType || quote.offer_type || '-'}
+                                                </span>
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="font-semibold text-silver-light">
@@ -1465,6 +1502,29 @@ const SalesQuotation = () => {
                                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                             />
                         </div>
+                    </div>
+
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Tipe Quotation
+                        </label>
+                        <input
+                            type="text"
+                            list="blink-quotation-offer-types"
+                            value={formData.offerType}
+                            onChange={(e) => setFormData({ ...formData, offerType: e.target.value })}
+                            placeholder="Pilih atau ketik manual..."
+                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
+                        />
+                        <datalist id="blink-quotation-offer-types">
+                            <option value="" />
+                            {quotationOfferTypeOptions.map(option => (
+                                <option key={option} value={option} />
+                            ))}
+                        </datalist>
+                        <p className="text-xs text-gray-500 mt-1">
+                            Pilih salah satu opsi tersedia atau ketik jenis quotation baru.
+                        </p>
                     </div>
 
                     {/* Route Information */}
@@ -2114,6 +2174,30 @@ const SalesQuotation = () => {
                                 )}
                             </div>
                             <div>
+                                <p className="text-xs text-gray-500 font-medium mb-1">Tipe Quotation</p>
+                                {isEditingQuotation ? (
+                                    <>
+                                        <input
+                                            type="text"
+                                            list="blink-quotation-offer-types-edit"
+                                            value={editedQuotation?.offerType || ''}
+                                            onChange={(e) => setEditedQuotation({ ...editedQuotation, offerType: e.target.value })}
+                                            placeholder="Pilih atau ketik manual..."
+                                            className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm"
+                                        />
+                                        <datalist id="blink-quotation-offer-types-edit">
+                                            {quotationOfferTypeOptions.map(option => (
+                                                <option key={option} value={option} />
+                                            ))}
+                                        </datalist>
+                                    </>
+                                ) : (
+                                    <p className="text-gray-900 font-medium">
+                                        {viewingQuotation.offerType || viewingQuotation.offer_type || <span className="text-gray-400 italic">—</span>}
+                                    </p>
+                                )}
+                            </div>
+                            <div>
                                 <p className="text-xs text-gray-500 font-medium mb-1">Quotation Date</p>
                                 <p className="text-gray-900 font-medium">{viewingQuotation.quotationDate || viewingQuotation.createdAt}</p>
                             </div>
@@ -2651,9 +2735,16 @@ const SalesQuotation = () => {
 const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettings }) => {
     const [creatorName, setCreatorName] = React.useState(quotation?.preparedBy || quotation?.prepared_by || quotation?.salesPerson || quotation?.sales_person || '');
     const [approverName, setApproverName] = React.useState(quotation?.approvedBy || quotation?.approved_by || '');
+    const [showGrandTotal, setShowGrandTotal] = React.useState(true);
+    const [showEstimatedTotal, setShowEstimatedTotal] = React.useState(true);
+
+    const offerTypeTitle = quotation?.offerType || quotation?.offer_type || '';
 
     const handlePrint = () => {
-        onPrint(quotation, creatorName, approverName);
+        onPrint(quotation, creatorName, approverName, {
+            showGrandTotal,
+            showEstimatedTotal
+        });
     };
 
     const formatCurrency = (value, currency = 'IDR') => {
@@ -2727,7 +2818,7 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                             </div>
                         </div>
                         <div className="text-right">
-                            <h2 className="text-4xl font-light tracking-tight text-slate-900 mb-2">Quotation</h2>
+                            <h2 className="text-4xl font-light tracking-tight text-slate-900 mb-2">{offerTypeTitle ? `${offerTypeTitle.toUpperCase()} Quotation` : 'Quotation'}</h2>
                             <p className="text-accent-blue font-mono font-medium text-lg">{quotation.quotationNumber || quotation.quotation_number}</p>
                             <p className="text-sm text-slate-400 mt-1">Issued Date: {new Date(quotation.quotationDate || quotation.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
                         </div>
@@ -2842,17 +2933,36 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                         </div>
                     </div>
 
-                    {/* Pricing Table */}
+                    {/* Totals Visibility Controls */}
+                    <div className="flex flex-wrap items-center gap-4 mb-4 print:hidden">
+                        <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                            <input
+                                type="checkbox"
+                                checked={showGrandTotal}
+                                onChange={(e) => setShowGrandTotal(e.target.checked)}
+                                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            Show Grand Total
+                        </label>
+                        <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                            <input
+                                type="checkbox"
+                                checked={showEstimatedTotal}
+                                onChange={(e) => setShowEstimatedTotal(e.target.checked)}
+                                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            Show Estimated Total
+                        </label>
+                    </div>
                     <div className="mb-6">
                         <table className="w-full text-[11px] leading-tight">
                             <thead>
                                 <tr className="border-b border-slate-200">
                                     <th className="text-center font-semibold text-slate-900 py-1.5 uppercase text-[9px] tracking-wider w-[5%] bg-slate-50 pl-4 rounded-l-md">No</th>
-                                    <th className="text-left font-semibold text-slate-900 py-1.5 uppercase text-[9px] tracking-wider w-[35%] bg-slate-50">Description</th>
-                                    <th className="text-center font-semibold text-slate-900 py-1.5 uppercase text-[9px] tracking-wider w-[12%] bg-slate-50">Qty & Unit</th>
-                                    <th className="text-right font-semibold text-slate-900 py-1.5 uppercase text-[9px] tracking-wider w-[13%] bg-slate-50">Rate</th>
-                                    <th className="text-right font-semibold text-slate-900 py-1.5 uppercase text-[9px] tracking-wider w-[15%] bg-slate-50">Value (IDR)</th>
-                                    <th className="text-right font-semibold text-slate-900 py-1.5 uppercase text-[9px] tracking-wider w-[15%] bg-slate-50">Total (USD)</th>
+                                    <th className="text-left font-semibold text-slate-900 py-1.5 uppercase text-[9px] tracking-wider w-[45%] bg-slate-50">Description</th>
+                                    <th className="text-right font-semibold text-slate-900 py-1.5 uppercase text-[9px] tracking-wider w-[17%] bg-slate-50">Rate</th>
+                                    <th className="text-right font-semibold text-slate-900 py-1.5 uppercase text-[9px] tracking-wider w-[17%] bg-slate-50">Value (IDR)</th>
+                                    <th className="text-right font-semibold text-slate-900 py-1.5 uppercase text-[9px] tracking-wider w-[17%] bg-slate-50">Total (USD)</th>
                                     <th className="text-center font-semibold text-slate-900 py-1.5 uppercase text-[9px] tracking-wider w-[10%] bg-slate-50 pr-4 rounded-r-md">Remarks</th>
                                 </tr>
                             </thead>
@@ -2866,7 +2976,7 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                                     return (
                                         <React.Fragment key={groupIndex}>
                                             <tr className="bg-slate-50/70">
-                                                <td colSpan={7} className="py-2 pl-4 font-bold text-slate-800 text-[10px] uppercase">
+                                                <td colSpan={6} className="py-2 pl-4 font-bold text-slate-800 text-[10px] uppercase">
                                                     {groupName} (Rate: Rp {currentGroupRate.toLocaleString('id-ID')})
                                                 </td>
                                             </tr>
@@ -2890,9 +3000,6 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                                                         </td>
                                                         <td className="py-2 text-slate-800 font-medium capitalize">
                                                             {(item.description || item.name || '-').toLowerCase()}
-                                                        </td>
-                                                        <td className="py-2 text-center text-slate-600">
-                                                            {item.quantity || 1} {item.unit || 'Unit'}
                                                         </td>
                                                         <td className="py-2 text-right text-slate-600 font-mono">
                                                             {item.currency || 'USD'} {(parseFloat(item.unitPrice) || 0).toLocaleString('id-ID')}
@@ -2918,22 +3025,28 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                         {/* Total Summary */}
                         <div className="flex justify-end mt-4">
                             <div className="w-80 bg-slate-900 text-white p-5 rounded-lg shadow-md">
-                                <div className="flex justify-between items-center mb-2">
-                                    <span className="text-slate-400 text-xs">GRAND TOTAL (IDR):</span>
-                                    <span className="font-mono font-bold text-sm">IDR {computedGrandTotalIDR.toLocaleString('id-ID')}</span>
-                                </div>
-                                <div className="flex justify-between items-center mb-3">
-                                    <span className="text-slate-400 text-xs">GRAND TOTAL (USD):</span>
-                                    <span className="font-mono font-bold text-sm">USD {computedGrandTotalUSD.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                </div>
-                                <div className="flex justify-between items-center pt-3 border-t border-dashed border-slate-700">
-                                    <span className="font-bold text-slate-200 text-xs">ESTIMASI TOTAL ({quotation.currency}):</span>
-                                    <span className="font-bold text-base text-emerald-400 font-mono">
-                                        {quotation.currency === 'IDR'
-                                            ? `Rp ${computedGrandTotalIDR.toLocaleString('id-ID')}`
-                                            : `$ ${computedGrandTotalUSD.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                                    </span>
-                                </div>
+                                {showGrandTotal && (
+                                    <>
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-slate-400 text-xs">GRAND TOTAL (IDR):</span>
+                                            <span className="font-mono font-bold text-sm">IDR {computedGrandTotalIDR.toLocaleString('id-ID')}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center mb-3">
+                                            <span className="text-slate-400 text-xs">GRAND TOTAL (USD):</span>
+                                            <span className="font-mono font-bold text-sm">USD {computedGrandTotalUSD.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        </div>
+                                    </>
+                                )}
+                                {showEstimatedTotal && (
+                                    <div className="flex justify-between items-center pt-3 border-t border-dashed border-slate-700">
+                                        <span className="font-bold text-slate-200 text-xs">ESTIMASI TOTAL ({quotation.currency}):</span>
+                                        <span className="font-bold text-base text-emerald-400 font-mono">
+                                            {quotation.currency === 'IDR'
+                                                ? `Rp ${computedGrandTotalIDR.toLocaleString('id-ID')}`
+                                                : `$ ${computedGrandTotalUSD.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
