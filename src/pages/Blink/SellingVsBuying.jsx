@@ -46,25 +46,46 @@ const SellingVsBuying = () => {
             const processedShipments = (data || []).map(shipment => {
                 const quotedAmount = parseFloat(shipment.quoted_amount) || 0;
                 const cogsData = shipment.cogs || {};
+                const baseCurrency = shipment.currency || 'USD';
+                const rate = parseFloat(shipment.exchange_rate) || 16000;
+                const cogsCurrency = shipment.cogs_currency || baseCurrency;
+
+                const convertToQuotationCurrency = (amount, fromCurrency) => {
+                    const amt = parseFloat(amount || 0);
+                    if (isNaN(amt) || amt === 0) return 0;
+                    if (fromCurrency === baseCurrency) return amt;
+
+                    if (baseCurrency === 'USD' && fromCurrency === 'IDR') {
+                        return rate > 0 ? amt / rate : amt;
+                    }
+                    if (baseCurrency === 'IDR' && fromCurrency === 'USD') {
+                        return amt * rate;
+                    }
+                    return amt;
+                };
 
                 // Calculate total COGS
                 let totalCOGS = 0;
                 const cogsFields = ['oceanFreight', 'airFreight', 'trucking', 'thc', 'documentation', 'customs', 'insurance', 'demurrage', 'other'];
                 cogsFields.forEach(field => {
-                    totalCOGS += parseFloat(cogsData[field]) || 0;
+                    const amt = parseFloat(cogsData[field]) || 0;
+                    totalCOGS += convertToQuotationCurrency(amt, cogsCurrency);
                 });
 
                 // Add additional costs
                 if (cogsData.additionalCosts && Array.isArray(cogsData.additionalCosts)) {
                     cogsData.additionalCosts.forEach(cost => {
-                        totalCOGS += parseFloat(cost.amount) || 0;
+                        const amt = parseFloat(cost.amount) || 0;
+                        totalCOGS += convertToQuotationCurrency(amt, cogsCurrency);
                     });
                 }
 
                 // Add buying items
                 const buyingItems = shipment.buying_items || [];
                 buyingItems.forEach(item => {
-                    totalCOGS += parseFloat(item.amount) || 0;
+                    const amt = parseFloat(item.amount) || 0;
+                    const itemCurrency = item.currency || cogsCurrency;
+                    totalCOGS += convertToQuotationCurrency(amt, itemCurrency);
                 });
 
                 const profit = quotedAmount - totalCOGS;

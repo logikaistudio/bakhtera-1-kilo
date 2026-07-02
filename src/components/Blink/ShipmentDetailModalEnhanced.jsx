@@ -525,10 +525,10 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                 otherDescription: '',
                 additionalCosts: []
             });
-            // Smart COGS currency: use shipment.cogs_currency if it matches shipment.currency, else use shipment.currency
+            // Smart COGS currency: use saved cogs currency, fallback to shipment currency
             const shipmentCurrency = shipment.currency || 'IDR';
             const savedCogsCurrency = shipment.cogsCurrency || shipment.cogs_currency;
-            const effectiveCogsCurrency = (savedCogsCurrency && savedCogsCurrency === shipmentCurrency) ? savedCogsCurrency : shipmentCurrency;
+            const effectiveCogsCurrency = savedCogsCurrency || shipmentCurrency;
             setCogsCurrency(effectiveCogsCurrency);
             setExchangeRate(shipment.exchangeRate || shipment.exchange_rate || '');
             setRateDate(shipment.rateDate || shipment.rate_date || new Date().toISOString().split('T')[0]);
@@ -964,14 +964,24 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
         // Additional costs from array
         const additionalTotal = (cogsData.additionalCosts || []).reduce((sum, item) => sum + parseVal(item.amount), 0);
 
-        // Buying items total — convert per-item currency to IDR if needed
+        // Buying items total — convert based on target cogsCurrency
         const rate = parseFloat(exchangeRate) || 0;
         const buyingTotal = (buyingItems || []).reduce((sum, item) => {
             const amount = parseVal(item.amount);
-            if ((item.currency || 'IDR') === 'USD' && rate > 0) {
-                return sum + amount * rate;
+            const itemCurrency = item.currency || 'IDR';
+            if (cogsCurrency === 'USD') {
+                // We want USD total
+                if (itemCurrency === 'IDR' && rate > 0) {
+                    return sum + amount / rate;
+                }
+                return sum + amount;
+            } else {
+                // We want IDR total
+                if (itemCurrency === 'USD' && rate > 0) {
+                    return sum + amount * rate;
+                }
+                return sum + amount;
             }
-            return sum + amount;
         }, 0);
 
         return baseCOGS + additionalTotal + buyingTotal;

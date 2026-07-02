@@ -65,11 +65,29 @@ const SellingBuyingDetailModal = ({ isOpen, onClose, shipment }) => {
 
         // Process Buying Fields (COGS)
         const cogs = shipment.cogs || shipment.cogsData || {};
+        const baseCurrency = shipment.currency || 'USD';
+        const rate = parseFloat(shipment.exchange_rate || shipment.exchangeRate) || 16000;
+        const cogsCurrency = shipment.cogs_currency || shipment.cogsCurrency || baseCurrency;
+
+        const convertToQuotationCurrency = (amount, fromCurrency) => {
+            const amt = parseFloat(amount || 0);
+            if (isNaN(amt) || amt === 0) return 0;
+            if (fromCurrency === baseCurrency) return amt;
+
+            if (baseCurrency === 'USD' && fromCurrency === 'IDR') {
+                return rate > 0 ? amt / rate : amt;
+            }
+            if (baseCurrency === 'IDR' && fromCurrency === 'USD') {
+                return amt * rate;
+            }
+            return amt;
+        };
 
         const addBuying = (cat, name, amount) => {
-            if (amount > 0) {
-                categories[cat].buying.push({ name, amount });
-                categories[cat].totalB += amount;
+            const convertedAmount = convertToQuotationCurrency(amount, cogsCurrency);
+            if (convertedAmount > 0) {
+                categories[cat].buying.push({ name, amount: convertedAmount });
+                categories[cat].totalB += convertedAmount;
             }
         };
 
@@ -84,12 +102,15 @@ const SellingBuyingDetailModal = ({ isOpen, onClose, shipment }) => {
         addBuying('others', cogs.otherDescription || 'Other', parseFloat(cogs.other || 0));
 
         // Buying Items (Additional)
-        const buyingItems = shipment.buyingItems || [];
+        const buyingItems = shipment.buyingItems || shipment.buying_items || [];
         buyingItems.forEach(item => {
             const cat = categorizeSellingItem(item);
-            const amount = parseFloat(item.amount || 0);
-            categories[cat].buying.push({ name: item.description, amount });
-            categories[cat].totalB += amount;
+            const itemCurrency = item.currency || cogsCurrency;
+            const convertedAmount = convertToQuotationCurrency(item.amount, itemCurrency);
+            if (convertedAmount > 0) {
+                categories[cat].buying.push({ name: item.description || item.name, amount: convertedAmount });
+                categories[cat].totalB += convertedAmount;
+            }
         });
 
         // Calculate Totals
