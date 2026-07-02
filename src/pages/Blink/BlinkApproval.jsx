@@ -150,7 +150,7 @@ const recordApprovalHistory = async (item, action, reason = null, approverName =
     // IMPORTANT: This function must NEVER throw or block the approval flow.
     // History logging is secondary; the actual approval update is primary.
     try {
-        const approvalModule = ['quotation', 'invoice'].includes(item.type) ? 'blink_sales' : 'blink_operations';
+        const approvalModule = 'blink_operations';
         
         const payload = {
             document_number: item.refNumber || item.jobNumber || '-',
@@ -373,7 +373,7 @@ const BlinkApproval = () => {
             const histRes = await supabase
                 .from('blink_approval_history')
                 .select('*')
-                .in('module', ['blink_sales', 'blink_operations'])
+                .eq('module', 'blink_operations')
                 .order('approved_at', { ascending: false });
 
             if (histRes.error && histRes.error.message?.includes("Could not find the 'module' column")) {

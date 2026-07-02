@@ -28,7 +28,8 @@ const recordApprovalHistory = async (item, action, reason = null, approverName =
             approved_at: new Date().toISOString(),
             approver: approverName,
             status: action,
-            reason: reason
+            reason: reason,
+            module: 'blink_sales'
         };
         await tryInsertTable('blink_approval_history', payload);
     } catch (e) {
@@ -153,7 +154,7 @@ const SalesBlinkApproval = () => {
             const { data: historyData, error: histErr } = await supabase
                 .from('blink_approval_history')
                 .select('*')
-                .eq('document_type', 'sales_quotation')
+                .eq('module', 'blink_sales')
                 .order('created_at', { ascending: false });
                 
             if (histErr && !isMissingTableError(histErr)) {
