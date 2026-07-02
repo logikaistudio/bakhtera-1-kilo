@@ -449,11 +449,11 @@ const GroupedServiceItemManager = ({
                         </div>
 
                         {/* Items Sub-table using modern Grid */}
-                        <div className="p-4 bg-white flex-1">
+                        <div className="p-4 bg-white flex-1 overflow-x-auto">
                             {group.items && group.items.length > 0 ? (
-                                <div className="space-y-3">
+                                <div className="space-y-3 min-w-[850px]">
                                     {/* Grid Header */}
-                                    <div className="hidden lg:grid grid-cols-[3.5fr_0.5fr_0.5fr_0.5fr_1fr_1fr_1fr_min-content] gap-3 px-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                                    <div className="hidden lg:grid grid-cols-[3fr_0.7fr_0.8fr_0.8fr_1.3fr_1.3fr_1.3fr_min-content] gap-3 px-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
                                         <div>Description</div>
                                         <div className="text-right">Qty</div>
                                         <div className="text-center">Unit</div>
@@ -479,7 +479,7 @@ const GroupedServiceItemManager = ({
                                             }
 
                                             return (
-                                                <div key={item.id} className="grid grid-cols-1 lg:grid-cols-[3.5fr_0.5fr_0.5fr_0.5fr_1fr_1fr_1fr_min-content] gap-3 items-center p-3 lg:p-2 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-md transition-all group/row relative">
+                                                <div key={item.id} className="grid grid-cols-1 lg:grid-cols-[3fr_0.7fr_0.8fr_0.8fr_1.3fr_1.3fr_1.3fr_min-content] gap-3 items-center p-3 lg:p-2 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-md transition-all group/row relative">
                                                     
                                                     {/* Mobile Labels (Hidden on Desktop) */}
                                                     <div className="lg:hidden text-xs font-bold text-gray-400 uppercase mb-1">Item Details</div>
