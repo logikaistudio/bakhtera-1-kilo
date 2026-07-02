@@ -752,7 +752,7 @@ const SalesQuotation = () => {
     };
 
     // Print quotation handler
-    const handlePrintQuotation = (quotation) => {
+    const handlePrintQuotation = (quotation, creatorName = '') => {
         try {
             const printWindow = window.open('', '_blank');
 
@@ -880,11 +880,12 @@ const SalesQuotation = () => {
                             ${companySettings?.company_email ? `<div>Email: ${companySettings.company_email}</div>` : ''}
                         </div>
                         <div>
-                            <h3 style="font-size: 14px; font-weight: bold; margin-bottom: 10px; color: #555;">TO:</h3>
-                            <div style="font-weight: bold;">${quotation.customerName || quotation.customer_name}</div>
-                            <div>${quotation.customerCompany || quotation.customer_company || ''}</div>
-                            <div>${quotation.customerAddress || quotation.customer_address || ''}</div>
-                             ${(quotation.salesPerson || quotation.sales_person) ? `<div>Attn: ${quotation.salesPerson || quotation.sales_person}</div>` : ''}
+                            <h3 style="font-size: 12px; font-weight: bold; margin-bottom: 8px; color: #666; text-transform: uppercase; letter-spacing: 1px;">BILL TO:</h3>
+                            <div style="font-weight: bold; font-size: 14px; color: #111;">${quotation.customerCompany || quotation.customer_company || quotation.customerName || quotation.customer_name}</div>
+                            <div style="margin-top: 4px; color: #555; font-size: 11px;">${quotation.customerAddress || quotation.customer_address || ''}</div>
+                            ${(quotation.customerContact || quotation.customer_contact_name || quotation.customerName || quotation.customer_name) ? `<div style="margin-top: 6px; font-size: 11px;"><span style="font-weight:bold; color:#333;">Attn:</span> ${quotation.customerContact || quotation.customer_contact_name || quotation.customerName || quotation.customer_name}</div>` : ''}
+                            ${(quotation.customerEmail || quotation.customer_email) ? `<div style="font-size: 11px;"><span style="font-weight:bold; color:#333;">Email:</span> ${quotation.customerEmail || quotation.customer_email}</div>` : ''}
+                            ${(quotation.customerPhone || quotation.customer_phone) ? `<div style="font-size: 11px;"><span style="font-weight:bold; color:#333;">Phone:</span> ${quotation.customerPhone || quotation.customer_phone}</div>` : ''}
                         </div>
                     </div>
 
@@ -943,11 +944,27 @@ const SalesQuotation = () => {
                         </div>
                     </div>
 
-                    <div style="margin-top: 40px; border-top: 1px solid #ddd; padding-top: 20px;">
-                        <h4 style="font-size: 12px; font-weight: bold; margin-bottom: 10px;">TERMS & CONDITIONS:</h4>
-                        <ol style="padding-left: 20px; margin: 0; line-height: 1.5;">
-                            ${termsLines}
-                        </ol>
+                    <div style="margin-top: 50px; display: grid; grid-template-columns: 1fr 1fr; gap: 60px;">
+                        <div>
+                            <h4 style="font-size: 12px; font-weight: bold; margin-bottom: 8px;">TERMS &amp; CONDITIONS:</h4>
+                            <ol style="padding-left: 18px; margin: 0; line-height: 1.7; font-size: 11px;">
+                                ${termsLines}
+                            </ol>
+                        </div>
+                        <div style="display: flex; flex-direction: column; justify-content: flex-end;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; text-align: center;">
+                                <div>
+                                    <div style="height: 60px; border-bottom: 1px solid #888; margin-bottom: 8px;"></div>
+                                    <div style="font-size: 11px; font-weight: bold; color: #333;">Prepared By</div>
+                                    <div style="font-size: 11px; color: #111; font-weight: 600; margin-top: 3px;">${creatorName || '______________________'}</div>
+                                </div>
+                                <div>
+                                    <div style="height: 60px; border-bottom: 1px solid #888; margin-bottom: 8px;"></div>
+                                    <div style="font-size: 11px; font-weight: bold; color: #333;">Approved By</div>
+                                    <div style="font-size: 11px; color: #555; margin-top: 3px;">Management</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="footer">
@@ -1940,9 +1957,9 @@ const SalesQuotation = () => {
                                     size="sm"
                                     variant="outline"
                                     icon={FileText}
-                                    onClick={() => handlePrintQuotation(isEditingQuotation ? editedQuotation : viewingQuotation)}
+                                    onClick={() => setShowPrintPreview(true)}
                                 >
-                                    Print
+                                    Preview & Print
                                 </Button>
 
                                 {!isEditingQuotation && (
@@ -2593,6 +2610,8 @@ const SalesQuotation = () => {
 };
 
 const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettings }) => {
+    const [creatorName, setCreatorName] = React.useState(quotation?.salesPerson || quotation?.sales_person || '');
+
     const handlePrint = () => {
         window.print();
     };
@@ -2633,7 +2652,7 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                     <h2 className="text-xl font-bold text-silver-light">Quotation Preview</h2>
                     <div className="flex gap-2 print:hidden">
                         <button
-                            onClick={() => onPrint(quotation)}
+                            onClick={() => onPrint(quotation, creatorName)}
                             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium text-sm"
                         >
                             <Download className="w-4 h-4" />
@@ -2680,13 +2699,17 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                         <div className="col-span-5">
                             <h3 className="text-xs uppercase tracking-widest text-slate-400 font-semibold mb-4">Bill To</h3>
                             <div className="text-sm leading-relaxed">
-                                <p className="font-bold text-slate-900 text-lg mb-1">{quotation.customerName || quotation.customer_name}</p>
-                                <p className="text-slate-600 mb-2">{quotation.customerCompany || quotation.customer_company}</p>
-                                <p className="text-slate-500 whitespace-pre-line mb-4">{quotation.customerAddress || quotation.customer_address}</p>
+                                {/* Company name — primary identity */}
+                                <p className="font-bold text-slate-900 text-base mb-0.5">
+                                    {quotation.customerCompany || quotation.customer_company || quotation.customerName || quotation.customer_name}
+                                </p>
+                                <p className="text-slate-500 text-xs mb-3">
+                                    {quotation.customerAddress || quotation.customer_address}
+                                </p>
 
                                 <dl className="space-y-1 text-slate-600 text-xs border-l-2 border-slate-100 pl-3">
-                                    {(quotation.customerContact || quotation.customer_contact_name) && (
-                                        <div className="flex gap-2"><dt className="font-medium text-slate-900 w-12">Attn:</dt> <dd>{quotation.customerContact || quotation.customer_contact_name}</dd></div>
+                                    {(quotation.customerContact || quotation.customer_contact_name || quotation.customerName || quotation.customer_name) && (
+                                        <div className="flex gap-2"><dt className="font-medium text-slate-900 w-12">Attn:</dt> <dd>{quotation.customerContact || quotation.customer_contact_name || quotation.customerName || quotation.customer_name}</dd></div>
                                     )}
                                     {(quotation.customerEmail || quotation.customer_email) && (
                                         <div className="flex gap-2"><dt className="font-medium text-slate-900 w-12">Email:</dt> <dd>{quotation.customerEmail || quotation.customer_email}</dd></div>
@@ -2695,6 +2718,19 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                                         <div className="flex gap-2"><dt className="font-medium text-slate-900 w-12">Phone:</dt> <dd>{quotation.customerPhone || quotation.customer_phone}</dd></div>
                                     )}
                                 </dl>
+
+                                {/* Nama Pembuat — manual input */}
+                                <div className="mt-5 pt-4 border-t border-slate-100 print:hidden">
+                                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Nama Pembuat *</label>
+                                    <input
+                                        type="text"
+                                        value={creatorName}
+                                        onChange={e => setCreatorName(e.target.value)}
+                                        placeholder="Ketik nama pembuat quotation..."
+                                        className="w-full text-sm px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-800 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
+                                    />
+                                    <p className="text-xs text-slate-400 mt-1">Nama akan muncul di kolom Prepared By saat dicetak.</p>
+                                </div>
                             </div>
                         </div>
 
@@ -2858,7 +2894,7 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                                 <div className="flex-1">
                                     <div className="h-20 border-b border-slate-300 mb-2"></div>
                                     <p className="font-semibold text-slate-900 text-sm">Prepared By</p>
-                                    <p className="text-xs text-slate-500">{quotation.salesPerson || 'Sales Representative'}</p>
+                                    <p className="text-xs text-slate-700 font-medium mt-0.5">{creatorName || '___________________'}</p>
                                 </div>
                                 <div className="flex-1">
                                     <div className="h-20 border-b border-slate-300 mb-2"></div>
