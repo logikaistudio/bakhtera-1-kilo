@@ -2258,8 +2258,8 @@ const SalesQuotation = () => {
                             </div>
                         </div>
 
-                        {/* Side-by-Side Selling & Buying items */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Selling & Buying items - Stacked Vertically */}
+                        <div className="space-y-6">
                             {/* Left Column: Selling Items (Revenue) */}
                             <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 flex flex-col">
                                 <h4 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wider">Selling Items (Revenue)</h4>
@@ -2321,7 +2321,7 @@ const SalesQuotation = () => {
                                 </div>
                             </div>
 
-                            {/* Right Column: Cost Breakdown (Buying/COGS) */}
+                            {/* Cost Breakdown (Buying/COGS) */}
                             <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 flex flex-col">
                                 <div className="flex items-center justify-between mb-3">
                                     <h4 className="text-sm font-semibold text-gray-700 mb-0 uppercase tracking-wider">Cost Breakdown (Estimated Buying)</h4>
