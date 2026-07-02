@@ -174,6 +174,19 @@ function App() {
                     <Route path="/blink/master/coa" element={<ProtectedRoute menuCode="blink_coa"><COAMaster /></ProtectedRoute>} />
                     <Route path="/blink/master/settings" element={<ProtectedRoute menuCode="blink_settings"><BlinkCompanySettings /></ProtectedRoute>} />
 
+                    {/* BXPO Module - Duplicated Sales & Operations */}
+                    <Route path="/bxpo" element={<ProtectedRoute menuCode="bxpo_dashboard"><BlinkDashboard /></ProtectedRoute>} />
+                    <Route path="/bxpo/sales-quotations" element={<ProtectedRoute menuCode="bxpo_sales_quotations"><SalesQuotation /></ProtectedRoute>} />
+                    <Route path="/bxpo/operations/quotations" element={<ProtectedRoute menuCode="bxpo_quotations"><QuotationManagement /></ProtectedRoute>} />
+                    <Route path="/bxpo/flow-monitor" element={<ProtectedRoute menuCode="bxpo_flow_monitor"><FlowMonitor /></ProtectedRoute>} />
+                    <Route path="/bxpo/sales-achievement" element={<ProtectedRoute menuCode="bxpo_sales"><SalesAchievement /></ProtectedRoute>} />
+                    <Route path="/bxpo/sales-approvals" element={<ProtectedRoute menuCode="bxpo_sales_approval"><SalesBlinkApproval /></ProtectedRoute>} />
+                    <Route path="/bxpo/shipments" element={<ProtectedRoute menuCode="bxpo_shipments"><ShipmentManagement /></ProtectedRoute>} />
+                    <Route path="/bxpo/operations/tracking" element={<ProtectedRoute menuCode="bxpo_tracking"><TrackingMonitoring /></ProtectedRoute>} />
+                    <Route path="/bxpo/operations/awb" element={<ProtectedRoute menuCode="bxpo_awb"><AWBManagement /></ProtectedRoute>} />
+                    <Route path="/bxpo/operations/bl" element={<ProtectedRoute menuCode="bxpo_bl"><BLManagement /></ProtectedRoute>} />
+                    <Route path="/bxpo/approvals" element={<ProtectedRoute menuCode="bxpo_approval"><BlinkApproval /></ProtectedRoute>} />
+
                     {/* Blink Finance Module */}
                     <Route path="/blink/finance/invoices" element={<ProtectedRoute menuCode="blink_invoices"><InvoiceManagement /></ProtectedRoute>} />
                     <Route path="/blink/finance/purchase-orders" element={<ProtectedRoute menuCode="blink_purchase_order"><PurchaseOrder /></ProtectedRoute>} />

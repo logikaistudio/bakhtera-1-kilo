@@ -17,6 +17,7 @@ import {
     Truck,
     DollarSign,
     Package,
+    Layers,
     FileCheck,
     Shield,
     LogOut,
@@ -94,6 +95,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
             if (p.startsWith('/pabean')) return 'pabean';
             if (p.startsWith('/big')) return 'big';
             if (p.startsWith('/blink')) return 'blink';
+            if (p.startsWith('/bxpo')) return 'bxpo';
             return '';
         };
 
@@ -139,6 +141,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
     const mainMenuItems = [
         { path: '/', label: 'Dashboard Bakhtera-1', icon: LayoutDashboard },
         { path: '/blink', label: 'BLINK', subtitle: 'Freight & Forward Management', icon: Plane },
+        { path: '/bxpo', label: 'BXPO', subtitle: 'Sales & Operation', icon: Layers },
         { path: '/big', label: 'BIG', subtitle: 'Event Organizer', icon: Calendar },
         { path: '/bridge', label: 'BRIDGE', subtitle: 'Bounded Management', icon: Building2 },
         { path: '/pabean', label: 'Pabean', subtitle: 'Customs Portal', icon: Building2 },
@@ -336,6 +339,42 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
             ]
         },
     ];
+
+    // BXPO submenu - Duplikasi menu sales sampai operation
+    const bxpoSubMenuItems = [
+        // Dashboard - Standalone (outside categories)
+        { path: '/bxpo', label: 'Dashboard', icon: LayoutDashboard, menuCode: 'bxpo_dashboard' },
+
+        // Sales & Marketing Category
+        {
+            type: 'category', label: '📋 Sales & Marketing', items: [
+                { path: '/bxpo/sales-quotations', label: 'Sales Quotation', menuCode: 'bxpo_sales_quotations' },
+                { path: '/bxpo/flow-monitor', label: 'Flow Monitor', menuCode: 'bxpo_flow_monitor' },
+                { path: '/bxpo/sales-achievement', label: 'Sales Achievement', menuCode: 'bxpo_sales' },
+                { path: '/bxpo/sales-approvals', label: 'Approval Center', menuCode: 'bxpo_sales_approval', showBadge: true }
+            ]
+        },
+
+        // Operations Category
+        {
+            type: 'category', label: '🚚 Operations', items: [
+                { path: '/bxpo/operations/quotations', label: 'Quotation', menuCode: 'bxpo_quotations' },
+                { path: '/bxpo/shipments', label: 'Sales Order Management', menuCode: 'bxpo_shipments' },
+                { path: '/bxpo/operations/bl', label: 'BL/AWB Documents', menuCode: 'bxpo_bl' },
+                { path: '/bxpo/approvals', label: 'Approval Center', menuCode: 'bxpo_approval', showBadge: true },
+            ]
+        },
+    ];
+
+    const hasBxpoAccess = () => {
+        if (canAccessPortal('bxpo_dashboard')) return true;
+        return bxpoSubMenuItems.some(subItem => {
+            if (subItem.type === 'category') {
+                return subItem.items.some(menuItem => menuItem.menuCode && canAccessPortal(menuItem.menuCode));
+            }
+            return subItem.menuCode && canAccessPortal(subItem.menuCode);
+        });
+    };
 
     const hasBridgeAccess = () => {
         if (canAccessPortal('bridge_dashboard')) return true;
@@ -1015,6 +1054,189 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                                                                                             {itemObj.showBadge && (itemObj.menuCode === 'blink_sales_approval' ? blinkSalesPendingCount : blinkOpsPendingCount) > 0 && (
                                                                                                 <span className="ml-2 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-yellow-500 text-white text-[10px] font-bold px-1 animate-pulse">
                                                                                                     {(itemObj.menuCode === 'blink_sales_approval' ? blinkSalesPendingCount : blinkOpsPendingCount) > 99 ? '99+' : (itemObj.menuCode === 'blink_sales_approval' ? blinkSalesPendingCount : blinkOpsPendingCount)}
+                                                                                                </span>
+                                                                                            )}
+                                                                                        </Link>
+                                                                                    );
+                                                                                })}
+                                                                            </motion.div>
+                                                                        )}
+                                                                    </AnimatePresence>
+                                                                </div>
+                                                            );
+                                                        }
+
+                                                        return null;
+                                                    })}
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
+                                );
+                            }
+
+                            // Special handling for BXPO with submenu
+                            if (item.path === '/bxpo') {
+                                if (!hasBxpoAccess()) return null;
+                                const isExpanded = expandedSection === 'bxpo';
+                                const isBxpoActive = location.pathname.startsWith('/bxpo');
+                                const hasDashboardAccess = canAccessPortal('bxpo_dashboard');
+
+                                return (
+                                    <div key={item.path}>
+                                        <div className="flex items-center gap-1" id="menu-bxpo">
+                                            {hasDashboardAccess ? (
+                                                <Link
+                                                    to={item.path}
+                                                    onClick={() => {
+                                                        if (isMobile) setIsOpen(false);
+                                                        const isCurrentlyExpanded = expandedSection === 'bxpo';
+                                                        setExpandedSection(isCurrentlyExpanded ? '' : 'bxpo');
+                                                        if (!isCurrentlyExpanded) scrollToElement('menu-bxpo');
+                                                    }}
+                                                    className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition text-sm ${isBxpoActive
+                                                        ? 'text-silver-light'
+                                                        : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface'
+                                                        }`}
+                                                >
+                                                    <item.icon className="w-5 h-5 flex-shrink-0" />
+                                                    <div className="flex-1 text-left">
+                                                        <div className="font-medium">{item.label}</div>
+                                                        <div className={`text-xs ${isBxpoActive ? 'text-silver-dark' : 'text-silver-dark'}`}>
+                                                            {item.subtitle}
+                                                        </div>
+                                                    </div>
+                                                </Link>
+                                            ) : (
+                                                <button
+                                                    onClick={() => {
+                                                        const isCurrentlyExpanded = expandedSection === 'bxpo';
+                                                        setExpandedSection(isCurrentlyExpanded ? '' : 'bxpo');
+                                                        if (!isCurrentlyExpanded) scrollToElement('menu-bxpo');
+                                                    }}
+                                                    className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition text-sm text-left ${isBxpoActive
+                                                        ? 'text-silver-light'
+                                                        : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface'
+                                                        }`}
+                                                >
+                                                    <item.icon className="w-5 h-5 flex-shrink-0" />
+                                                    <div className="flex-1 text-left">
+                                                        <div className="font-medium">{item.label}</div>
+                                                        <div className="text-xs text-silver-dark">
+                                                            {item.subtitle}
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={() => {
+                                                    const newState = isExpanded ? '' : 'bxpo';
+                                                    setExpandedSection(newState);
+                                                    if (newState === 'bxpo') scrollToElement('menu-bxpo');
+                                                }}
+                                                className="p-2 hover:bg-dark-surface rounded-lg smooth-transition"
+                                            >
+                                                <ChevronRight className={`w-4 h-4 transition-transform text-silver-dark ${isExpanded ? 'rotate-90' : ''}`} />
+                                            </button>
+                                        </div>
+
+                                        <AnimatePresence>
+                                            {isExpanded && (
+                                                <motion.div
+                                                    initial={{ height: 0, opacity: 0 }}
+                                                    animate={{ height: 'auto', opacity: 1 }}
+                                                    exit={{ height: 0, opacity: 0 }}
+                                                    className="ml-8 mt-1 space-y-1 overflow-hidden"
+                                                >
+                                                    {bxpoSubMenuItems.map((subItem, idx) => {
+                                                        // Standalone items (Dashboard)
+                                                        if (!subItem.type) {
+                                                            if (subItem.menuCode && !canAccessPortal(subItem.menuCode)) return null;
+                                                            return (
+                                                                <Link
+                                                                    key={subItem.path}
+                                                                    to={subItem.path}
+                                                                    onClick={() => isMobile && setIsOpen(false)}
+                                                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm smooth-transition ${isActive(subItem.path)
+                                                                        ? 'bg-white/20 text-white font-medium'
+                                                                        : 'text-silver-dark hover:text-white hover:bg-white/10'
+                                                                        }`}
+                                                                >
+                                                                    {subItem.icon && <subItem.icon className="w-4 h-4" />}
+                                                                    <span>{subItem.label}</span>
+                                                                </Link>
+                                                            );
+                                                        }
+
+                                                        // Render category dengan nested items
+                                                        if (subItem.type === 'category') {
+                                                            const lastWord = subItem.label.toLowerCase().split(' ').pop();
+                                                            const categoryKey = 'bxpo-' + lastWord;
+                                                            const isCategoryExpanded = expandedCategories.includes(categoryKey);
+
+                                                            // Filter items yang bisa diakses (skip dividers in filter)
+                                                            const accessibleItems = subItem.items.filter(itemObj =>
+                                                                itemObj.type === 'divider' || !itemObj.menuCode || canAccessPortal(itemObj.menuCode)
+                                                            );
+                                                            // Count actual menu items (non-divider) accessible
+                                                            const hasAccessibleMenuItems = accessibleItems.some(itemObj => itemObj.type !== 'divider');
+                                                            if (!hasAccessibleMenuItems) return null;
+
+                                                            return (
+                                                                <div key={`category-${idx}`}>
+                                                                    {/* Category Header - Clickable */}
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setExpandedCategories(prev =>
+                                                                                prev.includes(categoryKey)
+                                                                                    ? prev.filter(c => c !== categoryKey)
+                                                                                    : [...prev, categoryKey]
+                                                                            );
+                                                                        }}
+                                                                        className="w-full flex items-center justify-between px-4 py-2 text-sm font-semibold text-silver hover:text-silver-light smooth-transition"
+                                                                    >
+                                                                        <span>{subItem.label}</span>
+                                                                        <ChevronRight className={`w-3 h-3 transition-transform ${isCategoryExpanded ? 'rotate-90' : ''}`} />
+                                                                    </button>
+
+                                                                    {/* Category Items */}
+                                                                    <AnimatePresence>
+                                                                        {isCategoryExpanded && (
+                                                                            <motion.div
+                                                                                initial={{ height: 0, opacity: 0 }}
+                                                                                animate={{ height: 'auto', opacity: 1 }}
+                                                                                exit={{ height: 0, opacity: 0 }}
+                                                                                className="overflow-hidden"
+                                                                            >
+                                                                                {accessibleItems.map((itemObj, itemIdx) => {
+                                                                                    if (itemObj.type === 'divider') {
+                                                                                        return (
+                                                                                            <div key={`divider-${itemIdx}`} className="pl-8 pr-4 pt-3 pb-1 border-t border-dark-border/30 mt-2 first:mt-0 first:border-t-0">
+                                                                                                <span className="text-xs font-bold text-silver-light uppercase tracking-widest">
+                                                                                                    {itemObj.label}
+                                                                                                </span>
+                                                                                            </div>
+                                                                                        );
+                                                                                    }
+
+                                                                                    const isSalesApproval = itemObj.menuCode === 'blink_sales_approval' || itemObj.menuCode === 'bxpo_sales_approval';
+                                                                                    const isOpsApproval = itemObj.menuCode === 'blink_approval' || itemObj.menuCode === 'bxpo_approval';
+                                                                                    const pendingCount = isSalesApproval ? blinkSalesPendingCount : isOpsApproval ? blinkOpsPendingCount : 0;
+
+                                                                                    return (
+                                                                                        <Link
+                                                                                            key={itemObj.path}
+                                                                                            to={itemObj.path}
+                                                                                            onClick={() => isMobile && setIsOpen(false)}
+                                                                                            className={`flex items-center ${itemObj.indent ? 'pl-16' : 'pl-14'} pr-4 py-2 text-sm smooth-transition border-l-2 ml-2 ${isActive(itemObj.path)
+                                                                                                ? 'bg-white/20 text-white font-medium border-white sidebar-active-item'
+                                                                                                : 'text-silver-dark hover:text-white hover:bg-white/10 border-transparent hover:border-white/50'
+                                                                                                }`}
+                                                                                        >
+                                                                                            <span className="flex-1">{itemObj.label}</span>
+                                                                                            {itemObj.showBadge && pendingCount > 0 && (
+                                                                                                <span className="ml-2 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-yellow-500 text-white text-[10px] font-bold px-1 animate-pulse">
+                                                                                                    {pendingCount > 99 ? '99+' : pendingCount}
                                                                                                 </span>
                                                                                             )}
                                                                                         </Link>

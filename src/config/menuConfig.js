@@ -103,6 +103,27 @@ export const APP_MENUS = {
         ],
     },
 
+    BXPO: {
+        label: 'BXPO',
+        color: 'indigo',
+        menus: [
+            // ─── Utama ───
+            { code: 'bxpo_dashboard', label: 'Dashboard BXPO', group: 'Utama', path: '/bxpo' },
+            // ─── Sales & Marketing ───
+            { code: 'bxpo_sales_quotations', label: 'Sales Quotation', group: 'Sales & Marketing', path: '/bxpo/sales-quotations' },
+            { code: 'bxpo_flow_monitor', label: 'Flow Monitor', group: 'Sales & Marketing', path: '/bxpo/flow-monitor' },
+            { code: 'bxpo_sales', label: 'Sales Achievement', group: 'Sales & Marketing', path: '/bxpo/sales-achievement' },
+            { code: 'bxpo_sales_approval', label: 'Sales Approval Center', group: 'Sales & Marketing', path: '/bxpo/sales-approvals' },
+            // ─── Operations ───
+            { code: 'bxpo_quotations', label: 'Quotation', group: 'Operations', path: '/bxpo/operations/quotations' },
+            { code: 'bxpo_shipments', label: 'Sales Order Management', group: 'Operations', path: '/bxpo/shipments' },
+            { code: 'bxpo_bl', label: 'Document BL/AWB', group: 'Operations', path: '/bxpo/operations/bl' },
+            { code: 'bxpo_tracking', label: 'Tracking & Monitoring', group: 'Operations', path: '/bxpo/operations/tracking' },
+            { code: 'bxpo_awb', label: 'AWB Management', group: 'Operations', path: '/bxpo/operations/awb' },
+            { code: 'bxpo_approval', label: 'Approval Center', group: 'Operations', path: '/bxpo/approvals' }
+        ],
+    },
+
     Big: {
         label: 'BIG',
         color: 'orange',

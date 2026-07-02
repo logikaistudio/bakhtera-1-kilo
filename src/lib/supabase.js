@@ -28,7 +28,7 @@ if (supabasePublishableKey && !supabaseAnonKey) {
 }
 
 // Create Supabase client
-export const supabase = createClient(supabaseUrl, supabaseKey, {
+const client = createClient(supabaseUrl, supabaseKey, {
     auth: {
         persistSession: true,
         autoRefreshToken: true,
@@ -37,6 +37,69 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
         schema: 'public'
     }
 });
+
+const FILTERED_TABLES = new Set([
+    'blink_sales_quotations',
+    'blink_quotations',
+    'blink_shipments',
+    'blink_purchase_orders',
+    'blink_invoices',
+    'blink_payments',
+    'blink_ar_transactions',
+    'blink_ap_transactions',
+    'blink_journal_entries',
+    'blink_approval_history'
+]);
+
+const getDivision = () => {
+    if (typeof window !== 'undefined' && window.location && window.location.pathname) {
+        return window.location.pathname.startsWith('/bxpo') ? 'bxpo' : 'blink';
+    }
+    return 'blink';
+};
+
+// Intercept client.from to inject division partitioning
+const originalFrom = client.from;
+client.from = function (relation) {
+    const builder = originalFrom.call(this, relation);
+    if (!FILTERED_TABLES.has(relation)) {
+        return builder;
+    }
+
+    const division = getDivision();
+
+    return new Proxy(builder, {
+        get(target, prop, receiver) {
+            const originalVal = Reflect.get(target, prop, receiver);
+
+            if (typeof originalVal === 'function') {
+                return function (...args) {
+                    if (prop === 'insert' || prop === 'upsert') {
+                        let values = args[0];
+                        if (Array.isArray(values)) {
+                            args[0] = values.map(v => ({ ...v, division }));
+                        } else if (typeof values === 'object' && values !== null) {
+                            args[0] = { ...values, division };
+                        }
+                    }
+
+                    let result = originalVal.apply(target, args);
+
+                    if (prop === 'select' || prop === 'update' || prop === 'delete') {
+                        result = result.eq('division', division);
+                    }
+
+                    return result;
+                };
+            }
+
+            return originalVal;
+        }
+    });
+};
+
+export const supabase = client;
+
 
 // Test connection function
 export const testSupabaseConnection = async () => {
