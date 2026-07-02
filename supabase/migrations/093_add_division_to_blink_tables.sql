@@ -24,10 +24,9 @@ UPDATE public.blink_ap_transactions SET division = 'blink' WHERE division IS NUL
 UPDATE public.blink_journal_entries SET division = 'blink' WHERE division IS NULL;
 UPDATE public.blink_approval_history SET division = 'blink' WHERE division IS NULL;
 
--- Insert default role permissions for the new menu codes of BXPO
+-- Insert default role permissions for the new menu codes of BXPO (Dashboard is deleted, mapping directly to main dashboard)
 INSERT INTO public.role_permissions (role_id, role_label, menu_code, can_access, can_view, can_create, can_edit, can_delete, can_approve)
 VALUES
-    ('direksi', 'Direksi', 'bxpo_dashboard', true, true, true, true, true, true),
     ('direksi', 'Direksi', 'bxpo_sales_quotations', true, true, true, true, true, true),
     ('direksi', 'Direksi', 'bxpo_flow_monitor', true, true, true, true, true, true),
     ('direksi', 'Direksi', 'bxpo_sales', true, true, true, true, true, true),
@@ -39,7 +38,6 @@ VALUES
     ('direksi', 'Direksi', 'bxpo_awb', true, true, true, true, true, true),
     ('direksi', 'Direksi', 'bxpo_approval', true, true, true, true, true, true),
 
-    ('chief', 'Chief', 'bxpo_dashboard', true, true, true, true, true, true),
     ('chief', 'Chief', 'bxpo_sales_quotations', true, true, true, true, true, true),
     ('chief', 'Chief', 'bxpo_flow_monitor', true, true, true, true, true, true),
     ('chief', 'Chief', 'bxpo_sales', true, true, true, true, true, true),
@@ -51,7 +49,6 @@ VALUES
     ('chief', 'Chief', 'bxpo_awb', true, true, true, true, true, true),
     ('chief', 'Chief', 'bxpo_approval', true, true, true, true, true, true),
 
-    ('manager', 'Manager', 'bxpo_dashboard', true, true, true, true, true, true),
     ('manager', 'Manager', 'bxpo_sales_quotations', true, true, true, true, true, true),
     ('manager', 'Manager', 'bxpo_flow_monitor', true, true, true, true, true, true),
     ('manager', 'Manager', 'bxpo_sales', true, true, true, true, true, true),
@@ -63,7 +60,6 @@ VALUES
     ('manager', 'Manager', 'bxpo_awb', true, true, true, true, true, true),
     ('manager', 'Manager', 'bxpo_approval', true, true, true, true, true, true),
 
-    ('staff', 'Staff', 'bxpo_dashboard', true, true, true, true, false, false),
     ('staff', 'Staff', 'bxpo_sales_quotations', true, true, true, true, false, false),
     ('staff', 'Staff', 'bxpo_flow_monitor', true, true, true, true, false, false),
     ('staff', 'Staff', 'bxpo_sales', true, true, true, true, false, false),
@@ -75,7 +71,6 @@ VALUES
     ('staff', 'Staff', 'bxpo_awb', true, true, true, true, false, false),
     ('staff', 'Staff', 'bxpo_approval', true, true, true, true, false, false),
 
-    ('viewer', 'Viewer', 'bxpo_dashboard', true, true, false, false, false, false),
     ('viewer', 'Viewer', 'bxpo_sales_quotations', true, true, false, false, false, false),
     ('viewer', 'Viewer', 'bxpo_flow_monitor', true, true, false, false, false, false),
     ('viewer', 'Viewer', 'bxpo_sales', true, true, false, false, false, false),

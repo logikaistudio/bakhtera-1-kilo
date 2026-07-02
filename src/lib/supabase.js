@@ -38,17 +38,21 @@ const client = createClient(supabaseUrl, supabaseKey, {
     }
 });
 
-const FILTERED_TABLES = new Set([
+const ISOLATED_TABLES = new Set([
     'blink_sales_quotations',
     'blink_quotations',
     'blink_shipments',
-    'blink_purchase_orders',
+    'blink_bl_documents',
+    'blink_approval_history'
+]);
+
+const SHARED_TRANSACTION_TABLES = new Set([
     'blink_invoices',
+    'blink_purchase_orders',
     'blink_payments',
     'blink_ar_transactions',
     'blink_ap_transactions',
-    'blink_journal_entries',
-    'blink_approval_history'
+    'blink_journal_entries'
 ]);
 
 const getDivision = () => {
@@ -62,7 +66,10 @@ const getDivision = () => {
 const originalFrom = client.from;
 client.from = function (relation) {
     const builder = originalFrom.call(this, relation);
-    if (!FILTERED_TABLES.has(relation)) {
+    const isIsolated = ISOLATED_TABLES.has(relation);
+    const isShared = SHARED_TRANSACTION_TABLES.has(relation);
+
+    if (!isIsolated && !isShared) {
         return builder;
     }
 
@@ -85,7 +92,7 @@ client.from = function (relation) {
 
                     let result = originalVal.apply(target, args);
 
-                    if (prop === 'select' || prop === 'update' || prop === 'delete') {
+                    if (isIsolated && (prop === 'select' || prop === 'update' || prop === 'delete')) {
                         result = result.eq('division', division);
                     }
 

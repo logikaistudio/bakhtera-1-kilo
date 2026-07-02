@@ -175,7 +175,6 @@ function App() {
                     <Route path="/blink/master/settings" element={<ProtectedRoute menuCode="blink_settings"><BlinkCompanySettings /></ProtectedRoute>} />
 
                     {/* BXPO Module - Duplicated Sales & Operations */}
-                    <Route path="/bxpo" element={<ProtectedRoute menuCode="bxpo_dashboard"><BlinkDashboard /></ProtectedRoute>} />
                     <Route path="/bxpo/sales-quotations" element={<ProtectedRoute menuCode="bxpo_sales_quotations"><SalesQuotation /></ProtectedRoute>} />
                     <Route path="/bxpo/operations/quotations" element={<ProtectedRoute menuCode="bxpo_quotations"><QuotationManagement /></ProtectedRoute>} />
                     <Route path="/bxpo/flow-monitor" element={<ProtectedRoute menuCode="bxpo_flow_monitor"><FlowMonitor /></ProtectedRoute>} />

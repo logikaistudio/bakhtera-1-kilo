@@ -342,9 +342,6 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
 
     // BXPO submenu - Duplikasi menu sales sampai operation
     const bxpoSubMenuItems = [
-        // Dashboard - Standalone (outside categories)
-        { path: '/bxpo', label: 'Dashboard', icon: LayoutDashboard, menuCode: 'bxpo_dashboard' },
-
         // Sales & Marketing Category
         {
             type: 'category', label: '📋 Sales & Marketing', items: [
@@ -367,7 +364,6 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
     ];
 
     const hasBxpoAccess = () => {
-        if (canAccessPortal('bxpo_dashboard')) return true;
         return bxpoSubMenuItems.some(subItem => {
             if (subItem.type === 'category') {
                 return subItem.items.some(menuItem => menuItem.menuCode && canAccessPortal(menuItem.menuCode));
@@ -1080,54 +1076,29 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                                 if (!hasBxpoAccess()) return null;
                                 const isExpanded = expandedSection === 'bxpo';
                                 const isBxpoActive = location.pathname.startsWith('/bxpo');
-                                const hasDashboardAccess = canAccessPortal('bxpo_dashboard');
 
                                 return (
                                     <div key={item.path}>
                                         <div className="flex items-center gap-1" id="menu-bxpo">
-                                            {hasDashboardAccess ? (
-                                                <Link
-                                                    to={item.path}
-                                                    onClick={() => {
-                                                        if (isMobile) setIsOpen(false);
-                                                        const isCurrentlyExpanded = expandedSection === 'bxpo';
-                                                        setExpandedSection(isCurrentlyExpanded ? '' : 'bxpo');
-                                                        if (!isCurrentlyExpanded) scrollToElement('menu-bxpo');
-                                                    }}
-                                                    className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition text-sm ${isBxpoActive
-                                                        ? 'text-silver-light'
-                                                        : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface'
-                                                        }`}
-                                                >
-                                                    <item.icon className="w-5 h-5 flex-shrink-0" />
-                                                    <div className="flex-1 text-left">
-                                                        <div className="font-medium">{item.label}</div>
-                                                        <div className={`text-xs ${isBxpoActive ? 'text-silver-dark' : 'text-silver-dark'}`}>
-                                                            {item.subtitle}
-                                                        </div>
+                                            <button
+                                                onClick={() => {
+                                                    const isCurrentlyExpanded = expandedSection === 'bxpo';
+                                                    setExpandedSection(isCurrentlyExpanded ? '' : 'bxpo');
+                                                    if (!isCurrentlyExpanded) scrollToElement('menu-bxpo');
+                                                }}
+                                                className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition text-sm text-left ${isBxpoActive
+                                                    ? 'text-silver-light'
+                                                    : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface'
+                                                    }`}
+                                            >
+                                                <item.icon className="w-5 h-5 flex-shrink-0" />
+                                                <div className="flex-1 text-left">
+                                                    <div className="font-medium">{item.label}</div>
+                                                    <div className="text-xs text-silver-dark">
+                                                        {item.subtitle}
                                                     </div>
-                                                </Link>
-                                            ) : (
-                                                <button
-                                                    onClick={() => {
-                                                        const isCurrentlyExpanded = expandedSection === 'bxpo';
-                                                        setExpandedSection(isCurrentlyExpanded ? '' : 'bxpo');
-                                                        if (!isCurrentlyExpanded) scrollToElement('menu-bxpo');
-                                                    }}
-                                                    className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition text-sm text-left ${isBxpoActive
-                                                        ? 'text-silver-light'
-                                                        : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface'
-                                                        }`}
-                                                >
-                                                    <item.icon className="w-5 h-5 flex-shrink-0" />
-                                                    <div className="flex-1 text-left">
-                                                        <div className="font-medium">{item.label}</div>
-                                                        <div className="text-xs text-silver-dark">
-                                                            {item.subtitle}
-                                                        </div>
-                                                    </div>
-                                                </button>
-                                            )}
+                                                </div>
+                                            </button>
                                             <button
                                                 onClick={() => {
                                                     const newState = isExpanded ? '' : 'bxpo';

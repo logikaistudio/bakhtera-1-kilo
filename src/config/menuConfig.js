@@ -107,8 +107,6 @@ export const APP_MENUS = {
         label: 'BXPO',
         color: 'indigo',
         menus: [
-            // ─── Utama ───
-            { code: 'bxpo_dashboard', label: 'Dashboard BXPO', group: 'Utama', path: '/bxpo' },
             // ─── Sales & Marketing ───
             { code: 'bxpo_sales_quotations', label: 'Sales Quotation', group: 'Sales & Marketing', path: '/bxpo/sales-quotations' },
             { code: 'bxpo_flow_monitor', label: 'Flow Monitor', group: 'Sales & Marketing', path: '/bxpo/flow-monitor' },
