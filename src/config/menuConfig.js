@@ -111,7 +111,6 @@ export const APP_MENUS = {
             { code: 'bxpo_sales_quotations', label: 'Sales Quotation', group: 'Sales & Marketing', path: '/bxpo/sales-quotations' },
             { code: 'bxpo_flow_monitor', label: 'Flow Monitor', group: 'Sales & Marketing', path: '/bxpo/flow-monitor' },
             { code: 'bxpo_sales', label: 'Sales Achievement', group: 'Sales & Marketing', path: '/bxpo/sales-achievement' },
-            { code: 'bxpo_sales_approval', label: 'Sales Approval Center', group: 'Sales & Marketing', path: '/bxpo/sales-approvals' },
             // ─── Operations ───
             { code: 'bxpo_quotations', label: 'Quotation', group: 'Operations', path: '/bxpo/operations/quotations' },
             { code: 'bxpo_shipments', label: 'Sales Order Management', group: 'Operations', path: '/bxpo/shipments' },

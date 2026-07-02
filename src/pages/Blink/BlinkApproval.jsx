@@ -150,7 +150,9 @@ const recordApprovalHistory = async (item, action, reason = null, approverName =
     // IMPORTANT: This function must NEVER throw or block the approval flow.
     // History logging is secondary; the actual approval update is primary.
     try {
-        const approvalModule = 'blink_operations';
+        const approvalModule = typeof window !== 'undefined' && window.location && window.location.pathname.startsWith('/bxpo')
+            ? 'bxpo_operations'
+            : 'blink_operations';
         
         const payload = {
             document_number: item.refNumber || item.jobNumber || '-',
@@ -216,6 +218,18 @@ const BlinkApproval = () => {
 
     const isApprovalPending = (status) => ['submitted', 'manager_approval', 'pending', 'pending_approval'].includes(status);
 
+    const normalizeItems = (items) => {
+        let normalized = [];
+        (items || []).forEach(groupOrItem => {
+            if (groupOrItem.items) {
+                normalized = normalized.concat(groupOrItem.items);
+            } else {
+                normalized.push(groupOrItem);
+            }
+        });
+        return normalized;
+    };
+
     const isApprover = isSuperAdmin() || isAdmin() ||
         ['manager', 'blink_manager', 'approver'].includes(user?.user_level);
 
@@ -240,6 +254,21 @@ const BlinkApproval = () => {
     const fetchSubmissions = async () => {
         try {
             setLoading(true);
+            const division = typeof window !== 'undefined' && window.location && window.location.pathname.startsWith('/bxpo')
+                ? 'bxpo'
+                : 'blink';
+
+            // Fetch pending sales quotations (only for BXPO)
+            let salesQuotations = [];
+            if (division === 'bxpo') {
+                const { data, error } = await supabase
+                    .from('blink_sales_quotations')
+                    .select('*')
+                    .eq('status', 'manager_approval')
+                    .order('created_at', { ascending: false });
+                if (error) console.error('Error fetching sales quotations:', error);
+                else salesQuotations = data || [];
+            }
 
             // Fetch pending quotations
             const { data: quotations, error: qErr } = await supabase
@@ -249,11 +278,12 @@ const BlinkApproval = () => {
                 .order('created_at', { ascending: false });
             if (qErr) console.error('Error fetching quotations:', qErr);
 
-            // Fetch pending Purchase Orders
+            // Fetch pending Purchase Orders (filtered by division)
             const { data: purchaseOrders, error: poErr } = await supabase
                 .from('blink_purchase_orders')
                 .select('*')
                 .in('status', ['submitted', 'manager_approval', 'pending', 'pending_approval'])
+                .eq('division', division)
                 .order('created_at', { ascending: false });
             if (poErr) console.error('Error fetching POs:', poErr);
 
@@ -265,13 +295,37 @@ const BlinkApproval = () => {
                 .order('created_at', { ascending: false });
             if (shErr) console.error('Error fetching shipments:', shErr);
 
-            // Fetch pending Invoices
+            // Fetch pending Invoices (filtered by division)
             const { data: invoices, error: invErr } = await supabase
                 .from('blink_invoices')
                 .select('*')
                 .in('status', ['submitted', 'manager_approval', 'pending', 'pending_approval'])
+                .eq('division', division)
                 .order('created_at', { ascending: false });
             if (invErr) console.error('Error fetching invoices:', invErr);
+
+            const mappedSalesQuotations = salesQuotations.map(sq => ({
+                id: sq.id,
+                type: 'sales_quotation',
+                typeLabel: 'Sales Quotation',
+                refNumber: sq.quotation_number || sq.job_number || '-',
+                customerName: sq.customer_name || '-',
+                submittedBy: sq.sales_person || '-',
+                serviceType: sq.service_type || 'general',
+                origin: sq.origin || '-',
+                destination: sq.destination || '-',
+                amount: sq.revenue_amount || sq.total_revenue || sq.grand_total || sq.total_amount || 0,
+                currency: sq.currency || 'USD',
+                status: sq.status,
+                createdAt: sq.created_at,
+                updatedAt: sq.updated_at,
+                notes: sq.notes || '',
+                rejectionReason: sq.rejection_reason || '',
+                serviceItems: sq.service_items || [],
+                costItems: sq.cost_items || [],
+                commodity: sq.commodity || '',
+                quotationType: sq.quotation_type || 'RG',
+            }));
 
             const mappedQuotations = (quotations || []).map(q => ({
                 id: q.id,
@@ -363,17 +417,18 @@ const BlinkApproval = () => {
                 cargoType: '',
             }));
 
-            setSubmissions([...mappedShipments, ...mappedPOs, ...mappedQuotations, ...mappedInvoices]);
+            setSubmissions([...mappedSalesQuotations, ...mappedShipments, ...mappedPOs, ...mappedQuotations, ...mappedInvoices]);
 
-            // Fetch History - ISOLATED for Blink only
+            // Fetch History - ISOLATED for Blink / BXPO
             let historyData = [];
             let histErr = null;
+            const historyModule = division === 'bxpo' ? 'bxpo_operations' : 'blink_operations';
 
             // Try with module filter first
             const histRes = await supabase
                 .from('blink_approval_history')
                 .select('*')
-                .eq('module', 'blink_operations')
+                .eq('module', historyModule)
                 .order('approved_at', { ascending: false });
 
             if (histRes.error && histRes.error.message?.includes("Could not find the 'module' column")) {
@@ -392,7 +447,7 @@ const BlinkApproval = () => {
 
             // Fetch cancellation activity directly from operational tables.
             // This keeps History tab complete without changing other menu flows.
-            const [cancelShipRes, cancelPoRes, cancelInvRes, cancelQuotRes] = await Promise.all([
+            const [cancelShipRes, cancelPoRes, cancelInvRes, cancelQuotRes, cancelSalesQuotRes] = await Promise.all([
                 supabase
                     .from('blink_shipments')
                     .select('id, job_number, so_number, updated_at, created_at, rejection_reason')
@@ -400,15 +455,23 @@ const BlinkApproval = () => {
                 supabase
                     .from('blink_purchase_orders')
                     .select('id, po_number, updated_at, created_at, rejection_reason')
-                    .eq('status', 'cancelled'),
+                    .eq('status', 'cancelled')
+                    .eq('division', division),
                 supabase
                     .from('blink_invoices')
                     .select('id, invoice_number, updated_at, created_at, rejection_reason')
-                    .eq('status', 'cancelled'),
+                    .eq('status', 'cancelled')
+                    .eq('division', division),
                 supabase
                     .from('blink_quotations')
                     .select('id, quotation_number, job_number, updated_at, created_at, rejection_reason')
-                    .eq('status', 'cancelled')
+                    .eq('status', 'cancelled'),
+                division === 'bxpo'
+                    ? supabase
+                        .from('blink_sales_quotations')
+                        .select('id, quotation_number, job_number, updated_at, created_at, rejection_reason')
+                        .eq('status', 'cancelled')
+                    : Promise.resolve({ data: [], error: null })
             ]);
 
             const cancellationLogs = [];
@@ -422,7 +485,7 @@ const BlinkApproval = () => {
                     approver: 'System',
                     status: 'cancelled',
                     reason: row.rejection_reason || 'Cancelled from shipment workflow',
-                    module: 'blink_operations'
+                    module: historyModule
                 })));
             }
 
@@ -435,7 +498,7 @@ const BlinkApproval = () => {
                     approver: 'System',
                     status: 'cancelled',
                     reason: row.rejection_reason || 'Cancelled from purchase order workflow',
-                    module: 'blink_operations'
+                    module: historyModule
                 })));
             }
 
@@ -448,7 +511,7 @@ const BlinkApproval = () => {
                     approver: 'System',
                     status: 'cancelled',
                     reason: row.rejection_reason || 'Cancelled from invoice workflow',
-                    module: 'blink_sales'
+                    module: historyModule
                 })));
             }
 
@@ -461,7 +524,20 @@ const BlinkApproval = () => {
                     approver: 'System',
                     status: 'cancelled',
                     reason: row.rejection_reason || 'Cancelled from quotation workflow',
-                    module: 'blink_sales'
+                    module: historyModule
+                })));
+            }
+
+            if (division === 'bxpo' && cancelSalesQuotRes && !cancelSalesQuotRes.error) {
+                cancellationLogs.push(...(cancelSalesQuotRes.data || []).map((row) => ({
+                    id: `cancel-sales-quotation-${row.id}`,
+                    approved_at: row.updated_at || row.created_at || new Date().toISOString(),
+                    document_number: row.quotation_number || row.job_number || '-',
+                    document_type: 'sales_quotation',
+                    approver: 'System',
+                    status: 'cancelled',
+                    reason: row.rejection_reason || 'Cancelled from sales quotation workflow',
+                    module: historyModule
                 })));
             }
 
@@ -783,7 +859,146 @@ const BlinkApproval = () => {
                 } catch (jeErr) {
                     console.warn('[Approval] Invoice Journal creation failed:', jeErr.message);
                 }
-            } else {
+            } else if (item.type === 'sales_quotation') {
+                // Fetch quotation data
+                const { data: quotationData, error: fetchErr } = await supabase
+                    .from('blink_sales_quotations')
+                    .select('*')
+                    .eq('id', item.id)
+                    .single();
+                if (fetchErr) throw fetchErr;
+
+                // Generate SO Number
+                const { generateSONumber } = await import('../../utils/documentNumbers');
+                const jobNumber = quotationData.job_number || quotationData.quotation_number;
+                const soNumber = generateSONumber(jobNumber);
+
+                // --- AUTO-FLATTENING WITH SMART CURRENCY CONVERSION ---
+                const baseCurrency = quotationData.currency || 'USD';
+                const baseExchangeRate = quotationData.exchange_rate || 16000;
+
+                const flattenItems = (groupedItems) => {
+                    const flatList = [];
+                    (groupedItems || []).forEach(groupOrItem => {
+                        const isGroup = groupOrItem.items !== undefined;
+                        const groupName = isGroup ? (groupOrItem.groupName || 'General') : 'General';
+                        const groupRate = isGroup ? (groupOrItem.groupExchangeRate || baseExchangeRate) : baseExchangeRate;
+                        const subItems = isGroup ? groupOrItem.items : [groupOrItem];
+
+                        subItems.forEach(flatItem => {
+                            const originalAmt = parseFloat(flatItem.amount) || 0;
+                            const originalCurrency = flatItem.currency || 'USD';
+                            let finalAmt = originalAmt;
+
+                            if (originalCurrency !== baseCurrency) {
+                                if (baseCurrency === 'IDR' && originalCurrency === 'USD') {
+                                    finalAmt = originalAmt * groupRate;
+                                } else if (baseCurrency === 'USD' && originalCurrency === 'IDR') {
+                                    finalAmt = originalAmt / groupRate;
+                                }
+                            }
+
+                            flatList.push({
+                                id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                                description: isGroup ? `[${groupName}] ${flatItem.description || flatItem.name || 'Item'}` : (flatItem.description || flatItem.name || 'Item'),
+                                qty: parseFloat(flatItem.quantity) || 1,
+                                unit: flatItem.unit || 'Job',
+                                rate: finalAmt / (parseFloat(flatItem.quantity) || 1),
+                                amount: finalAmt,
+                                coa_id: flatItem.coa_id || null,
+                                vendor: flatItem.vendor || flatItem.supplier || '',
+                                original_currency: originalCurrency,
+                                original_amount: originalAmt,
+                                exchange_rate_used: groupRate,
+                                group_name: groupName,
+                                item_name: flatItem.name || flatItem.description || 'Item'
+                            });
+                        });
+                    });
+                    return flatList;
+                };
+
+                const flatSellingItems = flattenItems(quotationData.service_items || []);
+                const flatBuyingItems = flattenItems(quotationData.cost_items || []);
+
+                const isAirFreight = (quotationData.service_type || '').toLowerCase() === 'air';
+                const blType = isAirFreight ? 'AWB' : 'MBL';
+                const blPrefix = isAirFreight ? 'AWB' : 'BL';
+                const blNumber = `${blPrefix}-${soNumber}`;
+
+                const coreData = {
+                    shipper: quotationData.shipper || quotationData.shipper_name || quotationData.customer_name || '',
+                    shipper_name: quotationData.shipper_name || quotationData.shipper || quotationData.customer_name || '',
+                    quotation_shipper_name: quotationData.shipper_name || null,
+                    job_number: quotationData.job_number,
+                    so_number: soNumber,
+                    sales_quotation_id: quotationData.id,
+                    quotation_id: quotationData.id,
+                    customer: quotationData.customer_name || '',
+                    customer_id: quotationData.partner_id || null,
+                    sales_person: quotationData.sales_person || '',
+                    quotation_type: quotationData.quotation_type || 'RG',
+                    quotation_date: quotationData.quotation_date,
+                    origin: quotationData.origin,
+                    destination: quotationData.destination,
+                    service_type: quotationData.service_type,
+                    cargo_type: quotationData.cargo_type,
+                    weight: quotationData.weight,
+                    volume: quotationData.volume,
+                    commodity: quotationData.commodity,
+                    quoted_amount: quotationData.total_amount || 0,
+                    currency: quotationData.currency || 'USD',
+                    exchange_rate: quotationData.currency === 'IDR' ? 1 : (quotationData.exchange_rate || 16000),
+                    status: 'pending',
+                    created_from: 'sales_order',
+                    service_items: flatSellingItems,
+                    selling_items: flatSellingItems,
+                    buying_items: flatBuyingItems,
+                    notes: quotationData.notes || '',
+                    gross_weight: quotationData.gross_weight || null,
+                    net_weight: quotationData.net_weight || null,
+                    measure: quotationData.measure || null,
+                    packages: quotationData.quantity && quotationData.package_type
+                        ? `${quotationData.quantity} ${quotationData.package_type}`
+                        : (quotationData.package_type || null),
+                    incoterm: quotationData.incoterm || null,
+                    payment_terms: quotationData.payment_terms || null,
+                    bl_number: blNumber,
+                    bl_type: blType,
+                    bl_status: 'draft',
+                    bl_subject: `${(quotationData.service_type || 'SEA').toUpperCase()} Freight - ${quotationData.origin} to ${quotationData.destination}`,
+                    bl_place_of_receipt: quotationData.origin || '',
+                    bl_place_of_delivery: quotationData.destination || '',
+                };
+
+                const { error: shipErr } = await supabase
+                    .from('blink_shipments')
+                    .insert([coreData]);
+
+                if (shipErr) throw shipErr;
+
+                // Mark quotation as converted
+                const { error: updateErr } = await supabase
+                    .from('blink_sales_quotations')
+                    .update({ status: 'converted', updated_at: new Date().toISOString() })
+                    .eq('id', item.id);
+                if (updateErr) console.error('Warning: Error updating quotation status to converted:', updateErr);
+
+                // Add to history
+                await recordApprovalHistory(item, 'approved', null, user?.name || user?.email || 'Manager');
+
+                setSubmissions(prev => prev.filter(i => i.id !== item.id));
+                setShowDetailModal(false);
+                setSelectedItem(null);
+                fetchSubmissions();
+
+                const isBxpo = window.location.pathname.startsWith('/bxpo');
+                const shipmentsPath = isBxpo ? '/bxpo/shipments' : '/blink/shipments';
+
+                alert(`✅ Sales Quotation ${item.refNumber} disetujui!\n\n📦 Sales Order ${soNumber} berhasil dibuat.`);
+                setTimeout(() => navigate(shipmentsPath), 1000);
+                return;
+            } else if (item.type === 'quotation') {
                 // Approve Quotation → Auto-create SO & Shipment
                 // Fetch full quotation data first
                 const { data: quotationData, error: fetchErr } = await supabase
@@ -930,6 +1145,14 @@ const BlinkApproval = () => {
                     updated_at: new Date().toISOString()
                 });
                 if (!res.success) throw res.error || new Error('Failed to update invoice');
+            } else if (item.type === 'sales_quotation') {
+                const res = await safeUpdateById('blink_sales_quotations', item.id, {
+                    status: 'rejected',
+                    rejection_reason: rejectReason,
+                    rejection_date: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                });
+                if (!res.success) throw res.error || new Error('Failed to update sales quotation');
             } else {
                 const res = await safeUpdateById('blink_quotations', item.id, {
                     status: 'rejected',
@@ -1300,32 +1523,90 @@ const BlinkApproval = () => {
                             })()}
 
                             {/* Service items */}
-                            {selectedItem.serviceItems?.length > 0 && (
-                                <div>
-                                    <h3 style={{ color: '#111827' }} className="text-sm font-semibold mb-2">Cost Breakdown</h3>
-                                    <div className="bg-white rounded-lg overflow-hidden border border-gray-200">
-                                        <table className="w-full text-sm">
-                                            <thead>
-                                                <tr>
-                                                    <th className="text-left px-3 py-2">Item</th>
-                                                    <th className="text-left px-3 py-2">Description</th>
-                                                    <th className="text-right px-3 py-2">Qty</th>
-                                                    <th className="text-right px-3 py-2">Amount</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {selectedItem.serviceItems.map((si, i) => (
-                                                    <tr key={i}>
-                                                        <td className="px-3 py-2 font-mono text-xs" style={{ color: '#0070BB' }}>{si.itemCode || '-'}</td>
-                                                        <td className="px-3 py-2">{si.description || si.name || '-'}</td>
-                                                        <td className="px-3 py-2 text-right">{si.quantity || 1}</td>
-                                                        <td className="px-3 py-2 text-right">{formatCurrency(si.amount || si.total || 0, selectedItem.currency)}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
+                            {selectedItem.type === 'sales_quotation' ? (
+                                <div className="space-y-4">
+                                    {/* Revenue Items */}
+                                    {selectedItem.serviceItems?.length > 0 && (
+                                        <div>
+                                            <h3 style={{ color: '#111827' }} className="text-sm font-semibold mb-2">Revenue Items (Selling Price)</h3>
+                                            <div className="bg-white rounded-lg overflow-hidden border border-gray-200">
+                                                <table className="w-full text-sm">
+                                                    <thead className="bg-gray-50 border-b border-gray-100 text-gray-500">
+                                                        <tr>
+                                                            <th className="text-left px-3 py-2 font-medium">Description</th>
+                                                            <th className="text-right px-3 py-2 font-medium">Qty</th>
+                                                            <th className="text-right px-3 py-2 font-medium">Amount</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {normalizeItems(selectedItem.serviceItems).map((si, i) => (
+                                                            <tr key={i} className="border-b border-gray-50 last:border-b-0">
+                                                                <td className="px-3 py-2">{si.description || si.name || '-'}</td>
+                                                                <td className="px-3 py-2 text-right">{si.quantity || si.qty || 1}</td>
+                                                                <td className="px-3 py-2 text-right">{formatCurrency(si.amount || si.total || 0, selectedItem.currency)}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Cost Items */}
+                                    {selectedItem.costItems?.length > 0 && (
+                                        <div>
+                                            <h3 style={{ color: '#111827' }} className="text-sm font-semibold mb-2">Cost Breakdown (Estimated Buying Price)</h3>
+                                            <div className="bg-white rounded-lg overflow-hidden border border-gray-200">
+                                                <table className="w-full text-sm">
+                                                    <thead className="bg-gray-50 border-b border-gray-100 text-gray-500">
+                                                        <tr>
+                                                            <th className="text-left px-3 py-2 font-medium">Description</th>
+                                                            <th className="text-right px-3 py-2 font-medium">Qty</th>
+                                                            <th className="text-right px-3 py-2 font-medium">Amount</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {normalizeItems(selectedItem.costItems).map((ci, i) => (
+                                                            <tr key={i} className="border-b border-gray-50 last:border-b-0">
+                                                                <td className="px-3 py-2">{ci.description || ci.name || '-'}</td>
+                                                                <td className="px-3 py-2 text-right">{ci.quantity || ci.qty || 1}</td>
+                                                                <td className="px-3 py-2 text-right">{formatCurrency(ci.amount || ci.total || 0, selectedItem.currency)}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
+                            ) : (
+                                selectedItem.serviceItems?.length > 0 && (
+                                    <div>
+                                        <h3 style={{ color: '#111827' }} className="text-sm font-semibold mb-2">Cost Breakdown</h3>
+                                        <div className="bg-white rounded-lg overflow-hidden border border-gray-200">
+                                            <table className="w-full text-sm">
+                                                <thead className="bg-gray-50 border-b border-gray-100 text-gray-500">
+                                                    <tr>
+                                                        <th className="text-left px-3 py-2 font-medium">Item</th>
+                                                        <th className="text-left px-3 py-2 font-medium">Description</th>
+                                                        <th className="text-right px-3 py-2 font-medium">Qty</th>
+                                                        <th className="text-right px-3 py-2 font-medium">Amount</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {normalizeItems(selectedItem.serviceItems).map((si, i) => (
+                                                        <tr key={i} className="border-b border-gray-50 last:border-b-0">
+                                                            <td className="px-3 py-2 font-mono text-xs" style={{ color: '#0070BB' }}>{si.itemCode || si.coa_id || '-'}</td>
+                                                            <td className="px-3 py-2">{si.description || si.name || '-'}</td>
+                                                            <td className="px-3 py-2 text-right">{si.quantity || si.qty || 1}</td>
+                                                            <td className="px-3 py-2 text-right">{formatCurrency(si.amount || si.total || 0, selectedItem.currency)}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )
                             )}
 
                             {/* Notes */}

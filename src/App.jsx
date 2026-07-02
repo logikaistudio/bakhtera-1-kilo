@@ -179,7 +179,6 @@ function App() {
                     <Route path="/bxpo/operations/quotations" element={<ProtectedRoute menuCode="bxpo_quotations"><QuotationManagement /></ProtectedRoute>} />
                     <Route path="/bxpo/flow-monitor" element={<ProtectedRoute menuCode="bxpo_flow_monitor"><FlowMonitor /></ProtectedRoute>} />
                     <Route path="/bxpo/sales-achievement" element={<ProtectedRoute menuCode="bxpo_sales"><SalesAchievement /></ProtectedRoute>} />
-                    <Route path="/bxpo/sales-approvals" element={<ProtectedRoute menuCode="bxpo_sales_approval"><SalesBlinkApproval /></ProtectedRoute>} />
                     <Route path="/bxpo/shipments" element={<ProtectedRoute menuCode="bxpo_shipments"><ShipmentManagement /></ProtectedRoute>} />
                     <Route path="/bxpo/operations/tracking" element={<ProtectedRoute menuCode="bxpo_tracking"><TrackingMonitoring /></ProtectedRoute>} />
                     <Route path="/bxpo/operations/awb" element={<ProtectedRoute menuCode="bxpo_awb"><AWBManagement /></ProtectedRoute>} />

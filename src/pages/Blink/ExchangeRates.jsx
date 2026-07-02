@@ -47,7 +47,9 @@ const ExchangeRates = () => {
             setRates(data || []);
         } catch (error) {
             console.error('Error fetching exchange rates:', error);
-            alert('Gagal mengambil data kurs referensi: ' + error.message);
+            const detailMsg = error.details ? `\nDetail: ${error.details}` : '';
+            const hintMsg = error.hint ? `\nHint: ${error.hint}` : '';
+            alert(`Gagal mengambil data kurs referensi: ${error.message}${detailMsg}${hintMsg}`);
         } finally {
             setLoading(false);
         }
@@ -123,7 +125,9 @@ const ExchangeRates = () => {
             fetchRates();
         } catch (error) {
             console.error('Error saving exchange rate:', error);
-            alert('Gagal menyimpan kurs referensi: ' + error.message);
+            const detailMsg = error.details ? `\nDetail: ${error.details}` : '';
+            const hintMsg = error.hint ? `\nHint: ${error.hint}` : '';
+            alert(`Gagal menyimpan kurs referensi: ${error.message}${detailMsg}${hintMsg}`);
         }
     };
 
@@ -143,7 +147,9 @@ const ExchangeRates = () => {
             fetchRates();
         } catch (error) {
             console.error('Error deleting exchange rate:', error);
-            alert('Gagal menghapus kurs referensi: ' + error.message);
+            const detailMsg = error.details ? `\nDetail: ${error.details}` : '';
+            const hintMsg = error.hint ? `\nHint: ${error.hint}` : '';
+            alert(`Gagal menghapus kurs referensi: ${error.message}${detailMsg}${hintMsg}`);
         }
     };
 

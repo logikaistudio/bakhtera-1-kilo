@@ -60,13 +60,14 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
         const fetchBlinkPending = async () => {
             try {
                 const { supabase } = await import('../../lib/supabase');
+                const division = typeof window !== 'undefined' && window.location && window.location.pathname.startsWith('/bxpo') ? 'bxpo' : 'blink';
                 
                 // Fetch Operations Pending
                 const [qRes, sRes, iRes, pRes] = await Promise.all([
                     supabase.from('blink_quotations').select('id', { count: 'exact', head: true }).eq('status', 'manager_approval'),
                     supabase.from('blink_shipments').select('id', { count: 'exact', head: true }).eq('status', 'manager_approval'),
-                    supabase.from('blink_invoices').select('id', { count: 'exact', head: true }).eq('status', 'manager_approval'),
-                    supabase.from('blink_purchase_orders').select('id', { count: 'exact', head: true }).in('status', ['submitted', 'manager_approval'])
+                    supabase.from('blink_invoices').select('id', { count: 'exact', head: true }).eq('status', 'manager_approval').eq('division', division),
+                    supabase.from('blink_purchase_orders').select('id', { count: 'exact', head: true }).in('status', ['submitted', 'manager_approval']).eq('division', division)
                 ]);
                 const opsCount = (qRes.count || 0) + (sRes.count || 0) + (iRes.count || 0) + (pRes.count || 0);
                 setBlinkOpsPendingCount(opsCount);
@@ -84,7 +85,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
             clearInterval(interval);
             window.removeEventListener('blink_approval_updated', fetchBlinkPending);
         };
-    }, []);
+    }, [location.pathname]);
     const lastPathRef = React.useRef(null);
 
     // Initial check and Listener for path changes
@@ -347,8 +348,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
             type: 'category', label: '📋 Sales & Marketing', items: [
                 { path: '/bxpo/sales-quotations', label: 'Sales Quotation', menuCode: 'bxpo_sales_quotations' },
                 { path: '/bxpo/flow-monitor', label: 'Flow Monitor', menuCode: 'bxpo_flow_monitor' },
-                { path: '/bxpo/sales-achievement', label: 'Sales Achievement', menuCode: 'bxpo_sales' },
-                { path: '/bxpo/sales-approvals', label: 'Approval Center', menuCode: 'bxpo_sales_approval', showBadge: true }
+                { path: '/bxpo/sales-achievement', label: 'Sales Achievement', menuCode: 'bxpo_sales' }
             ]
         },
 
@@ -1192,7 +1192,11 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
 
                                                                                     const isSalesApproval = itemObj.menuCode === 'blink_sales_approval' || itemObj.menuCode === 'bxpo_sales_approval';
                                                                                     const isOpsApproval = itemObj.menuCode === 'blink_approval' || itemObj.menuCode === 'bxpo_approval';
-                                                                                    const pendingCount = isSalesApproval ? blinkSalesPendingCount : isOpsApproval ? blinkOpsPendingCount : 0;
+                                                                                    const pendingCount = isSalesApproval
+                                                                                        ? blinkSalesPendingCount
+                                                                                        : isOpsApproval
+                                                                                            ? (blinkOpsPendingCount + (itemObj.menuCode === 'bxpo_approval' ? blinkSalesPendingCount : 0))
+                                                                                            : 0;
 
                                                                                     return (
                                                                                         <Link
