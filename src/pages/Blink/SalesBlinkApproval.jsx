@@ -53,6 +53,58 @@ const SalesBlinkApproval = () => {
     // Is the user an approver? (Admin, Super Admin, Manager)
     const isApprover = isSuperAdmin() || isAdmin() || ['manager', 'blink_manager', 'bridge_manager'].includes(user?.user_level);
 
+    // Financial calculations for Selected Item (Quotation) in Detail Modal
+    let computedGrandTotalIDR = 0;
+    let computedGrandTotalUSD = 0;
+    let costGrandTotalIDR = 0;
+    let costGrandTotalUSD = 0;
+    let marginIDR = 0;
+    let marginUSD = 0;
+    let marginPct = 0;
+
+    if (selectedItem) {
+        const rate = selectedItem.exchange_rate || 16000;
+        const revItems = selectedItem.serviceItems || [];
+        revItems.forEach(group => {
+            const isGroup = group.items !== undefined;
+            const subItems = isGroup ? group.items : [group];
+            const currentGroupRate = group.groupExchangeRate || rate;
+
+            subItems.forEach(item => {
+                const amt = parseFloat(item.amount) || 0;
+                if (item.currency === 'IDR') {
+                    computedGrandTotalIDR += amt;
+                    computedGrandTotalUSD += amt / currentGroupRate;
+                } else {
+                    computedGrandTotalUSD += amt;
+                    computedGrandTotalIDR += amt * currentGroupRate;
+                }
+            });
+        });
+
+        const cstItems = selectedItem.costItems || [];
+        cstItems.forEach(group => {
+            const isGroup = group.items !== undefined;
+            const subItems = isGroup ? group.items : [group];
+            const currentGroupRate = group.groupExchangeRate || rate;
+
+            subItems.forEach(item => {
+                const amt = parseFloat(item.amount) || 0;
+                if (item.currency === 'IDR') {
+                    costGrandTotalIDR += amt;
+                    costGrandTotalUSD += amt / currentGroupRate;
+                } else {
+                    costGrandTotalUSD += amt;
+                    costGrandTotalIDR += amt * currentGroupRate;
+                }
+            });
+        });
+
+        marginIDR = computedGrandTotalIDR - costGrandTotalIDR;
+        marginUSD = computedGrandTotalUSD - costGrandTotalUSD;
+        marginPct = computedGrandTotalIDR > 0 ? (marginIDR / computedGrandTotalIDR) * 100 : 0;
+    }
+
     const fetchSubmissions = async () => {
         try {
             setLoading(true);
@@ -89,6 +141,8 @@ const SalesBlinkApproval = () => {
                 updatedAt: sq.updated_at,
                 notes: sq.notes || '',
                 serviceItems: sq.service_items || sq.revenue_items || [],
+                costItems: sq.cost_items || [],
+                exchange_rate: sq.exchange_rate || 16000,
                 commodity: sq.commodity || '',
                 cargoType: sq.cargo_type || '',
             }));
@@ -623,7 +677,7 @@ const SalesBlinkApproval = () => {
                                     { label: 'Commodity', value: selectedItem.commodity || '-' },
                                     { label: 'Total Estimated', value: formatCurrency(selectedItem.amount, selectedItem.currency), highlight: true },
                                     { label: 'Created At', value: formatDate(selectedItem.createdAt) },
-                                    { label: 'Updated At', value: formatDate(selectedItem.updatedAt) },
+{ label: 'Updated At', value: formatDate(selectedItem.updatedAt) },
                                 ].map((f, i) => (
                                     <div key={i} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
                                         <p style={{ color: '#4B5563' }} className="text-xs mb-1">{f.label}</p>
@@ -632,10 +686,38 @@ const SalesBlinkApproval = () => {
                                 ))}
                             </div>
 
+                            {/* Financial Summary Card */}
+                            <div className="p-4 bg-gradient-to-r from-orange-500/10 via-amber-500/10 to-emerald-500/10 border border-orange-200/50 rounded-xl space-y-3">
+                                <h4 style={{ color: '#111827' }} className="text-xs font-bold uppercase tracking-wider">Financial Summary</h4>
+                                <div className="grid grid-cols-3 gap-4 text-xs">
+                                    <div>
+                                        <p style={{ color: '#4B5563' }} className="mb-0.5 font-medium">Total Revenue (Selling)</p>
+                                        <p className="font-semibold text-gray-900 font-mono">
+                                            Rp {computedGrandTotalIDR.toLocaleString('id-ID')} <br/>
+                                            $ {computedGrandTotalUSD.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p style={{ color: '#4B5563' }} className="mb-0.5 font-medium">Total Cost (Buying)</p>
+                                        <p className="font-semibold text-gray-900 font-mono">
+                                            Rp {costGrandTotalIDR.toLocaleString('id-ID')} <br/>
+                                            $ {costGrandTotalUSD.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p style={{ color: '#4B5563' }} className="mb-0.5 font-medium">Estimated Margin</p>
+                                        <p className={`font-bold font-mono ${marginIDR >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                            Rp {marginIDR.toLocaleString('id-ID')} <br/>
+                                            {marginPct.toFixed(1)}%
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
                             {/* Service items */}
                             {selectedItem.serviceItems?.length > 0 && (
                                 <div>
-                                    <h3 style={{ color: '#111827' }} className="text-sm font-semibold mb-2">Revenue Breakdown</h3>
+                                    <h3 style={{ color: '#111827' }} className="text-sm font-semibold mb-2">Revenue Breakdown (Selling)</h3>
                                     <div className="bg-white rounded-lg overflow-hidden border border-gray-200">
                                         <table className="w-full text-sm">
                                             <thead>
@@ -652,7 +734,37 @@ const SalesBlinkApproval = () => {
                                                         <tr key={i} className="border-t border-gray-100">
                                                             <td className="px-3 py-2">{si.description || si.name || '-'}</td>
                                                             <td className="px-3 py-2 text-right">{si.quantity || 1}</td>
-                                                            <td className="px-3 py-2 text-right">{formatCurrency(itemTotal, selectedItem.currency)}</td>
+                                                            <td className="px-3 py-2 text-right">{formatCurrency(itemTotal, si.currency || selectedItem.currency)}</td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Cost items */}
+                            {selectedItem.costItems?.length > 0 && (
+                                <div>
+                                    <h3 style={{ color: '#111827' }} className="text-sm font-semibold mb-2">Cost Breakdown (Buying)</h3>
+                                    <div className="bg-white rounded-lg overflow-hidden border border-gray-200">
+                                        <table className="w-full text-sm">
+                                            <thead>
+                                                <tr>
+                                                    <th className="text-left px-3 py-2 bg-gray-50">Description</th>
+                                                    <th className="text-right px-3 py-2 bg-gray-50">Qty</th>
+                                                    <th className="text-right px-3 py-2 bg-gray-50">Amount</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {normalizeItems(selectedItem.costItems).map((ci, i) => {
+                                                    const itemTotal = ci.amount || ci.total || ci.subtotal || ((ci.quantity || 1) * (ci.price || ci.unitPrice || ci.unit_price || 0));
+                                                    return (
+                                                        <tr key={i} className="border-t border-gray-100">
+                                                            <td className="px-3 py-2">{ci.description || ci.name || '-'}</td>
+                                                            <td className="px-3 py-2 text-right">{ci.quantity || 1}</td>
+                                                            <td className="px-3 py-2 text-right">{formatCurrency(itemTotal, ci.currency || selectedItem.currency)}</td>
                                                         </tr>
                                                     );
                                                 })}
@@ -723,7 +835,7 @@ const SalesBlinkApproval = () => {
                             {/* Link to quotation/PO page */}
                             <button
                                 onClick={() => {
-                                    navigate('/blink/sales/quotations');
+                                    navigate(`/blink/sales-quotations?id=${selectedItem.id}`);
                                     closeModal();
                                 }}
                                 className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-gray-700 transition-colors"

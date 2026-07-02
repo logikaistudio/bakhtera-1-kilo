@@ -192,6 +192,17 @@ const SalesQuotation = () => {
 
             console.log('✅ Mapped', mapped.length, 'quotations');
             setQuotations(mapped);
+
+            // Auto open quotation from query parameter
+            const urlParams = new URLSearchParams(window.location.search);
+            const targetId = urlParams.get('id');
+            if (targetId) {
+                const found = mapped.find(q => q.id === targetId);
+                if (found) {
+                    setViewingQuotation(found);
+                    setShowViewModal(true);
+                }
+            }
         } catch (error) {
             console.error('Error fetching quotations:', error);
             alert('Failed to load quotations from database');
@@ -373,6 +384,7 @@ const SalesQuotation = () => {
                     sales_person: editedQuotation.salesPerson,
 
                     // Route & Service
+                    quotation_type: editedQuotation.quotationType,
                     origin: editedQuotation.origin,
                     destination: editedQuotation.destination,
                     service_type: editedQuotation.serviceType,
@@ -2024,13 +2036,25 @@ const SalesQuotation = () => {
                             </div>
                             <div>
                                 <p className="text-xs text-gray-500 font-medium mb-1">Quotation Type</p>
-                                <p className="text-gray-900 font-medium">
-                                    {viewingQuotation.quotationType === 'RG' && 'Regular'}
-                                    {viewingQuotation.quotationType === 'PJ' && 'Project'}
-                                    {viewingQuotation.quotationType?.startsWith('EV') && 'Event'}
-                                    {viewingQuotation.quotationType === 'CM' && 'Event'}
-                                    {!viewingQuotation.quotationType && 'Regular'}
-                                </p>
+                                {isEditingQuotation ? (
+                                    <select
+                                        value={editedQuotation?.quotationType || 'RG'}
+                                        onChange={(e) => setEditedQuotation({ ...editedQuotation, quotationType: e.target.value })}
+                                        className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm"
+                                    >
+                                        <option value="RG">Regular</option>
+                                        <option value="PJ">Project</option>
+                                        <option value="EV">Event</option>
+                                    </select>
+                                ) : (
+                                    <p className="text-gray-900 font-medium">
+                                        {viewingQuotation.quotationType === 'RG' && 'Regular'}
+                                        {viewingQuotation.quotationType === 'PJ' && 'Project'}
+                                        {viewingQuotation.quotationType?.startsWith('EV') && 'Event'}
+                                        {viewingQuotation.quotationType === 'CM' && 'Event'}
+                                        {!viewingQuotation.quotationType && 'Regular'}
+                                    </p>
+                                )}
                             </div>
                             <div>
                                 <p className="text-xs text-gray-500 font-medium mb-1">Quotation Date</p>
