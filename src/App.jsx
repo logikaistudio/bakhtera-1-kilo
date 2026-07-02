@@ -58,6 +58,7 @@ import BalanceSheet from './pages/Blink/BalanceSheet';
 import GeneralLedger from './pages/Blink/GeneralLedger';
 import TrialBalance from './pages/Blink/TrialBalance';
 import SellingVsBuying from './pages/Blink/SellingVsBuying';
+import ExchangeRates from './pages/Blink/ExchangeRates';
 
 // Bridge Module
 import BridgeOverview from './pages/Bridge/BridgeOverview';
@@ -188,6 +189,7 @@ function App() {
                     <Route path="/blink/finance/profit-loss-detail" element={<ProtectedRoute menuCode="blink_pnl"><ProfitLossDetail /></ProtectedRoute>} />
                     <Route path="/blink/finance/balance-sheet" element={<ProtectedRoute menuCode="blink_balance_sheet"><BalanceSheet /></ProtectedRoute>} />
                     <Route path="/blink/finance/selling-buying" element={<ProtectedRoute menuCode="blink_selling_buying"><SellingVsBuying /></ProtectedRoute>} />
+                    <Route path="/blink/finance/exchange-rates" element={<ProtectedRoute menuCode="blink_exchange_rates"><ExchangeRates /></ProtectedRoute>} />
                     <Route path="/blink/sales-revenue" element={<ProtectedRoute menuCode="blink_dashboard"><SalesRevenue /></ProtectedRoute>} />
 
                     {/* Legacy Blink Routes - Redirects */}

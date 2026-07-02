@@ -323,6 +323,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                 { path: '/blink/finance/profit-loss', label: 'Profit & Loss (P&L)', menuCode: 'blink_pnl' },
                 { path: '/blink/finance/profit-loss-detail', label: 'Detail P&L', menuCode: 'blink_pnl' },
                 { path: '/blink/finance/balance-sheet', label: 'Balance Sheet', menuCode: 'blink_balance_sheet' },
+                { path: '/blink/finance/exchange-rates', label: 'Kurs Referensi', menuCode: 'blink_exchange_rates' },
             ]
         },
 

@@ -94,6 +94,7 @@ export const APP_MENUS = {
             { code: 'blink_trial_balance', label: 'Neraca Saldo', group: 'Finance', path: '/blink/finance/trial-balance' },
             { code: 'blink_pnl', label: 'Laba Rugi', group: 'Finance', path: '/blink/finance/profit-loss' },
             { code: 'blink_balance_sheet', label: 'Neraca', group: 'Finance', path: '/blink/finance/balance-sheet' },
+            { code: 'blink_exchange_rates', label: 'Kurs Referensi', group: 'Finance', path: '/blink/finance/exchange-rates' },
             // ─── Master Data ───
             { code: 'blink_routes', label: 'Master Routes', group: 'Master Data', path: '/blink/master/routes' },
             { code: 'blink_coa', label: 'COA Master', group: 'Master Data', path: '/blink/master/coa' },
