@@ -151,6 +151,48 @@ const SalesQuotation = () => {
         return permissionChecker('blink_sales_quotations') || permissionChecker('blink_sales');
     };
 
+    const parseMissingColumnFromError = (error) => {
+        const msg = String(error?.message || error?.details || error || '').toLowerCase();
+        const match = msg.match(/could not find the '([^']+)' column/i) || msg.match(/column "([^"]+)" does not exist/i);
+        return match ? match[1] : null;
+    };
+
+    const safeDatabaseUpdateById = async (table, id, payload) => {
+        let attemptPayload = { ...payload };
+        const droppedColumns = [];
+
+        while (true) {
+            const { error } = await supabase.from(table).update(attemptPayload).eq('id', id);
+            if (!error) return { success: true, dropped: droppedColumns };
+
+            const missingColumn = parseMissingColumnFromError(error);
+            if (!missingColumn || !Object.prototype.hasOwnProperty.call(attemptPayload, missingColumn)) {
+                return { success: false, error };
+            }
+
+            droppedColumns.push(missingColumn);
+            delete attemptPayload[missingColumn];
+        }
+    };
+
+    const safeDatabaseInsert = async (table, payload) => {
+        let attemptPayload = { ...payload };
+        const droppedColumns = [];
+
+        while (true) {
+            const { data, error } = await supabase.from(table).insert([attemptPayload]).select();
+            if (!error) return { success: true, data, dropped: droppedColumns };
+
+            const missingColumn = parseMissingColumnFromError(error);
+            if (!missingColumn || !Object.prototype.hasOwnProperty.call(attemptPayload, missingColumn)) {
+                return { success: false, error };
+            }
+
+            droppedColumns.push(missingColumn);
+            delete attemptPayload[missingColumn];
+        }
+    };
+
     // Fetch quotations from Supabase on mount
     useEffect(() => {
         fetchQuotations();
@@ -313,12 +355,8 @@ const SalesQuotation = () => {
         };
 
         try {
-            const { data, error } = await supabase
-                .from('blink_sales_quotations')
-                .insert([newQuotation])
-                .select();
-
-            if (error) throw error;
+            const result = await safeDatabaseInsert('blink_sales_quotations', newQuotation);
+            if (!result.success) throw result.error;
 
             // Refresh quotations list
             await fetchQuotations();
@@ -394,53 +432,51 @@ const SalesQuotation = () => {
             }, 0) || editedQuotation.totalAmount;
 
             // Update in Supabase
-            const { error } = await supabase
-                .from('blink_sales_quotations')
-                .update({
-                    // Customer info
-                    customer_name: editedQuotation.customerName,
-                    customer_address: editedQuotation.customerAddress,
-                    customer_contact_name: editedQuotation.customerContact,
-                    customer_email: editedQuotation.customerEmail,
-                    customer_phone: editedQuotation.customerPhone,
-                    sales_person: editedQuotation.salesPerson,
+            const payload = {
+                // Customer info
+                customer_name: editedQuotation.customerName,
+                customer_address: editedQuotation.customerAddress,
+                customer_contact_name: editedQuotation.customerContact,
+                customer_email: editedQuotation.customerEmail,
+                customer_phone: editedQuotation.customerPhone,
+                sales_person: editedQuotation.salesPerson,
 
-                    // Route & Service
-                    quotation_type: editedQuotation.quotationType,
-                    origin: editedQuotation.origin,
-                    destination: editedQuotation.destination,
-                    service_type: editedQuotation.serviceType,
-                    cargo_type: editedQuotation.cargoType,
-                    container_size: editedQuotation.containerSize || null,
-                    container_count: editedQuotation.containerCount ? parseInt(editedQuotation.containerCount) : null,
-                    commodity: editedQuotation.commodity,
+                // Route & Service
+                quotation_type: editedQuotation.quotationType,
+                origin: editedQuotation.origin,
+                destination: editedQuotation.destination,
+                service_type: editedQuotation.serviceType,
+                cargo_type: editedQuotation.cargoType,
+                container_size: editedQuotation.containerSize || null,
+                container_count: editedQuotation.containerCount ? parseInt(editedQuotation.containerCount) : null,
+                commodity: editedQuotation.commodity,
 
-                    // Cargo details
-                    volume: editedQuotation.volume ? parseFloat(editedQuotation.volume) : null,
-                    gross_weight: editedQuotation.grossWeight ? parseFloat(editedQuotation.grossWeight) : null,
-                    net_weight: editedQuotation.netWeight ? parseFloat(editedQuotation.netWeight) : null,
-                    measure: editedQuotation.measure ? parseFloat(editedQuotation.measure) : null,
+                // Cargo details
+                volume: editedQuotation.volume ? parseFloat(editedQuotation.volume) : null,
+                gross_weight: editedQuotation.grossWeight ? parseFloat(editedQuotation.grossWeight) : null,
+                net_weight: editedQuotation.netWeight ? parseFloat(editedQuotation.netWeight) : null,
+                measure: editedQuotation.measure ? parseFloat(editedQuotation.measure) : null,
 
-                    // Pricing
-                    total_amount: total,
-                    service_items: editedQuotation.serviceItems || [],
-                    cost_items: editedQuotation.costItems || [],
+                // Pricing
+                total_amount: total,
+                service_items: editedQuotation.serviceItems || [],
+                cost_items: editedQuotation.costItems || [],
 
-                    // Additional details
-                    offer_type: editedQuotation.offerType ? editedQuotation.offerType.trim() : null,
-                    incoterm: editedQuotation.incoterm,
-                    payment_terms: editedQuotation.paymentTerms,
-                    package_type: editedQuotation.packageType,
-                    quantity: editedQuotation.quantity ? parseFloat(editedQuotation.quantity) : null,
+                // Additional details
+                offer_type: editedQuotation.offerType ? editedQuotation.offerType.trim() : null,
+                incoterm: editedQuotation.incoterm,
+                payment_terms: editedQuotation.paymentTerms,
+                package_type: editedQuotation.packageType,
+                quantity: editedQuotation.quantity ? parseFloat(editedQuotation.quantity) : null,
 
-                    // Notes
-                    notes: editedQuotation.notes,
-                    terms_and_conditions: editedQuotation.termsConditions,
-                    prepared_by: editedQuotation.preparedBy || null
-                })
-                .eq('id', editedQuotation.id);
+                // Notes
+                notes: editedQuotation.notes,
+                terms_and_conditions: editedQuotation.termsConditions,
+                prepared_by: editedQuotation.preparedBy || null
+            };
 
-            if (error) throw error;
+            const updateResult = await safeDatabaseUpdateById('blink_sales_quotations', editedQuotation.id, payload);
+            if (!updateResult.success) throw updateResult.error;
 
             // Refresh list
             await fetchQuotations();
@@ -890,7 +926,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                 : `<div style="font-size: 24px; font-weight: bold; font-style: italic;">${companySettings?.company_name?.split(' ')[0] || 'FREIGHT'}ONE</div><div style="font-size: 9px; letter-spacing: 3px; color: #555;">LOGISTICS SOLUTIONS</div>`
                             }
                             <div style="margin-top: 15px;">
-                                <div class="title">${offerTypeTitle ? `${offerTypeTitle.toUpperCase()} QUOTATION` : 'QUOTATION'}</div>
+                                <div class="title">${offerTypeTitle ? `${offerTypeTitle.toUpperCase()} CHARGE COST` : 'QUOTATION'}</div>
                                 <div style="margin-top: 5px; font-size: 16px;">${quotation.quotationNumber || quotation.quotation_number}</div>
                             </div>
                         </div>
@@ -2818,7 +2854,7 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                             </div>
                         </div>
                         <div className="text-right">
-                            <h2 className="text-4xl font-light tracking-tight text-slate-900 mb-2">{offerTypeTitle ? `${offerTypeTitle.toUpperCase()} Quotation` : 'Quotation'}</h2>
+                            <h2 className="text-4xl font-light tracking-tight text-slate-900 mb-2">{offerTypeTitle ? `${offerTypeTitle.toUpperCase()} CHARGE COST` : 'Quotation'}</h2>
                             <p className="text-accent-blue font-mono font-medium text-lg">{quotation.quotationNumber || quotation.quotation_number}</p>
                             <p className="text-sm text-slate-400 mt-1">Issued Date: {new Date(quotation.quotationDate || quotation.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
                         </div>
