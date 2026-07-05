@@ -60,13 +60,13 @@ const BarangMasuk = () => {
 
     // Filter Transactions
     const filteredTransactions = mergedTransactions.filter(t => {
-        const docDate = new Date(t.date || t.created_at || Date.now());
+        const rawDate = t.date || t.created_at || null;
+        const docDate = rawDate ? new Date(rawDate) : null;
         const start = startDate ? new Date(startDate) : null;
         const end = endDate ? new Date(endDate) : null;
-
         if (end) end.setHours(23, 59, 59, 999);
 
-        const matchesDate = (!start || docDate >= start) && (!end || docDate <= end);
+        const matchesDate = docDate ? ((!start || docDate >= start) && (!end || docDate <= end)) : (!start && !end);
         const matchesSearch = (
             (t.pengajuanNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
             (t.customsDocNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
