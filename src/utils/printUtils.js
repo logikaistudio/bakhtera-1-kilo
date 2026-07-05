@@ -63,6 +63,14 @@ export const generateBLPrintHTML = (blData) => {
     };
 
     const coLogo = blData.logo_url || blData.company_logo || blData.companyLogo || '';
+    const watermarkRaw = (d.watermark || '').toString().trim();
+    const watermarkNormalized = watermarkRaw.toUpperCase().replace(/[-_\s]+/g, ' ').trim();
+    const isCopyNonNegotiable = watermarkNormalized.includes('COPY') && watermarkNormalized.includes('NEGOTIABLE');
+    const watermarkHTML = d.watermark
+        ? isCopyNonNegotiable
+            ? `<div class="doc-watermark copy-non-negotiable"><span>COPY</span><span>NON NEGOTIABLE</span></div>`
+            : `<div class="doc-watermark">${watermarkRaw}</div>`
+        : '';
 
     return `
 <!DOCTYPE html>
@@ -177,7 +185,7 @@ export const generateBLPrintHTML = (blData) => {
 
         .doc-watermark {
             position: absolute;
-            top: 58%;
+            top: calc(58% + 10mm);
             left: 50%;
             transform: translate(-50%, -50%) rotate(-30deg);
             font-size: 22pt;
@@ -187,6 +195,21 @@ export const generateBLPrintHTML = (blData) => {
             white-space: nowrap;
             pointer-events: none;
             letter-spacing: 4px;
+        }
+
+        .doc-watermark.copy-non-negotiable {
+            top: calc(58% + 10mm);
+            font-size: 15.4pt; /* 30% smaller than 22pt */
+            color: transparent;
+            -webkit-text-fill-color: transparent;
+            -webkit-text-stroke: 1.4px rgba(254, 90, 29, 0.95);
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            line-height: 1.2;
         }
 
         .release-stamp {
@@ -252,13 +275,25 @@ export const generateBLPrintHTML = (blData) => {
     
     <!-- PAGE 1: BILL OF LADING -->
     <div class="page">
-        ${d.watermark ? `<div class="doc-watermark">${d.watermark}</div>` : ''}
+        ${watermarkHTML}
 
         <div class="container">
             
             <!-- ROW 1: Shipper & BL Info -->
             <div class="row">
                 <div class="col" style="width: 50%;">
+                    <div style="margin-bottom: 6px;">
+                        ${coLogo ? `
+                            <div style="display:flex;align-items:flex-start;justify-content:flex-start;">
+                                <img src="${coLogo}" alt="Logo" style="max-height:88px;max-width:180px;object-fit:contain;" />
+                            </div>
+                        ` : `
+                            <div style="font-size: 7pt; color: #555; font-weight: 600; letter-spacing: 1.5px; margin-bottom: 3px; text-transform: uppercase;">Ocean Bill of Lading</div>
+                            <div style="font-size: 14pt; font-weight: 900; line-height: 1;">BAKHTERA</div>
+                            <div style="font-size: 8pt; font-weight: 600; color: #333;">FREIGHT WORLDWIDE</div>
+                        `}
+                        ${d.releaseType ? `<br><span class="release-stamp">${d.releaseType}</span>` : ''}
+                    </div>
                     <span class="label">Shipper / Exporter</span>
                     <div class="value-bold">${d.shipper}</div>
                     <div class="value">${d.shipperAddr}</div>
@@ -293,18 +328,6 @@ export const generateBLPrintHTML = (blData) => {
                 <div class="col" style="width: 50%;">
                     <span class="label">Forwarding Agent References</span>
                     <div class="value small-text">${d.agentRefs}</div>
-                        <div class="header-logo">
-                        ${coLogo ? `
-                            <div style="display:flex;align-items:center;justify-content:flex-end;">
-                                <img src="${coLogo}" alt="Logo" style="max-height:88px;max-width:180px;object-fit:contain;margin-left:12px;" />
-                            </div>
-                        ` : `
-                            <div style="font-size: 7pt; color: #555; font-weight: 600; letter-spacing: 1.5px; margin-bottom: 3px; text-transform: uppercase;">Ocean Bill of Lading</div>
-                            <span class="company-main">BAKHTERA</span>
-                            <span class="company-sub">FREIGHT WORLDWIDE</span>
-                        `}
-                        ${d.releaseType ? `<br><span class="release-stamp">${d.releaseType}</span>` : ''}
-                    </div>
                 </div>
             </div>
 

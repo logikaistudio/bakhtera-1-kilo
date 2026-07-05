@@ -1355,9 +1355,28 @@ const PurchaseOrder = () => {
 
     // Calculate summary stats
     const totalPOs = pos.length;
-    const totalValue = pos.filter(p => p.status !== 'cancelled').reduce((sum, po) => sum + (po.total_amount || 0), 0);
     const pendingApproval = pos.filter(p => p.status === 'submitted').length;
     const approvedPOs = pos.filter(p => p.status === 'approved').length;
+
+    const convertToSummaryCurrencies = (amount, currency, exchangeRate) => {
+        const amt = Number(amount || 0);
+        const curr = String(currency || 'IDR').toUpperCase();
+        const rawRate = Number(exchangeRate || 0);
+        const rate = rawRate > 1 ? rawRate : 16000;
+
+        if (curr === 'USD') {
+            return { idr: amt * rate, usd: amt };
+        }
+
+        return { idr: amt, usd: rate > 0 ? amt / rate : 0 };
+    };
+
+    const totalValueSummary = pos
+        .filter(p => p.status !== 'cancelled')
+        .reduce((acc, po) => {
+            const converted = convertToSummaryCurrencies(po.total_amount, po.currency, po.exchange_rate);
+            return { idr: acc.idr + converted.idr, usd: acc.usd + converted.usd };
+        }, { idr: 0, usd: 0 });
 
     const handleExportXLS = () => {
         import('../../utils/exportXLS').then(({ exportToXLS }) => {
@@ -1405,6 +1424,42 @@ const PurchaseOrder = () => {
                             Buat PO Baru
                         </Button>
                     )}
+                </div>
+            </div>
+
+            {/* Summary Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="glass-card p-4 rounded-lg">
+                    <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs text-silver-dark">Total PO</p>
+                        <FileText className="w-4 h-4 text-blue-400" />
+                    </div>
+                    <p className="text-xl font-bold text-silver-light">{totalPOs}</p>
+                </div>
+
+                <div className="glass-card p-4 rounded-lg">
+                    <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs text-silver-dark">Total Nilai PO</p>
+                        <TrendingUp className="w-4 h-4 text-green-400" />
+                    </div>
+                    <p className="text-lg font-bold text-green-400">{formatCurrency(totalValueSummary.idr, 'IDR')}</p>
+                    <p className="text-xs text-blue-300 mt-1">{formatCurrency(totalValueSummary.usd, 'USD')}</p>
+                </div>
+
+                <div className="glass-card p-4 rounded-lg">
+                    <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs text-silver-dark">Pending Approval</p>
+                        <Clock className="w-4 h-4 text-yellow-400" />
+                    </div>
+                    <p className="text-xl font-bold text-yellow-400">{pendingApproval}</p>
+                </div>
+
+                <div className="glass-card p-4 rounded-lg">
+                    <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs text-silver-dark">Approved PO</p>
+                        <CheckCircle className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <p className="text-xl font-bold text-emerald-400">{approvedPOs}</p>
                 </div>
             </div>
 

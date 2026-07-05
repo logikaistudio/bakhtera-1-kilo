@@ -34,6 +34,40 @@ const AWBManagement = () => {
 
     const { companySettings } = useData();
 
+    const numberToWords = (n) => {
+        const words = ['', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE', 'TEN'];
+        return words[n] || String(n);
+    };
+
+    const normalizeContainers = (rawContainers) => {
+        if (!rawContainers) return [];
+
+        if (Array.isArray(rawContainers)) return rawContainers;
+
+        if (typeof rawContainers === 'string') {
+            try {
+                const parsed = JSON.parse(rawContainers);
+                if (Array.isArray(parsed)) return parsed;
+                if (parsed && typeof parsed === 'object') return [parsed];
+            } catch {
+                return [];
+            }
+        }
+
+        if (typeof rawContainers === 'object') return [rawContainers];
+        return [];
+    };
+
+    const buildPackagesInWordsFromContainers = (containers = []) => {
+        const normalizedContainers = normalizeContainers(containers);
+        const count = normalizedContainers.reduce((sum, c) => {
+            const qty = Number(c?.qty ?? c?.quantity ?? c?.pieces ?? 1);
+            return sum + (Number.isFinite(qty) && qty > 0 ? qty : 1);
+        }, 0);
+        if (count <= 0) return '';
+        return `SAY: ${numberToWords(count)} (${count}) CONTAINER${count > 1 ? 'S' : ''} ONLY`;
+    };
+
     useEffect(() => {
         fetchAWBs();
     }, []);
@@ -41,6 +75,9 @@ const AWBManagement = () => {
     // Initialize edit form when selectedAWB changes
     useEffect(() => {
         if (selectedAWB) {
+            const inferredGrossWeight = selectedAWB.grossWeight || selectedAWB.gross_weight || '';
+            const inferredChargeableWeight = selectedAWB.chargeableWeight || selectedAWB.chargeable_weight || inferredGrossWeight || '';
+            const derivedPieces = buildPackagesInWordsFromContainers(selectedAWB.containers || []);
             setEditForm({
                 status: selectedAWB.status,
                 awbNumber: selectedAWB.awbNumber !== '-' ? selectedAWB.awbNumber : '',
@@ -49,20 +86,20 @@ const AWBManagement = () => {
                 // Parties - Explicit separation
                 // Note: Customer is shown as reference, but Shipper/Consignee are editable document fields
                 shipperName: selectedAWB.blShipperName || selectedAWB.shipperName,
-                shipperAddress: selectedAWB.blShipperAddress || '',
+                shipperAddress: selectedAWB.blShipperAddress || selectedAWB.shipperAddress || '',
                 consigneeName: selectedAWB.blConsigneeName || selectedAWB.consigneeName,
-                consigneeAddress: selectedAWB.blConsigneeAddress || '',
+                consigneeAddress: selectedAWB.blConsigneeAddress || selectedAWB.consigneeAddress || selectedAWB.customerAddress || '',
 
                 // Routing (Air)
-                flightNumber: selectedAWB.vessel, // reusing vessel col for flight
+                flightNumber: selectedAWB.flightNumber || selectedAWB.vessel || '',
                 airportDeparture: selectedAWB.portOfLoading,
                 airportDestination: selectedAWB.portOfDischarge,
 
                 // Cargo
                 descriptionGoods: selectedAWB.blDescriptionPackages || selectedAWB.cargoDescription,
-                grossWeight: selectedAWB.blGrossWeightText || (selectedAWB.grossWeight ? `${selectedAWB.grossWeight} KGS` : ''),
-                chargeableWeight: selectedAWB.chargeableWeight || (selectedAWB.grossWeight ? `${selectedAWB.grossWeight} KGS` : ''), // Usually calc based on vol
-                pieces: selectedAWB.blTotalPackagesText || selectedAWB.packages || 'AS PER ATTACHED LIST',
+                grossWeight: selectedAWB.blGrossWeightText || (inferredGrossWeight ? `${inferredGrossWeight} KGS` : ''),
+                chargeableWeight: selectedAWB.blChargeableWeightText || (inferredChargeableWeight ? `${inferredChargeableWeight} KGS` : ''),
+                pieces: selectedAWB.blTotalPackagesText || derivedPieces || selectedAWB.blNumberOfPackages || selectedAWB.packages || 'AS PER ATTACHED LIST',
 
                 // Footer
                 executedAt: selectedAWB.blIssuedPlace || 'JAKARTA, INDONESIA',
@@ -88,17 +125,10 @@ const AWBManagement = () => {
 
             if (error) throw error;
 
-            // Filter for Air shipments loosely (if service_type exists)
-            const airShipments = shipments.filter(s =>
-                (s.service_type && s.service_type.toLowerCase().includes('air')) ||
-                (s.mbl && s.mbl.startsWith('MAWB')) || // Heuristic
-                (s.transport_mode === 'AIR') // If column exists
-            );
-
-            // If no strict filter, just use all for now, or maybe the user wants to see all documentable shipments
-            // Let's stick to 'blink_shipments' and assume the user manages all here, but we mark them
-
-            const awbData = (shipments || []).map(ship => ({
+            const awbData = (shipments || []).map(ship => {
+                const containers = normalizeContainers(ship.containers);
+                const derivedPieces = buildPackagesInWordsFromContainers(containers);
+                return {
                 id: ship.id,
                 type: 'MAWB', // Default
                 awbNumber: ship.awb_number || ship.bl_number || '-', // Fallback
@@ -106,17 +136,25 @@ const AWBManagement = () => {
 
                 // Base Shipment Data (The "Truth")
                 customerName: ship.customer || ship.customer_name || 'N/A', // The payer
+                customerAddress: ship.customer_address || '',
                 shipperName: ship.shipper || ship.shipper_name || 'N/A',
+                shipperAddress: ship.shipper_address || '',
                 consigneeName: ship.consignee_name || 'N/A', // If empty, it's NOT same as customer automatically
+                consigneeAddress: ship.consignee_address || '',
 
                 vessel: ship.vessel_name || ship.flight_number || '', // Flight No
+                flightNumber: ship.flight_number || ship.vessel_name || '',
                 portOfLoading: ship.origin || '',
                 portOfDischarge: ship.destination || '',
 
                 cargoDescription: ship.cargo_description || ship.commodity || '',
                 grossWeight: ship.weight,
+                gross_weight: ship.gross_weight,
+                chargeableWeight: ship.chargeable_weight,
+                chargeable_weight: ship.chargeable_weight,
                 volume: ship.volume,
                 packages: ship.packages || null,
+                containers,
 
                 // Document Specific (Editable Overrides)
                 blShipperName: ship.bl_shipper_name,
@@ -126,7 +164,11 @@ const AWBManagement = () => {
 
                 blDescriptionPackages: ship.bl_description_packages,
                 blGrossWeightText: ship.bl_gross_weight_text,
-                blTotalPackagesText: ship.bl_total_packages_text,
+                blChargeableWeightText: ship.bl_chargeable_weight_text,
+                blNumberOfPackages: ship.bl_number_of_packages,
+                blTotalPackagesText: ship.bl_total_packages_in_words || derivedPieces,
+
+                awbIssuedDate: ship.awb_date || ship.bl_issued_date,
 
                 blIssuedPlace: ship.bl_issued_place,
                 blIssuedDate: ship.bl_issued_date,
@@ -135,7 +177,8 @@ const AWBManagement = () => {
 
                 createdAt: ship.created_at,
                 status: ship.bl_status || 'draft',
-            }));
+            };
+            });
 
             setAwbs(awbData);
             setError(null);
@@ -159,6 +202,10 @@ const AWBManagement = () => {
                 .update({
                     bl_status: editForm.status,
                     awb_number: editForm.awbNumber || null,
+                    awb_date: editForm.awbDate || null,
+                    flight_number: editForm.flightNumber || null,
+                    origin: editForm.airportDeparture || null,
+                    destination: editForm.airportDestination || null,
                     // BL number field is also updated for consistency if needed, or kept separate
 
                     // Parties
@@ -176,7 +223,9 @@ const AWBManagement = () => {
                     // Cargo
                     bl_description_packages: editForm.descriptionGoods,
                     bl_gross_weight_text: editForm.grossWeight,
-                    bl_total_packages_text: editForm.pieces,
+                    bl_chargeable_weight_text: editForm.chargeableWeight,
+                    bl_number_of_packages: editForm.pieces || null,
+                    bl_total_packages_in_words: editForm.pieces,
                 })
                 .eq('id', selectedAWB.id);
 
@@ -312,7 +361,9 @@ const AWBManagement = () => {
                             >
                                 <td className="px-4 py-3 text-sm font-semibold text-accent-orange">{awb.awbNumber}</td>
                                 <td className="px-4 py-3 text-xs text-silver-light">
-                                    {awb.createdAt ? new Date(awb.createdAt).toLocaleDateString() : '-'}
+                                    {awb.awbIssuedDate
+                                        ? new Date(awb.awbIssuedDate).toLocaleDateString()
+                                        : (awb.createdAt ? new Date(awb.createdAt).toLocaleDateString() : '-')}
                                 </td>
                                 <td className="px-4 py-3 text-xs font-mono text-silver-dark">{awb.jobNumber}</td>
                                 <td className="px-4 py-3 text-xs text-silver-light">{awb.blShipperName || awb.shipperName}</td>

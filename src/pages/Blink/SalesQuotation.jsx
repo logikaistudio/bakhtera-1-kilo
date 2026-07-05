@@ -13,7 +13,7 @@ import 'jspdf-autotable';
 import {
     User, DollarSign, Calendar, MapPin, Package, Ship, Plane, Truck, FileText, X,
     CheckCircle, Clock, XCircle, Send, ArrowRight, TrendingUp, Users, Eye, Edit,
-    Plus, Check, Filter, Download, Search, Trash, Circle
+    Plus, Check, Filter, Download, Search, Trash, Circle, Copy
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -62,6 +62,196 @@ const duplicateAsCostItems = (serviceGroups) => {
     }));
 };
 
+const cloneGroupedItemsForRepeat = (groups = []) => {
+    const now = Date.now();
+    return (groups || []).map((group, gIdx) => ({
+        ...group,
+        id: `repeat-group-${now}-${gIdx}-${Math.random().toString(36).substr(2, 9)}`,
+        items: (group.items || []).map((item, iIdx) => ({
+            ...item,
+            id: `repeat-item-${now}-${gIdx}-${iIdx}-${Math.random().toString(36).substr(2, 9)}`
+        }))
+    }));
+};
+
+const escapeHtml = (unsafe = '') => String(unsafe)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
+const normalizeNotesHtml = (value = '') => {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+
+    // Keep existing rich text if already HTML-like.
+    if (/[<][a-z/!][^>]*>/i.test(raw)) {
+        return raw;
+    }
+
+    return escapeHtml(raw).replace(/\n/g, '<br/>');
+};
+
+const CARGO_META_PREFIX = 'CARGO_DETAILS_JSON:';
+
+const extractCargoMetaFromNotes = (rawNotes = '') => {
+    const source = String(rawNotes || '');
+    const match = source.match(/<!--\s*CARGO_DETAILS_JSON:([\s\S]*?)\s*-->/i);
+    if (!match) {
+        return { cleanedNotes: source, cargoDetailsFromMeta: null };
+    }
+
+    let parsed = null;
+    try {
+        parsed = JSON.parse(decodeURIComponent(match[1] || ''));
+    } catch {
+        parsed = null;
+    }
+
+    return {
+        cleanedNotes: source.replace(match[0], '').trim(),
+        cargoDetailsFromMeta: Array.isArray(parsed) ? parsed : null
+    };
+};
+
+const appendCargoMetaToNotes = (notesHtml = '', cargoDetails = []) => {
+    const safeNotes = String(notesHtml || '').replace(/<!--\s*CARGO_DETAILS_JSON:[\s\S]*?-->/gi, '').trim();
+    const payload = encodeURIComponent(JSON.stringify(cargoDetails || []));
+    return `${safeNotes}\n<!--${CARGO_META_PREFIX}${payload}-->`;
+};
+
+const createEmptyCargoDetail = () => ({
+    id: `cargo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    containerNumber: '',
+    containerSize: '',
+    packageType: '',
+    quantity: '',
+    grossWeight: '',
+    chargeableWeight: '',
+    volume: '',
+    description: ''
+});
+
+const normalizeCargoDetails = (rawCargoDetails = [], fallback = {}) => {
+    if (Array.isArray(rawCargoDetails) && rawCargoDetails.length > 0) {
+        return rawCargoDetails.map(item => ({
+            ...createEmptyCargoDetail(),
+            ...item,
+            id: item.id || `cargo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        }));
+    }
+
+    return [{
+        ...createEmptyCargoDetail(),
+        containerSize: fallback.containerSize || '',
+        quantity: fallback.quantity || fallback.containerCount || '',
+        packageType: fallback.packageType || '',
+        grossWeight: fallback.grossWeight || '',
+        chargeableWeight: fallback.chargeableWeight || '',
+        volume: fallback.volume || '',
+        description: fallback.commodity || ''
+    }];
+};
+
+const hasCargoRows = (value) => Array.isArray(value) && value.length > 0;
+
+const resolveQuotationRenderData = (quotation = {}) => {
+    const { cleanedNotes, cargoDetailsFromMeta } = extractCargoMetaFromNotes(quotation?.notes || '');
+    const rawCargoDetails = hasCargoRows(quotation?.cargoDetails)
+        ? quotation.cargoDetails
+        : hasCargoRows(quotation?.cargo_details)
+            ? quotation.cargo_details
+            : hasCargoRows(cargoDetailsFromMeta)
+                ? cargoDetailsFromMeta
+                : [];
+
+    const cargoDetails = normalizeCargoDetails(rawCargoDetails, {
+        containerSize: quotation?.containerSize || quotation?.container_size || '',
+        containerCount: quotation?.containerCount || quotation?.container_count || '',
+        packageType: quotation?.packageType || quotation?.package_type || '',
+        quantity: quotation?.quantity || '',
+        grossWeight: quotation?.grossWeight || quotation?.gross_weight || '',
+        chargeableWeight: quotation?.chargeableWeight || quotation?.chargeable_weight || '',
+        volume: quotation?.volume || '',
+        commodity: quotation?.commodity || ''
+    });
+
+    return {
+        notesHtml: normalizeNotesHtml(cleanedNotes || ''),
+        cargoDetails
+    };
+};
+
+const RichTextEditor = ({ value, onChange, rows = 4, placeholder = '' }) => {
+    const editorRef = React.useRef(null);
+    const [textColor, setTextColor] = React.useState('#111827');
+    const [highlightColor, setHighlightColor] = React.useState('#fef08a');
+
+    React.useEffect(() => {
+        const nextValue = normalizeNotesHtml(value || '');
+        if (editorRef.current && editorRef.current.innerHTML !== nextValue) {
+            editorRef.current.innerHTML = nextValue;
+        }
+    }, [value]);
+
+    const exec = (command, cmdValue = null) => {
+        if (!editorRef.current) return;
+        editorRef.current.focus();
+        document.execCommand('styleWithCSS', false, true);
+        document.execCommand(command, false, cmdValue);
+        onChange(editorRef.current.innerHTML);
+    };
+
+    const minHeight = `${rows * 24}px`;
+
+    return (
+        <div className="border border-gray-300 rounded-lg overflow-hidden bg-white">
+            <div className="flex flex-wrap items-center gap-2 p-2 border-b border-gray-200 bg-gray-50">
+                <button type="button" onClick={() => exec('removeFormat')} className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-white">Regular</button>
+                <button type="button" onClick={() => exec('bold')} className="px-2 py-1 text-xs font-bold border border-gray-300 rounded hover:bg-white">B</button>
+                <button type="button" onClick={() => exec('italic')} className="px-2 py-1 text-xs italic border border-gray-300 rounded hover:bg-white">I</button>
+                <button type="button" onClick={() => exec('underline')} className="px-2 py-1 text-xs underline border border-gray-300 rounded hover:bg-white">U</button>
+                <label className="flex items-center gap-1 text-xs text-gray-600">
+                    Text
+                    <input
+                        type="color"
+                        value={textColor}
+                        onChange={(e) => {
+                            const color = e.target.value;
+                            setTextColor(color);
+                            exec('foreColor', color);
+                        }}
+                        className="w-6 h-6 border border-gray-300 rounded"
+                    />
+                </label>
+                <label className="flex items-center gap-1 text-xs text-gray-600">
+                    Bg
+                    <input
+                        type="color"
+                        value={highlightColor}
+                        onChange={(e) => {
+                            const color = e.target.value;
+                            setHighlightColor(color);
+                            exec('hiliteColor', color);
+                        }}
+                        className="w-6 h-6 border border-gray-300 rounded"
+                    />
+                </label>
+            </div>
+            <div
+                ref={editorRef}
+                contentEditable
+                suppressContentEditableWarning
+                onInput={() => onChange(editorRef.current?.innerHTML || '')}
+                data-placeholder={placeholder}
+                className="w-full px-3 py-2 text-black text-sm focus:outline-none"
+                style={{ minHeight }}
+            />
+        </div>
+    );
+};
+
 const SalesQuotation = () => {
     const { user, canCreate, canEdit, canDelete, canApprove } = useAuth();
     const navigate = useNavigate();
@@ -75,6 +265,9 @@ const SalesQuotation = () => {
     const [quotations, setQuotations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showPrintPreview, setShowPrintPreview] = useState(false);
+    const [repeatSourceQuotation, setRepeatSourceQuotation] = useState(null);
+    const [repeatSelectionMode, setRepeatSelectionMode] = useState(false);
+    const [editingDraftId, setEditingDraftId] = useState(null);
 
     // Form state
     const [formData, setFormData] = useState({
@@ -95,17 +288,21 @@ const SalesQuotation = () => {
         weight: '',
         volume: '',
         grossWeight: '',
+        chargeableWeight: '',
         netWeight: '',
         measure: '',
         commodity: '',
         currency: 'USD',
+        exchange_rate: 16000,
         totalAmount: '',
         validityDays: 30,
         notes: '',
         incoterm: '',
         paymentTerms: 'Net 30 Days',
+        termOfPayment: 'Net 30 Days',
         packageType: '',
         quantity: '',
+        cargoDetails: [createEmptyCargoDetail()],
         customerContact: '',
         customerEmail: '',
         customerPhone: '',
@@ -209,7 +406,9 @@ const SalesQuotation = () => {
             if (error) throw error;
 
             // Map snake_case to camelCase for UI
-            const mapped = (data || []).map(q => ({
+            const mapped = (data || []).map(q => {
+                const { cleanedNotes, cargoDetailsFromMeta } = extractCargoMetaFromNotes(q.notes || '');
+                return {
                 ...q,
                 jobNumber: q.job_number || q.jobNumber,
                 quotationNumber: q.quotation_number || q.quotationNumber,
@@ -232,25 +431,38 @@ const SalesQuotation = () => {
                 createdAt: q.created_at || q.createdAt,
                 updatedAt: q.updated_at || q.updatedAt,
                 currency: q.currency || 'USD',
-                exchange_rate: q.exchange_rate || (q.currency === 'USD' ? 16000 : 1),
+                exchange_rate: q.exchange_rate || q.exchangeRate || 16000,
                 status: q.status || 'draft',
                 grossWeight: q.gross_weight || q.grossWeight,
+                chargeableWeight: q.chargeable_weight || q.chargeableWeight,
                 netWeight: q.net_weight || q.netWeight,
                 measure: q.measure || q.measure,
                 incoterm: q.incoterm,
                 offerType: q.offer_type || q.offerType || '',
                 paymentTerms: q.payment_terms || 'Net 30 Days',
+                termOfPayment: q.payment_terms || q.term_of_payment || 'Net 30 Days',
                 packageType: q.package_type,
                 quantity: q.quantity,
+                cargoDetails: normalizeCargoDetails(q.cargo_details || q.cargoDetails || cargoDetailsFromMeta, {
+                    containerSize: q.container_size || q.containerSize || '',
+                    containerCount: q.container_count || q.containerCount || '',
+                    packageType: q.package_type || q.packageType || '',
+                    quantity: q.quantity || '',
+                    grossWeight: q.gross_weight || q.grossWeight || '',
+                    chargeableWeight: q.chargeable_weight || q.chargeableWeight || '',
+                    volume: q.volume || '',
+                    commodity: q.commodity || ''
+                }),
                 customerContact: q.customer_contact_name,
                 customerEmail: q.customer_email,
                 customerPhone: q.customer_phone,
                 preparedBy: q.prepared_by || '',
+                notes: normalizeNotesHtml(cleanedNotes || ''),
                 termsConditions: q.terms_and_conditions || `1. All rates are subject to change without prior notice.
 2. Payment terms: Net 30 Days.
 3. Subject to space and equipment availability.
 4. Standard Trading Conditions apply.`
-            }));
+            }});
 
             console.log('✅ Mapped', mapped.length, 'quotations');
             setQuotations(mapped);
@@ -298,21 +510,21 @@ const SalesQuotation = () => {
 
     const handleSubmit = async (e, status = 'draft') => {
         e.preventDefault();
-        if (!canManageQuotation('create')) {
+        if (editingDraftId) {
+            if (!canManageQuotation('edit')) {
+                alert('Anda tidak memiliki hak akses untuk mengubah draft quotation.');
+                return;
+            }
+        } else if (!canManageQuotation('create')) {
             alert('Anda tidak memiliki hak akses untuk membuat quotation.');
             return;
         }
-
-        // Generate Job Number using centralized generator - Format: SQT-BLKYYMM-XXXX
-        const jobNumber = await generateSalesQuotationNumber();
 
         // Calculate validity date
         const validUntil = new Date();
         validUntil.setDate(validUntil.getDate() + parseInt(formData.validityDays));
 
-        const newQuotation = {
-            job_number: jobNumber,
-            quotation_number: jobNumber,
+        const quotationPayload = {
             customer_name: formData.customerName,
             customer_company: formData.customerCompany,
             partner_id: formData.partnerId || null, // Link to business partner
@@ -332,20 +544,22 @@ const SalesQuotation = () => {
             weight: formData.grossWeight ? parseFloat(formData.grossWeight) : (formData.weight ? parseFloat(formData.weight) : null),
             volume: formData.volume ? parseFloat(formData.volume) : null,
             gross_weight: formData.grossWeight ? parseFloat(formData.grossWeight) : null,
+            chargeable_weight: formData.chargeableWeight ? parseFloat(formData.chargeableWeight) : null,
             net_weight: formData.netWeight ? parseFloat(formData.netWeight) : null,
             measure: formData.measure ? parseFloat(formData.measure) : null,
             commodity: formData.commodity,
             currency: formData.currency,
-            exchange_rate: formData.currency === 'IDR' ? 1 : (formData.exchange_rate || 16000),
+            exchange_rate: formData.exchange_rate || 16000,
             total_amount: formData.totalAmount ? parseFloat(formData.totalAmount.toString()) : 0,
             status: status,
-            notes: formData.notes,
+            notes: appendCargoMetaToNotes(normalizeNotesHtml(formData.notes), formData.cargoDetails || []),
             service_items: formData.serviceItems,
             cost_items: formData.costItems,
+            cargo_details: formData.cargoDetails,
             terms_and_conditions: formData.termsConditions,
             incoterm: formData.incoterm,
             offer_type: formData.offerType ? formData.offerType.trim() : null,
-            payment_terms: formData.paymentTerms,
+            payment_terms: formData.termOfPayment || formData.paymentTerms,
             package_type: formData.packageType,
             quantity: formData.quantity ? parseFloat(formData.quantity) : null,
             customer_contact_name: formData.customerContact,
@@ -355,7 +569,27 @@ const SalesQuotation = () => {
         };
 
         try {
-            const result = await safeDatabaseInsert('blink_sales_quotations', newQuotation);
+            let result;
+            let jobNumber = null;
+
+            if (editingDraftId) {
+                const existingDraft = quotations.find(q => q.id === editingDraftId);
+                if (!existingDraft) {
+                    throw new Error('Draft yang akan diupdate tidak ditemukan. Silakan refresh halaman lalu coba lagi.');
+                }
+
+                result = await safeDatabaseUpdateById('blink_sales_quotations', editingDraftId, quotationPayload);
+                jobNumber = existingDraft.jobNumber || existingDraft.job_number || '-';
+            } else {
+                // Generate Job Number using centralized generator - Format: SQT-BLKYYMM-XXXX
+                jobNumber = await generateSalesQuotationNumber();
+                result = await safeDatabaseInsert('blink_sales_quotations', {
+                    ...quotationPayload,
+                    job_number: jobNumber,
+                    quotation_number: jobNumber,
+                });
+            }
+
             if (!result.success) throw result.error;
 
             // Refresh quotations list
@@ -367,11 +601,11 @@ const SalesQuotation = () => {
 
             const message = status === 'draft'
                 ? `Job Number ${jobNumber} saved as draft!`
-                : `Job Number ${jobNumber} created and sent for Finance approval!`;
+                : `Job Number ${jobNumber} submitted for Manager approval!`;
             alert(message + '\nThis will be the reference for SO, Shipment, and BL/AWB.');
         } catch (error) {
-            console.error('Error creating quotation:', error);
-            alert('Failed to create quotation: ' + error.message);
+            console.error('Error submitting quotation:', error);
+            alert('Failed to save quotation: ' + error.message);
         }
     };
 
@@ -454,6 +688,7 @@ const SalesQuotation = () => {
                 // Cargo details
                 volume: editedQuotation.volume ? parseFloat(editedQuotation.volume) : null,
                 gross_weight: editedQuotation.grossWeight ? parseFloat(editedQuotation.grossWeight) : null,
+                chargeable_weight: editedQuotation.chargeableWeight ? parseFloat(editedQuotation.chargeableWeight) : null,
                 net_weight: editedQuotation.netWeight ? parseFloat(editedQuotation.netWeight) : null,
                 measure: editedQuotation.measure ? parseFloat(editedQuotation.measure) : null,
 
@@ -465,12 +700,13 @@ const SalesQuotation = () => {
                 // Additional details
                 offer_type: editedQuotation.offerType ? editedQuotation.offerType.trim() : null,
                 incoterm: editedQuotation.incoterm,
-                payment_terms: editedQuotation.paymentTerms,
+                payment_terms: editedQuotation.termOfPayment || editedQuotation.paymentTerms,
                 package_type: editedQuotation.packageType,
                 quantity: editedQuotation.quantity ? parseFloat(editedQuotation.quantity) : null,
+                cargo_details: editedQuotation.cargoDetails || [],
 
                 // Notes
-                notes: editedQuotation.notes,
+                notes: appendCargoMetaToNotes(normalizeNotesHtml(editedQuotation.notes), editedQuotation.cargoDetails || []),
                 terms_and_conditions: editedQuotation.termsConditions,
                 prepared_by: editedQuotation.preparedBy || null
             };
@@ -495,6 +731,7 @@ const SalesQuotation = () => {
     };
 
     const resetForm = () => {
+        setEditingDraftId(null);
         setFormData({
             partnerId: '',
             customerName: '',
@@ -512,6 +749,7 @@ const SalesQuotation = () => {
             weight: '',
             volume: '',
             grossWeight: '',
+            chargeableWeight: '',
             netWeight: '',
             measure: '',
             commodity: '',
@@ -520,6 +758,8 @@ const SalesQuotation = () => {
             totalAmount: '',
             validityDays: 30,
             notes: '',
+            termOfPayment: 'Net 30 Days',
+            cargoDetails: [createEmptyCargoDetail()],
             serviceItems: [],
             costItems: [],
             termsConditions: `1. All rates are subject to change without prior notice.
@@ -531,8 +771,143 @@ const SalesQuotation = () => {
 
     // View quotation detail
     const handleViewQuotation = (quotation) => {
+        setRepeatSourceQuotation(quotation);
         setViewingQuotation(quotation);
         setShowViewModal(true);
+    };
+
+    const handleRepeatOrder = (sourceQuotation) => {
+        if (!canManageQuotation('create')) {
+            alert('Anda tidak memiliki hak akses untuk membuat quotation baru dari repeat order.');
+            return;
+        }
+
+        const today = new Date().toISOString().split('T')[0];
+        const copiedServiceItems = cloneGroupedItemsForRepeat(sourceQuotation?.serviceItems || []);
+        const copiedCostItems = cloneGroupedItemsForRepeat(sourceQuotation?.costItems || []);
+
+        setFormData(prev => ({
+            ...prev,
+            partnerId: sourceQuotation?.customerId || sourceQuotation?.partner_id || '',
+            customerName: sourceQuotation?.customerName || sourceQuotation?.customer_name || '',
+            customerCompany: sourceQuotation?.customerCompany || sourceQuotation?.customer_company || '',
+            customerAddress: sourceQuotation?.customerAddress || sourceQuotation?.customer_address || '',
+            salesPerson: user?.full_name || user?.username || sourceQuotation?.salesPerson || prev.salesPerson,
+            preparedBy: sourceQuotation?.preparedBy || '',
+            offerType: sourceQuotation?.offerType || sourceQuotation?.offer_type || '',
+            quotationType: sourceQuotation?.quotationType || sourceQuotation?.quotation_type || 'RG',
+            quotationDate: today,
+            origin: sourceQuotation?.origin || '',
+            destination: sourceQuotation?.destination || '',
+            serviceType: sourceQuotation?.serviceType || sourceQuotation?.service_type || 'sea',
+            cargoType: sourceQuotation?.cargoType || sourceQuotation?.cargo_type || '',
+            containerSize: sourceQuotation?.containerSize || sourceQuotation?.container_size || '',
+            containerCount: sourceQuotation?.containerCount || sourceQuotation?.container_count || '',
+            weight: sourceQuotation?.weight || '',
+            volume: sourceQuotation?.volume || '',
+            grossWeight: sourceQuotation?.grossWeight || sourceQuotation?.gross_weight || '',
+            chargeableWeight: sourceQuotation?.chargeableWeight || sourceQuotation?.chargeable_weight || '',
+            netWeight: sourceQuotation?.netWeight || sourceQuotation?.net_weight || '',
+            measure: sourceQuotation?.measure || '',
+            commodity: sourceQuotation?.commodity || '',
+            currency: sourceQuotation?.currency || 'USD',
+            exchange_rate: sourceQuotation?.exchange_rate || sourceQuotation?.exchangeRate || 16000,
+            totalAmount: sourceQuotation?.totalAmount || sourceQuotation?.total_amount || 0,
+            validityDays: sourceQuotation?.validityDays || 30,
+            notes: normalizeNotesHtml(sourceQuotation?.notes || ''),
+            incoterm: sourceQuotation?.incoterm || '',
+            paymentTerms: sourceQuotation?.paymentTerms || 'Net 30 Days',
+            termOfPayment: sourceQuotation?.termOfPayment || sourceQuotation?.paymentTerms || sourceQuotation?.payment_terms || 'Net 30 Days',
+            packageType: sourceQuotation?.packageType || sourceQuotation?.package_type || '',
+            quantity: sourceQuotation?.quantity || '',
+            cargoDetails: normalizeCargoDetails(sourceQuotation?.cargoDetails || sourceQuotation?.cargo_details, {
+                containerSize: sourceQuotation?.containerSize || sourceQuotation?.container_size || '',
+                containerCount: sourceQuotation?.containerCount || sourceQuotation?.container_count || '',
+                packageType: sourceQuotation?.packageType || sourceQuotation?.package_type || '',
+                quantity: sourceQuotation?.quantity || '',
+                grossWeight: sourceQuotation?.grossWeight || sourceQuotation?.gross_weight || '',
+                chargeableWeight: sourceQuotation?.chargeableWeight || sourceQuotation?.chargeable_weight || '',
+                volume: sourceQuotation?.volume || '',
+                commodity: sourceQuotation?.commodity || ''
+            }),
+            customerContact: sourceQuotation?.customerContact || sourceQuotation?.customer_contact_name || '',
+            customerEmail: sourceQuotation?.customerEmail || sourceQuotation?.customer_email || '',
+            customerPhone: sourceQuotation?.customerPhone || sourceQuotation?.customer_phone || '',
+            serviceItems: copiedServiceItems,
+            costItems: copiedCostItems,
+            termsConditions: sourceQuotation?.termsConditions || sourceQuotation?.terms_and_conditions || prev.termsConditions,
+        }));
+
+        setShowViewModal(false);
+        setRepeatSelectionMode(false);
+        setEditingDraftId(null);
+        setShowModal(true);
+    };
+
+    const handleEditDraftInForm = (quotation) => {
+        const source = quotation || {};
+        const quotationDate = source.quotationDate || source.quotation_date || new Date().toISOString().split('T')[0];
+        const validUntil = source.validUntil || source.valid_until || quotationDate;
+        const qDateObj = new Date(quotationDate);
+        const validObj = new Date(validUntil);
+        const diffMs = validObj.getTime() - qDateObj.getTime();
+        const derivedValidityDays = Number.isFinite(diffMs) ? Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24))) : 30;
+
+        setEditingDraftId(source.id || null);
+        setFormData(prev => ({
+            ...prev,
+            partnerId: source.customerId || source.partner_id || '',
+            customerName: source.customerName || source.customer_name || '',
+            customerCompany: source.customerCompany || source.customer_company || '',
+            customerAddress: source.customerAddress || source.customer_address || '',
+            salesPerson: source.salesPerson || source.sales_person || user?.full_name || user?.username || '',
+            preparedBy: source.preparedBy || source.prepared_by || '',
+            offerType: source.offerType || source.offer_type || '',
+            quotationType: source.quotationType || source.quotation_type || 'RG',
+            quotationDate,
+            origin: source.origin || '',
+            destination: source.destination || '',
+            serviceType: source.serviceType || source.service_type || 'sea',
+            cargoType: source.cargoType || source.cargo_type || '',
+            containerSize: source.containerSize || source.container_size || '',
+            containerCount: source.containerCount || source.container_count || '',
+            weight: source.weight || '',
+            volume: source.volume || '',
+            grossWeight: source.grossWeight || source.gross_weight || '',
+            chargeableWeight: source.chargeableWeight || source.chargeable_weight || '',
+            netWeight: source.netWeight || source.net_weight || '',
+            measure: source.measure || '',
+            commodity: source.commodity || '',
+            currency: source.currency || 'USD',
+            exchange_rate: source.exchange_rate || source.exchangeRate || 16000,
+            totalAmount: source.totalAmount || source.total_amount || 0,
+            validityDays: source.validityDays || derivedValidityDays,
+            notes: normalizeNotesHtml(source.notes || ''),
+            incoterm: source.incoterm || '',
+            paymentTerms: source.paymentTerms || source.payment_terms || 'Net 30 Days',
+            termOfPayment: source.termOfPayment || source.paymentTerms || source.payment_terms || 'Net 30 Days',
+            packageType: source.packageType || source.package_type || '',
+            quantity: source.quantity || '',
+            cargoDetails: normalizeCargoDetails(source.cargoDetails || source.cargo_details, {
+                containerSize: source.containerSize || source.container_size || '',
+                containerCount: source.containerCount || source.container_count || '',
+                packageType: source.packageType || source.package_type || '',
+                quantity: source.quantity || '',
+                grossWeight: source.grossWeight || source.gross_weight || '',
+                chargeableWeight: source.chargeableWeight || source.chargeable_weight || '',
+                volume: source.volume || '',
+                commodity: source.commodity || ''
+            }),
+            customerContact: source.customerContact || source.customer_contact_name || '',
+            customerEmail: source.customerEmail || source.customer_email || '',
+            customerPhone: source.customerPhone || source.customer_phone || '',
+            serviceItems: cloneGroupedItemsForRepeat(source.serviceItems || source.service_items || []),
+            costItems: cloneGroupedItemsForRepeat(source.costItems || source.cost_items || []),
+            termsConditions: source.termsConditions || source.terms_and_conditions || prev.termsConditions,
+        }));
+        setShowViewModal(false);
+        setRepeatSelectionMode(false);
+        setShowModal(true);
     };
 
     // Delete quotation (Cascading delete to all financial records)
@@ -752,7 +1127,7 @@ const SalesQuotation = () => {
                 volume: parentQuotation.volume,
                 commodity: parentQuotation.commodity,
                 currency: parentQuotation.currency,
-                exchange_rate: parentQuotation.currency === 'IDR' ? 1 : (parentQuotation.exchange_rate || 16000),
+                exchange_rate: parentQuotation.exchange_rate || 16000,
                 total_amount: parentQuotation.totalAmount,
                 validity_days: parentQuotation.validityDays || 30,
                 notes: parentQuotation.notes,
@@ -823,16 +1198,27 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                 return;
             }
 
-            const formatCurrency = (value, currency = 'IDR') => {
-                return currency === 'USD'
-                    ? `$${(value || 0).toLocaleString('id-ID')}`
-                    : `Rp ${(value || 0).toLocaleString('id-ID')}`;
+            const formatNumberByCurrency = (value, currency = 'IDR') => {
+                const numeric = Number(value) || 0;
+                if (String(currency).toUpperCase() === 'USD') {
+                    return numeric.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                }
+                return numeric.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+            };
+
+            const formatRateParts = (value, currency = 'IDR') => {
+                const code = String(currency || 'IDR').toUpperCase();
+                return {
+                    code,
+                    amount: formatNumberByCurrency(value, code)
+                };
             };
 
             const items = quotation.serviceItems || quotation.service_items || [];
             const showGrandTotal = options.showGrandTotal !== false;
             const showEstimatedTotal = options.showEstimatedTotal !== false;
-            const offerTypeTitle = quotation.offerType || quotation.offer_type || '';
+            const offerTypeTitle = String(quotation.offerType || quotation.offer_type || '').trim();
+            const quotationTitle = offerTypeTitle ? `${offerTypeTitle.toUpperCase()} CHARGE COST` : 'CHARGE COST';
             
             let grandTotalIDR = 0;
             let grandTotalUSD = 0;
@@ -847,7 +1233,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                 let groupHTML = `
                     <tr>
                         <td colspan="7" style="background-color: #f0f0f0; font-weight: bold; font-size: 11px;">
-                            ${groupName} (Rate: Rp ${currentGroupRate.toLocaleString('id-ID')})
+                            ${groupName} (Rate: Rp ${formatNumberByCurrency(currentGroupRate, 'IDR')})
                         </td>
                     </tr>
                 `;
@@ -859,6 +1245,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                     const amt = parseFloat(item.amount) || 0;
                     let amtIDR = 0;
                     let amtUSD = 0;
+                    const rateParts = formatRateParts(parseFloat(item.unitPrice) || 0, item.currency || 'USD');
 
                     if (item.currency === 'IDR') {
                         amtIDR = amt;
@@ -875,9 +1262,14 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                         <tr>
                             <td style="text-align: center;">${groupIndex + 1}.${itemIndex + 1}</td>
                             <td>${item.description || item.name || '-'}</td>
-                            <td style="text-align: right;">${item.currency || 'USD'} ${(parseFloat(item.unitPrice) || 0).toLocaleString('id-ID')}</td>
+                            <td style="font-family: monospace;">
+                                <div style="display: flex; justify-content: space-between; gap: 8px;">
+                                    <span style="text-align: left;">${rateParts.code}</span>
+                                    <span style="text-align: right; flex: 1;">${rateParts.amount}</span>
+                                </div>
+                            </td>
                             <td style="text-align: right; font-family: monospace;">${amtIDR > 0 ? amtIDR.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '-'}</td>
-                            <td style="text-align: right; font-family: monospace;">${amtUSD > 0 ? amtUSD.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
+                            <td style="text-align: right; font-family: monospace;">${amtUSD > 0 ? amtUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
                             <td style="text-align: center;">${item.remarks || '-'}</td>
                         </tr>
                     `;
@@ -893,6 +1285,18 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
 2. Payment terms: Net 30 Days.
 3. Subject to space and equipment availability.
 4. Standard Trading Conditions apply.`).split('\n').map(line => `<li>${line.replace(/^\d+\.\s*/, '')}</li>`).join('');
+            const termOfPayment = quotation.termOfPayment || quotation.paymentTerms || quotation.payment_terms || 'Net 30 Days';
+            const { notesHtml, cargoDetails } = resolveQuotationRenderData(quotation || {});
+            const cargoRows = cargoDetails.map((cargo, idx) => `
+                <tr>
+                    <td style="text-align:center;">${idx + 1}</td>
+                    <td>${cargo.containerNumber || '-'}</td>
+                    <td>${cargo.containerSize || '-'}</td>
+                    <td style="text-align:right;">${cargo.quantity || '-'}</td>
+                    <td style="text-align:right;">${cargo.grossWeight || '-'}</td>
+                    <td style="text-align:right;">${cargo.chargeableWeight || '-'}</td>
+                </tr>
+            `).join('');
 
             const content = `
                 <!DOCTYPE html>
@@ -903,6 +1307,10 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                     <style>
                         * { margin: 0; padding: 0; box-sizing: border-box; }
                         body { font-family: Arial, sans-serif; margin: 20px; color: #333; font-size: 12px; }
+                        html, body, body * {
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
+                        }
                         .header { display: flex; justify-content: space-between; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
                         .title { font-size: 24px; font-weight: bold; color: #333; }
                         .company-info { margin-bottom: 30px; }
@@ -912,10 +1320,28 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                         th, td { padding: 10px; border-bottom: 1px solid #ddd; }
                         th { text-align: left; background: #333; color: white; }
                         .total-row { text-align: right; background: #333; color: white; padding: 10px; font-weight: bold; font-size: 14px; }
-                        .total-value { font-family: monospace; display: inline-block; min-width: 100px; text-align: right;}
+                        .total-value {
+                            font-family: monospace;
+                            display: inline-flex;
+                            align-items: center;
+                            justify-content: space-between;
+                            gap: 10px;
+                            min-width: 170px;
+                            text-align: right;
+                        }
+                        .total-value .tv-code { opacity: 0.85; }
+                        .total-value .tv-num { min-width: 120px; text-align: right; }
                         .footer { margin-top: 50px; text-align: center; color: #666; font-size: 10px; border-top: 1px solid #ddd; padding-top: 20px; }
                         ul.summary-list { list-style: none; margin: 0; padding: 0; }
-                        ul.summary-list li { margin-bottom: 5px; display: flex; justify-content: flex-end; gap: 20px;}
+                        ul.summary-list li { margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; gap: 16px; min-width: 360px;}
+                        .notes-rich, .notes-rich * {
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
+                        }
+                        @media print {
+                            html, body { margin: 0; }
+                            body { margin: 12mm; }
+                        }
                     </style>
                 </head>
                 <body>
@@ -926,8 +1352,9 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                 : `<div style="font-size: 24px; font-weight: bold; font-style: italic;">${companySettings?.company_name?.split(' ')[0] || 'FREIGHT'}ONE</div><div style="font-size: 9px; letter-spacing: 3px; color: #555;">LOGISTICS SOLUTIONS</div>`
                             }
                             <div style="margin-top: 15px;">
-                                <div class="title">${offerTypeTitle ? `${offerTypeTitle.toUpperCase()} CHARGE COST` : 'QUOTATION'}</div>
+                                <div class="title">${quotationTitle}</div>
                                 <div style="margin-top: 5px; font-size: 16px;">${quotation.quotationNumber || quotation.quotation_number}</div>
+                                <div style="margin-top: 6px; font-size: 11px; color: #111;"><strong>Term of Payment:</strong> ${termOfPayment}</div>
                             </div>
                         </div>
                         <div style="text-align: right;">
@@ -963,12 +1390,32 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                             <div><strong>Jenis Penawaran:</strong> ${quotation.offerType || quotation.offer_type || '—'}</div>
                             <div><strong>Container:</strong> ${quotation.containerSize || quotation.container_size || '—'} / ${quotation.containerCount || quotation.container_count || '—'}</div>
                             <div><strong>Incoterm:</strong> ${quotation.incoterm || '—'}</div>
+                            <div><strong>Chargeable Weight:</strong> ${quotation.chargeableWeight || quotation.chargeable_weight || '—'} KGS</div>
                             <div><strong>Validity:</strong> ${quotation.validityDays || 30} Days</div>
                         </div>
                     </div>
 
+                    <div class="section">
+                        <h4 style="font-size: 12px; margin-bottom: 8px;">CARGO DETAIL</h4>
+                        <table style="margin-bottom: 0; font-size: 11px;">
+                            <thead>
+                                <tr>
+                                    <th style="width:40px; text-align:center;">No</th>
+                                    <th>Container No</th>
+                                    <th>Size</th>
+                                    <th style="text-align:right;">Qty</th>
+                                    <th style="text-align:right;">Gross (kg)</th>
+                                    <th style="text-align:right;">Chargeable (kg)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${cargoRows}
+                            </tbody>
+                        </table>
+                    </div>
+
                     <div style="text-align: right; margin-bottom: 5px; font-size: 11px;">
-                        <strong>Exchange Rate: 1 USD = Rp ${(quotation.exchange_rate || 16000).toLocaleString('id-ID')}</strong>
+                        <strong>Exchange Rate: 1 USD = Rp ${formatNumberByCurrency(quotation.exchange_rate || 16000, 'IDR')}</strong>
                     </div>
                     <table>
                         <thead>
@@ -993,21 +1440,22 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                     ${showGrandTotal ? `
                                     <li>
                                         <span>GRAND TOTAL (IDR):</span>
-                                        <span class="total-value">IDR ${grandTotalIDR.toLocaleString('id-ID')}</span>
+                                        <span class="total-value"><span class="tv-code">IDR</span><span class="tv-num">${formatNumberByCurrency(grandTotalIDR, 'IDR')}</span></span>
                                     </li>
                                     <li style="margin-top: 8px;">
                                         <span>GRAND TOTAL (USD):</span>
-                                        <span class="total-value">USD ${grandTotalUSD.toLocaleString('id-ID', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                        <span class="total-value"><span class="tv-code">USD</span><span class="tv-num">${formatNumberByCurrency(grandTotalUSD, 'USD')}</span></span>
                                     </li>
                                     ` : ''}
                                     ${showEstimatedTotal ? `
                                     <li style="margin-top: 8px; ${showGrandTotal ? 'border-top: 1px dashed white; padding-top: 8px;' : ''}">
                                         <span><strong>ESTIMASI TOTAL (${quotation.currency}):</strong></span>
                                         <span class="total-value">
-                                            <strong>
-                                                ${quotation.currency === 'IDR' 
-                                                    ? 'Rp ' + grandTotalIDR.toLocaleString('id-ID')
-                                                    : '$ ' + grandTotalUSD.toLocaleString('id-ID', {minimumFractionDigits: 2, maximumFractionDigits: 2})
+                                            <strong class="tv-code">${quotation.currency === 'IDR' ? 'IDR' : 'USD'}</strong>
+                                            <strong class="tv-num">
+                                                ${quotation.currency === 'IDR'
+                                                    ? formatNumberByCurrency(grandTotalIDR, 'IDR')
+                                                    : formatNumberByCurrency(grandTotalUSD, 'USD')
                                                 }
                                             </strong>
                                         </span>
@@ -1018,7 +1466,16 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                         </div>
                     ` : ''}
 
-                    <div style="margin-top: 50px; display: grid; grid-template-columns: 1fr 1fr; gap: 60px;">
+                    <div style="margin-top: 30px; display: grid; grid-template-columns: 1fr; gap: 20px;">
+                        <div>
+                            <h4 style="font-size: 12px; font-weight: bold; margin-bottom: 8px;">NOTES / REVIEW:</h4>
+                            <div class="notes-rich" style="min-height: 52px; border: 1px solid #ddd; border-radius: 4px; padding: 10px; line-height: 1.6; font-size: 11px;">
+                                ${notesHtml || '<span style="color:#999; font-style:italic;">No notes</span>'}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 60px;">
                         <div>
                             <h4 style="font-size: 12px; font-weight: bold; margin-bottom: 8px;">TERMS &amp; CONDITIONS:</h4>
                             <ol style="padding-left: 18px; margin: 0; line-height: 1.7; font-size: 11px;">
@@ -1179,7 +1636,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                     commodity: newShipment.commodity,
                     quoted_amount: newShipment.quotedAmount,
                     currency: quotation.currency || 'USD',
-                    exchange_rate: quotation.currency === 'IDR' ? 1 : (quotation.exchange_rate || 16000),
+                    exchange_rate: quotation.exchange_rate || 16000,
                     incoterm: quotation.incoterm || null,
                     payment_terms: quotation.paymentTerms || null,
                     status: newShipment.status,
@@ -1253,6 +1710,25 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
     // Only show active customers
     const activeCustomers = customers.filter(c => c.status === 'active');
 
+    const handleRepeatOrderButtonClick = () => {
+        if (!canManageQuotation('create')) return;
+
+        if (!repeatSelectionMode) {
+            setRepeatSelectionMode(true);
+            if (!repeatSourceQuotation && filteredQuotations.length > 0) {
+                setRepeatSourceQuotation(filteredQuotations[0]);
+            }
+            return;
+        }
+
+        if (!repeatSourceQuotation) {
+            alert('Pilih quotation dari tabel terlebih dahulu untuk Repeat Order.');
+            return;
+        }
+
+        handleRepeatOrder(repeatSourceQuotation);
+    };
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -1262,11 +1738,30 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                     <p className="text-silver-dark mt-1">Manage quotations untuk customer</p>
                 </div>
                 {canManageQuotation('create') && (
-                    <Button onClick={() => setShowModal(true)} icon={Plus}>
-                        New Quotation
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            onClick={handleRepeatOrderButtonClick}
+                            icon={Copy}
+                            variant="secondary"
+                        >
+                            {repeatSelectionMode ? 'Gunakan Quotation Terpilih' : 'Repeat Order'}
+                        </Button>
+                        <Button onClick={() => {
+                            setEditingDraftId(null);
+                            setRepeatSelectionMode(false);
+                            setShowModal(true);
+                        }} icon={Plus}>
+                            New Quotation
+                        </Button>
+                    </div>
                 )}
             </div>
+
+            {repeatSelectionMode && (
+                <div className="px-4 py-2 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 text-sm">
+                    Mode Repeat Order aktif: klik baris quotation untuk memilih sumber copy (baris terpilih akan berwarna), lalu klik tombol "Gunakan Quotation Terpilih".
+                </div>
+            )}
 
             {/* Search Bar */}
             <div className="relative">
@@ -1352,12 +1847,21 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                     return (
                                         <tr
                                             key={quote.id}
-                                            onClick={() => handleViewQuotation(quote)}
-                                            className="hover:bg-dark-surface smooth-transition cursor-pointer"
+                                            onClick={() => {
+                                                if (repeatSelectionMode) {
+                                                    setRepeatSourceQuotation(quote);
+                                                    return;
+                                                }
+                                                handleViewQuotation(quote);
+                                            }}
+                                            className={`smooth-transition cursor-pointer ${repeatSelectionMode && repeatSourceQuotation?.id === quote.id ? 'bg-amber-200/60 ring-1 ring-amber-400' : 'hover:bg-dark-surface'}`}
                                         >
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-2">
                                                     <span className="font-medium text-accent-orange">{quote.jobNumber}</span>
+                                                    {repeatSelectionMode && repeatSourceQuotation?.id === quote.id && (
+                                                        <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-xs rounded">Selected</span>
+                                                    )}
                                                     {quote.revision_number > 1 && (
                                                         <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded">
                                                             Rev {quote.revision_number}
@@ -1455,7 +1959,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                     setShowModal(false);
                     resetForm();
                 }}
-                title="New Quotation"
+                title={editingDraftId ? 'Edit Draft Quotation' : 'New Quotation'}
                 size="large"
             >
                 <form onSubmit={(e) => handleSubmit(e, 'draft')} className="space-y-6">
@@ -1506,11 +2010,11 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                         />
                     </div>
 
-                    {/* Quotation Type & Date */}
+                    {/* Quotation Category (Internal) & Date */}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Quotation Type <span className="text-red-400">*</span>
+                                Kategori Quotation (Internal) <span className="text-red-400">*</span>
                             </label>
                             <select
                                 required
@@ -1525,6 +2029,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                 <option value="EV_KEK">Event KEK</option>
                                 <option value="EV_FAIR">Event Fair & Excebition</option>
                             </select>
+                            <p className="text-xs text-gray-500 mt-1">Untuk klasifikasi internal dokumen quotation.</p>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1542,7 +2047,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
 
                     <div className="mb-4">
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Tipe Quotation
+                            Jenis Penawaran (Business Type)
                         </label>
                         <input
                             type="text"
@@ -1559,7 +2064,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                             ))}
                         </datalist>
                         <p className="text-xs text-gray-500 mt-1">
-                            Pilih salah satu opsi tersedia atau ketik jenis quotation baru.
+                            Pilih salah satu opsi bisnis/layanan atau ketik manual.
                         </p>
                     </div>
 
@@ -1689,8 +2194,8 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                         </div>
                     </div>
 
-                    {/* Gross Weight, Net Weight & Measure */}
-                    <div className="grid grid-cols-3 gap-4">
+                    {/* Gross Weight, Net Weight, Chargeable Weight & Measure */}
+                    <div className="grid grid-cols-4 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Gross Weight (kgs)
@@ -1721,6 +2226,20 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Chargeable Weight (kgs)
+                            </label>
+                            <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={formData.chargeableWeight}
+                                onChange={(e) => setFormData({ ...formData, chargeableWeight: e.target.value })}
+                                placeholder="1150"
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Measure (M³)
                             </label>
                             <input
@@ -1733,6 +2252,133 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                             />
                         </div>
+                    </div>
+
+                    {/* Cargo Detail (Multi Container) */}
+                    <div className="p-4 bg-white rounded-lg border border-gray-300 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <label className="block text-sm font-semibold text-gray-700">Cargo Detail (Multiple Container)</label>
+                            <button
+                                type="button"
+                                onClick={() => setFormData(prev => {
+                                    const nextCargo = [...(prev.cargoDetails || []), createEmptyCargoDetail()];
+                                    return { ...prev, cargoDetails: nextCargo, containerCount: String(nextCargo.length) };
+                                })}
+                                className="px-3 py-1 text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100"
+                            >
+                                + Add Container
+                            </button>
+                        </div>
+
+                        {(formData.cargoDetails || []).map((cargo, idx) => (
+                            <div key={cargo.id || idx} className="p-3 border border-gray-200 rounded-lg bg-gray-50">
+                                <div className="flex items-center justify-between mb-2">
+                                    <p className="text-xs font-semibold text-gray-600 uppercase">Container #{idx + 1}</p>
+                                    {(formData.cargoDetails || []).length > 1 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData(prev => {
+                                                const nextCargo = (prev.cargoDetails || []).filter((_, i) => i !== idx);
+                                                return { ...prev, cargoDetails: nextCargo, containerCount: String(nextCargo.length) };
+                                            })}
+                                            className="text-xs text-red-600 hover:text-red-700"
+                                        >
+                                            Remove
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-4 gap-3">
+                                    <input
+                                        type="text"
+                                        value={cargo.containerNumber || ''}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            cargoDetails: (prev.cargoDetails || []).map((c, i) => i === idx ? { ...c, containerNumber: e.target.value } : c)
+                                        }))}
+                                        placeholder="Container No"
+                                        className="px-2 py-1 bg-white border border-gray-300 rounded text-black text-sm"
+                                    />
+                                    <input
+                                        type="text"
+                                        value={cargo.containerSize || ''}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            containerSize: idx === 0 ? e.target.value : prev.containerSize,
+                                            cargoDetails: (prev.cargoDetails || []).map((c, i) => i === idx ? { ...c, containerSize: e.target.value } : c)
+                                        }))}
+                                        placeholder="Size (20ft / 40HC)"
+                                        className="px-2 py-1 bg-white border border-gray-300 rounded text-black text-sm"
+                                    />
+                                    <input
+                                        type="text"
+                                        value={cargo.packageType || ''}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            cargoDetails: (prev.cargoDetails || []).map((c, i) => i === idx ? { ...c, packageType: e.target.value } : c)
+                                        }))}
+                                        placeholder="Package Type"
+                                        className="px-2 py-1 bg-white border border-gray-300 rounded text-black text-sm"
+                                    />
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        value={cargo.quantity || ''}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            cargoDetails: (prev.cargoDetails || []).map((c, i) => i === idx ? { ...c, quantity: e.target.value } : c)
+                                        }))}
+                                        placeholder="Qty"
+                                        className="px-2 py-1 bg-white border border-gray-300 rounded text-black text-sm"
+                                    />
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={cargo.grossWeight || ''}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            cargoDetails: (prev.cargoDetails || []).map((c, i) => i === idx ? { ...c, grossWeight: e.target.value } : c)
+                                        }))}
+                                        placeholder="Gross Weight"
+                                        className="px-2 py-1 bg-white border border-gray-300 rounded text-black text-sm"
+                                    />
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={cargo.chargeableWeight || ''}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            cargoDetails: (prev.cargoDetails || []).map((c, i) => i === idx ? { ...c, chargeableWeight: e.target.value } : c)
+                                        }))}
+                                        placeholder="Chargeable Weight"
+                                        className="px-2 py-1 bg-white border border-gray-300 rounded text-black text-sm"
+                                    />
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="0.001"
+                                        value={cargo.volume || ''}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            cargoDetails: (prev.cargoDetails || []).map((c, i) => i === idx ? { ...c, volume: e.target.value } : c)
+                                        }))}
+                                        placeholder="Volume (CBM)"
+                                        className="px-2 py-1 bg-white border border-gray-300 rounded text-black text-sm"
+                                    />
+                                    <input
+                                        type="text"
+                                        value={cargo.description || ''}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            cargoDetails: (prev.cargoDetails || []).map((c, i) => i === idx ? { ...c, description: e.target.value } : c)
+                                        }))}
+                                        placeholder="Description"
+                                        className="px-2 py-1 bg-white border border-gray-300 rounded text-black text-sm"
+                                    />
+                                </div>
+                            </div>
+                        ))}
                     </div>
 
                     {/* Additional Shipment Details (Incoterm, Package, etc) */}
@@ -1748,11 +2394,11 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Payment Terms</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Term of Payment</label>
                             <input
                                 type="text"
-                                value={formData.paymentTerms}
-                                onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })}
+                                value={formData.termOfPayment || formData.paymentTerms}
+                                onChange={(e) => setFormData({ ...formData, termOfPayment: e.target.value, paymentTerms: e.target.value })}
                                 placeholder="Net 30 Days"
                                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black text-sm"
                             />
@@ -1823,7 +2469,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                     setFormData(prev => ({
                                         ...prev,
                                         currency: newCurrency,
-                                        exchange_rate: newCurrency === 'IDR' ? 1 : (prev.exchange_rate || 16000)
+                                        exchange_rate: prev.exchange_rate || 16000
                                     }));
                                 }}
                                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
@@ -1842,7 +2488,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                             <input
                                 type="number"
                                 value={formData.exchange_rate}
-                                onChange={(e) => setFormData(prev => ({ ...prev, exchange_rate: parseFloat(e.target.value) || 1 }))}
+                                onChange={(e) => setFormData(prev => ({ ...prev, exchange_rate: parseFloat(e.target.value) || 16000 }))}
                                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                                 disabled={formData.currency === 'IDR'}
                                 min="1"
@@ -1980,12 +2626,11 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                             Notes / Remarks
                         </label>
-                        <textarea
-                            rows={3}
+                        <RichTextEditor
+                            rows={5}
                             value={formData.notes}
-                            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                            placeholder="Additional information..."
-                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
+                            onChange={(html) => setFormData({ ...formData, notes: html })}
+                            placeholder="Tulis notes/review dan atur style per kata..."
                         />
                     </div>
 
@@ -2081,7 +2726,18 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
 
                                 {!isEditingQuotation && (
                                     <>
-                                        <Button size="sm" variant="secondary" icon={Edit} onClick={handleEditQuotation}>
+                                        <Button
+                                            size="sm"
+                                            variant="secondary"
+                                            icon={Edit}
+                                            onClick={() => {
+                                                if (viewingQuotation?.status === 'draft') {
+                                                    handleEditDraftInForm(viewingQuotation);
+                                                    return;
+                                                }
+                                                handleEditQuotation();
+                                            }}
+                                        >
                                             Edit
                                         </Button>
                                         <Button
@@ -2188,7 +2844,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                 )}
                             </div>
                             <div>
-                                <p className="text-xs text-gray-500 font-medium mb-1">Quotation Type</p>
+                                <p className="text-xs text-gray-500 font-medium mb-1">Kategori Quotation (Internal)</p>
                                 {isEditingQuotation ? (
                                     <select
                                         value={editedQuotation?.quotationType || 'RG'}
@@ -2210,7 +2866,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                 )}
                             </div>
                             <div>
-                                <p className="text-xs text-gray-500 font-medium mb-1">Tipe Quotation</p>
+                                <p className="text-xs text-gray-500 font-medium mb-1">Jenis Penawaran (Business Type)</p>
                                 {isEditingQuotation ? (
                                     <>
                                         <input
@@ -2251,11 +2907,11 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                         />
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-500 mb-1">Payment Terms</p>
+                                        <p className="text-xs text-gray-500 mb-1">Term of Payment</p>
                                         <input
                                             type="text"
-                                            value={editedQuotation.paymentTerms || ''}
-                                            onChange={(e) => setEditedQuotation({ ...editedQuotation, paymentTerms: e.target.value })}
+                                            value={editedQuotation.termOfPayment || editedQuotation.paymentTerms || ''}
+                                            onChange={(e) => setEditedQuotation({ ...editedQuotation, termOfPayment: e.target.value, paymentTerms: e.target.value })}
                                             placeholder="Net 30 Days"
                                             className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-black text-sm"
                                         />
@@ -2422,7 +3078,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                     />
                                 </div>
                             </div>
-                            <div className="grid grid-cols-3 gap-3">
+                            <div className="grid grid-cols-4 gap-3">
                                 <div>
                                     <p className="text-xs text-gray-500 mb-1">Gross (kg)</p>
                                     <input
@@ -2446,6 +3102,17 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                     />
                                 </div>
                                 <div>
+                                    <p className="text-xs text-gray-500 mb-1">Chargeable (kg)</p>
+                                    <input
+                                        type="number"
+                                        value={isEditingQuotation ? (editedQuotation?.chargeableWeight || '') : (viewingQuotation.chargeableWeight || '')}
+                                        onChange={(e) => setEditedQuotation({ ...editedQuotation, chargeableWeight: e.target.value })}
+                                        disabled={!isEditingQuotation}
+                                        className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm disabled:bg-gray-100/50"
+                                        placeholder="-"
+                                    />
+                                </div>
+                                <div>
                                     <p className="text-xs text-gray-500 mb-1">Measure (M³)</p>
                                     <input
                                         type="number"
@@ -2456,6 +3123,102 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                         placeholder="-"
                                     />
                                 </div>
+                            </div>
+
+                            <div className="mt-4 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Container Breakdown</p>
+                                    {isEditingQuotation && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setEditedQuotation(prev => {
+                                                const nextCargo = [...normalizeCargoDetails(prev.cargoDetails, prev), createEmptyCargoDetail()];
+                                                return { ...prev, cargoDetails: nextCargo, containerCount: String(nextCargo.length) };
+                                            })}
+                                            className="text-xs px-2 py-1 border border-blue-200 text-blue-600 rounded hover:bg-blue-50"
+                                        >
+                                            + Add
+                                        </button>
+                                    )}
+                                </div>
+
+                                {(isEditingQuotation
+                                    ? normalizeCargoDetails(editedQuotation?.cargoDetails, editedQuotation)
+                                    : resolveQuotationRenderData(viewingQuotation || {}).cargoDetails
+                                ).map((cargo, idx) => (
+                                    <div key={cargo.id || idx} className="grid grid-cols-5 gap-2 p-2 border border-gray-200 rounded bg-white">
+                                        <input
+                                            type="text"
+                                            value={cargo.containerNumber || ''}
+                                            onChange={(e) => {
+                                                if (!isEditingQuotation) return;
+                                                setEditedQuotation(prev => ({
+                                                    ...prev,
+                                                    cargoDetails: normalizeCargoDetails(prev.cargoDetails, prev).map((c, i) => i === idx ? { ...c, containerNumber: e.target.value } : c)
+                                                }));
+                                            }}
+                                            disabled={!isEditingQuotation}
+                                            placeholder="Container No"
+                                            className="px-2 py-1 border border-gray-300 rounded text-xs disabled:bg-gray-100"
+                                        />
+                                        <input
+                                            type="text"
+                                            value={cargo.containerSize || ''}
+                                            onChange={(e) => {
+                                                if (!isEditingQuotation) return;
+                                                setEditedQuotation(prev => ({
+                                                    ...prev,
+                                                    cargoDetails: normalizeCargoDetails(prev.cargoDetails, prev).map((c, i) => i === idx ? { ...c, containerSize: e.target.value } : c)
+                                                }));
+                                            }}
+                                            disabled={!isEditingQuotation}
+                                            placeholder="Size"
+                                            className="px-2 py-1 border border-gray-300 rounded text-xs disabled:bg-gray-100"
+                                        />
+                                        <input
+                                            type="number"
+                                            value={cargo.quantity || ''}
+                                            onChange={(e) => {
+                                                if (!isEditingQuotation) return;
+                                                setEditedQuotation(prev => ({
+                                                    ...prev,
+                                                    cargoDetails: normalizeCargoDetails(prev.cargoDetails, prev).map((c, i) => i === idx ? { ...c, quantity: e.target.value } : c)
+                                                }));
+                                            }}
+                                            disabled={!isEditingQuotation}
+                                            placeholder="Qty"
+                                            className="px-2 py-1 border border-gray-300 rounded text-xs disabled:bg-gray-100"
+                                        />
+                                        <input
+                                            type="number"
+                                            value={cargo.grossWeight || ''}
+                                            onChange={(e) => {
+                                                if (!isEditingQuotation) return;
+                                                setEditedQuotation(prev => ({
+                                                    ...prev,
+                                                    cargoDetails: normalizeCargoDetails(prev.cargoDetails, prev).map((c, i) => i === idx ? { ...c, grossWeight: e.target.value } : c)
+                                                }));
+                                            }}
+                                            disabled={!isEditingQuotation}
+                                            placeholder="Gross"
+                                            className="px-2 py-1 border border-gray-300 rounded text-xs disabled:bg-gray-100"
+                                        />
+                                        <input
+                                            type="number"
+                                            value={cargo.chargeableWeight || ''}
+                                            onChange={(e) => {
+                                                if (!isEditingQuotation) return;
+                                                setEditedQuotation(prev => ({
+                                                    ...prev,
+                                                    cargoDetails: normalizeCargoDetails(prev.cargoDetails, prev).map((c, i) => i === idx ? { ...c, chargeableWeight: e.target.value } : c)
+                                                }));
+                                            }}
+                                            disabled={!isEditingQuotation}
+                                            placeholder="Chargeable"
+                                            className="px-2 py-1 border border-gray-300 rounded text-xs disabled:bg-gray-100"
+                                        />
+                                    </div>
+                                ))}
                             </div>
                         </div>
 
@@ -2669,6 +3432,24 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                             })()}
                         </div>
 
+                        {/* Notes / Review (View/Edit) */}
+                        <div className="p-4 bg-white rounded-lg border border-gray-200">
+                            <h5 className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Notes / Review</h5>
+                            {isEditingQuotation ? (
+                                <RichTextEditor
+                                    rows={5}
+                                    value={editedQuotation?.notes || ''}
+                                    onChange={(html) => setEditedQuotation({ ...editedQuotation, notes: html })}
+                                    placeholder="Tambahkan notes dan format sesuai kebutuhan..."
+                                />
+                            ) : (
+                                <div
+                                    className="text-sm text-gray-700 leading-relaxed pl-4 border-l-2 border-blue-200"
+                                    dangerouslySetInnerHTML={{ __html: normalizeNotesHtml(viewingQuotation.notes || '') || '<span style="color:#9ca3af;font-style:italic;">No notes</span>' }}
+                                />
+                            )}
+                        </div>
+
                         {/* Terms & Conditions (View/Edit) */}
                         <div className="p-4 bg-white rounded-lg border border-gray-200">
                             <h5 className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Terms & Conditions</h5>
@@ -2695,7 +3476,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                         <Button onClick={() => handleUpdateStatus(viewingQuotation.id, 'manager_approval')}>
                                             Submit for Manager Approval
                                         </Button>
-                                        <Button variant="secondary" onClick={handleEditQuotation} icon={Edit}>
+                                        <Button variant="secondary" onClick={() => handleEditDraftInForm(viewingQuotation)} icon={Edit}>
                                             Edit
                                         </Button>
                                     </>
@@ -2775,6 +3556,8 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
     const [showEstimatedTotal, setShowEstimatedTotal] = React.useState(true);
 
     const offerTypeTitle = quotation?.offerType || quotation?.offer_type || '';
+    const termOfPayment = quotation?.termOfPayment || quotation?.paymentTerms || quotation?.payment_terms || 'Net 30 Days';
+    const { notesHtml, cargoDetails } = resolveQuotationRenderData(quotation || {});
 
     const handlePrint = () => {
         onPrint(quotation, creatorName, approverName, {
@@ -2783,10 +3566,20 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
         });
     };
 
-    const formatCurrency = (value, currency = 'IDR') => {
-        return currency === 'USD'
-            ? `$ ${(value || 0).toLocaleString('id-ID')}`
-            : `Rp ${(value || 0).toLocaleString('id-ID')}`;
+    const formatNumberByCurrency = (value, currency = 'IDR') => {
+        const numeric = Number(value) || 0;
+        if (String(currency).toUpperCase() === 'USD') {
+            return numeric.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+        return numeric.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    };
+
+    const formatRateParts = (value, currency = 'IDR') => {
+        const code = String(currency || 'IDR').toUpperCase();
+        return {
+            code,
+            amount: formatNumberByCurrency(value, code)
+        };
     };
 
     const items = quotation.serviceItems || quotation.service_items || [];
@@ -2856,6 +3649,7 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                         <div className="text-right">
                             <h2 className="text-4xl font-light tracking-tight text-slate-900 mb-2">{offerTypeTitle ? `${offerTypeTitle.toUpperCase()} CHARGE COST` : 'Quotation'}</h2>
                             <p className="text-accent-blue font-mono font-medium text-lg">{quotation.quotationNumber || quotation.quotation_number}</p>
+                            <p className="text-xs text-slate-600 mt-2"><span className="font-semibold">Term of Payment:</span> {termOfPayment}</p>
                             <p className="text-sm text-slate-400 mt-1">Issued Date: {new Date(quotation.quotationDate || quotation.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
                         </div>
                     </header>
@@ -2959,13 +3753,43 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                                 </div>
                                 <div>
                                     <span className="block text-xs text-slate-400 mb-1">Payment Term</span>
-                                    <span className="font-semibold text-slate-800">{quotation.paymentTerms || quotation.payment_terms || 'Net 30 Days'}</span>
+                                    <span className="font-semibold text-slate-800">{termOfPayment}</span>
                                 </div>
                                 <div>
                                     <span className="block text-xs text-slate-400 mb-1">Validity</span>
                                     <span className="font-semibold text-slate-800">{quotation.validityDays || 30} Days</span>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    <div className="mb-8">
+                        <h3 className="text-xs uppercase tracking-widest text-slate-400 font-semibold mb-3">Cargo Detail</h3>
+                        <div className="border border-slate-200 rounded-lg overflow-hidden">
+                            <table className="w-full text-[11px]">
+                                <thead className="bg-slate-50">
+                                    <tr>
+                                        <th className="py-2 px-3 text-center w-12">No</th>
+                                        <th className="py-2 px-3 text-left">Container No</th>
+                                        <th className="py-2 px-3 text-left">Size</th>
+                                        <th className="py-2 px-3 text-right">Qty</th>
+                                        <th className="py-2 px-3 text-right">Gross (kg)</th>
+                                        <th className="py-2 px-3 text-right">Chargeable (kg)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {cargoDetails.map((cargo, idx) => (
+                                        <tr key={cargo.id || idx} className="border-t border-slate-100">
+                                            <td className="py-2 px-3 text-center text-slate-500">{idx + 1}</td>
+                                            <td className="py-2 px-3">{cargo.containerNumber || '-'}</td>
+                                            <td className="py-2 px-3">{cargo.containerSize || '-'}</td>
+                                            <td className="py-2 px-3 text-right">{cargo.quantity || '-'}</td>
+                                            <td className="py-2 px-3 text-right">{cargo.grossWeight || '-'}</td>
+                                            <td className="py-2 px-3 text-right">{cargo.chargeableWeight || '-'}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 
@@ -3013,13 +3837,14 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                                         <React.Fragment key={groupIndex}>
                                             <tr className="bg-slate-50/70">
                                                 <td colSpan={6} className="py-2 pl-4 font-bold text-slate-800 text-[10px] uppercase">
-                                                    {groupName} (Rate: Rp {currentGroupRate.toLocaleString('id-ID')})
+                                                    {groupName} (Rate: Rp {formatNumberByCurrency(currentGroupRate, 'IDR')})
                                                 </td>
                                             </tr>
                                             {subItems.map((item, itemIndex) => {
                                                 const amt = parseFloat(item.amount) || 0;
                                                 let amtIDR = 0;
                                                 let amtUSD = 0;
+                                                const rateParts = formatRateParts(parseFloat(item.unitPrice) || 0, item.currency || 'USD');
 
                                                 if (item.currency === 'IDR') {
                                                     amtIDR = amt;
@@ -3037,14 +3862,17 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                                                         <td className="py-2 text-slate-800 font-medium capitalize">
                                                             {(item.description || item.name || '-').toLowerCase()}
                                                         </td>
-                                                        <td className="py-2 text-right text-slate-600 font-mono">
-                                                            {item.currency || 'USD'} {(parseFloat(item.unitPrice) || 0).toLocaleString('id-ID')}
+                                                        <td className="py-2 text-slate-600 font-mono">
+                                                            <div className="flex items-center justify-between gap-2">
+                                                                <span className="text-left">{rateParts.code}</span>
+                                                                <span className="text-right">{rateParts.amount}</span>
+                                                            </div>
                                                         </td>
                                                         <td className="py-2 text-right text-slate-600 font-mono">
                                                             {amtIDR > 0 ? amtIDR.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '-'}
                                                         </td>
                                                         <td className="py-2 text-right text-slate-900 font-bold font-mono">
-                                                            {amtUSD > 0 ? amtUSD.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
+                                                            {amtUSD > 0 ? amtUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
                                                         </td>
                                                         <td className="py-2 text-center text-slate-500 pr-4 text-[10px]">
                                                             {item.remarks || '-'}
@@ -3065,21 +3893,30 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                                     <>
                                         <div className="flex justify-between items-center mb-2">
                                             <span className="text-slate-400 text-xs">GRAND TOTAL (IDR):</span>
-                                            <span className="font-mono font-bold text-sm">IDR {computedGrandTotalIDR.toLocaleString('id-ID')}</span>
+                                            <span className="font-mono font-bold text-sm min-w-[170px] inline-flex items-center justify-between gap-2">
+                                                <span className="text-slate-300">IDR</span>
+                                                <span className="text-right">{formatNumberByCurrency(computedGrandTotalIDR, 'IDR')}</span>
+                                            </span>
                                         </div>
                                         <div className="flex justify-between items-center mb-3">
                                             <span className="text-slate-400 text-xs">GRAND TOTAL (USD):</span>
-                                            <span className="font-mono font-bold text-sm">USD {computedGrandTotalUSD.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                            <span className="font-mono font-bold text-sm min-w-[170px] inline-flex items-center justify-between gap-2">
+                                                <span className="text-slate-300">USD</span>
+                                                <span className="text-right">{formatNumberByCurrency(computedGrandTotalUSD, 'USD')}</span>
+                                            </span>
                                         </div>
                                     </>
                                 )}
                                 {showEstimatedTotal && (
                                     <div className="flex justify-between items-center pt-3 border-t border-dashed border-slate-700">
                                         <span className="font-bold text-slate-200 text-xs">ESTIMASI TOTAL ({quotation.currency}):</span>
-                                        <span className="font-bold text-base text-emerald-400 font-mono">
-                                            {quotation.currency === 'IDR'
-                                                ? `Rp ${computedGrandTotalIDR.toLocaleString('id-ID')}`
-                                                : `$ ${computedGrandTotalUSD.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                                        <span className="font-bold text-base text-emerald-400 font-mono min-w-[170px] inline-flex items-center justify-between gap-2">
+                                            <span>{quotation.currency === 'IDR' ? 'IDR' : 'USD'}</span>
+                                            <span className="text-right">
+                                                {quotation.currency === 'IDR'
+                                                    ? formatNumberByCurrency(computedGrandTotalIDR, 'IDR')
+                                                    : formatNumberByCurrency(computedGrandTotalUSD, 'USD')}
+                                            </span>
                                         </span>
                                     </div>
                                 )}
@@ -3087,8 +3924,18 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                         </div>
                     </div>
 
-                    {/* Terms & Footer */}
-                    <div className="grid grid-cols-2 gap-12 mt-auto">
+                    {/* Notes / Terms & Footer */}
+                    <div className="grid grid-cols-1 gap-8 mt-auto">
+                        <div className="text-xs text-slate-500">
+                            <h4 className="font-bold text-slate-900 uppercase mb-2">Notes / Review</h4>
+                            <div
+                                className="leading-relaxed border border-slate-200 rounded-md p-3 min-h-[64px]"
+                                dangerouslySetInnerHTML={{ __html: notesHtml || '<span style="color:#94a3b8;font-style:italic;">No notes</span>' }}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-12 mt-8">
                         <div className="text-xs text-slate-500">
                             <h4 className="font-bold text-slate-900 uppercase mb-2">Terms & Conditions</h4>
                             <div className="whitespace-pre-line leading-relaxed">

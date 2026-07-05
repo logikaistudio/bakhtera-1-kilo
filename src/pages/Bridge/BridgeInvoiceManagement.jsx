@@ -1373,6 +1373,15 @@ const BridgeInvoiceManagement = () => {
                                         `;
                                     })()}
                                 </div>
+
+                                <div style="margin-top: 10px; border: 1px solid #d7d7d7; background: #fafafa;">
+                                    <div style="padding: 8px 10px; font-size: 10px; line-height: 1.55; border-bottom: 1px solid #e3e3e3; font-style: normal;">
+                                        All payments shall be made in full amount, except for withholding tax deductions. The full invoiced amount must be received by the Seller within thirty (30) calendar days from the invoice date.
+                                    </div>
+                                    <div style="padding: 8px 10px; font-size: 10px; line-height: 1.55; font-style: normal;">
+                                        Any payment received after the thirty (30)-day due date shall be subject to a late payment charge of 2% of the total invoice amount per month, calculated from the due date until the date on which full payment is received.
+                                    </div>
+                                </div>
                                 
                                 <div style="margin-top: 10px; font-style: italic; white-space: pre-line;">
                                     <strong>Notes:</strong><br>
@@ -2840,7 +2849,7 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
 
                 <div className="space-y-6">
                     {/* Invoice Info Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                         <div className="glass-card p-4 rounded-lg">
                             <div className="flex items-center gap-2 mb-3">
                                 <User className="w-4 h-4 text-accent-orange" />
@@ -2881,7 +2890,7 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                         </div>
 
                         {/* Shipment & Cargo Details - Side by Side Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4 md:col-span-2 xl:col-span-1">
                             {/* Shipment Details Card */}
                             <div className="glass-card p-4 rounded-lg">
                                 <div className="flex items-center gap-2 mb-3">
@@ -2891,7 +2900,9 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                                 <div className="space-y-2 text-sm">
                                     <div>
                                         <span className="text-silver-dark">Route:</span>
-                                        <span className="text-silver-light ml-2">{invoice.origin} → {invoice.destination}</span>
+                                        <span className="text-silver-light ml-2 whitespace-normal break-words leading-snug inline-block align-top">
+                                            {invoice.origin} → {invoice.destination}
+                                        </span>
                                     </div>
                                     <div>
                                         <span className="text-silver-dark">Service:</span>
@@ -3920,6 +3931,15 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                                             </>
                                         );
                                     })()}
+                                </div>
+
+                                <div style={{ marginTop: '10px', border: '1px solid #d7d7d7', background: '#fafafa' }}>
+                                    <div style={{ padding: '8px 10px', fontSize: '10px', lineHeight: 1.55, borderBottom: '1px solid #e3e3e3', fontStyle: 'normal' }}>
+                                        All payments shall be made in full amount, except for withholding tax deductions. The full invoiced amount must be received by the Seller within thirty (30) calendar days from the invoice date.
+                                    </div>
+                                    <div style={{ padding: '8px 10px', fontSize: '10px', lineHeight: 1.55, fontStyle: 'normal' }}>
+                                        Any payment received after the thirty (30)-day due date shall be subject to a late payment charge of 2% of the total invoice amount per month, calculated from the due date until the date on which full payment is received.
+                                    </div>
                                 </div>
 
                                 <div style={{ marginTop: '10px', fontStyle: 'italic', whiteSpace: 'pre-line' }}>

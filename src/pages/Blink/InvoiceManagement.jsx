@@ -37,6 +37,8 @@ const InvoiceManagement = () => {
     const [financeMigrationRan, setFinanceMigrationRan] = useState(false);
     const [showReimbursementModal, setShowReimbursementModal] = useState(false);
     const [reimbursementInvoice, setReimbursementInvoice] = useState(null);
+    const [showReinvoiceModal, setShowReinvoiceModal] = useState(false);
+    const [reinvoiceSourceInvoice, setReinvoiceSourceInvoice] = useState(null);
     const [previewInvoiceData, setPreviewInvoiceData] = useState(null);
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [selectedQuotation, setSelectedQuotation] = useState(null);
@@ -1434,6 +1436,15 @@ const InvoiceManagement = () => {
                                         `;
                                     })()}
                                 </div>
+
+                                <div style="margin-top: 10px; border: 1px solid #d7d7d7; background: #fafafa;">
+                                    <div style="padding: 8px 10px; font-size: 10px; line-height: 1.55; border-bottom: 1px solid #e3e3e3; font-style: normal;">
+                                        All payments shall be made in full amount, except for withholding tax deductions. The full invoiced amount must be received by the Seller within thirty (30) calendar days from the invoice date.
+                                    </div>
+                                    <div style="padding: 8px 10px; font-size: 10px; line-height: 1.55; font-style: normal;">
+                                        Any payment received after the thirty (30)-day due date shall be subject to a late payment charge of 2% of the total invoice amount per month, calculated from the due date until the date on which full payment is received.
+                                    </div>
+                                </div>
                                 
                                 <div style="margin-top: 10px; font-style: italic; white-space: pre-line;">
                                     <strong>Notes:</strong><br>
@@ -1627,6 +1638,138 @@ const InvoiceManagement = () => {
         }
     };
 
+    // ── Create Reinvoice From Paid Invoice ─────────────────────────────────────
+    // Creates a new draft invoice from a paid invoice while keeping same invoice number
+    const handleCreateReinvoice = async (invoice, newInvoiceDate, reinvoiceNote) => {
+        if (!canEdit('blink_invoices')) {
+            alert('Anda tidak memiliki hak akses untuk memanipulasi (Edit) invoice.');
+            return;
+        }
+
+        const isPaidInvoice =
+            invoice?.status === 'paid' ||
+            ((Number(invoice?.paid_amount) || 0) >= (Number(invoice?.total_amount) || 0) && Number(invoice?.total_amount) > 0);
+
+        if (!isPaidInvoice) {
+            alert('Reinvoicing hanya bisa dilakukan dari invoice yang sudah Paid.');
+            return;
+        }
+
+        if (!newInvoiceDate) {
+            alert('Tanggal invoice baru wajib diisi.');
+            return;
+        }
+
+        try {
+            const timestamp = new Date().toISOString();
+            const invoiceDateObj = new Date(newInvoiceDate);
+            const terms = String(invoice.payment_terms || 'NET 30');
+            const days = parseInt(terms.replace('NET ', ''), 10);
+            const dueDateObj = Number.isFinite(days)
+                ? new Date(invoiceDateObj.getTime() + (days * 24 * 60 * 60 * 1000))
+                : invoiceDateObj;
+            const newDueDate = dueDateObj.toISOString().split('T')[0];
+
+            const internalReinvoiceNote =
+                `[REINVOICE ${timestamp.slice(0, 10)}] Source: ${invoice.invoice_number}. ` +
+                `${reinvoiceNote?.trim() || 'Perubahan terhadap invoice lama.'}`;
+
+            const newInvoice = {
+                quotation_id: invoice.quotation_id || null,
+                shipment_id: invoice.shipment_id || null,
+                job_number: invoice.job_number || null,
+                so_number: invoice.so_number || null,
+                customer_id: invoice.customer_id || null,
+                customer_name: invoice.customer_name || null,
+                customer_company: invoice.customer_company || null,
+                customer_address: invoice.customer_address || null,
+                customer_email: invoice.customer_email || null,
+                customer_phone: invoice.customer_phone || null,
+                invoice_number: invoice.invoice_number,
+                invoice_date: newInvoiceDate,
+                due_date: newDueDate,
+                payment_terms: invoice.payment_terms || 'NET 30',
+                currency: invoice.currency || 'IDR',
+                exchange_rate: invoice.exchange_rate || 1,
+                invoice_items: invoice.invoice_items || [],
+                cogs_items: invoice.cogs_items || [],
+                subtotal: Number(invoice.subtotal) || 0,
+                tax_amount: Number(invoice.tax_amount) || 0,
+                tax_rate: Number(invoice.tax_rate) || 0,
+                discount_amount: Number(invoice.discount_amount) || 0,
+                total_amount: Number(invoice.total_amount) || 0,
+                paid_amount: 0,
+                outstanding_amount: Number(invoice.total_amount) || 0,
+                status: 'draft',
+                payment_bank_id: invoice.payment_bank_id || null,
+                cogs_subtotal: Number(invoice.cogs_subtotal) || 0,
+                gross_profit: Number(invoice.gross_profit) || 0,
+                profit_margin: Number(invoice.profit_margin) || 0,
+                customer_notes: invoice.customer_notes || null,
+                notes: internalReinvoiceNote,
+                consignor: invoice.consignor || null,
+                consignee: invoice.consignee || null,
+                order_reference: invoice.order_reference || null,
+                goods_description: invoice.goods_description || null,
+                import_broker: invoice.import_broker || null,
+                chargeable_weight: invoice.chargeable_weight || null,
+                packages: invoice.packages || null,
+                vessel_name: invoice.vessel_name || null,
+                voyage_number: invoice.voyage_number || null,
+                ocean_bl: invoice.ocean_bl || null,
+                house_bl: invoice.house_bl || null,
+                etd: invoice.etd || null,
+                eta: invoice.eta || null,
+                containers: invoice.containers || null,
+                created_at: timestamp,
+                updated_at: timestamp,
+            };
+
+            const { data: insertedData, error: insertError } = await supabase
+                .from('blink_invoices')
+                .insert([newInvoice])
+                .select();
+
+            if (insertError) {
+                const errMsg = String(insertError?.message || '').toLowerCase();
+                if (insertError?.code === '23505' || errMsg.includes('duplicate key') || errMsg.includes('invoice_number')) {
+                    alert('❌ Reinvoicing gagal: sistem database saat ini masih mensyaratkan nomor invoice unik.\n\nSilakan update constraint database jika ingin mengizinkan nomor invoice yang sama untuk reinvoicing.');
+                    return;
+                }
+                throw insertError;
+            }
+
+            const sourceHistoryNote =
+                `[REINVOICE CREATED ${timestamp.slice(0, 10)}] Draft reinvoice dibuat dengan nomor yang sama (${invoice.invoice_number}) dan tanggal baru ${newInvoiceDate}.`;
+            const mergedSourceNotes = invoice.notes
+                ? `${invoice.notes}\n${sourceHistoryNote}`
+                : sourceHistoryNote;
+
+            await supabase
+                .from('blink_invoices')
+                .update({ notes: mergedSourceNotes, updated_at: timestamp })
+                .eq('id', invoice.id);
+
+            await fetchInvoices();
+            setShowReinvoiceModal(false);
+            setReinvoiceSourceInvoice(null);
+            setShowViewModal(false);
+            setSelectedInvoice(null);
+
+            const created = insertedData?.[0];
+            alert(
+                `✅ Reinvoicing draft berhasil dibuat.\n\n` +
+                `Source Invoice: ${invoice.invoice_number}\n` +
+                `New Draft ID: ${created?.id || '-'}\n` +
+                `Invoice Number: ${invoice.invoice_number}\n` +
+                `Invoice Date: ${newInvoiceDate}`
+            );
+        } catch (error) {
+            console.error('Error creating reinvoice:', error);
+            alert('Failed to create reinvoice: ' + error.message);
+        }
+    };
+
 
 
     const filteredInvoices = invoices.filter(inv => {
@@ -1649,9 +1792,30 @@ const InvoiceManagement = () => {
 
     // Calculate summary stats excluding draft, manager_approval, cancelled, and rejected
     const activeInvoices = invoices.filter(inv => !['draft', 'manager_approval', 'cancelled', 'rejected'].includes(inv.status));
-    const totalRevenue = activeInvoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
-    const totalOutstanding = activeInvoices.reduce((sum, inv) => sum + (inv.outstanding_amount || 0), 0);
     const overdueCount = activeInvoices.filter(inv => inv.status === 'overdue').length;
+
+    const convertToSummaryCurrencies = (amount, currency, exchangeRate) => {
+        const amt = Number(amount || 0);
+        const curr = String(currency || 'IDR').toUpperCase();
+        const rawRate = Number(exchangeRate || 0);
+        const rate = rawRate > 1 ? rawRate : 16000;
+
+        if (curr === 'USD') {
+            return { idr: amt * rate, usd: amt };
+        }
+
+        return { idr: amt, usd: rate > 0 ? amt / rate : 0 };
+    };
+
+    const revenueSummary = activeInvoices.reduce((acc, inv) => {
+        const converted = convertToSummaryCurrencies(inv.total_amount, inv.currency, inv.exchange_rate);
+        return { idr: acc.idr + converted.idr, usd: acc.usd + converted.usd };
+    }, { idr: 0, usd: 0 });
+
+    const outstandingSummary = activeInvoices.reduce((acc, inv) => {
+        const converted = convertToSummaryCurrencies(inv.outstanding_amount, inv.currency, inv.exchange_rate);
+        return { idr: acc.idr + converted.idr, usd: acc.usd + converted.usd };
+    }, { idr: 0, usd: 0 });
 
     const handleExportXLS = () => {
         import('../../utils/exportXLS').then(({ exportToXLS }) => {
@@ -1763,22 +1927,9 @@ const InvoiceManagement = () => {
                     <p className="text-silver-dark mt-1">Kelola invoice dan tracking pembayaran</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <Button
-                        onClick={runMigration}
-                        icon={PlaySquare}
-                        variant="secondary"
-                        disabled={isMigrating}
-                    >
-                        {isMigrating ? 'Migrating...' : 'Migrate Auto Journal'}
-                    </Button>
                     <Button onClick={handleExportXLS} variant="secondary" icon={Download}>
                         Export XLS
                     </Button>
-                    {canCreate('blink_invoices') && (
-                        <Button onClick={() => setShowCreateModal(true)} icon={Plus}>
-                            Generate Invoice
-                        </Button>
-                    )}
                 </div>
             </div>
 
@@ -1797,7 +1948,8 @@ const InvoiceManagement = () => {
                         <p className="text-xs text-silver-dark">Total Revenue</p>
                         <TrendingUp className="w-4 h-4 text-green-400" />
                     </div>
-                    <p className="text-xl font-bold text-green-400">{formatCurrency(totalRevenue)}</p>
+                    <p className="text-lg font-bold text-green-400">{formatCurrency(revenueSummary.idr, 'IDR')}</p>
+                    <p className="text-xs text-blue-300 mt-1">{formatCurrency(revenueSummary.usd, 'USD')}</p>
                 </div>
 
                 <div className="glass-card p-4 rounded-lg">
@@ -1805,7 +1957,8 @@ const InvoiceManagement = () => {
                         <p className="text-xs text-silver-dark">Outstanding</p>
                         <DollarSign className="w-4 h-4 text-yellow-400" />
                     </div>
-                    <p className="text-xl font-bold text-yellow-400">{formatCurrency(totalOutstanding)}</p>
+                    <p className="text-lg font-bold text-yellow-400">{formatCurrency(outstandingSummary.idr, 'IDR')}</p>
+                    <p className="text-xs text-blue-300 mt-1">{formatCurrency(outstandingSummary.usd, 'USD')}</p>
                 </div>
 
                 <div className="glass-card p-4 rounded-lg">
@@ -1975,6 +2128,10 @@ const InvoiceManagement = () => {
                             setReimbursementInvoice(selectedInvoice);
                             setShowReimbursementModal(true);
                         }}
+                        onReinvoice={() => {
+                            setReinvoiceSourceInvoice(selectedInvoice);
+                            setShowReinvoiceModal(true);
+                        }}
                         statusConfig={statusConfig}
                         canEditInvoice={canEdit('blink_invoices')}
                         canSubmitInvoice={canCreate('blink_invoices') || canEdit('blink_invoices')}
@@ -2030,6 +2187,20 @@ const InvoiceManagement = () => {
                             setReimbursementInvoice(null);
                         }}
                         onSave={handleCreateReimbursement}
+                    />
+                )
+            }
+
+            {/* Create Reinvoice Modal */}
+            {
+                showReinvoiceModal && reinvoiceSourceInvoice && (
+                    <ReinvoiceModal
+                        invoice={reinvoiceSourceInvoice}
+                        onClose={() => {
+                            setShowReinvoiceModal(false);
+                            setReinvoiceSourceInvoice(null);
+                        }}
+                        onSave={handleCreateReinvoice}
                     />
                 )
             }
@@ -2859,7 +3030,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
 };
 
 // Invoice View Modal Component
-const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint, onPreview, onSubmit, onAddItem, statusConfig, canEditInvoice, canSubmitInvoice, bankAccounts, onInvoiceUpdate, onEdit }) => {
+const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint, onPreview, onSubmit, onAddItem, onReinvoice, statusConfig, canEditInvoice, canSubmitInvoice, bankAccounts, onInvoiceUpdate, onEdit }) => {
     const [payments, setPayments] = useState([]);
     const [loadingPayments, setLoadingPayments] = useState(true);
     const [selectedBankId, setSelectedBankId] = useState(invoice.payment_bank_id || '');
@@ -2943,7 +3114,7 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
 
                 <div className="space-y-6">
                     {/* Invoice Info Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                         <div className="glass-card p-4 rounded-lg">
                             <div className="flex items-center gap-2 mb-3">
                                 <User className="w-4 h-4 text-accent-orange" />
@@ -2984,7 +3155,7 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                         </div>
 
                         {/* Shipment & Cargo Details - Side by Side Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4 md:col-span-2 xl:col-span-1">
                             {/* Shipment Details Card */}
                             <div className="glass-card p-4 rounded-lg">
                                 <div className="flex items-center gap-2 mb-3">
@@ -2994,7 +3165,9 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                                 <div className="space-y-2 text-sm">
                                     <div>
                                         <span className="text-silver-dark">Route:</span>
-                                        <span className="text-silver-light ml-2">{invoice.origin} → {invoice.destination}</span>
+                                        <span className="text-silver-light ml-2 whitespace-normal break-words leading-snug inline-block align-top">
+                                            {invoice.origin} → {invoice.destination}
+                                        </span>
                                     </div>
                                     <div>
                                         <span className="text-silver-dark">Service:</span>
@@ -3259,6 +3432,17 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                             >
                                 <Plus className="w-4 h-4" />
                                 Create Reimbursement
+                            </button>
+                        )}
+
+                        {onReinvoice && canEditInvoice && (invoice.status === 'paid' || ((invoice.paid_amount || 0) >= (invoice.total_amount || 0) && (invoice.total_amount || 0) > 0)) && (
+                            <button
+                                onClick={onReinvoice}
+                                className="flex items-center gap-2 px-4 py-2 border border-orange-500 text-orange-400 rounded-lg hover:bg-orange-500/10 smooth-transition font-semibold"
+                                title="Create new draft invoice from this paid invoice (reinvoicing)"
+                            >
+                                <FileText className="w-4 h-4" />
+                                Create Reinvoice
                             </button>
                         )}
 
@@ -4021,6 +4205,15 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                                     })()}
                                 </div>
 
+                                <div style={{ marginTop: '10px', border: '1px solid #d7d7d7', background: '#fafafa' }}>
+                                    <div style={{ padding: '8px 10px', fontSize: '10px', lineHeight: 1.55, borderBottom: '1px solid #e3e3e3', fontStyle: 'normal' }}>
+                                        All payments shall be made in full amount, except for withholding tax deductions. The full invoiced amount must be received by the Seller within thirty (30) calendar days from the invoice date.
+                                    </div>
+                                    <div style={{ padding: '8px 10px', fontSize: '10px', lineHeight: 1.55, fontStyle: 'normal' }}>
+                                        Any payment received after the thirty (30)-day due date shall be subject to a late payment charge of 2% of the total invoice amount per month, calculated from the due date until the date on which full payment is received.
+                                    </div>
+                                </div>
+
                                 <div style={{ marginTop: '10px', fontStyle: 'italic', whiteSpace: 'pre-line' }}>
                                     <strong>Notes:</strong><br />
                                     {safeStr(invoice.customer_notes)}
@@ -4367,6 +4560,81 @@ const ReimbursementModal = ({ invoice, formatCurrency, revenueAccounts, onClose,
                         ) : (
                             <><Plus className="w-4 h-4" /> Create Reimbursement Invoice</>
                         )}
+                    </button>
+                </div>
+            </div>
+        </Modal>
+    );
+};
+
+const ReinvoiceModal = ({ invoice, onClose, onSave }) => {
+    const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
+    const [internalNote, setInternalNote] = useState('Perubahan terhadap invoice lama.');
+    const [saving, setSaving] = useState(false);
+
+    const handleSave = async () => {
+        setSaving(true);
+        await onSave(invoice, invoiceDate, internalNote);
+        setSaving(false);
+    };
+
+    return (
+        <Modal isOpen={true} onClose={onClose} maxWidth="max-w-2xl">
+            <div className="p-6">
+                <div className="mb-5">
+                    <h2 className="text-xl font-bold gradient-text">Create Reinvoice Draft</h2>
+                    <p className="text-silver-dark text-sm mt-1">
+                        Source: {invoice.invoice_number} - {invoice.customer_name}
+                    </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
+                    <div className="glass-card p-3 rounded-lg border border-dark-border">
+                        <p className="text-[10px] text-silver-dark uppercase tracking-wider">Invoice Number</p>
+                        <p className="text-sm font-mono font-bold text-silver-light mt-1">{invoice.invoice_number}</p>
+                        <p className="text-[10px] text-silver-dark mt-1">Nomor invoice tetap sama sesuai permintaan reinvoicing.</p>
+                    </div>
+                    <div className="glass-card p-3 rounded-lg border border-dark-border">
+                        <p className="text-[10px] text-silver-dark uppercase tracking-wider">Source Status</p>
+                        <p className="text-sm font-bold text-green-400 mt-1">{invoice.status || 'paid'}</p>
+                    </div>
+                </div>
+
+                <div className="mb-4">
+                    <label className="block text-sm text-silver-dark mb-1">Invoice Date (baru)</label>
+                    <input
+                        type="date"
+                        value={invoiceDate}
+                        onChange={(e) => setInvoiceDate(e.target.value)}
+                        className="w-full bg-dark-surface border border-dark-border rounded-lg px-3 py-2 text-silver-light"
+                    />
+                </div>
+
+                <div className="mb-5">
+                    <label className="block text-sm text-silver-dark mb-1">Internal Note (wajib untuk jejak reinvoicing)</label>
+                    <textarea
+                        rows={3}
+                        value={internalNote}
+                        onChange={(e) => setInternalNote(e.target.value)}
+                        className="w-full bg-dark-surface border border-dark-border rounded-lg px-3 py-2 text-silver-light"
+                        placeholder="Contoh: Revisi nominal karena koreksi item handling"
+                    />
+                </div>
+
+                <div className="flex justify-end gap-3 border-t border-dark-border pt-4">
+                    <button
+                        onClick={onClose}
+                        disabled={saving}
+                        className="px-5 py-2 border border-dark-border text-silver-light rounded-lg hover:bg-dark-surface smooth-transition"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg smooth-transition font-semibold disabled:opacity-50"
+                    >
+                        {saving ? 'Creating...' : 'Create Reinvoice Draft'}
                     </button>
                 </div>
             </div>

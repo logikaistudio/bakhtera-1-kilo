@@ -163,6 +163,13 @@ const GroupedServiceItemManager = ({
         onChange(newGroups);
     };
 
+    const sanitizeUnitValue = (value) => {
+        return String(value || '')
+            .replace(/[0-9]/g, '')
+            .replace(/\s{2,}/g, ' ')
+            .trimStart();
+    };
+
     const addGroup = () => {
         const newGroup = {
             id: 'group-' + Date.now(),
@@ -214,7 +221,9 @@ const GroupedServiceItemManager = ({
             if (g.id === groupId) {
                 const newItems = g.items.map(item => {
                     if (item.id === itemId) {
-                        const updatedItem = { ...item, [field]: value };
+                        // Unit must stay textual; strip digits from typed/pasted values.
+                        const nextValue = field === 'unit' ? sanitizeUnitValue(value) : value;
+                        const updatedItem = { ...item, [field]: nextValue };
                         
                         // Auto-calculate amount if quantity or unitPrice changes
                         if (field === 'quantity' || field === 'unitPrice' || field === 'currency') {
@@ -291,7 +300,6 @@ const GroupedServiceItemManager = ({
                 const amt = parseAmountValue(item.amount, item.currency, groupRate) || 0;
                 if (item.currency === 'IDR') {
                     totalIdr = Number(totalIdr) + Number(amt);
-                    totalUsd = Number(totalUsd) + (groupRate ? (Number(amt) / Number(groupRate)) : 0);
                 } else if (item.currency === 'USD') {
                     totalUsd = Number(totalUsd) + Number(amt);
                     totalIdr = Number(totalIdr) + (Number(amt) * Number(groupRate || 1));
@@ -372,7 +380,6 @@ const GroupedServiceItemManager = ({
                     const amt = parseFloat(item.amount) || 0;
                     if (item.currency === 'IDR') {
                         groupTotalIdr += amt;
-                        groupTotalUsd += amt / currentGroupRate;
                     } else if (item.currency === 'USD') {
                         groupTotalUsd += amt;
                         groupTotalIdr += amt * currentGroupRate;
@@ -472,7 +479,6 @@ const GroupedServiceItemManager = ({
                                             let usdEq = 0;
                                             if (item.currency === 'IDR') {
                                                 idrEq = amt;
-                                                usdEq = amt / currentGroupRate;
                                             } else {
                                                 usdEq = amt;
                                                 idrEq = amt * currentGroupRate;
