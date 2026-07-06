@@ -81,7 +81,7 @@ const PartnerManagement = () => {
     };
 
     const { isAdmin: isAdminUser, canDelete } = useAuth();
-    const { deleteBusinessPartner, deleteAllBusinessPartners, addBusinessPartner, updateBusinessPartner } = useData();
+    const { deleteBusinessPartner, deleteBusinessPartnersBulk, deleteAllBusinessPartners, addBusinessPartner, updateBusinessPartner } = useData();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -184,10 +184,8 @@ const PartnerManagement = () => {
         if (!confirm(`Yakin hapus ${selectedIds.length} mitra terpilih? Data transaksi terkait tidak akan terhapus.`)) return;
 
         try {
-            const success = await Promise.all(
-                selectedIds.map(id => deleteBusinessPartner(id, 'blink_business_partners', 'blink_partners'))
-            );
-            if (success.some(result => !result)) return;
+            const success = await deleteBusinessPartnersBulk(selectedIds, 'blink_business_partners', 'blink_partners');
+            if (!success) return;
             alert(`✅ ${selectedIds.length} mitra berhasil dihapus`);
             setSelectedIds([]);
             fetchPartners();

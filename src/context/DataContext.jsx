@@ -1043,6 +1043,48 @@ export const DataProvider = ({ children }) => {
         onProgress(`${percent}% • ${label}${batchInfo}`);
     };
 
+    const isStatementTimeoutError = (error) => {
+        const msg = String(error?.message || '').toLowerCase();
+        const details = String(error?.details || '').toLowerCase();
+        return msg.includes('statement timeout') || msg.includes('canceling statement') || details.includes('statement timeout');
+    };
+
+    const deletePartnersByIdChunks = async (table, targetIds = [], onProgress, { stage = 1, totalStages = 1, baseLabel = 'Menghapus data mitra...' } = {}) => {
+        const normalizedIds = Array.isArray(targetIds) ? targetIds.filter(Boolean) : [];
+        if (normalizedIds.length === 0) return 0;
+
+        let cursor = 0;
+        let deletedCount = 0;
+        let chunkSize = 200;
+        const minChunkSize = 10;
+
+        while (cursor < normalizedIds.length) {
+            const batch = normalizedIds.slice(cursor, cursor + chunkSize);
+
+            emitProgress(onProgress, {
+                stage,
+                totalStages,
+                label: `${baseLabel} ${deletedCount}/${normalizedIds.length}`,
+                batchIndex: Math.floor(cursor / chunkSize) + 1,
+                totalBatches: Math.max(1, Math.ceil(normalizedIds.length / chunkSize))
+            });
+
+            const { error } = await supabase.from(table).delete().in('id', batch);
+            if (error) {
+                if (isStatementTimeoutError(error) && chunkSize > minChunkSize) {
+                    chunkSize = Math.max(minChunkSize, Math.floor(chunkSize / 2));
+                    continue;
+                }
+                throw error;
+            }
+
+            cursor += batch.length;
+            deletedCount += batch.length;
+        }
+
+        return deletedCount;
+    };
+
     // Bulk delete helper for Business Partners (selected IDs or all rows)
     const deleteBusinessPartnersBulk = async (ids = [], table = 'blink_business_partners', menuCode = 'central_vendors', options = {}) => {
         const onProgress = typeof options?.onProgress === 'function' ? options.onProgress : null;
@@ -1058,11 +1100,22 @@ export const DataProvider = ({ children }) => {
                 totalStages: 2,
                 label: hasIds ? `Menghapus ${ids.length} data mitra...` : 'Menghapus seluruh data mitra...'
             });
-            let query = supabase.from(table).delete();
-            query = hasIds ? query.in('id', ids) : query.not('id', 'is', null);
 
-            const { error } = await query;
-            if (error) throw error;
+            let targetIds = hasIds ? ids : [];
+            if (!hasIds) {
+                const { data: allRows, error: fetchErr } = await supabase
+                    .from(table)
+                    .select('id')
+                    .not('id', 'is', null);
+                if (fetchErr) throw fetchErr;
+                targetIds = (allRows || []).map(row => row.id).filter(Boolean);
+            }
+
+            const deletedCount = await deletePartnersByIdChunks(table, targetIds, onProgress, {
+                stage: 1,
+                totalStages: 2,
+                baseLabel: hasIds ? 'Menghapus data mitra terpilih...' : 'Menghapus seluruh data mitra...'
+            });
 
             if (table === 'blink_business_partners') {
                 if (hasIds) {
@@ -1084,7 +1137,7 @@ export const DataProvider = ({ children }) => {
                 }
             }
 
-            const scope = hasIds ? `${ids.length} partner(s)` : 'ALL partners';
+            const scope = hasIds ? `${deletedCount} partner(s)` : `ALL partners (${deletedCount})`;
             logActivity(menuCode, 'delete', 'business_partner', hasIds ? ids.join(',') : 'ALL', hasIds ? ids.join(',') : 'ALL', `Bulk deleted ${scope} from ${table}`);
             emitProgress(onProgress, { stage: 2, totalStages: 2, label: 'Cleansing mitra selesai.' });
             return true;
