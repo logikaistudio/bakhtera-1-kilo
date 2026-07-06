@@ -27,6 +27,18 @@
  *   - path  : route path (opsional, untuk referensi)
  */
 export const APP_MENUS = {
+    Pusat: {
+        label: 'Pusat',
+        color: 'purple',
+        menus: [
+            { code: 'central_vendors', label: 'Vendor Management', group: 'Fungsi Terpusat', path: '/vendors' },
+            { code: 'central_customers', label: 'Customer Management', group: 'Fungsi Terpusat', path: '/customers' },
+            { code: 'central_finance', label: 'Finance Center', group: 'Fungsi Terpusat', path: '/finance' },
+            { code: 'central_coa', label: 'COA Master (Pusat)', group: 'Fungsi Terpusat', path: '/finance/coa' },
+            { code: 'central_settings', label: 'Pengaturan Pusat', group: 'Fungsi Terpusat', path: '/settings' },
+        ],
+    },
+
     Bridge: {
         label: 'Bridge',
         color: 'blue',
@@ -133,15 +145,12 @@ export const APP_MENUS = {
             { code: 'big_events', label: 'Event Management', group: 'Operations', path: '/big/operations/events' },
             { code: 'big_costs', label: 'Event Costs', group: 'Operations', path: '/big/operations/costs' },
             // ─── Finance ───
-            { code: 'big_invoices', label: 'Invoice', group: 'Finance', path: '/big/finance/invoices' },
-            { code: 'big_ar', label: 'Piutang (AR)', group: 'Finance', path: '/big/finance/ar' },
+            { code: 'big_finance', label: 'Keuangan (Invoice/PO/AR/AP)', group: 'Finance', path: '/big/finance/invoices' },
             { code: 'big_coa', label: 'COA Master', group: 'Finance', path: '/big/finance/coa' },
             // ─── Master Data ───
             { code: 'big_settings', label: 'Pengaturan Modul', group: 'Master Data', path: '/big/master/settings' },
         ],
     },
-
-    // Pusat group removed — vendor/customer/finance/coa/settings each exist within their own portals.
 };
 
 

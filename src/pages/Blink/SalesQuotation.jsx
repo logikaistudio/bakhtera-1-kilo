@@ -979,85 +979,10 @@ const SalesQuotation = () => {
                 }
             }
 
-            console.log('🗑️ Starting cascade delete for quotation:', quotationId);
-            const quotationIds = [quotationId];
-
-            // Step 1: Find all related shipments
-            const { data: shipments } = await supabase.from('blink_shipments').select('id').in('quotation_id', quotationIds);
-            const shipmentIds = (shipments || []).map(s => s.id);
-
-            // Step 2: Find all related invoices (AR)
-            const { data: invoices } = await supabase.from('blink_invoices').select('id').in('quotation_id', quotationIds);
-            const invoiceIds = (invoices || []).map(i => i.id);
-
-            // Step 3: Find all related POs (AP)
-            const { data: pos } = await supabase.from('blink_purchase_orders').select('id').in('quotation_id', quotationIds);
-            const poIds = (pos || []).map(p => p.id);
-
-            // Fetch ARs associated with Invoices
-            let arIds = [];
-            if (invoiceIds.length > 0) {
-                const { data: ars } = await supabase.from('blink_ar_transactions').select('id').in('invoice_id', invoiceIds);
-                arIds = (ars || []).map(a => a.id);
-            }
-
-            // Fetch APs associated with POs
-            let apIds = [];
-            if (poIds.length > 0) {
-                const { data: aps } = await supabase.from('blink_ap_transactions').select('id').in('po_id', poIds);
-                apIds = (aps || []).map(a => a.id);
-            }
-
-            // Fetch Payments linked to any of the above
-            let paymentRefKeys = [];
-            if (invoiceIds.length > 0) paymentRefKeys.push(...invoiceIds);
-            if (poIds.length > 0) paymentRefKeys.push(...poIds);
-            if (arIds.length > 0) paymentRefKeys.push(...arIds);
-            if (apIds.length > 0) paymentRefKeys.push(...apIds);
-            
-            let paymentIds = [];
-            if (paymentRefKeys.length > 0) {
-                const { data: payments } = await supabase.from('blink_payments').select('id').in('reference_id', paymentRefKeys);
-                paymentIds = (payments || []).map(p => p.id);
-            }
-
-            // Reference IDs for journal entries
-            const journalRefIds = [...quotationIds, ...shipmentIds, ...invoiceIds, ...poIds, ...arIds, ...apIds, ...paymentIds];
-
-            // DO CASCADE EXECUTIONS (Bottom-Up)
-            
-            if (journalRefIds.length > 0) {
-                console.log(`Deleting journals...`);
-                await supabase.from('blink_journal_entries').delete().in('reference_id', journalRefIds);
-            }
-
-            if (paymentIds.length > 0) {
-                console.log(`Deleting payments...`);
-                await supabase.from('blink_payments').delete().in('id', paymentIds);
-            }
-
-            if (arIds.length > 0) await supabase.from('blink_ar_transactions').delete().in('id', arIds);
-            if (apIds.length > 0) await supabase.from('blink_ap_transactions').delete().in('id', apIds);
-
-            if (invoiceIds.length > 0) await supabase.from('blink_invoices').delete().in('id', invoiceIds);
-            if (poIds.length > 0) await supabase.from('blink_purchase_orders').delete().in('id', poIds);
-
-            if (shipmentIds.length > 0) {
-                // Delete BLs explicitly to avoid constraint error
-                await supabase.from('blink_bl_documents').delete().in('shipment_id', shipmentIds);
-                await supabase.from('blink_shipments').delete().in('id', shipmentIds);
-            }
-
-            // Delete Quotation
-            console.log('Deleting quotation...');
-            const { error: quotationError } = await supabase
-                .from('blink_sales_quotations')
-                .delete()
-                .eq('id', quotationId);
-
-            if (quotationError) throw quotationError;
-
-            console.log('✅ Quotation deleted successfully');
+            console.log('🗑️ Starting cascade delete for quotation via DataContext helper:', quotationId);
+            const success = await deleteBlinkQuotationCascade(quotationId, 'blink_sales_quotations', 'blink_sales_quotations');
+            if (!success) throw new Error('Delete failed');
+            console.log('✅ Quotation deleted successfully (via helper)');
 
             // Refresh quotations list
             await fetchQuotations();

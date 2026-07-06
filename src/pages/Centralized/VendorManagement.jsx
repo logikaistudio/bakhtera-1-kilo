@@ -4,10 +4,12 @@ import DataTable from '../../components/Common/DataTable';
 import Modal from '../../components/Common/Modal';
 import Button from '../../components/Common/Button';
 import { Plus, Users, Download } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import { exportToCSV } from '../../utils/exportCSV';
 
 const VendorManagement = () => {
     const { businessPartners, addBusinessPartner, updateBusinessPartner, deleteBusinessPartner } = useData();
+    const { isAdmin, canDelete } = useAuth();
 
     // Filter vendors from business partners
     const vendors = useMemo(() =>
@@ -81,6 +83,10 @@ const VendorManagement = () => {
     };
 
     const handleRemove = (vendor) => {
+        if (!(isAdmin() || canDelete('central_vendors'))) {
+            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus partner.');
+            return;
+        }
         if (window.confirm(`Are you sure you want to delete ${vendor.partner_name}?`)) {
             deleteBusinessPartner(vendor.id);
         }
@@ -357,7 +363,7 @@ const VendorManagement = () => {
                     </div>
 
                     <div className="flex justify-between gap-3 mt-6">
-                        {editingVendor && (
+                        {editingVendor && (isAdmin() || canDelete('central_vendors')) && (
                             <Button
                                 type="button"
                                 variant="secondary"

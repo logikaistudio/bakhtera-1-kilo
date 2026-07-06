@@ -73,14 +73,19 @@ const RolePermissions = () => {
     const [permissions, setPermissions] = useState({});
     const [activeModule, setActiveModule] = useState('Bridge');
     const [activeRole, setActiveRole] = useState('direksi');
-    const [loading, setLoading] = useState(false);
+    const [, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [notification, setNotification] = useState(null);
     const [showAddRole, setShowAddRole] = useState(false);
     const [newRoleName, setNewRoleName] = useState('');
-    const [expandedMenus, setExpandedMenus] = useState({});
     const [editingRoleId, setEditingRoleId] = useState(null);
     const [editRoleName, setEditRoleName] = useState('');
+
+    const notifyRoleConfigUpdated = () => {
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new Event('role-config-updated'));
+        }
+    };
 
     // Load from Supabase on mount — custom roles juga ikut diload
     useEffect(() => {
@@ -194,10 +199,6 @@ const RolePermissions = () => {
     const isMenuFullyGranted = (roleId, menuCode) =>
         PERMISSION_COLS.every(col => permissions[roleId]?.[menuCode]?.[col.key]);
 
-    const isMenuPartiallyGranted = (roleId, menuCode) =>
-        PERMISSION_COLS.some(col => permissions[roleId]?.[menuCode]?.[col.key]) &&
-        !isMenuFullyGranted(roleId, menuCode);
-
     const isModuleFullyGranted = (roleId, moduleName) =>
         MODULE_MENUS[moduleName].menus.every(m => isMenuFullyGranted(roleId, m.code));
 
@@ -264,6 +265,7 @@ const RolePermissions = () => {
                 type: 'success',
                 message: `✅ Sync berhasil! ${toInsert.length} entri menu baru ditambahkan ke database.`,
             });
+            notifyRoleConfigUpdated();
             // Reload agar tampilan di-update
             await loadPermissions();
         } catch (err) {
@@ -312,6 +314,7 @@ const RolePermissions = () => {
             setNotification({ type: 'success', message: `✅ Pengaturan role berhasil disimpan! (${rows.length} entri) — User yang sedang login perlu logout & login ulang agar perubahan berlaku.` });
             // Refresh permissions untuk admin yang sedang login
             await refreshPermissions();
+            notifyRoleConfigUpdated();
         } catch (err) {
             console.error('❌ Save error:', err);
             setNotification({ type: 'error', message: `Gagal menyimpan pengaturan: ${err.message || 'Unknown error'}` });
@@ -354,6 +357,7 @@ const RolePermissions = () => {
                 .upsert(rows, { onConflict: 'role_id,menu_code', ignoreDuplicates: false });
             if (error) throw error;
             setNotification({ type: 'success', message: `Role "${trimmed}" berhasil ditambahkan & disimpan!` });
+            notifyRoleConfigUpdated();
         } catch (err) {
             console.error('❌ addRole DB error:', err);
             // ✅ Fixed: Show error notification with actual error message
@@ -383,6 +387,7 @@ const RolePermissions = () => {
                 .eq('role_id', roleId);
             if (error) throw error;
             setNotification({ type: 'success', message: `Role "${roleName}" berhasil dihapus.` });
+            notifyRoleConfigUpdated();
         } catch (err) {
             console.error('❌ deleteRole DB error:', err);
             // ✅ Fixed: Show error instead of success
@@ -423,6 +428,7 @@ const RolePermissions = () => {
 
             if (error) throw error;
             setNotification({ type: 'success', message: `Role diubah menjadi "${trimmed}"` });
+            notifyRoleConfigUpdated();
         } catch (err) {
             console.error('❌ editRole DB error:', err);
             // ✅ Fixed: Show error instead of success
@@ -434,7 +440,6 @@ const RolePermissions = () => {
     };
 
     const currentMenus = MODULE_MENUS[activeModule]?.menus || [];
-    const style = MODULE_STYLES[activeModule];
     const ModuleIcon = MODULE_MENUS[activeModule]?.icon;
 
     return (
@@ -600,10 +605,11 @@ const RolePermissions = () => {
                             const modColors = {
                                 Bridge: { active: '#eff6ff', border: '#bfdbfe', text: '#1d4ed8' },
                                 Blink: { active: '#ecfeff', border: '#a5f3fc', text: '#0e7490' },
+                                BXPO: { active: '#eef2ff', border: '#c7d2fe', text: '#4338ca' },
                                 Big: { active: '#fff7ed', border: '#fed7aa', text: '#c2410c' },
                                 Pusat: { active: '#faf5ff', border: '#ddd6fe', text: '#6d28d9' },
                             };
-                            const mc = modColors[modName];
+                            const mc = modColors[modName] || { active: '#f9fafb', border: '#e5e7eb', text: '#374151' };
                             return (
                                 <button
                                     key={modName}

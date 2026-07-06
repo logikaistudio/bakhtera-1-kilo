@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
     Users, Shield, CheckCircle2, AlertCircle, Edit2, Save, X,
@@ -45,12 +45,12 @@ const UserPermissionAssignment = () => {
     const [saving, setSaving] = useState(false);
     const [notification, setNotification] = useState(null);
 
-    const showNotif = (type, message) => {
+    const showNotif = useCallback((type, message) => {
         setNotification({ type, message });
         setTimeout(() => setNotification(null), 4000);
-    };
+    }, []);
 
-    const loadUsers = async () => {
+    const loadUsers = useCallback(async () => {
         try {
             const { data, error } = await supabase
                 .from('users')
@@ -62,10 +62,10 @@ const UserPermissionAssignment = () => {
         } catch (err) {
             showNotif('error', 'Gagal memuat data user: ' + err.message);
         }
-    };
+    }, [showNotif]);
 
     // Load roles dari tabel role_permissions + super_admin
-    const loadRoles = async () => {
+    const loadRoles = useCallback(async () => {
         try {
             // ✅ Fixed: Use simpler query and explicit deduplication
             const { data, error } = await supabase
@@ -113,17 +113,26 @@ const UserPermissionAssignment = () => {
             setRoles(defaultRoles);
             console.warn('⚠️  Using fallback roles due to error:', err.message);
         }
-    };
+    }, []);
 
-    const loadAll = async () => {
+    const loadAll = useCallback(async () => {
         setLoading(true);
         await Promise.all([loadUsers(), loadRoles()]);
         setLoading(false);
-    };
+    }, [loadUsers, loadRoles]);
 
     useEffect(() => {
         loadAll();
-    }, []);
+    }, [loadAll]);
+
+    useEffect(() => {
+        const syncFromRoleManager = () => {
+            loadAll();
+        };
+
+        window.addEventListener('role-config-updated', syncFromRoleManager);
+        return () => window.removeEventListener('role-config-updated', syncFromRoleManager);
+    }, [loadAll]);
 
     const startEdit = (user) => {
         setEditingId(user.id);

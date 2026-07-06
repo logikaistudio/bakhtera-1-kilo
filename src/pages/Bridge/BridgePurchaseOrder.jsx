@@ -52,7 +52,7 @@ const recordApprovalHistory = async (po, action, reason = null, approverName = '
 
 const BridgePurchaseOrder = () => {
     const { user, canCreate, canEdit, canDelete, canView, canApprove } = useAuth();
-    const { companySettings, bridgeBusinessPartners } = useData();
+    const { companySettings, bridgeBusinessPartners, deleteBridgePurchaseOrderCascade } = useData();
     const [pos, setPOs] = useState([]);
     const [vendors, setVendors] = useState([]);
     const [shipments, setShipments] = useState([]);
@@ -93,6 +93,9 @@ const BridgePurchaseOrder = () => {
     // Edit state
     const [isEditing, setIsEditing] = useState(false);
     const [editId, setEditId] = useState(null);
+    const canCleanseBridgePO = canDelete('bridge_finance');
+    const [isCleansing, setIsCleansing] = useState(false);
+    const [cleanseProgress, setCleanseProgress] = useState('');
 
     const statusConfig = {
         draft: { label: 'Draft', color: 'bg-gray-600 text-gray-100', icon: FileText },
@@ -483,7 +486,7 @@ const BridgePurchaseOrder = () => {
     };
 
     const handleDeletePO = async (po) => {
-        if (!canDelete('blink_purchase_order')) {
+        if (!canCleanseBridgePO) {
             alert('Anda tidak memiliki hak akses untuk menghapus PO.');
             return;
         }
@@ -496,69 +499,8 @@ const BridgePurchaseOrder = () => {
         if (!confirm(`Hapus PO ${po.po_number}?\n\nPerhatian: This action cannot be undone dan akan menghapus AP yang terkait.`)) return;
 
         try {
-            console.log('Deleting PO:', po.po_number);
-
-            // 1. Fetch linked AP entry to delete its related journal entries
-            const { data: linkedAp } = await supabase
-                .from('bridge_ap_transactions')
-                .select('id')
-                .eq('po_id', po.id)
-                .single();
-                
-            let apIdToDelete = linkedAp?.id;
-            if (!apIdToDelete) {
-                const { data: bigLinkedAp } = await supabase
-                    .from('bridge_ap_transactions')
-                    .select('id')
-                    .eq('po_id', po.id)
-                    .single();
-                apIdToDelete = bigLinkedAp?.id;
-            }
-
-            if (apIdToDelete) {
-                const { error: journalError } = await supabase
-                    .from('bridge_journal_entries')
-                    .delete()
-                    .eq('reference_id', apIdToDelete);
-
-                if (journalError) {
-                    console.warn('Could not delete linked journal entries:', journalError);
-                }
-            }
-
-            // 2. Delete linked AP entry if exists
-            const { error: apError } = await supabase
-                .from('bridge_ap_transactions')
-                .delete()
-                .eq('po_id', po.id);
-                
-            const { error: bigApError } = await supabase
-                .from('bridge_ap_transactions')
-                .delete()
-                .eq('po_id', po.id);
-
-            if (apError && bigApError) {
-                console.warn('Could not delete linked AP (may not exist):', apError);
-            }
-
-            // 2. Delete linked payments if any
-            const { error: paymentError } = await supabase
-                .from('bridge_payments')
-                .delete()
-                .eq('reference_id', po.id)
-                .eq('reference_type', 'po');
-
-            if (paymentError) {
-                console.warn('Could not delete linked payments:', paymentError);
-            }
-
-            // 3. Delete the PO
-            const { error } = await supabase
-                .from('bridge_pos')
-                .delete()
-                .eq('id', po.id);
-
-            if (error) throw error;
+            const success = await deleteBridgePurchaseOrderCascade(po.id);
+            if (!success) return;
 
             await fetchPOs();
             setShowViewModal(false);
@@ -567,6 +509,39 @@ const BridgePurchaseOrder = () => {
         } catch (error) {
             console.error('Error deleting PO:', error);
             alert('Failed to delete PO: ' + error.message);
+        }
+    };
+
+    const handleCleanseAllBridgePO = async () => {
+        if (!canCleanseBridgePO) {
+            alert('Akses Ditolak: Anda tidak memiliki hak untuk cleansing PO Bridge.');
+            return;
+        }
+        if (pos.length === 0) {
+            alert('Tidak ada data PO Bridge untuk dihapus.');
+            return;
+        }
+
+        const confirm1 = confirm(`Cleansing akan menghapus SEMUA PO Bridge (${pos.length} baris) beserta AP, pembayaran, dan jurnal terkait. Lanjutkan?`);
+        if (!confirm1) return;
+
+        const confirm2 = confirm('Konfirmasi terakhir: semua data PO Bridge akan dihapus permanen. Yakin lanjut?');
+        if (!confirm2) return;
+
+        try {
+            setIsCleansing(true);
+            setCleanseProgress('Memulai cleansing PO Bridge...');
+            const success = await deleteBridgePurchaseOrderCascade(pos.map(po => po.id), {
+                onProgress: (message) => setCleanseProgress(message)
+            });
+            if (!success) return;
+            await fetchPOs();
+            alert('✅ Cleansing PO Bridge selesai.');
+        } catch (error) {
+            console.error('Error cleansing bridge PO:', error);
+            alert('❌ Gagal cleansing PO Bridge: ' + (error.message || error));
+        } finally {
+            setIsCleansing(false);
         }
     };
 
@@ -1312,6 +1287,14 @@ const BridgePurchaseOrder = () => {
                     <p className="text-silver-dark mt-1">Kelola pembelian dari vendor</p>
                 </div>
                 <div className="flex gap-2">
+                    <Button
+                        onClick={handleCleanseAllBridgePO}
+                        icon={Trash2}
+                        variant="danger"
+                        disabled={!canCleanseBridgePO || pos.length === 0 || isCleansing}
+                    >
+                        {isCleansing ? 'Cleansing...' : 'Bersihkan Semua Data'}
+                    </Button>
                     <Button onClick={handleExportXLS} icon={Download} variant="secondary">
                         Export to Excel
                     </Button>
@@ -1322,6 +1305,12 @@ const BridgePurchaseOrder = () => {
                     )}
                 </div>
             </div>
+
+            {isCleansing && (
+                <div className="glass-card px-4 py-2 rounded-lg border border-amber-500/30 bg-amber-500/10">
+                    <p className="text-xs text-amber-300">Progress Cleansing: {cleanseProgress || 'Sedang memproses...'}</p>
+                </div>
+            )}
 
             {/* Search - Full Width */}
             <div className="w-full">

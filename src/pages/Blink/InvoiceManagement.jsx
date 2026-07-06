@@ -21,7 +21,7 @@ import InvoiceProfitSummary from '../../components/Blink/InvoiceProfitSummary';
 const InvoiceManagement = () => {
     const navigate = useNavigate();
     const { canCreate, canEdit, canDelete, canApprove, user } = useAuth();
-    const { companySettings, bankAccounts, businessPartners } = useData();
+    const { companySettings, bankAccounts, businessPartners, deleteInvoiceCascade } = useData();
     const [invoices, setInvoices] = useState([]);
     const [quotations, setQuotations] = useState([]);
     const [shipments, setShipments] = useState([]);
@@ -51,6 +51,41 @@ const InvoiceManagement = () => {
     const [successSubmitMsg, setSuccessSubmitMsg] = useState('');
     const [isEditingInvoice, setIsEditingInvoice] = useState(false);
     const [editInvoiceId, setEditInvoiceId] = useState(null);
+    const [isCleansing, setIsCleansing] = useState(false);
+    const [cleanseProgress, setCleanseProgress] = useState('');
+
+    const handleCleanseAllInvoices = async () => {
+        if (!canDelete('blink_invoices')) {
+            alert('Akses Ditolak: Anda tidak memiliki hak untuk cleansing Invoice.');
+            return;
+        }
+        if (invoices.length === 0) {
+            alert('Tidak ada data invoice untuk dihapus.');
+            return;
+        }
+
+        const confirm1 = confirm(`Cleansing akan menghapus SEMUA invoice (${invoices.length} baris) beserta AR, pembayaran, dan jurnal terkait. Lanjutkan?`);
+        if (!confirm1) return;
+
+        const confirm2 = confirm('Konfirmasi terakhir: semua data invoice terkait akan dihapus permanen. Yakin lanjut?');
+        if (!confirm2) return;
+
+        try {
+            setIsCleansing(true);
+            setCleanseProgress('Memulai cleansing invoice...');
+            const success = await deleteInvoiceCascade(invoices.map(inv => inv.id), {
+                onProgress: (message) => setCleanseProgress(message)
+            });
+            if (!success) return;
+            await fetchInvoices();
+            alert('✅ Cleansing invoice selesai.');
+        } catch (error) {
+            console.error('Error cleansing invoices:', error);
+            alert('❌ Gagal cleansing invoice: ' + (error.message || error));
+        } finally {
+            setIsCleansing(false);
+        }
+    };
 
     // Form state for creating invoice
     const [formData, setFormData] = useState({
@@ -1927,11 +1962,25 @@ const InvoiceManagement = () => {
                     <p className="text-silver-dark mt-1">Kelola invoice dan tracking pembayaran</p>
                 </div>
                 <div className="flex items-center gap-3">
+                    <Button
+                        onClick={handleCleanseAllInvoices}
+                        variant="danger"
+                        icon={Trash}
+                        disabled={!canDelete('blink_invoices') || invoices.length === 0 || isCleansing}
+                    >
+                        {isCleansing ? 'Cleansing...' : 'Bersihkan Semua Data'}
+                    </Button>
                     <Button onClick={handleExportXLS} variant="secondary" icon={Download}>
                         Export XLS
                     </Button>
                 </div>
             </div>
+
+            {isCleansing && (
+                <div className="glass-card px-4 py-2 rounded-lg border border-amber-500/30 bg-amber-500/10">
+                    <p className="text-xs text-amber-300">Progress Cleansing: {cleanseProgress || 'Sedang memproses...'}</p>
+                </div>
+            )}
 
             {/* Summary Cards - Compact */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

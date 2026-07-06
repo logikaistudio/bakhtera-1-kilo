@@ -52,7 +52,7 @@ const recordApprovalHistory = async (po, action, reason = null, approverName = '
 
 const PurchaseOrder = () => {
     const { user, canCreate, canEdit, canDelete, canView, canApprove } = useAuth();
-    const { companySettings, businessPartners } = useData();
+    const { companySettings, businessPartners, deletePurchaseOrderCascade } = useData();
     const [pos, setPOs] = useState([]);
     const [vendors, setVendors] = useState([]);
     const [shipments, setShipments] = useState([]);
@@ -93,6 +93,9 @@ const PurchaseOrder = () => {
     // Edit state
     const [isEditing, setIsEditing] = useState(false);
     const [editId, setEditId] = useState(null);
+    const canCleansePO = canDelete('blink_purchase_order');
+    const [isCleansing, setIsCleansing] = useState(false);
+    const [cleanseProgress, setCleanseProgress] = useState('');
 
     const statusConfig = {
         draft: { label: 'Draft', color: 'bg-gray-600 text-gray-100', icon: FileText },
@@ -498,68 +501,8 @@ const PurchaseOrder = () => {
         try {
             console.log('Deleting PO:', po.po_number);
 
-            // 1. Fetch linked AP entry to delete its related journal entries
-            const { data: linkedAp } = await supabase
-                .from('blink_ap_transactions')
-                .select('id')
-                .eq('po_id', po.id)
-                .single();
-                
-            let apIdToDelete = linkedAp?.id;
-            if (!apIdToDelete) {
-                const { data: bigLinkedAp } = await supabase
-                    .from('big_ap_transactions')
-                    .select('id')
-                    .eq('po_id', po.id)
-                    .single();
-                apIdToDelete = bigLinkedAp?.id;
-            }
-
-            if (apIdToDelete) {
-                const { error: journalError } = await supabase
-                    .from('blink_journal_entries')
-                    .delete()
-                    .eq('reference_id', apIdToDelete);
-
-                if (journalError) {
-                    console.warn('Could not delete linked journal entries:', journalError);
-                }
-            }
-
-            // 2. Delete linked AP entry if exists
-            const { error: apError } = await supabase
-                .from('blink_ap_transactions')
-                .delete()
-                .eq('po_id', po.id);
-                
-            const { error: bigApError } = await supabase
-                .from('big_ap_transactions')
-                .delete()
-                .eq('po_id', po.id);
-
-            if (apError && bigApError) {
-                console.warn('Could not delete linked AP (may not exist):', apError);
-            }
-
-            // 2. Delete linked payments if any
-            const { error: paymentError } = await supabase
-                .from('blink_payments')
-                .delete()
-                .eq('reference_id', po.id)
-                .eq('reference_type', 'po');
-
-            if (paymentError) {
-                console.warn('Could not delete linked payments:', paymentError);
-            }
-
-            // 3. Delete the PO
-            const { error } = await supabase
-                .from('blink_purchase_orders')
-                .delete()
-                .eq('id', po.id);
-
-            if (error) throw error;
-
+            const success = await deletePurchaseOrderCascade(po.id);
+            if (!success) return;
             await fetchPOs();
             setShowViewModal(false);
             setSelectedPO(null);
@@ -567,6 +510,39 @@ const PurchaseOrder = () => {
         } catch (error) {
             console.error('Error deleting PO:', error);
             alert('Failed to delete PO: ' + error.message);
+        }
+    };
+
+    const handleCleanseAllPOs = async () => {
+        if (!canCleansePO) {
+            alert('Akses Ditolak: Anda tidak memiliki hak untuk cleansing PO.');
+            return;
+        }
+        if (pos.length === 0) {
+            alert('Tidak ada data PO untuk dihapus.');
+            return;
+        }
+
+        const confirm1 = confirm(`Cleansing akan menghapus SEMUA PO (${pos.length} baris) beserta AP, pembayaran, dan jurnal terkait. Lanjutkan?`);
+        if (!confirm1) return;
+
+        const confirm2 = confirm('Konfirmasi terakhir: semua data PO terkait akan dihapus permanen. Yakin lanjut?');
+        if (!confirm2) return;
+
+        try {
+            setIsCleansing(true);
+            setCleanseProgress('Memulai cleansing PO...');
+            const success = await deletePurchaseOrderCascade(pos.map(po => po.id), {
+                onProgress: (message) => setCleanseProgress(message)
+            });
+            if (!success) return;
+            await fetchPOs();
+            alert('✅ Cleansing PO selesai.');
+        } catch (error) {
+            console.error('Error cleansing PO:', error);
+            alert('❌ Gagal cleansing PO: ' + (error.message || error));
+        } finally {
+            setIsCleansing(false);
         }
     };
 
@@ -1416,6 +1392,14 @@ const PurchaseOrder = () => {
                     <p className="text-silver-dark mt-1">Kelola pembelian dari vendor</p>
                 </div>
                 <div className="flex gap-2">
+                    <Button
+                        onClick={handleCleanseAllPOs}
+                        icon={Trash2}
+                        variant="danger"
+                        disabled={!canCleansePO || pos.length === 0 || isCleansing}
+                    >
+                        {isCleansing ? 'Cleansing...' : 'Bersihkan Semua Data'}
+                    </Button>
                     <Button onClick={handleExportXLS} icon={Download} variant="secondary">
                         Export to Excel
                     </Button>
@@ -1426,6 +1410,12 @@ const PurchaseOrder = () => {
                     )}
                 </div>
             </div>
+
+            {isCleansing && (
+                <div className="glass-card px-4 py-2 rounded-lg border border-amber-500/30 bg-amber-500/10">
+                    <p className="text-xs text-amber-300">Progress Cleansing: {cleanseProgress || 'Sedang memproses...'}</p>
+                </div>
+            )}
 
             {/* Summary Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

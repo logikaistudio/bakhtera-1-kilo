@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
+import { useData } from '../../context/DataContext';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
 import { exportPartnerTemplate, parsePartnerImportFile, bulkImportPartners } from '../../utils/partnerExport';
@@ -16,6 +18,8 @@ const PartnerManagement = () => {
     const [showModal, setShowModal] = useState(false);
     const [editingPartner, setEditingPartner] = useState(null);
     const fileInputRef = useRef(null);
+    const [isCleansing, setIsCleansing] = useState(false);
+    const [cleanseProgress, setCleanseProgress] = useState('');
 
     const [formData, setFormData] = useState({
         partner_name: '',
@@ -102,21 +106,59 @@ const PartnerManagement = () => {
         }
     };
 
+    const { isAdmin, canDelete } = useAuth();
+    const { deleteBusinessPartner, deleteAllBusinessPartners } = useData();
+    const canDeletePartner = isAdmin() || canDelete('blink_partners');
+
     const handleDelete = async (partnerId) => {
+        if (!canDeletePartner) {
+            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus partner.');
+            return;
+        }
+
         if (!confirm('Are you sure you want to delete mitra ini? Data transaksi terkait tidak akan terhapus.')) return;
 
         try {
-            const { error } = await supabase
-                .from('blink_business_partners')
-                .delete()
-                .eq('id', partnerId);
-
-            if (error) throw error;
+            const success = await deleteBusinessPartner(partnerId, 'blink_business_partners', 'blink_partners');
+            if (!success) return;
             alert('✅ Partner deleted');
             fetchPartners();
         } catch (error) {
             console.error('Error deleting partner:', error);
-            alert('❌ Failed to delete: ' + error.message);
+            alert('❌ Failed to delete: ' + (error.message || error));
+        }
+    };
+
+    const handleCleanseAll = async () => {
+        if (!canDeletePartner) {
+            alert('Akses Ditolak: Anda tidak memiliki hak untuk cleansing data partner.');
+            return;
+        }
+        if (partners.length === 0) {
+            alert('Tidak ada data mitra untuk dihapus.');
+            return;
+        }
+
+        const firstConfirm = confirm(`Cleansing akan menghapus SEMUA data mitra (${partners.length} baris). Lanjutkan?`);
+        if (!firstConfirm) return;
+
+        const secondConfirm = confirm('Konfirmasi terakhir: semua data mitra akan dihapus permanen. Yakin lanjut?');
+        if (!secondConfirm) return;
+
+        try {
+            setIsCleansing(true);
+            setCleanseProgress('Memulai proses cleansing mitra...');
+            const success = await deleteAllBusinessPartners('blink_business_partners', 'blink_partners', {
+                onProgress: (message) => setCleanseProgress(message)
+            });
+            if (!success) return;
+            alert('✅ Cleansing selesai: semua data mitra berhasil dihapus.');
+            fetchPartners();
+        } catch (error) {
+            console.error('Error cleansing business partners:', error);
+            alert('❌ Gagal cleansing data mitra: ' + (error.message || error));
+        } finally {
+            setIsCleansing(false);
         }
     };
 
@@ -265,6 +307,18 @@ const PartnerManagement = () => {
                     <p className="text-silver-dark mt-1">Kelola Customer, Vendor, Agent, dan Partner lainnya</p>
                 </div>
                 <div className="flex gap-2">
+                    <button
+                        onClick={handleCleanseAll}
+                        disabled={!canDeletePartner || partners.length === 0 || isCleansing}
+                        className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm ${canDeletePartner && partners.length > 0
+                            ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                            : 'bg-dark-surface text-silver-dark cursor-not-allowed opacity-60'
+                            }`}
+                        title={canDeletePartner ? 'Hapus semua data mitra' : 'Tidak ada akses delete'}
+                    >
+                        <Trash2 className="w-4 h-4" />
+                        {isCleansing ? 'Cleansing...' : 'Bersihkan Semua Data'}
+                    </button>
                     <div className="relative">
                         <input
                             ref={fileInputRef}
@@ -300,6 +354,12 @@ const PartnerManagement = () => {
                     </Button>
                 </div>
             </div>
+
+            {isCleansing && (
+                <div className="glass-card px-4 py-2 rounded-lg border border-amber-500/30 bg-amber-500/10">
+                    <p className="text-xs text-amber-300">Progress Cleansing: {cleanseProgress || 'Sedang memproses...'}</p>
+                </div>
+            )}
 
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
@@ -375,7 +435,7 @@ const PartnerManagement = () => {
             {/* Partners Table */}
             <div className="glass-card rounded-lg overflow-hidden">
                 <p className="text-xs text-silver-dark px-4 py-2 bg-dark-surface/50 border-b border-dark-border">
-                    💡 Klik baris untuk edit • Klik kanan untuk hapus
+                    💡 Klik baris untuk edit • Gunakan tombol hapus di kanan baris
                 </p>
                 <div className="overflow-x-auto">
                     <table className="w-full">
@@ -400,10 +460,6 @@ const PartnerManagement = () => {
                                         key={partner.id}
                                         className="hover:bg-dark-surface/50 transition-colors cursor-pointer"
                                         onClick={() => handleEdit(partner)}
-                                        onContextMenu={(e) => {
-                                            e.preventDefault();
-                                            handleDelete(partner.id);
-                                        }}
                                     >
                                         <td className="px-4 py-3 text-xs font-mono text-blue-400">{partner.partner_code}</td>
                                         <td className="px-4 py-3">
@@ -426,12 +482,31 @@ const PartnerManagement = () => {
                                             {partner.phone && <div className="flex items-center gap-1"><Phone className="w-3 h-3" />{partner.phone}</div>}
                                         </td>
                                         <td className="px-4 py-3">
-                                            <div className="flex flex-wrap gap-1">
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div className="flex flex-wrap gap-1">
                                                 {getRoleBadges(partner).map((role, idx) => (
                                                     <span key={idx} className={`px-2 py-0.5 rounded text-[10px] font-bold ${role.color}`}>
                                                         {role.label}
                                                     </span>
                                                 ))}
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    disabled={!canDeletePartner}
+                                                    className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold border transition-colors ${canDeletePartner
+                                                        ? 'text-red-400 border-red-500/30 hover:text-red-300 hover:bg-red-500/10'
+                                                        : 'text-silver-dark border-dark-border cursor-not-allowed opacity-60'
+                                                        }`}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (!canDeletePartner) return;
+                                                        handleDelete(partner.id);
+                                                    }}
+                                                    title={canDeletePartner ? 'Hapus Mitra' : 'Tidak ada akses hapus'}
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                    Hapus
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>

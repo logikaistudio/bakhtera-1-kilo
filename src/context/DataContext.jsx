@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { fileToBase64, validateImage } from '../utils/validateImage';
+import { useAuth } from './AuthContext';
 
 const DataContext = createContext();
 
@@ -49,6 +50,9 @@ export const DataProvider = ({ children }) => {
 
     // Activity Logs for audit tracking
     const [activityLogs, setActivityLogs] = useState([]);
+
+    // Auth helpers (AuthProvider wraps DataProvider)
+    const { isAdmin, canDelete } = useAuth();
 
     // Helper function to log activity
     const logActivity = (module, action, entityType, entityId, entityName, details, user = 'System User') => {
@@ -896,8 +900,12 @@ export const DataProvider = ({ children }) => {
         return true;
     };
 
-    const deleteBusinessPartner = async (id) => {
-        const { error } = await supabase.from('blink_business_partners').delete().eq('id', id);
+    const deleteBusinessPartner = async (id, table = 'blink_business_partners', menuCode = 'central_vendors') => {
+        if (!(isAdmin() || canDelete(menuCode))) {
+            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus partner.');
+            return false;
+        }
+        const { error } = await supabase.from(table).delete().eq('id', id);
         if (error) {
             console.error('Error deleting business partner:', error);
             alert('Failed to delete business partner');
@@ -907,7 +915,208 @@ export const DataProvider = ({ children }) => {
         setBusinessPartners(prev => prev.filter(p => p.id !== id));
         setCustomers(prev => prev.filter(c => c.id !== id));
         setVendors(prev => prev.filter(v => v.id !== id));
+        logActivity('central_vendors', 'delete', 'business_partner', id, id, `Deleted business partner ${id}`);
         return true;
+    };
+
+    const emitProgress = (onProgress, { stage = 1, totalStages = 1, label = '', batchIndex = 1, totalBatches = 1 }) => {
+        if (!onProgress) return;
+        const safeTotalStages = Math.max(1, Number(totalStages) || 1);
+        const safeStage = Math.min(safeTotalStages, Math.max(1, Number(stage) || 1));
+        const safeTotalBatches = Math.max(1, Number(totalBatches) || 1);
+        const safeBatchIndex = Math.min(safeTotalBatches, Math.max(1, Number(batchIndex) || 1));
+        const percent = Math.min(100, Math.max(0, Math.floor((((safeStage - 1) + (safeBatchIndex / safeTotalBatches)) / safeTotalStages) * 100)));
+        const remainingBatches = Math.max(0, safeTotalBatches - safeBatchIndex);
+        const batchInfo = safeTotalBatches > 1 ? ` (batch ${safeBatchIndex}/${safeTotalBatches}, estimasi sisa ${remainingBatches} batch)` : '';
+        onProgress(`${percent}% • ${label}${batchInfo}`);
+    };
+
+    // Bulk delete helper for Business Partners (selected IDs or all rows)
+    const deleteBusinessPartnersBulk = async (ids = [], table = 'blink_business_partners', menuCode = 'central_vendors', options = {}) => {
+        const onProgress = typeof options?.onProgress === 'function' ? options.onProgress : null;
+        if (!(isAdmin() || canDelete(menuCode))) {
+            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus partner.');
+            return false;
+        }
+
+        try {
+            const hasIds = Array.isArray(ids) && ids.length > 0;
+            emitProgress(onProgress, {
+                stage: 1,
+                totalStages: 2,
+                label: hasIds ? `Menghapus ${ids.length} data mitra...` : 'Menghapus seluruh data mitra...'
+            });
+            let query = supabase.from(table).delete();
+            query = hasIds ? query.in('id', ids) : query.not('id', 'is', null);
+
+            const { error } = await query;
+            if (error) throw error;
+
+            if (table === 'blink_business_partners') {
+                if (hasIds) {
+                    setBusinessPartners(prev => prev.filter(p => !ids.includes(p.id)));
+                    setCustomers(prev => prev.filter(c => !ids.includes(c.id)));
+                    setVendors(prev => prev.filter(v => !ids.includes(v.id)));
+                } else {
+                    setBusinessPartners([]);
+                    setCustomers([]);
+                    setVendors([]);
+                }
+            }
+
+            if (table === 'bridge_business_partners') {
+                if (hasIds) {
+                    setBridgeBusinessPartners(prev => prev.filter(p => !ids.includes(p.id)));
+                } else {
+                    setBridgeBusinessPartners([]);
+                }
+            }
+
+            const scope = hasIds ? `${ids.length} partner(s)` : 'ALL partners';
+            logActivity(menuCode, 'delete', 'business_partner', hasIds ? ids.join(',') : 'ALL', hasIds ? ids.join(',') : 'ALL', `Bulk deleted ${scope} from ${table}`);
+            emitProgress(onProgress, { stage: 2, totalStages: 2, label: 'Cleansing mitra selesai.' });
+            return true;
+        } catch (error) {
+            console.error('Error bulk deleting business partners:', error);
+            alert('Gagal menghapus data mitra: ' + (error.message || error));
+            return false;
+        }
+    };
+
+    const deleteAllBusinessPartners = async (table = 'blink_business_partners', menuCode = 'central_vendors', options = {}) => {
+        return deleteBusinessPartnersBulk([], table, menuCode, options);
+    };
+
+    // Delete COA - centralized helper with permission check and audit
+    const deleteCOA = async (id, menuCode = 'central_coa') => {
+        if (!(isAdmin() || canDelete(menuCode))) {
+            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus COA.');
+            return false;
+        }
+
+        try {
+            const { error } = await supabase.from('finance_coa').delete().eq('id', id);
+            if (error) {
+                if (error.code === '23503' || error.message?.includes('foreign key')) {
+                    alert('Gagal menghapus: COA ini terhubung dengan transaksi.');
+                    return false;
+                }
+                throw error;
+            }
+            setAccounts && setAccounts(prev => prev ? prev.filter(a => a.id !== id) : prev);
+            logActivity(menuCode, 'delete', 'coa', id, id, `Deleted COA ${id}`);
+            return true;
+        } catch (err) {
+            console.error('Error deleting COA:', err);
+            alert('Error deleting COA: ' + (err.message || err));
+            return false;
+        }
+    };
+
+    // Bridge COA delete (soft-delete for code_of_accounts table)
+    const deleteBridgeCOA = async (id) => {
+        if (!(isAdmin() || canDelete('bridge_coa'))) {
+            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus COA di Bridge.');
+            return false;
+        }
+
+        try {
+            const { error } = await supabase.from('code_of_accounts').update({ is_active: false }).eq('id', id);
+            if (error) throw error;
+            // update local cache if present
+            setAccounts && setAccounts(prev => prev ? prev.filter(a => a.id !== id) : prev);
+            logActivity('bridge_coa', 'delete', 'coa', id, id, `Soft-deleted bridge COA ${id}`);
+            return true;
+        } catch (err) {
+            console.error('Error deleting bridge COA:', err);
+            alert('Error deleting COA: ' + (err.message || err));
+            return false;
+        }
+    };
+
+    // Delete Blink quotation with cascade (UI should confirm first). Returns true on success.
+    const deleteBlinkQuotationCascade = async (quotationIds, quotationsTable = 'blink_quotations', menuCode = 'blink_quotations', options = {}) => {
+        const onProgress = typeof options?.onProgress === 'function' ? options.onProgress : null;
+        if (!(isAdmin() || canDelete(menuCode))) {
+            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus pengajuan ini.');
+            return false;
+        }
+
+        try {
+            // Accept single id or array
+            const ids = Array.isArray(quotationIds) ? quotationIds : [quotationIds];
+            emitProgress(onProgress, { stage: 1, totalStages: 8, label: `Mencari relasi quotation (${ids.length} data)...` });
+
+            // Step 1: Find related shipments
+            const { data: shipments } = await supabase.from('blink_shipments').select('id').in('quotation_id', ids);
+            const shipmentIds = (shipments || []).map(s => s.id);
+
+            // Step 2: related invoices
+            const { data: invoices } = await supabase.from('blink_invoices').select('id').in('quotation_id', ids);
+            const invoiceIds = (invoices || []).map(i => i.id);
+
+            // Step 3: related POs
+            const { data: pos } = await supabase.from('blink_purchase_orders').select('id').in('quotation_id', ids);
+            const poIds = (pos || []).map(p => p.id);
+            emitProgress(onProgress, { stage: 2, totalStages: 8, label: 'Menghapus jurnal dan pembayaran terkait...' });
+
+            // AR and AP
+            let arIds = [];
+            if (invoiceIds.length > 0) {
+                const { data: ars } = await supabase.from('blink_ar_transactions').select('id').in('invoice_id', invoiceIds);
+                arIds = (ars || []).map(a => a.id);
+            }
+
+            let apIds = [];
+            if (poIds.length > 0) {
+                const { data: aps } = await supabase.from('blink_ap_transactions').select('id').in('po_id', poIds);
+                apIds = (aps || []).map(a => a.id);
+            }
+
+            // Payments
+            let paymentRefKeys = [];
+            if (invoiceIds.length > 0) paymentRefKeys.push(...invoiceIds);
+            if (poIds.length > 0) paymentRefKeys.push(...poIds);
+            if (arIds.length > 0) paymentRefKeys.push(...arIds);
+            if (apIds.length > 0) paymentRefKeys.push(...apIds);
+
+            let paymentIds = [];
+            if (paymentRefKeys.length > 0) {
+                const { data: payments } = await supabase.from('blink_payments').select('id').in('reference_id', paymentRefKeys);
+                paymentIds = (payments || []).map(p => p.id);
+            }
+
+            const journalRefIds = [...ids, ...shipmentIds, ...invoiceIds, ...poIds, ...arIds, ...apIds, ...paymentIds];
+
+            if (journalRefIds.length > 0) await supabase.from('blink_journal_entries').delete().in('reference_id', journalRefIds);
+            if (paymentIds.length > 0) await supabase.from('blink_payments').delete().in('id', paymentIds);
+            emitProgress(onProgress, { stage: 3, totalStages: 8, label: 'Menghapus AR/AP...' });
+            if (arIds.length > 0) await supabase.from('blink_ar_transactions').delete().in('id', arIds);
+            if (apIds.length > 0) await supabase.from('blink_ap_transactions').delete().in('id', apIds);
+            emitProgress(onProgress, { stage: 4, totalStages: 8, label: 'Menghapus invoice/PO...' });
+            if (invoiceIds.length > 0) await supabase.from('blink_invoices').delete().in('id', invoiceIds);
+            if (poIds.length > 0) await supabase.from('blink_purchase_orders').delete().in('id', poIds);
+
+            if (shipmentIds.length > 0) {
+                emitProgress(onProgress, { stage: 5, totalStages: 8, label: 'Menghapus BL dan shipment...' });
+                await supabase.from('blink_bl_documents').delete().in('shipment_id', shipmentIds);
+                await supabase.from('blink_shipments').delete().in('id', shipmentIds);
+            }
+
+            // Finally delete quotations
+            emitProgress(onProgress, { stage: 6, totalStages: 8, label: 'Menghapus data quotation utama...' });
+            const { error } = await supabase.from(quotationsTable).delete().in('id', ids);
+            if (error) throw error;
+
+            logActivity(menuCode, 'delete', 'quotation', ids.join(','), ids.join(','), `Deleted quotations ${ids.join(',')}`);
+            emitProgress(onProgress, { stage: 7, totalStages: 8, label: 'Menyimpan activity log...' });
+            emitProgress(onProgress, { stage: 8, totalStages: 8, label: 'Cleansing quotation selesai.' });
+            return true;
+        } catch (err) {
+            console.error('Cascade Delete Error (DataContext):', err);
+            alert('Gagal menghapus data: ' + (err.message || err));
+            return false;
+        }
     };
 
     // ========================================
@@ -1076,6 +1285,76 @@ export const DataProvider = ({ children }) => {
             return;
         }
         setShipments(prev => prev.filter(s => s.id !== id));
+    };
+
+    // Cascade delete for Shipments in Blink module
+    const deleteShipmentCascade = async (shipmentIds, options = {}) => {
+        const onProgress = typeof options?.onProgress === 'function' ? options.onProgress : null;
+        if (!(isAdmin() || canDelete('blink_shipments'))) {
+            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus shipment.');
+            return false;
+        }
+
+        try {
+            const ids = Array.isArray(shipmentIds) ? shipmentIds : [shipmentIds];
+            emitProgress(onProgress, { stage: 1, totalStages: 6, label: `Memproses ${ids.length} shipment...` });
+
+            // Find invoices linked to shipments
+            const { data: invoices } = await supabase.from('blink_invoices').select('id').in('shipment_id', ids);
+            const invoiceIds = (invoices || []).map(i => i.id);
+
+            // Find POs linked to shipments
+            const { data: pos } = await supabase.from('blink_purchase_orders').select('id').in('shipment_id', ids);
+            const poIds = (pos || []).map(p => p.id);
+            emitProgress(onProgress, { stage: 2, totalStages: 6, label: 'Menghapus jurnal dan payment...' });
+
+            // AR / AP
+            let arIds = [];
+            if (invoiceIds.length > 0) {
+                const { data: ars } = await supabase.from('blink_ar_transactions').select('id').in('invoice_id', invoiceIds);
+                arIds = (ars || []).map(a => a.id);
+            }
+
+            let apIds = [];
+            if (poIds.length > 0) {
+                const { data: aps } = await supabase.from('blink_ap_transactions').select('id').in('po_id', poIds);
+                apIds = (aps || []).map(a => a.id);
+            }
+
+            // Payments referencing any of above
+            let paymentRefKeys = [];
+            paymentRefKeys.push(...invoiceIds, ...poIds, ...arIds, ...apIds);
+            let paymentIds = [];
+            if (paymentRefKeys.length > 0) {
+                const { data: payments } = await supabase.from('blink_payments').select('id').in('reference_id', paymentRefKeys);
+                paymentIds = (payments || []).map(p => p.id);
+            }
+
+            const journalRefIds = [...ids, ...invoiceIds, ...poIds, ...arIds, ...apIds, ...paymentIds];
+
+            if (journalRefIds.length > 0) await supabase.from('blink_journal_entries').delete().in('reference_id', journalRefIds);
+            if (paymentIds.length > 0) await supabase.from('blink_payments').delete().in('id', paymentIds);
+            emitProgress(onProgress, { stage: 3, totalStages: 6, label: 'Menghapus AR/AP/Invoice/PO...' });
+            if (arIds.length > 0) await supabase.from('blink_ar_transactions').delete().in('id', arIds);
+            if (apIds.length > 0) await supabase.from('blink_ap_transactions').delete().in('id', apIds);
+            if (invoiceIds.length > 0) await supabase.from('blink_invoices').delete().in('id', invoiceIds);
+            if (poIds.length > 0) await supabase.from('blink_purchase_orders').delete().in('id', poIds);
+
+            // delete BL documents and shipments
+            emitProgress(onProgress, { stage: 4, totalStages: 6, label: 'Menghapus BL documents...' });
+            await supabase.from('blink_bl_documents').delete().in('shipment_id', ids);
+            emitProgress(onProgress, { stage: 5, totalStages: 6, label: 'Menghapus shipment utama...' });
+            await supabase.from('blink_shipments').delete().in('id', ids);
+
+            setShipments(prev => prev ? prev.filter(s => !ids.includes(s.id)) : prev);
+            logActivity('blink_shipments', 'delete', 'shipment', ids.join(','), ids.join(','), `Deleted shipments ${ids.join(',')}`);
+            emitProgress(onProgress, { stage: 6, totalStages: 6, label: 'Cleansing shipment selesai.' });
+            return true;
+        } catch (err) {
+            console.error('Error deleting shipments cascade:', err);
+            alert('Gagal menghapus shipment: ' + (err.message || err));
+            return false;
+        }
     };
 
     // Asset CRUD operations (Bridge module)
@@ -3491,6 +3770,94 @@ export const DataProvider = ({ children }) => {
         setPurchases(prev => prev.filter(pur => pur.id !== purchaseId));
     };
 
+    const chunkArray = (arr, size = 500) => {
+        const chunks = [];
+        for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size));
+        return chunks;
+    };
+
+    // Cascade delete for Invoices in Blink module
+    const deleteInvoiceCascade = async (invoiceIds, options = {}) => {
+        const onProgress = typeof options?.onProgress === 'function' ? options.onProgress : null;
+        if (!(isAdmin() || canDelete('blink_invoices'))) {
+            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus Invoice.');
+            return false;
+        }
+
+        try {
+            const ids = Array.isArray(invoiceIds) ? invoiceIds : [invoiceIds];
+
+            const collectByIn = async (table, selectCol, filterCol, values, stage, stageLabel, totalStages = 6) => {
+                const rows = [];
+                const chunks = chunkArray(values);
+                for (let i = 0; i < chunks.length; i += 1) {
+                    const chunk = chunks[i];
+                    emitProgress(onProgress, {
+                        stage,
+                        totalStages,
+                        label: stageLabel,
+                        batchIndex: i + 1,
+                        totalBatches: chunks.length
+                    });
+                    const { data, error } = await supabase.from(table).select(selectCol).in(filterCol, chunk);
+                    if (error) throw error;
+                    rows.push(...(data || []));
+                }
+                return rows;
+            };
+
+            const deleteByIn = async (table, filterCol, values, stage, stageLabel, totalStages = 6) => {
+                const chunks = chunkArray(values);
+                for (let i = 0; i < chunks.length; i += 1) {
+                    const chunk = chunks[i];
+                    emitProgress(onProgress, {
+                        stage,
+                        totalStages,
+                        label: stageLabel,
+                        batchIndex: i + 1,
+                        totalBatches: chunks.length
+                    });
+                    const { error } = await supabase.from(table).delete().in(filterCol, chunk);
+                    if (error) throw error;
+                }
+            };
+
+            // Find related ARs
+            emitProgress(onProgress, { stage: 1, totalStages: 6, label: 'Mencari AR terkait...' });
+            const ars = await collectByIn('blink_ar_transactions', 'id', 'invoice_id', ids, 1, 'Mencari AR terkait', 6);
+            const arIds = ars.map(a => a.id);
+
+            // Find related payments (by invoice or AR reference)
+            const paymentRefs = [...ids, ...arIds];
+            let paymentIds = [];
+            if (paymentRefs.length > 0) {
+                emitProgress(onProgress, { stage: 2, totalStages: 6, label: 'Mencari payment terkait...' });
+                const payments = await collectByIn('blink_payments', 'id', 'reference_id', paymentRefs, 2, 'Mencari payment terkait', 6);
+                paymentIds = payments.map(p => p.id);
+            }
+
+            const journalRefIds = [...ids, ...arIds, ...paymentIds];
+
+            emitProgress(onProgress, { stage: 3, totalStages: 6, label: 'Menghapus jurnal...' });
+            if (journalRefIds.length > 0) await deleteByIn('blink_journal_entries', 'reference_id', journalRefIds, 3, 'Menghapus jurnal', 6);
+            emitProgress(onProgress, { stage: 4, totalStages: 6, label: 'Menghapus payment dan AR...' });
+            if (paymentIds.length > 0) await deleteByIn('blink_payments', 'id', paymentIds, 4, 'Menghapus payment', 6);
+            if (arIds.length > 0) await deleteByIn('blink_ar_transactions', 'id', arIds, 4, 'Menghapus AR', 6);
+
+            emitProgress(onProgress, { stage: 5, totalStages: 6, label: 'Menghapus invoice utama...' });
+            await deleteByIn('blink_invoices', 'id', ids, 5, 'Menghapus invoice utama', 6);
+
+            setInvoices(prev => prev ? prev.filter(inv => !ids.includes(inv.id)) : prev);
+            logActivity('blink_invoices', 'delete', 'invoice', ids.join(','), ids.join(','), `Deleted invoices ${ids.join(',')}`);
+            emitProgress(onProgress, { stage: 6, totalStages: 6, label: 'Cleansing invoice selesai.' });
+            return true;
+        } catch (err) {
+            console.error('Error deleting invoice cascade:', err);
+            alert('Gagal menghapus Invoice: ' + (err.message || err));
+            return false;
+        }
+    };
+
     // Purchase Order CRUD operations
     const addPurchaseOrder = (poData) => {
         const newPO = {
@@ -3512,6 +3879,244 @@ export const DataProvider = ({ children }) => {
 
     const deletePurchaseOrder = (poId) => {
         setPurchaseOrders(prev => prev.filter(po => po.id !== poId));
+    };
+
+    // Cascade delete for Purchase Orders in Blink module
+    const deletePurchaseOrderCascade = async (poIds, options = {}) => {
+        const onProgress = typeof options?.onProgress === 'function' ? options.onProgress : null;
+        if (!(isAdmin() || canDelete('blink_purchase_order'))) {
+            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus PO.');
+            return false;
+        }
+
+        try {
+            const ids = Array.isArray(poIds) ? poIds : [poIds];
+
+            const collectByIn = async (table, selectCol, filterCol, values, stage, stageLabel, totalStages = 5) => {
+                const rows = [];
+                const chunks = chunkArray(values);
+                for (let i = 0; i < chunks.length; i += 1) {
+                    const chunk = chunks[i];
+                    emitProgress(onProgress, {
+                        stage,
+                        totalStages,
+                        label: stageLabel,
+                        batchIndex: i + 1,
+                        totalBatches: chunks.length
+                    });
+                    const { data, error } = await supabase.from(table).select(selectCol).in(filterCol, chunk);
+                    if (error) throw error;
+                    rows.push(...(data || []));
+                }
+                return rows;
+            };
+
+            const deleteByIn = async (table, filterCol, values, stage, stageLabel, totalStages = 5) => {
+                const chunks = chunkArray(values);
+                for (let i = 0; i < chunks.length; i += 1) {
+                    const chunk = chunks[i];
+                    emitProgress(onProgress, {
+                        stage,
+                        totalStages,
+                        label: stageLabel,
+                        batchIndex: i + 1,
+                        totalBatches: chunks.length
+                    });
+                    const { error } = await supabase.from(table).delete().in(filterCol, chunk);
+                    if (error) throw error;
+                }
+            };
+
+            // Find related APs
+            emitProgress(onProgress, { stage: 1, totalStages: 5, label: 'Mencari AP terkait...' });
+            const aps = await collectByIn('blink_ap_transactions', 'id', 'po_id', ids, 1, 'Mencari AP terkait', 5);
+            const apIds = aps.map(a => a.id);
+
+            // Find related payments referencing POs
+            let paymentIds = [];
+            if (ids.length > 0) {
+                emitProgress(onProgress, { stage: 2, totalStages: 5, label: 'Mencari payment terkait...' });
+                const payments = await collectByIn('blink_payments', 'id', 'reference_id', ids, 2, 'Mencari payment terkait', 5);
+                paymentIds = payments.map(p => p.id);
+            }
+
+            // Delete journals for APs
+            emitProgress(onProgress, { stage: 3, totalStages: 5, label: 'Menghapus jurnal/AP/payment...' });
+            if (apIds.length > 0) await deleteByIn('blink_journal_entries', 'reference_id', apIds, 3, 'Menghapus jurnal AP', 5);
+            // Delete payments
+            if (paymentIds.length > 0) await deleteByIn('blink_payments', 'id', paymentIds, 3, 'Menghapus payment PO', 5);
+            // Delete APs
+            if (apIds.length > 0) await deleteByIn('blink_ap_transactions', 'id', apIds, 3, 'Menghapus AP', 5);
+
+            // Finally delete POs
+            emitProgress(onProgress, { stage: 4, totalStages: 5, label: 'Menghapus PO utama...' });
+            await deleteByIn('blink_purchase_orders', 'id', ids, 4, 'Menghapus PO utama', 5);
+
+            // Update local cache if present
+            setPurchaseOrders(prev => prev ? prev.filter(p => !ids.includes(p.id)) : prev);
+            logActivity('blink_purchase_order', 'delete', 'purchase_order', ids.join(','), ids.join(','), `Deleted POs ${ids.join(',')}`);
+            emitProgress(onProgress, { stage: 5, totalStages: 5, label: 'Cleansing PO selesai.' });
+            return true;
+        } catch (err) {
+            console.error('Error deleting PO cascade:', err);
+            alert('Gagal menghapus PO: ' + (err.message || err));
+            return false;
+        }
+    };
+
+    // Cascade delete for Purchase Orders in Bridge module (chunk-safe)
+    const deleteBridgePurchaseOrderCascade = async (poIds, options = {}) => {
+        const onProgress = typeof options?.onProgress === 'function' ? options.onProgress : null;
+        if (!(isAdmin() || canDelete('bridge_finance'))) {
+            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus PO Bridge.');
+            return false;
+        }
+
+        try {
+            const ids = Array.isArray(poIds) ? poIds : [poIds];
+
+            const collectByIn = async (table, selectCol, filterCol, values, stage, stageLabel, totalStages = 5) => {
+                const rows = [];
+                const chunks = chunkArray(values);
+                for (let i = 0; i < chunks.length; i += 1) {
+                    const chunk = chunks[i];
+                    emitProgress(onProgress, {
+                        stage,
+                        totalStages,
+                        label: stageLabel,
+                        batchIndex: i + 1,
+                        totalBatches: chunks.length
+                    });
+                    const { data, error } = await supabase.from(table).select(selectCol).in(filterCol, chunk);
+                    if (error) throw error;
+                    rows.push(...(data || []));
+                }
+                return rows;
+            };
+
+            const deleteByIn = async (table, filterCol, values, stage, stageLabel, totalStages = 5) => {
+                const chunks = chunkArray(values);
+                for (let i = 0; i < chunks.length; i += 1) {
+                    const chunk = chunks[i];
+                    emitProgress(onProgress, {
+                        stage,
+                        totalStages,
+                        label: stageLabel,
+                        batchIndex: i + 1,
+                        totalBatches: chunks.length
+                    });
+                    const { error } = await supabase.from(table).delete().in(filterCol, chunk);
+                    if (error) throw error;
+                }
+            };
+
+            emitProgress(onProgress, { stage: 1, totalStages: 5, label: 'Mencari AP Bridge terkait...' });
+            const aps = await collectByIn('bridge_ap_transactions', 'id', 'po_id', ids, 1, 'Mencari AP Bridge', 5);
+            const apIds = aps.map(a => a.id);
+
+            const paymentRefs = [...ids, ...apIds];
+            let paymentIds = [];
+            if (paymentRefs.length > 0) {
+                emitProgress(onProgress, { stage: 2, totalStages: 5, label: 'Mencari payment Bridge terkait...' });
+                const payments = await collectByIn('bridge_payments', 'id', 'reference_id', paymentRefs, 2, 'Mencari payment Bridge', 5);
+                paymentIds = payments.map(p => p.id);
+            }
+
+            const journalRefs = [...ids, ...apIds, ...paymentIds];
+            emitProgress(onProgress, { stage: 3, totalStages: 5, label: 'Menghapus jurnal/AP/payment Bridge...' });
+            if (journalRefs.length > 0) await deleteByIn('bridge_journal_entries', 'reference_id', journalRefs, 3, 'Menghapus jurnal Bridge', 5);
+            if (paymentIds.length > 0) await deleteByIn('bridge_payments', 'id', paymentIds, 3, 'Menghapus payment Bridge', 5);
+            if (apIds.length > 0) await deleteByIn('bridge_ap_transactions', 'id', apIds, 3, 'Menghapus AP Bridge', 5);
+
+            emitProgress(onProgress, { stage: 4, totalStages: 5, label: 'Menghapus PO Bridge utama...' });
+            await deleteByIn('bridge_pos', 'id', ids, 4, 'Menghapus PO Bridge', 5);
+
+            logActivity('bridge_finance', 'delete', 'bridge_purchase_order', ids.join(','), ids.join(','), `Deleted bridge POs ${ids.join(',')}`);
+            emitProgress(onProgress, { stage: 5, totalStages: 5, label: 'Cleansing PO Bridge selesai.' });
+            return true;
+        } catch (err) {
+            console.error('Error deleting bridge PO cascade:', err);
+            alert('Gagal menghapus PO Bridge: ' + (err.message || err));
+            return false;
+        }
+    };
+
+    // Cascade delete for Invoices in Bridge module (chunk-safe)
+    const deleteBridgeInvoiceCascade = async (invoiceIds, options = {}) => {
+        const onProgress = typeof options?.onProgress === 'function' ? options.onProgress : null;
+        if (!(isAdmin() || canDelete('bridge_finance'))) {
+            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus Invoice Bridge.');
+            return false;
+        }
+
+        try {
+            const ids = Array.isArray(invoiceIds) ? invoiceIds : [invoiceIds];
+
+            const collectByIn = async (table, selectCol, filterCol, values, stage, stageLabel, totalStages = 6) => {
+                const rows = [];
+                const chunks = chunkArray(values);
+                for (let i = 0; i < chunks.length; i += 1) {
+                    const chunk = chunks[i];
+                    emitProgress(onProgress, {
+                        stage,
+                        totalStages,
+                        label: stageLabel,
+                        batchIndex: i + 1,
+                        totalBatches: chunks.length
+                    });
+                    const { data, error } = await supabase.from(table).select(selectCol).in(filterCol, chunk);
+                    if (error) throw error;
+                    rows.push(...(data || []));
+                }
+                return rows;
+            };
+
+            const deleteByIn = async (table, filterCol, values, stage, stageLabel, totalStages = 6) => {
+                const chunks = chunkArray(values);
+                for (let i = 0; i < chunks.length; i += 1) {
+                    const chunk = chunks[i];
+                    emitProgress(onProgress, {
+                        stage,
+                        totalStages,
+                        label: stageLabel,
+                        batchIndex: i + 1,
+                        totalBatches: chunks.length
+                    });
+                    const { error } = await supabase.from(table).delete().in(filterCol, chunk);
+                    if (error) throw error;
+                }
+            };
+
+            emitProgress(onProgress, { stage: 1, totalStages: 6, label: 'Mencari AR Bridge terkait...' });
+            const ars = await collectByIn('bridge_ar_transactions', 'id', 'invoice_id', ids, 1, 'Mencari AR Bridge', 6);
+            const arIds = ars.map(a => a.id);
+
+            const paymentRefs = [...ids, ...arIds];
+            let paymentIds = [];
+            if (paymentRefs.length > 0) {
+                emitProgress(onProgress, { stage: 2, totalStages: 6, label: 'Mencari payment Bridge terkait...' });
+                const payments = await collectByIn('bridge_payments', 'id', 'reference_id', paymentRefs, 2, 'Mencari payment Bridge', 6);
+                paymentIds = payments.map(p => p.id);
+            }
+
+            const journalRefs = [...ids, ...arIds, ...paymentIds];
+            emitProgress(onProgress, { stage: 3, totalStages: 6, label: 'Menghapus jurnal Bridge...' });
+            if (journalRefs.length > 0) await deleteByIn('bridge_journal_entries', 'reference_id', journalRefs, 3, 'Menghapus jurnal Bridge', 6);
+            emitProgress(onProgress, { stage: 4, totalStages: 6, label: 'Menghapus payment dan AR Bridge...' });
+            if (paymentIds.length > 0) await deleteByIn('bridge_payments', 'id', paymentIds, 4, 'Menghapus payment Bridge', 6);
+            if (arIds.length > 0) await deleteByIn('bridge_ar_transactions', 'id', arIds, 4, 'Menghapus AR Bridge', 6);
+
+            emitProgress(onProgress, { stage: 5, totalStages: 6, label: 'Menghapus invoice Bridge utama...' });
+            await deleteByIn('bridge_invoices', 'id', ids, 5, 'Menghapus invoice Bridge', 6);
+
+            logActivity('bridge_finance', 'delete', 'bridge_invoice', ids.join(','), ids.join(','), `Deleted bridge invoices ${ids.join(',')}`);
+            emitProgress(onProgress, { stage: 6, totalStages: 6, label: 'Cleansing invoice Bridge selesai.' });
+            return true;
+        } catch (err) {
+            console.error('Error deleting bridge invoice cascade:', err);
+            alert('Gagal menghapus Invoice Bridge: ' + (err.message || err));
+            return false;
+        }
     };
 
     const value = {
@@ -3573,6 +4178,8 @@ export const DataProvider = ({ children }) => {
         addBusinessPartner,
         updateBusinessPartner,
         deleteBusinessPartner,
+        deleteBusinessPartnersBulk,
+        deleteAllBusinessPartners,
 
         // Finance operations
         addFinanceTransaction,
@@ -3583,6 +4190,7 @@ export const DataProvider = ({ children }) => {
         addShipment,
         updateShipment,
         deleteShipment,
+        deleteShipmentCascade,
 
         // Asset operations
         addAsset,
@@ -3618,6 +4226,8 @@ export const DataProvider = ({ children }) => {
         addQuotation,
         updateQuotation,
         deleteQuotation,
+        // Cascade delete helper for blink quotations (permission checked)
+        deleteBlinkQuotationCascade,
         confirmQuotation,
         approveBC,
         rejectBC,
@@ -3640,6 +4250,8 @@ export const DataProvider = ({ children }) => {
         addInvoice,
         updateInvoice,
         deleteInvoice,
+        deleteInvoiceCascade,
+        deleteBridgeInvoiceCascade,
 
         // Purchase operations
         addPurchase,
@@ -3651,6 +4263,12 @@ export const DataProvider = ({ children }) => {
         addPurchaseOrder,
         updatePurchaseOrder,
         deletePurchaseOrder,
+        deletePurchaseOrderCascade,
+        deleteBridgePurchaseOrderCascade,
+
+        // COA delete helpers
+        deleteCOA,
+        deleteBridgeCOA,
 
         // Item Master operations
         addItemCode,

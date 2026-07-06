@@ -6,10 +6,14 @@ import XLSX from 'xlsx-js-style';
 import {
     Plus, Search, Edit, Trash2, FileText, CheckCircle, XCircle, Grid, List, Upload, Clock
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { useData } from '../../context/DataContext';
 
 const { read, utils } = XLSX;
 
-const COAMaster = () => {
+    const COAMaster = () => {
+    const { isAdmin, canDelete } = useAuth();
+    const { deleteCOA } = useData();
     const [accounts, setAccounts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -617,14 +621,14 @@ const COAMaster = () => {
     };
 
     const handleDelete = async (id) => {
+        if (!(isAdmin() || canDelete('central_coa'))) {
+            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus COA.');
+            return;
+        }
         if (!confirm('Are you sure you want to delete this account?')) return;
         try {
-            const { error } = await supabase
-                .from('finance_coa')
-                .delete()
-                .eq('id', id);
-
-            if (error) throw error;
+            const success = await deleteCOA(id);
+            if (!success) return;
             await fetchAccounts();
         } catch (error) {
             console.error('Error deleting account:', error);
@@ -633,6 +637,10 @@ const COAMaster = () => {
     };
 
     const handleDeleteAll = async () => {
+        if (!(isAdmin() || canDelete('central_coa'))) {
+            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus seluruh COA.');
+            return;
+        }
         if (accounts.length === 0) {
             alert('Tidak ada data COA untuk dihapus.');
             return;
@@ -673,6 +681,10 @@ const COAMaster = () => {
     };
 
     const handleDeleteSelected = async () => {
+        if (!(isAdmin() || canDelete('central_coa'))) {
+            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus COA.');
+            return;
+        }
         if (selectedIds.length === 0) return;
 
         if (!confirm(`Hapus ${selectedIds.length} akun yang dipilih? Tindakan ini tidak dapat dibatalkan.`)) return;

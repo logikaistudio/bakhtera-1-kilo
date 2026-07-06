@@ -36,6 +36,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import COAPicker from '../Common/COAPicker';
 import PartnerPicker from '../Common/PartnerPicker';
+import { useData } from '../../context/DataContext';
+import { useAuth } from '../../context/AuthContext';
 
 const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCancel, onViewAnalysis, canEditShipment = true, canCreatePO = true }) => {
     const navigate = useNavigate();
@@ -179,25 +181,26 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
     });
 
     // Delete shipment handler
+    const { deleteShipmentCascade } = useData();
+    const { canDelete } = useAuth();
+
     const handleDeleteShipment = async () => {
+        if (!canDelete('blink_shipments')) {
+            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus shipment.');
+            return;
+        }
         if (!confirm('Are you sure you want to delete this sales order? This action cannot be undone.')) {
             return;
         }
 
         try {
-            const { error } = await supabase
-                .from('blink_shipments')
-                .delete()
-                .eq('id', shipment.id);
-
-            if (error) throw error;
-
+            const success = await deleteShipmentCascade(shipment.id);
+            if (!success) return;
             alert('✅ Sales Order deleted successfully');
             onClose(); // Close modal
-            // Parent component should refresh the list
         } catch (error) {
             console.error('Error deleting shipment:', error);
-            alert('Failed to delete sales order: ' + error.message);
+            alert('Failed to delete sales order: ' + (error.message || error));
         }
     };
 

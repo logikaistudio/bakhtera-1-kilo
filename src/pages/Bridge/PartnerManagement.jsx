@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { useData } from '../../context/DataContext';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
 import {
@@ -21,6 +22,8 @@ const BridgePartnerManagement = () => {
     const [showModal, setShowModal] = useState(false);
     const [editingPartner, setEditingPartner] = useState(null);
     const fileInputRef = useRef(null);
+    const [isCleansing, setIsCleansing] = useState(false);
+    const [cleanseProgress, setCleanseProgress] = useState('');
 
     const [formData, setFormData] = useState({
         partner_name: '',
@@ -112,20 +115,19 @@ const BridgePartnerManagement = () => {
     };
 
 
+    const { deleteBusinessPartner, deleteBusinessPartnersBulk, deleteAllBusinessPartners } = useData();
+
     const handleDelete = async (partnerId) => {
         if (!hasDelete) return;
         if (!confirm('Yakin hapus mitra ini? Data transaksi terkait tidak akan terhapus.')) return;
         try {
-            const { error } = await supabase
-                .from('bridge_business_partners')
-                .delete()
-                .eq('id', partnerId);
-            if (error) throw error;
+            const success = await deleteBusinessPartner(partnerId, 'bridge_business_partners', 'bridge_partners');
+            if (!success) return;
             alert('✅ Mitra berhasil dihapus');
             fetchPartners();
         } catch (error) {
             console.error('Error deleting partner:', error);
-            alert('❌ Gagal menghapus: ' + error.message);
+            alert('❌ Gagal menghapus: ' + (error.message || error));
         }
     };
 
@@ -148,17 +150,48 @@ const BridgePartnerManagement = () => {
         if (!hasDelete || selectedIds.length === 0) return;
         if (!confirm(`Yakin hapus ${selectedIds.length} mitra terpilih? Data transaksi terkait tidak akan terhapus.`)) return;
         try {
-            const { error } = await supabase
-                .from('bridge_business_partners')
-                .delete()
-                .in('id', selectedIds);
-            if (error) throw error;
+            const success = await deleteBusinessPartnersBulk(selectedIds, 'bridge_business_partners', 'bridge_partners');
+            if (!success) return;
             alert(`✅ ${selectedIds.length} mitra berhasil dihapus`);
             setSelectedIds([]);
             fetchPartners();
         } catch (error) {
             console.error('Error multi-deleting partners:', error);
-            alert('❌ Gagal menghapus: ' + error.message);
+            alert('❌ Gagal menghapus: ' + (error.message || error));
+        }
+    };
+
+    const handleCleanseAll = async () => {
+        if (!hasDelete) {
+            alert('Akses Ditolak: Anda tidak memiliki hak untuk cleansing data mitra.');
+            return;
+        }
+        if (partners.length === 0) {
+            alert('Tidak ada data mitra untuk dihapus.');
+            return;
+        }
+
+        const firstConfirm = confirm(`Cleansing akan menghapus SEMUA data mitra Bridge (${partners.length} baris). Lanjutkan?`);
+        if (!firstConfirm) return;
+
+        const secondConfirm = confirm('Konfirmasi terakhir: semua data mitra Bridge akan dihapus permanen. Yakin lanjut?');
+        if (!secondConfirm) return;
+
+        try {
+            setIsCleansing(true);
+            setCleanseProgress('Memulai proses cleansing mitra Bridge...');
+            const success = await deleteAllBusinessPartners('bridge_business_partners', 'bridge_partners', {
+                onProgress: (message) => setCleanseProgress(message)
+            });
+            if (!success) return;
+            alert('✅ Cleansing selesai: semua data mitra Bridge berhasil dihapus.');
+            setSelectedIds([]);
+            fetchPartners();
+        } catch (error) {
+            console.error('Error cleansing bridge partners:', error);
+            alert('❌ Gagal cleansing data mitra Bridge: ' + (error.message || error));
+        } finally {
+            setIsCleansing(false);
         }
     };
 
@@ -272,6 +305,15 @@ const BridgePartnerManagement = () => {
                     <p className="text-silver-dark mt-1">Kelola Customer, Vendor, Consignee, Shipper (TPB/Gudang Berikat)</p>
                 </div>
                 <div className="flex gap-2">
+                    {hasDelete && (
+                        <Button
+                            onClick={handleCleanseAll}
+                            disabled={partners.length === 0 || isCleansing}
+                            className={`bg-red-600/20 text-red-400 hover:bg-red-600/30 ${partners.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                            {isCleansing ? 'Cleansing...' : 'Bersihkan Semua Data'}
+                        </Button>
+                    )}
                     <button
                         onClick={handleExportCSV}
                         className="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-colors flex items-center gap-2 text-sm"
@@ -295,6 +337,12 @@ const BridgePartnerManagement = () => {
                     )}
                 </div>
             </div>
+
+            {isCleansing && (
+                <div className="glass-card px-4 py-2 rounded-lg border border-amber-500/30 bg-amber-500/10">
+                    <p className="text-xs text-amber-300">Progress Cleansing: {cleanseProgress || 'Sedang memproses...'}</p>
+                </div>
+            )}
 
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
@@ -431,7 +479,7 @@ const BridgePartnerManagement = () => {
                                             {partner.email && <div className="flex items-center gap-1"><Mail className="w-3 h-3" />{partner.email}</div>}
                                             {partner.phone && <div className="flex items-center gap-1"><Phone className="w-3 h-3" />{partner.phone}</div>}
                                         </td>
-                                        <td className="px-4 py-3">
+                                        <td className="px-4 py-3 flex items-center justify-between">
                                             <div className="flex flex-wrap gap-1">
                                                 {getRoleBadges(partner).map((role, idx) => (
                                                     <span key={idx} className={`px-2 py-0.5 rounded text-[10px] font-bold ${role.color}`}>
@@ -439,6 +487,15 @@ const BridgePartnerManagement = () => {
                                                     </span>
                                                 ))}
                                             </div>
+                                            {hasDelete && (
+                                                <button
+                                                    className="ml-4 text-red-500 hover:text-red-700"
+                                                    onClick={(e) => { e.stopPropagation(); handleDelete(partner.id); }}
+                                                    title="Hapus Mitra"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            )}
                                         </td>
                                     </tr>
                                 ))

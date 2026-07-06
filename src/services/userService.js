@@ -1,10 +1,33 @@
 import { supabase } from '../lib/supabase';
-import { hashPassword, verifyPassword } from './passwordService';
+import { hashPassword, verifyPassword, validatePasswordStrength } from './passwordService';
 
 /**
  * User Service
  * Handles CRUD operations for users (Super Admin only)
  */
+
+const DEFAULT_FALLBACK_ROLE_IDS = ['super_admin', 'direksi', 'chief', 'manager', 'staff', 'viewer'];
+
+const getAllowedRoleIds = async () => {
+    try {
+        const { data, error } = await supabase
+            .from('role_permissions')
+            .select('role_id');
+
+        if (error) {
+            return new Set(DEFAULT_FALLBACK_ROLE_IDS);
+        }
+
+        const roles = new Set(DEFAULT_FALLBACK_ROLE_IDS);
+        (data || []).forEach(r => {
+            if (r?.role_id) roles.add(r.role_id);
+        });
+
+        return roles;
+    } catch {
+        return new Set(DEFAULT_FALLBACK_ROLE_IDS);
+    }
+};
 
 /**
  * Create a new user
@@ -23,6 +46,18 @@ export const createUser = async (userData, createdBy) => {
 
         if (!creator || creator.user_level !== 'super_admin') {
             throw new Error('Only Super Admin can create users');
+        }
+
+        // Validate role exists in role manager source of truth
+        const allowedRoleIds = await getAllowedRoleIds();
+        if (!allowedRoleIds.has(userData.user_level)) {
+            throw new Error('Role tidak valid atau belum tersinkron dari Manajemen Role & Akses');
+        }
+
+        // Validate password strength before hashing
+        const strength = validatePasswordStrength(userData.password);
+        if (!strength.valid) {
+            throw new Error(strength.errors[0]);
         }
 
         // Hash password
@@ -122,6 +157,13 @@ export const updateUser = async (userId, updates, updatedBy) => {
             throw new Error('Only Super Admin can update users');
         }
 
+        if (updates.user_level) {
+            const allowedRoleIds = await getAllowedRoleIds();
+            if (!allowedRoleIds.has(updates.user_level)) {
+                throw new Error('Role tidak valid atau belum tersinkron dari Manajemen Role & Akses');
+            }
+        }
+
         // Get old values for audit
         const { data: oldUser } = await supabase
             .from('users')
@@ -177,6 +219,11 @@ export const resetPassword = async (userId, newPassword, resetBy, requireChange 
             if (!resetter || resetter.user_level !== 'super_admin') {
                 throw new Error('Only Super Admin can reset other users passwords');
             }
+        }
+
+        const strength = validatePasswordStrength(newPassword);
+        if (!strength.valid) {
+            throw new Error(strength.errors[0]);
         }
 
         // Hash new password

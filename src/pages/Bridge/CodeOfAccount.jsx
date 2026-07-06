@@ -14,6 +14,7 @@ import {
     Filter
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useData } from '../../context/DataContext';
 
 const CodeOfAccount = () => {
     const { canCreate, canEdit, canDelete } = useAuth();
@@ -46,6 +47,8 @@ const CodeOfAccount = () => {
     useEffect(() => {
         fetchAccounts();
     }, []);
+
+    const { deleteBridgeCOA } = useData();
 
     const fetchAccounts = async () => {
         try {
@@ -137,17 +140,13 @@ const CodeOfAccount = () => {
         if (!confirm(`Delete account ${account.code} - ${account.name}?`)) return;
 
         try {
-            const { error } = await supabase
-                .from('code_of_accounts')
-                .update({ is_active: false })
-                .eq('id', account.id);
-
-            if (error) throw error;
+            const success = await deleteBridgeCOA(account.id);
+            if (!success) return;
             alert('✅ Account deleted');
             fetchAccounts();
         } catch (error) {
             console.error('Error deleting account:', error);
-            alert('❌ Error: ' + error.message);
+            alert('❌ Error: ' + (error.message || error));
         }
     };
 

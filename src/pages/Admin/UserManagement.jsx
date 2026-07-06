@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { getAllUsers, createUser, updateUser, resetPassword, toggleUserActive, deleteUser } from '../../services/userService';
@@ -34,6 +34,14 @@ const FALLBACK_ROLES = [
 
 const getDefaultColor = () => ({ bg: '#f0f9ff', text: '#0284c7', border: '#bae6fd' });
 
+const pickDefaultRoleId = (roles = []) => {
+    const roleIds = (roles || []).map(r => r.id);
+    return roleIds.find(id => id === 'manager')
+        || roleIds.find(id => id === 'staff')
+        || roleIds.find(id => id !== 'super_admin')
+        || 'staff';
+};
+
 const UserManagement = () => {
     const { user } = useAuth();
     const [users, setUsers] = useState([]);
@@ -44,23 +52,17 @@ const UserManagement = () => {
     const [selectedUser, setSelectedUser] = useState(null);
     const [availableRoles, setAvailableRoles] = useState([]);
 
-    // Fetch users + roles on mount
-    useEffect(() => {
-        loadUsers();
-        loadRoles();
-    }, []);
-
-    const loadUsers = async () => {
+    const loadUsers = useCallback(async () => {
         setLoading(true);
         const result = await getAllUsers(user.id);
         if (result.success) {
             setUsers(result.users);
         }
         setLoading(false);
-    };
+    }, [user.id]);
 
     // Load roles dari tabel role_permissions + tambahkan super_admin
-    const loadRoles = async () => {
+    const loadRoles = useCallback(async () => {
         try {
             const { data, error } = await supabase
                 .from('role_permissions')
@@ -114,7 +116,34 @@ const UserManagement = () => {
             // Selalu tampilkan fallback agar dropdown tidak pernah kosong
             setAvailableRoles(FALLBACK_ROLES);
         }
-    };
+    }, []);
+
+    // Fetch users + roles on mount
+    useEffect(() => {
+        let isCancelled = false;
+
+        const init = async () => {
+            if (isCancelled) return;
+            await loadUsers();
+            if (isCancelled) return;
+            await loadRoles();
+        };
+
+        void init();
+        return () => {
+            isCancelled = true;
+        };
+    }, [loadUsers, loadRoles]);
+
+    useEffect(() => {
+        const syncFromRoleManager = () => {
+            loadRoles();
+            loadUsers();
+        };
+
+        window.addEventListener('role-config-updated', syncFromRoleManager);
+        return () => window.removeEventListener('role-config-updated', syncFromRoleManager);
+    }, [loadUsers, loadRoles]);
 
     const handleCreateUser = () => {
         setShowCreateModal(true);
@@ -360,15 +389,16 @@ const UserManagement = () => {
  * CREATE USER MODAL — dropdown role dinamis
  * ============================================================================= */
 const CreateUserModal = ({ roles, onClose, onSuccess, createdBy }) => {
+    const defaultRoleId = pickDefaultRoleId(roles);
     const [formData, setFormData] = useState({
         username: '',
         full_name: '',
         email: '',
-        user_level: 'staff',
+        user_level: defaultRoleId,
         password: '',
         portal_access: true,
         is_active: true,
-        requires_password_change: false
+        requires_password_change: true
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -382,6 +412,13 @@ const CreateUserModal = ({ roles, onClose, onSuccess, createdBy }) => {
         e.preventDefault();
         setError('');
         setLoading(true);
+
+        const roleExists = (roles || []).some(r => r.id === formData.user_level);
+        if (!roleExists) {
+            setError('Role tidak ditemukan. Silakan refresh daftar role terlebih dahulu.');
+            setLoading(false);
+            return;
+        }
 
         const result = await createUser(formData, createdBy);
 
@@ -556,6 +593,13 @@ const EditUserModal = ({ user: selectedUser, roles, onClose, onSuccess, updatedB
         setError('');
         setLoading(true);
 
+        const roleExists = allRoles.some(r => r.id === formData.user_level);
+        if (!roleExists) {
+            setError('Role tidak ditemukan. Silakan refresh daftar role terlebih dahulu.');
+            setLoading(false);
+            return;
+        }
+
         const result = await updateUser(selectedUser.id, formData, updatedBy);
 
         if (result.success) {
@@ -674,7 +718,7 @@ const EditUserModal = ({ user: selectedUser, roles, onClose, onSuccess, updatedB
  * ============================================================================= */
 const ResetPasswordModal = ({ user: selectedUser, onClose, onSuccess, resetBy }) => {
     const [password, setPassword] = useState('');
-    const [requireChange, setRequireChange] = useState(false);
+    const [requireChange, setRequireChange] = useState(true);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -687,6 +731,12 @@ const ResetPasswordModal = ({ user: selectedUser, onClose, onSuccess, resetBy })
         e.preventDefault();
         setError('');
         setLoading(true);
+
+        if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
+            setError('Password minimal 8 karakter dan harus mengandung huruf serta angka.');
+            setLoading(false);
+            return;
+        }
 
         const result = await resetPassword(selectedUser.id, password, resetBy, requireChange);
 

@@ -44,7 +44,7 @@ const formatInputAmount = (value, currency) => {
 const QuotationManagement = () => {
     const { user, canCreate, canEdit, canDelete, canView, canApprove, isAdmin } = useAuth();
     const navigate = useNavigate();
-    const { customers, companySettings } = useData();
+    const { deleteBlinkQuotationCascade, customers, companySettings } = useData();
     const [showModal, setShowModal] = useState(false);
     const [showViewModal, setShowViewModal] = useState(false);
     const [viewingQuotation, setViewingQuotation] = useState(null);
@@ -55,6 +55,9 @@ const QuotationManagement = () => {
     const [loading, setLoading] = useState(true);
     const [showPrintPreview, setShowPrintPreview] = useState(false);
     const [selectedIds, setSelectedIds] = useState([]);
+    const [isCleansing, setIsCleansing] = useState(false);
+    const [cleanseProgress, setCleanseProgress] = useState('');
+    const canCleanseQuotations = isAdmin() || canDelete('blink_quotations');
 
     // Form state
     const [formData, setFormData] = useState({
@@ -118,6 +121,7 @@ const QuotationManagement = () => {
     const fetchQuotations = async () => {
         try {
             setLoading(true);
+            setCleanseProgress('Menjalankan cascade delete quotation...');
             const { data, error } = await supabase
                 .from('blink_quotations')
                 .select('*')
@@ -437,8 +441,8 @@ const QuotationManagement = () => {
 
     // Delete quotation (Cascading delete to all financial records)
     const handleForceCascadeDelete = async (quotationIds) => {
-        if (!isAdmin()) {
-            alert('Akses Ditolak: Fitur force delete hanya untuk Admin/Superadmin.');
+        if (!(isAdmin() || canDelete('blink_quotations'))) {
+            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus pengajuan ini.');
             return;
         }
 
@@ -517,12 +521,13 @@ const QuotationManagement = () => {
                 await supabase.from('blink_shipments').delete().in('id', shipmentIds);
             }
 
-            // Delete Quotation(s)
-            console.log(`Deleting ${quotationIds.length} quotations...`);
-            const { error: delErr } = await supabase.from('blink_quotations').delete().in('id', quotationIds);
-            if (delErr) throw delErr;
+            // Delete Quotation(s) using centralized helper (permission + cascade)
+            const success = await deleteBlinkQuotationCascade(quotationIds, 'blink_quotations', 'blink_quotations', {
+                onProgress: (message) => setCleanseProgress(message)
+            });
+            if (!success) throw new Error('Delete failed');
 
-            alert('✅ Sukses! Data Pengajuan dan SEMUA transaksi terkait (Shipments, Invoices, PO, AR, AP, Payments, Jurnal) berhasil dihapus bersih.');
+            alert('✅ Sukses! Data Pengajuan dan SEMUA transaksi terkait berhasil dihapus.');
             setSelectedIds([]);
             setShowViewModal(false);
             await fetchQuotations();
@@ -531,6 +536,31 @@ const QuotationManagement = () => {
             alert('❌ Gagal menghapus data: ' + error.message);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleCleanseAllQuotations = async () => {
+        if (!canCleanseQuotations) {
+            alert('Akses Ditolak: Anda tidak memiliki hak untuk cleansing quotation.');
+            return;
+        }
+        if (quotations.length === 0) {
+            alert('Tidak ada data quotation untuk dihapus.');
+            return;
+        }
+
+        const confirm1 = confirm(`Cleansing akan menghapus SEMUA quotation (${quotations.length} baris) beserta transaksi turunannya. Lanjutkan?`);
+        if (!confirm1) return;
+
+        const confirm2 = confirm('Konfirmasi terakhir: semua data quotation terkait akan dihapus permanen. Yakin lanjut?');
+        if (!confirm2) return;
+
+        try {
+            setIsCleansing(true);
+            setCleanseProgress('Memulai cleansing quotation...');
+            await handleForceCascadeDelete(quotations.map(q => q.id));
+        } finally {
+            setIsCleansing(false);
         }
     };
 
@@ -1002,6 +1032,11 @@ const QuotationManagement = () => {
                     <p className="text-silver-dark mt-1">Manage operational quotations</p>
                 </div>
                 <div className="flex items-center gap-3">
+                    {canCleanseQuotations && (
+                        <Button variant="danger" icon={Trash} onClick={handleCleanseAllQuotations} disabled={isCleansing || quotations.length === 0}>
+                            {isCleansing ? 'Cleansing...' : 'Bersihkan Semua Data'}
+                        </Button>
+                    )}
                     {isAdmin() && selectedIds.length > 0 && (
                         <Button variant="danger" icon={Trash} onClick={() => handleForceCascadeDelete(selectedIds)}>
                             Delete Selected ({selectedIds.length})
@@ -1017,6 +1052,12 @@ const QuotationManagement = () => {
                     )}
                 </div>
             </div>
+
+            {isCleansing && (
+                <div className="glass-card px-4 py-2 rounded-lg border border-amber-500/30 bg-amber-500/10">
+                    <p className="text-xs text-amber-300">Progress Cleansing: {cleanseProgress || 'Sedang memproses...'}</p>
+                </div>
+            )}
 
             {/* Search Bar */}
             <div className="relative">

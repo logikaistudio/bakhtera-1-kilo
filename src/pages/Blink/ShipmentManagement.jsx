@@ -2,14 +2,16 @@ import React, { useState, useEffect } from 'react';
 import Button from '../../components/Common/Button';
 import ShipmentDetailModal from '../../components/Blink/ShipmentDetailModalEnhanced';
 import SellingBuyingDetailModal from '../../components/Blink/SellingBuyingDetailModal';
-import { Ship, Plus, MapPin, Filter, Search, Download, X, ShoppingCart, FileText } from 'lucide-react';
+import { Ship, Plus, MapPin, Filter, Search, Download, X, ShoppingCart, FileText, Trash2 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { getQuotationTypeLabel } from '../../utils/orderTypeDetection';
 import { useAuth } from '../../context/AuthContext';
+import { useData } from '../../context/DataContext';
 
 const ShipmentManagement = () => {
     const { canCreate, canEdit, canDelete, canView, canApprove, canAccess } = useAuth();
+    const { deleteShipmentCascade } = useData();
     const [filter, setFilter] = useState('all');
     const [shipments, setShipments] = useState([]);
     const [selectedShipment, setSelectedShipment] = useState(null);
@@ -32,6 +34,41 @@ const ShipmentManagement = () => {
     const [listPOVendors, setListPOVendors] = useState([]);
     const [listPOSelectedVendor, setListPOSelectedVendor] = useState('');
     const [listPOShipment, setListPOShipment] = useState(null);
+    const [isCleansing, setIsCleansing] = useState(false);
+    const [cleanseProgress, setCleanseProgress] = useState('');
+
+    const handleCleanseAllShipments = async () => {
+        if (!canDelete('blink_shipments')) {
+            alert('Akses Ditolak: Anda tidak memiliki hak untuk cleansing shipment.');
+            return;
+        }
+        if (shipments.length === 0) {
+            alert('Tidak ada data shipment untuk dihapus.');
+            return;
+        }
+
+        const confirm1 = confirm(`Cleansing akan menghapus SEMUA shipment (${shipments.length} baris) beserta data turunannya. Lanjutkan?`);
+        if (!confirm1) return;
+
+        const confirm2 = confirm('Konfirmasi terakhir: semua data shipment terkait akan dihapus permanen. Yakin lanjut?');
+        if (!confirm2) return;
+
+        try {
+            setIsCleansing(true);
+            setCleanseProgress('Memulai cleansing shipment...');
+            const success = await deleteShipmentCascade(shipments.map(s => s.id), {
+                onProgress: (message) => setCleanseProgress(message)
+            });
+            if (!success) return;
+            await fetchShipments();
+            alert('✅ Cleansing shipment selesai.');
+        } catch (error) {
+            console.error('Error cleansing shipments:', error);
+            alert('❌ Gagal cleansing shipment: ' + (error.message || error));
+        } finally {
+            setIsCleansing(false);
+        }
+    };
 
     // Load shipments from Supabase
     useEffect(() => {
@@ -618,6 +655,15 @@ const ShipmentManagement = () => {
                 <div className="flex gap-2">
                     <Button
                         size="sm"
+                        variant="danger"
+                        icon={Trash2}
+                        onClick={handleCleanseAllShipments}
+                        disabled={!canDelete('blink_shipments') || shipments.length === 0 || isCleansing}
+                    >
+                        {isCleansing ? 'Cleansing...' : 'Bersihkan Semua Data'}
+                    </Button>
+                    <Button
+                        size="sm"
                         variant="secondary"
                         icon={Download}
                         onClick={handleExportToExcel}
@@ -630,6 +676,12 @@ const ShipmentManagement = () => {
                     </Button>
                 </div>
             </div>
+
+            {isCleansing && (
+                <div className="glass-card px-4 py-2 rounded-lg border border-amber-500/30 bg-amber-500/10">
+                    <p className="text-xs text-amber-300">Progress Cleansing: {cleanseProgress || 'Sedang memproses...'}</p>
+                </div>
+            )}
 
             {/* Search Bar */}
             <div className="glass-card p-4 rounded-lg">
