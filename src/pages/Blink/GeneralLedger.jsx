@@ -12,6 +12,7 @@ import { printReport, fmtDatePrint } from '../../utils/printPDF';
 import { journalEntriesHasColumn } from '../../utils/journalHelper';
 import { useData } from '../../context/DataContext';
 import { getActiveDivision } from '../../utils/divisionContext';
+import { filterActiveBlinkJournalEntries } from '../../utils/blinkJournalIntegrity';
 
 // ─── COA Type Config ─────────────────────────────────────────────────────────
 const COA_TYPE_CONFIG = {
@@ -271,8 +272,8 @@ const GeneralLedger = () => {
             const yearEnd = today.toISOString().split('T')[0];
 
             const selectCols = journalHasCoaId
-                ? 'coa_id, account_code, debit, credit, currency, exchange_rate'
-                : 'account_code, debit, credit, currency, exchange_rate';
+                ? 'id, coa_id, account_code, debit, credit, currency, exchange_rate, reference_type, reference_id'
+                : 'id, account_code, debit, credit, currency, exchange_rate, reference_type, reference_id';
 
             const { data } = await supabase
                 .from('blink_journal_entries')
@@ -282,6 +283,7 @@ const GeneralLedger = () => {
                 .lte('entry_date', yearEnd);
 
             if (!data) return;
+            const filteredData = await filterActiveBlinkJournalEntries(data, activeDivision);
 
             const codeMap = {};
             const nameMap = {};
@@ -291,7 +293,7 @@ const GeneralLedger = () => {
             });
 
             const bal = {};
-            data.forEach(e => {
+            filteredData.forEach(e => {
                 let targetId = journalHasCoaId ? e.coa_id : codeMap[e.account_code];
                 if (!targetId && e.account_name) {
                     targetId = nameMap[e.account_name.toLowerCase().trim()];
@@ -342,25 +344,26 @@ const GeneralLedger = () => {
             const fetchPrev = async () => {
                 const results = await Promise.all([
                     supabase.from('blink_journal_entries')
-                        .select('debit, credit, currency, exchange_rate, id')
+                        .select('debit, credit, currency, exchange_rate, id, reference_type, reference_id')
                         .eq('division', activeDivision)
                         .eq('coa_id', selectedAccount)
                         .lt('entry_date', dateRange.start),
                     (acc?.code || isUnclassified) ? supabase.from('blink_journal_entries')
-                        .select('debit, credit, currency, exchange_rate, id')
+                        .select('debit, credit, currency, exchange_rate, id, reference_type, reference_id')
                         .eq('division', activeDivision)
                         .eq('account_code', acc?.code || unclassifiedCode)
                         .is('coa_id', null)
                         .lt('entry_date', dateRange.start) : Promise.resolve({ data: [] }),
                     acc?.name ? supabase.from('blink_journal_entries')
-                        .select('debit, credit, currency, exchange_rate, id')
+                        .select('debit, credit, currency, exchange_rate, id, reference_type, reference_id')
                         .eq('division', activeDivision)
                         .ilike('account_name', acc.name)
                         .lt('entry_date', dateRange.start) : Promise.resolve({ data: [] })
                 ]);
                 const rows = [...(results[0].data || []), ...(results[1].data || []), ...(results[2].data || [])];
                 // deduplicate by id
-                return [...new Map(rows.map(r => [r.id, r])).values()];
+                const deduped = [...new Map(rows.map(r => [r.id, r])).values()];
+                return filterActiveBlinkJournalEntries(deduped, activeDivision);
             };
 
             const prev = await fetchPrev();
@@ -413,7 +416,7 @@ const GeneralLedger = () => {
                     }
                 }
             });
-            const unique = Array.from(uniqueMap.values());
+            const unique = await filterActiveBlinkJournalEntries(Array.from(uniqueMap.values()), activeDivision);
             
             // sort chronologically
             unique.sort((a, b) => {

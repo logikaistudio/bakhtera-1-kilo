@@ -10,6 +10,7 @@ import Button from '../../components/Common/Button';
 import { printReport } from '../../utils/printPDF';
 import { useData } from '../../context/DataContext';
 import { getActiveDivision } from '../../utils/divisionContext';
+import { filterActiveBlinkJournalEntries } from '../../utils/blinkJournalIntegrity';
 
 // ── COA Group Definitions ────────────────────────────────────────────────────
 const ASSET_GROUPS = [
@@ -78,7 +79,8 @@ const BalanceSheet = () => {
             if (r2.error) throw r2.error;
 
             const combined = [...(r1.data || []), ...(r2.data || [])];
-            const entries = [...new Map(combined.map(r => [r.id, r])).values()];
+            const dedupedEntries = [...new Map(combined.map(r => [r.id, r])).values()];
+            const entries = await filterActiveBlinkJournalEntries(dedupedEntries, activeDivision);
 
             const accMap = {};
             const accCodeMap = {};

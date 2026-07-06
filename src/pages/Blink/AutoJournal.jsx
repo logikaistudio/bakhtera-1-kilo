@@ -11,6 +11,7 @@ import {
 import { printReport, fmtDatePrint } from '../../utils/printPDF';
 import { useData } from '../../context/DataContext';
 import { getActiveDivision } from '../../utils/divisionContext';
+import { filterActiveBlinkJournalEntries } from '../../utils/blinkJournalIntegrity';
 
 // ─── Source badge config ─────────────────────────────────────────────────────
 const SOURCE_CONFIG = {
@@ -102,7 +103,8 @@ const AutoJournal = () => {
 
             const { data, error } = await q;
             if (error) throw error;
-            setEntries(data || []);
+            const filtered = await filterActiveBlinkJournalEntries(data || [], activeDivision);
+            setEntries(filtered);
         } catch (e) {
             console.error('Error fetching auto journal entries:', e);
             setEntries([]);

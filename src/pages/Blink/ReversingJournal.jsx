@@ -14,6 +14,7 @@ import { printReport, fmtDatePrint } from '../../utils/printPDF';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { getActiveDivision } from '../../utils/divisionContext';
+import { filterActiveBlinkJournalEntries } from '../../utils/blinkJournalIntegrity';
 
 // ─── Source badge config ─────────────────────────────────────────────────────
 const SOURCE_CONFIG = {
@@ -126,7 +127,8 @@ const ReversingJournal = () => {
 
             const { data, error } = await q;
             if (error) throw error;
-            setEntries(data || []);
+            const filtered = await filterActiveBlinkJournalEntries(data || [], activeDivision);
+            setEntries(filtered);
         } catch (e) {
             console.error('Error fetching reversing journal entries:', e);
             setEntries([]);

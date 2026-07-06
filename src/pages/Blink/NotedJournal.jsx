@@ -13,6 +13,7 @@ import { printReport, fmtDatePrint } from '../../utils/printPDF';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { getActiveDivision } from '../../utils/divisionContext';
+import { filterActiveBlinkJournalEntries } from '../../utils/blinkJournalIntegrity';
 
 // ─── Currency Formatter ──────────────────────────────────────────────────────
 const fmt = (value, currency = 'IDR') => {
@@ -114,7 +115,8 @@ const NotedJournal = () => {
 
             const { data, error } = await q;
             if (error) throw error;
-            setEntries(data || []);
+            const filtered = await filterActiveBlinkJournalEntries(data || [], activeDivision);
+            setEntries(filtered);
         } catch (e) {
             console.error('Error fetching noted journal entries:', e);
             setEntries([]);

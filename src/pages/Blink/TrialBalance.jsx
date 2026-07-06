@@ -10,6 +10,7 @@ import XLSX from 'xlsx-js-style';
 import { printReport, fmtPrint, fmtDatePrint } from '../../utils/printPDF';
 import { useData } from '../../context/DataContext';
 import { getActiveDivision } from '../../utils/divisionContext';
+import { filterActiveBlinkJournalEntries } from '../../utils/blinkJournalIntegrity';
 
 const TrialBalance = () => {
     const navigate = useNavigate();
@@ -100,7 +101,8 @@ const TrialBalance = () => {
                     }
                 }
             });
-            const entries = Array.from(uniqueMap.values());
+            const dedupedEntries = Array.from(uniqueMap.values());
+            const entries = await filterActiveBlinkJournalEntries(dedupedEntries, activeDivision);
 
             // 3. Process Data
             // 3. Process Data
