@@ -330,20 +330,289 @@ export const parsePartnerImportFile = (file) => {
 /**
  * Bulk insert partners to Supabase
  */
-export const bulkImportPartners = async (supabase, partners) => {
-    try {
-        const { data, error } = await supabase
-            .from('blink_business_partners')
-            .insert(partners)
-            .select();
+export const bulkImportPartners = async (supabase, partners, options = {}) => {
+    const normalize = (value) => (value || '').toString().trim().toLowerCase();
+    const normalizePhone = (value) => (value || '').toString().replace(/\D/g, '');
 
-        if (error) throw error;
-
+    const parseDbCode = (code) => {
+        const match = String(code || '').match(/^BP-(\d{4})-(\d{4})$/i);
+        if (!match) return null;
         return {
-            success: true,
-            imported: data.length,
-            data: data
+            yymm: match[1],
+            seq: Number.parseInt(match[2], 10)
         };
+    };
+
+    const now = new Date();
+    const currentYYMM = `${String(now.getFullYear()).slice(-2)}${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    const ensurePartnerCode = (startCounter = 1) => {
+        let counter = startCounter;
+        const used = new Set();
+
+        return (preferredCode = '') => {
+            const preferred = String(preferredCode || '').trim();
+            if (preferred && !used.has(preferred)) {
+                used.add(preferred);
+                return preferred;
+            }
+
+            let candidate = `BP-${currentYYMM}-${String(counter).padStart(4, '0')}`;
+            while (used.has(candidate)) {
+                counter += 1;
+                candidate = `BP-${currentYYMM}-${String(counter).padStart(4, '0')}`;
+            }
+
+            used.add(candidate);
+            counter += 1;
+            return candidate;
+        };
+    };
+
+    const toPartnerPayload = (partner, defaults = {}) => ({
+        partner_code: String(partner.partner_code || '').trim(),
+        partner_name: String(partner.partner_name || '').trim(),
+        partner_type: partner.partner_type || 'company',
+        contact_person: partner.contact_person || '',
+        email: partner.email || '',
+        phone: partner.phone || '',
+        mobile: partner.mobile || '',
+        address_line1: partner.address_line1 || '',
+        address_line2: partner.address_line2 || '',
+        city: partner.city || '',
+        postal_code: partner.postal_code || '',
+        country: partner.country || 'Indonesia',
+        tax_id: partner.tax_id || '',
+        is_customer: Boolean(partner.is_customer),
+        is_vendor: Boolean(partner.is_vendor),
+        is_agent: Boolean(partner.is_agent),
+        is_transporter: Boolean(partner.is_transporter),
+        is_consignee: Boolean(partner.is_consignee),
+        is_shipper: Boolean(partner.is_shipper),
+        payment_terms: partner.payment_terms || 'NET 30',
+        currency: partner.currency || 'IDR',
+        credit_limit: Number.parseFloat(partner.credit_limit) || 0,
+        bank_name: partner.bank_name || '',
+        bank_account_number: partner.bank_account_number || '',
+        bank_account_holder: partner.bank_account_holder || '',
+        notes: partner.notes || '',
+        status: partner.status || 'active',
+        owner_division: defaults.owner_division,
+        is_shared: Boolean(defaults.is_shared)
+    });
+
+    const mergeRoleFlags = (current, incoming) => ({
+        is_customer: Boolean(current.is_customer || incoming.is_customer),
+        is_vendor: Boolean(current.is_vendor || incoming.is_vendor),
+        is_agent: Boolean(current.is_agent || incoming.is_agent),
+        is_transporter: Boolean(current.is_transporter || incoming.is_transporter),
+        is_consignee: Boolean(current.is_consignee || incoming.is_consignee),
+        is_shipper: Boolean(current.is_shipper || incoming.is_shipper)
+    });
+
+    const findDuplicate = (maps, payload) => {
+        const partnerCode = normalize(payload.partner_code);
+        const taxId = normalize(payload.tax_id);
+        const partnerName = normalize(payload.partner_name);
+        const email = normalize(payload.email);
+        const phone = normalizePhone(payload.phone || payload.mobile);
+
+        if (partnerCode && maps.byCode.has(partnerCode)) return maps.byCode.get(partnerCode);
+        if (taxId && maps.byTaxId.has(taxId)) return maps.byTaxId.get(taxId);
+
+        if (partnerName && email) {
+            const key = `${partnerName}|${email}`;
+            if (maps.byNameEmail.has(key)) return maps.byNameEmail.get(key);
+        }
+
+        if (partnerName && phone) {
+            const key = `${partnerName}|${phone}`;
+            if (maps.byNamePhone.has(key)) return maps.byNamePhone.get(key);
+        }
+
+        return null;
+    };
+
+    const indexPartner = (maps, row) => {
+        const code = normalize(row.partner_code);
+        const taxId = normalize(row.tax_id);
+        const name = normalize(row.partner_name);
+        const email = normalize(row.email);
+        const phone = normalizePhone(row.phone || row.mobile);
+
+        if (code) maps.byCode.set(code, row);
+        if (taxId) maps.byTaxId.set(taxId, row);
+        if (name && email) maps.byNameEmail.set(`${name}|${email}`, row);
+        if (name && phone) maps.byNamePhone.set(`${name}|${phone}`, row);
+    };
+
+    const stripUnsupportedFields = (payload, err) => {
+        const msg = String(err?.message || '').toLowerCase();
+        const details = String(err?.details || '').toLowerCase();
+        const hint = String(err?.hint || '').toLowerCase();
+        const text = `${msg} ${details} ${hint}`;
+        const cleaned = { ...payload };
+        let changed = false;
+
+        if (text.includes('owner_division')) {
+            delete cleaned.owner_division;
+            changed = true;
+        }
+        if (text.includes('is_shared')) {
+            delete cleaned.is_shared;
+            changed = true;
+        }
+
+        return changed ? cleaned : null;
+    };
+
+    try {
+        const defaults = options.defaults || {};
+        const sourceRows = Array.isArray(partners) ? partners : [];
+
+        if (sourceRows.length === 0) {
+            return {
+                success: true,
+                imported: 0,
+                merged: 0,
+                skipped: 0,
+                failed: 0,
+                errors: []
+            };
+        }
+
+        const { data: existingRows, error: existingError } = await supabase
+            .from('blink_business_partners')
+            .select('id, partner_code, partner_name, tax_id, email, phone, mobile, is_customer, is_vendor, is_agent, is_transporter, is_consignee, is_shipper')
+            .limit(50000);
+
+        if (existingError) throw existingError;
+
+        const maps = {
+            byCode: new Map(),
+            byTaxId: new Map(),
+            byNameEmail: new Map(),
+            byNamePhone: new Map()
+        };
+
+        let maxCurrentMonthSeq = 0;
+
+        (existingRows || []).forEach((row) => {
+            const parsed = parseDbCode(row.partner_code);
+            if (parsed && parsed.yymm === currentYYMM && parsed.seq > maxCurrentMonthSeq) {
+                maxCurrentMonthSeq = parsed.seq;
+            }
+        });
+
+        const generateCode = ensurePartnerCode(maxCurrentMonthSeq + 1);
+
+        (existingRows || []).forEach((row) => {
+            generateCode(row.partner_code);
+            indexPartner(maps, row);
+        });
+
+        const summary = {
+            success: true,
+            imported: 0,
+            merged: 0,
+            skipped: 0,
+            failed: 0,
+            errors: [],
+            data: []
+        };
+
+        for (let index = 0; index < sourceRows.length; index += 1) {
+            const rowNumber = index + 2;
+            const payload = toPartnerPayload(sourceRows[index], defaults);
+
+            if (!payload.partner_name) {
+                summary.skipped += 1;
+                summary.errors.push({ row: rowNumber, error: 'Partner name is required' });
+                continue;
+            }
+
+            const duplicate = findDuplicate(maps, payload);
+            if (duplicate) {
+                const mergedFlags = mergeRoleFlags(duplicate, payload);
+                const needsRoleMerge =
+                    mergedFlags.is_customer !== Boolean(duplicate.is_customer) ||
+                    mergedFlags.is_vendor !== Boolean(duplicate.is_vendor) ||
+                    mergedFlags.is_agent !== Boolean(duplicate.is_agent) ||
+                    mergedFlags.is_transporter !== Boolean(duplicate.is_transporter) ||
+                    mergedFlags.is_consignee !== Boolean(duplicate.is_consignee) ||
+                    mergedFlags.is_shipper !== Boolean(duplicate.is_shipper);
+
+                if (needsRoleMerge) {
+                    const { data: mergedRows, error: mergeError } = await supabase
+                        .from('blink_business_partners')
+                        .update({ ...mergedFlags, updated_at: new Date().toISOString() })
+                        .eq('id', duplicate.id)
+                        .select('id, partner_code, partner_name, tax_id, email, phone, mobile, is_customer, is_vendor, is_agent, is_transporter, is_consignee, is_shipper');
+
+                    if (mergeError) {
+                        summary.failed += 1;
+                        summary.errors.push({ row: rowNumber, error: mergeError.message });
+                        continue;
+                    }
+
+                    const merged = mergedRows?.[0] || { ...duplicate, ...mergedFlags };
+                    indexPartner(maps, merged);
+                }
+
+                summary.merged += 1;
+                continue;
+            }
+
+            payload.partner_code = generateCode(payload.partner_code);
+
+            let insertPayload = { ...payload };
+            let { data, error } = await supabase
+                .from('blink_business_partners')
+                .insert([insertPayload])
+                .select('id, partner_code, partner_name, tax_id, email, phone, mobile, is_customer, is_vendor, is_agent, is_transporter, is_consignee, is_shipper');
+
+            if (error) {
+                const compatiblePayload = stripUnsupportedFields(insertPayload, error);
+                if (compatiblePayload) {
+                    insertPayload = compatiblePayload;
+                    const retryCompat = await supabase
+                        .from('blink_business_partners')
+                        .insert([insertPayload])
+                        .select('id, partner_code, partner_name, tax_id, email, phone, mobile, is_customer, is_vendor, is_agent, is_transporter, is_consignee, is_shipper');
+                    data = retryCompat.data;
+                    error = retryCompat.error;
+                }
+            }
+
+            if (error && (error.code === '23505' || String(error.message || '').toLowerCase().includes('partner_code'))) {
+                const retryPayload = {
+                    ...insertPayload,
+                    partner_code: generateCode('')
+                };
+
+                const retryInsert = await supabase
+                    .from('blink_business_partners')
+                    .insert([retryPayload])
+                    .select('id, partner_code, partner_name, tax_id, email, phone, mobile, is_customer, is_vendor, is_agent, is_transporter, is_consignee, is_shipper');
+                data = retryInsert.data;
+                error = retryInsert.error;
+            }
+
+            if (error) {
+                summary.failed += 1;
+                summary.errors.push({ row: rowNumber, error: error.message });
+                continue;
+            }
+
+            const inserted = data?.[0];
+            if (inserted) {
+                summary.imported += 1;
+                summary.data.push(inserted);
+                indexPartner(maps, inserted);
+            }
+        }
+
+        return summary;
     } catch (error) {
         return {
             success: false,

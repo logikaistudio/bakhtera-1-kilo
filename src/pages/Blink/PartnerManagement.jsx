@@ -310,11 +310,32 @@ const PartnerManagement = () => {
                 return;
             }
 
-            // Bulk insert
-            const importResult = await bulkImportPartners(supabase, result.partners);
+            // Resilient import with duplicate filtering/merge and division defaults
+            const importResult = await bulkImportPartners(supabase, result.partners, {
+                defaults: {
+                    owner_division: getActiveDivision(),
+                    is_shared: isAdminUser() ? true : false
+                }
+            });
 
             if (importResult.success) {
-                alert(`✅ Successfully imported ${importResult.imported} partners!`);
+                const summary = [
+                    `✅ Import selesai`,
+                    `- Data baru: ${importResult.imported || 0}`,
+                    `- Duplikat difilter/merge: ${importResult.merged || 0}`,
+                    `- Skip invalid: ${importResult.skipped || 0}`,
+                    `- Gagal: ${importResult.failed || 0}`
+                ];
+
+                if ((importResult.errors || []).length > 0) {
+                    const preview = importResult.errors
+                        .slice(0, 10)
+                        .map((err) => `Row ${err.row}: ${err.error}`)
+                        .join('\n');
+                    summary.push('', 'Detail error (maks 10):', preview);
+                }
+
+                alert(summary.join('\n'));
                 fetchPartners(); // Refresh list
             } else {
                 alert('❌ Import failed: ' + importResult.error);
