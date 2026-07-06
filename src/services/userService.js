@@ -7,6 +7,20 @@ import { hashPassword, verifyPassword, validatePasswordStrength, generatePasswor
  */
 
 const DEFAULT_FALLBACK_ROLE_IDS = ['super_admin', 'direksi', 'chief', 'manager', 'staff', 'viewer'];
+let canUsePasswordPlainColumn = true;
+
+const isMissingPasswordPlainColumnError = (error) => {
+    const msg = (error?.message || '').toLowerCase();
+    return msg.includes('password_plain') && msg.includes('does not exist');
+};
+
+const markPasswordPlainUnavailable = (error) => {
+    if (isMissingPasswordPlainColumnError(error)) {
+        canUsePasswordPlainColumn = false;
+        return true;
+    }
+    return false;
+};
 
 const getAllowedRoleIds = async () => {
     try {
@@ -64,22 +78,48 @@ export const createUser = async (userData, createdBy) => {
         const passwordHash = await hashPassword(userData.password);
 
         // Create user
-        const { data: newUser, error } = await supabase
-            .from('users')
-            .insert({
-                username: userData.username,
-                password_hash: passwordHash,
+        let insertPayload = {
+            username: userData.username,
+            password_hash: passwordHash,
+            full_name: userData.full_name,
+            email: userData.email || null,
+            user_level: userData.user_level,
+            portal_access: userData.portal_access ?? true,
+            is_active: userData.is_active ?? true,
+            requires_password_change: userData.requires_password_change ?? true,
+            created_by: createdBy
+        };
+
+        if (canUsePasswordPlainColumn) {
+            insertPayload = {
+                ...insertPayload,
                 password_plain: userData.password,
-                full_name: userData.full_name,
-                email: userData.email || null,
-                user_level: userData.user_level,
-                portal_access: userData.portal_access ?? true,
-                is_active: userData.is_active ?? true,
-                requires_password_change: userData.requires_password_change ?? true,
-                created_by: createdBy
-            })
+            };
+        }
+
+        let { data: newUser, error } = await supabase
+            .from('users')
+            .insert(insertPayload)
             .select()
             .single();
+
+        if (markPasswordPlainUnavailable(error)) {
+            ({ data: newUser, error } = await supabase
+                .from('users')
+                .insert({
+                    username: userData.username,
+                    password_hash: passwordHash,
+                    full_name: userData.full_name,
+                    email: userData.email || null,
+                    user_level: userData.user_level,
+                    portal_access: userData.portal_access ?? true,
+                    is_active: userData.is_active ?? true,
+                    requires_password_change: userData.requires_password_change ?? true,
+                    created_by: createdBy
+                })
+                .select()
+                .single());
+        }
 
         if (error) {
             throw error;
@@ -123,14 +163,31 @@ export const getAllUsers = async (requestedBy) => {
             throw new Error('Only Super Admin can view all users');
         }
 
-        const { data: users, error } = await supabase
+        let userSelect = 'id, username, full_name, email, user_level, portal_access, is_active, last_login, created_at';
+        if (canUsePasswordPlainColumn) {
+            userSelect += ', password_plain';
+        }
+
+        let { data: users, error } = await supabase
             .from('users')
-            .select('id, username, full_name, email, user_level, portal_access, is_active, last_login, created_at, password_plain')
+            .select(userSelect)
             .order('created_at', { ascending: false });
+
+        if (markPasswordPlainUnavailable(error)) {
+            ({ data: users, error } = await supabase
+                .from('users')
+                .select('id, username, full_name, email, user_level, portal_access, is_active, last_login, created_at')
+                .order('created_at', { ascending: false }));
+        }
 
         if (error) throw error;
 
-        return { success: true, users };
+        const normalizedUsers = (users || []).map(u => ({
+            ...u,
+            password_plain: u.password_plain ?? null,
+        }));
+
+        return { success: true, users: normalizedUsers };
 
     } catch (error) {
         console.error('Error getting users:', error);
@@ -231,14 +288,28 @@ export const resetPassword = async (userId, newPassword, resetBy, requireChange 
         const passwordHash = await hashPassword(newPassword);
 
         // Update password
-        const { error } = await supabase
+        let updatePayload = {
+            password_hash: passwordHash,
+            requires_password_change: requireChange
+        };
+        if (canUsePasswordPlainColumn) {
+            updatePayload = { ...updatePayload, password_plain: newPassword };
+        }
+
+        let { error } = await supabase
             .from('users')
-            .update({
-                password_hash: passwordHash,
-                password_plain: newPassword,
-                requires_password_change: requireChange
-            })
+            .update(updatePayload)
             .eq('id', userId);
+
+        if (markPasswordPlainUnavailable(error)) {
+            ({ error } = await supabase
+                .from('users')
+                .update({
+                    password_hash: passwordHash,
+                    requires_password_change: requireChange
+                })
+                .eq('id', userId));
+        }
 
         if (error) throw error;
 
@@ -435,14 +506,28 @@ export const changePassword = async (userId, oldPassword, newPassword) => {
         const newHash = await hashPassword(newPassword);
 
         // Update
-        const { error: updateError } = await supabase
+        let updatePayload = {
+            password_hash: newHash,
+            requires_password_change: false
+        };
+        if (canUsePasswordPlainColumn) {
+            updatePayload = { ...updatePayload, password_plain: newPassword };
+        }
+
+        let { error: updateError } = await supabase
             .from('users')
-            .update({
-                password_hash: newHash,
-                password_plain: newPassword,
-                requires_password_change: false
-            })
+            .update(updatePayload)
             .eq('id', userId);
+
+        if (markPasswordPlainUnavailable(updateError)) {
+            ({ error: updateError } = await supabase
+                .from('users')
+                .update({
+                    password_hash: newHash,
+                    requires_password_change: false
+                })
+                .eq('id', userId));
+        }
 
         if (updateError) throw updateError;
 
@@ -468,15 +553,33 @@ export const changePassword = async (userId, oldPassword, newPassword) => {
  */
 export const getUserById = async (userId) => {
     try {
-        const { data: user, error } = await supabase
+        let userSelect = 'id, username, full_name, email, user_level, portal_access, is_active, last_login, created_at';
+        if (canUsePasswordPlainColumn) {
+            userSelect += ', password_plain';
+        }
+
+        let { data: user, error } = await supabase
             .from('users')
-            .select('id, username, full_name, email, user_level, portal_access, is_active, last_login, created_at, password_plain')
+            .select(userSelect)
             .eq('id', userId)
             .single();
 
+        if (markPasswordPlainUnavailable(error)) {
+            ({ data: user, error } = await supabase
+                .from('users')
+                .select('id, username, full_name, email, user_level, portal_access, is_active, last_login, created_at')
+                .eq('id', userId)
+                .single());
+        }
+
         if (error) throw error;
 
-        return { success: true, user };
+        const normalizedUser = {
+            ...user,
+            password_plain: user?.password_plain ?? null,
+        };
+
+        return { success: true, user: normalizedUser };
 
     } catch (error) {
         console.error('Error getting user:', error);
@@ -522,14 +625,28 @@ export const forgotPasswordSelfService = async (username, fullName) => {
         const generatedPassword = generatePassword(12);
         const passwordHash = await hashPassword(generatedPassword);
 
-        const { error: updateError } = await supabase
+        let updatePayload = {
+            password_hash: passwordHash,
+            requires_password_change: true
+        };
+        if (canUsePasswordPlainColumn) {
+            updatePayload = { ...updatePayload, password_plain: generatedPassword };
+        }
+
+        let { error: updateError } = await supabase
             .from('users')
-            .update({
-                password_hash: passwordHash,
-                password_plain: generatedPassword,
-                requires_password_change: true
-            })
+            .update(updatePayload)
             .eq('id', user.id);
+
+        if (markPasswordPlainUnavailable(updateError)) {
+            ({ error: updateError } = await supabase
+                .from('users')
+                .update({
+                    password_hash: passwordHash,
+                    requires_password_change: true
+                })
+                .eq('id', user.id));
+        }
 
         if (updateError) throw updateError;
 
@@ -576,9 +693,22 @@ export const bulkResetLegacyPasswords = async (requestedBy) => {
             throw new Error('Only Super Admin can perform bulk password reset');
         }
 
-        const { data: allUsers, error: usersError } = await supabase
+        let userSelect = 'id, username, full_name, is_active, portal_access';
+        if (canUsePasswordPlainColumn) {
+            userSelect += ', password_plain';
+        }
+
+        let { data: allUsers, error: usersError } = await supabase
             .from('users')
-            .select('id, username, full_name, is_active, portal_access, password_plain');
+            .select(userSelect);
+
+        if (markPasswordPlainUnavailable(usersError)) {
+            return {
+                success: false,
+                error: 'Fitur reset legacy membutuhkan kolom users.password_plain. Jalankan migrasi SQL terbaru terlebih dahulu.',
+                requiresMigration: true,
+            };
+        }
 
         if (usersError) throw usersError;
 
@@ -598,7 +728,7 @@ export const bulkResetLegacyPasswords = async (requestedBy) => {
             const generatedPassword = generatePassword(12);
             const passwordHash = await hashPassword(generatedPassword);
 
-            const { error: updateError } = await supabase
+            let { error: updateError } = await supabase
                 .from('users')
                 .update({
                     password_hash: passwordHash,
@@ -606,6 +736,14 @@ export const bulkResetLegacyPasswords = async (requestedBy) => {
                     requires_password_change: true
                 })
                 .eq('id', target.id);
+
+            if (markPasswordPlainUnavailable(updateError)) {
+                return {
+                    success: false,
+                    error: 'Fitur reset legacy membutuhkan kolom users.password_plain. Jalankan migrasi SQL terbaru terlebih dahulu.',
+                    requiresMigration: true,
+                };
+            }
 
             if (updateError) {
                 console.error('Bulk reset update error for user:', target.username, updateError);

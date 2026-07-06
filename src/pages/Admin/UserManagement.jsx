@@ -249,6 +249,10 @@ const UserManagement = () => {
         setBulkResetLoading(false);
 
         if (!result.success) {
+            if (result.requiresMigration) {
+                alert(`Gagal reset massal: ${result.error}\n\nJalankan SQL ini di database produksi:\nALTER TABLE public.users ADD COLUMN IF NOT EXISTS password_plain TEXT;`);
+                return;
+            }
             alert(`Gagal reset massal: ${result.error}`);
             return;
         }
