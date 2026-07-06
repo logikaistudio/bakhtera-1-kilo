@@ -14,6 +14,7 @@ const ItemMaster = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [showModal, setShowModal] = useState(false);
     const [editingItem, setEditingItem] = useState(null);
+    const [selectedIds, setSelectedIds] = useState([]);
     const [formData, setFormData] = useState({
         itemCode: '',
         itemType: ''
@@ -50,6 +51,34 @@ const ItemMaster = () => {
         }
     };
 
+    const toggleSelectOne = (id) => {
+        setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    };
+
+    const toggleSelectAll = () => {
+        if (filteredItems.length === 0) return;
+        if (selectedIds.length === filteredItems.length) {
+            setSelectedIds([]);
+            return;
+        }
+        setSelectedIds(filteredItems.map(i => i.id));
+    };
+
+    const handleDeleteSelected = () => {
+        if (!hasDelete || selectedIds.length === 0) return;
+        if (!window.confirm(`Apakah Anda yakin ingin menghapus ${selectedIds.length} kode barang terpilih?`)) return;
+        selectedIds.forEach(id => deleteItemCode(id));
+        setSelectedIds([]);
+    };
+
+    const handleDeleteAll = () => {
+        if (!hasDelete || itemMaster.length === 0) return;
+        if (!window.confirm(`Hapus seluruh data kode barang (${itemMaster.length} baris)?`)) return;
+        if (!window.confirm('Konfirmasi terakhir: semua kode barang akan dihapus permanen. Lanjutkan?')) return;
+        itemMaster.forEach(item => deleteItemCode(item.id));
+        setSelectedIds([]);
+    };
+
     // Export to CSV handler
     const handleExportCSV = () => {
         const columns = [
@@ -68,12 +97,26 @@ const ItemMaster = () => {
                     <h1 className="text-3xl font-bold gradient-text">Master Kode Barang</h1>
                     <p className="text-silver-dark mt-1">Manajemen Kode & Tipe Barang</p>
                 </div>
-                {hasCreate && (
-                    <Button onClick={() => setShowModal(true)}>
-                        <Plus className="w-4 h-4 mr-2" />
-                        Tambah Kode Barang
-                    </Button>
-                )}
+                <div className="flex items-center gap-2">
+                    {hasDelete && (
+                        <>
+                            <Button onClick={handleDeleteSelected} variant="danger" disabled={selectedIds.length === 0}>
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Hapus Terpilih ({selectedIds.length})
+                            </Button>
+                            <Button onClick={handleDeleteAll} variant="danger" disabled={itemMaster.length === 0}>
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Bersihkan Semua Data
+                            </Button>
+                        </>
+                    )}
+                    {hasCreate && (
+                        <Button onClick={() => setShowModal(true)}>
+                            <Plus className="w-4 h-4 mr-2" />
+                            Tambah Kode Barang
+                        </Button>
+                    )}
+                </div>
             </div>
 
             {/* Search & Stats */}
@@ -118,6 +161,14 @@ const ItemMaster = () => {
                     <table className="w-full">
                         <thead className="bg-accent-blue/10">
                             <tr>
+                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver">
+                                    <input
+                                        type="checkbox"
+                                        checked={filteredItems.length > 0 && selectedIds.length === filteredItems.length}
+                                        onChange={toggleSelectAll}
+                                        className="w-4 h-4"
+                                    />
+                                </th>
                                 <th className="px-4 py-3 text-center text-xs font-semibold text-silver">No</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-silver">Kode Barang</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-silver">Tipe Barang</th>
@@ -126,7 +177,7 @@ const ItemMaster = () => {
                         <tbody>
                             {filteredItems.length === 0 ? (
                                 <tr>
-                                    <td colSpan="3" className="px-4 py-12 text-center">
+                                    <td colSpan="4" className="px-4 py-12 text-center">
                                         <Package className="w-16 h-16 mx-auto mb-4 opacity-30 text-silver-dark" />
                                         <p className="text-lg text-silver-dark">Belum ada kode barang</p>
                                         <p className="text-sm text-silver-dark mt-2">Tambahkan kode barang untuk memulai</p>
@@ -139,6 +190,14 @@ const ItemMaster = () => {
                                         onClick={() => hasEdit && handleEdit(item)}
                                         className={`border-t border-dark-border hover:bg-dark-surface/50 ${hasEdit ? 'cursor-pointer' : ''}`}
                                     >
+                                        <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedIds.includes(item.id)}
+                                                onChange={() => toggleSelectOne(item.id)}
+                                                className="w-4 h-4"
+                                            />
+                                        </td>
                                         <td className="px-4 py-3 text-sm text-center text-silver-light">{idx + 1}</td>
                                         <td className="px-4 py-3 text-sm text-accent-blue font-mono">{item.itemCode}</td>
                                         <td className="px-4 py-3 text-sm text-silver-light">{item.itemType}</td>

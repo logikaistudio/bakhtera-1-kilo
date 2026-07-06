@@ -17,10 +17,12 @@ import {
 } from 'lucide-react';
 
 const ExchangeRates = () => {
-    const { user } = useAuth();
+    const { user, canDelete } = useAuth();
+    const hasDelete = canDelete('blink_exchange_rates');
     const [rates, setRates] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedIds, setSelectedIds] = useState([]);
     
     // Modal states
     const [showModal, setShowModal] = useState(false);
@@ -132,6 +134,10 @@ const ExchangeRates = () => {
     };
 
     const handleDelete = async (id, date) => {
+        if (!hasDelete) {
+            alert('Anda tidak memiliki izin untuk menghapus kurs referensi.');
+            return;
+        }
         if (!confirm(`Apakah Anda yakin ingin menghapus kurs referensi untuk tanggal ${date}?`)) {
             return;
         }
@@ -164,6 +170,69 @@ const ExchangeRates = () => {
         );
     });
 
+    const isAllFilteredSelected = filteredRates.length > 0 && filteredRates.every(r => selectedIds.includes(r.id));
+
+    const toggleSelectOne = (id) => {
+        setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    };
+
+    const toggleSelectAll = () => {
+        if (isAllFilteredSelected) {
+            setSelectedIds(prev => prev.filter(id => !filteredRates.some(r => r.id === id)));
+            return;
+        }
+        setSelectedIds(prev => {
+            const merged = new Set(prev);
+            filteredRates.forEach(r => merged.add(r.id));
+            return Array.from(merged);
+        });
+    };
+
+    const handleDeleteSelected = async () => {
+        if (!hasDelete || selectedIds.length === 0) return;
+        if (!confirm(`Hapus ${selectedIds.length} kurs referensi terpilih?`)) return;
+
+        try {
+            const { error } = await supabase
+                .from('blink_exchange_rates')
+                .delete()
+                .in('id', selectedIds);
+
+            if (error) throw error;
+            alert(`✅ ${selectedIds.length} kurs referensi berhasil dihapus`);
+            setSelectedIds([]);
+            fetchRates();
+        } catch (error) {
+            console.error('Error deleting selected exchange rates:', error);
+            alert('Gagal menghapus kurs terpilih: ' + error.message);
+        }
+    };
+
+    const handleDeleteAll = async () => {
+        if (!hasDelete) return;
+        if (rates.length === 0) {
+            alert('Tidak ada data kurs untuk dihapus.');
+            return;
+        }
+        if (!confirm(`Hapus seluruh data kurs referensi (${rates.length} baris)?`)) return;
+        if (!confirm('Konfirmasi terakhir: seluruh data kurs akan dihapus permanen. Lanjutkan?')) return;
+
+        try {
+            const { error } = await supabase
+                .from('blink_exchange_rates')
+                .delete()
+                .neq('id', '00000000-0000-0000-0000-000000000000');
+
+            if (error) throw error;
+            alert('✅ Seluruh data kurs berhasil dihapus');
+            setSelectedIds([]);
+            fetchRates();
+        } catch (error) {
+            console.error('Error deleting all exchange rates:', error);
+            alert('Gagal menghapus seluruh data kurs: ' + error.message);
+        }
+    };
+
     const latestRateObj = rates.length > 0 ? rates[0] : null;
 
     return (
@@ -180,6 +249,16 @@ const ExchangeRates = () => {
                     </p>
                 </div>
                 <div className="flex gap-2">
+                    {hasDelete && (
+                        <>
+                            <Button size="sm" variant="danger" icon={Trash2} onClick={handleDeleteSelected} disabled={selectedIds.length === 0}>
+                                Hapus Terpilih ({selectedIds.length})
+                            </Button>
+                            <Button size="sm" variant="danger" icon={Trash2} onClick={handleDeleteAll} disabled={rates.length === 0}>
+                                Bersihkan Semua Data
+                            </Button>
+                        </>
+                    )}
                     <Button size="sm" variant="secondary" icon={RefreshCw} onClick={fetchRates} disabled={loading}>
                         Refresh
                     </Button>
@@ -254,6 +333,14 @@ const ExchangeRates = () => {
                         <table className="w-full">
                             <thead className="bg-accent-orange">
                                 <tr>
+                                    <th className="px-6 py-3 text-center text-xs font-semibold text-white uppercase tracking-wider">
+                                        <input
+                                            type="checkbox"
+                                            checked={isAllFilteredSelected}
+                                            onChange={toggleSelectAll}
+                                            className="w-4 h-4"
+                                        />
+                                    </th>
                                     <th className="px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Tanggal Berlaku</th>
                                     <th className="px-6 py-3 text-right text-xs font-semibold text-white uppercase tracking-wider">Nilai Tukar (USD ↔ IDR)</th>
                                     <th className="px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Dibuat Oleh</th>
@@ -264,6 +351,14 @@ const ExchangeRates = () => {
                             <tbody className="divide-y divide-dark-border">
                                 {filteredRates.map((r) => (
                                     <tr key={r.id} className="hover:bg-dark-surface smooth-transition">
+                                        <td className="px-6 py-4 whitespace-nowrap text-center" onClick={(e) => e.stopPropagation()}>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedIds.includes(r.id)}
+                                                onChange={() => toggleSelectOne(r.id)}
+                                                className="w-4 h-4"
+                                            />
+                                        </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-silver-light flex items-center gap-2">
                                             <Calendar className="w-4 h-4 text-accent-orange" />
                                             {new Date(r.effective_date).toLocaleDateString('id-ID', {

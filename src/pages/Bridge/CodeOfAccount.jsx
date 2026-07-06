@@ -28,6 +28,7 @@ const CodeOfAccount = () => {
     const [editingAccount, setEditingAccount] = useState(null);
     const [expandedGroups, setExpandedGroups] = useState(['Asset', 'Liability', 'Equity', 'Revenue', 'Expense']);
     const [filterGroup, setFilterGroup] = useState('all');
+    const [selectedIds, setSelectedIds] = useState([]);
 
     const [form, setForm] = useState({
         code: '',
@@ -179,6 +180,31 @@ const CodeOfAccount = () => {
         }
     };
 
+    const handleDeleteSelected = async () => {
+        if (!hasDelete || selectedIds.length === 0) return;
+        if (!confirm(`Delete ${selectedIds.length} selected accounts?`)) return;
+
+        try {
+            setLoading(true);
+            const { error } = await supabase
+                .from('code_of_accounts')
+                .update({ is_active: false })
+                .in('id', selectedIds)
+                .eq('is_active', true);
+
+            if (error) throw error;
+
+            alert(`✅ ${selectedIds.length} accounts successfully deactivated.`);
+            setSelectedIds([]);
+            fetchAccounts();
+        } catch (error) {
+            console.error('Error deleting selected accounts:', error);
+            alert('❌ Error: ' + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const resetForm = () => {
         setForm({
             code: '',
@@ -228,6 +254,24 @@ const CodeOfAccount = () => {
         return acc;
     }, {});
 
+    const isAllFilteredSelected = filteredAccounts.length > 0 && filteredAccounts.every(a => selectedIds.includes(a.id));
+
+    const toggleSelectOne = (id) => {
+        setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    };
+
+    const toggleSelectAll = () => {
+        if (isAllFilteredSelected) {
+            setSelectedIds(prev => prev.filter(id => !filteredAccounts.some(a => a.id === id)));
+            return;
+        }
+        setSelectedIds(prev => {
+            const merged = new Set(prev);
+            filteredAccounts.forEach(a => merged.add(a.id));
+            return Array.from(merged);
+        });
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-96">
@@ -245,6 +289,16 @@ const CodeOfAccount = () => {
                     <p className="text-silver-dark mt-1">Master data kode akun untuk klasifikasi anggaran</p>
                 </div>
                 <div className="flex gap-2">
+                    {hasDelete && (
+                        <Button
+                            variant="danger"
+                            icon={Trash2}
+                            onClick={handleDeleteSelected}
+                            disabled={selectedIds.length === 0}
+                        >
+                            Delete Selected ({selectedIds.length})
+                        </Button>
+                    )}
                     {hasDelete && accounts.length > 0 && (
                         <Button
                             variant="danger"
@@ -310,6 +364,14 @@ const CodeOfAccount = () => {
                     <table className="w-full">
                         <thead className="bg-dark-surface">
                             <tr>
+                                <th className="px-4 py-3 text-center text-xs font-bold text-silver-dark uppercase">
+                                    <input
+                                        type="checkbox"
+                                        checked={isAllFilteredSelected}
+                                        onChange={toggleSelectAll}
+                                        className="w-4 h-4"
+                                    />
+                                </th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-silver-dark uppercase">Code</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-silver-dark uppercase">Name</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-silver-dark uppercase">Master Code #</th>
@@ -332,7 +394,7 @@ const CodeOfAccount = () => {
                                         className={`${groupColors[group]} cursor-pointer hover:opacity-80`}
                                         onClick={() => toggleGroup(group)}
                                     >
-                                        <td colSpan="12" className="px-4 py-2">
+                                        <td colSpan="13" className="px-4 py-2">
                                             <div className="flex items-center gap-2 font-bold">
                                                 {expandedGroups.includes(group) ? (
                                                     <ChevronDown className="w-4 h-4" />
@@ -346,6 +408,14 @@ const CodeOfAccount = () => {
                                     {/* Account Rows */}
                                     {expandedGroups.includes(group) && accts.map(account => (
                                         <tr key={account.id} className="hover:bg-dark-surface/50">
+                                            <td className="px-4 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedIds.includes(account.id)}
+                                                    onChange={() => toggleSelectOne(account.id)}
+                                                    className="w-4 h-4"
+                                                />
+                                            </td>
                                             <td className="px-4 py-2 text-sm">
                                                 <span
                                                     className="font-mono font-medium text-accent-orange"
@@ -416,7 +486,7 @@ const CodeOfAccount = () => {
                             ))}
                             {filteredAccounts.length === 0 && (
                                 <tr>
-                                    <td colSpan="12" className="px-4 py-8 text-center text-silver-dark">
+                                    <td colSpan="13" className="px-4 py-8 text-center text-silver-dark">
                                         <FileSpreadsheet className="w-12 h-12 mx-auto mb-2 opacity-50" />
                                         <p>No accounts found</p>
                                     </td>

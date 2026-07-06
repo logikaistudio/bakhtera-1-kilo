@@ -21,6 +21,7 @@ const DeliveryNotes = () => {
     const [showModal, setShowModal] = useState(false);
     const [selectedNote, setSelectedNote] = useState(null);
     const [viewMode, setViewMode] = useState('list'); // list, create, edit, view
+    const [selectedIds, setSelectedIds] = useState([]);
 
     // Load delivery notes from Supabase
     useEffect(() => {
@@ -70,6 +71,24 @@ const DeliveryNotes = () => {
         return matchSearch && matchStatus && matchDate;
     });
 
+    const isAllFilteredSelected = filteredNotes.length > 0 && filteredNotes.every(n => selectedIds.includes(n.id));
+
+    const toggleSelectOne = (id) => {
+        setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    };
+
+    const toggleSelectAll = () => {
+        if (isAllFilteredSelected) {
+            setSelectedIds(prev => prev.filter(id => !filteredNotes.some(n => n.id === id)));
+            return;
+        }
+        setSelectedIds(prev => {
+            const merged = new Set(prev);
+            filteredNotes.forEach(n => merged.add(n.id));
+            return Array.from(merged);
+        });
+    };
+
     // Status badge component
     const StatusBadge = ({ status }) => {
         const statusConfig = {
@@ -115,6 +134,49 @@ const DeliveryNotes = () => {
         }
     };
 
+    const handleDeleteSelected = async () => {
+        if (!hasDelete || selectedIds.length === 0) return;
+        if (!window.confirm(`Apakah Anda yakin ingin menghapus ${selectedIds.length} surat jalan terpilih?`)) return;
+
+        try {
+            const { error } = await supabase
+                .from('freight_delivery_notes')
+                .delete()
+                .in('id', selectedIds);
+
+            if (error) throw error;
+            setSelectedIds([]);
+            await loadDeliveryNotes();
+        } catch (error) {
+            console.error('Error deleting selected delivery notes:', error);
+            alert('Gagal menghapus surat jalan terpilih');
+        }
+    };
+
+    const handleDeleteAll = async () => {
+        if (!hasDelete) return;
+        if (deliveryNotes.length === 0) {
+            alert('Tidak ada data surat jalan untuk dihapus.');
+            return;
+        }
+        if (!window.confirm(`Hapus seluruh data surat jalan (${deliveryNotes.length} baris)?`)) return;
+        if (!window.confirm('Konfirmasi terakhir: semua surat jalan akan dihapus permanen. Lanjutkan?')) return;
+
+        try {
+            const { error } = await supabase
+                .from('freight_delivery_notes')
+                .delete()
+                .neq('id', '00000000-0000-0000-0000-000000000000');
+
+            if (error) throw error;
+            setSelectedIds([]);
+            await loadDeliveryNotes();
+        } catch (error) {
+            console.error('Error deleting all delivery notes:', error);
+            alert('Gagal menghapus seluruh surat jalan');
+        }
+    };
+
     // Print delivery note
     const handlePrint = (note) => {
         setSelectedNote(note);
@@ -135,18 +197,40 @@ const DeliveryNotes = () => {
                             Kelola surat jalan pengiriman barang
                         </p>
                     </div>
-                    {hasCreate && (
-                        <button
-                            onClick={() => {
-                                setSelectedNote(null);
-                                setViewMode('create');
-                            }}
-                            className="btn-primary flex items-center gap-2"
-                        >
-                            <Plus className="w-4 h-4" />
-                            Buat Surat Jalan
-                        </button>
-                    )}
+                    <div className="flex items-center gap-2">
+                        {hasDelete && (
+                            <>
+                                <button
+                                    onClick={handleDeleteSelected}
+                                    disabled={selectedIds.length === 0}
+                                    className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${selectedIds.length > 0 ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-dark-surface text-silver-dark cursor-not-allowed opacity-60'}`}
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                    Hapus Terpilih ({selectedIds.length})
+                                </button>
+                                <button
+                                    onClick={handleDeleteAll}
+                                    disabled={deliveryNotes.length === 0}
+                                    className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${deliveryNotes.length > 0 ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-dark-surface text-silver-dark cursor-not-allowed opacity-60'}`}
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                    Bersihkan Semua Data
+                                </button>
+                            </>
+                        )}
+                        {hasCreate && (
+                            <button
+                                onClick={() => {
+                                    setSelectedNote(null);
+                                    setViewMode('create');
+                                }}
+                                className="btn-primary flex items-center gap-2"
+                            >
+                                <Plus className="w-4 h-4" />
+                                Buat Surat Jalan
+                            </button>
+                        )}
+                    </div>
                 </div>
 
                 {/* Filters */}
@@ -261,6 +345,14 @@ const DeliveryNotes = () => {
                     <table className="w-full">
                         <thead className="bg-accent-blue">
                             <tr>
+                                <th className="px-4 py-3 text-center text-xs font-bold text-white">
+                                    <input
+                                        type="checkbox"
+                                        checked={isAllFilteredSelected}
+                                        onChange={toggleSelectAll}
+                                        className="w-4 h-4"
+                                    />
+                                </th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-white">No. Surat Jalan</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-white">Tanggal</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-white">Tujuan</th>
@@ -274,19 +366,27 @@ const DeliveryNotes = () => {
                         <tbody className="divide-y divide-gray-200 dark:divide-dark-border">
                             {loading ? (
                                 <tr>
-                                    <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
+                                    <td colSpan="9" className="px-4 py-8 text-center text-gray-500">
                                         Loading...
                                     </td>
                                 </tr>
                             ) : filteredNotes.length === 0 ? (
                                 <tr>
-                                    <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
+                                    <td colSpan="9" className="px-4 py-8 text-center text-gray-500">
                                         Tidak ada data surat jalan
                                     </td>
                                 </tr>
                             ) : (
                                 filteredNotes.map((note) => (
                                     <tr key={note.id} className="hover:bg-gray-50 dark:hover:bg-dark-surface transition-colors">
+                                        <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedIds.includes(note.id)}
+                                                onChange={() => toggleSelectOne(note.id)}
+                                                className="w-4 h-4"
+                                            />
+                                        </td>
                                         <td className="px-4 py-3 text-sm font-medium text-accent-blue">
                                             {note.delivery_note_number}
                                         </td>

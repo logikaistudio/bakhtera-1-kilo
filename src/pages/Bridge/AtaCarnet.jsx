@@ -48,6 +48,7 @@ const AtaCarnet = () => {
     const [showModal, setShowModal] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedIds, setSelectedIds] = useState([]);
 
     const initialFormState = {
         id: '',
@@ -82,6 +83,7 @@ const AtaCarnet = () => {
     const handleDelete = (id) => {
         if (window.confirm('Are you sure run delete this Carnet document?')) {
             setCarnetList(prev => prev.filter(item => item.id !== id));
+            setSelectedIds(prev => prev.filter(x => x !== id));
         }
     };
 
@@ -114,6 +116,39 @@ const AtaCarnet = () => {
         item.holder.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.description.toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    const isAllFilteredSelected = filteredList.length > 0 && filteredList.every(i => selectedIds.includes(i.id));
+
+    const toggleSelectOne = (id) => {
+        setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    };
+
+    const toggleSelectAll = () => {
+        if (isAllFilteredSelected) {
+            setSelectedIds(prev => prev.filter(id => !filteredList.some(i => i.id === id)));
+            return;
+        }
+        setSelectedIds(prev => {
+            const merged = new Set(prev);
+            filteredList.forEach(i => merged.add(i.id));
+            return Array.from(merged);
+        });
+    };
+
+    const handleDeleteSelected = () => {
+        if (!hasDelete || selectedIds.length === 0) return;
+        if (!window.confirm(`Delete ${selectedIds.length} selected Carnet documents?`)) return;
+        setCarnetList(prev => prev.filter(item => !selectedIds.includes(item.id)));
+        setSelectedIds([]);
+    };
+
+    const handleDeleteAll = () => {
+        if (!hasDelete || carnetList.length === 0) return;
+        if (!window.confirm(`Delete all Carnet documents (${carnetList.length} rows)?`)) return;
+        if (!window.confirm('Final confirmation: all Carnet data will be permanently deleted. Continue?')) return;
+        setCarnetList([]);
+        setSelectedIds([]);
+    };
 
     const handleExportExcel = () => {
         const dataToExport = filteredList.map((item, index) => ({
@@ -174,6 +209,18 @@ const AtaCarnet = () => {
                     <p className="text-silver-dark text-sm mt-1">Manage temporary admission documents (ATA Carnet)</p>
                 </div>
                 <div className="flex gap-2">
+                    {hasDelete && (
+                        <>
+                            <Button onClick={handleDeleteSelected} variant="danger" disabled={selectedIds.length === 0}>
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Hapus Terpilih ({selectedIds.length})
+                            </Button>
+                            <Button onClick={handleDeleteAll} variant="danger" disabled={carnetList.length === 0}>
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Bersihkan Semua Data
+                            </Button>
+                        </>
+                    )}
                     <Button onClick={handleExportExcel} variant="secondary">
                         <Download className="w-4 h-4 mr-2" />
                         Export Excel
@@ -207,6 +254,14 @@ const AtaCarnet = () => {
                     <table className="w-full">
                         <thead>
                             <tr className="bg-dark-surface border-b border-dark-border">
+                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver uppercase tracking-wider min-w-[60px]">
+                                    <input
+                                        type="checkbox"
+                                        checked={isAllFilteredSelected}
+                                        onChange={toggleSelectAll}
+                                        className="w-4 h-4"
+                                    />
+                                </th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-silver uppercase tracking-wider min-w-[150px]">Carnet Number</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-silver uppercase tracking-wider min-w-[200px]">Holder / Origin</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-silver uppercase tracking-wider min-w-[100px]">Entry Date</th>
@@ -225,6 +280,14 @@ const AtaCarnet = () => {
                                         key={item.id}
                                         className="hover:bg-dark-surface/50 transition-colors"
                                     >
+                                        <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedIds.includes(item.id)}
+                                                onChange={() => toggleSelectOne(item.id)}
+                                                className="w-4 h-4"
+                                            />
+                                        </td>
                                         <td className="px-4 py-3 text-silver-light text-sm font-medium whitespace-nowrap">{item.carnetNumber}</td>
                                         <td className="px-4 py-3">
                                             <div className="text-sm text-silver-light line-clamp-1">{item.holder}</div>
@@ -277,7 +340,7 @@ const AtaCarnet = () => {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan="9" className="px-6 py-8 text-center text-silver-dark">
+                                    <td colSpan="10" className="px-6 py-8 text-center text-silver-dark">
                                         No ATA Carnet documents found.
                                     </td>
                                 </tr>

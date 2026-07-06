@@ -8,6 +8,7 @@ const AssetInventory = () => {
     const [assets, setAssets] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedIds, setSelectedIds] = useState([]);
 
     // Modal state
     const [showModal, setShowModal] = useState(false);
@@ -95,6 +96,50 @@ const AssetInventory = () => {
         }
     };
 
+    const handleDeleteSelected = async () => {
+        if (!canDelete('bridge_asset_inventory') || selectedIds.length === 0) return;
+        if (!window.confirm(`Apakah Anda yakin ingin menghapus ${selectedIds.length} aset terpilih?`)) return;
+
+        try {
+            const { error } = await supabase
+                .from('bridge_assets')
+                .delete()
+                .in('id', selectedIds);
+
+            if (error) throw error;
+            setSelectedIds([]);
+            fetchAssets();
+        } catch (error) {
+            console.error('Error deleting selected assets:', error);
+            alert('Gagal menghapus aset terpilih: ' + error.message);
+        }
+    };
+
+    const handleDeleteAll = async () => {
+        if (!canDelete('bridge_asset_inventory')) return;
+        if (assets.length === 0) {
+            alert('Tidak ada data aset untuk dihapus.');
+            return;
+        }
+
+        if (!window.confirm(`Hapus seluruh data aset (${assets.length} baris)?`)) return;
+        if (!window.confirm('Konfirmasi terakhir: semua data aset akan dihapus permanen. Lanjutkan?')) return;
+
+        try {
+            const { error } = await supabase
+                .from('bridge_assets')
+                .delete()
+                .neq('id', '00000000-0000-0000-0000-000000000000');
+
+            if (error) throw error;
+            setSelectedIds([]);
+            fetchAssets();
+        } catch (error) {
+            console.error('Error deleting all assets:', error);
+            alert('Gagal menghapus seluruh aset: ' + error.message);
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
 
@@ -148,6 +193,25 @@ const AssetInventory = () => {
         (asset.serial_number && asset.serial_number.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
+    const isAllFilteredSelected = filteredAssets.length > 0 && filteredAssets.every(a => selectedIds.includes(a.id));
+
+    const toggleSelectOne = (id) => {
+        setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    };
+
+    const toggleSelectAll = () => {
+        if (isAllFilteredSelected) {
+            setSelectedIds(prev => prev.filter(id => !filteredAssets.some(a => a.id === id)));
+            return;
+        }
+
+        setSelectedIds(prev => {
+            const merged = new Set(prev);
+            filteredAssets.forEach(a => merged.add(a.id));
+            return Array.from(merged);
+        });
+    };
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -156,15 +220,37 @@ const AssetInventory = () => {
                     <h1 className="text-3xl font-bold gradient-text">Asset Inventory</h1>
                     <p className="text-silver-dark mt-1">Kelola data inventaris aset operasional harian.</p>
                 </div>
-                {canCreate('bridge_asset_inventory') && (
-                    <button
-                        onClick={openCreateModal}
-                        className="flex items-center gap-2 px-4 py-2 bg-accent-blue text-white rounded-lg hover:bg-accent-blue/90 smooth-transition"
-                    >
-                        <Plus className="w-5 h-5" />
-                        Tambah Aset
-                    </button>
-                )}
+                <div className="flex items-center gap-2">
+                    {canDelete('bridge_asset_inventory') && (
+                        <>
+                            <button
+                                onClick={handleDeleteSelected}
+                                disabled={selectedIds.length === 0}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg smooth-transition ${selectedIds.length > 0 ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-dark-surface text-silver-dark cursor-not-allowed opacity-60'}`}
+                            >
+                                <Trash className="w-4 h-4" />
+                                Hapus Terpilih ({selectedIds.length})
+                            </button>
+                            <button
+                                onClick={handleDeleteAll}
+                                disabled={assets.length === 0}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg smooth-transition ${assets.length > 0 ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-dark-surface text-silver-dark cursor-not-allowed opacity-60'}`}
+                            >
+                                <Trash className="w-4 h-4" />
+                                Bersihkan Semua Data
+                            </button>
+                        </>
+                    )}
+                    {canCreate('bridge_asset_inventory') && (
+                        <button
+                            onClick={openCreateModal}
+                            className="flex items-center gap-2 px-4 py-2 bg-accent-blue text-white rounded-lg hover:bg-accent-blue/90 smooth-transition"
+                        >
+                            <Plus className="w-5 h-5" />
+                            Tambah Aset
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Search Bar */}
@@ -185,6 +271,14 @@ const AssetInventory = () => {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-dark-surface border-b border-dark-border text-xs uppercase tracking-wider text-silver">
+                                <th className="px-4 py-3 font-medium text-center">
+                                    <input
+                                        type="checkbox"
+                                        checked={isAllFilteredSelected}
+                                        onChange={toggleSelectAll}
+                                        className="w-4 h-4"
+                                    />
+                                </th>
                                 <th className="px-4 py-3 font-medium text-center">No</th>
                                 <th className="px-4 py-3 font-medium">Nama Aset</th>
                                 <th className="px-4 py-3 font-medium">Merk / Tipe</th>
@@ -200,7 +294,7 @@ const AssetInventory = () => {
                         <tbody className="divide-y divide-dark-border">
                             {loading ? (
                                 <tr>
-                                    <td colSpan="10" className="px-4 py-8 text-center text-silver-dark">
+                                    <td colSpan="11" className="px-4 py-8 text-center text-silver-dark">
                                         <div className="flex flex-col items-center justify-center">
                                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-blue mb-4"></div>
                                             <p>Memuat data aset...</p>
@@ -209,7 +303,7 @@ const AssetInventory = () => {
                                 </tr>
                             ) : filteredAssets.length === 0 ? (
                                 <tr>
-                                    <td colSpan="10" className="px-4 py-12 text-center text-silver-dark">
+                                    <td colSpan="11" className="px-4 py-12 text-center text-silver-dark">
                                         <Package className="w-12 h-12 mx-auto mb-3 opacity-20" />
                                         <p className="text-lg">Belum ada aset terdaftar.</p>
                                         {canCreate('bridge_asset_inventory') && (
@@ -220,6 +314,14 @@ const AssetInventory = () => {
                             ) : (
                                 filteredAssets.map((asset, index) => (
                                     <tr key={asset.id} className="hover:bg-dark-surface/50 smooth-transition text-sm">
+                                        <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedIds.includes(asset.id)}
+                                                onChange={() => toggleSelectOne(asset.id)}
+                                                className="w-4 h-4"
+                                            />
+                                        </td>
                                         <td className="px-4 py-3 text-center text-silver-dark">{index + 1}</td>
                                         <td className="px-4 py-3 font-medium text-silver-light">{asset.name}</td>
                                         <td className="px-4 py-3 text-silver">

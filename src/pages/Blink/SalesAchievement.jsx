@@ -37,6 +37,7 @@ const SalesAchievement = () => {
     // Target management
     const [salesTargets, setSalesTargets] = useState({});   // { sales_name: yearly_target }
     const [targetList, setTargetList] = useState([]);       // raw DB rows
+    const [selectedTargetIds, setSelectedTargetIds] = useState([]);
     const [monthlyPaid, setMonthlyPaid] = useState({});     // { sales_name: amount in current month }
     const [showTargetModal, setShowTargetModal] = useState(false);
     const [targetForm, setTargetForm] = useState({ sales_name: '', yearly_target: '', division: 'Umum' });
@@ -64,6 +65,7 @@ const SalesAchievement = () => {
             const map = {};
             (data || []).forEach(t => { map[t.sales_name] = { yearly_target: t.yearly_target, division: t.division || 'Umum' }; });
             setSalesTargets(map);
+            setSelectedTargetIds([]);
         } catch (err) {
             console.error('Error fetching sales targets:', err);
         }
@@ -113,6 +115,56 @@ const SalesAchievement = () => {
             await fetchSalesTargets();
         } catch (err) {
             alert('Gagal menghapus target: ' + err.message);
+        }
+    };
+
+    const toggleSelectAllTargets = () => {
+        if (targetList.length === 0) return;
+        if (selectedTargetIds.length === targetList.length) {
+            setSelectedTargetIds([]);
+            return;
+        }
+        setSelectedTargetIds(targetList.map(t => t.id));
+    };
+
+    const toggleSelectOneTarget = (id) => {
+        setSelectedTargetIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    };
+
+    const handleDeleteSelectedTargets = async () => {
+        if (!canDelete('blink_sales') || selectedTargetIds.length === 0) return;
+        if (!window.confirm(`Hapus ${selectedTargetIds.length} target terpilih?`)) return;
+
+        try {
+            const { error } = await supabase
+                .from('blink_sales_targets')
+                .delete()
+                .in('id', selectedTargetIds);
+            if (error) throw error;
+            await fetchSalesTargets();
+        } catch (err) {
+            alert('Gagal menghapus target terpilih: ' + err.message);
+        }
+    };
+
+    const handleDeleteAllTargets = async () => {
+        if (!canDelete('blink_sales')) return;
+        if (targetList.length === 0) {
+            alert('Tidak ada target untuk dihapus.');
+            return;
+        }
+        if (!window.confirm(`Hapus seluruh target sales (${targetList.length} baris)?`)) return;
+        if (!window.confirm('Konfirmasi terakhir: semua target sales akan dihapus permanen. Lanjutkan?')) return;
+
+        try {
+            const { error } = await supabase
+                .from('blink_sales_targets')
+                .delete()
+                .neq('id', '00000000-0000-0000-0000-000000000000');
+            if (error) throw error;
+            await fetchSalesTargets();
+        } catch (err) {
+            alert('Gagal menghapus semua target: ' + err.message);
         }
     };
 
@@ -701,13 +753,41 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
 
                             {/* Daftar target */}
                             <div>
-                                <h3 className="text-sm font-semibold text-silver-light mb-3">Daftar Target ({targetList.length})</h3>
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-sm font-semibold text-silver-light">Daftar Target ({targetList.length})</h3>
+                                    {canDelete('blink_sales') && (
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={handleDeleteSelectedTargets}
+                                                disabled={selectedTargetIds.length === 0}
+                                                className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${selectedTargetIds.length > 0 ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-dark-surface text-silver-dark cursor-not-allowed opacity-60'}`}
+                                            >
+                                                Hapus Terpilih ({selectedTargetIds.length})
+                                            </button>
+                                            <button
+                                                onClick={handleDeleteAllTargets}
+                                                disabled={targetList.length === 0}
+                                                className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${targetList.length > 0 ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-dark-surface text-silver-dark cursor-not-allowed opacity-60'}`}
+                                            >
+                                                Bersihkan Semua Data
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                                 {targetList.length === 0 ? (
                                     <p className="text-sm text-silver-dark text-center py-6">Belum ada target yang diset</p>
                                 ) : (
                                     <table className="w-full text-sm">
                                         <thead className="bg-dark-surface">
                                             <tr>
+                                                <th className="px-3 py-2 text-center text-xs font-bold text-silver uppercase">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={targetList.length > 0 && selectedTargetIds.length === targetList.length}
+                                                        onChange={toggleSelectAllTargets}
+                                                        className="w-4 h-4"
+                                                    />
+                                                </th>
                                                 <th className="px-3 py-2 text-left text-xs font-bold text-silver uppercase">Nama Sales</th>
                                                 <th className="px-3 py-2 text-left text-xs font-bold text-silver uppercase">Divisi</th>
                                                 <th className="px-3 py-2 text-right text-xs font-bold text-silver uppercase">Target / Tahun</th>
@@ -718,6 +798,14 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                                         <tbody className="divide-y divide-dark-border">
                                             {targetList.map(row => (
                                                 <tr key={row.id} className="hover:bg-dark-surface/30">
+                                                    <td className="px-3 py-3 text-center">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedTargetIds.includes(row.id)}
+                                                            onChange={() => toggleSelectOneTarget(row.id)}
+                                                            className="w-4 h-4"
+                                                        />
+                                                    </td>
                                                     <td className="px-3 py-3 text-black font-medium">{row.sales_name}</td>
                                                     <td className="px-3 py-3 text-black">{row.division || 'Umum'}</td>
                                                     <td className="px-3 py-3 text-right text-black">{fmtIDR(row.yearly_target)}</td>
