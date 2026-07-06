@@ -134,9 +134,8 @@ const Login = () => {
                             className="h-12 w-auto drop-shadow-md"
                         />
                     </div>
-                    <div className="mb-6">
-                        <h2 className="text-xl font-semibold text-gray-800">Masuk ke Akun Anda</h2>
-                        <p className="text-sm text-gray-500 mt-1">Masukkan kredensial untuk melanjutkan</p>
+                    <div className="mb-6 text-center">
+                        <h2 className="text-xl font-semibold text-gray-800">Login</h2>
                     </div>
 
                     {/* Error alert */}
@@ -226,20 +225,6 @@ const Login = () => {
                             )}
                         </button>
                     </form>
-
-                    {/* Footer note */}
-                    <div className="text-center text-xs text-gray-400 mt-6 space-y-2">
-                        <p>
-                            Tidak ada email server aktif untuk reset password otomatis.
-                        </p>
-                        <button
-                            type="button"
-                            onClick={openForgotModal}
-                            className="text-blue-500 font-semibold hover:text-blue-600"
-                        >
-                            Lupa password? Reset mandiri di sini
-                        </button>
-                    </div>
 
                 </div>
 
