@@ -894,8 +894,7 @@ export const DataProvider = ({ children }) => {
         if (normalizedTaxId) {
             const { data, error } = await supabase
                 .from('blink_business_partners')
-                .select('id, partner_name, tax_id, email, phone, mobile, owner_division, is_shared, is_customer, is_vendor, is_agent, is_transporter, is_consignee, is_shipper')
-                .is('merged_into_partner_id', null)
+                .select('id, partner_name, tax_id, email, phone, mobile, is_customer, is_vendor, is_agent, is_transporter, is_consignee, is_shipper')
                 .eq('tax_id', partner.tax_id)
                 .limit(30);
             duplicateCandidates = data || [];
@@ -903,8 +902,7 @@ export const DataProvider = ({ children }) => {
         } else if (partner.partner_name) {
             const { data, error } = await supabase
                 .from('blink_business_partners')
-                .select('id, partner_name, tax_id, email, phone, mobile, owner_division, is_shared, is_customer, is_vendor, is_agent, is_transporter, is_consignee, is_shipper')
-                .is('merged_into_partner_id', null)
+                .select('id, partner_name, tax_id, email, phone, mobile, is_customer, is_vendor, is_agent, is_transporter, is_consignee, is_shipper')
                 .ilike('partner_name', partner.partner_name)
                 .limit(30);
             duplicateCandidates = data || [];
@@ -940,10 +938,6 @@ export const DataProvider = ({ children }) => {
                 updated_at: new Date().toISOString(),
             };
 
-            if ((duplicate.owner_division || 'blink') !== activeDivision && isAdmin()) {
-                mergedUpdate.is_shared = true;
-            }
-
             const { data: mergedRows, error: mergeError } = await supabase
                 .from('blink_business_partners')
                 .update(mergedUpdate)
@@ -973,8 +967,6 @@ export const DataProvider = ({ children }) => {
         const newPartner = {
             ...partner,
             partner_code: partnerCode,
-            owner_division: partner.owner_division || activeDivision,
-            is_shared: isAdmin() ? Boolean(partner.is_shared) : false,
             id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(),
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
