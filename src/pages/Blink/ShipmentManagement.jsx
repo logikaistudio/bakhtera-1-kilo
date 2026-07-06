@@ -8,6 +8,7 @@ import { supabase } from '../../lib/supabase';
 import { getQuotationTypeLabel } from '../../utils/orderTypeDetection';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
+import { getActiveDivision } from '../../utils/divisionContext';
 
 const ShipmentManagement = () => {
     const { canCreate, canEdit, canDelete, canView, canApprove, canAccess } = useAuth();
@@ -28,6 +29,7 @@ const ShipmentManagement = () => {
     const location = useLocation();
     // Detect if running in BXPO portal for permission & navigation context
     const isBxpo = location.pathname.startsWith('/bxpo');
+    const activeDivision = getActiveDivision();
     const poMenuCode = isBxpo ? 'bxpo_shipments' : 'blink_purchase_order'; // BXPO users have shipment access = can create PO
 
     // PO generation from list
@@ -117,6 +119,7 @@ const ShipmentManagement = () => {
             const { data, error } = await supabase
                 .from('blink_shipments')
                 .select('*')
+                .eq('division', activeDivision)
                 .order('created_at', { ascending: false });
 
             if (error) {
@@ -436,6 +439,7 @@ const ShipmentManagement = () => {
             const { data: vendorDataRaw } = await supabase
                 .from('blink_business_partners')
                 .select('*')
+                .or(`owner_division.eq.${activeDivision},is_shared.eq.true`)
                 .order('partner_name');
             const vendorData = (vendorDataRaw || []).filter(p => {
                 const val = p.is_vendor;
@@ -479,6 +483,7 @@ const ShipmentManagement = () => {
 
             const { error } = await supabase.from('blink_purchase_orders').insert([{
                 po_number: poNumber,
+                division: activeDivision,
                 vendor_id: vendor.id,
                 vendor_name: vendor.partner_name,
                 vendor_email: vendor.email || '',
@@ -622,7 +627,8 @@ const ShipmentManagement = () => {
                 const { error } = await supabase
                     .from('blink_shipments')
                     .update(dbFormat)
-                    .eq('id', updatedShipment.id);
+                    .eq('id', updatedShipment.id)
+                    .eq('division', activeDivision);
 
                 if (error) throw error;
             }
@@ -674,21 +680,24 @@ const ShipmentManagement = () => {
             const { error: shErr } = await supabase
                 .from('blink_shipments')
                 .update({ status: 'cancelled' })
-                .eq('id', shipmentId);
+                .eq('id', shipmentId)
+                .eq('division', activeDivision);
             if (shErr) throw shErr;
 
             // 2. Cancel Invoices
             const { error: invErr } = await supabase
                 .from('blink_invoices')
                 .update({ status: 'cancelled' })
-                .eq('shipment_id', shipmentId);
+                .eq('shipment_id', shipmentId)
+                .eq('division', activeDivision);
             if (invErr) console.warn('Note: No invoices to cancel or error:', invErr);
 
             // 3. Cancel POs
             const { error: poErr } = await supabase
                 .from('blink_purchase_orders')
                 .update({ status: 'cancelled' })
-                .eq('shipment_id', shipmentId);
+                .eq('shipment_id', shipmentId)
+                .eq('division', activeDivision);
             if (poErr) console.warn('Note: No POs to cancel or error:', poErr);
 
             alert('Shipment dan seluruh alur terkait berhasil dibatalkan.');

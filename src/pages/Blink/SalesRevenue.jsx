@@ -8,8 +8,10 @@ import {
     Calendar,
     BarChart3
 } from 'lucide-react';
+import { getActiveDivision } from '../../utils/divisionContext';
 
 const SalesRevenue = () => {
+    const activeDivision = getActiveDivision();
     const [revenueData, setRevenueData] = useState({
         totalRevenue: 0,
         regularRevenue: 0,
@@ -34,6 +36,7 @@ const SalesRevenue = () => {
             // Fetch quotations
             const { data: quotations, error: quotError } = await supabase
                 .from('blink_quotations')
+                .eq('division', activeDivision)
                 .select('*');
 
             if (quotError) throw quotError;
@@ -41,6 +44,7 @@ const SalesRevenue = () => {
             // Fetch shipments
             const { data: shipments, error: shipError } = await supabase
                 .from('blink_shipments')
+                .eq('division', activeDivision)
                 .select('*');
 
             if (shipError) throw shipError;
@@ -173,6 +177,7 @@ const SalesRevenue = () => {
             <div>
                 <h1 className="text-3xl font-bold gradient-text">Sales & Revenue</h1>
                 <p className="text-silver-dark mt-1">Analisa revenue dari Regular Sales & Operation Sales</p>
+                <p className="text-xs text-blue-300 mt-1">Data ditampilkan sesuai divisi aktif: {activeDivision?.toUpperCase()}</p>
             </div>
 
             {/* Summary Cards */}

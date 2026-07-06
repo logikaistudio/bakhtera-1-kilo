@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getCurrencySummary, getAgingByCurrency, formatCurrencySummary } from '../../utils/multiCurrencyHelper';
+import { getActiveDivision } from '../../utils/divisionContext';
 
 // AP Payment Record Modal Component
 const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
@@ -97,6 +98,7 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
             // Create payment record
             const paymentData = {
                 payment_number: paymentNumber,
+                division: ap.division || getActiveDivision(),
                 payment_type: 'outgoing',
                 payment_date: formData.payment_date,
                 reference_type: 'po',
@@ -144,7 +146,8 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
                         last_payment_date: formData.payment_date,
                         last_payment_amount: parseFloat(formData.amount)
                     })
-                    .eq('id', ap.id);
+                    .eq('id', ap.id)
+                    .eq('division', ap.division || getActiveDivision());
 
                 if (apError) {
                     console.warn('Failed to update blink_ap_transactions (likely because it is missing):', apError);
@@ -171,6 +174,7 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
                     .from('blink_purchase_orders')
                     .select('id')
                     .eq('po_number', ap.po_number)
+                    .eq('division', ap.division || getActiveDivision())
                     .single();
 
                 if (lookupError) {
@@ -200,7 +204,8 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
                 const { error: poError } = await supabase
                     .from('blink_purchase_orders')
                     .update(updateData)
-                    .eq('id', poIdentifier);
+                    .eq('id', poIdentifier)
+                    .eq('division', ap.division || getActiveDivision());
 
                 if (poError) {
                     console.error('PO Sync Error:', poError);
@@ -528,6 +533,7 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment, canEditAP
                 .from('blink_payments')
                 .select('*')
                 .eq('reference_id', ap.id)
+                .eq('division', ap.division || getActiveDivision())
                 .order('payment_date', { ascending: false });
 
             if (error) throw error;
@@ -569,6 +575,7 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment, canEditAP
                 .from('blink_purchase_orders')
                 .select('po_items')
                 .eq('id', ap.po_id)
+                .eq('division', ap.division || getActiveDivision())
                 .single();
 
             if (error) throw error;
@@ -603,7 +610,8 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment, canEditAP
                 await supabase
                     .from('blink_purchase_orders')
                     .update({ po_items: updatedItems })
-                    .eq('id', ap.po_id);
+                    .eq('id', ap.po_id)
+                    .eq('division', ap.division || getActiveDivision());
             } catch (error) {
                 console.error('Error auto-saving COA assignment:', error);
             }
@@ -620,7 +628,8 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment, canEditAP
             const { error } = await supabase
                 .from('blink_purchase_orders')
                 .update({ po_items: poItems })
-                .eq('id', ap.po_id);
+                .eq('id', ap.po_id)
+                .eq('division', ap.division || getActiveDivision());
 
             if (error) throw error;
 
@@ -830,6 +839,7 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment, canEditAP
 
 const AccountsPayable = () => {
     const { canEdit, canCreate, canDelete } = useAuth();
+    const activeDivision = getActiveDivision();
     const [apTransactions, setAPTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all');
@@ -851,6 +861,7 @@ const AccountsPayable = () => {
             const { data: apData, error: apError } = await supabase
                 .from('blink_ap_transactions')
                 .select('*')
+                .eq('division', activeDivision)
                 .order('bill_date', { ascending: false });
 
             let finalRows = [];
@@ -869,6 +880,7 @@ const AccountsPayable = () => {
                 const { data: poRows, error: poErr } = await supabase
                     .from('blink_purchase_orders')
                     .select('*')
+                    .eq('division', activeDivision)
                     .in('status', ['approved', 'received', 'paid'])
                     .order('po_date', { ascending: false });
 
@@ -1060,6 +1072,7 @@ const AccountsPayable = () => {
                 </div>
                 <Button onClick={handleExportXLS} icon={Download}>Export to Excel</Button>
             </div>
+                    <p className="text-xs text-blue-300 mt-1">Data ditampilkan sesuai divisi aktif: {activeDivision?.toUpperCase()}</p>
 
             {/* Summary Cards - Currency Breakdown */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

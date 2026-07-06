@@ -11,6 +11,7 @@ import {
 import { printReport, fmtDatePrint } from '../../utils/printPDF';
 import { journalEntriesHasColumn } from '../../utils/journalHelper';
 import { useData } from '../../context/DataContext';
+import { getActiveDivision } from '../../utils/divisionContext';
 
 // ─── COA Type Config ─────────────────────────────────────────────────────────
 const COA_TYPE_CONFIG = {
@@ -196,6 +197,7 @@ const GeneralLedger = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { companySettings } = useData();
+    const activeDivision = getActiveDivision();
 
     const [accounts, setAccounts] = useState([]);
     const [selectedAccount, setSelectedAccount] = useState('');
@@ -275,6 +277,7 @@ const GeneralLedger = () => {
             const { data } = await supabase
                 .from('blink_journal_entries')
                 .select(selectCols)
+                .eq('division', activeDivision)
                 .gte('entry_date', yearStart)
                 .lte('entry_date', yearEnd);
 
@@ -340,15 +343,18 @@ const GeneralLedger = () => {
                 const results = await Promise.all([
                     supabase.from('blink_journal_entries')
                         .select('debit, credit, currency, exchange_rate, id')
+                        .eq('division', activeDivision)
                         .eq('coa_id', selectedAccount)
                         .lt('entry_date', dateRange.start),
                     (acc?.code || isUnclassified) ? supabase.from('blink_journal_entries')
                         .select('debit, credit, currency, exchange_rate, id')
+                        .eq('division', activeDivision)
                         .eq('account_code', acc?.code || unclassifiedCode)
                         .is('coa_id', null)
                         .lt('entry_date', dateRange.start) : Promise.resolve({ data: [] }),
                     acc?.name ? supabase.from('blink_journal_entries')
                         .select('debit, credit, currency, exchange_rate, id')
+                        .eq('division', activeDivision)
                         .ilike('account_name', acc.name)
                         .lt('entry_date', dateRange.start) : Promise.resolve({ data: [] })
                 ]);
@@ -367,6 +373,7 @@ const GeneralLedger = () => {
             const [r1, r2, r3] = await Promise.all([
                 supabase.from('blink_journal_entries')
                     .select('*')
+                    .eq('division', activeDivision)
                     .eq('coa_id', selectedAccount)
                     .gte('entry_date', dateRange.start)
                     .lte('entry_date', dateRange.end)
@@ -374,6 +381,7 @@ const GeneralLedger = () => {
                     .order('created_at', { ascending: true }),
                 (acc?.code || isUnclassified) ? supabase.from('blink_journal_entries')
                     .select('*')
+                    .eq('division', activeDivision)
                     .eq('account_code', acc?.code || unclassifiedCode)
                     .is('coa_id', null)
                     .gte('entry_date', dateRange.start)
@@ -382,6 +390,7 @@ const GeneralLedger = () => {
                     .order('created_at', { ascending: true }) : Promise.resolve({ data: [] }),
                 acc?.name ? supabase.from('blink_journal_entries')
                     .select('*')
+                    .eq('division', activeDivision)
                     .ilike('account_name', acc.name)
                     .gte('entry_date', dateRange.start)
                     .lte('entry_date', dateRange.end)
@@ -552,6 +561,7 @@ const GeneralLedger = () => {
                     <div>
                         <h1 className="text-base font-bold gradient-text leading-tight">General Ledger</h1>
                         <p className="text-[10px] text-silver-dark">Per-account transaction detail with running balance</p>
+                        <p className="text-[10px] text-blue-300">Divisi aktif: {activeDivision?.toUpperCase()}</p>
                     </div>
                 </div>
                 <div className="w-px h-7 bg-dark-border hidden md:block mx-1 shrink-0" />

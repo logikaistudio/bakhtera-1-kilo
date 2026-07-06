@@ -11,6 +11,10 @@ export const resolveDivisionFromPathname = (pathname = '') => {
 
 export const getActiveDivision = () => {
     if (typeof window === 'undefined') return DIVISIONS.BLINK;
+    const params = new URLSearchParams(window.location?.search || '');
+    const requested = (params.get('division') || '').toLowerCase();
+    if (requested === DIVISIONS.BXPO) return DIVISIONS.BXPO;
+    if (requested === DIVISIONS.BLINK) return DIVISIONS.BLINK;
     return resolveDivisionFromPathname(window.location?.pathname || '');
 };
 

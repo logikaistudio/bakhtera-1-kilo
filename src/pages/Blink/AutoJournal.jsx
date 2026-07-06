@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { printReport, fmtDatePrint } from '../../utils/printPDF';
 import { useData } from '../../context/DataContext';
+import { getActiveDivision } from '../../utils/divisionContext';
 
 // ─── Source badge config ─────────────────────────────────────────────────────
 const SOURCE_CONFIG = {
@@ -66,6 +67,7 @@ const fmtIDR = (value) => {
 const AutoJournal = () => {
     const navigate = useNavigate();
     const { companySettings } = useData();
+    const activeDivision = getActiveDivision();
 
     const [entries, setEntries] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -91,6 +93,7 @@ const AutoJournal = () => {
                 .from('blink_journal_entries')
                 .select('*')
                 .eq('journal_type', 'auto')
+                .eq('division', activeDivision)
                 .order('entry_date', { ascending: false })
                 .order('created_at', { ascending: false });
 
@@ -263,6 +266,7 @@ const AutoJournal = () => {
                 </div>
                 <div class="summary-card blue-card">
                     <div class="label">Total Credit</div>
+                    <p className="text-xs text-blue-300 mt-1">Data ditampilkan sesuai divisi aktif: {activeDivision?.toUpperCase()}</p>
                     <div class="value">Rp ${Math.round(totals.totalCredit).toLocaleString('id-ID')}</div>
                 </div>
                 <div class="summary-card ${Math.abs(totals.balance) < 1 ? '' : 'red-card'}">

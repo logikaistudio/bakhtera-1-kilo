@@ -12,6 +12,7 @@ import {
 import { printReport, fmtDatePrint } from '../../utils/printPDF';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
+import { getActiveDivision } from '../../utils/divisionContext';
 
 // ─── Currency Formatter ──────────────────────────────────────────────────────
 const fmt = (value, currency = 'IDR') => {
@@ -52,6 +53,7 @@ const fmtIDR = (value) => {
 const NotedJournal = () => {
     const { companySettings } = useData();
     const { canCreate, canDelete } = useAuth();
+    const activeDivision = getActiveDivision();
 
     const [entries, setEntries] = useState([]);
     const [accounts, setAccounts] = useState([]);
@@ -103,6 +105,7 @@ const NotedJournal = () => {
                 .from('blink_journal_entries')
                 .select('*')
                 .eq('journal_type', 'note')
+                .eq('division', activeDivision)
                 .order('entry_date', { ascending: false })
                 .order('created_at', { ascending: false });
 
@@ -215,6 +218,7 @@ const NotedJournal = () => {
             const { data } = await supabase
                 .from('blink_journal_entries')
                 .select('entry_number')
+                .eq('division', activeDivision)
                 .like('entry_number', `${prefix}%`)
                 .order('entry_number', { ascending: false })
                 .limit(20);
@@ -265,6 +269,7 @@ const NotedJournal = () => {
                 note: newEntry.note,
                 batch_id: batchId,
                 source: 'manual',
+                division: activeDivision,
                 currency: 'IDR',
                 journal_type: 'note',
                 reference_number: baseEntryNumber,
@@ -305,7 +310,7 @@ const NotedJournal = () => {
         }
         if (!confirm('Delete this noted journal entry? This cannot be undone.')) return;
         try {
-            const { error } = await supabase.from('blink_journal_entries').delete().eq('batch_id', batchId);
+            const { error } = await supabase.from('blink_journal_entries').delete().eq('batch_id', batchId).eq('division', activeDivision);
             if (error) throw error;
             setShowDetailModal(false);
             fetchEntries();
@@ -375,6 +380,7 @@ const NotedJournal = () => {
                 </div>
                 <div class="summary-card blue-card">
                     <div class="label">Total Credit</div>
+                    <p className="text-xs text-blue-300 mt-1">Data ditampilkan sesuai divisi aktif: {activeDivision?.toUpperCase()}</p>
                     <div class="value">Rp ${Math.round(totals.totalCredit).toLocaleString('id-ID')}</div>
                 </div>
                 <div class="summary-card ${Math.abs(totals.balance) < 1 ? '' : 'red-card'}">

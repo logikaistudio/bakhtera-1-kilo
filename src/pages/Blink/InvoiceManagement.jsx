@@ -16,12 +16,14 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import InvoiceProfitSummary from '../../components/Blink/InvoiceProfitSummary';
+import { getActiveDivision } from '../../utils/divisionContext';
 
 
 const InvoiceManagement = () => {
     const navigate = useNavigate();
     const { canCreate, canEdit, canDelete, canApprove, user } = useAuth();
     const { companySettings, bankAccounts, businessPartners, deleteInvoiceCascade } = useData();
+    const activeDivision = getActiveDivision();
     const [invoices, setInvoices] = useState([]);
     const [quotations, setQuotations] = useState([]);
     const [shipments, setShipments] = useState([]);
@@ -217,6 +219,7 @@ const InvoiceManagement = () => {
             const { data: invoicesData, error: invoicesError } = await supabase
                 .from('blink_invoices')
                 .select(`*`)
+                .eq('division', activeDivision)
                 .order('created_at', { ascending: false });
 
             if (invoicesError) throw invoicesError;
@@ -239,6 +242,7 @@ const InvoiceManagement = () => {
                 .select('*')
                 // Include more statuses - user wants to invoice from approved AND converted quotations
                 .in('status', ['approved', 'sent', 'approved_internal', 'converted'])
+                .eq('division', activeDivision)
                 .order('created_at', { ascending: false });
 
             if (error) {
@@ -278,6 +282,7 @@ const InvoiceManagement = () => {
                 .from('blink_shipments')
                 .select('*')
                 .eq('status', 'approved')
+                .eq('division', activeDivision)
                 .order('created_at', { ascending: false });
 
             if (error) {
@@ -725,6 +730,7 @@ const InvoiceManagement = () => {
 
             const newInvoice = {
                 invoice_number: invoiceNumber,
+                division: selectedShipment?.division || selectedQuotation?.division || activeDivision,
                 quotation_id: selectedQuotation?.id || null,
                 shipment_id: selectedShipment?.id || null,
                 job_number: formData.job_number,
@@ -979,7 +985,8 @@ const InvoiceManagement = () => {
             const { error } = await supabase
                 .from('blink_invoices')
                 .update(updates)
-                .eq('id', editInvoiceId);
+                .eq('id', editInvoiceId)
+                .eq('division', currentInvoice?.division || activeDivision);
 
             if (error) throw error;
             
@@ -1022,6 +1029,7 @@ const InvoiceManagement = () => {
                 .from('blink_invoices')
                 .select('*')
                 .eq('id', editInvoiceId)
+                .eq('division', currentInvoice?.division || activeDivision)
                 .single();
                 
             if (updatedInv && updatedInv.status === 'unpaid') {
@@ -1561,6 +1569,7 @@ const InvoiceManagement = () => {
                 .from('blink_invoices')
                 .update({ status: 'manager_approval', updated_at: new Date().toISOString() })
                 .eq('id', invoice.id)
+                .eq('division', invoice.division || activeDivision)
                 .select();
 
             if (error) {
@@ -1631,6 +1640,7 @@ const InvoiceManagement = () => {
 
             // ── 1. Create NEW Reimbursement Invoice ──────────────────────────────
             const reimbursementData = {
+                division: invoice.division || activeDivision,
                 job_number: invoice.job_number || '',
                 quotation_id: invoice.quotation_id || null,
                 shipment_id: invoice.shipment_id || null,
@@ -1690,6 +1700,7 @@ const InvoiceManagement = () => {
                     updated_at: timestamp,
                 })
                 .eq('id', invoice.id)
+                .eq('division', invoice.division || activeDivision)
                 .select();
 
             if (error) throw error;
@@ -1744,6 +1755,7 @@ const InvoiceManagement = () => {
                 `${reinvoiceNote?.trim() || 'Perubahan terhadap invoice lama.'}`;
 
             const newInvoice = {
+                division: invoice.division || activeDivision,
                 quotation_id: invoice.quotation_id || null,
                 shipment_id: invoice.shipment_id || null,
                 job_number: invoice.job_number || null,
@@ -1817,7 +1829,8 @@ const InvoiceManagement = () => {
             await supabase
                 .from('blink_invoices')
                 .update({ notes: mergedSourceNotes, updated_at: timestamp })
-                .eq('id', invoice.id);
+                .eq('id', invoice.id)
+                .eq('division', invoice.division || activeDivision);
 
             await fetchInvoices();
             setShowReinvoiceModal(false);
@@ -3174,7 +3187,8 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
             const { error } = await supabase
                 .from('blink_invoices')
                 .update({ payment_bank_id: bankId || null })
-                .eq('id', invoice.id);
+                .eq('id', invoice.id)
+                .eq('division', invoice.division || getActiveDivision());
             if (error) throw error;
             if (onInvoiceUpdate) onInvoiceUpdate({ ...invoice, payment_bank_id: bankId || null });
         } catch (err) {
@@ -3686,6 +3700,7 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
             // Create payment record
             const paymentData = {
                 payment_number: paymentNumber,
+                division: invoice.division || activeDivision,
                 payment_type: 'incoming',
                 payment_date: formData.payment_date,
                 reference_type: 'invoice',
@@ -3724,7 +3739,8 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
                     outstanding_amount: newOutstanding,
                     status: newStatus
                 })
-                .eq('id', invoice.id);
+                .eq('id', invoice.id)
+                .eq('division', invoice.division || activeDivision);
 
             if (invoiceError) throw invoiceError;
 

@@ -7,10 +7,12 @@ import {
     FileSpreadsheet, Printer
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
+import { getActiveDivision } from '../../utils/divisionContext';
 
 const ProfitLoss = () => {
     const navigate = useNavigate();
     const { companySettings } = useData();
+    const activeDivision = getActiveDivision();
     const currentYear = new Date().getFullYear();
     const [selectedMonth, setSelectedMonth] = useState(`${currentYear}-${String(new Date().getMonth() + 1).padStart(2, '0')}`);
     const [loading, setLoading] = useState(true);
@@ -88,10 +90,12 @@ const ProfitLoss = () => {
             const [r1, r2] = await Promise.all([
                 supabase.from('blink_journal_entries')
                     .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate')
+                    .eq('division', activeDivision)
                     .not('coa_id', 'is', null)
                     .gte('entry_date', queryStart).lte('entry_date', queryEnd),
                 supabase.from('blink_journal_entries')
                     .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate')
+                    .eq('division', activeDivision)
                     .is('coa_id', null)
                     .gte('entry_date', queryStart).lte('entry_date', queryEnd)
             ]);
@@ -606,6 +610,7 @@ const ProfitLoss = () => {
                         Profit & Loss
                     </h1>
                     <p className="text-slate-500 dark:text-silver-dark text-xs">Period: {period}</p>
+                    <p className="text-[11px] text-blue-500 dark:text-blue-300">Data ditampilkan sesuai divisi aktif: {activeDivision?.toUpperCase()}</p>
                 </div>
                 <div className="flex items-center gap-2 bg-white dark:bg-dark-surface p-1 rounded-lg border border-gray-200 dark:border-dark-border shadow-sm">
                     <div className="flex items-center px-2 border-r border-gray-200 dark:border-dark-border/50">

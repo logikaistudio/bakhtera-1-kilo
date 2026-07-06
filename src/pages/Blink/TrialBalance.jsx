@@ -9,10 +9,12 @@ import { useNavigate } from 'react-router-dom';
 import XLSX from 'xlsx-js-style';
 import { printReport, fmtPrint, fmtDatePrint } from '../../utils/printPDF';
 import { useData } from '../../context/DataContext';
+import { getActiveDivision } from '../../utils/divisionContext';
 
 const TrialBalance = () => {
     const navigate = useNavigate();
     const { companySettings } = useData();
+    const activeDivision = getActiveDivision();
     const [loading, setLoading] = useState(true);
     const [balances, setBalances] = useState([]);
     const [totals, setTotals] = useState({ opening: 0, debit: 0, credit: 0, closing: 0 });
@@ -53,10 +55,12 @@ const TrialBalance = () => {
             const [r1, r2] = await Promise.all([
                 supabase.from('blink_journal_entries')
                     .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate')
+                    .eq('division', activeDivision)
                     .not('coa_id', 'is', null)
                     .lte('entry_date', dateRange.end),
                 supabase.from('blink_journal_entries')
                     .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate')
+                    .eq('division', activeDivision)
                     .is('coa_id', null)
                     .lte('entry_date', dateRange.end)
             ]);
@@ -421,6 +425,7 @@ const TrialBalance = () => {
                         Trial Balance
                     </h1>
                     <p className="text-silver-dark mt-1">Account balances and period movements</p>
+                    <p className="text-xs text-blue-300 mt-1">Data ditampilkan sesuai divisi aktif: {activeDivision?.toUpperCase()}</p>
                 </div>
 
                 <div className="flex items-center gap-2">

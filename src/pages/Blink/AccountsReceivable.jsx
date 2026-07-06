@@ -10,9 +10,11 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getCurrencySummary, getAgingByCurrency, formatCurrencySummary } from '../../utils/multiCurrencyHelper';
+import { getActiveDivision } from '../../utils/divisionContext';
 
 const AccountsReceivable = () => {
     const { canEdit, canCreate, canDelete } = useAuth();
+    const activeDivision = getActiveDivision();
     const [arTransactions, setARTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -57,6 +59,7 @@ const AccountsReceivable = () => {
             const { data: arRows, error: arError } = await supabase
                 .from('blink_ar_transactions')
                 .select('*')
+                .eq('division', activeDivision)
                 .order('transaction_date', { ascending: false });
 
             let finalRows = [];
@@ -75,6 +78,7 @@ const AccountsReceivable = () => {
                 const { data: invoiceRows, error: invoiceError } = await supabase
                     .from('blink_invoices')
                     .select('*')
+                    .eq('division', activeDivision)
                     .neq('status', 'draft')
                     .neq('status', 'cancelled')
                     .order('invoice_date', { ascending: false });
@@ -225,6 +229,7 @@ const AccountsReceivable = () => {
                 </div>
                 <Button onClick={handleExportXLS} icon={Download}>Export to Excel</Button>
             </div>
+                    <p className="text-xs text-blue-300 mt-1">Data ditampilkan sesuai divisi aktif: {activeDivision?.toUpperCase()}</p>
 
 
             {/* Summary Cards - Currency Breakdown */}
@@ -608,6 +613,7 @@ const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency, canEditAR
                 .from('blink_invoices')
                 .select('*')
                 .eq('id', invoiceId)
+                .eq('division', ar.division || getActiveDivision())
                 .limit(1);
             if (error) throw error;
             const invoice = data?.[0] || null;
@@ -627,7 +633,8 @@ const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency, canEditAR
             const query = supabase
                 .from('blink_payments')
                 .select('*')
-                .eq('reference_type', 'invoice');
+                .eq('reference_type', 'invoice')
+                .eq('division', ar.division || getActiveDivision());
 
             if (ar.invoice_id) {
                 query.eq('reference_id', ar.invoice_id);
@@ -659,7 +666,8 @@ const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency, canEditAR
             await supabase
                 .from('blink_invoices')
                 .update({ invoice_items: updatedItems })
-                .eq('id', ar.id);
+                .eq('id', ar.id)
+                .eq('division', ar.division || getActiveDivision());
         } catch (error) {
             console.error('Error auto-saving COA assignment:', error);
         }
@@ -671,7 +679,8 @@ const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency, canEditAR
             const { error } = await supabase
                 .from('blink_invoices')
                 .update({ invoice_items: invoiceItems })
-                .eq('id', ar.id);
+                .eq('id', ar.id)
+                .eq('division', ar.division || getActiveDivision());
             if (error) throw error;
             alert('Revenue account allocation saved successfully!');
         } catch (error) {
@@ -997,6 +1006,7 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
                     .from('blink_invoices')
                     .select('id')
                     .eq('invoice_number', ar.invoice_number)
+                    .eq('division', ar.division || getActiveDivision())
                     .limit(1);
                 if (invByNum && invByNum.length > 0) {
                     invoiceId = invByNum[0].id;
@@ -1009,6 +1019,7 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
                     .from('blink_invoices')
                     .select('id')
                     .eq('id', ar.id)
+                    .eq('division', ar.division || getActiveDivision())
                     .limit(1);
                 if (invById && invById.length > 0) {
                     invoiceId = ar.id;
@@ -1023,6 +1034,7 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
             // ── Save Payment Record ─────────────────────────────────────────
             const paymentData = {
                 payment_number: paymentNumber,
+                division: ar.division || getActiveDivision(),
                 payment_type: 'incoming',
                 payment_date: formData.payment_date,
                 reference_type: 'invoice',
@@ -1061,7 +1073,8 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
             const { error: invoiceError } = await supabase
                 .from('blink_invoices')
                 .update({ paid_amount: newPaidAmount, outstanding_amount: newOutstanding, status: newStatus })
-                .eq('id', invoiceId);
+                .eq('id', invoiceId)
+                .eq('division', ar.division || getActiveDivision());
 
             if (invoiceError) throw invoiceError;
 
@@ -1076,7 +1089,8 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
                     last_payment_amount: parseFloat(formData.amount),
                     invoice_id: invoiceId // ensure backfilled
                 })
-                .eq('id', ar.id);
+                .eq('id', ar.id)
+                .eq('division', ar.division || getActiveDivision());
 
             if (arUpdateError) {
                 console.warn('[AR] AR transaction update warning:', arUpdateError.message);

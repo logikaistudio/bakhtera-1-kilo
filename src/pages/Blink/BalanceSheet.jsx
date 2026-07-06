@@ -9,6 +9,7 @@ import XLSX from 'xlsx-js-style';
 import Button from '../../components/Common/Button';
 import { printReport } from '../../utils/printPDF';
 import { useData } from '../../context/DataContext';
+import { getActiveDivision } from '../../utils/divisionContext';
 
 // ── COA Group Definitions ────────────────────────────────────────────────────
 const ASSET_GROUPS = [
@@ -44,6 +45,7 @@ function groupAccounts(accounts, groupDefs) {
 const BalanceSheet = () => {
     const navigate = useNavigate();
     const { companySettings } = useData();
+    const activeDivision = getActiveDivision();
     const [asOfDate, setAsOfDate] = useState(new Date().toISOString().split('T')[0]);
     const [loading, setLoading] = useState(false);
     const [reportData, setReportData] = useState(null);
@@ -65,9 +67,11 @@ const BalanceSheet = () => {
             const [r1, r2] = await Promise.all([
                 supabase.from('blink_journal_entries')
                     .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate')
+                    .eq('division', activeDivision)
                     .not('coa_id', 'is', null).lte('entry_date', asOfDate),
                 supabase.from('blink_journal_entries')
                     .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate')
+                    .eq('division', activeDivision)
                     .is('coa_id', null).lte('entry_date', asOfDate)
             ]);
             if (r1.error) throw r1.error;
@@ -666,6 +670,7 @@ const BalanceSheet = () => {
                         Balance Sheet
                     </h1>
                     <p className="text-silver-dark mt-1">Financial Position — Per {asOfLabel}</p>
+                    <p className="text-xs text-blue-300 mt-1">Data ditampilkan sesuai divisi aktif: {activeDivision?.toUpperCase()}</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <Button variant="secondary" icon={RefreshCw} onClick={fetchBalanceSheet}>Refresh</Button>

@@ -8,8 +8,10 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
     PieChart, Pie, Cell
 } from 'recharts';
+import { getActiveDivision } from '../../utils/divisionContext';
 
 const ProfitAnalysis = () => {
+    const activeDivision = getActiveDivision();
     const [jobs, setJobs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -32,6 +34,7 @@ const ProfitAnalysis = () => {
             const { data: invoices, error: invError } = await supabase
                 .from('blink_invoices')
                 .select('id, invoice_number, job_number, quotation_id, subtotal, total, status, currency, created_at')
+                .eq('division', activeDivision)
                 .neq('status', 'cancelled');
 
             if (invError) throw invError;
@@ -41,6 +44,7 @@ const ProfitAnalysis = () => {
             const { data: pos, error: poError } = await supabase
                 .from('blink_purchase_orders')
                 .select('id, po_number, job_number, shipment_id, quotation_id, total_amount, status, currency')
+                .eq('division', activeDivision)
                 .neq('status', 'cancelled');
 
             if (poError) throw poError;
@@ -139,6 +143,7 @@ const ProfitAnalysis = () => {
             <div>
                 <h1 className="text-3xl font-bold gradient-text">Job Profitability</h1>
                 <p className="text-silver-dark mt-1">Analisa Laba/Rugi per Pekerjaan (Job/Shipment)</p>
+                <p className="text-xs text-blue-300 mt-1">Data ditampilkan sesuai divisi aktif: {activeDivision?.toUpperCase()}</p>
             </div>
 
             {/* Top Section: Summary & Charts */}

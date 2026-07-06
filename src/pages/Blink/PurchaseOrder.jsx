@@ -11,6 +11,7 @@ import {
     XCircle, Clock, Package, DollarSign, TrendingUp, AlertCircle, X, Edit, Save, History, AlertTriangle, Trash2
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { getActiveDivision } from '../../utils/divisionContext';
 
 const isMissingTableError = (error) => {
     const message = String(error?.message || error?.details || error || '').toLowerCase();
@@ -53,6 +54,7 @@ const recordApprovalHistory = async (po, action, reason = null, approverName = '
 const PurchaseOrder = () => {
     const { user, canCreate, canEdit, canDelete, canView, canApprove } = useAuth();
     const { companySettings, businessPartners, deletePurchaseOrderCascade } = useData();
+    const activeDivision = getActiveDivision();
     const [pos, setPOs] = useState([]);
     const [vendors, setVendors] = useState([]);
     const [shipments, setShipments] = useState([]);
@@ -132,6 +134,7 @@ const PurchaseOrder = () => {
             const { data, error } = await supabase
                 .from('blink_purchase_orders')
                 .select('*')
+                .eq('division', activeDivision)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -152,6 +155,7 @@ const PurchaseOrder = () => {
             const { data, error } = await supabase
                 .from('blink_business_partners')
                 .select('id, partner_name, partner_code, email, phone, is_vendor, address_line1')
+                .or(`owner_division.eq.${activeDivision},is_shared.eq.true`)
                 .order('partner_name');
 
             if (error) throw error;
@@ -179,6 +183,7 @@ const PurchaseOrder = () => {
                 .from('blink_shipments')
                 .select('id, customer, customer_id, origin, destination, job_number, so_number, cogs, cogs_currency, buying_items, service_type, status')
                 .eq('status', 'approved')
+                .eq('division', activeDivision)
                 .order('created_at', { ascending: false });
             if (error) throw error;
             // Normalize field keys
@@ -201,6 +206,7 @@ const PurchaseOrder = () => {
                 .from('blink_quotations')
                 .select('*')
                 .in('status', ['approved', 'sent', 'approved_internal', 'converted'])
+                .eq('division', activeDivision)
                 .order('created_at', { ascending: false });
             if (error) throw error;
             setQuotations(data || []);
@@ -312,6 +318,7 @@ const PurchaseOrder = () => {
             const { data, error } = await supabase
                 .from('blink_purchase_orders')
                 .insert([{
+                    division: activeDivision,
                     vendor_id: vendor.id,
                     vendor_name: vendor.partner_name,
                     vendor_email: vendor.email || '',
@@ -366,6 +373,7 @@ const PurchaseOrder = () => {
                     status: 'approved'
                 })
                 .eq('id', po.id)
+                .eq('division', po.division || activeDivision)
                 .select();
 
             if (poError) {
@@ -474,7 +482,8 @@ const PurchaseOrder = () => {
                 .update({
                     status: 'submitted'
                 })
-                .eq('id', po.id);
+                .eq('id', po.id)
+                .eq('division', po.division || activeDivision);
 
             if (error) throw error;
 
@@ -1054,6 +1063,7 @@ const PurchaseOrder = () => {
                     .from('blink_business_partners')
                     .select('id, partner_name, address_line1')
                     .eq('id', po.vendor_id)
+                    .or(`owner_division.eq.${activeDivision},is_shared.eq.true`)
                     .maybeSingle();
                 if (!error && data) {
                     partnerData = data;
@@ -1080,7 +1090,8 @@ const PurchaseOrder = () => {
                     const { data, error } = await supabase
                         .from('blink_business_partners')
                         .select('id, partner_name, address_line1')
-                        .ilike('partner_name', `%${searchTerm}%`);
+                        .ilike('partner_name', `%${searchTerm}%`)
+                        .or(`owner_division.eq.${activeDivision},is_shared.eq.true`);
                     
                     if (!error && data && data.length > 0) {
                         // Use local matching logic on the candidates returned
@@ -1303,7 +1314,8 @@ const PurchaseOrder = () => {
             const { error } = await supabase
                 .from('blink_purchase_orders')
                 .update(updates)
-                .eq('id', editId);
+                .eq('id', editId)
+                .eq('division', currentPO?.division || activeDivision);
 
             if (error) throw error;
 
@@ -2665,6 +2677,7 @@ const POPaymentRecordModal = ({ po, formatCurrency, onClose, onSuccess }) => {
             // Create payment record in blink_payments table
             const paymentData = {
                 payment_number: paymentNumber,
+                division: po.division || getActiveDivision(),
                 payment_type: 'outgoing',
                 payment_date: formData.payment_date,
                 reference_type: 'po',
@@ -2702,7 +2715,8 @@ const POPaymentRecordModal = ({ po, formatCurrency, onClose, onSuccess }) => {
                     outstanding_amount: newOutstanding,
                     status: newStatus
                 })
-                .eq('id', po.id);
+                .eq('id', po.id)
+                .eq('division', po.division || getActiveDivision());
 
             if (poError) throw poError;
 

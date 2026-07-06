@@ -13,6 +13,7 @@ import {
 import { printReport, fmtDatePrint } from '../../utils/printPDF';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
+import { getActiveDivision } from '../../utils/divisionContext';
 
 // ─── Source badge config ─────────────────────────────────────────────────────
 const SOURCE_CONFIG = {
@@ -80,6 +81,7 @@ const GeneralJournal = () => {
     const navigate = useNavigate();
     const { companySettings } = useData();
     const { canCreate, canDelete } = useAuth();
+    const activeDivision = getActiveDivision();
 
     const [entries, setEntries] = useState([]);
     const [accounts, setAccounts] = useState([]);
@@ -130,6 +132,7 @@ const GeneralJournal = () => {
             let q = supabase
                 .from('blink_journal_entries')
                 .select('*')
+                .eq('division', activeDivision)
                 .order('entry_date', { ascending: false })
                 .order('created_at', { ascending: false });
 
@@ -261,6 +264,7 @@ const GeneralJournal = () => {
             const { data } = await supabase
                 .from('blink_journal_entries')
                 .select('entry_number')
+                .eq('division', activeDivision)
                 .like('entry_number', `${prefix}%`)
                 .order('entry_number', { ascending: false })
                 .limit(20); // fetch a few to safely find the highest base seq
@@ -315,6 +319,7 @@ const GeneralJournal = () => {
                 description: newEntry.description,
                 batch_id: batchId,
                 source: 'manual',
+                division: activeDivision,
                 currency: 'IDR',
                 journal_type: 'general',
                 // Store the base number for easy display/search
@@ -353,7 +358,7 @@ const GeneralJournal = () => {
         }
         if (!confirm('Delete this journal entry? This cannot be undone.')) return;
         try {
-            const { error } = await supabase.from('blink_journal_entries').delete().eq('batch_id', batchId);
+            const { error } = await supabase.from('blink_journal_entries').delete().eq('batch_id', batchId).eq('division', activeDivision);
             if (error) throw error;
             setShowDetailModal(false);
             fetchEntries();
@@ -493,6 +498,7 @@ const GeneralJournal = () => {
                 <div>
                     <h1 className="text-3xl font-bold gradient-text">General Journal</h1>
                     <p className="text-silver-dark mt-1">Double-entry transaction records from AR, AP, Invoices & PO</p>
+                    <p className="text-xs text-blue-300 mt-1">Data ditampilkan sesuai divisi aktif: {activeDivision?.toUpperCase()}</p>
                 </div>
                 <div className="flex gap-2 flex-wrap">
                     <Button variant="secondary" icon={RefreshCw} onClick={fetchEntries}>Refresh</Button>
