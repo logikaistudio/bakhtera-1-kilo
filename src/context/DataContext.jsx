@@ -847,6 +847,39 @@ export const DataProvider = ({ children }) => {
 
     const normalizePhone = (value) => (value || '').toString().replace(/\D/g, '');
 
+    const generatePartnerCode = async () => {
+        const now = new Date();
+        const yy = String(now.getFullYear()).slice(-2);
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const prefix = `BP-${yy}${mm}-`;
+
+        try {
+            const { data, error } = await supabase
+                .from('blink_business_partners')
+                .select('partner_code')
+                .ilike('partner_code', `${prefix}%`)
+                .order('partner_code', { ascending: false })
+                .limit(200);
+
+            if (error) throw error;
+
+            const codes = (data || []).map((row) => row.partner_code || '');
+            const seqNums = codes
+                .map((code) => {
+                    const parts = String(code).split('-');
+                    return parseInt(parts[parts.length - 1], 10);
+                })
+                .filter((n) => !Number.isNaN(n));
+
+            const seq = (seqNums.length > 0 ? Math.max(...seqNums) + 1 : 1);
+            return `${prefix}${String(seq).padStart(4, '0')}`;
+        } catch (err) {
+            console.warn('Partner code auto-generation fallback used:', err?.message || err);
+            const fallback = String(Date.now()).slice(-6);
+            return `${prefix}${fallback}`;
+        }
+    };
+
     const addBusinessPartner = async (partner) => {
         const activeDivision = getActiveDivision();
         const normalizedName = normalizePartnerString(partner.partner_name);
@@ -935,8 +968,11 @@ export const DataProvider = ({ children }) => {
             return merged;
         }
 
+        const partnerCode = (partner.partner_code || '').toString().trim() || await generatePartnerCode();
+
         const newPartner = {
             ...partner,
+            partner_code: partnerCode,
             owner_division: partner.owner_division || activeDivision,
             is_shared: isAdmin() ? Boolean(partner.is_shared) : false,
             id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(),
@@ -944,10 +980,54 @@ export const DataProvider = ({ children }) => {
             updated_at: new Date().toISOString(),
         };
 
-        const { data, error } = await supabase.from('blink_business_partners').insert([newPartner]).select();
+        const stripUnsupportedPartnerFields = (payload, err) => {
+            const msg = String(err?.message || '').toLowerCase();
+            const details = String(err?.details || '').toLowerCase();
+            const hint = String(err?.hint || '').toLowerCase();
+            const text = `${msg} ${details} ${hint}`;
+            const cleaned = { ...payload };
+            let changed = false;
+
+            if (text.includes('owner_division')) {
+                delete cleaned.owner_division;
+                changed = true;
+            }
+            if (text.includes('is_shared')) {
+                delete cleaned.is_shared;
+                changed = true;
+            }
+
+            return changed ? cleaned : null;
+        };
+
+        let insertPayload = { ...newPartner };
+        let { data, error } = await supabase.from('blink_business_partners').insert([insertPayload]).select();
+
+        if (error) {
+            const compatiblePayload = stripUnsupportedPartnerFields(insertPayload, error);
+            if (compatiblePayload) {
+                insertPayload = compatiblePayload;
+                const retryCompat = await supabase.from('blink_business_partners').insert([insertPayload]).select();
+                data = retryCompat.data;
+                error = retryCompat.error;
+            }
+        }
+
+        // Retry once if partner_code collides (rare concurrency case).
+        if (error && (error.code === '23505' || String(error.message || '').toLowerCase().includes('partner_code'))) {
+            const retryPayload = {
+                ...insertPayload,
+                partner_code: await generatePartnerCode(),
+                id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+            };
+            const retry = await supabase.from('blink_business_partners').insert([retryPayload]).select();
+            data = retry.data;
+            error = retry.error;
+        }
+
         if (error) {
             console.error('Error adding business partner:', error);
-            alert('Failed to add business partner to database');
+            alert('Failed to add business partner to database: ' + (error.message || error));
             return null;
         }
 
