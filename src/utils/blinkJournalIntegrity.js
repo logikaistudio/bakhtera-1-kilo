@@ -4,6 +4,8 @@ const INVOICE_REF_TYPES = new Set(['ar', 'invoice', 'ar_payment', 'ar_reversal']
 const PO_REF_TYPES = new Set(['po', 'ap_reversal']);
 const AP_REF_TYPES = new Set(['ap_payment']);
 const PAYMENT_REF_TYPES = new Set(['payment']);
+const MANUAL_SAFE_JOURNAL_TYPES = new Set(['general', 'note', 'reversal']);
+const TRANSACTIONAL_ENTRY_TYPES = new Set(['invoice', 'payment', 'bill_payment', 'purchase_order', 'cogs']);
 
 const cache = new Map();
 const CACHE_TTL_MS = 30 * 1000;
@@ -67,13 +69,32 @@ export const getActiveBlinkReferenceSets = async (division, { forceRefresh = fal
 export const isActiveBlinkJournalEntry = (entry, refSets) => {
     const refType = entry?.reference_type;
     const refId = entry?.reference_id != null ? String(entry.reference_id) : null;
+    const source = entry?.source;
+    const entryType = entry?.entry_type;
+    const journalType = entry?.journal_type;
 
-    if (!refType || !refId) return true;
+    // Manual journals (General/Note/Reversal) are intentionally not tied to transactions.
+    if (source === 'manual' || MANUAL_SAFE_JOURNAL_TYPES.has(journalType)) {
+        return true;
+    }
+
+    // Transactional/auto journals must always have valid reference pointer.
+    if (!refType || !refId) {
+        if (source === 'auto' || TRANSACTIONAL_ENTRY_TYPES.has(entryType)) {
+            return false;
+        }
+        return true;
+    }
 
     if (INVOICE_REF_TYPES.has(refType)) return refSets.activeInvoiceIds.has(refId);
     if (PO_REF_TYPES.has(refType)) return refSets.activePOIds.has(refId);
     if (AP_REF_TYPES.has(refType)) return refSets.activeAPIds.has(refId) || refSets.activeARIds.has(refId);
     if (PAYMENT_REF_TYPES.has(refType)) return refSets.activePaymentIds.has(refId);
+
+    // Unknown reference type in auto/transactional journal should be treated as orphan.
+    if (source === 'auto' || TRANSACTIONAL_ENTRY_TYPES.has(entryType)) {
+        return false;
+    }
 
     return true;
 };

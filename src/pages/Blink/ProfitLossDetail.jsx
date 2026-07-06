@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { getActiveDivision } from '../../utils/divisionContext';
+import { filterActiveBlinkJournalEntries } from '../../utils/blinkJournalIntegrity';
 
 const ProfitLossDetail = () => {
     const navigate = useNavigate();
@@ -84,48 +85,7 @@ const ProfitLossDetail = () => {
 
             const combined = [...(r1.data || []), ...(r2.data || [])];
             const dedupedEntries = [...new Map(combined.map(r => [r.id, r])).values()];
-
-            const [invRes, poRes, arRes, apRes] = await Promise.all([
-                supabase
-                    .from('blink_invoices')
-                    .select('id')
-                    .eq('division', activeDivision)
-                    .neq('status', 'cancelled'),
-                supabase
-                    .from('blink_purchase_orders')
-                    .select('id')
-                    .eq('division', activeDivision)
-                    .neq('status', 'cancelled'),
-                supabase
-                    .from('blink_ar_transactions')
-                    .select('id'),
-                supabase
-                    .from('blink_ap_transactions')
-                    .select('id')
-            ]);
-            if (invRes.error) throw invRes.error;
-            if (poRes.error) throw poRes.error;
-            if (arRes.error) throw arRes.error;
-            if (apRes.error) throw apRes.error;
-
-            const activeInvoiceIds = new Set((invRes.data || []).map(row => String(row.id)));
-            const activePOIds = new Set((poRes.data || []).map(row => String(row.id)));
-            const activeARIds = new Set((arRes.data || []).map(row => String(row.id)));
-            const activeAPIds = new Set((apRes.data || []).map(row => String(row.id)));
-
-            const invoiceRefTypes = new Set(['ar', 'invoice', 'ar_payment', 'ar_reversal']);
-            const poRefTypes = new Set(['po', 'ap_reversal']);
-            const apRefTypes = new Set(['ap_payment']);
-
-            const entries = dedupedEntries.filter((entry) => {
-                const refType = entry.reference_type;
-                const refId = entry.reference_id != null ? String(entry.reference_id) : null;
-                if (!refType || !refId) return true;
-                if (invoiceRefTypes.has(refType)) return activeInvoiceIds.has(refId);
-                if (poRefTypes.has(refType)) return activePOIds.has(refId);
-                if (apRefTypes.has(refType)) return activeAPIds.has(refId) || activeARIds.has(refId);
-                return true;
-            });
+            const entries = await filterActiveBlinkJournalEntries(dedupedEntries, activeDivision);
 
             const idToCode = {};
             const coaMapByCode = {};
