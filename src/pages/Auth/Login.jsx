@@ -135,7 +135,7 @@ const Login = () => {
                         />
                     </div>
                     <div className="mb-6 text-center">
-                        <h2 className="text-xl font-semibold text-gray-800">Login</h2>
+                        <h2 className="text-xl font-semibold text-sky-500">LOGIN</h2>
                     </div>
 
                     {/* Error alert */}
@@ -225,6 +225,16 @@ const Login = () => {
                             )}
                         </button>
                     </form>
+
+                    <div className="text-center mt-6">
+                        <button
+                            type="button"
+                            onClick={openForgotModal}
+                            className="text-blue-500 font-semibold hover:text-blue-600 text-sm"
+                        >
+                            Lupa password? Reset mandiri di sini
+                        </button>
+                    </div>
 
                 </div>
 
