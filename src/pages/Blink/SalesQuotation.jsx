@@ -268,6 +268,9 @@ const SalesQuotation = () => {
     const [repeatSourceQuotation, setRepeatSourceQuotation] = useState(null);
     const [repeatSelectionMode, setRepeatSelectionMode] = useState(false);
     const [editingDraftId, setEditingDraftId] = useState(null);
+    const [selectedQuotationIds, setSelectedQuotationIds] = useState([]);
+    const [isCleansing, setIsCleansing] = useState(false);
+    const [cleanseProgress, setCleanseProgress] = useState('');
 
     // Form state
     const [formData, setFormData] = useState({
@@ -1632,6 +1635,101 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
         );
     });
 
+    const isAllFilteredSelected = filteredQuotations.length > 0 && filteredQuotations.every(q => selectedQuotationIds.includes(q.id));
+
+    const toggleSelectQuotation = (quotationId) => {
+        setSelectedQuotationIds(prev => (
+            prev.includes(quotationId)
+                ? prev.filter(id => id !== quotationId)
+                : [...prev, quotationId]
+        ));
+    };
+
+    const toggleSelectAllFiltered = () => {
+        if (isAllFilteredSelected) {
+            setSelectedQuotationIds(prev => prev.filter(id => !filteredQuotations.some(q => q.id === id)));
+            return;
+        }
+
+        setSelectedQuotationIds(prev => {
+            const merged = new Set(prev);
+            filteredQuotations.forEach(q => merged.add(q.id));
+            return Array.from(merged);
+        });
+    };
+
+    const handleDeleteSelectedQuotations = async () => {
+        if (!canManageQuotation('delete')) {
+            alert('Anda tidak memiliki hak akses untuk menghapus quotation.');
+            return;
+        }
+        if (selectedQuotationIds.length === 0) {
+            alert('Pilih minimal 1 quotation untuk dihapus.');
+            return;
+        }
+
+        const confirm1 = confirm(`Hapus ${selectedQuotationIds.length} quotation terpilih beserta seluruh data terkait?`);
+        if (!confirm1) return;
+        const confirm2 = confirm('Konfirmasi terakhir: data terpilih akan dihapus permanen. Lanjutkan?');
+        if (!confirm2) return;
+
+        try {
+            setIsCleansing(true);
+            setCleanseProgress('Memulai hapus data terpilih...');
+            const success = await deleteBlinkQuotationCascade(
+                selectedQuotationIds,
+                'blink_sales_quotations',
+                'blink_sales_quotations',
+                { onProgress: (message) => setCleanseProgress(message) }
+            );
+            if (!success) return;
+            await fetchQuotations();
+            setSelectedQuotationIds([]);
+            alert('✅ Quotation terpilih berhasil dihapus.');
+        } catch (error) {
+            console.error('Error deleting selected sales quotations:', error);
+            alert('❌ Gagal hapus quotation terpilih: ' + (error.message || error));
+        } finally {
+            setIsCleansing(false);
+        }
+    };
+
+    const handleCleanseAllSalesQuotations = async () => {
+        if (!canManageQuotation('delete')) {
+            alert('Anda tidak memiliki hak akses untuk menghapus quotation.');
+            return;
+        }
+        if (quotations.length === 0) {
+            alert('Tidak ada data quotation untuk dihapus.');
+            return;
+        }
+
+        const confirm1 = confirm(`Cleansing akan menghapus SEMUA Sales Quotation (${quotations.length} baris) beserta alur transaksi terkait. Lanjutkan?`);
+        if (!confirm1) return;
+        const confirm2 = confirm('Konfirmasi terakhir: semua data Sales Quotation akan dihapus permanen. Yakin lanjut?');
+        if (!confirm2) return;
+
+        try {
+            setIsCleansing(true);
+            setCleanseProgress('Memulai cleansing sales quotation...');
+            const success = await deleteBlinkQuotationCascade(
+                quotations.map(q => q.id),
+                'blink_sales_quotations',
+                'blink_sales_quotations',
+                { onProgress: (message) => setCleanseProgress(message) }
+            );
+            if (!success) return;
+            await fetchQuotations();
+            setSelectedQuotationIds([]);
+            alert('✅ Cleansing sales quotation selesai.');
+        } catch (error) {
+            console.error('Error cleansing sales quotations:', error);
+            alert('❌ Gagal cleansing sales quotation: ' + (error.message || error));
+        } finally {
+            setIsCleansing(false);
+        }
+    };
+
     // Only show active customers
     const activeCustomers = customers.filter(c => c.status === 'active');
 
@@ -1662,8 +1760,29 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                     <h1 className="text-3xl font-bold gradient-text">Sales Quotation</h1>
                     <p className="text-silver-dark mt-1">Manage quotations untuk customer</p>
                 </div>
+                <div className="flex items-center gap-2">
+                    {canManageQuotation('delete') && (
+                        <>
+                            <Button
+                                onClick={handleDeleteSelectedQuotations}
+                                icon={Trash}
+                                variant="danger"
+                                disabled={selectedQuotationIds.length === 0 || isCleansing}
+                            >
+                                Hapus Terpilih ({selectedQuotationIds.length})
+                            </Button>
+                            <Button
+                                onClick={handleCleanseAllSalesQuotations}
+                                icon={Trash}
+                                variant="danger"
+                                disabled={quotations.length === 0 || isCleansing}
+                            >
+                                {isCleansing ? 'Cleansing...' : 'Bersihkan Semua Data'}
+                            </Button>
+                        </>
+                    )}
                 {canManageQuotation('create') && (
-                    <div className="flex items-center gap-2">
+                    <>
                         <Button
                             onClick={handleRepeatOrderButtonClick}
                             icon={Copy}
@@ -1678,9 +1797,16 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                         }} icon={Plus}>
                             New Quotation
                         </Button>
-                    </div>
+                    </>
                 )}
+                </div>
             </div>
+
+            {isCleansing && (
+                <div className="glass-card px-4 py-2 rounded-lg border border-amber-500/30 bg-amber-500/10">
+                    <p className="text-xs text-amber-300">Progress Cleansing: {cleanseProgress || 'Sedang memproses...'}</p>
+                </div>
+            )}
 
             {repeatSelectionMode && (
                 <div className="px-4 py-2 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 text-sm">
@@ -1742,6 +1868,15 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                     <table className="w-full">
                         <thead className="bg-accent-orange">
                             <tr>
+                                <th className="px-4 py-3 text-center text-xs font-semibold text-white uppercase">
+                                    <input
+                                        type="checkbox"
+                                        checked={isAllFilteredSelected}
+                                        onChange={toggleSelectAllFiltered}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="w-4 h-4"
+                                    />
+                                </th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">Job Number</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">Customer</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">Route</th>
@@ -1755,7 +1890,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                         <tbody className="divide-y divide-dark-border">
                             {filteredQuotations.length === 0 ? (
                                 <tr>
-                                    <td colSpan="7" className="px-4 py-12 text-center">
+                                    <td colSpan="9" className="px-4 py-12 text-center">
                                         <FileText className="w-12 h-12 text-silver-dark mx-auto mb-3" />
                                         <p className="text-silver-dark">
                                             {searchTerm
@@ -1781,6 +1916,14 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                             }}
                                             className={`smooth-transition cursor-pointer ${repeatSelectionMode && repeatSourceQuotation?.id === quote.id ? 'bg-amber-200/60 ring-1 ring-amber-400' : 'hover:bg-dark-surface'}`}
                                         >
+                                            <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedQuotationIds.includes(quote.id)}
+                                                    onChange={() => toggleSelectQuotation(quote.id)}
+                                                    className="w-4 h-4"
+                                                />
+                                            </td>
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-2">
                                                     <span className="font-medium text-accent-orange">{quote.jobNumber}</span>

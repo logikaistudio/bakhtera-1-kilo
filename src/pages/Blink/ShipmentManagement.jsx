@@ -15,6 +15,7 @@ const ShipmentManagement = () => {
     const [filter, setFilter] = useState('all');
     const [shipments, setShipments] = useState([]);
     const [selectedShipment, setSelectedShipment] = useState(null);
+    const [selectedShipmentIds, setSelectedShipmentIds] = useState([]);
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [showAnalysisModal, setShowAnalysisModal] = useState(false);
     const [analysisShipment, setAnalysisShipment] = useState(null);
@@ -65,6 +66,39 @@ const ShipmentManagement = () => {
         } catch (error) {
             console.error('Error cleansing shipments:', error);
             alert('❌ Gagal cleansing shipment: ' + (error.message || error));
+        } finally {
+            setIsCleansing(false);
+        }
+    };
+
+    const handleDeleteSelectedShipments = async () => {
+        if (!canDelete('blink_shipments')) {
+            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus shipment.');
+            return;
+        }
+        if (selectedShipmentIds.length === 0) {
+            alert('Pilih minimal 1 shipment untuk dihapus.');
+            return;
+        }
+
+        const confirm1 = confirm(`Hapus ${selectedShipmentIds.length} shipment terpilih beserta data turunannya?`);
+        if (!confirm1) return;
+        const confirm2 = confirm('Konfirmasi terakhir: data terpilih akan dihapus permanen. Lanjutkan?');
+        if (!confirm2) return;
+
+        try {
+            setIsCleansing(true);
+            setCleanseProgress('Memulai hapus shipment terpilih...');
+            const success = await deleteShipmentCascade(selectedShipmentIds, {
+                onProgress: (message) => setCleanseProgress(message)
+            });
+            if (!success) return;
+            await fetchShipments();
+            setSelectedShipmentIds([]);
+            alert('✅ Shipment terpilih berhasil dihapus.');
+        } catch (error) {
+            console.error('Error deleting selected shipments:', error);
+            alert('❌ Gagal hapus shipment terpilih: ' + (error.message || error));
         } finally {
             setIsCleansing(false);
         }
@@ -252,6 +286,29 @@ const ShipmentManagement = () => {
 
         return true;
     });
+
+    const isAllFilteredSelected = filteredShipments.length > 0 && filteredShipments.every(s => selectedShipmentIds.includes(s.id));
+
+    const toggleSelectShipment = (shipmentId) => {
+        setSelectedShipmentIds(prev => (
+            prev.includes(shipmentId)
+                ? prev.filter(id => id !== shipmentId)
+                : [...prev, shipmentId]
+        ));
+    };
+
+    const toggleSelectAllFiltered = () => {
+        if (isAllFilteredSelected) {
+            setSelectedShipmentIds(prev => prev.filter(id => !filteredShipments.some(s => s.id === id)));
+            return;
+        }
+
+        setSelectedShipmentIds(prev => {
+            const merged = new Set(prev);
+            filteredShipments.forEach(s => merged.add(s.id));
+            return Array.from(merged);
+        });
+    };
 
 
 
@@ -657,6 +714,15 @@ const ShipmentManagement = () => {
                         size="sm"
                         variant="danger"
                         icon={Trash2}
+                        onClick={handleDeleteSelectedShipments}
+                        disabled={!canDelete('blink_shipments') || selectedShipmentIds.length === 0 || isCleansing}
+                    >
+                        Hapus Terpilih ({selectedShipmentIds.length})
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant="danger"
+                        icon={Trash2}
                         onClick={handleCleanseAllShipments}
                         disabled={!canDelete('blink_shipments') || shipments.length === 0 || isCleansing}
                     >
@@ -824,6 +890,15 @@ const ShipmentManagement = () => {
                         <table className="w-full">
                             <thead className="bg-accent-orange">
                                 <tr>
+                                    <th className="px-4 py-3 text-center text-xs font-semibold text-white">
+                                        <input
+                                            type="checkbox"
+                                            checked={isAllFilteredSelected}
+                                            onChange={toggleSelectAllFiltered}
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="w-4 h-4"
+                                        />
+                                    </th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-white">Job Number</th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-white">Customer</th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-white">Route</th>
@@ -839,6 +914,14 @@ const ShipmentManagement = () => {
                                         onClick={() => handleViewShipment(ship)}
                                         className="hover:bg-dark-surface smooth-transition cursor-pointer"
                                     >
+                                        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedShipmentIds.includes(ship.id)}
+                                                onChange={() => toggleSelectShipment(ship.id)}
+                                                className="w-4 h-4"
+                                            />
+                                        </td>
                                         <td className="px-4 py-3 font-medium text-accent-orange">
                                             {ship.jobNumber}
                                         </td>

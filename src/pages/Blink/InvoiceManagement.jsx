@@ -41,6 +41,7 @@ const InvoiceManagement = () => {
     const [reinvoiceSourceInvoice, setReinvoiceSourceInvoice] = useState(null);
     const [previewInvoiceData, setPreviewInvoiceData] = useState(null);
     const [selectedInvoice, setSelectedInvoice] = useState(null);
+    const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([]);
     const [selectedQuotation, setSelectedQuotation] = useState(null);
     const [selectedShipment, setSelectedShipment] = useState(null);
     const [referenceType, setReferenceType] = useState('quotation'); // 'quotation' or 'so'
@@ -82,6 +83,39 @@ const InvoiceManagement = () => {
         } catch (error) {
             console.error('Error cleansing invoices:', error);
             alert('❌ Gagal cleansing invoice: ' + (error.message || error));
+        } finally {
+            setIsCleansing(false);
+        }
+    };
+
+    const handleDeleteSelectedInvoices = async () => {
+        if (!canDelete('blink_invoices')) {
+            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus Invoice.');
+            return;
+        }
+        if (selectedInvoiceIds.length === 0) {
+            alert('Pilih minimal 1 invoice untuk dihapus.');
+            return;
+        }
+
+        const confirm1 = confirm(`Hapus ${selectedInvoiceIds.length} invoice terpilih beserta AR, payment, dan jurnal terkait?`);
+        if (!confirm1) return;
+        const confirm2 = confirm('Konfirmasi terakhir: data terpilih akan dihapus permanen. Lanjutkan?');
+        if (!confirm2) return;
+
+        try {
+            setIsCleansing(true);
+            setCleanseProgress('Memulai hapus invoice terpilih...');
+            const success = await deleteInvoiceCascade(selectedInvoiceIds, {
+                onProgress: (message) => setCleanseProgress(message)
+            });
+            if (!success) return;
+            await fetchInvoices();
+            setSelectedInvoiceIds([]);
+            alert('✅ Invoice terpilih berhasil dihapus.');
+        } catch (error) {
+            console.error('Error deleting selected invoices:', error);
+            alert('❌ Gagal hapus invoice terpilih: ' + (error.message || error));
         } finally {
             setIsCleansing(false);
         }
@@ -1825,6 +1859,29 @@ const InvoiceManagement = () => {
         return inv.status === filter;
     });
 
+    const isAllFilteredSelected = filteredInvoices.length > 0 && filteredInvoices.every(inv => selectedInvoiceIds.includes(inv.id));
+
+    const toggleSelectInvoice = (invoiceId) => {
+        setSelectedInvoiceIds(prev => (
+            prev.includes(invoiceId)
+                ? prev.filter(id => id !== invoiceId)
+                : [...prev, invoiceId]
+        ));
+    };
+
+    const toggleSelectAllFiltered = () => {
+        if (isAllFilteredSelected) {
+            setSelectedInvoiceIds(prev => prev.filter(id => !filteredInvoices.some(inv => inv.id === id)));
+            return;
+        }
+
+        setSelectedInvoiceIds(prev => {
+            const merged = new Set(prev);
+            filteredInvoices.forEach(inv => merged.add(inv.id));
+            return Array.from(merged);
+        });
+    };
+
     // Calculate summary stats excluding draft, manager_approval, cancelled, and rejected
     const activeInvoices = invoices.filter(inv => !['draft', 'manager_approval', 'cancelled', 'rejected'].includes(inv.status));
     const overdueCount = activeInvoices.filter(inv => inv.status === 'overdue').length;
@@ -1963,6 +2020,14 @@ const InvoiceManagement = () => {
                 </div>
                 <div className="flex items-center gap-3">
                     <Button
+                        onClick={handleDeleteSelectedInvoices}
+                        variant="danger"
+                        icon={Trash}
+                        disabled={!canDelete('blink_invoices') || selectedInvoiceIds.length === 0 || isCleansing}
+                    >
+                        Hapus Terpilih ({selectedInvoiceIds.length})
+                    </Button>
+                    <Button
                         onClick={handleCleanseAllInvoices}
                         variant="danger"
                         icon={Trash}
@@ -2039,6 +2104,15 @@ const InvoiceManagement = () => {
                     <table className="w-full text-sm">
                         <thead className="bg-accent-orange">
                             <tr>
+                                <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap">
+                                    <input
+                                        type="checkbox"
+                                        checked={isAllFilteredSelected}
+                                        onChange={toggleSelectAllFiltered}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="w-4 h-4"
+                                    />
+                                </th>
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Invoice #</th>
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Job Number</th>
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Customer</th>
@@ -2053,7 +2127,7 @@ const InvoiceManagement = () => {
                         <tbody className="divide-y divide-dark-border">
                             {filteredInvoices.length === 0 ? (
                                 <tr>
-                                    <td colSpan="9" className="px-3 py-8 text-center text-silver-dark">
+                                    <td colSpan="10" className="px-3 py-8 text-center text-silver-dark">
                                         <FileText className="w-10 h-10 text-silver-dark mx-auto mb-2 opacity-50" />
                                         <p className="text-sm">
                                             {filter === 'all'
@@ -2072,6 +2146,14 @@ const InvoiceManagement = () => {
                                             setShowViewModal(true);
                                         }}
                                     >
+                                        <td className="px-3 py-2 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedInvoiceIds.includes(invoice.id)}
+                                                onChange={() => toggleSelectInvoice(invoice.id)}
+                                                className="w-4 h-4"
+                                            />
+                                        </td>
                                         <td className="px-3 py-2 whitespace-nowrap">
                                             <span className="font-medium text-accent-orange">{invoice.invoice_number}</span>
                                         </td>

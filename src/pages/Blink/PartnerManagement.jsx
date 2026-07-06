@@ -17,6 +17,7 @@ const PartnerManagement = () => {
     const [roleFilter, setRoleFilter] = useState('all'); // 'all', 'customer', 'vendor', 'agent'
     const [showModal, setShowModal] = useState(false);
     const [editingPartner, setEditingPartner] = useState(null);
+    const [selectedIds, setSelectedIds] = useState([]);
     const fileInputRef = useRef(null);
     const [isCleansing, setIsCleansing] = useState(false);
     const [cleanseProgress, setCleanseProgress] = useState('');
@@ -159,6 +160,37 @@ const PartnerManagement = () => {
             alert('❌ Gagal cleansing data mitra: ' + (error.message || error));
         } finally {
             setIsCleansing(false);
+        }
+    };
+
+    const toggleSelectAll = () => {
+        if (filteredPartners.length === 0) return;
+        if (selectedIds.length === filteredPartners.length) {
+            setSelectedIds([]);
+            return;
+        }
+        setSelectedIds(filteredPartners.map(p => p.id));
+    };
+
+    const toggleSelectOne = (id) => {
+        setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    };
+
+    const handleDeleteSelected = async () => {
+        if (!canDeletePartner || selectedIds.length === 0) return;
+        if (!confirm(`Yakin hapus ${selectedIds.length} mitra terpilih? Data transaksi terkait tidak akan terhapus.`)) return;
+
+        try {
+            const success = await Promise.all(
+                selectedIds.map(id => deleteBusinessPartner(id, 'blink_business_partners', 'blink_partners'))
+            );
+            if (success.some(result => !result)) return;
+            alert(`✅ ${selectedIds.length} mitra berhasil dihapus`);
+            setSelectedIds([]);
+            fetchPartners();
+        } catch (error) {
+            console.error('Error bulk delete partners:', error);
+            alert('❌ Gagal menghapus mitra terpilih: ' + error.message);
         }
     };
 
@@ -308,6 +340,18 @@ const PartnerManagement = () => {
                 </div>
                 <div className="flex gap-2">
                     <button
+                        onClick={handleDeleteSelected}
+                        disabled={!canDeletePartner || selectedIds.length === 0 || isCleansing}
+                        className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm ${canDeletePartner && selectedIds.length > 0
+                            ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                            : 'bg-dark-surface text-silver-dark cursor-not-allowed opacity-60'
+                            }`}
+                        title={canDeletePartner ? 'Hapus mitra terpilih' : 'Tidak ada akses delete'}
+                    >
+                        <Trash2 className="w-4 h-4" />
+                        Hapus Terpilih ({selectedIds.length})
+                    </button>
+                    <button
                         onClick={handleCleanseAll}
                         disabled={!canDeletePartner || partners.length === 0 || isCleansing}
                         className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm ${canDeletePartner && partners.length > 0
@@ -441,6 +485,14 @@ const PartnerManagement = () => {
                     <table className="w-full">
                         <thead className="bg-accent-orange">
                             <tr>
+                                <th className="px-4 py-3 text-center text-xs font-bold text-white uppercase">
+                                    <input
+                                        type="checkbox"
+                                        checked={filteredPartners.length > 0 && selectedIds.length === filteredPartners.length}
+                                        onChange={toggleSelectAll}
+                                        className="w-4 h-4"
+                                    />
+                                </th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">Kode</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">Nama Mitra</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">Kontak</th>
@@ -450,7 +502,7 @@ const PartnerManagement = () => {
                         <tbody className="divide-y divide-dark-border">
                             {filteredPartners.length === 0 ? (
                                 <tr>
-                                    <td colSpan="4" className="px-4 py-8 text-center text-silver-dark">
+                                    <td colSpan="5" className="px-4 py-8 text-center text-silver-dark">
                                         {searchTerm || roleFilter !== 'all' ? 'Tidak ada mitra yang cocok' : 'Belum ada mitra. Klik "Tambah Mitra Baru"'}
                                     </td>
                                 </tr>
@@ -461,6 +513,14 @@ const PartnerManagement = () => {
                                         className="hover:bg-dark-surface/50 transition-colors cursor-pointer"
                                         onClick={() => handleEdit(partner)}
                                     >
+                                        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedIds.includes(partner.id)}
+                                                onChange={() => toggleSelectOne(partner.id)}
+                                                className="w-4 h-4"
+                                            />
+                                        </td>
                                         <td className="px-4 py-3 text-xs font-mono text-blue-400">{partner.partner_code}</td>
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-2">

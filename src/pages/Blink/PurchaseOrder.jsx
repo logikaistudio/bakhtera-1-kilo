@@ -65,6 +65,7 @@ const PurchaseOrder = () => {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showViewModal, setShowViewModal] = useState(false);
     const [selectedPO, setSelectedPO] = useState(null);
+    const [selectedPOIds, setSelectedPOIds] = useState([]);
 
     // Form state
     const [formData, setFormData] = useState({
@@ -541,6 +542,39 @@ const PurchaseOrder = () => {
         } catch (error) {
             console.error('Error cleansing PO:', error);
             alert('❌ Gagal cleansing PO: ' + (error.message || error));
+        } finally {
+            setIsCleansing(false);
+        }
+    };
+
+    const handleDeleteSelectedPOs = async () => {
+        if (!canDelete('blink_purchase_order')) {
+            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus PO.');
+            return;
+        }
+        if (selectedPOIds.length === 0) {
+            alert('Pilih minimal 1 PO untuk dihapus.');
+            return;
+        }
+
+        const confirm1 = confirm(`Hapus ${selectedPOIds.length} PO terpilih beserta AP, pembayaran, dan jurnal terkait?`);
+        if (!confirm1) return;
+        const confirm2 = confirm('Konfirmasi terakhir: data terpilih akan dihapus permanen. Lanjutkan?');
+        if (!confirm2) return;
+
+        try {
+            setIsCleansing(true);
+            setCleanseProgress('Memulai hapus PO terpilih...');
+            const success = await deletePurchaseOrderCascade(selectedPOIds, {
+                onProgress: (message) => setCleanseProgress(message)
+            });
+            if (!success) return;
+            await fetchPOs();
+            setSelectedPOIds([]);
+            alert('✅ PO terpilih berhasil dihapus.');
+        } catch (error) {
+            console.error('Error deleting selected POs:', error);
+            alert('❌ Gagal hapus PO terpilih: ' + (error.message || error));
         } finally {
             setIsCleansing(false);
         }
@@ -1329,6 +1363,29 @@ const PurchaseOrder = () => {
         return matchesFilter && matchesSearch;
     });
 
+    const isAllFilteredSelected = filteredPOs.length > 0 && filteredPOs.every(po => selectedPOIds.includes(po.id));
+
+    const toggleSelectPO = (poId) => {
+        setSelectedPOIds(prev => (
+            prev.includes(poId)
+                ? prev.filter(id => id !== poId)
+                : [...prev, poId]
+        ));
+    };
+
+    const toggleSelectAllFiltered = () => {
+        if (isAllFilteredSelected) {
+            setSelectedPOIds(prev => prev.filter(id => !filteredPOs.some(po => po.id === id)));
+            return;
+        }
+
+        setSelectedPOIds(prev => {
+            const merged = new Set(prev);
+            filteredPOs.forEach(po => merged.add(po.id));
+            return Array.from(merged);
+        });
+    };
+
     // Calculate summary stats
     const totalPOs = pos.length;
     const pendingApproval = pos.filter(p => p.status === 'submitted').length;
@@ -1392,6 +1449,14 @@ const PurchaseOrder = () => {
                     <p className="text-silver-dark mt-1">Kelola pembelian dari vendor</p>
                 </div>
                 <div className="flex gap-2">
+                    <Button
+                        onClick={handleDeleteSelectedPOs}
+                        icon={Trash2}
+                        variant="danger"
+                        disabled={!canDelete('blink_purchase_order') || selectedPOIds.length === 0 || isCleansing}
+                    >
+                        Hapus Terpilih ({selectedPOIds.length})
+                    </Button>
                     <Button
                         onClick={handleCleanseAllPOs}
                         icon={Trash2}
@@ -1473,6 +1538,15 @@ const PurchaseOrder = () => {
                     <table className="w-full text-sm">
                         <thead className="bg-gradient-to-r from-accent-orange to-accent-orange/80">
                             <tr>
+                                <th className="px-4 py-3 text-center text-xs font-bold text-white uppercase tracking-wider">
+                                    <input
+                                        type="checkbox"
+                                        checked={isAllFilteredSelected}
+                                        onChange={toggleSelectAllFiltered}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="w-4 h-4"
+                                    />
+                                </th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">PO Number</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Vendor</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">PO Date</th>
@@ -1486,7 +1560,7 @@ const PurchaseOrder = () => {
                         <tbody className="divide-y divide-dark-border">
                             {filteredPOs.length === 0 ? (
                                 <tr>
-                                    <td colSpan="8" className="px-4 py-12 text-center">
+                                    <td colSpan="9" className="px-4 py-12 text-center">
                                         <FileText className="w-12 h-12 text-silver-dark mx-auto mb-3 opacity-50" />
                                         <p className="text-silver-dark text-sm font-medium">
                                             {filter === 'all'
@@ -1510,6 +1584,14 @@ const PurchaseOrder = () => {
                                                 setShowViewModal(true);
                                             }}
                                         >
+                                            <td className="px-4 py-3 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedPOIds.includes(po.id)}
+                                                    onChange={() => toggleSelectPO(po.id)}
+                                                    className="w-4 h-4"
+                                                />
+                                            </td>
                                             <td className="px-4 py-3 whitespace-nowrap">
                                                 <span className="font-bold text-accent-orange">{po.po_number}</span>
                                             </td>

@@ -65,6 +65,7 @@ const BridgePurchaseOrder = () => {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showViewModal, setShowViewModal] = useState(false);
     const [selectedPO, setSelectedPO] = useState(null);
+    const [selectedPOIds, setSelectedPOIds] = useState([]);
 
     // Form state
     const [formData, setFormData] = useState({
@@ -540,6 +541,39 @@ const BridgePurchaseOrder = () => {
         } catch (error) {
             console.error('Error cleansing bridge PO:', error);
             alert('❌ Gagal cleansing PO Bridge: ' + (error.message || error));
+        } finally {
+            setIsCleansing(false);
+        }
+    };
+
+    const handleDeleteSelectedBridgePO = async () => {
+        if (!canCleanseBridgePO) {
+            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus PO Bridge.');
+            return;
+        }
+        if (selectedPOIds.length === 0) {
+            alert('Pilih minimal 1 PO Bridge untuk dihapus.');
+            return;
+        }
+
+        const confirm1 = confirm(`Hapus ${selectedPOIds.length} PO Bridge terpilih beserta AP, pembayaran, dan jurnal terkait?`);
+        if (!confirm1) return;
+        const confirm2 = confirm('Konfirmasi terakhir: data terpilih akan dihapus permanen. Lanjutkan?');
+        if (!confirm2) return;
+
+        try {
+            setIsCleansing(true);
+            setCleanseProgress('Memulai hapus PO Bridge terpilih...');
+            const success = await deleteBridgePurchaseOrderCascade(selectedPOIds, {
+                onProgress: (message) => setCleanseProgress(message)
+            });
+            if (!success) return;
+            await fetchPOs();
+            setSelectedPOIds([]);
+            alert('✅ PO Bridge terpilih berhasil dihapus.');
+        } catch (error) {
+            console.error('Error deleting selected bridge POs:', error);
+            alert('❌ Gagal hapus PO Bridge terpilih: ' + (error.message || error));
         } finally {
             setIsCleansing(false);
         }
@@ -1243,6 +1277,29 @@ const BridgePurchaseOrder = () => {
         return matchesFilter && matchesSearch;
     });
 
+    const isAllFilteredSelected = filteredPOs.length > 0 && filteredPOs.every(po => selectedPOIds.includes(po.id));
+
+    const toggleSelectPO = (poId) => {
+        setSelectedPOIds(prev => (
+            prev.includes(poId)
+                ? prev.filter(id => id !== poId)
+                : [...prev, poId]
+        ));
+    };
+
+    const toggleSelectAllFiltered = () => {
+        if (isAllFilteredSelected) {
+            setSelectedPOIds(prev => prev.filter(id => !filteredPOs.some(po => po.id === id)));
+            return;
+        }
+
+        setSelectedPOIds(prev => {
+            const merged = new Set(prev);
+            filteredPOs.forEach(po => merged.add(po.id));
+            return Array.from(merged);
+        });
+    };
+
     // Calculate summary stats
     const totalPOs = pos.length;
     const totalValue = pos.filter(p => p.status !== 'cancelled').reduce((sum, po) => sum + (po.total_amount || 0), 0);
@@ -1288,6 +1345,14 @@ const BridgePurchaseOrder = () => {
                 </div>
                 <div className="flex gap-2">
                     <Button
+                        onClick={handleDeleteSelectedBridgePO}
+                        icon={Trash2}
+                        variant="danger"
+                        disabled={!canCleanseBridgePO || selectedPOIds.length === 0 || isCleansing}
+                    >
+                        Hapus Terpilih ({selectedPOIds.length})
+                    </Button>
+                    <Button
                         onClick={handleCleanseAllBridgePO}
                         icon={Trash2}
                         variant="danger"
@@ -1332,6 +1397,15 @@ const BridgePurchaseOrder = () => {
                     <table className="w-full text-sm">
                         <thead className="bg-gradient-to-r from-accent-orange to-accent-orange/80">
                             <tr>
+                                <th className="px-4 py-3 text-center text-xs font-bold text-white uppercase tracking-wider">
+                                    <input
+                                        type="checkbox"
+                                        checked={isAllFilteredSelected}
+                                        onChange={toggleSelectAllFiltered}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="w-4 h-4"
+                                    />
+                                </th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">PO Number</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Vendor</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">PO Date</th>
@@ -1345,7 +1419,7 @@ const BridgePurchaseOrder = () => {
                         <tbody className="divide-y divide-dark-border">
                             {filteredPOs.length === 0 ? (
                                 <tr>
-                                    <td colSpan="8" className="px-4 py-12 text-center">
+                                    <td colSpan="9" className="px-4 py-12 text-center">
                                         <FileText className="w-12 h-12 text-silver-dark mx-auto mb-3 opacity-50" />
                                         <p className="text-silver-dark text-sm font-medium">
                                             {filter === 'all'
@@ -1369,6 +1443,14 @@ const BridgePurchaseOrder = () => {
                                                 setShowViewModal(true);
                                             }}
                                         >
+                                            <td className="px-4 py-3 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedPOIds.includes(po.id)}
+                                                    onChange={() => toggleSelectPO(po.id)}
+                                                    className="w-4 h-4"
+                                                />
+                                            </td>
                                             <td className="px-4 py-3 whitespace-nowrap">
                                                 <span className="font-bold text-accent-orange">{po.po_number}</span>
                                             </td>
