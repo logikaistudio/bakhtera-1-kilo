@@ -126,7 +126,7 @@ const Login = () => {
                         </svg>
                     </div>
                     <h1 className="text-3xl font-bold text-white tracking-tight drop-shadow-sm">
-                        Bakhtera<span className="text-cyan-300">-1</span>
+                        Bakhtera<span className="text-cyan-300">One</span>
                     </h1>
                     <p className="text-sm text-blue-100/80 mt-1 font-medium">Freight Management Portal</p>
                 </div>
@@ -244,7 +244,7 @@ const Login = () => {
 
                 {/* Bottom branding */}
                 <p className="text-center text-xs text-blue-200/60 mt-6">
-                    © 2026 Bakhtera-1 &nbsp;•&nbsp; Powered by&nbsp;
+                    © 2026 BakhteraOne &nbsp;•&nbsp; Powered by&nbsp;
                     <a href="https://logikai.studio" target="_blank" rel="noopener noreferrer" className="text-cyan-300/80 hover:text-cyan-200 transition-colors">
                         LogikAi.studio
                     </a>
