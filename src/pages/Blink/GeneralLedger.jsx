@@ -272,8 +272,8 @@ const GeneralLedger = () => {
             const yearEnd = today.toISOString().split('T')[0];
 
             const selectCols = journalHasCoaId
-                ? 'id, coa_id, account_code, debit, credit, currency, exchange_rate, reference_type, reference_id'
-                : 'id, account_code, debit, credit, currency, exchange_rate, reference_type, reference_id';
+                ? 'id, coa_id, account_code, debit, credit, currency, exchange_rate, reference_type, reference_id, source, entry_type, journal_type'
+                : 'id, account_code, debit, credit, currency, exchange_rate, reference_type, reference_id, source, entry_type, journal_type';
 
             const { data } = await supabase
                 .from('blink_journal_entries')
@@ -344,18 +344,18 @@ const GeneralLedger = () => {
             const fetchPrev = async () => {
                 const results = await Promise.all([
                     supabase.from('blink_journal_entries')
-                        .select('debit, credit, currency, exchange_rate, id, reference_type, reference_id')
+                        .select('debit, credit, currency, exchange_rate, id, reference_type, reference_id, source, entry_type, journal_type')
                         .eq('division', activeDivision)
                         .eq('coa_id', selectedAccount)
                         .lt('entry_date', dateRange.start),
                     (acc?.code || isUnclassified) ? supabase.from('blink_journal_entries')
-                        .select('debit, credit, currency, exchange_rate, id, reference_type, reference_id')
+                        .select('debit, credit, currency, exchange_rate, id, reference_type, reference_id, source, entry_type, journal_type')
                         .eq('division', activeDivision)
                         .eq('account_code', acc?.code || unclassifiedCode)
                         .is('coa_id', null)
                         .lt('entry_date', dateRange.start) : Promise.resolve({ data: [] }),
                     acc?.name ? supabase.from('blink_journal_entries')
-                        .select('debit, credit, currency, exchange_rate, id, reference_type, reference_id')
+                        .select('debit, credit, currency, exchange_rate, id, reference_type, reference_id, source, entry_type, journal_type')
                         .eq('division', activeDivision)
                         .ilike('account_name', acc.name)
                         .lt('entry_date', dateRange.start) : Promise.resolve({ data: [] })

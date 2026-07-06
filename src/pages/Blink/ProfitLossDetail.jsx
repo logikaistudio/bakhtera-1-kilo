@@ -70,12 +70,12 @@ const ProfitLossDetail = () => {
 
             const [r1, r2] = await Promise.all([
                 supabase.from('blink_journal_entries')
-                    .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate, reference_type, reference_id')
+                    .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate, reference_type, reference_id, source, entry_type, journal_type')
                     .eq('division', activeDivision)
                     .not('coa_id', 'is', null)
                     .gte('entry_date', fetchStart).lte('entry_date', queryEnd),
                 supabase.from('blink_journal_entries')
-                    .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate, reference_type, reference_id')
+                    .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate, reference_type, reference_id, source, entry_type, journal_type')
                     .eq('division', activeDivision)
                     .is('coa_id', null)
                     .gte('entry_date', fetchStart).lte('entry_date', queryEnd)

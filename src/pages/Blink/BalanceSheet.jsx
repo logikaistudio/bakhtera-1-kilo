@@ -67,11 +67,11 @@ const BalanceSheet = () => {
 
             const [r1, r2] = await Promise.all([
                 supabase.from('blink_journal_entries')
-                    .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate')
+                    .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate, reference_type, reference_id, source, entry_type, journal_type')
                     .eq('division', activeDivision)
                     .not('coa_id', 'is', null).lte('entry_date', asOfDate),
                 supabase.from('blink_journal_entries')
-                    .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate')
+                    .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate, reference_type, reference_id, source, entry_type, journal_type')
                     .eq('division', activeDivision)
                     .is('coa_id', null).lte('entry_date', asOfDate)
             ]);
