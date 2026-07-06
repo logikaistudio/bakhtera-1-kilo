@@ -255,7 +255,7 @@ const RichTextEditor = ({ value, onChange, rows = 4, placeholder = '' }) => {
 const SalesQuotation = () => {
     const { user, canCreate, canEdit, canDelete, canApprove } = useAuth();
     const navigate = useNavigate();
-    const { customers, companySettings } = useData();
+    const { customers, companySettings, deleteBlinkQuotationCascade } = useData();
     const [showModal, setShowModal] = useState(false);
     const [showViewModal, setShowViewModal] = useState(false);
     const [viewingQuotation, setViewingQuotation] = useState(null);

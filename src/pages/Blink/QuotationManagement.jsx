@@ -1773,7 +1773,7 @@ const QuotationManagement = () => {
                                                 Edit
                                             </Button>
                                         )}
-                                        {isAdmin() && canDelete('blink_quotations') && (
+                                        {(isAdmin() || canDelete('blink_quotations')) && (
                                             <Button
                                                 size="sm"
                                                 variant="danger"
