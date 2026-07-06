@@ -119,11 +119,12 @@ const Login = () => {
 
                 {/* Logo area */}
                 <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white shadow-lg shadow-blue-900/30 mb-4">
-                        <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M6 9L18 3L30 9V17C30 23.627 24.627 29 18 29C11.373 29 6 23.627 6 17V9Z" fill="#2563eb" fillOpacity="0.15" stroke="#2563eb" strokeWidth="2" strokeLinejoin="round" />
-                            <path d="M12 18L16 22L24 14" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
+                    <div className="mb-4 flex items-center justify-center">
+                        <img
+                            src="/logo%20bakhtera%20lama.png"
+                            alt="Bakhtera Worldwide"
+                            className="h-24 w-auto drop-shadow-lg"
+                        />
                     </div>
                     <h1 className="text-3xl font-bold text-white tracking-tight drop-shadow-sm">
                         Bakhtera<span className="text-orange-400">One</span>
