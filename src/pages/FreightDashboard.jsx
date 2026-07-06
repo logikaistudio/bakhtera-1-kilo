@@ -215,7 +215,7 @@ const FreightDashboard = () => {
             {/* ── Header ──────────────────────────────────────────────────────── */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-4xl font-bold gradient-text mb-2">Dashboard Bakhtera-1</h1>
+                    <h1 className="text-4xl font-bold gradient-text mb-2">Dashboard BakhteraOne</h1>
                 </div>
                 <button
                     onClick={fetchAllData}

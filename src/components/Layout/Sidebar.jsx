@@ -140,7 +140,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
     };
 
     const mainMenuItems = [
-        { path: '/', label: 'Dashboard Bakhtera-1', icon: LayoutDashboard },
+        { path: '/', label: 'Dashboard BakhteraOne', icon: LayoutDashboard },
         { path: '/blink', label: 'BLINK', subtitle: 'Freight & Forward Management', icon: Plane },
         { path: '/bxpo', label: 'BXPO', subtitle: 'Sales & Operation', icon: Layers },
         { path: '/big', label: 'BIG', subtitle: 'Event Organizer', icon: Calendar },
@@ -433,7 +433,10 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
             {/* Logo */}
             <div className="px-6 py-6 border-b border-dark-border flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold gradient-text">BAKHTERA-1</h1>
+                    <h1 className="text-2xl font-bold tracking-tight">
+                        <span className="text-white">BAKHTERA</span>
+                        <span className="text-orange-400">ONE</span>
+                    </h1>
                     <p className="text-xs text-silver-dark mt-1">Freight & Asset Management</p>
                 </div>
                 {!isMobile && setIsSidebarOpen && (
@@ -1346,7 +1349,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                 {/* Branding */}
                 <div className="text-center pt-2 border-t border-dark-border/30 mt-2">
                     <p className="text-[10px] text-silver-dark/50">
-                        © 2026 Bakhtera-1 • v1.0.0
+                        © 2026 BakhteraOne • v1.0.0
                     </p>
                     <a
                         href="https://logikai.studio"

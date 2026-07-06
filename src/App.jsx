@@ -116,7 +116,7 @@ function App() {
   // Test Supabase connection on app initialization
   useEffect(() => {
     const initSupabase = async () => {
-      console.log('🚀 Bakhtera-1 Application Starting...');
+      console.log('🚀 BakhteraOne Application Starting...');
       const status = getSupabaseStatus();
       console.log('📊 Supabase Status:', status);
 

@@ -194,7 +194,7 @@ const BridgeFinance = () => {
 <body>
     <div class="header">
         <h1>${isInvoice ? 'INVOICE' : 'PURCHASE DOCUMENT'}</h1>
-        <p>Bakhtera-1 Freight Management</p>
+        <p>BakhteraOne Freight Management</p>
     </div>
     
     <div class="info-section">
@@ -240,7 +240,7 @@ const BridgeFinance = () => {
     
     <div class="footer">
         <p>Dicetak pada: ${new Date().toLocaleDateString('id-ID')} ${new Date().toLocaleTimeString('id-ID')}</p>
-        <p>Dokumen ini dibuat oleh sistem Bakhtera-1</p>
+        <p>Dokumen ini dibuat oleh sistem BakhteraOne</p>
     </div>
 </body>
 </html>`;

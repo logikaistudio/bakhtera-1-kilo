@@ -84,7 +84,9 @@ const ChangePassword = () => {
                     <h1 className="text-3xl font-bold text-white tracking-tight drop-shadow-sm">
                         Perbarui Password
                     </h1>
-                    <p className="text-sm text-blue-100/80 mt-1 font-medium">Bakhtera-1 Freight Management Portal</p>
+                    <p className="text-sm text-blue-100/80 mt-1 font-medium">
+                        <span className="text-white">Bakhtera</span><span className="text-orange-300">One</span> Freight Management Portal
+                    </p>
                 </div>
 
                 {/* Card */}
