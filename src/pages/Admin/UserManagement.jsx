@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { getAllUsers, createUser, updateUser, resetPassword, toggleUserActive, deleteUser } from '../../services/userService';
+import { getAllUsers, createUser, updateUser, resetPassword, toggleUserActive, deleteUser, bulkResetLegacyPasswords } from '../../services/userService';
 import { generatePassword } from '../../services/passwordService';
 import { Users, Plus, Edit, Key, Ban, CheckCircle, Shield, RefreshCw, Trash2, Download, Eye, EyeOff } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -42,6 +42,8 @@ const pickDefaultRoleId = (roles = []) => {
         || 'staff';
 };
 
+    const LEGACY_PASSWORD_NOTICE = 'Password lama masih aman (hash) dan tidak bisa ditampilkan ulang';
+
 const UserManagement = () => {
     const { user } = useAuth();
     const [users, setUsers] = useState([]);
@@ -52,6 +54,7 @@ const UserManagement = () => {
     const [selectedUser, setSelectedUser] = useState(null);
     const [availableRoles, setAvailableRoles] = useState([]);
     const [revealedPasswords, setRevealedPasswords] = useState({});
+    const [bulkResetLoading, setBulkResetLoading] = useState(false);
 
     const loadUsers = useCallback(async () => {
         setLoading(true);
@@ -194,7 +197,7 @@ const UserManagement = () => {
             return {
                 'Nama Lengkap': u.full_name,
                 'User ID': u.username,
-                'Password Aktif': u.password_plain || 'Belum diset',
+                'Password Aktif': u.password_plain || `Legacy: ${LEGACY_PASSWORD_NOTICE}`,
                 'Role': roleLabel
             };
         });
@@ -214,6 +217,52 @@ const UserManagement = () => {
         XLSX.writeFile(workbook, 'Data_User_Export.xlsx');
     };
 
+    const exportBulkResetResult = (resetList = []) => {
+        const worksheet = XLSX.utils.json_to_sheet(
+            resetList.map(item => ({
+                Username: item.username,
+                'Nama Lengkap': item.full_name,
+                'Password Baru': item.password,
+                Status: item.status,
+            }))
+        );
+
+        worksheet['!cols'] = [
+            { wch: 20 },
+            { wch: 30 },
+            { wch: 20 },
+            { wch: 16 },
+        ];
+
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Bulk Reset Legacy');
+        XLSX.writeFile(workbook, `Bulk_Reset_Legacy_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    };
+
+    const handleBulkResetLegacy = async () => {
+        if (!confirm('Reset massal password untuk semua user legacy yang belum punya Password Aktif? Password baru akan digenerate dan user wajib ganti saat login.')) {
+            return;
+        }
+
+        setBulkResetLoading(true);
+        const result = await bulkResetLegacyPasswords(user.id);
+        setBulkResetLoading(false);
+
+        if (!result.success) {
+            alert(`Gagal reset massal: ${result.error}`);
+            return;
+        }
+
+        if ((result.totalReset || 0) === 0) {
+            alert(result.message || 'Tidak ada user legacy yang perlu direset.');
+            return;
+        }
+
+        exportBulkResetResult(result.resetList || []);
+        alert(`${result.message}\n\nFile excel daftar password baru sudah diunduh. Karena tidak ada mail server, mohon bagikan dan minta user mencatat passwordnya.`);
+        await loadUsers();
+    };
+
     const getRoleBadge = (level) => {
         const c = ROLE_COLORS[level] || getDefaultColor();
         const role = availableRoles.find(r => r.id === level);
@@ -230,7 +279,7 @@ const UserManagement = () => {
     };
 
     const maskPassword = (value) => {
-        if (!value) return 'Belum diset';
+        if (!value) return `Legacy: ${LEGACY_PASSWORD_NOTICE}`;
         return '*'.repeat(Math.max(value.length, 8));
     };
 
@@ -268,6 +317,16 @@ const UserManagement = () => {
                         <RefreshCw style={{ width: 14, height: 14 }} />
                         Refresh
                     </button>
+                    {user?.user_level === 'super_admin' && (
+                        <button
+                            onClick={handleBulkResetLegacy}
+                            disabled={bulkResetLoading}
+                            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: '#f59e0b', color: '#fff', border: 'none', borderRadius: 8, cursor: bulkResetLoading ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 500, opacity: bulkResetLoading ? 0.7 : 1 }}
+                        >
+                            <Key style={{ width: 14, height: 14 }} />
+                            {bulkResetLoading ? 'Memproses...' : 'Reset Legacy'}
+                        </button>
+                    )}
                     {user?.user_level === 'super_admin' && (
                         <button
                             onClick={handleExportExcel}
@@ -329,7 +388,7 @@ const UserManagement = () => {
                                     <td style={{ padding: '12px 20px', whiteSpace: 'nowrap' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                             <span style={{ fontFamily: 'monospace', fontSize: 13, color: '#374151' }}>
-                                                {revealedPasswords[u.id] ? (u.password_plain || 'Belum diset') : maskPassword(u.password_plain)}
+                                                {revealedPasswords[u.id] ? (u.password_plain || `Legacy: ${LEGACY_PASSWORD_NOTICE}`) : maskPassword(u.password_plain)}
                                             </span>
                                             <button
                                                 type="button"

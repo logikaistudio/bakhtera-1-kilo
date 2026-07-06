@@ -559,6 +559,94 @@ export const forgotPasswordSelfService = async (username, fullName) => {
 };
 
 /**
+ * Bulk reset legacy users that do not yet have password_plain value.
+ * Intended for one-time migration so superadmin can see active passwords.
+ * @param {string} requestedBy - Super admin user ID
+ * @returns {Promise<object>} - Result with reset details
+ */
+export const bulkResetLegacyPasswords = async (requestedBy) => {
+    try {
+        const { data: requester } = await supabase
+            .from('users')
+            .select('user_level')
+            .eq('id', requestedBy)
+            .single();
+
+        if (!requester || requester.user_level !== 'super_admin') {
+            throw new Error('Only Super Admin can perform bulk password reset');
+        }
+
+        const { data: allUsers, error: usersError } = await supabase
+            .from('users')
+            .select('id, username, full_name, is_active, portal_access, password_plain');
+
+        if (usersError) throw usersError;
+
+        const targetUsers = (allUsers || []).filter(u => !u.password_plain);
+        if (targetUsers.length === 0) {
+            return {
+                success: true,
+                message: 'Tidak ada user legacy yang perlu direset.',
+                totalReset: 0,
+                resetList: []
+            };
+        }
+
+        const resetList = [];
+
+        for (const target of targetUsers) {
+            const generatedPassword = generatePassword(12);
+            const passwordHash = await hashPassword(generatedPassword);
+
+            const { error: updateError } = await supabase
+                .from('users')
+                .update({
+                    password_hash: passwordHash,
+                    password_plain: generatedPassword,
+                    requires_password_change: true
+                })
+                .eq('id', target.id);
+
+            if (updateError) {
+                console.error('Bulk reset update error for user:', target.username, updateError);
+                continue;
+            }
+
+            await supabase
+                .from('user_sessions')
+                .delete()
+                .eq('user_id', target.id);
+
+            await logAudit({
+                action_type: 'bulk_reset_legacy_password',
+                target_user_id: target.id,
+                performed_by: requestedBy,
+                new_value: {
+                    reason: 'legacy_password_plain_backfill'
+                }
+            });
+
+            resetList.push({
+                username: target.username,
+                full_name: target.full_name,
+                password: generatedPassword,
+                status: target.is_active && target.portal_access ? 'Aktif' : 'Perlu Aktivasi'
+            });
+        }
+
+        return {
+            success: true,
+            message: `Berhasil reset ${resetList.length} user legacy.`,
+            totalReset: resetList.length,
+            resetList
+        };
+    } catch (error) {
+        console.error('Error bulk resetting legacy passwords:', error);
+        return { success: false, error: error.message };
+    }
+};
+
+/**
  * Log audit entry
  * @param {object} auditData - Audit data
  * @private
