@@ -15,6 +15,7 @@ const GoodsMovement = () => {
     const hasDelete = canDelete('bridge_movement');
     const { mutationLogs = [], quotations = [], addMutationLog, updateMutationLog, updateInventoryStock, deleteMutationLog, companySettings, bridgeSettings, locations, getExhibitionLocation, isExhibitionLocation } = useData();
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedIds, setSelectedIds] = useState([]);
     const [selectedLog, setSelectedLog] = useState(null);
     const debugMode = (typeof window !== 'undefined') && new URLSearchParams(window.location.search).get('debug') === '1';
 
@@ -56,10 +57,40 @@ const GoodsMovement = () => {
         if (deleteMutationLog) {
             try {
                 await deleteMutationLog(id);
+                setSelectedIds(prev => prev.filter(x => x !== id));
             } catch (err) {
                 console.error(err);
                 alert("Gagal menghapus data mutasi");
             }
+        }
+    };
+
+    const toggleSelectOne = (id) => {
+        setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    };
+
+    const handleDeleteSelected = async () => {
+        if (!hasDelete || selectedIds.length === 0) return;
+        if (!window.confirm(`Hapus ${selectedIds.length} data mutasi terpilih?`)) return;
+        try {
+            await Promise.all(selectedIds.map(id => deleteMutationLog(id)));
+            setSelectedIds([]);
+        } catch (err) {
+            console.error(err);
+            alert('Gagal menghapus sebagian data mutasi terpilih');
+        }
+    };
+
+    const handleDeleteAll = async () => {
+        if (!hasDelete || mutationLogs.length === 0) return;
+        if (!window.confirm(`Hapus semua data mutasi (${mutationLogs.length} baris)?`)) return;
+        if (!window.confirm('Konfirmasi terakhir: semua data mutasi akan dihapus permanen. Lanjutkan?')) return;
+        try {
+            await Promise.all(mutationLogs.map(item => deleteMutationLog(item.id)));
+            setSelectedIds([]);
+        } catch (err) {
+            console.error(err);
+            alert('Gagal menghapus semua data mutasi');
         }
     };
 
@@ -202,7 +233,23 @@ const GoodsMovement = () => {
         }
     })();
 
-    const renderTable = (data, title, icon, colorClass, emptyMessage) => (
+    const renderTable = (data, title, icon, colorClass, emptyMessage) => {
+        const isAllInTableSelected = data.length > 0 && data.every(log => selectedIds.includes(log.id));
+
+        const toggleSelectAllInTable = () => {
+            if (data.length === 0) return;
+            if (isAllInTableSelected) {
+                setSelectedIds(prev => prev.filter(id => !data.some(log => log.id === id)));
+                return;
+            }
+            setSelectedIds(prev => {
+                const merged = new Set(prev);
+                data.forEach(log => merged.add(log.id));
+                return Array.from(merged);
+            });
+        };
+
+        return (
         <div className="glass-card rounded-lg overflow-hidden mb-6">
             <div className="p-4 border-b border-dark-border">
                 <div className="flex items-center gap-2">
@@ -244,6 +291,16 @@ const GoodsMovement = () => {
                     <table className="w-full">
                         <thead className={`${colorClass}/10`}>
                             <tr>
+                                {hasDelete && (
+                                    <th className="px-3 py-3 text-center text-xs text-silver">
+                                        <input
+                                            type="checkbox"
+                                            checked={isAllInTableSelected}
+                                            onChange={toggleSelectAllInTable}
+                                            className="w-4 h-4"
+                                        />
+                                    </th>
+                                )}
                                 <th className="px-3 py-3 text-left text-xs text-silver">No. Pengajuan</th>
                                 <th className="px-3 py-3 text-left text-xs text-silver">Kode Barang</th>
                                 <th className="px-3 py-3 text-left text-xs text-silver">Nama Item</th>
@@ -271,6 +328,16 @@ const GoodsMovement = () => {
                                         onClick={() => setSelectedLog(log)}
                                         title="Klik untuk melihat rincian mutasi dan dokumen"
                                     >
+                                        {hasDelete && (
+                                            <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedIds.includes(log.id)}
+                                                    onChange={() => toggleSelectOne(log.id)}
+                                                    className="w-4 h-4"
+                                                />
+                                            </td>
+                                        )}
                                         <td className="px-3 py-3 text-sm text-silver-light">{log.pengajuanNumber}</td>
                                         <td className="px-3 py-3 text-sm text-silver-light">{log.itemCode || '-'}</td>
                                         <td className="px-3 py-3 text-sm text-silver-light">
@@ -343,6 +410,7 @@ const GoodsMovement = () => {
             )}
         </div>
     );
+    };
 
     return (
         <div className="p-6 space-y-6">
@@ -364,6 +432,17 @@ const GoodsMovement = () => {
                 <h1 className="text-3xl font-bold gradient-text">Pergerakan Barang</h1>
                 <p className="text-silver-dark mt-1">Riwayat Mutasi & Pergerakan Inventaris Gudang</p>
             </div>
+
+            {hasDelete && (
+                <div className="flex gap-2">
+                    <Button onClick={handleDeleteSelected} variant="danger" disabled={selectedIds.length === 0} icon={Trash2}>
+                        Hapus Terpilih ({selectedIds.length})
+                    </Button>
+                    <Button onClick={handleDeleteAll} variant="danger" disabled={mutationLogs.length === 0} icon={Trash2}>
+                        Bersihkan Semua Data
+                    </Button>
+                </div>
+            )}
 
             {/* Search */}
             <div className="glass-card p-4 rounded-lg">

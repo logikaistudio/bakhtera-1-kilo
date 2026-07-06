@@ -14,6 +14,7 @@ const BCMaster = () => {
 
     const [showForm, setShowForm] = useState(false);
     const [editingCode, setEditingCode] = useState(null);
+    const [selectedIds, setSelectedIds] = useState([]);
     const [formData, setFormData] = useState({
         code: '',
         name: '',
@@ -58,7 +59,36 @@ const BCMaster = () => {
     const handleRemove = (id) => {
         if (window.confirm('Remove kode BC ini?')) {
             deleteBCCode(id);
+            setSelectedIds(prev => prev.filter(x => x !== id));
         }
+    };
+
+    const toggleSelectOne = (id) => {
+        setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    };
+
+    const toggleSelectAll = () => {
+        if (bcCodes.length === 0) return;
+        if (selectedIds.length === bcCodes.length) {
+            setSelectedIds([]);
+            return;
+        }
+        setSelectedIds(bcCodes.map(bc => bc.id));
+    };
+
+    const handleDeleteSelected = () => {
+        if (!hasDelete || selectedIds.length === 0) return;
+        if (!window.confirm(`Hapus ${selectedIds.length} kode BC terpilih?`)) return;
+        selectedIds.forEach(id => deleteBCCode(id));
+        setSelectedIds([]);
+    };
+
+    const handleDeleteAll = () => {
+        if (!hasDelete || bcCodes.length === 0) return;
+        if (!window.confirm(`Hapus semua kode BC (${bcCodes.length} baris)?`)) return;
+        if (!window.confirm('Konfirmasi terakhir: semua kode BC akan dihapus permanen. Lanjutkan?')) return;
+        bcCodes.forEach(item => deleteBCCode(item.id));
+        setSelectedIds([]);
     };
 
     const getCategoryBadge = (category) => {
@@ -90,11 +120,23 @@ const BCMaster = () => {
                     <h1 className="text-3xl font-bold gradient-text">Master Kode BC</h1>
                     <p className="text-silver-dark mt-1">CEISA 4.0 - Jenis Dokumen Pabean</p>
                 </div>
-                {hasCreate && (
-                    <Button onClick={() => setShowForm(!showForm)} icon={Plus}>
-                        {showForm ? 'Batal' : 'Tambah Kode BC'}
-                    </Button>
-                )}
+                <div className="flex items-center gap-2">
+                    {hasDelete && (
+                        <>
+                            <Button onClick={handleDeleteSelected} variant="danger" disabled={selectedIds.length === 0}>
+                                <Trash2 className="w-4 h-4 mr-1" /> Hapus Terpilih ({selectedIds.length})
+                            </Button>
+                            <Button onClick={handleDeleteAll} variant="danger" disabled={bcCodes.length === 0}>
+                                <Trash2 className="w-4 h-4 mr-1" /> Bersihkan Semua Data
+                            </Button>
+                        </>
+                    )}
+                    {hasCreate && (
+                        <Button onClick={() => setShowForm(!showForm)} icon={Plus}>
+                            {showForm ? 'Batal' : 'Tambah Kode BC'}
+                        </Button>
+                    )}
+                </div>
             </div>
 
             {/* Info */}
@@ -227,6 +269,14 @@ const BCMaster = () => {
                     <table className="w-full">
                         <thead className="bg-accent-blue">
                             <tr>
+                                <th className="px-4 py-3 text-center text-sm font-semibold text-white">
+                                    <input
+                                        type="checkbox"
+                                        checked={bcCodes.length > 0 && selectedIds.length === bcCodes.length}
+                                        onChange={toggleSelectAll}
+                                        className="w-4 h-4"
+                                    />
+                                </th>
                                 <th className="px-4 py-3 text-left text-sm font-semibold text-white">Kode BC</th>
                                 <th className="px-4 py-3 text-left text-sm font-semibold text-white">Nama Dokumen</th>
                                 <th className="px-4 py-3 text-left text-sm font-semibold text-white">Kategori</th>
@@ -241,6 +291,14 @@ const BCMaster = () => {
                                     className={`hover:bg-dark-surface smooth-transition ${hasEdit ? 'cursor-pointer' : ''}`}
                                     onClick={() => hasEdit && handleEdit(bc)}
                                 >
+                                    <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedIds.includes(bc.id)}
+                                            onChange={() => toggleSelectOne(bc.id)}
+                                            className="w-4 h-4"
+                                        />
+                                    </td>
                                     <td className="px-4 py-3 text-sm font-bold text-accent-blue">{bc.code}</td>
                                     <td className="px-4 py-3 text-sm text-silver-light font-medium">{bc.name}</td>
                                     <td className="px-4 py-3">
