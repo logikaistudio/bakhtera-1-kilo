@@ -89,12 +89,12 @@ const ProfitLoss = () => {
             // BUG FIX #2: Ambil juga entri yang menggunakan account_code (coa_id = null)
             const [r1, r2] = await Promise.all([
                 supabase.from('blink_journal_entries')
-                    .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate')
+                    .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate, reference_type, reference_id')
                     .eq('division', activeDivision)
                     .not('coa_id', 'is', null)
                     .gte('entry_date', queryStart).lte('entry_date', queryEnd),
                 supabase.from('blink_journal_entries')
-                    .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate')
+                    .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate, reference_type, reference_id')
                     .eq('division', activeDivision)
                     .is('coa_id', null)
                     .gte('entry_date', queryStart).lte('entry_date', queryEnd)
@@ -102,7 +102,50 @@ const ProfitLoss = () => {
             if (r1.error) throw r1.error;
             if (r2.error) throw r2.error;
             const combined = [...(r1.data || []), ...(r2.data || [])];
-            const entries = [...new Map(combined.map(r => [r.id, r])).values()];
+            const dedupedEntries = [...new Map(combined.map(r => [r.id, r])).values()];
+
+            // Exclude orphan/cancelled transactional journals from report calculations.
+            const [invRes, poRes, arRes, apRes] = await Promise.all([
+                supabase
+                    .from('blink_invoices')
+                    .select('id')
+                    .eq('division', activeDivision)
+                    .neq('status', 'cancelled'),
+                supabase
+                    .from('blink_purchase_orders')
+                    .select('id')
+                    .eq('division', activeDivision)
+                    .neq('status', 'cancelled'),
+                supabase
+                    .from('blink_ar_transactions')
+                    .select('id'),
+                supabase
+                    .from('blink_ap_transactions')
+                    .select('id')
+            ]);
+            if (invRes.error) throw invRes.error;
+            if (poRes.error) throw poRes.error;
+            if (arRes.error) throw arRes.error;
+            if (apRes.error) throw apRes.error;
+
+            const activeInvoiceIds = new Set((invRes.data || []).map(row => String(row.id)));
+            const activePOIds = new Set((poRes.data || []).map(row => String(row.id)));
+            const activeARIds = new Set((arRes.data || []).map(row => String(row.id)));
+            const activeAPIds = new Set((apRes.data || []).map(row => String(row.id)));
+
+            const invoiceRefTypes = new Set(['ar', 'invoice', 'ar_payment', 'ar_reversal']);
+            const poRefTypes = new Set(['po', 'ap_reversal']);
+            const apRefTypes = new Set(['ap_payment']);
+
+            const entries = dedupedEntries.filter((entry) => {
+                const refType = entry.reference_type;
+                const refId = entry.reference_id != null ? String(entry.reference_id) : null;
+                if (!refType || !refId) return true;
+                if (invoiceRefTypes.has(refType)) return activeInvoiceIds.has(refId);
+                if (poRefTypes.has(refType)) return activePOIds.has(refId);
+                if (apRefTypes.has(refType)) return activeAPIds.has(refId) || activeARIds.has(refId);
+                return true;
+            });
 
             const idToCode = {};
             const coaMapByCode = {};
