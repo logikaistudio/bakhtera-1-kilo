@@ -1085,6 +1085,44 @@ export const DataProvider = ({ children }) => {
         return deletedCount;
     };
 
+    const fetchAllPartnerIds = async (table, onProgress, { stage = 1, totalStages = 1 } = {}) => {
+        const pageSize = 1000;
+        const allIds = [];
+        let lastId = null;
+
+        while (true) {
+            let query = supabase
+                .from(table)
+                .select('id')
+                .not('id', 'is', null)
+                .order('id', { ascending: true })
+                .limit(pageSize);
+
+            if (lastId) {
+                query = query.gt('id', lastId);
+            }
+
+            const { data, error } = await query;
+            if (error) throw error;
+
+            const page = (data || []).map(row => row.id).filter(Boolean);
+            if (page.length === 0) break;
+
+            allIds.push(...page);
+            lastId = page[page.length - 1];
+
+            emitProgress(onProgress, {
+                stage,
+                totalStages,
+                label: `Mengumpulkan ID mitra... ${allIds.length}`
+            });
+
+            if (page.length < pageSize) break;
+        }
+
+        return allIds;
+    };
+
     // Bulk delete helper for Business Partners (selected IDs or all rows)
     const deleteBusinessPartnersBulk = async (ids = [], table = 'blink_business_partners', menuCode = 'central_vendors', options = {}) => {
         const onProgress = typeof options?.onProgress === 'function' ? options.onProgress : null;
@@ -1103,12 +1141,10 @@ export const DataProvider = ({ children }) => {
 
             let targetIds = hasIds ? ids : [];
             if (!hasIds) {
-                const { data: allRows, error: fetchErr } = await supabase
-                    .from(table)
-                    .select('id')
-                    .not('id', 'is', null);
-                if (fetchErr) throw fetchErr;
-                targetIds = (allRows || []).map(row => row.id).filter(Boolean);
+                targetIds = await fetchAllPartnerIds(table, onProgress, {
+                    stage: 1,
+                    totalStages: 2
+                });
             }
 
             const deletedCount = await deletePartnersByIdChunks(table, targetIds, onProgress, {
