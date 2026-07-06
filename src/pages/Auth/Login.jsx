@@ -119,13 +119,6 @@ const Login = () => {
 
                 {/* Logo area */}
                 <div className="text-center mb-8">
-                    <div className="mb-4 flex items-center justify-center">
-                        <img
-                            src="/logo%20bakhtera%20lama.png"
-                            alt="Bakhtera Worldwide"
-                            className="h-24 w-auto drop-shadow-lg"
-                        />
-                    </div>
                     <h1 className="text-3xl font-bold text-white tracking-tight drop-shadow-sm">
                         Bakhtera<span className="text-orange-400">One</span>
                     </h1>
@@ -134,6 +127,13 @@ const Login = () => {
 
                 {/* Card */}
                 <div className="rounded-2xl bg-white shadow-2xl shadow-blue-900/40 p-8">
+                    <div className="mb-4 flex items-center justify-center">
+                        <img
+                            src="/logo%20bakhtera%20lama.png"
+                            alt="Bakhtera Worldwide"
+                            className="h-12 w-auto drop-shadow-md"
+                        />
+                    </div>
                     <div className="mb-6">
                         <h2 className="text-xl font-semibold text-gray-800">Masuk ke Akun Anda</h2>
                         <p className="text-sm text-gray-500 mt-1">Masukkan kredensial untuk melanjutkan</p>
