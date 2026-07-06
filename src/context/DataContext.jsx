@@ -1155,33 +1155,44 @@ export const DataProvider = ({ children }) => {
         }
 
         try {
+            const assertNoError = (error, context) => {
+                if (error) {
+                    throw new Error(`${context}: ${error.message || error}`);
+                }
+            };
+
             // Accept single id or array
             const ids = Array.isArray(quotationIds) ? quotationIds : [quotationIds];
             emitProgress(onProgress, { stage: 1, totalStages: 8, label: `Mencari relasi quotation (${ids.length} data)...` });
 
             // Step 1: Find related shipments
-            const { data: shipments } = await supabase.from('blink_shipments').select('id').in('quotation_id', ids);
+            const { data: shipments, error: shipmentsErr } = await supabase.from('blink_shipments').select('id').in('quotation_id', ids);
+            assertNoError(shipmentsErr, 'Gagal membaca shipment terkait quotation');
             const shipmentIds = (shipments || []).map(s => s.id);
 
             // Step 2: related invoices
-            const { data: invoices } = await supabase.from('blink_invoices').select('id').in('quotation_id', ids);
+            const { data: invoices, error: invErr } = await supabase.from('blink_invoices').select('id').in('quotation_id', ids);
+            assertNoError(invErr, 'Gagal membaca invoice terkait quotation');
             const invoiceIds = (invoices || []).map(i => i.id);
 
             // Step 3: related POs
-            const { data: pos } = await supabase.from('blink_purchase_orders').select('id').in('quotation_id', ids);
+            const { data: pos, error: poErr } = await supabase.from('blink_purchase_orders').select('id').in('quotation_id', ids);
+            assertNoError(poErr, 'Gagal membaca PO terkait quotation');
             const poIds = (pos || []).map(p => p.id);
             emitProgress(onProgress, { stage: 2, totalStages: 8, label: 'Menghapus jurnal dan pembayaran terkait...' });
 
             // AR and AP
             let arIds = [];
             if (invoiceIds.length > 0) {
-                const { data: ars } = await supabase.from('blink_ar_transactions').select('id').in('invoice_id', invoiceIds);
+                const { data: ars, error: arErr } = await supabase.from('blink_ar_transactions').select('id').in('invoice_id', invoiceIds);
+                assertNoError(arErr, 'Gagal membaca AR terkait quotation');
                 arIds = (ars || []).map(a => a.id);
             }
 
             let apIds = [];
             if (poIds.length > 0) {
-                const { data: aps } = await supabase.from('blink_ap_transactions').select('id').in('po_id', poIds);
+                const { data: aps, error: apErr } = await supabase.from('blink_ap_transactions').select('id').in('po_id', poIds);
+                assertNoError(apErr, 'Gagal membaca AP terkait quotation');
                 apIds = (aps || []).map(a => a.id);
             }
 
@@ -1194,25 +1205,54 @@ export const DataProvider = ({ children }) => {
 
             let paymentIds = [];
             if (paymentRefKeys.length > 0) {
-                const { data: payments } = await supabase.from('blink_payments').select('id').in('reference_id', paymentRefKeys);
+                const { data: payments, error: payErr } = await supabase.from('blink_payments').select('id').in('reference_id', paymentRefKeys);
+                assertNoError(payErr, 'Gagal membaca payment terkait quotation');
                 paymentIds = (payments || []).map(p => p.id);
             }
 
             const journalRefIds = [...ids, ...shipmentIds, ...invoiceIds, ...poIds, ...arIds, ...apIds, ...paymentIds];
 
-            if (journalRefIds.length > 0) await supabase.from('blink_journal_entries').delete().in('reference_id', journalRefIds);
-            if (paymentIds.length > 0) await supabase.from('blink_payments').delete().in('id', paymentIds);
+            if (journalRefIds.length > 0) {
+                const { error: delJErr } = await supabase.from('blink_journal_entries').delete().in('reference_id', journalRefIds);
+                assertNoError(delJErr, 'Gagal menghapus jurnal terkait quotation');
+            }
+            if (paymentIds.length > 0) {
+                const { error: delPayErr } = await supabase.from('blink_payments').delete().in('id', paymentIds);
+                assertNoError(delPayErr, 'Gagal menghapus payment terkait quotation');
+            }
             emitProgress(onProgress, { stage: 3, totalStages: 8, label: 'Menghapus AR/AP...' });
-            if (arIds.length > 0) await supabase.from('blink_ar_transactions').delete().in('id', arIds);
-            if (apIds.length > 0) await supabase.from('blink_ap_transactions').delete().in('id', apIds);
+            if (arIds.length > 0) {
+                const { error: delArErr } = await supabase.from('blink_ar_transactions').delete().in('id', arIds);
+                assertNoError(delArErr, 'Gagal menghapus AR terkait quotation');
+            }
+            if (apIds.length > 0) {
+                const { error: delApErr } = await supabase.from('blink_ap_transactions').delete().in('id', apIds);
+                assertNoError(delApErr, 'Gagal menghapus AP terkait quotation');
+            }
             emitProgress(onProgress, { stage: 4, totalStages: 8, label: 'Menghapus invoice/PO...' });
-            if (invoiceIds.length > 0) await supabase.from('blink_invoices').delete().in('id', invoiceIds);
-            if (poIds.length > 0) await supabase.from('blink_purchase_orders').delete().in('id', poIds);
+            if (invoiceIds.length > 0) {
+                const { error: delInvErr } = await supabase.from('blink_invoices').delete().in('id', invoiceIds);
+                assertNoError(delInvErr, 'Gagal menghapus invoice terkait quotation');
+            }
+            if (poIds.length > 0) {
+                const { error: delPoErr } = await supabase.from('blink_purchase_orders').delete().in('id', poIds);
+                assertNoError(delPoErr, 'Gagal menghapus PO terkait quotation');
+            }
 
             if (shipmentIds.length > 0) {
                 emitProgress(onProgress, { stage: 5, totalStages: 8, label: 'Menghapus BL dan shipment...' });
-                await supabase.from('blink_bl_documents').delete().in('shipment_id', shipmentIds);
-                await supabase.from('blink_shipments').delete().in('id', shipmentIds);
+                const { error: delBlErr } = await supabase.from('blink_bl_documents').delete().in('shipment_id', shipmentIds);
+                assertNoError(delBlErr, 'Gagal menghapus BL terkait quotation');
+                const { error: delShipErr } = await supabase.from('blink_shipments').delete().in('id', shipmentIds);
+                assertNoError(delShipErr, 'Gagal menghapus shipment terkait quotation');
+            }
+
+            if (journalRefIds.length > 0) {
+                const { error: delLogErr } = await supabase
+                    .from('blink_transaction_logs')
+                    .delete()
+                    .in('transaction_id', journalRefIds);
+                assertNoError(delLogErr, 'Gagal menghapus transaction record terkait quotation');
             }
 
             // Finally delete quotations
@@ -1408,28 +1448,38 @@ export const DataProvider = ({ children }) => {
         }
 
         try {
+            const assertNoError = (error, context) => {
+                if (error) {
+                    throw new Error(`${context}: ${error.message || error}`);
+                }
+            };
+
             const ids = Array.isArray(shipmentIds) ? shipmentIds : [shipmentIds];
             emitProgress(onProgress, { stage: 1, totalStages: 6, label: `Memproses ${ids.length} shipment...` });
 
             // Find invoices linked to shipments
-            const { data: invoices } = await supabase.from('blink_invoices').select('id').in('shipment_id', ids);
+            const { data: invoices, error: invErr } = await supabase.from('blink_invoices').select('id').in('shipment_id', ids);
+            assertNoError(invErr, 'Gagal membaca invoice terkait shipment');
             const invoiceIds = (invoices || []).map(i => i.id);
 
             // Find POs linked to shipments
-            const { data: pos } = await supabase.from('blink_purchase_orders').select('id').in('shipment_id', ids);
+            const { data: pos, error: poErr } = await supabase.from('blink_purchase_orders').select('id').in('shipment_id', ids);
+            assertNoError(poErr, 'Gagal membaca PO terkait shipment');
             const poIds = (pos || []).map(p => p.id);
             emitProgress(onProgress, { stage: 2, totalStages: 6, label: 'Menghapus jurnal dan payment...' });
 
             // AR / AP
             let arIds = [];
             if (invoiceIds.length > 0) {
-                const { data: ars } = await supabase.from('blink_ar_transactions').select('id').in('invoice_id', invoiceIds);
+                const { data: ars, error: arErr } = await supabase.from('blink_ar_transactions').select('id').in('invoice_id', invoiceIds);
+                assertNoError(arErr, 'Gagal membaca AR terkait shipment');
                 arIds = (ars || []).map(a => a.id);
             }
 
             let apIds = [];
             if (poIds.length > 0) {
-                const { data: aps } = await supabase.from('blink_ap_transactions').select('id').in('po_id', poIds);
+                const { data: aps, error: apErr } = await supabase.from('blink_ap_transactions').select('id').in('po_id', poIds);
+                assertNoError(apErr, 'Gagal membaca AP terkait shipment');
                 apIds = (aps || []).map(a => a.id);
             }
 
@@ -1438,25 +1488,54 @@ export const DataProvider = ({ children }) => {
             paymentRefKeys.push(...invoiceIds, ...poIds, ...arIds, ...apIds);
             let paymentIds = [];
             if (paymentRefKeys.length > 0) {
-                const { data: payments } = await supabase.from('blink_payments').select('id').in('reference_id', paymentRefKeys);
+                const { data: payments, error: payErr } = await supabase.from('blink_payments').select('id').in('reference_id', paymentRefKeys);
+                assertNoError(payErr, 'Gagal membaca payment terkait shipment');
                 paymentIds = (payments || []).map(p => p.id);
             }
 
             const journalRefIds = [...ids, ...invoiceIds, ...poIds, ...arIds, ...apIds, ...paymentIds];
 
-            if (journalRefIds.length > 0) await supabase.from('blink_journal_entries').delete().in('reference_id', journalRefIds);
-            if (paymentIds.length > 0) await supabase.from('blink_payments').delete().in('id', paymentIds);
+            if (journalRefIds.length > 0) {
+                const { error: delJErr } = await supabase.from('blink_journal_entries').delete().in('reference_id', journalRefIds);
+                assertNoError(delJErr, 'Gagal menghapus jurnal terkait shipment');
+            }
+            if (paymentIds.length > 0) {
+                const { error: delPayErr } = await supabase.from('blink_payments').delete().in('id', paymentIds);
+                assertNoError(delPayErr, 'Gagal menghapus payment terkait shipment');
+            }
             emitProgress(onProgress, { stage: 3, totalStages: 6, label: 'Menghapus AR/AP/Invoice/PO...' });
-            if (arIds.length > 0) await supabase.from('blink_ar_transactions').delete().in('id', arIds);
-            if (apIds.length > 0) await supabase.from('blink_ap_transactions').delete().in('id', apIds);
-            if (invoiceIds.length > 0) await supabase.from('blink_invoices').delete().in('id', invoiceIds);
-            if (poIds.length > 0) await supabase.from('blink_purchase_orders').delete().in('id', poIds);
+            if (arIds.length > 0) {
+                const { error: delArErr } = await supabase.from('blink_ar_transactions').delete().in('id', arIds);
+                assertNoError(delArErr, 'Gagal menghapus AR terkait shipment');
+            }
+            if (apIds.length > 0) {
+                const { error: delApErr } = await supabase.from('blink_ap_transactions').delete().in('id', apIds);
+                assertNoError(delApErr, 'Gagal menghapus AP terkait shipment');
+            }
+            if (invoiceIds.length > 0) {
+                const { error: delInvErr } = await supabase.from('blink_invoices').delete().in('id', invoiceIds);
+                assertNoError(delInvErr, 'Gagal menghapus invoice terkait shipment');
+            }
+            if (poIds.length > 0) {
+                const { error: delPoErr } = await supabase.from('blink_purchase_orders').delete().in('id', poIds);
+                assertNoError(delPoErr, 'Gagal menghapus PO terkait shipment');
+            }
 
             // delete BL documents and shipments
             emitProgress(onProgress, { stage: 4, totalStages: 6, label: 'Menghapus BL documents...' });
-            await supabase.from('blink_bl_documents').delete().in('shipment_id', ids);
+            const { error: delBlErr } = await supabase.from('blink_bl_documents').delete().in('shipment_id', ids);
+            assertNoError(delBlErr, 'Gagal menghapus BL terkait shipment');
             emitProgress(onProgress, { stage: 5, totalStages: 6, label: 'Menghapus shipment utama...' });
-            await supabase.from('blink_shipments').delete().in('id', ids);
+            const { error: delShipErr } = await supabase.from('blink_shipments').delete().in('id', ids);
+            assertNoError(delShipErr, 'Gagal menghapus shipment utama');
+
+            if (journalRefIds.length > 0) {
+                const { error: delLogErr } = await supabase
+                    .from('blink_transaction_logs')
+                    .delete()
+                    .in('transaction_id', journalRefIds);
+                assertNoError(delLogErr, 'Gagal menghapus transaction record terkait shipment');
+            }
 
             setShipments(prev => prev ? prev.filter(s => !ids.includes(s.id)) : prev);
             logActivity('blink_shipments', 'delete', 'shipment', ids.join(','), ids.join(','), `Deleted shipments ${ids.join(',')}`);
@@ -4052,13 +4131,19 @@ export const DataProvider = ({ children }) => {
                 paymentIds = payments.map(p => p.id);
             }
 
-            // Delete journals for APs
+            // Delete all journals linked to PO, AP, and PO payments
             emitProgress(onProgress, { stage: 3, totalStages: 5, label: 'Menghapus jurnal/AP/payment...' });
-            if (apIds.length > 0) await deleteByIn('blink_journal_entries', 'reference_id', apIds, 3, 'Menghapus jurnal AP', 5);
+            const journalRefs = [...ids, ...apIds, ...paymentIds];
+            if (journalRefs.length > 0) await deleteByIn('blink_journal_entries', 'reference_id', journalRefs, 3, 'Menghapus jurnal PO/AP', 5);
             // Delete payments
             if (paymentIds.length > 0) await deleteByIn('blink_payments', 'id', paymentIds, 3, 'Menghapus payment PO', 5);
             // Delete APs
             if (apIds.length > 0) await deleteByIn('blink_ap_transactions', 'id', apIds, 3, 'Menghapus AP', 5);
+
+            // Delete transaction records so Finance Record module stays in sync.
+            if (journalRefs.length > 0) {
+                await deleteByIn('blink_transaction_logs', 'transaction_id', journalRefs, 3, 'Menghapus transaction record PO', 5);
+            }
 
             // Finally delete POs
             emitProgress(onProgress, { stage: 4, totalStages: 5, label: 'Menghapus PO utama...' });
