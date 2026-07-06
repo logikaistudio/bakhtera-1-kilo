@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Search, Building2, User, ChevronDown } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { getActiveDivision } from '../../utils/divisionContext';
 
 /**
  * PartnerPicker - Universal component for selecting business partners
@@ -23,6 +25,7 @@ const PartnerPicker = ({
     theme = 'dark',
     onPartnerLoad
 }) => {
+    const { isAdmin } = useAuth();
     const [partners, setPartners] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -71,10 +74,15 @@ const PartnerPicker = ({
     const fetchPartners = async (search) => {
         try {
             setLoading(true);
+            const activeDivision = getActiveDivision();
             let query = supabase
                 .from('blink_business_partners')
                 .select('*')
                 .eq('status', 'active');
+
+            if (!isAdmin()) {
+                query = query.or(`owner_division.eq.${activeDivision},is_shared.eq.true`);
+            }
 
             if (roleFilter !== 'all') {
                 query = query.eq(`is_${roleFilter}`, true);

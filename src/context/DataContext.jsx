@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { fileToBase64, validateImage } from '../utils/validateImage';
 import { useAuth } from './AuthContext';
+import { getActiveDivision, canViewPartnerInDivision } from '../utils/divisionContext';
 
 const DataContext = createContext();
 
@@ -400,7 +401,9 @@ export const DataProvider = ({ children }) => {
                     console.error('❌ Error fetching business partners:', partnerError);
                 } else if (partnerData) {
                     console.log(`✅ Loaded ${partnerData.length} business partners from Supabase`);
-                    setBusinessPartners(partnerData);
+                    const activeDivision = getActiveDivision();
+                    const visiblePartners = partnerData.filter(p => canViewPartnerInDivision(p, activeDivision, isAdmin()));
+                    setBusinessPartners(visiblePartners);
 
                     // Backward compatibility: Populate old state
                     const customerRecords = partnerData.filter(p => p.is_customer);
@@ -566,15 +569,29 @@ export const DataProvider = ({ children }) => {
             // ========================================
             .on('postgres_changes', { event: '*', schema: 'public', table: 'blink_business_partners' }, (payload) => {
                 console.log('⚡ Realtime Business Partner Update:', payload);
+                const activeDivision = getActiveDivision();
+                const visibleRecord = payload.new || payload.old;
+                const isVisible = canViewPartnerInDivision(visibleRecord, activeDivision, isAdmin());
 
                 if (payload.eventType === 'INSERT') {
-                    setBusinessPartners(prev => [...prev, payload.new]);
+                    if (isVisible) {
+                        setBusinessPartners(prev => {
+                            const exists = prev.some(item => item.id === payload.new.id);
+                            if (exists) return prev;
+                            return [...prev, payload.new];
+                        });
+                    }
                     // Update old state for backward compatibility
                     if (payload.new.is_customer) setCustomers(prev => [...prev, payload.new]);
                     if (payload.new.is_vendor) setVendors(prev => [...prev, payload.new]);
                 }
                 else if (payload.eventType === 'UPDATE') {
-                    setBusinessPartners(prev => prev.map(item => item.id === payload.new.id ? payload.new : item));
+                    setBusinessPartners(prev => {
+                        const exists = prev.some(item => item.id === payload.new.id);
+                        if (!isVisible) return prev.filter(item => item.id !== payload.new.id);
+                        if (!exists) return [...prev, payload.new];
+                        return prev.map(item => item.id === payload.new.id ? payload.new : item);
+                    });
                     // Update old state
                     if (payload.new.is_customer) {
                         setCustomers(prev => {
@@ -826,9 +843,102 @@ export const DataProvider = ({ children }) => {
     // ========================================
     // BUSINESS PARTNER CRUD OPERATIONS (NEW - CENTRALIZED)
     // ========================================
+    const normalizePartnerString = (value) => (value || '').toString().trim().toLowerCase();
+
+    const normalizePhone = (value) => (value || '').toString().replace(/\D/g, '');
+
     const addBusinessPartner = async (partner) => {
+        const activeDivision = getActiveDivision();
+        const normalizedName = normalizePartnerString(partner.partner_name);
+        const normalizedTaxId = normalizePartnerString(partner.tax_id);
+        const normalizedEmail = normalizePartnerString(partner.email);
+        const normalizedPhone = normalizePhone(partner.phone || partner.mobile);
+
+        // Auto-merge foundation: detect canonical candidate before insert.
+        let duplicateCandidates = [];
+        let duplicateSearchError = null;
+
+        if (normalizedTaxId) {
+            const { data, error } = await supabase
+                .from('blink_business_partners')
+                .select('id, partner_name, tax_id, email, phone, mobile, owner_division, is_shared, is_customer, is_vendor, is_agent, is_transporter, is_consignee, is_shipper')
+                .is('merged_into_partner_id', null)
+                .eq('tax_id', partner.tax_id)
+                .limit(30);
+            duplicateCandidates = data || [];
+            duplicateSearchError = error;
+        } else if (partner.partner_name) {
+            const { data, error } = await supabase
+                .from('blink_business_partners')
+                .select('id, partner_name, tax_id, email, phone, mobile, owner_division, is_shared, is_customer, is_vendor, is_agent, is_transporter, is_consignee, is_shipper')
+                .is('merged_into_partner_id', null)
+                .ilike('partner_name', partner.partner_name)
+                .limit(30);
+            duplicateCandidates = data || [];
+            duplicateSearchError = error;
+        }
+
+        if (duplicateSearchError) {
+            console.warn('Duplicate search skipped:', duplicateSearchError.message);
+        }
+
+        const duplicate = (duplicateCandidates || []).find((row) => {
+            const rowName = normalizePartnerString(row.partner_name);
+            const rowTaxId = normalizePartnerString(row.tax_id);
+            const rowEmail = normalizePartnerString(row.email);
+            const rowPhone = normalizePhone(row.phone || row.mobile);
+
+            if (normalizedTaxId && rowTaxId && normalizedTaxId === rowTaxId) return true;
+            if (normalizedName && rowName && normalizedName === rowName) {
+                if (normalizedEmail && rowEmail && normalizedEmail === rowEmail) return true;
+                if (normalizedPhone && rowPhone && normalizedPhone === rowPhone) return true;
+            }
+            return false;
+        });
+
+        if (duplicate) {
+            const mergedUpdate = {
+                is_customer: Boolean(duplicate.is_customer || partner.is_customer),
+                is_vendor: Boolean(duplicate.is_vendor || partner.is_vendor),
+                is_agent: Boolean(duplicate.is_agent || partner.is_agent),
+                is_transporter: Boolean(duplicate.is_transporter || partner.is_transporter),
+                is_consignee: Boolean(duplicate.is_consignee || partner.is_consignee),
+                is_shipper: Boolean(duplicate.is_shipper || partner.is_shipper),
+                updated_at: new Date().toISOString(),
+            };
+
+            if ((duplicate.owner_division || 'blink') !== activeDivision && isAdmin()) {
+                mergedUpdate.is_shared = true;
+            }
+
+            const { data: mergedRows, error: mergeError } = await supabase
+                .from('blink_business_partners')
+                .update(mergedUpdate)
+                .eq('id', duplicate.id)
+                .select();
+
+            if (mergeError) {
+                console.error('Error auto-merging business partner:', mergeError);
+                alert('Failed to merge duplicate business partner');
+                return null;
+            }
+
+            const merged = mergedRows?.[0] || { ...duplicate, ...mergedUpdate };
+            setBusinessPartners(prev => {
+                const exists = prev.some(p => p.id === merged.id);
+                if (exists) return prev.map(p => p.id === merged.id ? merged : p);
+                if (canViewPartnerInDivision(merged, activeDivision, isAdmin())) return [...prev, merged];
+                return prev;
+            });
+
+            alert('Partner terdeteksi duplikat dan telah digabung otomatis ke data existing.');
+            return merged;
+        }
+
         const newPartner = {
             ...partner,
+            owner_division: partner.owner_division || activeDivision,
+            is_shared: isAdmin() ? Boolean(partner.is_shared) : false,
             id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(),
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
@@ -843,7 +953,9 @@ export const DataProvider = ({ children }) => {
 
         // Realtime will handle state update, but we update optimistically
         const inserted = data?.[0] || newPartner;
-        setBusinessPartners(prev => [...prev, inserted]);
+        if (canViewPartnerInDivision(inserted, activeDivision, isAdmin())) {
+            setBusinessPartners(prev => [...prev, inserted]);
+        }
 
         // Update old state for backward compatibility
         if (inserted.is_customer) setCustomers(prev => [...prev, inserted]);

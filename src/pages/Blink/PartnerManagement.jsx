@@ -5,6 +5,7 @@ import { useData } from '../../context/DataContext';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
 import { exportPartnerTemplate, parsePartnerImportFile, bulkImportPartners } from '../../utils/partnerExport';
+import { getActiveDivision } from '../../utils/divisionContext';
 import {
     Users, Plus, Search, Edit, Trash2, Building2, User,
     Phone, Mail, MapPin, CreditCard, Filter, X, Check, Download, Upload
@@ -37,6 +38,7 @@ const PartnerManagement = () => {
         country: 'Indonesia',
         tax_id: '',
         // Roles
+        is_shared: false,
         is_customer: true,
         is_vendor: false,
         is_agent: false,
@@ -61,9 +63,11 @@ const PartnerManagement = () => {
     const fetchPartners = async () => {
         try {
             setLoading(true);
+            const activeDivision = getActiveDivision();
             const { data, error } = await supabase
                 .from('blink_business_partners')
                 .select('*')
+                .or(isAdminUser() ? 'id.not.is.null' : `owner_division.eq.${activeDivision},is_shared.eq.true`)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -76,26 +80,27 @@ const PartnerManagement = () => {
         }
     };
 
+    const { isAdmin: isAdminUser, canDelete } = useAuth();
+    const { deleteBusinessPartner, deleteAllBusinessPartners, addBusinessPartner, updateBusinessPartner } = useData();
+
     const handleSubmit = async (e) => {
         e.preventDefault();
 
         try {
             if (editingPartner) {
-                // Update
-                const { error } = await supabase
-                    .from('blink_business_partners')
-                    .update(formData)
-                    .eq('id', editingPartner.id);
-
-                if (error) throw error;
+                const success = await updateBusinessPartner(editingPartner.id, {
+                    ...formData,
+                    is_shared: isAdminUser() ? Boolean(formData.is_shared) : Boolean(editingPartner.is_shared)
+                });
+                if (!success) throw new Error('Failed to update partner');
                 alert('✅ Partner updated successfully');
             } else {
-                // Create
-                const { error } = await supabase
-                    .from('blink_business_partners')
-                    .insert([formData]);
-
-                if (error) throw error;
+                const inserted = await addBusinessPartner({
+                    ...formData,
+                    owner_division: getActiveDivision(),
+                    is_shared: isAdminUser() ? Boolean(formData.is_shared) : false,
+                });
+                if (!inserted) throw new Error('Failed to create partner');
                 alert('✅ Partner created successfully');
             }
 
@@ -107,9 +112,7 @@ const PartnerManagement = () => {
         }
     };
 
-    const { isAdmin, canDelete } = useAuth();
-    const { deleteBusinessPartner, deleteAllBusinessPartners } = useData();
-    const canDeletePartner = isAdmin() || canDelete('blink_partners');
+    const canDeletePartner = isAdminUser() || canDelete('blink_partners');
 
     const handleDelete = async (partnerId) => {
         if (!canDeletePartner) {
@@ -217,6 +220,7 @@ const PartnerManagement = () => {
             country: 'Indonesia',
             tax_id: '',
             status: 'active',
+            is_shared: false,
             is_customer: true,
             is_vendor: false,
             is_agent: false,
@@ -611,6 +615,20 @@ const PartnerManagement = () => {
                                             <option value="individual">Individual</option>
                                         </select>
                                     </div>
+
+                                    {isAdminUser() && (
+                                        <div className="md:col-span-2">
+                                            <label className="flex items-center gap-2 text-sm text-silver-light">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={Boolean(formData.is_shared)}
+                                                    onChange={(e) => setFormData({ ...formData, is_shared: e.target.checked })}
+                                                    className="w-4 h-4"
+                                                />
+                                                Shared lintas divisi (Blink & BXPO)
+                                            </label>
+                                        </div>
+                                    )}
                                     <div>
                                         <label className="block text-xs text-silver-dark mb-1">Contact Person</label>
                                         <input
