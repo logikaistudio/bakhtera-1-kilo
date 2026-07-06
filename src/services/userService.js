@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { hashPassword, verifyPassword, validatePasswordStrength } from './passwordService';
+import { hashPassword, verifyPassword, validatePasswordStrength, generatePassword } from './passwordService';
 
 /**
  * User Service
@@ -69,6 +69,7 @@ export const createUser = async (userData, createdBy) => {
             .insert({
                 username: userData.username,
                 password_hash: passwordHash,
+                password_plain: userData.password,
                 full_name: userData.full_name,
                 email: userData.email || null,
                 user_level: userData.user_level,
@@ -124,7 +125,7 @@ export const getAllUsers = async (requestedBy) => {
 
         const { data: users, error } = await supabase
             .from('users')
-            .select('id, username, full_name, email, user_level, portal_access, is_active, last_login, created_at')
+            .select('id, username, full_name, email, user_level, portal_access, is_active, last_login, created_at, password_plain')
             .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -234,6 +235,7 @@ export const resetPassword = async (userId, newPassword, resetBy, requireChange 
             .from('users')
             .update({
                 password_hash: passwordHash,
+                password_plain: newPassword,
                 requires_password_change: requireChange
             })
             .eq('id', userId);
@@ -437,6 +439,7 @@ export const changePassword = async (userId, oldPassword, newPassword) => {
             .from('users')
             .update({
                 password_hash: newHash,
+                password_plain: newPassword,
                 requires_password_change: false
             })
             .eq('id', userId);
@@ -467,7 +470,7 @@ export const getUserById = async (userId) => {
     try {
         const { data: user, error } = await supabase
             .from('users')
-            .select('id, username, full_name, email, user_level, portal_access, is_active, last_login, created_at')
+            .select('id, username, full_name, email, user_level, portal_access, is_active, last_login, created_at, password_plain')
             .eq('id', userId)
             .single();
 
@@ -477,6 +480,80 @@ export const getUserById = async (userId) => {
 
     } catch (error) {
         console.error('Error getting user:', error);
+        return { success: false, error: error.message };
+    }
+};
+
+/**
+ * Self-service forgot password reset (no email server flow).
+ * User verifies identity with username + full name, then receives a generated password.
+ * @param {string} username - Username
+ * @param {string} fullName - Full name
+ * @returns {Promise<object>} - Result with generated password on success
+ */
+export const forgotPasswordSelfService = async (username, fullName) => {
+    try {
+        const normalizedUsername = (username || '').trim();
+        const normalizedFullName = (fullName || '').trim();
+
+        if (!normalizedUsername || !normalizedFullName) {
+            throw new Error('Username dan nama lengkap wajib diisi');
+        }
+
+        const { data: user, error: userError } = await supabase
+            .from('users')
+            .select('id, username, full_name, is_active, portal_access')
+            .eq('username', normalizedUsername)
+            .single();
+
+        if (userError || !user) {
+            throw new Error('Data verifikasi tidak valid');
+        }
+
+        const fullNameMatch = (user.full_name || '').trim().toLowerCase() === normalizedFullName.toLowerCase();
+        if (!fullNameMatch) {
+            throw new Error('Data verifikasi tidak valid');
+        }
+
+        if (!user.is_active || !user.portal_access) {
+            throw new Error('Akun tidak aktif atau tidak memiliki akses portal');
+        }
+
+        const generatedPassword = generatePassword(12);
+        const passwordHash = await hashPassword(generatedPassword);
+
+        const { error: updateError } = await supabase
+            .from('users')
+            .update({
+                password_hash: passwordHash,
+                password_plain: generatedPassword,
+                requires_password_change: true
+            })
+            .eq('id', user.id);
+
+        if (updateError) throw updateError;
+
+        await supabase
+            .from('user_sessions')
+            .delete()
+            .eq('user_id', user.id);
+
+        await logAudit({
+            action_type: 'forgot_password_self_service',
+            target_user_id: user.id,
+            performed_by: user.id,
+            new_value: {
+                reset_channel: 'self_service_no_email'
+            }
+        });
+
+        return {
+            success: true,
+            generatedPassword,
+            message: 'Password baru berhasil dibuat. Catat password ini, lalu login dan segera ganti password Anda.'
+        };
+    } catch (error) {
+        console.error('Error forgot password self service:', error);
         return { success: false, error: error.message };
     }
 };

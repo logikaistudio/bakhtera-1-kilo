@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { forgotPasswordSelfService } from '../../services/userService';
 import { Eye, EyeOff, LogIn, Lock, User, AlertCircle } from 'lucide-react';
 
 const Login = () => {
@@ -9,6 +10,13 @@ const Login = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [showForgotModal, setShowForgotModal] = useState(false);
+    const [forgotUsername, setForgotUsername] = useState('');
+    const [forgotFullName, setForgotFullName] = useState('');
+    const [forgotLoading, setForgotLoading] = useState(false);
+    const [forgotError, setForgotError] = useState('');
+    const [forgotSuccessMessage, setForgotSuccessMessage] = useState('');
+    const [generatedPassword, setGeneratedPassword] = useState('');
     const navigate = useNavigate();
     const { login } = useAuth();
 
@@ -34,6 +42,49 @@ const Login = () => {
             console.error('Login error:', err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const openForgotModal = () => {
+        setShowForgotModal(true);
+        setForgotUsername(username || '');
+        setForgotFullName('');
+        setForgotError('');
+        setForgotSuccessMessage('');
+        setGeneratedPassword('');
+    };
+
+    const closeForgotModal = () => {
+        setShowForgotModal(false);
+        setForgotError('');
+        setForgotSuccessMessage('');
+        setGeneratedPassword('');
+        setForgotLoading(false);
+    };
+
+    const handleForgotPassword = async (e) => {
+        e.preventDefault();
+        setForgotError('');
+        setForgotSuccessMessage('');
+        setGeneratedPassword('');
+        setForgotLoading(true);
+
+        try {
+            const result = await forgotPasswordSelfService(forgotUsername, forgotFullName);
+            if (!result.success) {
+                setForgotError(result.error || 'Reset password gagal. Periksa data verifikasi Anda.');
+                return;
+            }
+
+            setForgotSuccessMessage(result.message || 'Password baru berhasil dibuat.');
+            setGeneratedPassword(result.generatedPassword || '');
+            setPassword(result.generatedPassword || '');
+            setUsername(forgotUsername);
+        } catch (err) {
+            console.error('Forgot password error:', err);
+            setForgotError('Terjadi kesalahan saat reset password. Silakan coba lagi.');
+        } finally {
+            setForgotLoading(false);
         }
     };
 
@@ -176,10 +227,18 @@ const Login = () => {
                     </form>
 
                     {/* Footer note */}
-                    <p className="text-center text-xs text-gray-400 mt-6">
-                        Lupa password? Hubungi&nbsp;
-                        <span className="text-blue-500 font-medium">Super Admin</span>
-                    </p>
+                    <div className="text-center text-xs text-gray-400 mt-6 space-y-2">
+                        <p>
+                            Tidak ada email server aktif untuk reset password otomatis.
+                        </p>
+                        <button
+                            type="button"
+                            onClick={openForgotModal}
+                            className="text-blue-500 font-semibold hover:text-blue-600"
+                        >
+                            Lupa password? Reset mandiri di sini
+                        </button>
+                    </div>
 
                 </div>
 
@@ -191,6 +250,80 @@ const Login = () => {
                     </a>
                 </p>
             </div>
+
+            {showForgotModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+                    <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+                        <h3 className="text-lg font-semibold text-gray-900">Reset Password Mandiri</h3>
+                        <p className="mt-1 text-sm text-gray-500">
+                            Verifikasi data Anda. Sistem akan membuat password baru tanpa email, lalu tampilkan di layar.
+                        </p>
+
+                        {forgotError && (
+                            <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                                {forgotError}
+                            </div>
+                        )}
+
+                        {forgotSuccessMessage && (
+                            <div className="mt-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+                                <p>{forgotSuccessMessage}</p>
+                                {generatedPassword && (
+                                    <p className="mt-2 font-semibold">
+                                        Password Baru: <span className="font-mono">{generatedPassword}</span>
+                                    </p>
+                                )}
+                                <p className="mt-2 font-medium">
+                                    Catat password ini sekarang, karena notifikasi hanya ditampilkan sekali di layar.
+                                </p>
+                            </div>
+                        )}
+
+                        <form onSubmit={handleForgotPassword} className="mt-4 space-y-3">
+                            <div>
+                                <label className="mb-1 block text-sm font-medium text-gray-700">Username</label>
+                                <input
+                                    type="text"
+                                    value={forgotUsername}
+                                    onChange={(e) => setForgotUsername(e.target.value)}
+                                    required
+                                    disabled={forgotLoading}
+                                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="mb-1 block text-sm font-medium text-gray-700">Nama Lengkap</label>
+                                <input
+                                    type="text"
+                                    value={forgotFullName}
+                                    onChange={(e) => setForgotFullName(e.target.value)}
+                                    required
+                                    disabled={forgotLoading}
+                                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                                />
+                            </div>
+
+                            <div className="flex justify-end gap-2 pt-1">
+                                <button
+                                    type="button"
+                                    onClick={closeForgotModal}
+                                    className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
+                                >
+                                    Tutup
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={forgotLoading}
+                                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+                                >
+                                    {forgotLoading ? 'Memproses...' : 'Reset Password'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

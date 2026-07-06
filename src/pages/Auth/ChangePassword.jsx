@@ -40,7 +40,7 @@ const ChangePassword = () => {
             const result = await changePassword(user.id, oldPassword, newPassword);
 
             if (result.success) {
-                setSuccess('Password berhasil diperbarui! Silakan masuk kembali dengan password baru Anda.');
+                setSuccess('Password berhasil diperbarui. Catat password baru Anda sekarang, lalu login kembali.');
                 setOldPassword('');
                 setNewPassword('');
                 setConfirmPassword('');

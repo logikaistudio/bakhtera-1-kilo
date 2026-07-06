@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { getAllUsers, createUser, updateUser, resetPassword, toggleUserActive, deleteUser } from '../../services/userService';
 import { generatePassword } from '../../services/passwordService';
-import { Users, Plus, Edit, Key, Ban, CheckCircle, Shield, RefreshCw, Trash2, Download } from 'lucide-react';
+import { Users, Plus, Edit, Key, Ban, CheckCircle, Shield, RefreshCw, Trash2, Download, Eye, EyeOff } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 /**
@@ -51,6 +51,7 @@ const UserManagement = () => {
     const [showPasswordModal, setShowPasswordModal] = useState(false);
     const [selectedUser, setSelectedUser] = useState(null);
     const [availableRoles, setAvailableRoles] = useState([]);
+    const [revealedPasswords, setRevealedPasswords] = useState({});
 
     const loadUsers = useCallback(async () => {
         setLoading(true);
@@ -193,7 +194,7 @@ const UserManagement = () => {
             return {
                 'Nama Lengkap': u.full_name,
                 'User ID': u.username,
-                'Password': '*** (Terenkripsi)',
+                'Password Aktif': u.password_plain || 'Belum diset',
                 'Role': roleLabel
             };
         });
@@ -205,7 +206,7 @@ const UserManagement = () => {
         const wscols = [
             { wch: 30 }, // Nama Lengkap
             { wch: 20 }, // User ID
-            { wch: 20 }, // Password
+            { wch: 20 }, // Password Aktif
             { wch: 20 }, // Role
         ];
         worksheet['!cols'] = wscols;
@@ -226,6 +227,18 @@ const UserManagement = () => {
                 {label}
             </span>
         );
+    };
+
+    const maskPassword = (value) => {
+        if (!value) return 'Belum diset';
+        return '*'.repeat(Math.max(value.length, 8));
+    };
+
+    const togglePasswordVisibility = (userId) => {
+        setRevealedPasswords(prev => ({
+            ...prev,
+            [userId]: !prev[userId]
+        }));
     };
 
     if (loading) {
@@ -294,8 +307,8 @@ const UserManagement = () => {
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead>
                             <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                                {['Username', 'Nama Lengkap', 'Email', 'Role', 'Status', 'Terakhir Login', 'Aksi'].map((h, i) => (
-                                    <th key={h} style={{ padding: '10px 20px', textAlign: i === 6 ? 'right' : 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>
+                                {['Username', 'Nama Lengkap', 'Email', 'Password Aktif', 'Role', 'Status', 'Terakhir Login', 'Aksi'].map((h, i) => (
+                                    <th key={h} style={{ padding: '10px 20px', textAlign: i === 7 ? 'right' : 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>
                                 ))}
                             </tr>
                         </thead>
@@ -313,6 +326,21 @@ const UserManagement = () => {
                                     </td>
                                     <td style={{ padding: '12px 20px', fontSize: 14, color: '#374151', whiteSpace: 'nowrap' }}>{u.full_name}</td>
                                     <td style={{ padding: '12px 20px', fontSize: 14, color: '#6b7280', whiteSpace: 'nowrap' }}>{u.email || '—'}</td>
+                                    <td style={{ padding: '12px 20px', whiteSpace: 'nowrap' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            <span style={{ fontFamily: 'monospace', fontSize: 13, color: '#374151' }}>
+                                                {revealedPasswords[u.id] ? (u.password_plain || 'Belum diset') : maskPassword(u.password_plain)}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => togglePasswordVisibility(u.id)}
+                                                title={revealedPasswords[u.id] ? 'Sembunyikan Password' : 'Lihat Password'}
+                                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 0 }}
+                                            >
+                                                {revealedPasswords[u.id] ? <EyeOff style={{ width: 16, height: 16 }} /> : <Eye style={{ width: 16, height: 16 }} />}
+                                            </button>
+                                        </div>
+                                    </td>
                                     <td style={{ padding: '12px 20px', whiteSpace: 'nowrap' }}>{getRoleBadge(u.user_level)}</td>
                                     <td style={{ padding: '12px 20px', whiteSpace: 'nowrap' }}>
                                         {u.is_active ? (
@@ -741,7 +769,7 @@ const ResetPasswordModal = ({ user: selectedUser, onClose, onSuccess, resetBy })
         const result = await resetPassword(selectedUser.id, password, resetBy, requireChange);
 
         if (result.success) {
-            alert(`Password berhasil direset untuk ${selectedUser.username}!\n\nPassword Baru: ${password}\n\nSimpan password ini dengan aman.`);
+            alert(`Password berhasil direset untuk ${selectedUser.username}!\n\nPassword Baru: ${password}\n\nTidak ada pengiriman email otomatis. Mohon catat password ini sekarang.`);
             onSuccess();
         } else {
             setError(result.error);
