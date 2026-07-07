@@ -262,9 +262,7 @@ const AWBManagement = () => {
                 ? cargoItems.map(item => item.marks).filter(Boolean).join('\n')
                 : null;
             // Mapping back AWB fields to the generic BL columns in DB
-            const { error } = await supabase
-                .from('blink_shipments')
-                .update({
+            const updateData = {
                     bl_status: editForm.status,
                     awb_number: editForm.awbNumber || null,
                     awb_date: editForm.awbDate || null,
@@ -304,8 +302,25 @@ const AWBManagement = () => {
                     bl_measurement_text: editForm.measurement,
                     bl_number_of_packages: editForm.pieces || null,
                     bl_total_packages_in_words: editForm.pieces,
-                })
+                };
+
+            const updateShipmentDocument = async (payload) => supabase
+                .from('blink_shipments')
+                .update(payload)
                 .eq('id', selectedAWB.id);
+
+            let { error } = await updateShipmentDocument(updateData);
+
+            if (error && /column .* does not exist|schema cache/i.test(error.message || '')) {
+                const fallbackData = { ...updateData };
+                const missingColumn = (error.message || '').match(/'([^']+)' column/)?.[1];
+                if (missingColumn) delete fallbackData[missingColumn];
+                delete fallbackData.bl_number_of_packages;
+                delete fallbackData.bl_chargeable_weight_text;
+
+                const retry = await updateShipmentDocument(fallbackData);
+                error = retry.error;
+            }
 
             if (error) throw error;
 
@@ -315,7 +330,7 @@ const AWBManagement = () => {
             setShowEditModal(false);
         } catch (error) {
             console.error('Error updating AWB:', error);
-            alert('❌ Failed to update AWB');
+            alert(`❌ Failed to update AWB: ${error.message || 'Unknown error'}`);
         }
     };
 

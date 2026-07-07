@@ -82,8 +82,8 @@ const ShipmentManagement = () => {
     };
 
     const handleDeleteSelectedShipments = async () => {
-        if (!canRunSuperAdminBatch) {
-            alert('Akses Ditolak: Hanya Super Admin yang dapat menghapus shipment terpilih.');
+        if (!canDelete('blink_shipments')) {
+            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus shipment terpilih.');
             return;
         }
         if (selectedShipmentIds.length === 0) {
@@ -748,27 +748,27 @@ const ShipmentManagement = () => {
                             <p className="text-silver-dark mt-1">Kelola semua sales order</p>
                 </div>
                 <div className="flex gap-2">
+                    {canDelete('blink_shipments') && (
+                        <Button
+                            size="sm"
+                            variant="danger"
+                            icon={Trash2}
+                            onClick={handleDeleteSelectedShipments}
+                            disabled={selectedShipmentIds.length === 0 || isCleansing}
+                        >
+                            Hapus Terpilih ({selectedShipmentIds.length})
+                        </Button>
+                    )}
                     {canRunSuperAdminBatch && (
-                        <>
-                            <Button
-                                size="sm"
-                                variant="danger"
-                                icon={Trash2}
-                                onClick={handleDeleteSelectedShipments}
-                                disabled={selectedShipmentIds.length === 0 || isCleansing}
-                            >
-                                Hapus Terpilih ({selectedShipmentIds.length})
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant="danger"
-                                icon={Trash2}
-                                onClick={handleCleanseAllShipments}
-                                disabled={shipments.length === 0 || isCleansing}
-                            >
-                                {isCleansing ? 'Cleansing...' : 'Bersihkan Semua Data'}
-                            </Button>
-                        </>
+                        <Button
+                            size="sm"
+                            variant="danger"
+                            icon={Trash2}
+                            onClick={handleCleanseAllShipments}
+                            disabled={shipments.length === 0 || isCleansing}
+                        >
+                            {isCleansing ? 'Cleansing...' : 'Bersihkan Semua Data'}
+                        </Button>
                     )}
                     <Button
                         size="sm"

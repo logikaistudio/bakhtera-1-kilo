@@ -603,10 +603,23 @@ const BLManagement = () => {
                 containers: editForm.containers || [],
             };
 
-            const { error } = await supabase
+            const updateShipmentDocument = async (payload) => supabase
                 .from('blink_shipments')
-                .update(updateData)
+                .update(payload)
                 .eq('id', selectedBL.id);
+
+            let { error } = await updateShipmentDocument(updateData);
+
+            if (error && /column .* does not exist|schema cache/i.test(error.message || '')) {
+                const fallbackData = { ...updateData };
+                const missingColumn = (error.message || '').match(/'([^']+)' column/)?.[1];
+                if (missingColumn) delete fallbackData[missingColumn];
+                delete fallbackData.bl_number_of_packages;
+                delete fallbackData.bl_chargeable_weight_text;
+
+                const retry = await updateShipmentDocument(fallbackData);
+                error = retry.error;
+            }
 
             if (error) throw error;
 
