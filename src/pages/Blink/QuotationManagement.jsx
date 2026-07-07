@@ -7,6 +7,7 @@ import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
 import ServiceItemManager from '../../components/Common/ServiceItemManager';
 import PartnerPicker from '../../components/Common/PartnerPicker';
+import { parseCurrency } from '../../utils/currencyFormatter';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import {
@@ -18,6 +19,7 @@ import { useAuth } from '../../context/AuthContext';
 
 const formatInputAmount = (value, currency) => {
     if (value === null || value === undefined || value === '') return '';
+    if (typeof value === 'string') return value;
     const valStr = value.toString();
     
     // If the user is currently typing a decimal point or trailing zero, don't format with toLocaleString to avoid cursor jump and losing the dot/zero
@@ -34,11 +36,9 @@ const formatInputAmount = (value, currency) => {
     const num = parseFloat(valStr);
     if (isNaN(num)) return valStr;
     
-    if (currency === 'IDR') {
-        return Math.round(num).toLocaleString('id-ID');
-    } else {
-        return num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-    }
+    return currency === 'IDR'
+        ? num.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+        : num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 };
 
 const QuotationManagement = () => {
@@ -240,7 +240,7 @@ const QuotationManagement = () => {
             commodity: formData.commodity,
             currency: formData.currency,
             exchange_rate: formData.currency === 'IDR' ? 1 : (formData.exchange_rate || 16000),
-            total_amount: formData.totalAmount ? parseFloat(formData.totalAmount.toString()) : 0,
+            total_amount: parseCurrency(formData.totalAmount),
             status: status,
             notes: formData.notes,
             service_items: formData.serviceItems,
@@ -339,7 +339,7 @@ const QuotationManagement = () => {
         try {
             // Calculate total from service items if available
             const total = editedQuotation.serviceItems?.reduce((sum, item) =>
-                sum + (parseFloat(item.amount) || 0), 0) || editedQuotation.totalAmount;
+                sum + (parseFloat(item.amount) || 0), 0) || parseCurrency(editedQuotation.totalAmount);
 
             // Update in Supabase
             const { error } = await supabase
@@ -883,6 +883,7 @@ const QuotationManagement = () => {
             const blType = isAirFreight ? 'AWB' : 'MBL';
             const blPrefix = isAirFreight ? 'AWB' : 'BL';
             const blNumber = `${blPrefix}-${soNumber}`;
+            const baseQuotedAmount = parseCurrency(quotation.total_amount ?? quotation.totalAmount ?? 0);
 
             const { data: shipmentData, error } = await supabase
                 .from('blink_shipments')
@@ -915,7 +916,7 @@ const QuotationManagement = () => {
                     incoterm: quotation.incoterm || null,
                     payment_terms: quotation.paymentTerms || null,
                     // Pricing
-                    quoted_amount: newShipment.quotedAmount,
+                    quoted_amount: baseQuotedAmount,
                     currency: quotation.currency || 'USD',
                     exchange_rate: quotation.currency === 'IDR' ? 1 : (quotation.exchange_rate || 16000),
                     status: newShipment.status,
@@ -1597,17 +1598,8 @@ const QuotationManagement = () => {
                                 value={formatInputAmount(formData.totalAmount, formData.currency)}
                                 onChange={(e) => {
                                     const value = e.target.value;
-                                    if (formData.currency === 'IDR') {
-                                        const clean = value.replace(/\./g, '');
-                                        if (clean === '' || /^\d+$/.test(clean)) {
-                                            setFormData({ ...formData, totalAmount: clean === '' ? '' : Number(clean) });
-                                        }
-                                    } else {
-                                        const clean = value.replace(/,/g, '');
-                                        if (clean === '' || /^\d*\.?\d*$/.test(clean)) {
-                                            setFormData({ ...formData, totalAmount: clean === '' ? '' : Number(clean) });
-                                        }
-                                    }
+                                    const clean = value.replace(/[^0-9.,-]/g, '');
+                                    setFormData({ ...formData, totalAmount: clean });
                                 }}
                                 placeholder="0"
                                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
@@ -2075,7 +2067,7 @@ const QuotationManagement = () => {
                                             totalUSD = totalUsdDerived;
                                             totalIDR = totalUSD * rate;
                                         } else {
-                                            const totalNum = parseFloat(String(data?.totalAmount || data?.total_amount || 0).replace(/\./g, '').replace(/,/g, '.')) || 0;
+                                            const totalNum = parseCurrency(data?.totalAmount || data?.total_amount || 0);
                                             const currency = data?.currency || 'IDR';
                                             const isIDR = currency === 'IDR';
                                             totalIDR = isIDR ? totalNum : totalNum * rate;
@@ -2086,11 +2078,11 @@ const QuotationManagement = () => {
                                             <div className="flex gap-4 items-stretch">
                                                 <div className="flex-1 max-w-[320px] p-3 bg-white/80 rounded-lg border border-orange-200">
                                                     <p className="text-[10px] text-gray-400 mb-0.5">IDR</p>
-                                                    <p className="text-2xl font-bold text-orange-600 break-words">Rp {Number(totalIDR || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
+                                                    <p className="text-2xl font-bold text-orange-600 break-words">Rp {formatInputAmount(isIDR ? data?.totalAmount : totalIDR, 'IDR')}</p>
                                                 </div>
                                                 <div className="flex-1 max-w-[320px] p-3 bg-white/80 rounded-lg border border-orange-200 text-right">
                                                     <p className="text-[10px] text-gray-400 mb-0.5">USD (@ Rp {Number(rate).toLocaleString('id-ID')})</p>
-                                                    <p className="text-2xl font-bold text-blue-600 break-words">{rate > 1 ? `$ ${Number(totalUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}</p>
+                                                    <p className="text-2xl font-bold text-blue-600 break-words">{rate > 1 ? `$ ${formatInputAmount(isIDR ? totalUSD : data?.totalAmount, 'USD')}` : '-'}</p>
                                                 </div>
                                             </div>
                                         );
@@ -2114,17 +2106,8 @@ const QuotationManagement = () => {
                                                     className="px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500"
                                                 >
                                                     <option value="IDR">IDR</option>
-                                                    <option value="USD">USD</option>
-                                                </select>
-                                            </div>
-                                            {editedQuotation?.currency === 'USD' && (
-                                                <div className="flex items-center gap-2">
-                                                    <label className="text-xs text-gray-500 font-medium whitespace-nowrap">Kurs Rate</label>
-                                                    <input
-                                                        type="number"
-                                                        value={editedQuotation?.exchange_rate || ''}
-                                                        onChange={(e) => setEditedQuotation({ ...editedQuotation, exchange_rate: parseFloat(e.target.value) || 1 })}
-                                                        className="w-24 px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                                                const clean = value.replace(/[^0-9.,-]/g, '');
+                                                                setFormData({ ...formData, totalAmount: clean });
                                                         placeholder="e.g., 16000"
                                                     />
                                                 </div>

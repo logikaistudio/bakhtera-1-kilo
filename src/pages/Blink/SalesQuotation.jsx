@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useData } from '../../context/DataContext';
 import { supabase } from '../../lib/supabase';
-import { getCurrencySymbol } from '../../utils/currencyFormatter';
+import { getCurrencySymbol, parseCurrency } from '../../utils/currencyFormatter';
 import { generateSalesQuotationNumber } from '../../utils/documentNumbers';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
@@ -19,6 +19,7 @@ import { useAuth } from '../../context/AuthContext';
 
 const formatInputAmount = (value, currency) => {
     if (value === null || value === undefined || value === '') return '';
+    if (typeof value === 'string') return value;
     const valStr = value.toString();
     
     // If the user is currently typing a decimal point or trailing zero, don't format with toLocaleString to avoid cursor jump and losing the dot/zero
@@ -35,11 +36,9 @@ const formatInputAmount = (value, currency) => {
     const num = parseFloat(valStr);
     if (isNaN(num)) return valStr;
     
-    if (currency === 'IDR') {
-        return Math.round(num).toLocaleString('id-ID');
-    } else {
-        return num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-    }
+    return currency === 'IDR'
+        ? num.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+        : num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 };
 
 const duplicateAsCostItems = (serviceGroups) => {
@@ -553,7 +552,7 @@ const SalesQuotation = () => {
             commodity: formData.commodity,
             currency: formData.currency,
             exchange_rate: formData.exchange_rate || 16000,
-            total_amount: formData.totalAmount ? parseFloat(formData.totalAmount.toString()) : 0,
+            total_amount: parseCurrency(formData.totalAmount),
             status: status,
             notes: appendCargoMetaToNotes(normalizeNotesHtml(formData.notes), formData.cargoDetails || []),
             service_items: formData.serviceItems,
@@ -666,7 +665,7 @@ const SalesQuotation = () => {
                     return sum + (editedQuotation.currency === 'IDR' ? idrAmount : usdAmount);
                 }, 0);
                 return acc + groupTotal;
-            }, 0) || editedQuotation.totalAmount;
+            }, 0) || parseCurrency(editedQuotation.totalAmount);
 
             // Update in Supabase
             const payload = {
@@ -1458,6 +1457,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
         console.log('📝 Generated SO Number:', soNumber);
 
         // Auto-create Shipment in Operations
+        const baseQuotedAmount = parseCurrency(quotation.total_amount ?? quotation.totalAmount ?? 0);
         const newShipment = {
             jobNumber: quotation.jobNumber, // Already mapped to camelCase
             soNumber: soNumber,
@@ -1474,7 +1474,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
             weight: quotation.weight,
             volume: quotation.volume,
             commodity: quotation.commodity,
-            quotedAmount: quotation.totalAmount || 0, // Already mapped
+            quotedAmount: baseQuotedAmount, // Preserve the quoted figure from the quotation record
             status: 'pending',
             createdAt: new Date().toISOString().split('T')[0],
             createdFrom: 'sales_order'
@@ -2580,7 +2580,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
 
                     {/* Estimated Total — auto calculated from service items */}
                     {(() => {
-                        const totalNum = parseFloat(formData.totalAmount) || 0;
+                        const totalNum = parseCurrency(formData.totalAmount);
                         const rate = parseFloat(formData.exchange_rate) || 16000;
                         const isIDR = formData.currency === 'IDR';
                         const totalIDR = isIDR ? totalNum : totalNum * rate;
@@ -2591,12 +2591,12 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                 <div className="flex gap-6">
                                     <div>
                                         <p className="text-[10px] text-gray-400 mb-0.5">IDR</p>
-                                        <p className="text-lg font-bold text-orange-600 break-words">Rp {totalIDR.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
+                                        <p className="text-lg font-bold text-orange-600 break-words">Rp {formatInputAmount(isIDR ? formData.totalAmount : totalIDR, 'IDR')}</p>
                                     </div>
                                     {rate > 1 && (
                                         <div className="border-l border-orange-200 pl-6">
                                             <p className="text-[10px] text-gray-400 mb-0.5">USD (@ Rp {rate.toLocaleString('id-ID')})</p>
-                                            <p className="text-lg font-bold text-blue-600 break-words">$ {totalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                            <p className="text-lg font-bold text-blue-600 break-words">$ {formatInputAmount(isIDR ? totalUSD : formData.totalAmount, 'USD')}</p>
                                         </div>
                                     )}
                                 </div>
@@ -2611,17 +2611,8 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                         items={formData.serviceItems}
                         onChange={(newGroups) => {
                             setFormData(prev => {
-                                        const parseAmountValue = (val, currency, groupRate) => {
-                                            if (val === null || val === undefined) return 0;
-                                            if (typeof val === 'number') return val;
-                                            const s = String(val).trim();
-                                            if (s === '') return 0;
-                                            try {
-                                                if (currency === 'IDR') {
-                                                    const cleaned = s.replace(/\./g, '').replace(/,/g, '.');
-                                                    const n = parseFloat(cleaned);
-                                                    return Number.isFinite(n) ? n : 0;
-                                                }
+                                    const clean = value.replace(/[^0-9.,-]/g, '');
+                                    setFormData({ ...formData, totalAmount: clean });
                                                 const cleaned = s.replace(/,/g, '');
                                                 const n = parseFloat(cleaned);
                                                 return Number.isFinite(n) ? n : 0;
