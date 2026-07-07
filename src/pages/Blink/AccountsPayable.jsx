@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { createAPPaymentJournal, getAllCOA } from '../../utils/journalHelper';
+import { createAPPaymentJournal, ensureJournalSuccess, getAllCOA } from '../../utils/journalHelper';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
 import {
@@ -219,22 +219,20 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
 
             // ── AUTO JOURNAL ENTRY ──────────────────────────────────────────────────────────────────
             // Dr Hutang Usaha / Cr Kas-Bank
-            try {
-                const coaList = await getAllCOA();
-                await createAPPaymentJournal({
-                    ap,
-                    paymentAmount: parseFloat(formData.amount),
-                    paymentDate: formData.payment_date,
-                    paymentNumber,
-                    selectedBank,
-                    apCOAId: formData.ap_coa_id,
-                    bankCOAId: selectedBank?.coa_id || null,
-                    paymentExchangeRate: formData.payment_exchange_rate
-                });
-                console.log('AP Payment journal entries created');
-            } catch (jeError) {
-                console.warn('[AP] Journal entry creation failed (non-critical):', jeError.message);
-            }
+            const coaList = await getAllCOA();
+            const journalResult = await createAPPaymentJournal({
+                ap,
+                paymentAmount: parseFloat(formData.amount),
+                paymentDate: formData.payment_date,
+                paymentNumber,
+                selectedBank,
+                apCOAId: formData.ap_coa_id,
+                bankCOAId: selectedBank?.coa_id || null,
+                paymentExchangeRate: formData.payment_exchange_rate,
+                coaList
+            });
+            ensureJournalSuccess(journalResult, `AP payment journal ${paymentNumber}`);
+            console.log('AP Payment journal entries created');
 
             // ── CATATAN AKUNTANSI ──────────────────────────────────────────
             // TIDAK perlu reversal journal saat AP lunas.

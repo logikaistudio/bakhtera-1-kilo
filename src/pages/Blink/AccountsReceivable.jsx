@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { createARPaymentJournal, getAllCOA } from '../../utils/journalHelper';
+import { createARPaymentJournal, ensureJournalSuccess, getAllCOA } from '../../utils/journalHelper';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
 import {
@@ -1100,32 +1100,29 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
             // CATATAN: Invoice journal (Dr Piutang / Cr Pendapatan) dibuat oleh
             // "Migrate Auto Journal" di Invoice Management — BUKAN di sini.
             // Jika dibuat di sini juga, akan terjadi duplikasi pencatatan.
-            try {
-                const coaList = await getAllCOA();
+            const coaList = await getAllCOA();
 
-                // Hanya buat payment journal — TIDAK membuat invoice journal
-                await createARPaymentJournal({
-                    invoice: {
-                        id: invoiceId,
-                        invoice_number: ar.invoice_number,
-                        customer_id: ar.customer_id,
-                        customer_name: ar.customer_name,
-                        currency: ar.currency,
-                        exchange_rate: ar.exchange_rate || 1
-                    },
-                    paymentAmount: parseFloat(formData.amount),
-                    paymentDate: formData.payment_date,
-                    paymentNumber,
-                    selectedBank,
-                    arCOAId: formData.ar_coa_id,
-                    bankCOAId: selectedBank?.coa_id || null,
-                    paymentExchangeRate: formData.payment_exchange_rate,
-                    coaList
-                });
-                console.log('[AR] Payment journal created for', paymentNumber);
-            } catch (jeError) {
-                console.warn('[AR] Payment journal warning (non-critical):', jeError.message);
-            }
+            // Hanya buat payment journal — TIDAK membuat invoice journal
+            const journalResult = await createARPaymentJournal({
+                invoice: {
+                    id: invoiceId,
+                    invoice_number: ar.invoice_number,
+                    customer_id: ar.customer_id,
+                    customer_name: ar.customer_name,
+                    currency: ar.currency,
+                    exchange_rate: ar.exchange_rate || 1
+                },
+                paymentAmount: parseFloat(formData.amount),
+                paymentDate: formData.payment_date,
+                paymentNumber,
+                selectedBank,
+                arCOAId: formData.ar_coa_id,
+                bankCOAId: selectedBank?.coa_id || null,
+                paymentExchangeRate: formData.payment_exchange_rate,
+                coaList
+            });
+            ensureJournalSuccess(journalResult, `AR payment journal ${paymentNumber}`);
+            console.log('[AR] Payment journal created for', paymentNumber);
 
             // ── CATATAN AKUNTANSI ──────────────────────────────────────────
             // TIDAK perlu reversal journal saat invoice lunas.

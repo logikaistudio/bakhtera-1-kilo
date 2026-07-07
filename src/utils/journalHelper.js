@@ -110,13 +110,29 @@ export async function journalEntriesHasColumn(columnName) {
  */
 export async function resolveCOA({ codes = [], prefixes = [], type, nameHint, coaList } = {}) {
     const list = coaList || await getAllCOA();
+    const activeList = list.filter(c => c.is_active !== false);
 
-    // PATCH: Hanya izinkan resolve COA berdasarkan id atau code yang valid
     for (const code of codes) {
-        const found = list.find(c => c.code === code && c.is_active !== false);
+        const found = activeList.find(c => c.code === code);
         if (found) return found;
     }
-    // Tidak ada fallback ke nameHint, prefix, atau fuzzy match
+
+    for (const prefix of prefixes) {
+        const found = activeList.find(c => String(c.code || '').startsWith(prefix));
+        if (found) return found;
+    }
+
+    if (type) {
+        const found = activeList.find(c => c.type === type);
+        if (found) return found;
+    }
+
+    if (nameHint) {
+        const hint = String(nameHint).toLowerCase().trim();
+        const found = activeList.find(c => String(c.name || '').toLowerCase().includes(hint));
+        if (found) return found;
+    }
+
     return null;
 }
 
@@ -493,7 +509,7 @@ async function checkDuplicateEntries(rows) {
     const duplicates = [];
     
     for (const row of rows) {
-        const { coa_id, account_code, debit, credit, entry_date } = row;
+        const { coa_id, account_code, debit, credit, entry_date, entry_type, reference_type, reference_id, reference_number } = row;
         
         // Build query for duplicate check
         let query = supabase
@@ -516,6 +532,11 @@ async function checkDuplicateEntries(rows) {
         if (entry_date) {
             query = query.eq('entry_date', entry_date);
         }
+
+        if (entry_type) query = query.eq('entry_type', entry_type);
+        if (reference_type) query = query.eq('reference_type', reference_type);
+        if (reference_id) query = query.eq('reference_id', String(reference_id));
+        if (reference_number) query = query.eq('reference_number', reference_number);
         
         const { data: existing, error } = await query;
         
@@ -593,6 +614,13 @@ export async function insertJournalEntries(rows) {
     }
 
     return { success: false, error: new Error('Journal insert failed after multiple retries') };
+}
+
+export function ensureJournalSuccess(result, context = 'Journal posting') {
+    if (result?.success) return result;
+
+    const reason = result?.error?.message || result?.reason || 'Unknown journal posting error';
+    throw new Error(`${context} failed: ${reason}`);
 }
 
 export async function journalExists({ refType, refId, entryType, refNumber } = {}) {

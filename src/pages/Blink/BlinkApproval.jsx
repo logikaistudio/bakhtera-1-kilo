@@ -7,7 +7,7 @@ import {
     FileText, User, Calendar, ChevronRight,
     RefreshCw, AlertCircle, Check, X, Ship, Plane, Truck, ShoppingBag, Receipt
 } from 'lucide-react';
-import { createPOApprovalJournal, createInvoiceJournal, getAllCOA } from '../../utils/journalHelper';
+import { createPOApprovalJournal, createInvoiceJournal, ensureJournalSuccess, getAllCOA } from '../../utils/journalHelper';
 import { generateAPNumber, generateARNumber } from '../../utils/documentNumbers';
 
 /**
@@ -720,6 +720,7 @@ const BlinkApproval = () => {
                 if (error) throw error;
 
             } else if (item.type === 'po') {
+                const previousStatus = item.status || 'manager_approval';
                 // Approve Purchase Order
                 const { error } = await supabase
                     .from('blink_purchase_orders')
@@ -782,20 +783,22 @@ const BlinkApproval = () => {
                 try {
                     await insertAPTransaction(blinkAPRow, bigAPRow);
                     console.log('AP entry created successfully for PO', poData.po_number);
-                } catch (apError) {
-                    console.error('[Approval] AP creation failed:', apError.message || apError);
-                }
 
-                // Create Journal Entries - using the robust journalHelper.js
-                try {
+                    // Create Journal Entries - using the robust journalHelper.js
                     const coaList = await getAllCOA();
-                    const fullPO = { ...poData, total_amount: poData.total_amount }; 
-                    await createPOApprovalJournal({ po: fullPO, coaList });
-                } catch (jeErr) {
-                    console.warn('[Approval] Journal entry creation failed:', jeErr.message);
+                    const fullPO = { ...poData, total_amount: poData.total_amount };
+                    const journalResult = await createPOApprovalJournal({ po: fullPO, coaList });
+                    ensureJournalSuccess(journalResult, `PO approval journal ${poData.po_number}`);
+                } catch (postingError) {
+                    await supabase
+                        .from('blink_purchase_orders')
+                        .update({ status: previousStatus, updated_at: new Date().toISOString() })
+                        .eq('id', item.id);
+                    throw postingError;
                 }
 
             } else if (item.type === 'invoice') {
+                const previousStatus = item.status || 'manager_approval';
                 // 1. Approve invoice
                 const { error } = await supabase
                     .from('blink_invoices')
@@ -848,16 +851,17 @@ const BlinkApproval = () => {
                 try {
                     await insertARTransaction(blinkARRow, bigARRow);
                     console.log('AR entry created successfully for Invoice', invData.invoice_number);
-                } catch (arError) {
-                    console.error('[Approval] AR creation failed:', arError.message || arError);
-                }
 
-                // 4. Auto-create Journal Entries: Debit AR, Credit Revenue
-                try {
+                    // 4. Auto-create Journal Entries: Debit AR, Credit Revenue
                     const coaList = await getAllCOA();
-                    await createInvoiceJournal({ invoice: invData, coaList });
-                } catch (jeErr) {
-                    console.warn('[Approval] Invoice Journal creation failed:', jeErr.message);
+                    const journalResult = await createInvoiceJournal({ invoice: invData, coaList });
+                    ensureJournalSuccess(journalResult, `Invoice approval journal ${invData.invoice_number}`);
+                } catch (postingError) {
+                    await supabase
+                        .from('blink_invoices')
+                        .update({ status: previousStatus, updated_at: new Date().toISOString() })
+                        .eq('id', item.id);
+                    throw postingError;
                 }
             } else if (item.type === 'sales_quotation') {
                 // Fetch quotation data
