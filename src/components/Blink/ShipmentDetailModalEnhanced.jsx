@@ -932,10 +932,18 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                 }
             });
 
-            const { error } = await supabase
+            const saveCOGSUpdate = async (payload) => supabase
                 .from('blink_shipments')
-                .update(updateData)
+                .update(payload)
                 .eq('id', shipment.id);
+
+            let { error } = await saveCOGSUpdate(updateData);
+
+            if (error && String(error.message || '').includes("'actual_cost'")) {
+                const retryData = { ...updateData };
+                delete retryData.actual_cost;
+                ({ error } = await saveCOGSUpdate(retryData));
+            }
 
             if (error) throw error;
 
