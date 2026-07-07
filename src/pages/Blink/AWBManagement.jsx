@@ -298,10 +298,10 @@ const AWBManagement = () => {
                     bl_marks_numbers: marksNumbers,
                     bl_description_packages: descriptionGoods,
                     bl_gross_weight_text: editForm.grossWeight,
-                    bl_chargeable_weight_text: editForm.chargeableWeight,
                     bl_measurement_text: editForm.measurement,
-                    bl_number_of_packages: editForm.pieces || null,
-                    bl_total_packages_in_words: editForm.pieces,
+                    gross_weight: parseFloat(editForm.grossWeight) || null,
+                    chargeable_weight: parseFloat(editForm.chargeableWeight) || null,
+                    packages: editForm.pieces || null,
                 };
 
             const updateShipmentDocument = async (payload) => supabase
@@ -309,17 +309,30 @@ const AWBManagement = () => {
                 .update(payload)
                 .eq('id', selectedAWB.id);
 
-            let { error } = await updateShipmentDocument(updateData);
+            const updateWithoutMissingColumns = async (payload) => {
+                const safePayload = { ...payload };
+                for (let attempt = 0; attempt < 8; attempt += 1) {
+                    const { error } = await updateShipmentDocument(safePayload);
+                    if (!error) return null;
+                    if (!/column .* does not exist|schema cache/i.test(error.message || '')) return error;
+
+                    const missingColumn = (error.message || '').match(/'([^']+)' column/)?.[1];
+                    if (!missingColumn || !(missingColumn in safePayload)) return error;
+                    delete safePayload[missingColumn];
+                }
+
+                const { error } = await updateShipmentDocument(safePayload);
+                return error;
+            };
+
+            let error = await updateWithoutMissingColumns(updateData);
 
             if (error && /column .* does not exist|schema cache/i.test(error.message || '')) {
                 const fallbackData = { ...updateData };
                 const missingColumn = (error.message || '').match(/'([^']+)' column/)?.[1];
                 if (missingColumn) delete fallbackData[missingColumn];
-                delete fallbackData.bl_number_of_packages;
-                delete fallbackData.bl_chargeable_weight_text;
 
-                const retry = await updateShipmentDocument(fallbackData);
-                error = retry.error;
+                error = await updateWithoutMissingColumns(fallbackData);
             }
 
             if (error) throw error;
