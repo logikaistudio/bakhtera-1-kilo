@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Trash2, ChevronDown, Search, GripVertical } from 'lucide-react';
 import Button from './Button';
 import { supabase } from '../../lib/supabase';
+import { parseCurrency } from '../../utils/currencyFormatter';
 
 // ─── Custom Item Picker ───────────────────────────────────────────────────────
 const ItemPicker = ({ value, onChange, accounts, readOnly }) => {
@@ -228,7 +229,7 @@ const GroupedServiceItemManager = ({
                         // Auto-calculate amount if quantity or unitPrice changes
                         if (field === 'quantity' || field === 'unitPrice' || field === 'currency') {
                             const currencyToUse = field === 'currency' ? value : item.currency;
-                            const qty = field === 'quantity' ? parseAmountValue(value, 'USD') : parseAmountValue(item.quantity, 'USD');
+                            const qty = field === 'quantity' ? parseCurrency(value) : parseCurrency(item.quantity);
                             const priceStr = field === 'unitPrice' ? value : item.unitPrice;
                             const price = parseAmountValue(priceStr, currencyToUse);
 
@@ -267,14 +268,9 @@ const GroupedServiceItemManager = ({
         try {
             if (currency === 'IDR') {
                 // IDR formatted like 35.000.000 or 35.000.000,00 -> remove dots, treat comma as decimal
-                const cleaned = s.replace(/\./g, '').replace(/,/g, '.');
-                const n = parseFloat(cleaned);
-                return Number.isFinite(n) ? n : 0;
+                return parseCurrency(s);
             }
-            // USD or other: remove commas used as thousands separator
-            const cleaned = s.replace(/,/g, '');
-            const n = parseFloat(cleaned);
-            return Number.isFinite(n) ? n : 0;
+            return parseCurrency(s);
         } catch (e) {
             return 0;
         }
@@ -410,7 +406,7 @@ const GroupedServiceItemManager = ({
                                         <div className="relative">
                                             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">Rp</span>
                                             <input
-                                                type="number"
+                                                type="text"
                                                 value={group.groupExchangeRate || ''}
                                                 onChange={(e) => updateGroupExchangeRate(group.id, e.target.value)}
                                                 placeholder={formatNumber(exchangeRate)}
@@ -500,7 +496,7 @@ const GroupedServiceItemManager = ({
                                                         <div>
                                                             <div className="lg:hidden text-[10px] font-semibold text-gray-400 uppercase mb-1">Qty</div>
                                                             <input
-                                                                type="number"
+                                                                type="text"
                                                                 min="0"
                                                                 step="0.01"
                                                                 value={item.quantity}

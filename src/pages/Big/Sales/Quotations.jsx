@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import Button from '../../../components/Common/Button';
 import Modal from '../../../components/Common/Modal';
+import { parseCurrency } from '../../../utils/currencyFormatter';
 
 const BigQuotations = () => {
     const navigate = useNavigate();
@@ -93,7 +94,7 @@ const BigQuotations = () => {
     };
 
     const calculateTotals = (items, taxRate) => {
-        const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+        const subtotal = items.reduce((sum, item) => sum + (parseCurrency(item.quantity) * parseCurrency(item.unit_price)), 0);
         const taxAmount = subtotal * (taxRate / 100);
         const total = subtotal + taxAmount;
         return { subtotal, taxAmount, total };
@@ -101,8 +102,8 @@ const BigQuotations = () => {
 
     const handleItemChange = (index, field, value) => {
         const newItems = [...formData.items];
-        newItems[index][field] = field === 'quantity' || field === 'unit_price' ? parseFloat(value) || 0 : value;
-        newItems[index].amount = newItems[index].quantity * newItems[index].unit_price;
+        newItems[index][field] = value;
+        newItems[index].amount = parseCurrency(newItems[index].quantity) * parseCurrency(newItems[index].unit_price);
         setFormData({ ...formData, items: newItems });
     };
 
@@ -190,10 +191,10 @@ const BigQuotations = () => {
                 const itemsToInsert = formData.items.map((item, idx) => ({
                     quotation_id: selectedQuotation.id,
                     description: item.description,
-                    quantity: item.quantity,
+                    quantity: parseCurrency(item.quantity),
                     unit: item.unit,
-                    unit_price: item.unit_price,
-                    amount: item.quantity * item.unit_price,
+                    unit_price: parseCurrency(item.unit_price),
+                    amount: parseCurrency(item.quantity) * parseCurrency(item.unit_price),
                     sort_order: idx
                 }));
                 await supabase.from('big_quotation_items').insert(itemsToInsert);
@@ -217,10 +218,10 @@ const BigQuotations = () => {
                 const itemsToInsert = formData.items.map((item, idx) => ({
                     quotation_id: data.id,
                     description: item.description,
-                    quantity: item.quantity,
+                    quantity: parseCurrency(item.quantity),
                     unit: item.unit,
-                    unit_price: item.unit_price,
-                    amount: item.quantity * item.unit_price,
+                    unit_price: parseCurrency(item.unit_price),
+                    amount: parseCurrency(item.quantity) * parseCurrency(item.unit_price),
                     sort_order: idx
                 }));
                 await supabase.from('big_quotation_items').insert(itemsToInsert);
@@ -629,7 +630,7 @@ const BigQuotations = () => {
                                         className="col-span-5 px-2 py-1 border rounded text-sm dark:bg-dark-surface dark:border-dark-border"
                                     />
                                     <input
-                                        type="number"
+                                        type="text"
                                         placeholder="Qty"
                                         value={item.quantity}
                                         onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
@@ -638,16 +639,16 @@ const BigQuotations = () => {
                                     <input
                                         type="text"
                                         placeholder="Unit Price"
-                                        value={item.unit_price ? parseInt(item.unit_price).toLocaleString('id-ID') : ''}
+                                        value={item.unit_price || item.unit_price === 0 ? (typeof item.unit_price === 'string' ? item.unit_price : parseCurrency(item.unit_price).toLocaleString('id-ID', { minimumFractionDigits: Number.isInteger(parseCurrency(item.unit_price)) ? 0 : 2, maximumFractionDigits: 6 })) : ''}
                                         onChange={(e) => {
-                                            const value = e.target.value.replace(/\./g, '');
-                                            if (value === '' || /^\d+$/.test(value)) {
+                                            const value = e.target.value;
+                                            if (value === '' || /^[\d.,]+$/.test(value)) {
                                                 handleItemChange(idx, 'unit_price', value);
                                             }
                                         }}
                                         className="col-span-3 px-2 py-1 border rounded text-sm dark:bg-dark-surface dark:border-dark-border text-right"
                                     />
-                                    <span className="col-span-1 text-sm text-right">{formatCurrency(item.quantity * item.unit_price)}</span>
+                                    <span className="col-span-1 text-sm text-right">{formatCurrency(parseCurrency(item.quantity) * parseCurrency(item.unit_price))}</span>
                                     {formData.items.length > 1 && (
                                         <button type="button" onClick={() => removeItem(idx)} className="col-span-1 text-red-500">
                                             <X className="w-4 h-4" />

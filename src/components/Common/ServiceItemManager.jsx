@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Trash2, ChevronDown, Search } from 'lucide-react';
 import Button from './Button';
 import { supabase } from '../../lib/supabase';
-import { getCurrencySymbol } from '../../utils/currencyFormatter';
+import { formatCurrency as formatLocalizedNumber, getCurrencySymbol, parseCurrency } from '../../utils/currencyFormatter';
 
 // ─── Custom Item Picker ───────────────────────────────────────────────────────
 // Dropdown list shows "code – name" for easy identification
@@ -159,8 +159,8 @@ const ServiceItemManager = ({ items = [], onChange, currency = 'USD', readOnly =
 
                 // Auto-calculate amount when quantity or unitPrice changes
                 if (field === 'quantity' || field === 'unitPrice') {
-                    const qty = field === 'quantity' ? parseFloat(value) || 0 : parseFloat(item.quantity) || 0;
-                    const price = field === 'unitPrice' ? parseFloat(value.toString().replace(/\./g, '')) || 0 : parseFloat(item.unitPrice) || 0;
+                    const qty = field === 'quantity' ? parseCurrency(value) : parseCurrency(item.quantity);
+                    const price = field === 'unitPrice' ? parseCurrency(value) : parseCurrency(item.unitPrice);
                     updatedItem.amount = qty * price;
                 }
 
@@ -179,12 +179,12 @@ const ServiceItemManager = ({ items = [], onChange, currency = 'USD', readOnly =
     };
 
     const calculateTotal = () => {
-        return serviceItems.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+        return serviceItems.reduce((sum, item) => sum + (parseCurrency(item.amount) || 0), 0);
     };
 
     const formatNumber = (num) => {
         if (!num && num !== 0) return '';
-        return parseInt(num).toLocaleString('id-ID');
+        return formatLocalizedNumber(parseCurrency(num));
     };
 
     // Returns only the name for a given code — used in read-only & print
@@ -274,10 +274,10 @@ const ServiceItemManager = ({ items = [], onChange, currency = 'USD', readOnly =
                                     <td className="py-2 px-2">
                                         <input
                                             type="text"
-                                            value={item.unitPrice ? formatNumber(item.unitPrice) : ''}
+                                            value={item.unitPrice || item.unitPrice === 0 ? (typeof item.unitPrice === 'string' ? item.unitPrice : formatNumber(item.unitPrice)) : ''}
                                             onChange={(e) => {
-                                                const value = e.target.value.replace(/\./g, '');
-                                                if (value === '' || /^\d+$/.test(value)) {
+                                                const value = e.target.value;
+                                                if (value === '' || /^[\d.,]+$/.test(value)) {
                                                     updateItem(item.id, 'unitPrice', value);
                                                 }
                                             }}

@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useData } from '../../context/DataContext';
 import { generateInvoiceNumber } from '../../utils/documentNumbers';
-import { getCurrencySymbol } from '../../utils/currencyFormatter';
+import { getCurrencySymbol, parseCurrency } from '../../utils/currencyFormatter';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
 import COAPicker from '../../components/Common/COAPicker';
@@ -158,6 +158,23 @@ const InvoiceManagement = () => {
         containers: ''
     });
 
+    const firstFilled = (...values) => values.find(value => value !== null && value !== undefined && String(value).trim() !== '') || '';
+    const getShipmentMasterDoc = (shipment = {}) => firstFilled(
+        shipment.mbl,
+        shipment.mawb,
+        shipment.mbl_number,
+        shipment.bl_awb_number,
+        shipment.bl_number,
+        shipment.awb_number
+    );
+    const getShipmentHouseDoc = (shipment = {}) => firstFilled(
+        shipment.hbl,
+        shipment.hawb,
+        shipment.hbl_number,
+        shipment.hawb_number,
+        shipment.house_bl
+    );
+
     const statusConfig = {
         draft: { label: 'Draft', color: 'bg-gray-500/20 text-gray-400', icon: FileText },
         sent: { label: 'Sent', color: 'bg-blue-500/20 text-blue-400', icon: Send },
@@ -226,7 +243,34 @@ const InvoiceManagement = () => {
 
             console.log('Fetched invoices:', invoicesData?.length || 0);
 
-            setInvoices(invoicesData || []);
+            const invoices = invoicesData || [];
+            const missingShipmentDocIds = [...new Set(invoices
+                .filter(inv => inv.shipment_id && (!inv.ocean_bl || !inv.house_bl))
+                .map(inv => inv.shipment_id))];
+
+            if (missingShipmentDocIds.length > 0) {
+                const { data: shipmentDocs, error: shipmentDocError } = await supabase
+                    .from('blink_shipments')
+                    .select('*')
+                    .in('id', missingShipmentDocIds);
+
+                if (shipmentDocError) {
+                    console.warn('Could not enrich invoice shipment document numbers:', shipmentDocError.message);
+                } else {
+                    const shipmentDocMap = new Map((shipmentDocs || []).map(ship => [ship.id, ship]));
+                    setInvoices(invoices.map(inv => {
+                        const shipment = shipmentDocMap.get(inv.shipment_id) || {};
+                        return {
+                            ...inv,
+                            ocean_bl: firstFilled(inv.ocean_bl, getShipmentMasterDoc(shipment)),
+                            house_bl: firstFilled(inv.house_bl, getShipmentHouseDoc(shipment))
+                        };
+                    }));
+                    return;
+                }
+            }
+
+            setInvoices(invoices);
         } catch (error) {
             console.error('Error fetching invoices:', error);
             setInvoices([]);
@@ -337,11 +381,11 @@ const InvoiceManagement = () => {
                         return {
                             item_name: acc?.name || item.itemCode || item.name || item.service_name || 'Item',
                             description: item.description || item.name || '',
-                            qty: parseFloat(item.quantity) || parseFloat(item.qty) || 1,
+                            qty: parseCurrency(item.quantity) || parseCurrency(item.qty) || 1,
                             unit: item.unit || 'Job',
-                            rate: parseFloat(item.unitPrice) || parseFloat(item.price) || parseFloat(item.rate) || 0,
-                            amount: parseFloat(item.amount) || parseFloat(item.total) ||
-                                ((parseFloat(item.quantity) || 1) * (parseFloat(item.unitPrice) || parseFloat(item.price) || parseFloat(item.rate) || 0)),
+                            rate: parseCurrency(item.unitPrice) || parseCurrency(item.price) || parseCurrency(item.rate) || 0,
+                            amount: parseCurrency(item.amount) || parseCurrency(item.total) ||
+                                ((parseCurrency(item.quantity) || 1) * (parseCurrency(item.unitPrice) || parseCurrency(item.price) || parseCurrency(item.rate) || 0)),
                             tax_amount: typeof item.tax_amount !== 'undefined' ? Number(item.tax_amount) : 0,
                             tax_rate: typeof item.tax_rate !== 'undefined' ? Number(item.tax_rate) : 0,
                             currency: item.currency || quotation.currency || 'IDR',
@@ -424,11 +468,11 @@ const InvoiceManagement = () => {
                             return {
                                 item_name: acc?.name || item.item_name || item.description || item.name || item.service_name || 'Item',
                                 description: item.description || item.name || '',
-                                qty: parseFloat(item.qty) || parseFloat(item.quantity) || 1,
+                                qty: parseCurrency(item.qty) || parseCurrency(item.quantity) || 1,
                                 unit: item.unit || 'Job',
-                                rate: parseFloat(item.rate) || parseFloat(item.unitPrice) || parseFloat(item.price) || 0,
-                                amount: parseFloat(item.amount) || parseFloat(item.total) ||
-                                    ((parseFloat(item.qty) || parseFloat(item.quantity) || 1) * (parseFloat(item.rate) || parseFloat(item.unitPrice) || 0)),
+                                rate: parseCurrency(item.rate) || parseCurrency(item.unitPrice) || parseCurrency(item.price) || 0,
+                                amount: parseCurrency(item.amount) || parseCurrency(item.total) ||
+                                    ((parseCurrency(item.qty) || parseCurrency(item.quantity) || 1) * (parseCurrency(item.rate) || parseCurrency(item.unitPrice) || 0)),
                                 tax_amount: typeof item.tax_amount !== 'undefined' ? Number(item.tax_amount) : 0,
                                 tax_rate: typeof item.tax_rate !== 'undefined' ? Number(item.tax_rate) : 0,
                                 currency: item.currency || shipment.currency || 'IDR',
@@ -531,8 +575,8 @@ const InvoiceManagement = () => {
                 consignee: shipment.consignee_name || shipment.customer || '',
                 vessel_name: shipment.vessel_name || '',
                 voyage_number: shipment.voyage_number || '',
-                ocean_bl: shipment.mbl || shipment.mawb || shipment.bl_number || shipment.awb_number || shipment.mbl_number || '',
-                house_bl: shipment.hbl || shipment.hawb || shipment.hbl_number || '',
+                ocean_bl: getShipmentMasterDoc(shipment),
+                house_bl: getShipmentHouseDoc(shipment),
                 etd: shipment.etd || '',
                 eta: shipment.eta || '',
                 containers: shipment.container_number || '',

@@ -1169,10 +1169,10 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                 let subTotalUSD = 0;
 
                 const rowHTML = subItems.map((item, itemIndex) => {
-                    const amt = parseFloat(item.amount) || 0;
+                    const amt = parseCurrency(item.amount) || 0;
                     let amtIDR = 0;
                     let amtUSD = 0;
-                    const rateParts = formatRateParts(parseFloat(item.unitPrice) || 0, item.currency || 'USD');
+                    const rateParts = formatRateParts(parseCurrency(item.unitPrice) || 0, item.currency || 'USD');
 
                     if (item.currency === 'IDR') {
                         amtIDR = amt;
@@ -3910,10 +3910,10 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                                                 </td>
                                             </tr>
                                             {subItems.map((item, itemIndex) => {
-                                                const amt = parseFloat(item.amount) || 0;
+                                                const amt = parseCurrency(item.amount) || 0;
                                                 let amtIDR = 0;
                                                 let amtUSD = 0;
-                                                const rateParts = formatRateParts(parseFloat(item.unitPrice) || 0, item.currency || 'USD');
+                                                const rateParts = formatRateParts(parseCurrency(item.unitPrice) || 0, item.currency || 'USD');
 
                                                 if (item.currency === 'IDR') {
                                                     amtIDR = amt;

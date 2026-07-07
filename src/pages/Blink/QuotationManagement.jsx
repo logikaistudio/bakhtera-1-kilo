@@ -715,7 +715,7 @@ const QuotationManagement = () => {
                     <td>${item.name || item.description}</td>
                     <td style="text-align: center;">${item.quantity || 1}</td>
                     <td style="text-align: center;">${item.unit || 'Job'}</td>
-                    <td style="text-align: right;">${formatCurrency(parseFloat(item.unitPrice || item.price || 0), quotation.currency)}</td>
+                    <td style="text-align: right;">${formatCurrency(parseCurrency(item.unitPrice || item.price || 0), quotation.currency)}</td>
                     <td style="text-align: right;">${formatCurrency(item.amount || item.total || ((item.quantity || 1) * (item.unitPrice || 0)), quotation.currency)}</td>
                 </tr>
             `).join('');
@@ -2418,7 +2418,7 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                                             </td>
                                             <td className="py-0.5 text-right text-slate-600">{item.quantity || 1} {item.unit || 'unit'}</td>
                                             <td className="py-0.5 text-right text-slate-600 font-mono">
-                                                {formatCurrency(parseFloat(item.unitPrice || item.price || 0), quotation.currency).replace('Rp', '').replace('$', '')}
+                                                {formatCurrency(parseCurrency(item.unitPrice || item.price || 0), quotation.currency).replace('Rp', '').replace('$', '')}
                                             </td>
                                             <td className="py-0.5 text-right text-slate-900 font-bold font-mono pr-4">
                                                 {formatCurrency(amount, quotation.currency)}
