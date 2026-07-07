@@ -55,7 +55,7 @@ export const generateBLPrintHTML = (blData) => {
         collect: blData.blCollect || blData.collect || '',
         shippedOnBoardDate: blData.blShippedOnBoardDate || blData.shippedOnBoardDate || '',
 
-        mode: blData.blType || 'MBL',
+        mode: blData.blType || blData.type || blData.awbType || 'MBL',
 
         // Print options
         watermark: blData.watermark || null,
@@ -63,6 +63,10 @@ export const generateBLPrintHTML = (blData) => {
     };
 
     const coLogo = blData.logo_url || blData.company_logo || blData.companyLogo || '';
+    const modeUpper = String(d.mode || '').toUpperCase();
+    const isAirDocument = modeUpper.includes('AWB') || modeUpper.includes('AIR');
+    const documentTitle = isAirDocument ? 'AIR WAYBILL' : 'OCEAN BILL OF LADING';
+    const documentNumberLabel = isAirDocument ? 'AWB Number' : 'B/L Number';
     const watermarkRaw = (d.watermark || '').toString().trim();
     const watermarkNormalized = watermarkRaw.toUpperCase().replace(/[-_\s]+/g, ' ').trim();
     const isCopyNonNegotiable = watermarkNormalized.includes('COPY') && watermarkNormalized.includes('NEGOTIABLE');
@@ -77,10 +81,8 @@ export const generateBLPrintHTML = (blData) => {
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Bill of Lading - ${d.blNo}</title>
+    <title>${documentTitle} - ${d.blNo}</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
-
         @media print {
             @page {
                 size: A4;
@@ -102,9 +104,9 @@ export const generateBLPrintHTML = (blData) => {
         * { box-sizing: border-box; }
         
         body {
-            font-family: 'Arial Narrow', 'Inter', sans-serif;
-            font-size: 9pt;
-            line-height: 1.2;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 8pt;
+            line-height: 1.18;
             color: #000;
             background: white;
             width: 210mm;
@@ -114,48 +116,58 @@ export const generateBLPrintHTML = (blData) => {
         .page {
             width: 210mm;
             min-height: 297mm;
-            padding: 8mm;
+            padding: 7mm 8mm;
             position: relative;
         }
 
         .container {
-            border: 1px solid #000;
-            height: 281mm;
+            width: 178mm;
+            height: 270mm;
+            margin: 0 auto;
+            border: 0.8px solid #222;
             display: flex;
             flex-direction: column;
+            background: #fff;
         }
 
         /* GRID SYSTEM */
-        .row { display: flex; width: 100%; border-bottom: 1px solid #000; }
+        .row { display: flex; width: 100%; border-bottom: 0.8px solid #222; }
         .row:last-child { border-bottom: none; }
-        .col { border-right: 1px solid #000; padding: 4px; }
+        .col { border-right: 0.8px solid #222; padding: 3px 4px; }
         .col:last-child { border-right: none; }
         
         /* TYPOGRAPHY */
-        .label { font-size: 6pt; text-transform: uppercase; color: #333; margin-bottom: 2px; display: block; }
-        .value { font-size: 9pt; font-weight: normal; white-space: pre-wrap; }
-        .value-bold { font-size: 9pt; font-weight: bold; }
-        .small-text { font-size: 7pt; }
+        .label { font-size: 5.5pt; text-transform: uppercase; color: #555; margin-bottom: 1.5px; display: block; line-height: 1.05; }
+        .value { font-size: 8pt; font-weight: normal; white-space: pre-wrap; }
+        .value-bold { font-size: 8pt; font-weight: 700; white-space: pre-wrap; }
+        .small-text { font-size: 6.5pt; }
+        .doc-title { font-size: 12pt; font-weight: 800; color: #6b7280; text-align: right; text-transform: uppercase; letter-spacing: .3px; text-decoration: underline; }
+        .field { min-height: 18mm; }
+        .field-sm { min-height: 9.5mm; }
+        .freight-note { font-size: 10pt; font-weight: 800; text-transform: uppercase; margin-top: 14mm; }
         
         .header-logo {
-            text-align: right;
-            padding: 8px;
+            text-align: left;
+            padding: 1px 2px 2px 2px;
             font-weight: 800;
-            font-size: 18pt;
+            font-size: 16pt;
             line-height: 1;
         }
         .header-logo .company-main {
             display:block;
             font-size: 20pt;
             font-weight: 900;
-            letter-spacing: 1px;
+            letter-spacing: .2px;
             margin-bottom: 2px;
+            color: #f97316;
+            font-style: italic;
         }
         .header-logo .company-sub {
             display:block;
-            font-size: 10pt;
+            font-size: 9pt;
             font-weight: 600;
-            color: #333;
+            color: #777;
+            font-style: italic;
         }
 
         /* TABLE PARTICULARS */
@@ -165,19 +177,19 @@ export const generateBLPrintHTML = (blData) => {
             flex: 1;
         }
         .particulars-table th {
-            border-bottom: 1px solid #000;
-            border-right: 1px solid #000;
-            padding: 4px;
-            font-size: 7pt;
+            border-bottom: 0.8px solid #222;
+            border-right: 0.8px solid #222;
+            padding: 3px 4px;
+            font-size: 5.8pt;
             text-transform: uppercase;
             text-align: center;
-            background: #f5f5f5;
+            background: #fff;
         }
         .particulars-table td {
-            border-right: 1px solid #000;
-            padding: 6px 4px;
+            border-right: 0.8px solid #222;
+            padding: 8px 5px;
             vertical-align: top;
-            font-size: 9pt;
+            font-size: 8pt;
         }
         .particulars-table th:last-child, .particulars-table td:last-child {
             border-right: none;
@@ -188,9 +200,9 @@ export const generateBLPrintHTML = (blData) => {
             top: calc(58% + 10mm);
             left: 50%;
             transform: translate(-50%, -50%) rotate(-30deg);
-            font-size: 22pt;
+            font-size: 20pt;
             font-weight: 900;
-            color: rgba(254, 90, 29, 0.8);
+            color: rgba(254, 90, 29, 0.45);
             z-index: 0;
             white-space: nowrap;
             pointer-events: none;
@@ -234,6 +246,33 @@ export const generateBLPrintHTML = (blData) => {
         }
         .print-btn:hover { background: #1d4ed8; }
 
+        .stamp-circle {
+            position: absolute;
+            right: 34mm;
+            bottom: 48mm;
+            width: 34mm;
+            height: 34mm;
+            border: 2px solid rgba(180, 135, 24, 0.7);
+            border-radius: 50%;
+            color: rgba(180, 135, 24, 0.75);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-size: 7pt;
+            font-weight: 800;
+            transform: rotate(-12deg);
+            pointer-events: none;
+        }
+
+        .signature-line {
+            border-top: 0.8px solid #222;
+            width: 46mm;
+            padding-top: 2px;
+            font-size: 7pt;
+            margin-top: 10mm;
+        }
+
         /* PAGE 2: Terms & Conditions */
         .terms-page {
             padding: 10mm;
@@ -271,229 +310,136 @@ export const generateBLPrintHTML = (blData) => {
     </style>
 </head>
 <body>
-    <button class="print-btn no-print" onclick="window.print()">🖨️ PRINT BL</button>
-    
-    <!-- PAGE 1: BILL OF LADING -->
+    <button class="print-btn no-print" onclick="window.print()">🖨️ PRINT ${isAirDocument ? 'AWB' : 'BL'}</button>
+
+    <!-- PAGE 1: BILL OF LADING / AIR WAYBILL -->
     <div class="page">
         ${watermarkHTML}
-
         <div class="container">
-            
-            <!-- ROW 1: Shipper & BL Info -->
-            <div class="row">
-                <div class="col" style="width: 50%;">
-                    <div style="margin-bottom: 6px;">
-                        ${coLogo ? `
-                            <div style="display:flex;align-items:flex-start;justify-content:flex-start;">
-                                <img src="${coLogo}" alt="Logo" style="max-height:88px;max-width:180px;object-fit:contain;" />
-                            </div>
-                        ` : `
-                            <div style="font-size: 7pt; color: #555; font-weight: 600; letter-spacing: 1.5px; margin-bottom: 3px; text-transform: uppercase;">Ocean Bill of Lading</div>
-                            <div style="font-size: 14pt; font-weight: 900; line-height: 1;">BAKHTERA</div>
-                            <div style="font-size: 8pt; font-weight: 600; color: #333;">FREIGHT WORLDWIDE</div>
-                        `}
+            <div class="row" style="min-height: 36mm;">
+                <div class="col" style="width: 52%; display:flex; flex-direction:column;">
+                    <div class="header-logo" style="min-height:19mm;">
+                        ${coLogo ? `<img src="${coLogo}" alt="Logo" style="max-height:18mm;max-width:58mm;object-fit:contain;" />` : `<span class="company-main">bakhtera</span><span class="company-sub">freight worldwide</span>`}
                         ${d.releaseType ? `<br><span class="release-stamp">${d.releaseType}</span>` : ''}
                     </div>
-                    <span class="label">Shipper / Exporter</span>
+                    <span class="label">Shipper</span>
                     <div class="value-bold">${d.shipper}</div>
                     <div class="value">${d.shipperAddr}</div>
                 </div>
-                <div class="col" style="width: 50%; padding: 0; display: flex; flex-direction: column;">
-                    <div style="flex: 1; padding: 4px; border-bottom: 1px solid #000;">
-                        <div style="display: flex;">
-                           <div style="width: 60%; border-right: 1px solid #000; padding-right: 4px;">
-                               <span class="label">Bill of Lading No.</span>
-                               <div class="value-bold" style="font-size: 11pt;">${d.blNo}</div>
-                           </div>
-                           <div style="width: 40%; padding-left: 4px;">
-                               <span class="label">Reference No.</span>
-                               <div class="value">${d.bookingNo}</div>
-                           </div>
+                <div class="col" style="width: 48%; padding:0; display:flex; flex-direction:column;">
+                    <div style="height:12mm; padding:3px 4px; border-bottom:0.8px solid #222; display:flex; justify-content:flex-end; align-items:flex-start;">
+                        <div class="doc-title">${documentTitle}</div>
+                    </div>
+                    <div style="height:13mm; display:flex; border-bottom:0.8px solid #222;">
+                        <div style="width:55%; border-right:0.8px solid #222; padding:3px 4px;">
+                            <span class="label">Booking Number</span>
+                            <div class="value-bold">${d.bookingNo}</div>
+                        </div>
+                        <div style="width:45%; padding:3px 4px;">
+                            <span class="label">${documentNumberLabel}</span>
+                            <div class="value-bold">${d.blNo}</div>
                         </div>
                     </div>
-                    <div style="flex: 1; padding: 4px;">
-                         <span class="label">Export References</span>
-                         <div class="value small-text">${d.exportRefs}</div>
+                    <div style="flex:1; padding:3px 4px;">
+                        <span class="label">Export References</span>
+                        <div class="value small-text">${d.exportRefs}</div>
                     </div>
                 </div>
             </div>
 
-            <!-- ROW 2: Consignee & Agent -->
-            <div class="row">
-                <div class="col" style="width: 50%;">
-                    <span class="label">Consignee (to Order of)</span>
+            <div class="row" style="min-height:26mm;">
+                <div class="col field" style="width:52%;">
+                    <span class="label">Consignee</span>
                     <div class="value-bold">${d.consignee}</div>
                     <div class="value">${d.consigneeAddr}</div>
                 </div>
-                <div class="col" style="width: 50%;">
+                <div class="col field" style="width:48%;">
+                    <span class="label">Forwarding Agent (Name and address - references)</span>
+                    <div class="value-bold small-text">${d.agentRefs}</div>
+                </div>
+            </div>
+
+            <div class="row" style="min-height:21mm;">
+                <div class="col field" style="width:52%;">
+                    <span class="label">Notify Party</span>
+                    <div class="value-bold">${d.notify}</div>
+                    <div class="value">${d.notifyAddr}</div>
+                </div>
+                <div class="col field" style="width:48%;">
                     <span class="label">Forwarding Agent References</span>
                     <div class="value small-text">${d.agentRefs}</div>
                 </div>
             </div>
 
-            <!-- ROW 3: Notify & routing -->
-            <div class="row">
-                <div class="col" style="width: 50%;">
-                    <span class="label">Notify Party</span>
-                    <div class="value-bold">${d.notify}</div>
-                    <div class="value">${d.notifyAddr}</div>
-                </div>
-                <div class="col" style="width: 50%; padding:0; display: flex; flex-direction: column;">
-                    <div style="display:flex; border-bottom: 1px solid #000;">
-                        <div style="flex:1; padding:4px; border-right:1px solid #000;">
-                            <span class="label">Place of Receipt</span>
-                            <div class="value">${d.placeReceipt}</div>
-                        </div>
-                         <div style="flex:1; padding:4px;">
-                            <span class="label">Pre-Carriage By</span>
-                            <div class="value">${d.preCarriage}</div>
-                        </div>
-                    </div>
-                     <div style="flex:1; padding:4px;">
-                         <span class="label">Point and Country of Origin</span>
-                         <div class="value">${d.countryOfOrigin}</div>
-                    </div>
-                </div>
+            <div class="row" style="min-height:15mm;">
+                <div class="col field-sm" style="width:26%;"><span class="label">Pre-Carriage By</span><div class="value-bold">${d.preCarriage}</div></div>
+                <div class="col field-sm" style="width:26%;"><span class="label">Place of Receipt</span><div class="value-bold">${d.placeReceipt}</div></div>
+                <div class="col field-sm" style="width:24%;"><span class="label">Freight Payable At</span><div class="value-bold" style="text-transform:uppercase;">${d.freightPayable}</div></div>
+                <div class="col field-sm" style="width:24%;"><span class="label">Number of Original B/L's</span><div class="value-bold">${d.originals}</div></div>
             </div>
 
-            <!-- ROW 4: Vessel Info -->
-            <div class="row">
-                <div class="col" style="width: 25%;">
-                    <span class="label">Vessel</span>
-                    <div class="value">${d.vessel}</div>
-                </div>
-                <div class="col" style="width: 25%;">
-                    <span class="label">Voyage No.</span>
-                    <div class="value">${d.voyage}</div>
-                </div>
-                <div class="col" style="width: 25%;">
-                    <span class="label">Port of Loading</span>
-                    <div class="value">${d.pol}</div>
-                </div>
-                 <div class="col" style="width: 25%;">
-                    <span class="label">Type of Move</span>
-                    <div class="value">${d.typeOfMove}</div>
-                </div>
+            <div class="row" style="min-height:15mm;">
+                <div class="col field-sm" style="width:26%;"><span class="label">Ocean Vessel & Voy No</span><div class="value-bold">${[d.vessel, d.voyage].filter(Boolean).join(' / ')}</div></div>
+                <div class="col field-sm" style="width:26%;"><span class="label">Port of Loading</span><div class="value-bold">${d.pol}</div></div>
+                <div class="col field-sm" style="width:24%;"><span class="label">Port of Discharge</span><div class="value-bold">${d.pod}</div></div>
+                <div class="col field-sm" style="width:24%;"><span class="label">Place of Delivery</span><div class="value-bold">${d.placeDelivery}</div></div>
             </div>
 
-            <!-- ROW 5: Discharge Info -->
-            <div class="row">
-                 <div class="col" style="width: 25%;">
-                    <span class="label">Port of Discharge</span>
-                    <div class="value">${d.pod}</div>
-                </div>
-                <div class="col" style="width: 25%;">
-                    <span class="label">Place of Delivery</span>
-                    <div class="value">${d.placeDelivery}</div>
-                </div>
-                 <div class="col" style="width: 25%;">
-                    <span class="label">Loading Pier/Terminal</span>
-                    <div class="value">${d.loadingPier}</div>
-                </div>
-                 <div class="col" style="width: 25%;">
-                    <span class="label">Number of Originals</span>
-                    <div class="value">${d.originals}</div>
-                </div>
+            <div class="row" style="min-height:10mm;">
+                <div class="col field-sm" style="width:26%;"><span class="label">Point and Country of Origin</span><div class="value">${d.countryOfOrigin}</div></div>
+                <div class="col field-sm" style="width:26%;"><span class="label">Loading Pier/Terminal</span><div class="value">${d.loadingPier}</div></div>
+                <div class="col field-sm" style="width:48%;"><span class="label">Type of Move</span><div class="value-bold">${d.typeOfMove}</div></div>
             </div>
 
-            <!-- ROW 6: Cargo Particulars Header -->
-            <div style="border-bottom: 1px solid #000; text-align: center; font-weight: bold; background: #f0f0f0; padding: 3px; font-size: 8pt;">
+            <div style="border-bottom:0.8px solid #222; text-align:center; font-weight:800; background:#fff; padding:2px; font-size:6.5pt;">
                 PARTICULARS FURNISHED BY SHIPPER
             </div>
 
-            <!-- ROW 7: Cargo Table -->
-            <div style="flex: 1; display: flex; border-bottom: 1px solid #000;">
+            <div style="height:88mm; display:flex; border-bottom:0.8px solid #222; position:relative;">
                 <table class="particulars-table">
                     <thead>
                         <tr>
-                            <th style="width: 18%">Marks & Numbers</th>
-                            <th style="width: 10%">No. of Pkgs</th>
-                            <th style="width: 47%">Description of Packages and Goods</th>
-                            <th style="width: 12%">Gross Weight</th>
-                            <th style="width: 13%">Measurement</th>
+                            <th style="width:18%">Marks and Numbers</th>
+                            <th style="width:12%">Number of Packages</th>
+                            <th style="width:45%">Description<br>As Per Merchant's Information</th>
+                            <th style="width:12%">Gross Weight</th>
+                            <th style="width:13%">Measurement</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
-                            <td>
-                                <div class="value" style="white-space: pre-wrap;">${d.marks}</div>
-                                <div class="value small-text" style="margin-top: 8px;">
-                                    ${d.containerNo ? 'CNTR: ' + d.containerNo : ''}
-                                    ${d.sealNo ? '<br>SEAL: ' + d.sealNo : ''}
-                                </div>
-                            </td>
-                             <td style="text-align: center;">
-                                <div class="value">${d.numberOfPackages}</div>
-                            </td>
-                            <td>
-                                <div class="value" style="font-weight: bold;">${d.description}</div>
-                            </td>
-                             <td style="text-align: right;">
-                                <div class="value">${d.weight}</div>
-                            </td>
-                             <td style="text-align: right;">
-                                <div class="value">${d.measurement}</div>
-                            </td>
+                            <td><div class="value" style="white-space:pre-wrap;">${d.marks}</div><div class="value small-text" style="margin-top:8px;">${d.containerNo ? 'CNTR: ' + d.containerNo : ''}${d.sealNo ? '<br>SEAL: ' + d.sealNo : ''}</div></td>
+                            <td style="text-align:center;"><div class="value-bold">${d.numberOfPackages}</div></td>
+                            <td><div class="value" style="font-weight:bold; text-align:center; line-height:1.35;">${d.description}</div></td>
+                            <td style="text-align:right;"><div class="value-bold">${d.weight}</div></td>
+                            <td style="text-align:right;"><div class="value-bold">${d.measurement}</div></td>
                         </tr>
                     </tbody>
                 </table>
             </div>
 
-            <!-- ROW 8: Totals -->
-            <div class="row" style="background: #f5f5f5;">
-                <div class="col" style="width: 30%;">
-                     <span class="label">Total Number of Packages (In Words)</span>
+            <div class="row" style="height:61mm; position:relative;">
+                <div class="col" style="width:52%; padding:0; display:flex; flex-direction:column;">
+                    <div style="height:11mm; border-bottom:0.8px solid #222; display:flex; align-items:center; justify-content:center; text-align:center; font-size:7pt; color:#555;">
+                        FREIGHT RATES, CHARGES, WEIGHTS AND / OR<br>MEASUREMENTS SUBJECT TO CORRECTION
+                    </div>
+                    <div style="display:flex; flex:1;">
+                        <div style="width:38%; border-right:0.8px solid #222; padding:4px;"><div class="freight-note">${String(d.freightPayable || '').toUpperCase().includes('DEST') ? 'FREIGHT COLLECT' : 'FREIGHT PREPAID'}</div></div>
+                        <div style="width:31%; border-right:0.8px solid #222; padding:4px;"><span class="label">Freight & Charges</span><div class="value">${d.freightCharges}</div></div>
+                        <div style="width:31%; padding:4px;"><span class="label">Total Packages in Words</span><div class="value-bold" style="text-transform:uppercase;">${d.totalPackagesInWords}</div></div>
+                    </div>
                 </div>
-                <div class="col" style="width: 70%;">
-                     <div class="value-bold" style="text-transform: uppercase;">${d.totalPackagesInWords}</div>
+                <div class="col" style="width:48%; padding:5px 6px; position:relative;">
+                    <div style="font-size:5.7pt; color:#555; line-height:1.2; text-align:justify;">
+                        Received by Carrier for shipment by ocean vessel between port of loading and port of discharge, and for arrangement or procurement of pre-carriage from place of receipt and on-carriage to place of delivery where stated. The goods to be delivered at the above mentioned port of discharge or place of delivery whichever applicable subject always to exceptions, limitations, conditions and liberties set out on the reverse side hereof.
+                    </div>
+                    <div style="margin-top:4mm; font-size:7pt;">DATED AT <strong>${String(d.placeIssue || '').toUpperCase()}</strong> ${d.dateIssue ? `ON ${d.dateIssue}` : ''}</div>
+                    ${d.shippedOnBoardDate ? `<div style="margin-top:2mm; font-size:7pt;">SHIPPED ON BOARD<br><strong>${String(d.placeIssue || '').toUpperCase()}</strong><br>ON DATE <strong>${d.shippedOnBoardDate}</strong></div>` : ''}
+                    <div style="margin-top:6mm; font-size:8pt;">By <strong>BAKHTERA FREIGHT WORLDWIDE</strong></div>
+                    <div class="signature-line">As Agent For Carrier</div>
                 </div>
+                <div class="stamp-circle">BAKHTERA<br>BFW<br>FREIGHT WORLDWIDE</div>
             </div>
-
-            <!-- ROW 9: Freight & Charges -->
-            <div class="row" style="min-height: 60px;">
-                 <div class="col" style="width: 25%;">
-                     <span class="label">Freight & Charges</span>
-                     <div class="value">${d.freightCharges}</div>
-                </div>
-                 <div class="col" style="width: 25%;">
-                     <span class="label">Prepaid</span>
-                     <div class="value">${d.prepaid}</div>
-                </div>
-                 <div class="col" style="width: 25%;">
-                     <span class="label">Collect</span>
-                     <div class="value">${d.collect}</div>
-                </div>
-                 <div class="col" style="width: 25%;">
-                     <span class="label">Freight Payable At</span>
-                     <div class="value" style="text-transform: uppercase;">${d.freightPayable}</div>
-                </div>
-            </div>
-
-            <!-- ROW 10: Footer (NO Authorized Signature) -->
-            <div class="row" style="min-height: 100px;">
-                 <div class="col" style="width: 50%; padding: 8px;">
-                     <span class="label">Date of Issue of B/L</span>
-                     <div class="value">${d.dateIssue}</div>
-                     <br>
-                     <span class="label">Place of Issue of B/L</span>
-                     <div class="value" style="text-transform: uppercase;">${d.placeIssue}</div>
-                     <br><br>
-                     <div style="border-top: 1px solid #000; display: inline-block; padding-top: 2px; width: 180px;">
-                        <span class="label">Shipped on Board Date</span>
-                        <div class="value">${d.shippedOnBoardDate}</div>
-                     </div>
-                </div>
-                 <div class="col" style="width: 50%; padding: 8px;">
-                     <span class="label">Signed for the Carrier</span>
-                     <div style="font-weight: bold; margin-top: 4px;">BAKHTERA FREIGHT WORLDWIDE</div>
-                     <div style="font-size: 7pt;">AS CARRIER</div>
-                     <br><br>
-                     <div style="font-size: 6pt; color: #666;">
-                        This Bill of Lading is subject to the terms and conditions printed overleaf.
-                     </div>
-                </div>
-            </div>
-
         </div>
     </div>
 
