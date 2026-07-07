@@ -18,7 +18,7 @@ const normalizeServiceType = (value) => {
 };
 
 const ShipmentManagement = () => {
-    const { canCreate, canEdit, canDelete, canView, canApprove, canAccess } = useAuth();
+    const { canCreate, canEdit, canDelete, canView, canApprove, canAccess, isSuperAdmin } = useAuth();
     const { deleteShipmentCascade } = useData();
     const [filter, setFilter] = useState('all');
     const [shipments, setShipments] = useState([]);
@@ -46,10 +46,11 @@ const ShipmentManagement = () => {
     const [listPOShipment, setListPOShipment] = useState(null);
     const [isCleansing, setIsCleansing] = useState(false);
     const [cleanseProgress, setCleanseProgress] = useState('');
+    const canRunSuperAdminBatch = isSuperAdmin();
 
     const handleCleanseAllShipments = async () => {
-        if (!canDelete('blink_shipments')) {
-            alert('Akses Ditolak: Anda tidak memiliki hak untuk cleansing shipment.');
+        if (!canRunSuperAdminBatch) {
+            alert('Akses Ditolak: Hanya Super Admin yang dapat cleansing shipment.');
             return;
         }
         if (shipments.length === 0) {
@@ -81,8 +82,8 @@ const ShipmentManagement = () => {
     };
 
     const handleDeleteSelectedShipments = async () => {
-        if (!canDelete('blink_shipments')) {
-            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus shipment.');
+        if (!canRunSuperAdminBatch) {
+            alert('Akses Ditolak: Hanya Super Admin yang dapat menghapus shipment terpilih.');
             return;
         }
         if (selectedShipmentIds.length === 0) {
@@ -747,24 +748,28 @@ const ShipmentManagement = () => {
                             <p className="text-silver-dark mt-1">Kelola semua sales order</p>
                 </div>
                 <div className="flex gap-2">
-                    <Button
-                        size="sm"
-                        variant="danger"
-                        icon={Trash2}
-                        onClick={handleDeleteSelectedShipments}
-                        disabled={!canDelete('blink_shipments') || selectedShipmentIds.length === 0 || isCleansing}
-                    >
-                        Hapus Terpilih ({selectedShipmentIds.length})
-                    </Button>
-                    <Button
-                        size="sm"
-                        variant="danger"
-                        icon={Trash2}
-                        onClick={handleCleanseAllShipments}
-                        disabled={!canDelete('blink_shipments') || shipments.length === 0 || isCleansing}
-                    >
-                        {isCleansing ? 'Cleansing...' : 'Bersihkan Semua Data'}
-                    </Button>
+                    {canRunSuperAdminBatch && (
+                        <>
+                            <Button
+                                size="sm"
+                                variant="danger"
+                                icon={Trash2}
+                                onClick={handleDeleteSelectedShipments}
+                                disabled={selectedShipmentIds.length === 0 || isCleansing}
+                            >
+                                Hapus Terpilih ({selectedShipmentIds.length})
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="danger"
+                                icon={Trash2}
+                                onClick={handleCleanseAllShipments}
+                                disabled={shipments.length === 0 || isCleansing}
+                            >
+                                {isCleansing ? 'Cleansing...' : 'Bersihkan Semua Data'}
+                            </Button>
+                        </>
+                    )}
                     <Button
                         size="sm"
                         variant="secondary"

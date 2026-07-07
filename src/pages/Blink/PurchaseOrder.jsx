@@ -52,7 +52,7 @@ const recordApprovalHistory = async (po, action, reason = null, approverName = '
 };
 
 const PurchaseOrder = () => {
-    const { user, canCreate, canEdit, canDelete, canView, canApprove } = useAuth();
+    const { user, canCreate, canEdit, canDelete, canView, canApprove, isSuperAdmin } = useAuth();
     const { companySettings, businessPartners, deletePurchaseOrderCascade } = useData();
     const activeDivision = getActiveDivision();
     const [pos, setPOs] = useState([]);
@@ -96,7 +96,8 @@ const PurchaseOrder = () => {
     // Edit state
     const [isEditing, setIsEditing] = useState(false);
     const [editId, setEditId] = useState(null);
-    const canCleansePO = canDelete('blink_purchase_order');
+    const canRunSuperAdminBatch = isSuperAdmin();
+    const canCleansePO = canRunSuperAdminBatch;
     const [isCleansing, setIsCleansing] = useState(false);
     const [cleanseProgress, setCleanseProgress] = useState('');
 
@@ -557,8 +558,8 @@ const PurchaseOrder = () => {
     };
 
     const handleDeleteSelectedPOs = async () => {
-        if (!canDelete('blink_purchase_order')) {
-            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus PO.');
+        if (!canRunSuperAdminBatch) {
+            alert('Akses Ditolak: Hanya Super Admin yang dapat menghapus PO terpilih.');
             return;
         }
         if (selectedPOIds.length === 0) {
@@ -1461,22 +1462,26 @@ const PurchaseOrder = () => {
                     <p className="text-silver-dark mt-1">Kelola pembelian dari vendor</p>
                 </div>
                 <div className="flex gap-2">
-                    <Button
-                        onClick={handleDeleteSelectedPOs}
-                        icon={Trash2}
-                        variant="danger"
-                        disabled={!canDelete('blink_purchase_order') || selectedPOIds.length === 0 || isCleansing}
-                    >
-                        Hapus Terpilih ({selectedPOIds.length})
-                    </Button>
-                    <Button
-                        onClick={handleCleanseAllPOs}
-                        icon={Trash2}
-                        variant="danger"
-                        disabled={!canCleansePO || pos.length === 0 || isCleansing}
-                    >
-                        {isCleansing ? 'Cleansing...' : 'Bersihkan Semua Data'}
-                    </Button>
+                    {canRunSuperAdminBatch && (
+                        <>
+                            <Button
+                                onClick={handleDeleteSelectedPOs}
+                                icon={Trash2}
+                                variant="danger"
+                                disabled={selectedPOIds.length === 0 || isCleansing}
+                            >
+                                Hapus Terpilih ({selectedPOIds.length})
+                            </Button>
+                            <Button
+                                onClick={handleCleanseAllPOs}
+                                icon={Trash2}
+                                variant="danger"
+                                disabled={pos.length === 0 || isCleansing}
+                            >
+                                {isCleansing ? 'Cleansing...' : 'Bersihkan Semua Data'}
+                            </Button>
+                        </>
+                    )}
                     <Button onClick={handleExportXLS} icon={Download} variant="secondary">
                         Export to Excel
                     </Button>

@@ -17,8 +17,9 @@ import {
 } from 'lucide-react';
 
 const ExchangeRates = () => {
-    const { user, canDelete } = useAuth();
+    const { user, canDelete, isSuperAdmin } = useAuth();
     const hasDelete = canDelete('blink_exchange_rates');
+    const canRunSuperAdminBatch = isSuperAdmin();
     const [rates, setRates] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
@@ -189,7 +190,7 @@ const ExchangeRates = () => {
     };
 
     const handleDeleteSelected = async () => {
-        if (!hasDelete || selectedIds.length === 0) return;
+        if (!canRunSuperAdminBatch || selectedIds.length === 0) return;
         if (!confirm(`Hapus ${selectedIds.length} kurs referensi terpilih?`)) return;
 
         try {
@@ -209,7 +210,7 @@ const ExchangeRates = () => {
     };
 
     const handleDeleteAll = async () => {
-        if (!hasDelete) return;
+        if (!canRunSuperAdminBatch) return;
         if (rates.length === 0) {
             alert('Tidak ada data kurs untuk dihapus.');
             return;
@@ -249,7 +250,7 @@ const ExchangeRates = () => {
                     </p>
                 </div>
                 <div className="flex gap-2">
-                    {hasDelete && (
+                    {canRunSuperAdminBatch && (
                         <>
                             <Button size="sm" variant="danger" icon={Trash2} onClick={handleDeleteSelected} disabled={selectedIds.length === 0}>
                                 Hapus Terpilih ({selectedIds.length})

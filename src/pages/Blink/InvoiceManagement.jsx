@@ -21,7 +21,7 @@ import { getActiveDivision } from '../../utils/divisionContext';
 
 const InvoiceManagement = () => {
     const navigate = useNavigate();
-    const { canCreate, canEdit, canDelete, canApprove, user } = useAuth();
+    const { canCreate, canEdit, canDelete, canApprove, isSuperAdmin, user } = useAuth();
     const { companySettings, bankAccounts, businessPartners, deleteInvoiceCascade } = useData();
     const activeDivision = getActiveDivision();
     const [invoices, setInvoices] = useState([]);
@@ -56,10 +56,11 @@ const InvoiceManagement = () => {
     const [editInvoiceId, setEditInvoiceId] = useState(null);
     const [isCleansing, setIsCleansing] = useState(false);
     const [cleanseProgress, setCleanseProgress] = useState('');
+    const canRunSuperAdminBatch = isSuperAdmin();
 
     const handleCleanseAllInvoices = async () => {
-        if (!canDelete('blink_invoices')) {
-            alert('Akses Ditolak: Anda tidak memiliki hak untuk cleansing Invoice.');
+        if (!canRunSuperAdminBatch) {
+            alert('Akses Ditolak: Hanya Super Admin yang dapat cleansing Invoice.');
             return;
         }
         if (invoices.length === 0) {
@@ -91,8 +92,8 @@ const InvoiceManagement = () => {
     };
 
     const handleDeleteSelectedInvoices = async () => {
-        if (!canDelete('blink_invoices')) {
-            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus Invoice.');
+        if (!canRunSuperAdminBatch) {
+            alert('Akses Ditolak: Hanya Super Admin yang dapat menghapus invoice terpilih.');
             return;
         }
         if (selectedInvoiceIds.length === 0) {
@@ -207,7 +208,7 @@ const InvoiceManagement = () => {
     }, []);
 
     useEffect(() => {
-        if (financeMigrationRan || loading || invoices.length === 0) return;
+        if (!canRunSuperAdminBatch || financeMigrationRan || loading || invoices.length === 0) return;
         const runMigration = async () => {
             setFinanceMigrationRan(true);
             try {
@@ -220,7 +221,7 @@ const InvoiceManagement = () => {
             }
         };
         runMigration();
-    }, [financeMigrationRan, loading, invoices]);
+    }, [canRunSuperAdminBatch, financeMigrationRan, loading, invoices]);
 
     const fetchRevenueAccounts = async () => {
         try {
@@ -2048,6 +2049,10 @@ const InvoiceManagement = () => {
     // --- Repair Missing Journals ---
     const [isMigrating, setIsMigrating] = useState(false);
     const runMigration = async () => {
+        if (!canRunSuperAdminBatch) {
+            alert('Akses Ditolak: Hanya Super Admin yang dapat menjalankan repair/migrate jurnal.');
+            return;
+        }
         if (!confirm('Repair missing journals for approved invoices and purchase orders?')) return;
         setIsMigrating(true);
         try {
@@ -2076,30 +2081,34 @@ const InvoiceManagement = () => {
                     <p className="text-silver-dark mt-1">Kelola invoice dan tracking pembayaran</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <Button
-                        onClick={runMigration}
-                        variant="secondary"
-                        icon={Receipt}
-                        disabled={isMigrating || !canEdit('blink_invoices')}
-                    >
-                        {isMigrating ? 'Repairing...' : 'Repair Missing Journals'}
-                    </Button>
-                    <Button
-                        onClick={handleDeleteSelectedInvoices}
-                        variant="danger"
-                        icon={Trash}
-                        disabled={!canDelete('blink_invoices') || selectedInvoiceIds.length === 0 || isCleansing}
-                    >
-                        Hapus Terpilih ({selectedInvoiceIds.length})
-                    </Button>
-                    <Button
-                        onClick={handleCleanseAllInvoices}
-                        variant="danger"
-                        icon={Trash}
-                        disabled={!canDelete('blink_invoices') || invoices.length === 0 || isCleansing}
-                    >
-                        {isCleansing ? 'Cleansing...' : 'Bersihkan Semua Data'}
-                    </Button>
+                    {canRunSuperAdminBatch && (
+                        <>
+                            <Button
+                                onClick={runMigration}
+                                variant="secondary"
+                                icon={Receipt}
+                                disabled={isMigrating}
+                            >
+                                {isMigrating ? 'Repairing...' : 'Repair Missing Journals'}
+                            </Button>
+                            <Button
+                                onClick={handleDeleteSelectedInvoices}
+                                variant="danger"
+                                icon={Trash}
+                                disabled={selectedInvoiceIds.length === 0 || isCleansing}
+                            >
+                                Hapus Terpilih ({selectedInvoiceIds.length})
+                            </Button>
+                            <Button
+                                onClick={handleCleanseAllInvoices}
+                                variant="danger"
+                                icon={Trash}
+                                disabled={invoices.length === 0 || isCleansing}
+                            >
+                                {isCleansing ? 'Cleansing...' : 'Bersihkan Semua Data'}
+                            </Button>
+                        </>
+                    )}
                     <Button onClick={handleExportXLS} variant="secondary" icon={Download}>
                         Export XLS
                     </Button>

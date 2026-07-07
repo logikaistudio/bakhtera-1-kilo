@@ -80,7 +80,7 @@ const PartnerManagement = () => {
         }
     };
 
-    const { isAdmin: isAdminUser, canDelete } = useAuth();
+    const { isAdmin: isAdminUser, canDelete, isSuperAdmin } = useAuth();
     const { deleteBusinessPartner, deleteBusinessPartnersBulk, deleteAllBusinessPartners, addBusinessPartner, updateBusinessPartner } = useData();
 
     const handleSubmit = async (e) => {
@@ -113,6 +113,7 @@ const PartnerManagement = () => {
     };
 
     const canDeletePartner = isAdminUser() || canDelete('blink_partners');
+    const canRunSuperAdminBatch = isSuperAdmin();
 
     const handleDelete = async (partnerId) => {
         if (!canDeletePartner) {
@@ -134,8 +135,8 @@ const PartnerManagement = () => {
     };
 
     const handleCleanseAll = async () => {
-        if (!canDeletePartner) {
-            alert('Akses Ditolak: Anda tidak memiliki hak untuk cleansing data partner.');
+        if (!canRunSuperAdminBatch) {
+            alert('Akses Ditolak: Hanya Super Admin yang dapat cleansing data partner.');
             return;
         }
         if (partners.length === 0) {
@@ -180,7 +181,7 @@ const PartnerManagement = () => {
     };
 
     const handleDeleteSelected = async () => {
-        if (!canDeletePartner || selectedIds.length === 0) return;
+        if (!canRunSuperAdminBatch || selectedIds.length === 0) return;
         if (!confirm(`Yakin hapus ${selectedIds.length} mitra terpilih? Data transaksi terkait tidak akan terhapus.`)) return;
 
         try {
@@ -362,30 +363,34 @@ const PartnerManagement = () => {
                     <p className="text-silver-dark mt-1">Kelola Customer, Vendor, Agent, dan Partner lainnya</p>
                 </div>
                 <div className="flex gap-2">
-                    <button
-                        onClick={handleDeleteSelected}
-                        disabled={!canDeletePartner || selectedIds.length === 0 || isCleansing}
-                        className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm ${canDeletePartner && selectedIds.length > 0
-                            ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                            : 'bg-dark-surface text-silver-dark cursor-not-allowed opacity-60'
-                            }`}
-                        title={canDeletePartner ? 'Hapus mitra terpilih' : 'Tidak ada akses delete'}
-                    >
-                        <Trash2 className="w-4 h-4" />
-                        Hapus Terpilih ({selectedIds.length})
-                    </button>
-                    <button
-                        onClick={handleCleanseAll}
-                        disabled={!canDeletePartner || partners.length === 0 || isCleansing}
-                        className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm ${canDeletePartner && partners.length > 0
-                            ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                            : 'bg-dark-surface text-silver-dark cursor-not-allowed opacity-60'
-                            }`}
-                        title={canDeletePartner ? 'Hapus semua data mitra' : 'Tidak ada akses delete'}
-                    >
-                        <Trash2 className="w-4 h-4" />
-                        {isCleansing ? 'Cleansing...' : 'Bersihkan Semua Data'}
-                    </button>
+                    {canRunSuperAdminBatch && (
+                        <>
+                            <button
+                                onClick={handleDeleteSelected}
+                                disabled={selectedIds.length === 0 || isCleansing}
+                                className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm ${selectedIds.length > 0
+                                    ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                                    : 'bg-dark-surface text-silver-dark cursor-not-allowed opacity-60'
+                                    }`}
+                                title="Hapus mitra terpilih"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                Hapus Terpilih ({selectedIds.length})
+                            </button>
+                            <button
+                                onClick={handleCleanseAll}
+                                disabled={partners.length === 0 || isCleansing}
+                                className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm ${partners.length > 0
+                                    ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                                    : 'bg-dark-surface text-silver-dark cursor-not-allowed opacity-60'
+                                    }`}
+                                title="Hapus semua data mitra"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                {isCleansing ? 'Cleansing...' : 'Bersihkan Semua Data'}
+                            </button>
+                        </>
+                    )}
                     <div className="relative">
                         <input
                             ref={fileInputRef}

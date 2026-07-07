@@ -259,7 +259,7 @@ const RichTextEditor = ({ value, onChange, rows = 4, placeholder = '' }) => {
 };
 
 const SalesQuotation = () => {
-    const { user, canCreate, canEdit, canDelete, canApprove } = useAuth();
+    const { user, canCreate, canEdit, canDelete, canApprove, isSuperAdmin } = useAuth();
     const navigate = useNavigate();
     const { customers, companySettings, deleteBlinkQuotationCascade } = useData();
     const [showModal, setShowModal] = useState(false);
@@ -277,6 +277,7 @@ const SalesQuotation = () => {
     const [selectedQuotationIds, setSelectedQuotationIds] = useState([]);
     const [isCleansing, setIsCleansing] = useState(false);
     const [cleanseProgress, setCleanseProgress] = useState('');
+    const canRunSuperAdminBatch = isSuperAdmin();
 
     // Form state
     const [formData, setFormData] = useState({
@@ -966,8 +967,8 @@ const SalesQuotation = () => {
     };
 
     const handleDeleteQuotation = async (quotationId) => {
-        if (!canManageQuotation('delete')) {
-            alert('Anda tidak memiliki hak akses untuk menghapus quotation.');
+        if (!canRunSuperAdminBatch) {
+            alert('Akses Ditolak: Hanya Super Admin yang dapat menghapus quotation terpilih.');
             return;
         }
         try {
@@ -1667,8 +1668,8 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
     };
 
     const handleDeleteSelectedQuotations = async () => {
-        if (!canManageQuotation('delete')) {
-            alert('Anda tidak memiliki hak akses untuk menghapus quotation.');
+        if (!canRunSuperAdminBatch) {
+            alert('Akses Ditolak: Hanya Super Admin yang dapat cleansing quotation.');
             return;
         }
         if (selectedQuotationIds.length === 0) {
@@ -1769,7 +1770,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                     <p className="text-silver-dark mt-1">Manage quotations untuk customer</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    {canManageQuotation('delete') && (
+                    {canRunSuperAdminBatch && (
                         <>
                             <Button
                                 onClick={handleDeleteSelectedQuotations}

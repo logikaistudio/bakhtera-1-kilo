@@ -14,7 +14,8 @@ const fmtIDR = (v) => {
 };
 
 const SalesAchievement = () => {
-    const { canCreate, canEdit, canDelete } = useAuth();
+    const { canCreate, canEdit, canDelete, isSuperAdmin } = useAuth();
+    const canRunSuperAdminBatch = isSuperAdmin();
 
     const [soAchievement, setSoAchievement] = useState({
         totalQuotations: 0,
@@ -132,7 +133,7 @@ const SalesAchievement = () => {
     };
 
     const handleDeleteSelectedTargets = async () => {
-        if (!canDelete('blink_sales') || selectedTargetIds.length === 0) return;
+        if (!canRunSuperAdminBatch || selectedTargetIds.length === 0) return;
         if (!window.confirm(`Hapus ${selectedTargetIds.length} target terpilih?`)) return;
 
         try {
@@ -148,7 +149,7 @@ const SalesAchievement = () => {
     };
 
     const handleDeleteAllTargets = async () => {
-        if (!canDelete('blink_sales')) return;
+        if (!canRunSuperAdminBatch) return;
         if (targetList.length === 0) {
             alert('Tidak ada target untuk dihapus.');
             return;
@@ -755,7 +756,7 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                             <div>
                                 <div className="flex items-center justify-between mb-3">
                                     <h3 className="text-sm font-semibold text-silver-light">Daftar Target ({targetList.length})</h3>
-                                    {canDelete('blink_sales') && (
+                                    {canRunSuperAdminBatch && (
                                         <div className="flex gap-2">
                                             <button
                                                 onClick={handleDeleteSelectedTargets}

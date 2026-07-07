@@ -20,7 +20,7 @@ import InvoiceProfitSummary from '../../components/Bridge/InvoiceProfitSummary';
 
 const BridgeInvoiceManagement = () => {
     const navigate = useNavigate();
-    const { canCreate, canEdit, canDelete, canApprove, user } = useAuth();
+    const { canCreate, canEdit, canDelete, canApprove, isSuperAdmin, user } = useAuth();
     const { companySettings, bankAccounts, quotations: ctxQuotations = [], shipments: ctxShipments = [], bridgeBusinessPartners = [], deleteBridgeInvoiceCascade } = useData();
     const [invoices, setInvoices] = useState([]);
     const [quotations, setQuotations] = useState([]);
@@ -50,7 +50,8 @@ const BridgeInvoiceManagement = () => {
     const [successSubmitMsg, setSuccessSubmitMsg] = useState('');
     const [isEditingInvoice, setIsEditingInvoice] = useState(false);
     const [editInvoiceId, setEditInvoiceId] = useState(null);
-    const canCleanseBridgeInvoice = canDelete('bridge_finance');
+    const canRunSuperAdminBatch = isSuperAdmin();
+    const canCleanseBridgeInvoice = canRunSuperAdminBatch;
     const [isCleansing, setIsCleansing] = useState(false);
     const [cleanseProgress, setCleanseProgress] = useState('');
 
@@ -130,7 +131,7 @@ const BridgeInvoiceManagement = () => {
     }, [ctxShipments]);
 
     useEffect(() => {
-        if (financeMigrationRan || loading || invoices.length === 0) return;
+        if (!canRunSuperAdminBatch || financeMigrationRan || loading || invoices.length === 0) return;
         const runMigration = async () => {
             setFinanceMigrationRan(true);
             try {
@@ -143,7 +144,7 @@ const BridgeInvoiceManagement = () => {
             }
         };
         runMigration();
-    }, [financeMigrationRan, loading, invoices]);
+    }, [canRunSuperAdminBatch, financeMigrationRan, loading, invoices]);
 
     const fetchRevenueAccounts = async () => {
         try {
@@ -1742,22 +1743,26 @@ const BridgeInvoiceManagement = () => {
                     <p className="text-silver-dark mt-1">Kelola invoice dan tracking pembayaran</p>
                 </div>
                     <div className="flex items-center gap-3">
-                    <Button
-                        onClick={handleDeleteSelectedBridgeInvoices}
-                        variant="danger"
-                        icon={Trash}
-                        disabled={!canCleanseBridgeInvoice || selectedInvoiceIds.length === 0 || isCleansing}
-                    >
-                        Hapus Terpilih ({selectedInvoiceIds.length})
-                    </Button>
-                    <Button
-                        onClick={handleCleanseAllBridgeInvoices}
-                        variant="danger"
-                        icon={Trash}
-                        disabled={!canCleanseBridgeInvoice || invoices.length === 0 || isCleansing}
-                    >
-                        {isCleansing ? 'Cleansing...' : 'Bersihkan Semua Data'}
-                    </Button>
+                    {canRunSuperAdminBatch && (
+                        <>
+                            <Button
+                                onClick={handleDeleteSelectedBridgeInvoices}
+                                variant="danger"
+                                icon={Trash}
+                                disabled={selectedInvoiceIds.length === 0 || isCleansing}
+                            >
+                                Hapus Terpilih ({selectedInvoiceIds.length})
+                            </Button>
+                            <Button
+                                onClick={handleCleanseAllBridgeInvoices}
+                                variant="danger"
+                                icon={Trash}
+                                disabled={invoices.length === 0 || isCleansing}
+                            >
+                                {isCleansing ? 'Cleansing...' : 'Bersihkan Semua Data'}
+                            </Button>
+                        </>
+                    )}
                     <Button onClick={handleExportXLS} variant="secondary" icon={Download}>
                         Export XLS
                     </Button>

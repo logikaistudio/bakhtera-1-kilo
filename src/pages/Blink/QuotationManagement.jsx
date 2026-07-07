@@ -49,7 +49,7 @@ const normalizeServiceType = (value) => {
 };
 
 const QuotationManagement = () => {
-    const { user, canCreate, canEdit, canDelete, canView, canApprove, isAdmin } = useAuth();
+    const { user, canCreate, canEdit, canDelete, canView, canApprove, isAdmin, isSuperAdmin } = useAuth();
     const navigate = useNavigate();
     const { deleteBlinkQuotationCascade, customers, companySettings } = useData();
     const [showModal, setShowModal] = useState(false);
@@ -64,7 +64,8 @@ const QuotationManagement = () => {
     const [selectedIds, setSelectedIds] = useState([]);
     const [isCleansing, setIsCleansing] = useState(false);
     const [cleanseProgress, setCleanseProgress] = useState('');
-    const canCleanseQuotations = isAdmin() || canDelete('blink_quotations');
+    const canRunSuperAdminBatch = isSuperAdmin();
+    const canCleanseQuotations = canRunSuperAdminBatch;
 
     // Form state
     const [formData, setFormData] = useState({
@@ -547,8 +548,8 @@ const QuotationManagement = () => {
     };
 
     const handleCleanseAllQuotations = async () => {
-        if (!canCleanseQuotations) {
-            alert('Akses Ditolak: Anda tidak memiliki hak untuk cleansing quotation.');
+        if (!canRunSuperAdminBatch) {
+            alert('Akses Ditolak: Hanya Super Admin yang dapat cleansing quotation.');
             return;
         }
         if (quotations.length === 0) {
@@ -1046,7 +1047,7 @@ const QuotationManagement = () => {
                             {isCleansing ? 'Cleansing...' : 'Bersihkan Semua Data'}
                         </Button>
                     )}
-                    {isAdmin() && selectedIds.length > 0 && (
+                    {canRunSuperAdminBatch && selectedIds.length > 0 && (
                         <Button variant="danger" icon={Trash} onClick={() => handleForceCascadeDelete(selectedIds)}>
                             Delete Selected ({selectedIds.length})
                         </Button>
