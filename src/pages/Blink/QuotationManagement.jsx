@@ -2106,8 +2106,17 @@ const QuotationManagement = () => {
                                                     className="px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500"
                                                 >
                                                     <option value="IDR">IDR</option>
-                                                                const clean = value.replace(/[^0-9.,-]/g, '');
-                                                                setFormData({ ...formData, totalAmount: clean });
+                                                    <option value="USD">USD</option>
+                                                </select>
+                                            </div>
+                                            {editedQuotation?.currency === 'USD' && (
+                                                <div className="flex items-center gap-2">
+                                                    <label className="text-xs text-gray-500 font-medium whitespace-nowrap">Kurs Rate</label>
+                                                    <input
+                                                        type="number"
+                                                        value={editedQuotation?.exchange_rate || ''}
+                                                        onChange={(e) => setEditedQuotation({ ...editedQuotation, exchange_rate: parseFloat(e.target.value) || 1 })}
+                                                        className="w-24 px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500"
                                                         placeholder="e.g., 16000"
                                                     />
                                                 </div>

@@ -2611,31 +2611,41 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                         items={formData.serviceItems}
                         onChange={(newGroups) => {
                             setFormData(prev => {
-                                    const clean = value.replace(/[^0-9.,-]/g, '');
-                                    setFormData({ ...formData, totalAmount: clean });
-                                                const cleaned = s.replace(/,/g, '');
-                                                const n = parseFloat(cleaned);
-                                                return Number.isFinite(n) ? n : 0;
-                                            } catch (e) {
-                                                return 0;
-                                            }
-                                        };
+                                const parseAmountValue = (val, currency) => {
+                                    if (val === null || val === undefined) return 0;
+                                    if (typeof val === 'number') return val;
+                                    const s = String(val).trim();
+                                    if (s === '') return 0;
+                                    try {
+                                        if (currency === 'IDR') {
+                                            const cleaned = s.replace(/\./g, '').replace(/,/g, '.');
+                                            const n = parseFloat(cleaned);
+                                            return Number.isFinite(n) ? n : 0;
+                                        }
+                                        const cleaned = s.replace(/,/g, '');
+                                        const n = parseFloat(cleaned);
+                                        return Number.isFinite(n) ? n : 0;
+                                    } catch {
+                                        return 0;
+                                    }
+                                };
 
-                                        let totalIdr = 0;
-                                        let totalUsd = 0;
-                                        newGroups.forEach(group => {
-                                            const groupRate = group.groupExchangeRate || prev.exchange_rate || 16000;
-                                            (group.items || []).forEach(item => {
-                                                const amt = parseAmountValue(item.amount, item.currency, groupRate) || 0;
-                                                if (item.currency === 'IDR') {
-                                                    totalIdr = Number(totalIdr) + Number(amt);
-                                                    totalUsd = Number(totalUsd) + (groupRate ? (Number(amt) / Number(groupRate)) : 0);
-                                                } else {
-                                                    totalUsd = Number(totalUsd) + Number(amt);
-                                                    totalIdr = Number(totalIdr) + (Number(amt) * Number(groupRate || 1));
-                                                }
-                                            });
-                                        });
+                                let totalIdr = 0;
+                                let totalUsd = 0;
+                                newGroups.forEach(group => {
+                                    const groupRate = group.groupExchangeRate || prev.exchange_rate || 16000;
+                                    (group.items || []).forEach(item => {
+                                        const amt = parseAmountValue(item.amount, item.currency) || 0;
+                                        if (item.currency === 'IDR') {
+                                            totalIdr += amt;
+                                            totalUsd += groupRate ? (amt / groupRate) : 0;
+                                        } else {
+                                            totalUsd += amt;
+                                            totalIdr += amt * (groupRate || 1);
+                                        }
+                                    });
+                                });
+
                                 const total = (prev.currency || 'IDR') === 'IDR' ? totalIdr : totalUsd;
                                 const next = { ...prev, serviceItems: newGroups, totalAmount: total, total_idr: totalIdr, total_usd: totalUsd };
                                 const hasCosts = prev.costItems && prev.costItems.some(g => g.items && g.items.length > 0);
