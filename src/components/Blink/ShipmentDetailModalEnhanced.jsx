@@ -49,6 +49,20 @@ const getPersistedSellingItems = (source = {}) => {
     return data.sellingItems || data.selling_items || data.serviceItems || data.service_items || [];
 };
 
+const getDefaultCogsData = () => ({
+    oceanFreight: '',
+    airFreight: '',
+    trucking: '',
+    thc: '',
+    documentation: '',
+    customs: '',
+    insurance: '',
+    demurrage: '',
+    other: '',
+    otherDescription: '',
+    additionalCosts: []
+});
+
 const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCancel, onViewAnalysis, canEditShipment = true, canCreatePO = true }) => {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('details');
@@ -240,20 +254,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
     });
 
     // COGS management
-    const [cogsData, setCogsData] = useState(shipment?.cogs || {
-        oceanFreight: '',
-        airFreight: '',
-        trucking: '',
-        thc: '',
-        documentation: '',
-        customs: '',
-        insurance: '',
-        demurrage: '',
-        other: '',
-        otherDescription: '',
-        // New: Array of additional other costs
-        additionalCosts: []
-    });
+    const [cogsData, setCogsData] = useState(shipment?.cogs || getDefaultCogsData());
 
     // Selling items from quotation (read-only reference)
     const [sellingItems, setSellingItems] = useState(getPersistedSellingItems(shipment));
@@ -526,19 +527,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                 deliveryDate: shipment.deliveryDate || '',
                 blDate: shipment.blDate || shipment.bl_date || ''
             });
-            setCogsData(shipment.cogs || {
-                oceanFreight: '',
-                airFreight: '',
-                trucking: '',
-                thc: '',
-                documentation: '',
-                customs: '',
-                insurance: '',
-                demurrage: '',
-                other: '',
-                otherDescription: '',
-                additionalCosts: []
-            });
+            setCogsData(shipment.cogs || getDefaultCogsData());
             // Smart COGS currency: use saved cogs currency, fallback to shipment currency
             const shipmentCurrency = shipment.currency || 'IDR';
             const savedCogsCurrency = shipment.cogsCurrency || shipment.cogs_currency;
@@ -609,6 +598,23 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
     };
 
     if (!shipment) return null;
+
+    const loadPersistedCogsForEditing = () => {
+        const persistedBuyingItems = getPersistedBuyingItems(shipment);
+        const persistedSellingItems = getPersistedSellingItems(shipment);
+
+        setCogsData(shipment.cogs || getDefaultCogsData());
+        setCogsCurrency(shipment.cogsCurrency || shipment.cogs_currency || shipment.currency || 'IDR');
+        setExchangeRate(shipment.exchangeRate || shipment.exchange_rate || '');
+        setRateDate(shipment.rateDate || shipment.rate_date || new Date().toISOString().split('T')[0]);
+
+        if (persistedBuyingItems.length > 0) {
+            setBuyingItems(persistedBuyingItems);
+        }
+        if (persistedSellingItems.length > 0) {
+            setSellingItems(persistedSellingItems);
+        }
+    };
 
 
 
@@ -1768,6 +1774,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                             icon={Edit}
                                             onClick={() => {
                                                 if (activeTab === 'cogs') {
+                                                    loadPersistedCogsForEditing();
                                                     setIsEditingCOGS(true);
                                                 } else {
                                                     setIsEditing(true);
@@ -1868,21 +1875,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                             if (activeTab === 'cogs') {
                                                 setIsEditingCOGS(false);
                                                 // Reset to original COGS values
-                                                setCogsData(shipment.cogs || {
-                                                    oceanFreight: '',
-                                                    airFreight: '',
-                                                    trucking: '',
-                                                    thc: '',
-                                                    documentation: '',
-                                                    customs: '',
-                                                    insurance: '',
-                                                    demurrage: '',
-                                                    other: '',
-                                                    otherDescription: ''
-                                                });
-                                                setCogsCurrency(shipment.cogsCurrency || shipment.currency || 'IDR');
-                                                setExchangeRate(shipment.exchangeRate || shipment.exchange_rate || '');
-                                                setRateDate(shipment.rateDate || shipment.rate_date || new Date().toISOString().split('T')[0]);
+                                                loadPersistedCogsForEditing();
                                             } else {
                                                 setEditedShipment(shipment);
                                                 setIsEditing(false);
@@ -1932,8 +1925,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                     onClick={() => {
                                         setActiveTab(tab.id);
                                         setIsEditing(false);
-                                        // Auto-activate COGS edit mode when switching to COGS tab
-                                        setIsEditingCOGS(tab.id === 'cogs');
+                                        setIsEditingCOGS(false);
                                     }}
                                     className={`flex items-center gap-2 px-4 py-2 border-b-2 smooth-transition ${activeTab === tab.id
                                         ? 'border-accent-orange text-accent-orange'
