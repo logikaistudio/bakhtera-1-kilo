@@ -6,11 +6,8 @@ import {
     Plane,
     Package,
     Trash2,
-    Download,
     Printer,
     Search,
-    FileText,
-    User
 } from 'lucide-react';
 import { printBLCertificate } from '../../utils/printUtils'; // We can reuse print logic or create printAWBUtils later
 import { useData } from '../../context/DataContext';
@@ -68,6 +65,35 @@ const AWBManagement = () => {
         return `SAY: ${numberToWords(count)} (${count}) CONTAINER${count > 1 ? 'S' : ''} ONLY`;
     };
 
+    const flattenShipmentItems = (items = []) => {
+        if (!Array.isArray(items)) return [];
+        return items.flatMap((entry) => Array.isArray(entry?.items) ? flattenShipmentItems(entry.items) : [entry]);
+    };
+
+    const buildCargoItemsFromShipment = (ship = {}) => {
+        const sourceItems = [
+            ...flattenShipmentItems(ship.service_items || []),
+            ...flattenShipmentItems(ship.selling_items || [])
+        ];
+        if (sourceItems.length > 0) {
+            return sourceItems.map((item, index) => ({
+                marks: index === 0 ? (ship.bl_marks_numbers || ship.container_number || 'N/M') : '',
+                packages: item.qty || item.quantity || item.pieces || item.unit || '',
+                description: item.description || item.name || item.item_name || item.service_name || item.itemCode || item.item_code || '',
+                grossWeight: item.grossWeight || item.gross_weight || item.weight || '',
+                measurement: item.measurement || item.measure || item.volume || item.cbm || ''
+            })).filter(item => item.description || item.packages || item.grossWeight || item.measurement || item.marks);
+        }
+
+        return [{
+            marks: ship.bl_marks_numbers || ship.container_number || 'N/M',
+            packages: ship.bl_number_of_packages || ship.packages || '',
+            description: ship.bl_description_packages || ship.cargo_description || ship.commodity || '',
+            grossWeight: ship.bl_gross_weight_text || ship.gross_weight || ship.weight || '',
+            measurement: ship.bl_measurement_text || ship.volume || ''
+        }];
+    };
+
     useEffect(() => {
         fetchAWBs();
     }, []);
@@ -78,6 +104,7 @@ const AWBManagement = () => {
             const inferredGrossWeight = selectedAWB.grossWeight || selectedAWB.gross_weight || '';
             const inferredChargeableWeight = selectedAWB.chargeableWeight || selectedAWB.chargeable_weight || inferredGrossWeight || '';
             const derivedPieces = buildPackagesInWordsFromContainers(selectedAWB.containers || []);
+            const cargoItems = selectedAWB.cargoItems?.length > 0 ? selectedAWB.cargoItems : buildCargoItemsFromShipment(selectedAWB.rawShipment || {});
             setEditForm({
                 status: selectedAWB.status,
                 awbNumber: selectedAWB.awbNumber !== '-' ? selectedAWB.awbNumber : '',
@@ -89,23 +116,37 @@ const AWBManagement = () => {
                 shipperAddress: selectedAWB.blShipperAddress || selectedAWB.shipperAddress || '',
                 consigneeName: selectedAWB.blConsigneeName || selectedAWB.consigneeName,
                 consigneeAddress: selectedAWB.blConsigneeAddress || selectedAWB.consigneeAddress || selectedAWB.customerAddress || '',
+                notifyPartyName: selectedAWB.blNotifyPartyName || 'SAME AS CONSIGNEE',
+                notifyPartyAddress: selectedAWB.blNotifyPartyAddress || '',
 
                 // Routing (Air)
                 flightNumber: selectedAWB.flightNumber || selectedAWB.vessel || '',
                 airportDeparture: selectedAWB.portOfLoading,
                 airportDestination: selectedAWB.portOfDischarge,
+                placeOfReceipt: selectedAWB.blPlaceOfReceipt || selectedAWB.portOfLoading || '',
+                placeOfDelivery: selectedAWB.blPlaceOfDelivery || selectedAWB.portOfDischarge || '',
+                typeOfMove: selectedAWB.blTypeOfMove || 'AIR/AIR',
+                freightPayableAt: selectedAWB.blFreightPayableAt || 'DESTINATION',
+                numberOfOriginals: selectedAWB.blNumberOfOriginals || 'THREE (3)',
 
                 // Cargo
                 descriptionGoods: selectedAWB.blDescriptionPackages || selectedAWB.cargoDescription,
                 grossWeight: selectedAWB.blGrossWeightText || (inferredGrossWeight ? `${inferredGrossWeight} KGS` : ''),
                 chargeableWeight: selectedAWB.blChargeableWeightText || (inferredChargeableWeight ? `${inferredChargeableWeight} KGS` : ''),
+                measurement: selectedAWB.blMeasurementText || (selectedAWB.volume ? `${selectedAWB.volume} CBM` : ''),
                 pieces: selectedAWB.blTotalPackagesText || derivedPieces || selectedAWB.blNumberOfPackages || selectedAWB.packages || 'AS PER ATTACHED LIST',
+                cargoItems,
 
                 // Footer
                 executedAt: selectedAWB.blIssuedPlace || 'JAKARTA, INDONESIA',
                 executedDate: selectedAWB.blIssuedDate || new Date().toISOString().split('T')[0],
                 agentIataCode: selectedAWB.blForwardingAgentRef || '', // Using this col for IATA code
                 accountingInfo: selectedAWB.blExportReferences || '', // Using this col for Accounting Info
+                freightCharges: selectedAWB.blFreightCharges || '',
+                prepaid: selectedAWB.blPrepaid || '',
+                collect: selectedAWB.blCollect || '',
+                shippedOnBoardDate: selectedAWB.blShippedOnBoardDate || '',
+                releaseType: selectedAWB.releaseType || '',
             });
             setIsEditing(false);
             setActiveTab('header');
@@ -128,8 +169,10 @@ const AWBManagement = () => {
             const awbData = (shipments || []).map(ship => {
                 const containers = normalizeContainers(ship.containers);
                 const derivedPieces = buildPackagesInWordsFromContainers(containers);
+                const cargoItems = buildCargoItemsFromShipment(ship);
                 return {
                 id: ship.id,
+                rawShipment: ship,
                 type: 'MAWB', // Default
                 awbNumber: ship.awb_number || ship.bl_number || '-', // Fallback
                 jobNumber: ship.job_number,
@@ -155,18 +198,33 @@ const AWBManagement = () => {
                 volume: ship.volume,
                 packages: ship.packages || null,
                 containers,
+                serviceItems: ship.service_items || [],
+                sellingItems: ship.selling_items || [],
+                cargoItems,
 
                 // Document Specific (Editable Overrides)
                 blShipperName: ship.bl_shipper_name,
                 blShipperAddress: ship.bl_shipper_address,
                 blConsigneeName: ship.bl_consignee_name,
                 blConsigneeAddress: ship.bl_consignee_address,
+                blNotifyPartyName: ship.bl_notify_party_name,
+                blNotifyPartyAddress: ship.bl_notify_party_address,
 
                 blDescriptionPackages: ship.bl_description_packages,
                 blGrossWeightText: ship.bl_gross_weight_text,
                 blChargeableWeightText: ship.bl_chargeable_weight_text,
+                blMeasurementText: ship.bl_measurement_text,
                 blNumberOfPackages: ship.bl_number_of_packages,
                 blTotalPackagesText: ship.bl_total_packages_in_words || derivedPieces,
+                blPlaceOfReceipt: ship.bl_place_of_receipt,
+                blPlaceOfDelivery: ship.bl_place_of_delivery,
+                blFreightPayableAt: ship.bl_freight_payable_at,
+                blNumberOfOriginals: ship.bl_number_of_originals,
+                blTypeOfMove: ship.bl_type_of_move,
+                blFreightCharges: ship.bl_freight_charges,
+                blPrepaid: ship.bl_prepaid,
+                blCollect: ship.bl_collect,
+                blShippedOnBoardDate: ship.bl_shipped_on_board_date,
 
                 awbIssuedDate: ship.awb_date || ship.bl_issued_date,
 
@@ -196,6 +254,13 @@ const AWBManagement = () => {
             return;
         }
         try {
+            const cargoItems = editForm.cargoItems || [];
+            const descriptionGoods = cargoItems.length > 0
+                ? cargoItems.map(item => item.description).filter(Boolean).join('\n')
+                : editForm.descriptionGoods;
+            const marksNumbers = cargoItems.length > 0
+                ? cargoItems.map(item => item.marks).filter(Boolean).join('\n')
+                : null;
             // Mapping back AWB fields to the generic BL columns in DB
             const { error } = await supabase
                 .from('blink_shipments')
@@ -213,17 +278,30 @@ const AWBManagement = () => {
                     bl_shipper_address: editForm.shipperAddress,
                     bl_consignee_name: editForm.consigneeName,
                     bl_consignee_address: editForm.consigneeAddress,
+                    bl_notify_party_name: editForm.notifyPartyName,
+                    bl_notify_party_address: editForm.notifyPartyAddress,
 
                     // Footer / Info
                     bl_issued_place: editForm.executedAt,
                     bl_issued_date: editForm.executedDate,
                     bl_forwarding_agent_ref: editForm.agentIataCode,
                     bl_export_references: editForm.accountingInfo,
+                    bl_freight_payable_at: editForm.freightPayableAt,
+                    bl_number_of_originals: editForm.numberOfOriginals,
+                    bl_type_of_move: editForm.typeOfMove,
+                    bl_freight_charges: editForm.freightCharges,
+                    bl_prepaid: editForm.prepaid,
+                    bl_collect: editForm.collect,
+                    bl_shipped_on_board_date: editForm.shippedOnBoardDate,
+                    bl_place_of_receipt: editForm.placeOfReceipt,
+                    bl_place_of_delivery: editForm.placeOfDelivery,
 
                     // Cargo
-                    bl_description_packages: editForm.descriptionGoods,
+                    bl_marks_numbers: marksNumbers,
+                    bl_description_packages: descriptionGoods,
                     bl_gross_weight_text: editForm.grossWeight,
                     bl_chargeable_weight_text: editForm.chargeableWeight,
+                    bl_measurement_text: editForm.measurement,
                     bl_number_of_packages: editForm.pieces || null,
                     bl_total_packages_in_words: editForm.pieces,
                 })
@@ -267,13 +345,72 @@ const AWBManagement = () => {
         }
     };
 
-    const handlePrintAWB = (awb) => {
-        try {
-            printBLCertificate({ ...awb, logo_url: companySettings?.logo_url || '', watermark: awb.watermark || null, releaseType: awb.releaseType || null });
-        } catch (err) {
-            console.error('AWB print failed', err);
-            alert('Failed to print AWB');
-        }
+    const handlePrintPreview = () => {
+        if (!selectedAWB) return;
+        const printData = {
+            ...selectedAWB,
+            blType: 'AWB',
+            type: 'AWB',
+            blNumber: editForm.awbNumber || selectedAWB.awbNumber,
+            blShipperName: editForm.shipperName,
+            blShipperAddress: editForm.shipperAddress,
+            blConsigneeName: editForm.consigneeName,
+            blConsigneeAddress: editForm.consigneeAddress,
+            blNotifyPartyName: editForm.notifyPartyName,
+            blNotifyPartyAddress: editForm.notifyPartyAddress,
+            blPlaceOfReceipt: editForm.placeOfReceipt,
+            blPlaceOfDelivery: editForm.placeOfDelivery,
+            blTypeOfMove: editForm.typeOfMove,
+            blFreightPayableAt: editForm.freightPayableAt,
+            blNumberOfOriginals: editForm.numberOfOriginals,
+            blIssuedPlace: editForm.executedAt,
+            blIssuedDate: editForm.executedDate,
+            blForwardingAgentRef: editForm.agentIataCode,
+            blExportReferences: editForm.accountingInfo,
+            blFreightCharges: editForm.freightCharges,
+            blPrepaid: editForm.prepaid,
+            blCollect: editForm.collect,
+            blShippedOnBoardDate: editForm.shippedOnBoardDate,
+            blDescriptionPackages: editForm.descriptionGoods,
+            blGrossWeightText: editForm.grossWeight,
+            blChargeableWeightText: editForm.chargeableWeight,
+            blMeasurementText: editForm.measurement,
+            blNumberOfPackages: editForm.pieces,
+            blTotalPackagesInWords: editForm.pieces,
+            cargoItems: editForm.cargoItems || [],
+            portOfLoading: editForm.airportDeparture,
+            portOfDischarge: editForm.airportDestination,
+            vessel: editForm.flightNumber,
+            flightNumber: editForm.flightNumber,
+            logo_url: companySettings?.logo_url || '',
+            releaseType: editForm.releaseType || null,
+        };
+        printBLCertificate(printData);
+    };
+
+    const updateCargoItem = (index, key, value) => {
+        setEditForm(prev => {
+            const cargoItems = [...(prev.cargoItems || [])];
+            cargoItems[index] = { ...cargoItems[index], [key]: value };
+            return { ...prev, cargoItems };
+        });
+    };
+
+    const addCargoItem = () => {
+        setEditForm(prev => ({
+            ...prev,
+            cargoItems: [
+                ...(prev.cargoItems || []),
+                { marks: '', packages: '', description: '', grossWeight: '', measurement: '' }
+            ]
+        }));
+    };
+
+    const removeCargoItem = (index) => {
+        setEditForm(prev => ({
+            ...prev,
+            cargoItems: (prev.cargoItems || []).filter((_, itemIndex) => itemIndex !== index)
+        }));
     };
 
 
@@ -299,6 +436,25 @@ const AWBManagement = () => {
                 )
             ) : (
                 <div className={`text-sm text-gray-900 dark:text-silver-light font-medium p-2 bg-gray-50 dark:bg-dark-bg/50 rounded border border-transparent ${type === 'textarea' ? 'whitespace-pre-wrap font-mono text-xs' : ''}`}>
+                    {editForm[key] || '-'}
+                </div>
+            )}
+        </div>
+    );
+
+    const renderSelect = (label, key, options = []) => (
+        <div className="mb-4">
+            <label className="block text-xs text-gray-500 dark:text-silver-dark font-semibold uppercase mb-1">{label}</label>
+            {isEditing ? (
+                <select
+                    value={editForm[key] || ''}
+                    onChange={(e) => setEditForm({ ...editForm, [key]: e.target.value })}
+                    className="w-full px-3 py-2 bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded text-sm text-gray-900 dark:text-silver-light focus:border-accent-orange"
+                >
+                    {options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+            ) : (
+                <div className="text-sm text-gray-900 dark:text-silver-light font-medium p-2 bg-gray-50 dark:bg-dark-bg/50 rounded border border-transparent">
                     {editForm[key] || '-'}
                 </div>
             )}
@@ -391,6 +547,10 @@ const AWBManagement = () => {
                                 </p>
                             </div>
                             <div className="flex gap-2">
+                                <Button size="sm" variant="secondary" onClick={handlePrintPreview}>
+                                    <Printer className="w-4 h-4 mr-1" />
+                                    Print Preview
+                                </Button>
                                 {isEditing ? (
                                     <>
                                         <Button size="sm" onClick={handleUpdateAWB}>Save Changes</Button>
@@ -426,6 +586,17 @@ const AWBManagement = () => {
                                     {renderInput('Executed On (Date)', 'executedDate', 'date')}
                                     {renderInput('Executed At (Place)', 'executedAt')}
                                     {renderInput('Agent IATA Code', 'agentIataCode')}
+                                    {renderInput('Freight Payable At', 'freightPayableAt')}
+                                    {renderInput('No. of Original AWB', 'numberOfOriginals')}
+                                    {renderInput('Freight Charges', 'freightCharges')}
+                                    {renderInput('Prepaid', 'prepaid')}
+                                    {renderInput('Collect', 'collect')}
+                                    {renderInput('Shipped On Board Date', 'shippedOnBoardDate', 'date')}
+                                    {renderSelect('Release Stamp', 'releaseType', [
+                                        { value: '', label: 'None' },
+                                        { value: 'TELEX RELEASE', label: 'TELEX RELEASE' },
+                                        { value: 'SURRENDER', label: 'SURRENDER' }
+                                    ])}
                                     {renderInput('Accounting Information', 'accountingInfo', 'textarea')}
                                 </div>
                             )}
@@ -491,26 +662,110 @@ const AWBManagement = () => {
                                         {renderInput('Consignee Name', 'consigneeName')}
                                         {renderInput('Consignee Address', 'consigneeAddress', 'textarea')}
                                     </div>
+                                    <div className="col-span-2 border-t border-dashed border-gray-300 dark:border-gray-700 pt-4">
+                                        <h3 className="text-amber-500 font-bold uppercase text-xs mb-3">Notify Party</h3>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            {renderInput('Notify Party Name', 'notifyPartyName')}
+                                            {renderInput('Notify Party Address', 'notifyPartyAddress', 'textarea')}
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 
                             {activeTab === 'routing' && (
                                 <div className="grid grid-cols-3 gap-4">
+                                    {renderInput('Place of Receipt', 'placeOfReceipt')}
                                     {renderInput('Airport of Departure', 'airportDeparture')}
                                     {renderInput('Airport of Destination', 'airportDestination')}
+                                    {renderInput('Place of Delivery', 'placeOfDelivery')}
                                     {renderInput('Flight / Date', 'flightNumber')}
+                                    {renderInput('Type of Move', 'typeOfMove')}
                                 </div>
                             )}
 
                             {activeTab === 'cargo' && (
-                                <div className="grid grid-cols-12 gap-4">
-                                    <div className="col-span-3">
+                                <div className="space-y-5">
+                                    <div className="grid grid-cols-4 gap-4">
                                         {renderInput('No. of Pieces', 'pieces')}
                                         {renderInput('Gross Weight', 'grossWeight')}
                                         {renderInput('Chargeable Weight', 'chargeableWeight')}
+                                        {renderInput('Measurement', 'measurement')}
                                     </div>
-                                    <div className="col-span-9">
+                                    <div>
                                         {renderInput('Nature and Quantity of Goods', 'descriptionGoods', 'textarea')}
+                                    </div>
+                                    <div className="border border-gray-200 dark:border-dark-border rounded-lg overflow-hidden">
+                                        <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-dark-surface border-b border-gray-200 dark:border-dark-border">
+                                            <div>
+                                                <h3 className="text-sm font-bold text-gray-900 dark:text-silver-light flex items-center gap-2">
+                                                    <Package className="w-4 h-4 text-accent-orange" />
+                                                    Document Cargo Items
+                                                </h3>
+                                                <p className="text-xs text-gray-500 dark:text-silver-dark mt-1">Rows are populated from Sales Order item details.</p>
+                                            </div>
+                                            {isEditing && (
+                                                <Button size="sm" variant="secondary" onClick={addCargoItem}>Add Row</Button>
+                                            )}
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full min-w-[900px]">
+                                                <thead className="bg-gray-100 dark:bg-dark-bg/70">
+                                                    <tr>
+                                                        <th className="px-3 py-2 text-left text-xs font-bold text-gray-600 dark:text-silver-dark uppercase w-[18%]">Marks & Numbers</th>
+                                                        <th className="px-3 py-2 text-left text-xs font-bold text-gray-600 dark:text-silver-dark uppercase w-[14%]">No. of Packages</th>
+                                                        <th className="px-3 py-2 text-left text-xs font-bold text-gray-600 dark:text-silver-dark uppercase">Description of Goods</th>
+                                                        <th className="px-3 py-2 text-left text-xs font-bold text-gray-600 dark:text-silver-dark uppercase w-[14%]">Gross Weight</th>
+                                                        <th className="px-3 py-2 text-left text-xs font-bold text-gray-600 dark:text-silver-dark uppercase w-[14%]">Measurement</th>
+                                                        {isEditing && <th className="px-3 py-2 w-12"></th>}
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-200 dark:divide-dark-border">
+                                                    {(editForm.cargoItems || []).length === 0 ? (
+                                                        <tr>
+                                                            <td colSpan={isEditing ? 6 : 5} className="px-3 py-6 text-center text-sm text-gray-500 dark:text-silver-dark">
+                                                                No cargo rows available.
+                                                            </td>
+                                                        </tr>
+                                                    ) : (editForm.cargoItems || []).map((item, index) => (
+                                                        <tr key={index} className="align-top">
+                                                            {['marks', 'packages', 'description', 'grossWeight', 'measurement'].map((key) => (
+                                                                <td key={key} className="px-3 py-2 text-sm text-gray-900 dark:text-silver-light">
+                                                                    {isEditing ? (
+                                                                        key === 'description' ? (
+                                                                            <textarea
+                                                                                value={item[key] || ''}
+                                                                                onChange={(e) => updateCargoItem(index, key, e.target.value)}
+                                                                                className="w-full min-h-[70px] px-2 py-1 bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded text-xs font-mono"
+                                                                            />
+                                                                        ) : (
+                                                                            <input
+                                                                                value={item[key] || ''}
+                                                                                onChange={(e) => updateCargoItem(index, key, e.target.value)}
+                                                                                className="w-full px-2 py-1 bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded text-xs"
+                                                                            />
+                                                                        )
+                                                                    ) : (
+                                                                        <span className={key === 'description' ? 'whitespace-pre-wrap font-mono text-xs' : ''}>{item[key] || '-'}</span>
+                                                                    )}
+                                                                </td>
+                                                            ))}
+                                                            {isEditing && (
+                                                                <td className="px-3 py-2 text-center">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => removeCargoItem(index)}
+                                                                        className="p-1.5 rounded text-red-500 hover:bg-red-500/10"
+                                                                        title="Remove row"
+                                                                    >
+                                                                        <Trash2 className="w-4 h-4" />
+                                                                    </button>
+                                                                </td>
+                                                            )}
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
                                 </div>
                             )}

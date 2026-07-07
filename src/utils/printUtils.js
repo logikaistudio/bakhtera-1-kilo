@@ -10,6 +10,29 @@
  * @returns {string} HTML string
  */
 export const generateBLPrintHTML = (blData) => {
+    const flattenCargoItems = (items = []) => {
+        if (!Array.isArray(items)) return [];
+
+        return items.flatMap((entry) => {
+            if (Array.isArray(entry?.items)) return flattenCargoItems(entry.items);
+            return [entry];
+        });
+    };
+
+    const formatCargoItem = (item = {}, index = 0) => ({
+        marks: item.marks || item.marksNumbers || item.containerNumber || (index === 0 ? (blData.blMarksNumbers || blData.marksNumbers || blData.containerNumber || 'N/M') : ''),
+        packages: item.packages || item.package || item.qty || item.quantity || item.pieces || '',
+        description: item.description || item.item_name || item.name || item.service_name || item.itemCode || item.item_code || '',
+        weight: item.grossWeight || item.gross_weight || item.weight || '',
+        measurement: item.measurement || item.measure || item.volume || item.cbm || ''
+    });
+
+    const sourceCargoItems = [
+        ...flattenCargoItems(blData.cargoItems || blData.cargo_items || []),
+        ...flattenCargoItems(blData.serviceItems || blData.service_items || []),
+        ...flattenCargoItems(blData.sellingItems || blData.selling_items || [])
+    ].map(formatCargoItem).filter(item => item.description || item.packages || item.weight || item.measurement || item.marks);
+
     // Prefer BL specific fields if available, otherwise fallback to generic
     const d = {
         shipper: blData.blShipperName || blData.shipperName || blData.shipper || '',
@@ -67,6 +90,23 @@ export const generateBLPrintHTML = (blData) => {
     const isAirDocument = modeUpper.includes('AWB') || modeUpper.includes('AIR');
     const documentTitle = isAirDocument ? 'AIR WAYBILL' : 'OCEAN BILL OF LADING';
     const documentNumberLabel = isAirDocument ? 'AWB Number' : 'B/L Number';
+    const cargoRows = sourceCargoItems.length > 0
+        ? sourceCargoItems
+        : [{
+            marks: d.marks,
+            packages: d.numberOfPackages,
+            description: d.description,
+            weight: d.weight,
+            measurement: d.measurement
+        }];
+    const cargoRowsHTML = cargoRows.map((item, index) => `
+                        <tr>
+                            <td><div class="value" style="white-space:pre-wrap;">${item.marks || ''}</div>${index === 0 && (d.containerNo || d.sealNo) ? `<div class="value small-text" style="margin-top:8px;">${d.containerNo ? 'CNTR: ' + d.containerNo : ''}${d.sealNo ? '<br>SEAL: ' + d.sealNo : ''}</div>` : ''}</td>
+                            <td style="text-align:center;"><div class="value-bold">${item.packages || ''}</div></td>
+                            <td><div class="value" style="font-weight:bold; text-align:center; line-height:1.35;">${item.description || ''}</div></td>
+                            <td style="text-align:right;"><div class="value-bold">${item.weight || ''}</div></td>
+                            <td style="text-align:right;"><div class="value-bold">${item.measurement || ''}</div></td>
+                        </tr>`).join('');
     const watermarkRaw = (d.watermark || '').toString().trim();
     const watermarkNormalized = watermarkRaw.toUpperCase().replace(/[-_\s]+/g, ' ').trim();
     const isCopyNonNegotiable = watermarkNormalized.includes('COPY') && watermarkNormalized.includes('NEGOTIABLE');
@@ -235,6 +275,8 @@ export const generateBLPrintHTML = (blData) => {
             letter-spacing: 1.5px;
             transform: rotate(-3deg);
             background: rgba(234, 88, 12, 0.05);
+            margin-left: 24mm;
+            opacity: 0.2;
         }
 
         .print-btn {
@@ -387,13 +429,7 @@ export const generateBLPrintHTML = (blData) => {
                         </tr>
                     </thead>
                     <tbody>
-                        <tr>
-                            <td><div class="value" style="white-space:pre-wrap;">${d.marks}</div><div class="value small-text" style="margin-top:8px;">${d.containerNo ? 'CNTR: ' + d.containerNo : ''}${d.sealNo ? '<br>SEAL: ' + d.sealNo : ''}</div></td>
-                            <td style="text-align:center;"><div class="value-bold">${d.numberOfPackages}</div></td>
-                            <td><div class="value" style="font-weight:bold; text-align:center; line-height:1.35;">${d.description}</div></td>
-                            <td style="text-align:right;"><div class="value-bold">${d.weight}</div></td>
-                            <td style="text-align:right;"><div class="value-bold">${d.measurement}</div></td>
-                        </tr>
+                        ${cargoRowsHTML}
                     </tbody>
                 </table>
             </div>
