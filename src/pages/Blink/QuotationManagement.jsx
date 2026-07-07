@@ -2057,6 +2057,9 @@ const QuotationManagement = () => {
                                         const totalIdrDerived = typeof data?.total_idr !== 'undefined' ? Number(data.total_idr) : undefined;
                                         const totalUsdDerived = typeof data?.total_usd !== 'undefined' ? Number(data.total_usd) : undefined;
 
+                                        const currency = data?.currency || 'IDR';
+                                        const isIDR = currency === 'IDR';
+
                                         let totalIDR = 0;
                                         let totalUSD = 0;
 
@@ -2068,8 +2071,6 @@ const QuotationManagement = () => {
                                             totalIDR = totalUSD * rate;
                                         } else {
                                             const totalNum = parseCurrency(data?.totalAmount || data?.total_amount || 0);
-                                            const currency = data?.currency || 'IDR';
-                                            const isIDR = currency === 'IDR';
                                             totalIDR = isIDR ? totalNum : totalNum * rate;
                                             totalUSD = isIDR ? (rate > 1 ? totalNum / rate : 0) : totalNum;
                                         }
