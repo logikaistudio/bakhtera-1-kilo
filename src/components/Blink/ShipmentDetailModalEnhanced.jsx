@@ -39,6 +39,22 @@ import PartnerPicker from '../Common/PartnerPicker';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 
+const getPersistedBuyingItems = (source = {}) => (
+    source.buyingItems ||
+    source.buying_items ||
+    source.cogsItems ||
+    source.cogs_items ||
+    []
+);
+
+const getPersistedSellingItems = (source = {}) => (
+    source.sellingItems ||
+    source.selling_items ||
+    source.serviceItems ||
+    source.service_items ||
+    []
+);
+
 const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCancel, onViewAnalysis, canEditShipment = true, canCreatePO = true }) => {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('details');
@@ -246,10 +262,10 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
     });
 
     // Selling items from quotation (read-only reference)
-    const [sellingItems, setSellingItems] = useState(shipment?.sellingItems || []);
+    const [sellingItems, setSellingItems] = useState(getPersistedSellingItems(shipment));
 
     // Buying items (editable and can add more)
-    const [buyingItems, setBuyingItems] = useState(shipment?.buyingItems || []);
+    const [buyingItems, setBuyingItems] = useState(getPersistedBuyingItems(shipment));
 
     // Currency management for COGS
     const [cogsCurrency, setCogsCurrency] = useState(shipment?.cogsCurrency || shipment?.currency || 'IDR');
@@ -285,8 +301,9 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                         setSellingItems(quotation.service_items || quotation.serviceItems || []);
                     }
 
-                    // Auto-populate buying items (COGS) from quotation if we don't have them yet
-                    if (buyingItems.length === 0) {
+                    // Auto-populate buying items (COGS) from quotation only when the shipment has no saved COGS.
+                    const savedBuyingItems = getPersistedBuyingItems(shipment);
+                    if (buyingItems.length === 0 && savedBuyingItems.length === 0) {
                         let rawCostItems = quotation.cost_items || quotation.costItems || [];
                         let isUsingServiceItemsAsFallback = false;
                         if (rawCostItems.length === 0) {
@@ -545,8 +562,8 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
             });
             setDocuments(shipment.documents || []);
             // Sync selling and buying items — only update if incoming has data, or if local is empty
-            const incomingSellingItems = shipment.sellingItems || shipment.selling_items || [];
-            const incomingBuyingItems = shipment.buyingItems || shipment.buying_items || [];
+            const incomingSellingItems = getPersistedSellingItems(shipment);
+            const incomingBuyingItems = getPersistedBuyingItems(shipment);
             if (incomingSellingItems.length > 0) {
                 setSellingItems(incomingSellingItems);
             }
@@ -894,6 +911,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
             }));
 
             const quotedAmount = calculateQuotedAmount();
+            const actualCost = parsedBuyingItems.reduce((sum, item) => sum + (parseNumber(item.amount) || 0), 0);
 
             // Update shipment with COGS data
             const updateData = {
@@ -902,6 +920,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                 exchange_rate: parseNumber(exchangeRate),
                 rate_date: rateDate || null,
                 quoted_amount: quotedAmount,
+                actual_cost: actualCost,
                 selling_items: sellingItems, // Save selling items (read-only reference)
                 buying_items: parsedBuyingItems // Save buying items (editable)
             };
@@ -928,8 +947,13 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                 exchangeRate: parseNumber(exchangeRate),
                 rateDate: rateDate,
                 quotedAmount: quotedAmount,
+                quoted_amount: quotedAmount,
+                actualCost: actualCost,
+                actual_cost: actualCost,
                 sellingItems: sellingItems,
-                buyingItems: parsedBuyingItems
+                selling_items: sellingItems,
+                buyingItems: parsedBuyingItems,
+                buying_items: parsedBuyingItems
             };
 
             onUpdate(updatedShipment, true); // skipDbUpdate = true
@@ -3032,26 +3056,6 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                                     ) : (
                                                                         <span className={`text-xs font-bold px-2 py-0.5 rounded ${(item.currency || 'IDR') === 'USD' ? 'bg-blue-500/20 text-blue-400' : 'bg-green-500/20 text-green-400'
                                                                             }`}>
-                                                                            {item.currency || 'IDR'}
-                                                                        </span>
-                                                                    )}
-                                                                </td>
-                                                                <td className="px-3 py-2 text-center">
-                                                                    {isEditingCOGS ? (
-                                                                        <select
-                                                                            value={item.currency || 'IDR'}
-                                                                            onChange={(e) => {
-                                                                                const updated = [...buyingItems];
-                                                                                updated[index].currency = e.target.value;
-                                                                                setBuyingItems(updated);
-                                                                            }}
-                                                                            className="w-full px-1 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm text-center"
-                                                                        >
-                                                                            <option value="IDR">IDR</option>
-                                                                            <option value="USD">USD</option>
-                                                                        </select>
-                                                                    ) : (
-                                                                        <span className={`text-xs font-bold px-2 py-0.5 rounded ${(item.currency || 'IDR') === 'USD' ? 'bg-blue-500/20 text-blue-400' : 'bg-green-500/20 text-green-400'}`}>
                                                                             {item.currency || 'IDR'}
                                                                         </span>
                                                                     )}
