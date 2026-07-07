@@ -51,6 +51,13 @@ const SalesBlinkApproval = () => {
     const [rejectReason, setRejectReason] = useState('');
     const [showRejectInput, setShowRejectInput] = useState(false);
 
+    const normalizeServiceType = (value) => {
+        const source = String(value || '').toLowerCase();
+        if (source.includes('air')) return 'air';
+        if (source.includes('land') || source.includes('truck')) return 'land';
+        return 'sea';
+    };
+
     // Is the user an approver? (Admin, Super Admin, Manager)
     const isApprover = isSuperAdmin() || isAdmin() || ['manager', 'blink_manager', 'bridge_manager'].includes(user?.user_level);
 
@@ -248,7 +255,8 @@ const SalesBlinkApproval = () => {
             const flatSellingItems = flattenItems(quotationData.service_items || []);
             const flatBuyingItems = flattenItems(quotationData.cost_items || []);
 
-            const isAirFreight = (quotationData.service_type || '').toLowerCase() === 'air';
+            const serviceType = normalizeServiceType(quotationData.service_type);
+            const isAirFreight = serviceType === 'air';
             const blType = isAirFreight ? 'AWB' : 'MBL';
             const blPrefix = isAirFreight ? 'AWB' : 'BL';
             const blNumber = `${blPrefix}-${soNumber}`;
@@ -268,7 +276,7 @@ const SalesBlinkApproval = () => {
                 quotation_date: quotationData.quotation_date,
                 origin: quotationData.origin,
                 destination: quotationData.destination,
-                service_type: quotationData.service_type,
+                service_type: serviceType,
                 cargo_type: quotationData.cargo_type,
                 weight: quotationData.weight,
                 volume: quotationData.volume,
@@ -293,7 +301,9 @@ const SalesBlinkApproval = () => {
                 bl_number: blNumber,
                 bl_type: blType,
                 bl_status: 'draft',
-                bl_subject: `${(quotationData.service_type || 'SEA').toUpperCase()} Freight - ${quotationData.origin} to ${quotationData.destination}`,
+                bl_subject: `${serviceType.toUpperCase()} Freight - ${quotationData.origin} to ${quotationData.destination}`,
+                bl_shipper_name: quotationData.shipper_name || quotationData.shipper || quotationData.customer_name || '',
+                bl_consignee_name: quotationData.consignee_name || quotationData.customer_name || '',
                 bl_place_of_receipt: quotationData.origin || '',
                 bl_place_of_delivery: quotationData.destination || '',
             };

@@ -10,6 +10,13 @@ import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { getActiveDivision } from '../../utils/divisionContext';
 
+const normalizeServiceType = (value) => {
+    const source = String(value || '').toLowerCase();
+    if (source.includes('air')) return 'air';
+    if (source.includes('land') || source.includes('truck')) return 'land';
+    return 'sea';
+};
+
 const ShipmentManagement = () => {
     const { canCreate, canEdit, canDelete, canView, canApprove, canAccess } = useAuth();
     const { deleteShipmentCascade } = useData();
@@ -130,11 +137,27 @@ const ShipmentManagement = () => {
             console.log(`📦 Fetched ${data?.length || 0} shipments from DB`);
             console.log('Raw data sample:', data?.[0]);
 
+            const firstFilled = (...values) => values.find(value => value !== null && value !== undefined && String(value).trim() !== '') || null;
+            const sourceQuotationIds = [...new Set((data || []).map(s => s.sales_quotation_id || s.quotation_id).filter(Boolean))];
+            let quotationMap = new Map();
+
+            if (sourceQuotationIds.length > 0) {
+                const [salesRes, opsRes] = await Promise.all([
+                    supabase.from('blink_sales_quotations').select('*').in('id', sourceQuotationIds),
+                    supabase.from('blink_quotations').select('*').in('id', sourceQuotationIds)
+                ]);
+                quotationMap = new Map([...(salesRes.data || []), ...(opsRes.data || [])].map(q => [q.id, q]));
+            }
+
             // Returns mapped data so callers can pick individual records
 
             // Map snake_case to camelCase
-            const mapped = (data || []).map(s => ({
+            const mapped = (data || []).map(s => {
+                const quote = quotationMap.get(s.sales_quotation_id || s.quotation_id) || {};
+                const sourceServiceType = quote.service_type || s.service_type || s.serviceType;
+                return ({
                 ...s,
+                service_type: normalizeServiceType(sourceServiceType),
                 jobNumber: s.job_number || s.jobNumber,
                 soNumber: s.so_number || s.soNumber,
                 quotationId: s.quotation_id || s.quotationId,
@@ -142,7 +165,7 @@ const ShipmentManagement = () => {
                 salesPerson: s.sales_person || s.salesPerson,
                 quotationType: s.quotation_type || s.quotationType || null,
                 quotationDate: s.quotation_date || s.quotationDate,
-                serviceType: s.service_type || s.serviceType,
+                serviceType: normalizeServiceType(sourceServiceType),
                 cargoType: s.cargo_type || s.cargoType,
                 quotedAmount: s.quoted_amount || s.quotedAmount,
                 cogsCurrency: s.cogs_currency || s.cogsCurrency,
@@ -165,15 +188,15 @@ const ShipmentManagement = () => {
                 bl_date: s.bl_date || null,
                 blDate: s.bl_date || null,
                 // Shipment detail fields
-                consignee_name: s.consignee_name || null,
-                shipperName: s.shipper_name || s.shipper || null,
-                shipper: s.shipper || s.shipper_name || null,
-                shipper_name: s.shipper_name || null,
-                grossWeight: s.gross_weight || s.grossWeight || null,
-                gross_weight: s.gross_weight || null,
+                consignee_name: firstFilled(s.consignee_name, quote.consignee_name),
+                shipperName: firstFilled(s.shipper_name, s.shipper, quote.shipper_name, quote.shipper),
+                shipper: firstFilled(s.shipper, s.shipper_name, quote.shipper, quote.shipper_name),
+                shipper_name: firstFilled(s.shipper_name, s.shipper, quote.shipper_name, quote.shipper),
+                grossWeight: firstFilled(s.gross_weight, s.grossWeight, quote.gross_weight),
+                gross_weight: firstFilled(s.gross_weight, s.grossWeight, quote.gross_weight),
                 netWeight: s.net_weight || s.netWeight || null,
                 net_weight: s.net_weight || null,
-                packages: s.packages || null,
+                packages: firstFilled(s.packages, quote.quantity && quote.package_type ? `${quote.quantity} ${quote.package_type}` : quote.package_type),
                 measure: s.measure || null,
                 shippingMode: s.shipping_mode || s.shippingMode || null,
                 shipping_mode: s.shipping_mode || null,
@@ -187,6 +210,10 @@ const ShipmentManagement = () => {
                 containers: s.containers || [],
                 // Documents
                 documents: s.documents || [],
+                cargo_details: s.cargo_details || quote.cargo_details || null,
+                commodity: firstFilled(s.commodity, quote.commodity),
+                chargeable_weight: firstFilled(s.chargeable_weight, quote.chargeable_weight),
+                volume: firstFilled(s.volume, s.cbm, quote.volume),
                 // Trade & transport terms
                 incoterm: s.incoterm || null,
                 paymentTerms: s.payment_terms || s.paymentTerms || null,
@@ -194,7 +221,8 @@ const ShipmentManagement = () => {
                 // Items mapping
                 sellingItems: s.selling_items || s.service_items || s.sellingItems || [],
                 buyingItems: s.buying_items || s.buyingItems || []
-            }));
+                });
+            });
 
             // Sort by created_at descending (newest first) - client-side guarantee
             mapped.sort((a, b) => {

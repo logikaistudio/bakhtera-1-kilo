@@ -41,6 +41,13 @@ const formatInputAmount = (value, currency) => {
         : num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 };
 
+const normalizeServiceType = (value) => {
+    const source = String(value || '').toLowerCase();
+    if (source.includes('air')) return 'air';
+    if (source.includes('land') || source.includes('truck')) return 'land';
+    return 'sea';
+};
+
 const QuotationManagement = () => {
     const { user, canCreate, canEdit, canDelete, canView, canApprove, isAdmin } = useAuth();
     const navigate = useNavigate();
@@ -856,6 +863,7 @@ const QuotationManagement = () => {
         console.log('📝 Generated SO Number:', soNumber);
 
         // Auto-create Shipment in Operations
+        const serviceType = normalizeServiceType(quotation.serviceType || quotation.service_type);
         const newShipment = {
             jobNumber: quotation.jobNumber, // Already mapped to camelCase
             soNumber: soNumber,
@@ -865,7 +873,7 @@ const QuotationManagement = () => {
             quotationDate: quotation.quotationDate,
             origin: quotation.origin,
             destination: quotation.destination,
-            serviceType: quotation.serviceType,
+            serviceType,
             cargoType: quotation.cargoType,
             weight: quotation.weight,
             volume: quotation.volume,
@@ -879,7 +887,7 @@ const QuotationManagement = () => {
         // Save shipment to Supabase FIRST, then update quotation status on success
         try {
             // Determine BL type based on service type
-            const isAirFreight = (quotation.serviceType || '').toLowerCase() === 'air';
+            const isAirFreight = serviceType === 'air';
             const blType = isAirFreight ? 'AWB' : 'MBL';
             const blPrefix = isAirFreight ? 'AWB' : 'BL';
             const blNumber = `${blPrefix}-${soNumber}`;
@@ -900,7 +908,7 @@ const QuotationManagement = () => {
                     // Route & service
                     origin: newShipment.origin,
                     destination: newShipment.destination,
-                    service_type: newShipment.serviceType,
+                    service_type: serviceType,
                     cargo_type: newShipment.cargoType,
                     // Cargo details - full set from quotation
                     weight: newShipment.weight,
@@ -936,9 +944,9 @@ const QuotationManagement = () => {
                     bl_number: blNumber,
                     bl_type: blType,
                     bl_status: 'draft',
-                    bl_subject: `${quotation.serviceType?.toUpperCase() || 'SEA'} Freight - ${quotation.origin} to ${quotation.destination}`,
-                    bl_shipper_name: quotation.customerName || quotation.customer_name || '',
-                    bl_consignee_name: quotation.consigneeName || '',
+                    bl_subject: `${serviceType.toUpperCase()} Freight - ${quotation.origin} to ${quotation.destination}`,
+                    bl_shipper_name: quotation.shipper_name || quotation.shipper || quotation.customerName || quotation.customer_name || '',
+                    bl_consignee_name: quotation.consigneeName || quotation.consignee_name || quotation.customerName || quotation.customer_name || '',
                     bl_place_of_receipt: quotation.origin || '',
                     bl_place_of_delivery: quotation.destination || '',
                     bl_description_packages: quotation.commodity || '',

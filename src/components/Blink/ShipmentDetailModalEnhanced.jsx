@@ -49,6 +49,13 @@ const getPersistedSellingItems = (source = {}) => {
     return data.sellingItems || data.selling_items || data.serviceItems || data.service_items || [];
 };
 
+const normalizeServiceType = (value) => {
+    const source = String(value || '').toLowerCase();
+    if (source.includes('air')) return 'air';
+    if (source.includes('land') || source.includes('truck')) return 'land';
+    return 'sea';
+};
+
 const getDefaultCogsData = () => ({
     oceanFreight: '',
     airFreight: '',
@@ -493,6 +500,8 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
             // Normalize all DB fields so editedShipment is always consistent
             const normalizedShipment = {
                 ...shipment,
+                serviceType: normalizeServiceType(shipment.serviceType || shipment.service_type),
+                service_type: normalizeServiceType(shipment.service_type || shipment.serviceType),
                 // Normalize camelCase / snake_case duplicates for cargo fields
                 gross_weight: shipment.gross_weight ?? shipment.grossWeight ?? null,
                 grossWeight: shipment.gross_weight ?? shipment.grossWeight ?? null,

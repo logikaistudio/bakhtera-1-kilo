@@ -159,6 +159,18 @@ const InvoiceManagement = () => {
     });
 
     const firstFilled = (...values) => values.find(value => value !== null && value !== undefined && String(value).trim() !== '') || '';
+    const formatContainerList = (value) => {
+        if (Array.isArray(value)) {
+            return value.map(item => item?.container_number || item?.containerNumber || item?.number || item?.container || item).filter(Boolean).join(', ');
+        }
+        return value || '';
+    };
+    const normalizeServiceType = (value) => {
+        const source = String(value || '').toLowerCase();
+        if (source.includes('air')) return 'air';
+        if (source.includes('land') || source.includes('truck')) return 'land';
+        return 'sea';
+    };
     const getShipmentMasterDoc = (shipment = {}) => firstFilled(
         shipment.mbl,
         shipment.mawb,
@@ -335,7 +347,33 @@ const InvoiceManagement = () => {
                 return;
             }
             console.log(`✅ Loaded ${(data || []).length} shipments for invoice creation`);
-            setShipments(data || []);
+            const sourceQuotationIds = [...new Set((data || []).map(ship => ship.sales_quotation_id || ship.quotation_id).filter(Boolean))];
+            let quotationMap = new Map();
+
+            if (sourceQuotationIds.length > 0) {
+                const [salesRes, opsRes] = await Promise.all([
+                    supabase.from('blink_sales_quotations').select('*').in('id', sourceQuotationIds),
+                    supabase.from('blink_quotations').select('*').in('id', sourceQuotationIds)
+                ]);
+                quotationMap = new Map([...(salesRes.data || []), ...(opsRes.data || [])].map(q => [q.id, q]));
+            }
+
+            setShipments((data || []).map(ship => {
+                const quote = quotationMap.get(ship.sales_quotation_id || ship.quotation_id) || {};
+                return {
+                    ...ship,
+                    service_type: quote.service_type ? normalizeServiceType(quote.service_type) : normalizeServiceType(ship.service_type),
+                    shipper_name: firstFilled(ship.shipper_name, ship.shipper, quote.shipper_name, quote.shipper),
+                    shipper: firstFilled(ship.shipper, ship.shipper_name, quote.shipper, quote.shipper_name),
+                    consignee_name: firstFilled(ship.consignee_name, quote.consignee_name),
+                    commodity: firstFilled(ship.commodity, quote.commodity),
+                    cargo_details: ship.cargo_details || quote.cargo_details || null,
+                    volume: firstFilled(ship.volume, ship.cbm, quote.volume),
+                    gross_weight: firstFilled(ship.gross_weight, quote.gross_weight),
+                    chargeable_weight: firstFilled(ship.chargeable_weight, quote.chargeable_weight),
+                    packages: firstFilled(ship.packages, quote.quantity && quote.package_type ? `${quote.quantity} ${quote.package_type}` : quote.package_type)
+                };
+            }));
         } catch (error) {
             console.error('Error fetching shipments:', error);
             setShipments([]);
@@ -443,10 +481,14 @@ const InvoiceManagement = () => {
                 billing_currency: shipment.currency || 'IDR',
                 exchange_rate: shipment.exchange_rate || shipment.exchangeRate || 1,
                 due_date: dueDate.toISOString().split('T')[0],
-                cargo_details: {
-                    weight: shipment.weight,
-                    volume: shipment.volume,
-                    commodity: shipment.commodity
+                cargo_details: shipment.cargo_details || {
+                    weight: firstFilled(shipment.weight, shipment.gross_weight, shipment.grossWeight),
+                    gross_weight: firstFilled(shipment.gross_weight, shipment.grossWeight, shipment.weight),
+                    chargeable_weight: firstFilled(shipment.chargeable_weight, shipment.chargeableWeight, shipment.weight),
+                    volume: firstFilled(shipment.volume, shipment.cbm, shipment.measure),
+                    commodity: shipment.commodity,
+                    packages: shipment.packages,
+                    containers: shipment.containers || shipment.container_number || shipment.containerNumber || []
                 },
                 // Bug Fix #1 & #5: Use selling_items OR service_items (whichever is populated).
                 // coa_id is taken directly from item.coa_id — do NOT rely on itemCode lookup
@@ -571,18 +613,18 @@ const InvoiceManagement = () => {
                     return extractedItems;
                 })(),
                 // Pre-fill fields from shipment
-                consignor: shipment.shipper_name || '',
-                consignee: shipment.consignee_name || shipment.customer || '',
-                vessel_name: shipment.vessel_name || '',
-                voyage_number: shipment.voyage_number || '',
+                consignor: firstFilled(shipment.shipper_name, shipment.shipper, shipment.bl_shipper_name),
+                consignee: firstFilled(shipment.consignee_name, shipment.consignee, shipment.bl_consignee_name, shipment.customer),
+                vessel_name: firstFilled(shipment.vessel_name, shipment.vessel, shipment.flight_number),
+                voyage_number: firstFilled(shipment.voyage_number, shipment.voyage, shipment.flight_date),
                 ocean_bl: getShipmentMasterDoc(shipment),
                 house_bl: getShipmentHouseDoc(shipment),
                 etd: shipment.etd || '',
                 eta: shipment.eta || '',
-                containers: shipment.container_number || '',
-                goods_description: shipment.commodity || '',
-                chargeable_weight: shipment.chargeable_weight || shipment.weight || '',
-                packages: shipment.packages || ''
+                containers: firstFilled(formatContainerList(shipment.containers), shipment.container_number, shipment.containerNumber),
+                goods_description: firstFilled(shipment.commodity, shipment.cargo_description, shipment.bl_description_packages),
+                chargeable_weight: firstFilled(shipment.chargeable_weight, shipment.chargeableWeight, shipment.gross_weight, shipment.weight),
+                packages: firstFilled(shipment.packages, shipment.bl_number_of_packages)
             }));
         }
     };
