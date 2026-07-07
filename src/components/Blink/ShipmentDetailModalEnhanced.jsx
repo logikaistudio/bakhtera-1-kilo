@@ -893,13 +893,15 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                 currency: item.currency || cogsCurrency
             }));
 
+            const quotedAmount = calculateQuotedAmount();
+
             // Update shipment with COGS data
             const updateData = {
                 cogs: parsedCOGS,
                 cogs_currency: cogsCurrency,
                 exchange_rate: parseNumber(exchangeRate),
                 rate_date: rateDate || null,
-                quoted_amount: parseNumber(shipment.quotedAmount),
+                quoted_amount: quotedAmount,
                 selling_items: sellingItems, // Save selling items (read-only reference)
                 buying_items: parsedBuyingItems // Save buying items (editable)
             };
@@ -925,7 +927,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                 cogsCurrency: cogsCurrency,
                 exchangeRate: parseNumber(exchangeRate),
                 rateDate: rateDate,
-                quotedAmount: parseNumber(shipment.quotedAmount) || shipment.quotedAmount,
+                quotedAmount: quotedAmount,
                 sellingItems: sellingItems,
                 buyingItems: parsedBuyingItems
             };
@@ -942,8 +944,64 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
     };
 
     // Calculate totals
+    const parseAmountValue = (value) => {
+        if (value === null || value === undefined || value === '') return 0;
+        if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+
+        let source = String(value).trim().replace(/[^0-9.,-]/g, '');
+        if (!source) return 0;
+
+        const lastDot = source.lastIndexOf('.');
+        const lastComma = source.lastIndexOf(',');
+
+        if (lastDot > -1 && lastComma > -1) {
+            if (lastComma > lastDot) {
+                source = source.replace(/\./g, '').replace(/,/g, '.');
+            } else {
+                source = source.replace(/,/g, '');
+            }
+        } else if (lastComma > -1) {
+            source = source.replace(/,/g, '.');
+        } else {
+            source = source.replace(/\.(?=\d{3}(?:\.|,|$))/g, '');
+        }
+
+        const parsed = parseFloat(source);
+        return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    const calculateItemsTotal = (items, baseCurrency = 'IDR', baseRate = 16000) => {
+        return (items || []).reduce((total, itemOrGroup) => {
+            const isGroup = Array.isArray(itemOrGroup?.items);
+            const groupRate = parseAmountValue(itemOrGroup?.groupExchangeRate) || baseRate;
+            const subItems = isGroup ? itemOrGroup.items : [itemOrGroup];
+
+            const groupTotal = (subItems || []).reduce((sum, item) => {
+                const quantity = parseAmountValue(item?.qty ?? item?.quantity) || 1;
+                const amount = parseAmountValue(item?.amount ?? item?.total) || (quantity * parseAmountValue(item?.rate ?? item?.unitPrice ?? item?.price));
+                const itemCurrency = item?.currency || baseCurrency;
+
+                if (itemCurrency === baseCurrency) return sum + amount;
+                if (baseCurrency === 'IDR' && itemCurrency === 'USD') return sum + (amount * groupRate);
+                if (baseCurrency === 'USD' && itemCurrency === 'IDR') return sum + (groupRate ? amount / groupRate : amount);
+                return sum + amount;
+            }, 0);
+
+            return total + groupTotal;
+        }, 0);
+    };
+
     const calculateQuotedAmount = () => {
-        return shipment?.quotedAmount || 0;
+        const baseCurrency = shipment?.currency || quotationData?.currency || 'IDR';
+        const baseRate = parseAmountValue(shipment?.exchangeRate || shipment?.exchange_rate || quotationData?.exchange_rate) || 16000;
+        const quotationItems = quotationData?.service_items || quotationData?.serviceItems || [];
+        const quotationItemsTotal = calculateItemsTotal(quotationItems, baseCurrency, baseRate);
+        if (quotationItemsTotal > 0) return quotationItemsTotal;
+
+        const sellingItemsTotal = calculateItemsTotal(sellingItems, baseCurrency, baseRate);
+        if (sellingItemsTotal > 0) return sellingItemsTotal;
+
+        return parseAmountValue(quotationData?.total_amount || quotationData?.totalAmount || shipment?.quotedAmount || shipment?.quoted_amount);
     };
 
     const calculateTotalCOGS = () => {
