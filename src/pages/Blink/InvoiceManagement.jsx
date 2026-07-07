@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { createInvoiceJournal, createCOGSJournal, createARPaymentJournal, getAllCOA, resolveARAccount, resolveRevenueAccount, generateUUID, migrateBlinkFinancialRecords } from '../../utils/journalHelper';
+import { createInvoiceJournal, createARPaymentJournal, getAllCOA, generateUUID, migrateBlinkFinancialRecords } from '../../utils/journalHelper';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useData } from '../../context/DataContext';
@@ -1959,65 +1959,23 @@ const InvoiceManagement = () => {
         }).catch(err => console.error("Failed to load export utility", err));
     };
 
-    // --- Dev Temp Migration ---
+    // --- Repair Missing Journals ---
     const [isMigrating, setIsMigrating] = useState(false);
     const runMigration = async () => {
-        if (!confirm('Run auto-journal migration for historical invoices?')) return;
+        if (!confirm('Repair missing journals for approved invoices and purchase orders?')) return;
         setIsMigrating(true);
         try {
-            const { data: allInvoices, error: invError } = await supabase
-                .from('blink_invoices')
-                .select('*')
-                .neq('status', 'draft')
-                .neq('status', 'cancelled');
-            if (invError) throw invError;
+            const { migratedInvoices, migratedPOs } = await migrateBlinkFinancialRecords();
+            await fetchInvoices();
 
-            const { data: currentJournals, error: jeError } = await supabase
-                .from('blink_journal_entries')
-                .select('reference_id')
-                .eq('reference_type', 'ar');
-            if (jeError) throw jeError;
-
-            const existingIds = new Set(currentJournals.map(je => je.reference_id));
-            const toMigrate = allInvoices
-                .filter(inv => !existingIds.has(inv.id))
-                .sort((a, b) => new Date(a.invoice_date) - new Date(b.invoice_date));
-
-            if (toMigrate.length === 0) {
-                alert('All invoices already migrated!');
-                setIsMigrating(false);
-                return;
-            }
-
-            let migratedCount = 0;
-            const coaList = await getAllCOA();
-
-            for (const inv of toMigrate) {
-                try {
-                    // Create detailed AR + Revenue journal
-                    await createInvoiceJournal({ invoice: inv, coaList });
-                    
-                    // Create detailed COGS + Inventory journal if applicable
-                    if (inv.cogs_subtotal > 0) {
-                        await createCOGSJournal({ 
-                            invoice: inv, 
-                            cogsAmount: inv.cogs_subtotal, 
-                            coaList 
-                        });
-                    }
-                    migratedCount++;
-                } catch (err) {
-                    console.error(`Failed to migrate invoice ${inv.invoice_number}:`, err);
-                }
-            }
-
-            if (migratedCount > 0) {
-                alert(`Successfully migrated ${migratedCount} invoices with detailed items!`);
-                await fetchInvoices();
+            if (migratedInvoices || migratedPOs) {
+                alert(`Repair completed. Invoice journals: ${migratedInvoices}, PO journals: ${migratedPOs}.`);
+            } else {
+                alert('No missing journals found. All approved invoices and POs are already posted.');
             }
         } catch (error) {
             console.error(error);
-            alert('Migration failed: ' + error.message);
+            alert('Repair missing journals failed: ' + error.message);
         } finally {
             setIsMigrating(false);
         }
@@ -2032,6 +1990,14 @@ const InvoiceManagement = () => {
                     <p className="text-silver-dark mt-1">Kelola invoice dan tracking pembayaran</p>
                 </div>
                 <div className="flex items-center gap-3">
+                    <Button
+                        onClick={runMigration}
+                        variant="secondary"
+                        icon={Receipt}
+                        disabled={isMigrating || !canEdit('blink_invoices')}
+                    >
+                        {isMigrating ? 'Repairing...' : 'Repair Missing Journals'}
+                    </Button>
                     <Button
                         onClick={handleDeleteSelectedInvoices}
                         variant="danger"
