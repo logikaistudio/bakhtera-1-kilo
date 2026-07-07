@@ -39,21 +39,15 @@ import PartnerPicker from '../Common/PartnerPicker';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 
-const getPersistedBuyingItems = (source = {}) => (
-    source.buyingItems ||
-    source.buying_items ||
-    source.cogsItems ||
-    source.cogs_items ||
-    []
-);
+const getPersistedBuyingItems = (source = {}) => {
+    const data = source || {};
+    return data.buyingItems || data.buying_items || data.cogsItems || data.cogs_items || [];
+};
 
-const getPersistedSellingItems = (source = {}) => (
-    source.sellingItems ||
-    source.selling_items ||
-    source.serviceItems ||
-    source.service_items ||
-    []
-);
+const getPersistedSellingItems = (source = {}) => {
+    const data = source || {};
+    return data.sellingItems || data.selling_items || data.serviceItems || data.service_items || [];
+};
 
 const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCancel, onViewAnalysis, canEditShipment = true, canCreatePO = true }) => {
     const navigate = useNavigate();
