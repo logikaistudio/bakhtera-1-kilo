@@ -185,7 +185,7 @@ const GroupedServiceItemManager = ({
     };
 
     const updateGroupExchangeRate = (groupId, rate) => {
-        const updated = groups.map(g => g.id === groupId ? { ...g, groupExchangeRate: parseFloat(rate) || exchangeRate } : g);
+        const updated = groups.map(g => g.id === groupId ? { ...g, groupExchangeRate: parseAmountValue(rate, 'IDR') || exchangeRate } : g);
         notifyChange(updated);
     };
 
@@ -227,24 +227,14 @@ const GroupedServiceItemManager = ({
                         
                         // Auto-calculate amount if quantity or unitPrice changes
                         if (field === 'quantity' || field === 'unitPrice' || field === 'currency') {
-                            const qty = field === 'quantity' ? parseFloat(value) || 0 : parseFloat(item.quantity) || 0;
-                            let priceStr = field === 'unitPrice' ? value.toString() : item.unitPrice.toString();
-                            
-                            let price = 0;
-                            // Need to handle both the newly selected currency and existing currency correctly
                             const currencyToUse = field === 'currency' ? value : item.currency;
-                            
-                            if (currencyToUse === 'IDR') {
-                                // IDR: remove dots (thousand separator), change comma to dot (decimal separator)
-                                price = parseFloat(priceStr.replace(/\./g, '').replace(/,/g, '.')) || 0;
-                            } else {
-                                // USD: remove commas (thousand separator), keep dot as decimal
-                                price = parseFloat(priceStr.replace(/,/g, '')) || 0;
-                            }
-                            
+                            const qty = field === 'quantity' ? parseAmountValue(value, 'USD') : parseAmountValue(item.quantity, 'USD');
+                            const priceStr = field === 'unitPrice' ? value : item.unitPrice;
+                            const price = parseAmountValue(priceStr, currencyToUse);
+
                             updatedItem.amount = qty * price;
                             if (field === 'unitPrice') {
-                                updatedItem.unitPrice = price; // Store numeric
+                                updatedItem.unitPrice = nextValue;
                             }
                         }
                         return updatedItem;
@@ -312,10 +302,15 @@ const GroupedServiceItemManager = ({
 
     const formatNumber = (num, decimals = 0) => {
         if (num === null || num === undefined) return '';
+        const parsed = typeof num === 'number' ? num : parseAmountValue(num, 'IDR');
+        const hasFraction = Number.isFinite(parsed) && !Number.isInteger(parsed);
         if (decimals > 0) {
-             return parseFloat(num).toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+             return parsed.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
         }
-        return parseInt(num).toLocaleString('id-ID');
+        return parsed.toLocaleString('id-ID', {
+            minimumFractionDigits: hasFraction ? 2 : 0,
+            maximumFractionDigits: hasFraction ? 2 : 0
+        });
     };
 
     const { totalIdr, totalUsd } = calculateGrandTotals();
@@ -377,7 +372,7 @@ const GroupedServiceItemManager = ({
                 const currentGroupRate = group.groupExchangeRate || exchangeRate;
                 
                 (group.items || []).forEach(item => {
-                    const amt = parseFloat(item.amount) || 0;
+                    const amt = parseAmountValue(item.amount, item.currency, currentGroupRate) || 0;
                     if (item.currency === 'IDR') {
                         groupTotalIdr += amt;
                     } else if (item.currency === 'USD') {
@@ -474,7 +469,7 @@ const GroupedServiceItemManager = ({
                                     {/* Grid Body */}
                                     <div className="space-y-2.5">
                                         {group.items.map((item) => {
-                                            const amt = parseFloat(item.amount) || 0;
+                                            const amt = parseAmountValue(item.amount, item.currency, currentGroupRate) || 0;
                                             let idrEq = 0;
                                             let usdEq = 0;
                                             if (item.currency === 'IDR') {
@@ -546,7 +541,7 @@ const GroupedServiceItemManager = ({
                                                         <div className="lg:hidden text-[10px] font-semibold text-gray-400 uppercase mb-1 mt-2">Rate / Price</div>
                                                         <input
                                                             type="text"
-                                                            value={item.unitPrice ? (item.currency==='IDR'? formatNumber(item.unitPrice) : item.unitPrice) : ''}
+                                                            value={item.unitPrice || item.unitPrice === 0 ? (typeof item.unitPrice === 'string' ? item.unitPrice : (item.currency==='IDR'? formatNumber(item.unitPrice) : item.unitPrice)) : ''}
                                                             onChange={(e) => updateItem(group.id, item.id, 'unitPrice', e.target.value)}
                                                             placeholder="0"
                                                             className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all text-right font-mono text-gray-800 shadow-sm"
