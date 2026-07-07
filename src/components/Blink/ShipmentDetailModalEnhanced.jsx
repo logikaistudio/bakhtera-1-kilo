@@ -302,9 +302,9 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                             const groupRate = isGroup ? (groupOrItem.groupExchangeRate || quotation.exchange_rate || 16000) : (quotation.exchange_rate || 16000);
 
                             subItems.forEach(item => {
-                                const qty = parseFloat(item.qty || item.quantity || 1);
-                                const rate = parseFloat(item.rate || item.unitPrice || item.price || 0);
-                                const amount = parseFloat(item.amount || item.total || 0) || (qty * rate);
+                                const qty = parseAmountValue(item.qty || item.quantity || 1);
+                                const rate = parseAmountValue(item.rate || item.unitPrice || item.price || 0);
+                                const amount = parseAmountValue(item.amount || item.total || 0) || (qty * rate);
                                 
                                 flatList.push({
                                     id: item.id || `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -668,7 +668,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
             }
 
             (buyingItems || []).forEach(item => {
-                const val = parseFloat(String(item.amount || 0).replace(/,/g, ''));
+                const val = parseAmountValue(item.amount || 0);
                 if (val && val > 0) {
                     const coaAccount = coaMap[item.coa_id];
                     const itemName = coaAccount ? coaAccount.name : (item.description || 'Item');
@@ -677,7 +677,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                         description: item.description || itemName,
                         qty: parseFloat(item.qty) || 1,
                         unit: item.unit || 'Job',
-                        unit_price: parseFloat(item.rate) || val,
+                        unit_price: parseAmountValue(item.rate) || val,
                         amount: val,
                         coa_id: item.coa_id || null,
                         vendor: item.vendor || null
@@ -861,8 +861,8 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
             // Helper to safely parse numbers
             const parseNumber = (value) => {
                 if (value === '' || value === null || value === undefined) return null;
-                const parsed = parseFloat(String(value).replace(/,/g, ''));
-                return isNaN(parsed) ? null : parsed;
+                const parsed = parseAmountValue(value);
+                return Number.isFinite(parsed) ? parsed : null;
             };
 
             // Parse COGS items - handle both simple values and arrays
@@ -1006,8 +1006,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
 
     const calculateTotalCOGS = () => {
         const parseVal = (val) => {
-            const parsed = parseFloat(String(val || 0).replace(/,/g, ''));
-            return isNaN(parsed) ? 0 : parsed;
+            return parseAmountValue(val);
         };
 
         // Base COGS items
@@ -2988,7 +2987,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                                             onChange={(e) => {
                                                                                 const updated = [...buyingItems];
                                                                                 updated[index].qty = e.target.value;
-                                                                                updated[index].amount = (parseFloat(e.target.value) || 0) * parseFloat(updated[index].rate || 0);
+                                                                                updated[index].amount = parseAmountValue(e.target.value) * parseAmountValue(updated[index].rate || 0);
                                                                                 setBuyingItems(updated);
                                                                             }}
                                                                             className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm text-center"
@@ -3061,29 +3060,29 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                                     {isEditingCOGS ? (
                                                                         <input
                                                                             type="text"
-                                                                            value={item.rate !== undefined ? parseFloat(item.rate.toString().replace(/\./g, '')).toLocaleString('id-ID') : ''}
+                                                                            value={item.rate !== undefined && item.rate !== null ? (typeof item.rate === 'string' ? item.rate : item.rate.toLocaleString('id-ID', { minimumFractionDigits: Number.isInteger(item.rate) ? 0 : 2, maximumFractionDigits: Number.isInteger(item.rate) ? 0 : 2 })) : ''}
                                                                             onChange={(e) => {
-                                                                                const valStr = e.target.value.replace(/\./g, '');
-                                                                                const numVal = parseFloat(valStr) || 0;
+                                                                                const rawValue = e.target.value.replace(/[^0-9.,-]/g, '');
+                                                                                const numVal = parseAmountValue(rawValue);
                                                                                 const updated = [...buyingItems];
-                                                                                updated[index].rate = numVal;
-                                                                                updated[index].amount = numVal * parseFloat(updated[index].qty || 1);
+                                                                                updated[index].rate = rawValue;
+                                                                                updated[index].amount = numVal * parseAmountValue(updated[index].qty || 1);
                                                                                 setBuyingItems(updated);
                                                                             }}
                                                                             className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm text-right"
                                                                             placeholder="0"
                                                                         />
                                                                     ) : (
-                                                                        <span className="text-silver-light text-sm">{parseFloat(item.rate || 0).toLocaleString('id-ID')}</span>
+                                                                        <span className="text-silver-light text-sm">{parseAmountValue(item.rate || 0).toLocaleString('id-ID', { minimumFractionDigits: Number.isInteger(parseAmountValue(item.rate || 0)) ? 0 : 2, maximumFractionDigits: Number.isInteger(parseAmountValue(item.rate || 0)) ? 0 : 2 })}</span>
                                                                     )}
                                                                 </td>
                                                                 <td className="px-2 py-2 text-right">
                                                                     <span className="text-silver-light text-sm font-medium">
-                                                                        {(item.currency || 'IDR') === 'USD' ? '$' : 'Rp '}{parseFloat(item.amount || 0).toLocaleString('id-ID')}
+                                                                        {(item.currency || 'IDR') === 'USD' ? '$' : 'Rp '}{parseAmountValue(item.amount || 0).toLocaleString('id-ID', { minimumFractionDigits: Number.isInteger(parseAmountValue(item.amount || 0)) ? 0 : 2, maximumFractionDigits: Number.isInteger(parseAmountValue(item.amount || 0)) ? 0 : 2 })}
                                                                     </span>
                                                                     {(item.currency || 'IDR') === 'USD' && exchangeRate && parseFloat(exchangeRate) > 0 && (
                                                                         <div className="text-xs text-silver-dark mt-0.5">
-                                                                            ≈ Rp {(parseFloat(item.amount || 0) * parseFloat(exchangeRate)).toLocaleString('id-ID')}
+                                                                            ≈ Rp {(parseAmountValue(item.amount || 0) * parseAmountValue(exchangeRate)).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                                         </div>
                                                                     )}
                                                                 </td>
