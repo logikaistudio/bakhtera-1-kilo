@@ -246,25 +246,6 @@ export const generateBLPrintHTML = (blData) => {
         }
         .print-btn:hover { background: #1d4ed8; }
 
-        .stamp-circle {
-            position: absolute;
-            right: 34mm;
-            bottom: 48mm;
-            width: 34mm;
-            height: 34mm;
-            border: 2px solid rgba(180, 135, 24, 0.7);
-            border-radius: 50%;
-            color: rgba(180, 135, 24, 0.75);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            font-size: 7pt;
-            font-weight: 800;
-            transform: rotate(-12deg);
-            pointer-events: none;
-        }
-
         .signature-line {
             border-top: 0.8px solid #222;
             width: 46mm;
@@ -386,8 +367,7 @@ export const generateBLPrintHTML = (blData) => {
             </div>
 
             <div class="row" style="min-height:10mm;">
-                <div class="col field-sm" style="width:26%;"><span class="label">Point and Country of Origin</span><div class="value">${d.countryOfOrigin}</div></div>
-                <div class="col field-sm" style="width:26%;"><span class="label">Loading Pier/Terminal</span><div class="value">${d.loadingPier}</div></div>
+                <div class="col field-sm" style="width:52%;"><span class="label">Containerized (Vessel only)</span><div class="value" style="display:flex; gap:12mm; align-items:center; margin-top:1mm;"><span>${d.containerNo || String(d.typeOfMove || '').toUpperCase().includes('FCL') ? '☑' : '☐'} Yes</span><span>${d.containerNo || String(d.typeOfMove || '').toUpperCase().includes('FCL') ? '☐' : '☑'} No</span></div></div>
                 <div class="col field-sm" style="width:48%;"><span class="label">Type of Move</span><div class="value-bold">${d.typeOfMove}</div></div>
             </div>
 
@@ -438,7 +418,6 @@ export const generateBLPrintHTML = (blData) => {
                     <div style="margin-top:6mm; font-size:8pt;">By <strong>BAKHTERA FREIGHT WORLDWIDE</strong></div>
                     <div class="signature-line">As Agent For Carrier</div>
                 </div>
-                <div class="stamp-circle">BAKHTERA<br>BFW<br>FREIGHT WORLDWIDE</div>
             </div>
         </div>
     </div>
