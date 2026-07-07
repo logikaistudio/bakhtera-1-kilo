@@ -132,6 +132,17 @@ const ProfitLoss = () => {
             };
 
             const getCodePrefix = (code) => code ? String(code).trim().charAt(0) : null;
+            const postedRevenueInvoiceIds = new Set();
+
+            const applyAmountToAccount = (account, amount, dateValue) => {
+                if (!account || !amount) return;
+                account.amount += amount;
+                const monthKey = dateValue?.substring(0, 7);
+                if (!monthKey) return;
+                if (monthKey === selectedMonth) account.byMonth.current += amount;
+                if (monthKey === prevMonthKey) account.byMonth.previous += amount;
+                if (monthKey.startsWith(`${targetYear}-`) && monthKey <= selectedMonth) account.byMonth.ytd += amount;
+            };
 
             entries.forEach(e => {
                 // Resolusi akun: prioritaskan coa_id, fallback ke account_code
@@ -152,15 +163,54 @@ const ProfitLoss = () => {
                 let val = 0;
                 if (prefix === '4' || prefix === '7' || prefix === '8') {
                     val = (credit - debit);
+                    if (prefix === '4' && e.entry_type === 'invoice' && ['ar', 'blink_invoice', 'invoice'].includes(e.reference_type) && e.reference_id) {
+                        postedRevenueInvoiceIds.add(String(e.reference_id));
+                    }
                 } else {
                     val = (debit - credit);
                 }
-                acc.amount += val;
-                const mKey = e.entry_date?.substring(0, 7);
-                if (!mKey) return;
-                if (mKey === selectedMonth) acc.byMonth.current += val;
-                if (mKey === prevMonthKey) acc.byMonth.previous += val;
-                if (mKey.startsWith(`${targetYear}-`) && mKey <= selectedMonth) acc.byMonth.ytd += val;
+                applyAmountToAccount(acc, val, e.entry_date);
+            });
+
+            const defaultRevenueAccount = Object.values(coaMapByCode).find(acc => getCodePrefix(acc.code) === '4');
+            const resolveRevenueAccountForItem = (item = {}) => {
+                if (item.coa_id && idToCode[item.coa_id] && getCodePrefix(idToCode[item.coa_id]) === '4') {
+                    return coaMapByCode[idToCode[item.coa_id]];
+                }
+                const code = String(item.coa_code || item.itemCode || '').trim();
+                if (code && coaMapByCode[code] && getCodePrefix(code) === '4') {
+                    return coaMapByCode[code];
+                }
+                return defaultRevenueAccount;
+            };
+
+            const { data: invoiceRows, error: invoiceFallbackError } = await supabase
+                .from('blink_invoices')
+                .select('id, invoice_date, status, subtotal, total_amount, invoice_items, currency, exchange_rate')
+                .eq('division', activeDivision)
+                .in('status', ['unpaid', 'paid', 'partially_paid', 'overdue'])
+                .gte('invoice_date', queryStart)
+                .lte('invoice_date', queryEnd);
+            if (invoiceFallbackError) throw invoiceFallbackError;
+
+            (invoiceRows || []).forEach(invoice => {
+                if (postedRevenueInvoiceIds.has(String(invoice.id))) return;
+
+                const invoiceItems = Array.isArray(invoice.invoice_items) ? invoice.invoice_items : [];
+                const exchangeRate = invoice.currency !== 'IDR' ? (Number(invoice.exchange_rate) || 1) : 1;
+
+                if (invoiceItems.length > 0) {
+                    invoiceItems.forEach(item => {
+                        const account = resolveRevenueAccountForItem(item);
+                        const rawAmount = Number(item.amount) || 0;
+                        const amount = toIDR(rawAmount, item.currency || invoice.currency || 'IDR', exchangeRate);
+                        applyAmountToAccount(account, amount, invoice.invoice_date);
+                    });
+                    return;
+                }
+
+                const fallbackAmount = Number(invoice.subtotal ?? invoice.total_amount) || 0;
+                applyAmountToAccount(defaultRevenueAccount, toIDR(fallbackAmount, invoice.currency || 'IDR', exchangeRate), invoice.invoice_date);
             });
 
             const all = Object.values(coaMapByCode);
