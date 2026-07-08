@@ -27,11 +27,9 @@ export const generateBLPrintHTML = (blData) => {
         measurement: item.measurement || item.measure || item.volume || item.cbm || ''
     });
 
-    const sourceCargoItems = [
-        ...flattenCargoItems(blData.cargoItems || blData.cargo_items || []),
-        ...flattenCargoItems(blData.serviceItems || blData.service_items || []),
-        ...flattenCargoItems(blData.sellingItems || blData.selling_items || [])
-    ].map(formatCargoItem).filter(item => item.description || item.packages || item.weight || item.measurement || item.marks);
+    const sourceCargoItems = flattenCargoItems(blData.cargoItems || blData.cargo_items || [])
+        .map(formatCargoItem)
+        .filter(item => item.description || item.packages || item.weight || item.measurement || item.marks);
 
     // Prefer BL specific fields if available, otherwise fallback to generic
     const d = {
@@ -91,7 +89,11 @@ export const generateBLPrintHTML = (blData) => {
     const documentTitle = isAirDocument ? 'AIR WAYBILL' : 'OCEAN BILL OF LADING';
     const documentNumberLabel = isAirDocument ? 'AWB Number' : 'B/L Number';
     const cargoRows = sourceCargoItems.length > 0
-        ? sourceCargoItems
+        ? sourceCargoItems.map((item, index) => (
+            index === 0 && d.description
+                ? { ...item, description: d.description }
+                : item
+        ))
         : [{
             marks: d.marks,
             packages: d.numberOfPackages,
@@ -342,15 +344,15 @@ export const generateBLPrintHTML = (blData) => {
     <div class="page">
         ${watermarkHTML}
         <div class="container">
-            <div class="row" style="min-height: 36mm;">
+            <div class="row" style="min-height: 43mm;">
                 <div class="col" style="width: 52%; display:flex; flex-direction:column;">
-                    <div class="header-logo" style="min-height:19mm;">
+                    <div class="header-logo" style="min-height:19mm; margin-bottom:1mm;">
                         ${coLogo ? `<img src="${coLogo}" alt="Logo" style="max-height:18mm;max-width:58mm;object-fit:contain;" />` : `<span class="company-main">bakhtera</span><span class="company-sub">freight worldwide</span>`}
                         ${d.releaseType ? `<br><span class="release-stamp">${d.releaseType}</span>` : ''}
                     </div>
                     <span class="label">Shipper</span>
-                    <div class="value-bold">${d.shipper}</div>
-                    <div class="value">${d.shipperAddr}</div>
+                    <div class="value-bold" style="font-size:7.2pt; line-height:1.05; margin-bottom:1px;">${d.shipper}</div>
+                    <div class="value" style="font-size:6.6pt; line-height:1.08; white-space:pre-wrap; max-height:11mm; overflow:hidden;">${d.shipperAddr}</div>
                 </div>
                 <div class="col" style="width: 48%; padding:0; display:flex; flex-direction:column;">
                     <div style="height:12mm; padding:3px 4px; border-bottom:0.8px solid #222; display:flex; justify-content:flex-end; align-items:flex-start;">
@@ -373,27 +375,27 @@ export const generateBLPrintHTML = (blData) => {
                 </div>
             </div>
 
-            <div class="row" style="min-height:26mm;">
+            <div class="row" style="min-height:30mm;">
                 <div class="col field" style="width:52%;">
                     <span class="label">Consignee</span>
-                    <div class="value-bold">${d.consignee}</div>
-                    <div class="value">${d.consigneeAddr}</div>
+                    <div class="value-bold" style="font-size:7.2pt; line-height:1.05; margin-bottom:1px;">${d.consignee}</div>
+                    <div class="value" style="font-size:6.6pt; line-height:1.08; white-space:pre-wrap; max-height:12mm; overflow:hidden;">${d.consigneeAddr}</div>
                 </div>
                 <div class="col field" style="width:48%;">
                     <span class="label">Forwarding Agent (Name and address - references)</span>
-                    <div class="value-bold small-text">${d.agentRefs}</div>
+                    <div class="value-bold small-text" style="line-height:1.05; white-space:pre-wrap; max-height:12mm; overflow:hidden;">${d.agentRefs}</div>
                 </div>
             </div>
 
-            <div class="row" style="min-height:21mm;">
+            <div class="row" style="min-height:24mm;">
                 <div class="col field" style="width:52%;">
                     <span class="label">Notify Party</span>
-                    <div class="value-bold">${d.notify}</div>
-                    <div class="value">${d.notifyAddr}</div>
+                    <div class="value-bold" style="font-size:7.2pt; line-height:1.05; margin-bottom:1px;">${d.notify}</div>
+                    <div class="value" style="font-size:6.6pt; line-height:1.08; white-space:pre-wrap; max-height:10mm; overflow:hidden;">${d.notifyAddr}</div>
                 </div>
                 <div class="col field" style="width:48%;">
                     <span class="label">Forwarding Agent References</span>
-                    <div class="value small-text">${d.agentRefs}</div>
+                    <div class="value small-text" style="line-height:1.05; white-space:pre-wrap; max-height:10mm; overflow:hidden;">${d.agentRefs}</div>
                 </div>
             </div>
 
