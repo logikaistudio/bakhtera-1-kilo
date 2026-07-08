@@ -1331,13 +1331,11 @@ const BLManagement = () => {
                                         {renderInput('Port of Loading', 'portOfLoading')}
                                         {renderInput('Port of Discharge', 'portOfDischarge')}
                                         {renderInput('Place of Delivery', 'placeOfDelivery')}
-                                        {renderInput('Loading Pier / Terminal', 'loadingPier')}
                                     </div>
                                     <div className="border-t border-gray-200 dark:border-dark-border pt-4 mt-4">
                                         <h3 className="text-xs font-bold text-silver-dark uppercase mb-3">Print-Specific Fields</h3>
                                         <div className="grid grid-cols-2 gap-x-8 gap-y-4">
                                             {renderInput('Type of Move', 'typeOfMove', 'text', 'e.g. FCL/FCL, LCL/LCL, CY/CY')}
-                                            {renderInput('Point and Country of Origin', 'countryOfOrigin', 'text', 'e.g. INDONESIA')}
                                             <div>
                                                 <label className="block text-xs text-gray-500 dark:text-silver-dark font-semibold uppercase mb-1">Containerized</label>
                                                 {isEditing ? (

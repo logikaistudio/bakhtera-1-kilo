@@ -113,7 +113,10 @@ export const generateBLPrintHTML = (blData) => {
     const watermarkRaw = (d.watermark || '').toString().trim();
     const watermarkNormalized = watermarkRaw.toUpperCase().replace(/[-_\s]+/g, ' ').trim();
     const isCopyNonNegotiable = watermarkNormalized.includes('COPY') && watermarkNormalized.includes('NEGOTIABLE');
-    const isFreightCollect = String(d.collect || '').trim().length > 0;
+    const collectText = String(d.collect || '').trim().toUpperCase();
+    const isFreightCollect = collectText
+        ? !collectText.includes('PREPAID')
+        : String(d.freightPayable || '').toUpperCase().includes('DEST');
     const watermarkHTML = d.watermark
         ? isCopyNonNegotiable
             ? `<div class="doc-watermark copy-non-negotiable"><span>COPY</span><span>NON NEGOTIABLE</span></div>`
