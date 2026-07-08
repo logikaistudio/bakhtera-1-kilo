@@ -50,6 +50,15 @@ const BLManagement = () => {
 
     const { companySettings } = useData();
 
+    const inferContainerized = (shipmentOrBL = {}) => {
+        const typeOfMove = String(shipmentOrBL.blTypeOfMove || shipmentOrBL.typeOfMove || shipmentOrBL.type_of_move || '').toUpperCase();
+        const containerCount = Array.isArray(shipmentOrBL.containers) ? shipmentOrBL.containers.length : 0;
+        if (containerCount > 0) return 'YES';
+        if (typeOfMove.includes('FCL') || typeOfMove.includes('CY/CY')) return 'YES';
+        if (typeOfMove.includes('LCL') || typeOfMove.includes('AIR') || typeOfMove.includes('FCL/LCL')) return 'NO';
+        return '';
+    };
+
     useEffect(() => {
         fetchBLs();
         fetchQuotations();
@@ -128,6 +137,7 @@ const BLManagement = () => {
                 // NEW: Extra routing fields for print
                 typeOfMove: selectedBL.blTypeOfMove || 'FCL/FCL',
                 countryOfOrigin: selectedBL.blCountryOfOrigin || 'INDONESIA',
+                containerized: selectedBL.containerized || selectedBL.blContainerized || inferContainerized(selectedBL),
 
                 // Cargo - Auto-populate from shipment data
                 containers: selectedBL.containers || [],
@@ -263,6 +273,7 @@ const BLManagement = () => {
                 // NEW: Extra BL fields
                 blTypeOfMove: ship.bl_type_of_move,
                 blCountryOfOrigin: ship.bl_country_of_origin,
+                containerized: ship.bl_containerized || inferContainerized(ship),
                 blFreightCharges: ship.bl_freight_charges,
                 blPrepaid: ship.bl_prepaid,
                 blCollect: ship.bl_collect,
@@ -279,7 +290,9 @@ const BLManagement = () => {
                 currency: ship.currency || 'USD',
                 status: normalizeBLStatus(ship.bl_status || ship.status || 'draft'),
 
-                // Shipment data for reference
+                    freightPayableAt: ship.bl_freight_payable_at || ship.freight_payable_at || 'DESTINATION',
+                    prepaid: ship.bl_prepaid || '',
+                    collect: ship.bl_collect || '',
                 origin: ship.origin,
                 destination: ship.destination,
                 serviceType: ship.service_type,
@@ -497,6 +510,7 @@ const BLManagement = () => {
                 blForwardingAgentRef: editForm.forwardingAgentRef,
                 blTypeOfMove: editForm.typeOfMove,
                 blCountryOfOrigin: editForm.countryOfOrigin,
+                blContainerized: editForm.containerized,
                 blMarksNumbers: editForm.marksNumbers,
                 blDescriptionPackages: editForm.descriptionPackages,
                 blGrossWeightText: editForm.grossWeight,
@@ -511,6 +525,10 @@ const BLManagement = () => {
                 blPrepaid: editForm.prepaid,
                 blCollect: editForm.collect,
                 blShippedOnBoardDate: editForm.shippedOnBoardDate,
+                containerized: editForm.containerized,
+                freightPayableAt: editForm.freightPayableAt,
+                collect: editForm.collect,
+                prepaid: editForm.prepaid,
             };
             printBLCertificate({ ...printData, logo_url: companySettings?.logo_url || '', watermark: printWatermark || null, releaseType: printReleaseType || null });
         } catch (error) {
@@ -772,6 +790,7 @@ const BLManagement = () => {
 
             // === TYPE OF MOVE ===
             typeOfMove: typeOfMove || prev.typeOfMove,
+            containerized: ship.containerized || ship.bl_containerized || inferContainerized(ship) || prev.containerized,
 
             // === PARTIES ===
             shipperName: ship.shipper_name || ship.shipper || prev.shipperName,
@@ -1319,6 +1338,25 @@ const BLManagement = () => {
                                         <div className="grid grid-cols-2 gap-x-8 gap-y-4">
                                             {renderInput('Type of Move', 'typeOfMove', 'text', 'e.g. FCL/FCL, LCL/LCL, CY/CY')}
                                             {renderInput('Point and Country of Origin', 'countryOfOrigin', 'text', 'e.g. INDONESIA')}
+                                            <div>
+                                                <label className="block text-xs text-gray-500 dark:text-silver-dark font-semibold uppercase mb-1">Containerized</label>
+                                                {isEditing ? (
+                                                    <div className="inline-flex rounded border border-gray-300 dark:border-dark-border overflow-hidden bg-white dark:bg-dark-surface">
+                                                        {['YES', 'NO'].map((option) => (
+                                                            <button
+                                                                key={option}
+                                                                type="button"
+                                                                onClick={() => setEditForm({ ...editForm, containerized: option })}
+                                                                className={`px-3 py-2 text-xs font-bold ${editForm.containerized === option ? 'bg-accent-orange text-white' : 'text-gray-700 dark:text-silver-light'}`}
+                                                            >
+                                                                {option}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-xs text-gray-900 dark:text-silver-light font-medium p-2 bg-gray-50 dark:bg-dark-bg/50 rounded border border-transparent">{editForm.containerized || '-'}</div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

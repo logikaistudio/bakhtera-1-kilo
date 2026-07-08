@@ -7,10 +7,10 @@ export const formatCurrency = (value) => {
     const num = typeof value === 'string' ? parseFloat(value) : Number(value);
     if (isNaN(num)) return '0';
 
-    // Show decimals only when present, up to 6 fraction digits
+    // Standardize monetary display to 3 decimal places
     const options = {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 6
+        minimumFractionDigits: 3,
+        maximumFractionDigits: 3
     };
 
     return num.toLocaleString('id-ID', options);

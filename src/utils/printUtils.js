@@ -56,6 +56,7 @@ export const generateBLPrintHTML = (blData) => {
 
         containerNo: blData.containerNumber || '',
         sealNo: blData.sealNumber || '',
+        containerized: blData.containerized || blData.blContainerized || '',
         marks: blData.blMarksNumbers || blData.marksNumbers || blData.containerNumber || 'N/M',
         numberOfPackages: blData.blNumberOfPackages || blData.numberOfPackages || '1',
         totalPackagesInWords: blData.blTotalPackagesInWords || blData.totalPackagesInWords || 'SAY: ONE (1) CONTAINER ONLY',
@@ -414,12 +415,8 @@ export const generateBLPrintHTML = (blData) => {
             </div>
 
             <div class="row" style="min-height:10mm;">
-                <div class="col field-sm" style="width:52%;"><span class="label">Containerized (Vessel only)</span><div class="value containerized-choice" style="margin-top:1mm;"><span class="${d.containerNo || String(d.typeOfMove || '').toUpperCase().includes('FCL') ? 'selected' : ''}">YES</span><span class="${d.containerNo || String(d.typeOfMove || '').toUpperCase().includes('FCL') ? '' : 'selected'}">NO</span></div></div>
+                <div class="col field-sm" style="width:52%;"><span class="label">Containerized (Vessel only)</span><div class="value containerized-choice" style="margin-top:1mm; justify-content:center; text-align:center;">${(() => { const selected = String(d.containerized || '').toUpperCase() || (d.containerNo || String(d.typeOfMove || '').toUpperCase().includes('FCL') ? 'YES' : 'NO'); return `<span>${selected}</span>`; })()}</div></div>
                 <div class="col field-sm" style="width:48%;"><span class="label">Type of Move</span><div class="value-bold">${d.typeOfMove}</div></div>
-            </div>
-
-            <div style="border-bottom:0.8px solid #222; text-align:center; font-weight:800; background:#fff; padding:2px; font-size:6.5pt;">
-                PARTICULARS FURNISHED BY SHIPPER
             </div>
 
             <div style="height:88mm; display:flex; border-bottom:0.8px solid #222; position:relative;">
@@ -445,7 +442,7 @@ export const generateBLPrintHTML = (blData) => {
                         FREIGHT RATES, CHARGES, WEIGHTS AND / OR<br>MEASUREMENTS SUBJECT TO CORRECTION
                     </div>
                     <div style="display:flex; flex:1;">
-                        <div style="width:38%; border-right:0.8px solid #222; padding:4px;"><div class="freight-note">${String(d.freightPayable || '').toUpperCase().includes('DEST') ? 'FREIGHT COLLECT' : 'FREIGHT PREPAID'}</div></div>
+                        <div style="width:38%; border-right:0.8px solid #222; padding:4px; display:flex; align-items:center; justify-content:center; text-align:center;"><div class="freight-note">${String(d.freightPayable || '').toUpperCase().includes('DEST') ? 'FREIGHT COLLECT' : 'FREIGHT PREPAID'}</div></div>
                         <div style="width:31%; border-right:0.8px solid #222; padding:4px;"><span class="label">Freight & Charges</span><div class="value">${d.freightCharges}</div></div>
                         <div style="width:31%; padding:4px;"><span class="label">Total Packages in Words</span><div class="value-bold" style="text-transform:uppercase;">${d.totalPackagesInWords}</div></div>
                     </div>
