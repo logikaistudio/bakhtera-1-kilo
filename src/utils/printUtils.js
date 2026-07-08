@@ -113,6 +113,7 @@ export const generateBLPrintHTML = (blData) => {
     const watermarkRaw = (d.watermark || '').toString().trim();
     const watermarkNormalized = watermarkRaw.toUpperCase().replace(/[-_\s]+/g, ' ').trim();
     const isCopyNonNegotiable = watermarkNormalized.includes('COPY') && watermarkNormalized.includes('NEGOTIABLE');
+    const isFreightCollect = String(d.collect || '').trim().length > 0;
     const watermarkHTML = d.watermark
         ? isCopyNonNegotiable
             ? `<div class="doc-watermark copy-non-negotiable"><span>COPY</span><span>NON NEGOTIABLE</span></div>`
@@ -442,7 +443,7 @@ export const generateBLPrintHTML = (blData) => {
                         FREIGHT RATES, CHARGES, WEIGHTS AND / OR<br>MEASUREMENTS SUBJECT TO CORRECTION
                     </div>
                     <div style="display:flex; flex:1;">
-                        <div style="width:38%; border-right:0.8px solid #222; padding:4px; display:flex; align-items:center; justify-content:center; text-align:center;"><div class="freight-note">${String(d.freightPayable || '').toUpperCase().includes('DEST') ? 'FREIGHT COLLECT' : 'FREIGHT PREPAID'}</div></div>
+                        <div style="width:38%; border-right:0.8px solid #222; padding:4px; display:flex; align-items:center; justify-content:center; text-align:center;"><div class="freight-note">${isFreightCollect ? 'FREIGHT COLLECT' : 'FREIGHT PREPAID'}</div></div>
                         <div style="width:31%; border-right:0.8px solid #222; padding:4px;"><span class="label">Freight & Charges</span><div class="value">${d.freightCharges}</div></div>
                         <div style="width:31%; padding:4px;"><span class="label">Total Packages in Words</span><div class="value-bold" style="text-transform:uppercase;">${d.totalPackagesInWords}</div></div>
                     </div>
