@@ -65,12 +65,48 @@ const AWBManagement = () => {
         return `SAY: ${numberToWords(count)} (${count}) CONTAINER${count > 1 ? 'S' : ''} ONLY`;
     };
 
+    const buildGoodsDescriptionFromShipment = (ship = {}) => {
+        const directDescription = [
+            ship.commodity,
+            ship.cargo_description,
+            ship.goods_description,
+            ship.description_goods,
+            ship.descriptionGoods,
+            ship.description
+        ].find((value) => String(value || '').trim());
+
+        if (directDescription) return String(directDescription).trim();
+
+        const containers = normalizeContainers(ship.containers);
+        const containerSummary = containers
+            .map((container) => [container.containerNumber, container.containerType].filter(Boolean).join(' '))
+            .filter(Boolean)
+            .join('\n');
+
+        return containerSummary || '';
+    };
+
     const flattenShipmentItems = (items = []) => {
         if (!Array.isArray(items)) return [];
         return items.flatMap((entry) => Array.isArray(entry?.items) ? flattenShipmentItems(entry.items) : [entry]);
     };
 
     const buildCargoItemsFromShipment = (ship = {}) => {
+        const goodsDescription = buildGoodsDescriptionFromShipment(ship);
+        const packagesValue = ship.bl_number_of_packages || ship.packages || ship.containers?.length || '';
+        const grossWeightValue = ship.bl_gross_weight_text || ship.gross_weight || ship.weight || '';
+        const measurementValue = ship.bl_measurement_text || ship.volume || '';
+
+        if (goodsDescription) {
+            return [{
+                marks: ship.bl_marks_numbers || ship.container_number || 'N/M',
+                packages: packagesValue,
+                description: goodsDescription,
+                grossWeight: grossWeightValue,
+                measurement: measurementValue,
+            }];
+        }
+
         const sourceItems = [
             ...flattenShipmentItems(ship.service_items || []),
             ...flattenShipmentItems(ship.selling_items || [])
@@ -130,7 +166,7 @@ const AWBManagement = () => {
                 numberOfOriginals: selectedAWB.blNumberOfOriginals || 'THREE (3)',
 
                 // Cargo
-                descriptionGoods: selectedAWB.blDescriptionPackages || selectedAWB.cargoDescription,
+                descriptionGoods: selectedAWB.blDescriptionPackages || selectedAWB.cargoDescription || buildGoodsDescriptionFromShipment(selectedAWB.rawShipment || {}),
                 grossWeight: selectedAWB.blGrossWeightText || (inferredGrossWeight ? `${inferredGrossWeight} KGS` : ''),
                 chargeableWeight: selectedAWB.blChargeableWeightText || (inferredChargeableWeight ? `${inferredChargeableWeight} KGS` : ''),
                 measurement: selectedAWB.blMeasurementText || (selectedAWB.volume ? `${selectedAWB.volume} CBM` : ''),
@@ -190,7 +226,7 @@ const AWBManagement = () => {
                 portOfLoading: ship.origin || '',
                 portOfDischarge: ship.destination || '',
 
-                cargoDescription: ship.cargo_description || ship.commodity || '',
+                cargoDescription: buildGoodsDescriptionFromShipment(ship),
                 grossWeight: ship.weight,
                 gross_weight: ship.gross_weight,
                 chargeableWeight: ship.chargeable_weight,

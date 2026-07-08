@@ -101,9 +101,9 @@ export const generateBLPrintHTML = (blData) => {
         }];
     const cargoRowsHTML = cargoRows.map((item, index) => `
                         <tr>
-                            <td><div class="value" style="white-space:pre-wrap;">${item.marks || ''}</div>${index === 0 && (d.containerNo || d.sealNo) ? `<div class="value small-text" style="margin-top:8px;">${d.containerNo ? 'CNTR: ' + d.containerNo : ''}${d.sealNo ? '<br>SEAL: ' + d.sealNo : ''}</div>` : ''}</td>
+                            <td><div class="value">${item.marks || ''}</div>${index === 0 && (d.containerNo || d.sealNo) ? `<div class="value small-text" style="margin-top:6px;">${d.containerNo ? 'CNTR: ' + d.containerNo : ''}${d.sealNo ? '<br>SEAL: ' + d.sealNo : ''}</div>` : ''}</td>
                             <td style="text-align:center;"><div class="value-bold">${item.packages || ''}</div></td>
-                            <td><div class="value" style="font-weight:bold; text-align:center; line-height:1.35;">${item.description || ''}</div></td>
+                            <td><div class="value-bold" style="text-align:center; line-height:1.15;">${item.description || ''}</div></td>
                             <td style="text-align:right;"><div class="value-bold">${item.weight || ''}</div></td>
                             <td style="text-align:right;"><div class="value-bold">${item.measurement || ''}</div></td>
                         </tr>`).join('');
@@ -178,13 +178,16 @@ export const generateBLPrintHTML = (blData) => {
         
         /* TYPOGRAPHY */
         .label { font-size: 5.5pt; text-transform: uppercase; color: #555; margin-bottom: 1.5px; display: block; line-height: 1.05; }
-        .value { font-size: 8pt; font-weight: normal; white-space: pre-wrap; }
-        .value-bold { font-size: 8pt; font-weight: 700; white-space: pre-wrap; }
+        .value { font-size: 7.6pt; font-weight: normal; white-space: pre-wrap; line-height: 1.08; word-break: break-word; overflow-wrap: anywhere; }
+        .value-bold { font-size: 7.6pt; font-weight: 700; white-space: pre-wrap; line-height: 1.08; word-break: break-word; overflow-wrap: anywhere; }
         .small-text { font-size: 6.5pt; }
         .doc-title { font-size: 12pt; font-weight: 800; color: #6b7280; text-align: right; text-transform: uppercase; letter-spacing: .3px; text-decoration: underline; }
         .field { min-height: 18mm; }
         .field-sm { min-height: 9.5mm; }
-        .freight-note { font-size: 10pt; font-weight: 800; text-transform: uppercase; margin-top: 14mm; }
+        .freight-note { font-size: 8pt; font-weight: 800; text-transform: uppercase; margin-top: 13mm; white-space: nowrap; line-height: 1; letter-spacing: .1px; }
+        .containerized-choice { display: inline-flex; align-items: center; gap: 2mm; font-size: 7pt; font-weight: 800; text-transform: uppercase; }
+        .containerized-choice span { min-width: 10mm; text-align: center; }
+        .containerized-choice .selected { text-decoration: underline; }
         
         .header-logo {
             text-align: left;
@@ -409,7 +412,7 @@ export const generateBLPrintHTML = (blData) => {
             </div>
 
             <div class="row" style="min-height:10mm;">
-                <div class="col field-sm" style="width:52%;"><span class="label">Containerized (Vessel only)</span><div class="value" style="display:flex; gap:12mm; align-items:center; margin-top:1mm;"><span>${d.containerNo || String(d.typeOfMove || '').toUpperCase().includes('FCL') ? '☑' : '☐'} Yes</span><span>${d.containerNo || String(d.typeOfMove || '').toUpperCase().includes('FCL') ? '☐' : '☑'} No</span></div></div>
+                <div class="col field-sm" style="width:52%;"><span class="label">Containerized (Vessel only)</span><div class="value containerized-choice" style="margin-top:1mm;"><span class="${d.containerNo || String(d.typeOfMove || '').toUpperCase().includes('FCL') ? 'selected' : ''}">YES</span><span class="${d.containerNo || String(d.typeOfMove || '').toUpperCase().includes('FCL') ? '' : 'selected'}">NO</span></div></div>
                 <div class="col field-sm" style="width:48%;"><span class="label">Type of Move</span><div class="value-bold">${d.typeOfMove}</div></div>
             </div>
 
