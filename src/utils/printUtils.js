@@ -114,9 +114,12 @@ export const generateBLPrintHTML = (blData) => {
     const watermarkNormalized = watermarkRaw.toUpperCase().replace(/[-_\s]+/g, ' ').trim();
     const isCopyNonNegotiable = watermarkNormalized.includes('COPY') && watermarkNormalized.includes('NEGOTIABLE');
     const collectText = String(d.collect || '').trim().toUpperCase();
-    const isFreightCollect = collectText
-        ? !collectText.includes('PREPAID')
-        : String(d.freightPayable || '').toUpperCase().includes('DEST');
+    const collectIsExplicitlyEmpty = ['', 'NONE', 'NO', 'N/A', 'NA', '-', '0'].includes(collectText);
+    const isFreightCollect = collectIsExplicitlyEmpty
+        ? false
+        : collectText
+            ? !collectText.includes('PREPAID')
+            : String(d.freightPayable || '').toUpperCase().includes('DEST');
     const watermarkHTML = d.watermark
         ? isCopyNonNegotiable
             ? `<div class="doc-watermark copy-non-negotiable"><span>COPY</span><span>NON NEGOTIABLE</span></div>`
@@ -286,7 +289,7 @@ export const generateBLPrintHTML = (blData) => {
             transform: rotate(-3deg);
             background: rgba(234, 88, 12, 0.05);
             margin-left: 24mm;
-            opacity: 0.2;
+            opacity: 0.8;
         }
 
         .print-btn {
