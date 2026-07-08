@@ -115,12 +115,16 @@ export const generateBLPrintHTML = (blData) => {
     const isCopyNonNegotiable = watermarkNormalized.includes('COPY') && watermarkNormalized.includes('NEGOTIABLE');
     const prepaidText = String(d.prepaid || '').trim().toUpperCase();
     const collectText = String(d.collect || '').trim().toUpperCase();
+    const freightChargesText = String(d.freightCharges || '').trim().toUpperCase();
     const isExplicitValue = (value) => !['', 'NONE', 'NO', 'N/A', 'NA', '-', '0'].includes(value);
+    const freightChargesSuggestPrepaid = ['CASH', 'PREPAID', 'PAID'].some((token) => freightChargesText.includes(token));
     const isFreightPrepaid = isExplicitValue(prepaidText)
         ? !prepaidText.includes('COLLECT')
-        : isExplicitValue(collectText)
-            ? false
-            : String(d.freightPayable || '').toUpperCase().includes('PRE');
+        : freightChargesSuggestPrepaid
+            ? true
+            : isExplicitValue(collectText)
+                ? false
+                : true;
     const watermarkHTML = d.watermark
         ? isCopyNonNegotiable
             ? `<div class="doc-watermark copy-non-negotiable"><span>COPY</span><span>NON NEGOTIABLE</span></div>`
