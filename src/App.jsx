@@ -143,6 +143,9 @@ function App() {
             {/* Auth Route - No Layout */}
             <Route path="/login" element={<Login />} />
             <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
+            <Route path="/print/document" element={<DocumentPrintResolver />} />
+            <Route path="/print/document/:docType/:docNo" element={<DocumentPrintResolver />} />
+            <Route path="/p/:docType/:docNo" element={<DocumentPrintResolver />} />
 
             {/* App Routes - With Layout */}
             <Route path="/*" element={
@@ -151,8 +154,6 @@ function App() {
                   <Routes>
                     {/* Main Dashboard */}
                     <Route path="/" element={<FreightDashboard />} />
-                    <Route path="/print/document" element={<DocumentPrintResolver />} />
-                    <Route path="/print/document/:docType/:docNo" element={<DocumentPrintResolver />} />
 
                     {/* Centralized Modules — dilindungi per menuCode */}
                     <Route path="/vendors" element={<ProtectedRoute menuCode="central_vendors"><VendorManagement /></ProtectedRoute>} />
