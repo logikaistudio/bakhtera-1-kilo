@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { login as loginService, logout as logoutService, validateSession, getUserPermissions } from '../services/authService';
+import { syncRolePermissionsWithMenus } from '../services/rolePermissionSyncService';
 
 /**
  * Auth Context
@@ -40,6 +41,23 @@ export const AuthProvider = ({ children }) => {
 
         loadSession();
     }, []);
+
+    useEffect(() => {
+        const runRoleMenuAutoSync = async () => {
+            if (!user || user.user_level !== 'super_admin') return;
+
+            try {
+                await syncRolePermissionsWithMenus({ pruneStale: true });
+                const newPerms = await getUserPermissions(user.id, user.user_level);
+                setPermissions(newPerms);
+                console.log('[Auth] Role/menu auto-sync completed for super_admin');
+            } catch (error) {
+                console.warn('[Auth] Role/menu auto-sync skipped:', error.message);
+            }
+        };
+
+        runRoleMenuAutoSync();
+    }, [user]);
 
     /**
      * Login function

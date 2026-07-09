@@ -89,6 +89,13 @@ export const generateBLPrintHTML = (blData) => {
     const isAirDocument = modeUpper.includes('AWB') || modeUpper.includes('AIR');
     const documentTitle = isAirDocument ? 'AIR WAYBILL' : 'OCEAN BILL OF LADING';
     const documentNumberLabel = isAirDocument ? 'AWB Number' : 'B/L Number';
+    const barcodeValue = (() => {
+        const base = typeof window !== 'undefined' && window.location?.origin
+            ? window.location.origin
+            : 'https://bakhtera.app';
+        return `${base}/print/document?docNo=${encodeURIComponent(d.blNo || '')}&docType=${encodeURIComponent(isAirDocument ? 'AWB' : 'BL')}`;
+    })();
+    const barcodeUrl = `https://barcode.tec-it.com/barcode.ashx?data=${encodeURIComponent(barcodeValue)}&code=Code128&dpi=96&translate-esc=on`;
     const cargoRows = sourceCargoItems.length > 0
         ? sourceCargoItems.map((item, index) => (
             index === 0 && d.description
@@ -106,7 +113,7 @@ export const generateBLPrintHTML = (blData) => {
                         <tr>
                             <td><div class="value">${item.marks || ''}</div>${index === 0 && (d.containerNo || d.sealNo) ? `<div class="value small-text" style="margin-top:6px;">${d.containerNo ? 'CNTR: ' + d.containerNo : ''}${d.sealNo ? '<br>SEAL: ' + d.sealNo : ''}</div>` : ''}</td>
                             <td style="text-align:center;"><div class="value-bold">${item.packages || ''}</div></td>
-                            <td><div class="value-bold" style="text-align:center; line-height:1.15;">${item.description || ''}</div></td>
+                            <td><div class="value-bold" style="text-align:left; line-height:1.15;">${item.description || ''}</div></td>
                             <td style="text-align:right;"><div class="value-bold">${item.weight || ''}</div></td>
                             <td style="text-align:right;"><div class="value-bold">${item.measurement || ''}</div></td>
                         </tr>`).join('');
@@ -114,6 +121,12 @@ export const generateBLPrintHTML = (blData) => {
     const watermarkNormalized = watermarkRaw.toUpperCase().replace(/[-_\s]+/g, ' ').trim();
     const isCopyNonNegotiable = watermarkNormalized.includes('COPY') && watermarkNormalized.includes('NEGOTIABLE');
     const prepaidDisplay = String(d.prepaid || '').trim();
+    const containerizedSelected = (() => {
+        const raw = String(d.containerized || '').trim().toUpperCase();
+        if (raw === 'YES' || raw === 'Y') return 'YES';
+        if (raw === 'NO' || raw === 'N') return 'NO';
+        return (d.containerNo || String(d.typeOfMove || '').toUpperCase().includes('FCL')) ? 'YES' : 'NO';
+    })();
     const watermarkHTML = d.watermark
         ? isCopyNonNegotiable
             ? `<div class="doc-watermark copy-non-negotiable"><span>COPY</span><span>NON NEGOTIABLE</span></div>`
@@ -189,9 +202,11 @@ export const generateBLPrintHTML = (blData) => {
         .field { min-height: 18mm; }
         .field-sm { min-height: 9.5mm; }
         .freight-note { font-size: 8pt; font-weight: 800; text-transform: uppercase; margin-top: 13mm; white-space: nowrap; line-height: 1; letter-spacing: .1px; }
-        .containerized-choice { display: inline-flex; align-items: center; gap: 2mm; font-size: 7pt; font-weight: 800; text-transform: uppercase; }
-        .containerized-choice span { min-width: 10mm; text-align: center; }
+        .containerized-choice { display: inline-flex; align-items: center; gap: 3.2mm; font-size: 7pt; font-weight: 800; text-transform: uppercase; }
+        .containerized-choice span { min-width: 7mm; text-align: left; }
         .containerized-choice .selected { text-decoration: underline; }
+        .containerized-choice .opt { display: inline-flex; align-items: center; gap: 1.8mm; }
+        .containerized-choice .box { width: 4.5mm; height: 4.5mm; border: 0.8px solid #111; display: inline-flex; align-items: center; justify-content: center; font-size: 7.2pt; line-height: 1; }
         
         .header-logo {
             text-align: left;
@@ -357,8 +372,12 @@ export const generateBLPrintHTML = (blData) => {
                     <div class="value" style="font-size:6.6pt; line-height:1.08; white-space:pre-wrap; max-height:11mm; overflow:hidden;">${d.shipperAddr}</div>
                 </div>
                 <div class="col" style="width: 48%; padding:0; display:flex; flex-direction:column;">
-                    <div style="height:12mm; padding:3px 4px; border-bottom:0.8px solid #222; display:flex; justify-content:flex-end; align-items:flex-start;">
-                        <div class="doc-title">${documentTitle}</div>
+                    <div style="height:12mm; padding:2px 4px; border-bottom:0.8px solid #222; display:flex; justify-content:space-between; align-items:flex-start; gap:4px;">
+                        <div style="display:flex; flex-direction:column; align-items:flex-start; justify-content:flex-start; min-width:39mm;">
+                            <img src="${barcodeUrl}" alt="Barcode ${d.blNo}" style="height:8.4mm; width:38mm; object-fit:fill;" />
+                            <div style="font-size:5.1pt; color:#666; margin-top:0.35mm; line-height:1; letter-spacing:0.1px;">${d.blNo}</div>
+                        </div>
+                        <div class="doc-title" style="padding-top:0.55mm;">${documentTitle}</div>
                     </div>
                     <div style="height:13mm; display:flex; border-bottom:0.8px solid #222;">
                         <div style="width:55%; border-right:0.8px solid #222; padding:3px 4px;">
@@ -390,14 +409,10 @@ export const generateBLPrintHTML = (blData) => {
             </div>
 
             <div class="row" style="min-height:24mm;">
-                <div class="col field" style="width:52%;">
+                <div class="col field" style="width:100%;">
                     <span class="label">Notify Party</span>
                     <div class="value-bold" style="font-size:7.2pt; line-height:1.05; margin-bottom:1px;">${d.notify}</div>
                     <div class="value" style="font-size:6.6pt; line-height:1.08; white-space:pre-wrap; max-height:10mm; overflow:hidden;">${d.notifyAddr}</div>
-                </div>
-                <div class="col field" style="width:48%;">
-                    <span class="label">Forwarding Agent References</span>
-                    <div class="value small-text" style="line-height:1.05; white-space:pre-wrap; max-height:10mm; overflow:hidden;">${d.agentRefs}</div>
                 </div>
             </div>
 
@@ -416,7 +431,7 @@ export const generateBLPrintHTML = (blData) => {
             </div>
 
             <div class="row" style="min-height:10mm;">
-                <div class="col field-sm" style="width:52%;"><span class="label">Containerized (Vessel only)</span><div class="value containerized-choice" style="margin-top:1mm; justify-content:center; text-align:center;">${(() => { const selected = String(d.containerized || '').toUpperCase() || (d.containerNo || String(d.typeOfMove || '').toUpperCase().includes('FCL') ? 'YES' : 'NO'); return `<span>${selected}</span>`; })()}</div></div>
+                <div class="col field-sm" style="width:52%;"><span class="label">Containerized (Vessel only)</span><div class="value containerized-choice" style="margin-top:1mm; justify-content:flex-start; text-align:left;"><span class="opt"><span class="box">${containerizedSelected === 'YES' ? '&#10003;' : ''}</span><span>YES</span></span><span class="opt"><span class="box">${containerizedSelected === 'NO' ? '&#10003;' : ''}</span><span>NO</span></span></div></div>
                 <div class="col field-sm" style="width:48%;"><span class="label">Type of Move</span><div class="value-bold">${d.typeOfMove}</div></div>
             </div>
 
@@ -426,7 +441,7 @@ export const generateBLPrintHTML = (blData) => {
                         <tr>
                             <th style="width:18%">Marks and Numbers</th>
                             <th style="width:12%">Number of Packages</th>
-                            <th style="width:45%">Description<br>As Per Merchant's Information</th>
+                            <th style="width:45%; text-align:left; padding-left:6px;">Description<br>As Per Merchant's Information</th>
                             <th style="width:12%">Gross Weight</th>
                             <th style="width:13%">Measurement</th>
                         </tr>
@@ -444,7 +459,7 @@ export const generateBLPrintHTML = (blData) => {
                     </div>
                     <div style="display:flex; flex:1;">
                         <div style="width:38%; border-right:0.8px solid #222; padding:4px; display:flex; align-items:center; justify-content:center; text-align:center;"><div class="freight-note">${prepaidDisplay || ''}</div></div>
-                        <div style="width:31%; border-right:0.8px solid #222; padding:4px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;"><span class="label">Freight & Charges</span><div class="value-bold" style="font-size:8pt; line-height:1; text-transform:uppercase; text-align:center; margin-top:2px;">${d.freightCharges}</div></div>
+                        <div style="width:31%; border-right:0.8px solid #222; padding:4px 4px 4px 5px; display:flex; flex-direction:column; align-items:flex-start; justify-content:center; text-align:left;"><div class="value-bold" style="font-size:8pt; line-height:1.2; text-transform:uppercase; text-align:left; white-space:pre-wrap; word-break:break-word;">${d.freightCharges}</div></div>
                         <div style="width:31%; padding:4px;"><span class="label">Total Packages in Words</span><div class="value-bold" style="text-transform:uppercase;">${d.totalPackagesInWords}</div></div>
                     </div>
                 </div>

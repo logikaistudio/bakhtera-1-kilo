@@ -355,7 +355,12 @@ const SalesQuotation = () => {
         const permissionChecker = actionMap[action];
         if (!permissionChecker) return false;
 
-        return permissionChecker('blink_sales_quotations') || permissionChecker('blink_sales');
+        const isBxpoPage = typeof window !== 'undefined' && window.location.pathname.startsWith('/bxpo');
+        const menuCandidates = isBxpoPage
+            ? ['bxpo_sales_quotations', 'bxpo_sales']
+            : ['blink_sales_quotations', 'blink_sales'];
+
+        return menuCandidates.some((menuCode) => permissionChecker(menuCode));
     };
 
     const parseMissingColumnFromError = (error) => {

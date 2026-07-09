@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { syncRolePermissionsWithMenus } from '../../services/rolePermissionSyncService';
 import { getAllUsers, createUser, updateUser, resetPassword, toggleUserActive, deleteUser, bulkResetLegacyPasswords } from '../../services/userService';
 import { generatePassword } from '../../services/passwordService';
 import { Users, Plus, Edit, Key, Ban, CheckCircle, Shield, RefreshCw, Trash2, Download, Eye, EyeOff } from 'lucide-react';
@@ -68,6 +69,12 @@ const UserManagement = () => {
     // Load roles dari tabel role_permissions + tambahkan super_admin
     const loadRoles = useCallback(async () => {
         try {
+            try {
+                await syncRolePermissionsWithMenus({ pruneStale: true });
+            } catch (syncErr) {
+                console.warn('⚠️ role/menu auto-sync skipped:', syncErr.message);
+            }
+
             const { data, error } = await supabase
                 .from('role_permissions')
                 .select('role_id, role_label')

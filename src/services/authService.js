@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { verifyPassword } from './passwordService';
 import { v4 as uuidv4 } from 'uuid';
+import { getAllMenuCodes } from '../config/menuConfig';
 
 /**
  * Authentication Service
@@ -174,13 +175,11 @@ export const getUserPermissions = async (userId, userLevel) => {
     try {
         // Super admin and admin have all permissions
         if (userLevel === 'super_admin' || userLevel === 'admin') {
-            const { data: menus } = await supabase
-                .from('menu_registry')
-                .select('menu_code');
+            const menus = getAllMenuCodes();
 
             const permissions = {};
-            menus?.forEach(menu => {
-                permissions[menu.menu_code] = {
+            menus.forEach(menuCode => {
+                permissions[menuCode] = {
                     can_access: true,
                     can_view: true,
                     can_create: true,
@@ -192,7 +191,7 @@ export const getUserPermissions = async (userId, userLevel) => {
                 };
             });
 
-            console.debug(`[Auth] ${userLevel}: full access to ${menus?.length || 0} menus`);
+            console.debug(`[Auth] ${userLevel}: full access to ${menus.length || 0} menus`);
             return permissions;
         }
 

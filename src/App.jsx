@@ -9,6 +9,7 @@ import { testSupabaseConnection, getSupabaseStatus } from './lib/supabase';
 import Login from './pages/Auth/Login';
 import ChangePassword from './pages/Auth/ChangePassword';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
+import DocumentPrintResolver from './pages/Print/DocumentPrintResolver';
 
 // Admin Module  
 import UserManagement from './pages/Admin/UserManagement';
@@ -150,6 +151,7 @@ function App() {
                   <Routes>
                     {/* Main Dashboard */}
                     <Route path="/" element={<FreightDashboard />} />
+                    <Route path="/print/document" element={<DocumentPrintResolver />} />
 
                     {/* Centralized Modules — dilindungi per menuCode */}
                     <Route path="/vendors" element={<ProtectedRoute menuCode="central_vendors"><VendorManagement /></ProtectedRoute>} />
@@ -186,7 +188,7 @@ function App() {
                     <Route path="/bxpo/approvals" element={<ProtectedRoute menuCode="bxpo_approval"><BlinkApproval /></ProtectedRoute>} />
 
                     {/* Blink Finance Module */}
-                    <Route path="/blink/finance/invoices" element={<ProtectedRoute menuCode="blink_invoices"><InvoiceManagement /></ProtectedRoute>} />
+                    <Route path="/blink/finance/invoices" element={<ProtectedRoute menuCode="blink_invoices" menuCodes={['blink_invoice', 'blink_finance']}><InvoiceManagement /></ProtectedRoute>} />
                     <Route path="/blink/finance/purchase-orders" element={<ProtectedRoute menuCode="blink_purchase_order"><PurchaseOrder /></ProtectedRoute>} />
                     <Route path="/blink/finance/auto-journal" element={<ProtectedRoute menuCode="blink_auto_journal"><AutoJournal /></ProtectedRoute>} />
                     <Route path="/blink/finance/reversing-journal" element={<ProtectedRoute menuCode="blink_reversing_journal"><ReversingJournal /></ProtectedRoute>} />
@@ -204,7 +206,7 @@ function App() {
                     <Route path="/blink/sales-revenue" element={<ProtectedRoute menuCode="blink_dashboard"><SalesRevenue /></ProtectedRoute>} />
 
                     {/* Legacy Blink Routes - Redirects */}
-                    <Route path="/blink/invoices" element={<ProtectedRoute menuCode="blink_invoices"><InvoiceManagement /></ProtectedRoute>} />
+                    <Route path="/blink/invoices" element={<ProtectedRoute menuCode="blink_invoices" menuCodes={['blink_invoice', 'blink_finance']}><InvoiceManagement /></ProtectedRoute>} />
                     <Route path="/blink/finance/profit" element={<ProtectedRoute menuCode="blink_pnl"><ProfitAnalysis /></ProtectedRoute>} />
                     <Route path="/blink/approvals" element={<ProtectedRoute menuCode="blink_approval"><BlinkApproval /></ProtectedRoute>} />
 

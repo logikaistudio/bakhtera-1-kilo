@@ -14,7 +14,7 @@
  *   1. Tambahkan entry di sini (APP_MENUS)
  *   2. Tambahkan route di App.jsx
  *   3. Tambahkan menu item di Sidebar.jsx dengan menuCode yang sama
- *   4. Klik "Sync ke Database" di RolePermissions agar entry baru masuk DB
+ *   4. Role item akan auto-sync saat membuka halaman Admin (Role/User Management)
  * ─────────────────────────────────────────────────────────────────────────────
  */
 

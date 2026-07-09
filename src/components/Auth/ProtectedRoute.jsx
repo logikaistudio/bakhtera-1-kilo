@@ -7,9 +7,10 @@ import { useAuth } from '../../context/AuthContext';
  * Wrapper for routes that require authentication and optional permissions
  * @param {ReactNode} children - Child components to render if authorized
  * @param {string} menuCode - Optional menu code to check access
+ * @param {string[]} menuCodes - Optional list of menu codes (OR logic)
  * @param {boolean} requireSuperAdmin - Optional flag to require super admin access
  */
-export const ProtectedRoute = ({ children, menuCode, requireSuperAdmin = false }) => {
+export const ProtectedRoute = ({ children, menuCode, menuCodes = [], requireSuperAdmin = false }) => {
     const { isAuthenticated, isSuperAdmin, canAccess, loading, user } = useAuth();
 
     // Show loading state while checking auth
@@ -44,8 +45,13 @@ export const ProtectedRoute = ({ children, menuCode, requireSuperAdmin = false }
         );
     }
 
-    // Check menu access if menuCode provided
-    if (menuCode && !canAccess(menuCode)) {
+    // Check menu access if menuCode/menuCodes provided
+    const candidateCodes = [
+        ...(menuCode ? [menuCode] : []),
+        ...(Array.isArray(menuCodes) ? menuCodes : [])
+    ].filter(Boolean);
+
+    if (candidateCodes.length > 0 && !candidateCodes.some((code) => canAccess(code))) {
         return (
             <div className="flex items-center justify-center min-h-screen">
                 <div className="text-center">

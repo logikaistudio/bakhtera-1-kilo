@@ -7,6 +7,7 @@ import {
     RefreshCw, Database, Info
 } from 'lucide-react';
 import { APP_MENUS } from '../../config/menuConfig';
+import { syncRolePermissionsWithMenus } from '../../services/rolePermissionSyncService';
 
 /* ─────────────────────────────────────────────
    MODULE_MENUS — derived dari APP_MENUS (menuConfig.js)
@@ -80,6 +81,14 @@ const RolePermissions = () => {
     const [newRoleName, setNewRoleName] = useState('');
     const [editingRoleId, setEditingRoleId] = useState(null);
     const [editRoleName, setEditRoleName] = useState('');
+    const [syncAudit, setSyncAudit] = useState({
+        lastSyncedAt: null,
+        insertedCount: 0,
+        deletedCount: 0,
+        staleMenuCodes: [],
+        roleCount: 0,
+        menuCount: 0,
+    });
 
     const notifyRoleConfigUpdated = () => {
         if (typeof window !== 'undefined') {
@@ -92,9 +101,40 @@ const RolePermissions = () => {
         loadPermissions();
     }, []);
 
+    const runMenuSync = async ({ showNotification = false } = {}) => {
+        const summary = await syncRolePermissionsWithMenus({ pruneStale: true });
+
+        setSyncAudit({
+            lastSyncedAt: new Date().toISOString(),
+            insertedCount: summary.insertedCount,
+            deletedCount: summary.deletedCount,
+            staleMenuCodes: summary.staleMenuCodes || [],
+            roleCount: summary.roleCount || 0,
+            menuCount: summary.menuCount || 0,
+        });
+
+        if (showNotification) {
+            const changeText = [
+                `${summary.insertedCount} ditambahkan`,
+                `${summary.deletedCount} dihapus`
+            ].join(' • ');
+
+            setNotification({
+                type: 'success',
+                message: `✅ Sinkronisasi menu role selesai (${changeText}).`
+            });
+            setTimeout(() => setNotification(null), 5000);
+        }
+
+        return summary;
+    };
+
     const loadPermissions = async () => {
         setLoading(true);
         try {
+            // Auto-sync agar menu baru langsung punya role item, dan menu usang dibersihkan.
+            await runMenuSync();
+
             const { data, error } = await supabase
                 .from('role_permissions')
                 .select('*');
@@ -204,69 +244,14 @@ const RolePermissions = () => {
 
     /**
      * syncMenusToDatabase — pastikan semua menu yang ada di APP_MENUS
-     * sudah punya baris di tabel role_permissions untuk setiap role.
-     * Menu baru akan di-insert dengan semua permission = false.
-     * Menu yang sudah ada TIDAK diubah.
+     * sudah punya baris di tabel role_permissions untuk setiap role,
+     * dan menu usang dihapus agar role item tetap bersih.
      */
     const syncMenusToDatabase = async () => {
         setSaving(true);
         try {
-            // 1. Ambil semua baris yang sudah ada
-            const { data: existing, error: fetchErr } = await supabase
-                .from('role_permissions')
-                .select('role_id, menu_code');
-            if (fetchErr) throw fetchErr;
-
-            const existingSet = new Set(
-                (existing || []).map(r => `${r.role_id}||${r.menu_code}`)
-            );
-
-            // 2. Bangun baris yang BELUM ada di DB
-            const toInsert = [];
-            roles.forEach(role => {
-                Object.values(APP_MENUS).forEach(mod => {
-                    mod.menus.forEach(menu => {
-                        const key = `${role.id}||${menu.code}`;
-                        if (!existingSet.has(key)) {
-                            toInsert.push({
-                                role_id: role.id,
-                                role_label: role.label,
-                                menu_code: menu.code,
-                                can_access: false,
-                                can_view: false,
-                                can_create: false,
-                                can_edit: false,
-                                can_delete: false,
-                                can_approve: false,
-                                updated_at: new Date().toISOString(),
-                            });
-                        }
-                    });
-                });
-            });
-
-            if (toInsert.length === 0) {
-                setNotification({ type: 'success', message: '✅ Database sudah sinkron — tidak ada menu baru yang perlu ditambahkan.' });
-                setTimeout(() => setNotification(null), 4000);
-                setSaving(false);
-                return;
-            }
-
-            // 3. Insert dalam batch
-            const BATCH = 500;
-            for (let i = 0; i < toInsert.length; i += BATCH) {
-                const { error } = await supabase
-                    .from('role_permissions')
-                    .insert(toInsert.slice(i, i + BATCH));
-                if (error) throw error;
-            }
-
-            setNotification({
-                type: 'success',
-                message: `✅ Sync berhasil! ${toInsert.length} entri menu baru ditambahkan ke database.`,
-            });
+            await runMenuSync({ showNotification: true });
             notifyRoleConfigUpdated();
-            // Reload agar tampilan di-update
             await loadPermissions();
         } catch (err) {
             console.error('❌ Sync error:', err);
@@ -441,6 +426,9 @@ const RolePermissions = () => {
 
     const currentMenus = MODULE_MENUS[activeModule]?.menus || [];
     const ModuleIcon = MODULE_MENUS[activeModule]?.icon;
+    const lastSyncedLabel = syncAudit.lastSyncedAt
+        ? new Date(syncAudit.lastSyncedAt).toLocaleString('id-ID')
+        : '-';
 
     return (
         <div className="p-4 lg:p-6 space-y-6">
@@ -458,11 +446,11 @@ const RolePermissions = () => {
                     <button
                         onClick={syncMenusToDatabase}
                         disabled={saving}
-                        title="Pastikan semua menu di aplikasi sudah ada di database"
+                        title="Sinkronkan menu aktif ke role item dan bersihkan menu usang"
                         className="flex items-center gap-2 px-4 py-2 rounded-lg bg-dark-surface border border-dark-border text-silver hover:text-silver-light hover:border-accent-cyan smooth-transition text-sm disabled:opacity-60"
                     >
                         <Database className="w-4 h-4" />
-                        Sync DB
+                        Sync Menu Item
                     </button>
                     <button
                         onClick={() => setShowAddRole(true)}
@@ -494,6 +482,54 @@ const RolePermissions = () => {
                     {notification.message}
                 </div>
             )}
+
+            {/* ── Sync Audit Summary ── */}
+            <div className="glass-card border border-dark-border rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                    <h2 className="text-sm font-semibold text-silver-light flex items-center gap-2">
+                        <Database className="w-4 h-4 text-accent-cyan" />
+                        Audit Sinkronisasi Menu Role
+                    </h2>
+                    <span className="text-xs text-silver-dark">Sync terakhir: {lastSyncedLabel}</span>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="rounded-lg border border-dark-border bg-dark-surface px-3 py-2">
+                        <div className="text-xs text-silver-dark">Role Aktif</div>
+                        <div className="text-sm font-semibold text-silver-light">{syncAudit.roleCount}</div>
+                    </div>
+                    <div className="rounded-lg border border-dark-border bg-dark-surface px-3 py-2">
+                        <div className="text-xs text-silver-dark">Menu Aktif</div>
+                        <div className="text-sm font-semibold text-silver-light">{syncAudit.menuCount}</div>
+                    </div>
+                    <div className="rounded-lg border border-dark-border bg-dark-surface px-3 py-2">
+                        <div className="text-xs text-silver-dark">Item Ditambahkan</div>
+                        <div className="text-sm font-semibold text-green-400">{syncAudit.insertedCount}</div>
+                    </div>
+                    <div className="rounded-lg border border-dark-border bg-dark-surface px-3 py-2">
+                        <div className="text-xs text-silver-dark">Item Dihapus</div>
+                        <div className="text-sm font-semibold text-red-400">{syncAudit.deletedCount}</div>
+                    </div>
+                </div>
+
+                <div>
+                    <div className="text-xs text-silver-dark mb-1.5">Menu usang yang dibersihkan</div>
+                    {syncAudit.staleMenuCodes.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                            {syncAudit.staleMenuCodes.map((code) => (
+                                <span
+                                    key={code}
+                                    className="px-2 py-1 rounded-md text-xs bg-red-500/10 border border-red-500/30 text-red-300"
+                                >
+                                    {code}
+                                </span>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-xs text-silver-dark">Tidak ada menu usang.</div>
+                    )}
+                </div>
+            </div>
 
             {/* ── Add Role Modal ── */}
             {showAddRole && (

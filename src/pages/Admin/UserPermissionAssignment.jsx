@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
+import { syncRolePermissionsWithMenus } from '../../services/rolePermissionSyncService';
 import {
     Users, Shield, CheckCircle2, AlertCircle, Edit2, Save, X,
     UserCheck, UserX, Info, RefreshCw
@@ -67,6 +68,12 @@ const UserPermissionAssignment = () => {
     // Load roles dari tabel role_permissions + super_admin
     const loadRoles = useCallback(async () => {
         try {
+            try {
+                await syncRolePermissionsWithMenus({ pruneStale: true });
+            } catch (syncErr) {
+                console.warn('⚠️ role/menu auto-sync skipped:', syncErr.message);
+            }
+
             // ✅ Fixed: Use simpler query and explicit deduplication
             const { data, error } = await supabase
                 .from('role_permissions')
