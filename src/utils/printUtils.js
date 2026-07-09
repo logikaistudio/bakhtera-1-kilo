@@ -95,7 +95,7 @@ export const generateBLPrintHTML = (blData) => {
             : 'https://bakhtera.app';
         return `${base}/p/${encodeURIComponent(isAirDocument ? 'AWB' : 'BL')}/${encodeURIComponent(d.blNo || '')}`;
     })();
-    const barcodeUrl = `https://bwipjs-api.metafloor.com/?bcid=code128&text=${encodeURIComponent(barcodeValue)}&scale=2&height=18&includetext=false`;
+    const barcodeUrl = `https://bwipjs-api.metafloor.com/?bcid=code128&text=${encodeURIComponent(barcodeValue)}&scale=2&height=36&includetext=false`;
     const barcodeFallbackUrl = `https://barcode.tec-it.com/barcode.ashx?data=${encodeURIComponent(barcodeValue)}&code=Code128&dpi=200&translate-esc=on`;
     const cargoRows = sourceCargoItems.length > 0
         ? sourceCargoItems.map((item, index) => (
