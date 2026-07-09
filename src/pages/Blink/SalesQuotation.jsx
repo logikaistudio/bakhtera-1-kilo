@@ -1157,6 +1157,12 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
             const items = quotation.serviceItems || quotation.service_items || [];
             const showGrandTotal = options.showGrandTotal !== false;
             const showEstimatedTotal = options.showEstimatedTotal !== false;
+            const resolvedCreatorName = String(
+                creatorName || quotation.preparedBy || quotation.prepared_by || ''
+            ).trim();
+            const resolvedApproverName = String(
+                approverName || quotation.approvedBy || quotation.approved_by || ''
+            ).trim();
             const offerTypeTitle = String(quotation.offerType || quotation.offer_type || '').trim();
             const quotationTitle = offerTypeTitle ? `${offerTypeTitle.toUpperCase()} CHARGE COST` : 'CHARGE COST';
             
@@ -1226,17 +1232,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
 3. Subject to space and equipment availability.
 4. Standard Trading Conditions apply.`).split('\n').map(line => `<li>${line.replace(/^\d+\.\s*/, '')}</li>`).join('');
             const termOfPayment = quotation.termOfPayment || quotation.paymentTerms || quotation.payment_terms || 'Net 30 Days';
-            const { notesHtml, cargoDetails } = resolveQuotationRenderData(quotation || {});
-            const cargoRows = cargoDetails.map((cargo, idx) => `
-                <tr>
-                    <td style="text-align:center;">${idx + 1}</td>
-                    <td>${cargo.containerNumber || '-'}</td>
-                    <td>${cargo.containerSize || '-'}</td>
-                    <td style="text-align:right;">${cargo.quantity || '-'}</td>
-                    <td style="text-align:right;">${cargo.grossWeight || '-'}</td>
-                    <td style="text-align:right;">${cargo.chargeableWeight || '-'}</td>
-                </tr>
-            `).join('');
+            const { notesHtml } = resolveQuotationRenderData(quotation || {});
 
             const content = `
                 <!DOCTYPE html>
@@ -1309,7 +1305,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                             <div>${(companySettings?.company_address || 'Jakarta, Indonesia').replace(/\n/g, '<br/>')}</div>
                             ${companySettings?.company_phone ? `<div>Tel: ${companySettings.company_phone}</div>` : ''}
                             ${companySettings?.company_email ? `<div>Email: ${companySettings.company_email}</div>` : ''}
-                            ${creatorName ? `<div>Created By: ${creatorName}</div>` : ''}
+                            ${resolvedCreatorName ? `<div>Created By: ${resolvedCreatorName}</div>` : ''}
                         </div>
                         <div>
                             <h3 style="font-size: 12px; font-weight: bold; margin-bottom: 8px; color: #666; text-transform: uppercase; letter-spacing: 1px;">BILL TO:</h3>
@@ -1317,7 +1313,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                             <div style="margin-top: 4px; color: #555; font-size: 11px;">${quotation.customerAddress || quotation.customer_address || ''}</div>
                             ${(quotation.customerContact || quotation.customer_contact_name || quotation.customerName || quotation.customer_name) ? `<div style="margin-top: 6px; font-size: 11px;"><span style="font-weight:bold; color:#333;">Attn:</span> ${quotation.customerContact || quotation.customer_contact_name || quotation.customerName || quotation.customer_name}</div>` : ''}
                             ${(quotation.customerEmail || quotation.customer_email) ? `<div style="font-size: 11px;"><span style="font-weight:bold; color:#333;">Email:</span> ${quotation.customerEmail || quotation.customer_email}</div>` : ''}
-                            ${creatorName ? `<div style="font-size: 11px;"><span style="font-weight:bold; color:#333;">Created By:</span> ${creatorName}</div>` : ''}
+                            ${resolvedCreatorName ? `<div style="font-size: 11px;"><span style="font-weight:bold; color:#333;">Created By:</span> ${resolvedCreatorName}</div>` : ''}
                             ${(quotation.customerPhone || quotation.customer_phone) ? `<div style="font-size: 11px;"><span style="font-weight:bold; color:#333;">Phone:</span> ${quotation.customerPhone || quotation.customer_phone}</div>` : ''}
                         </div>
                     </div>
@@ -1333,25 +1329,6 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                             <div><strong>Chargeable Weight:</strong> ${quotation.chargeableWeight || quotation.chargeable_weight || '—'} KGS</div>
                             <div><strong>Validity:</strong> ${quotation.validityDays || 30} Days</div>
                         </div>
-                    </div>
-
-                    <div class="section">
-                        <h4 style="font-size: 12px; margin-bottom: 8px;">CARGO DETAIL</h4>
-                        <table style="margin-bottom: 0; font-size: 11px;">
-                            <thead>
-                                <tr>
-                                    <th style="width:40px; text-align:center;">No</th>
-                                    <th>Container No</th>
-                                    <th>Size</th>
-                                    <th style="text-align:right;">Qty</th>
-                                    <th style="text-align:right;">Gross (kg)</th>
-                                    <th style="text-align:right;">Chargeable (kg)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${cargoRows}
-                            </tbody>
-                        </table>
                     </div>
 
                     <div style="text-align: right; margin-bottom: 5px; font-size: 11px;">
@@ -1427,12 +1404,12 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                 <div>
                                     <div style="height: 60px; border-bottom: 1px solid #888; margin-bottom: 8px;"></div>
                                     <div style="font-size: 11px; font-weight: bold; color: #333;">Prepared By</div>
-                                    <div style="font-size: 11px; color: #111; font-weight: 600; margin-top: 3px;">${creatorName || '______________________'}</div>
+                                    <div style="font-size: 11px; color: #111; font-weight: 600; margin-top: 3px;">${resolvedCreatorName || '______________________'}</div>
                                 </div>
                                 <div>
                                     <div style="height: 60px; border-bottom: 1px solid #888; margin-bottom: 8px;"></div>
                                     <div style="font-size: 11px; font-weight: bold; color: #333;">Approved By</div>
-                                    <div style="font-size: 11px; color: #111; font-weight: 600; margin-top: 3px;">${approverName || '______________________'}</div>
+                                    <div style="font-size: 11px; color: #111; font-weight: 600; margin-top: 3px;">${resolvedApproverName || '______________________'}</div>
                                 </div>
                             </div>
                         </div>
@@ -3633,14 +3610,14 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
 };
 
 const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettings }) => {
-    const [creatorName, setCreatorName] = React.useState(quotation?.preparedBy || quotation?.prepared_by || quotation?.salesPerson || quotation?.sales_person || '');
+    const [creatorName, setCreatorName] = React.useState(quotation?.preparedBy || quotation?.prepared_by || '');
     const [approverName, setApproverName] = React.useState(quotation?.approvedBy || quotation?.approved_by || '');
     const [showGrandTotal, setShowGrandTotal] = React.useState(true);
     const [showEstimatedTotal, setShowEstimatedTotal] = React.useState(true);
 
     const offerTypeTitle = quotation?.offerType || quotation?.offer_type || '';
     const termOfPayment = quotation?.termOfPayment || quotation?.paymentTerms || quotation?.payment_terms || 'Net 30 Days';
-    const { notesHtml, cargoDetails } = resolveQuotationRenderData(quotation || {});
+    const { notesHtml } = resolveQuotationRenderData(quotation || {});
 
     const handlePrint = () => {
         onPrint(quotation, creatorName, approverName, {
@@ -3843,36 +3820,6 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                                     <span className="font-semibold text-slate-800">{quotation.validityDays || 30} Days</span>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-
-                    <div className="mb-8">
-                        <h3 className="text-xs uppercase tracking-widest text-slate-400 font-semibold mb-3">Cargo Detail</h3>
-                        <div className="border border-slate-200 rounded-lg overflow-hidden">
-                            <table className="w-full text-[11px]">
-                                <thead className="bg-slate-50">
-                                    <tr>
-                                        <th className="py-2 px-3 text-center w-12">No</th>
-                                        <th className="py-2 px-3 text-left">Container No</th>
-                                        <th className="py-2 px-3 text-left">Size</th>
-                                        <th className="py-2 px-3 text-right">Qty</th>
-                                        <th className="py-2 px-3 text-right">Gross (kg)</th>
-                                        <th className="py-2 px-3 text-right">Chargeable (kg)</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {cargoDetails.map((cargo, idx) => (
-                                        <tr key={cargo.id || idx} className="border-t border-slate-100">
-                                            <td className="py-2 px-3 text-center text-slate-500">{idx + 1}</td>
-                                            <td className="py-2 px-3">{cargo.containerNumber || '-'}</td>
-                                            <td className="py-2 px-3">{cargo.containerSize || '-'}</td>
-                                            <td className="py-2 px-3 text-right">{cargo.quantity || '-'}</td>
-                                            <td className="py-2 px-3 text-right">{cargo.grossWeight || '-'}</td>
-                                            <td className="py-2 px-3 text-right">{cargo.chargeableWeight || '-'}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
                         </div>
                     </div>
 

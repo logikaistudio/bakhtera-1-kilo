@@ -732,6 +732,10 @@ const QuotationManagement = () => {
 2. Payment terms: Net 30 Days.
 3. Subject to space and equipment availability.
 4. Standard Trading Conditions apply.`).split('\n').map(line => `<li>${line.replace(/^\d+\.\s*/, '')}</li>`).join('');
+            const preparedByName = String(
+                quotation.preparedBy || quotation.prepared_by || quotation.salesName || quotation.sales_name || quotation.salesPerson || quotation.sales_person || ''
+            ).trim();
+            const customerAttn = quotation.customerContact || quotation.customer_contact_name || '';
 
             const content = `
                 <!DOCTYPE html>
@@ -784,7 +788,7 @@ const QuotationManagement = () => {
                             <div style="font-weight: bold;">${quotation.customerName || quotation.customer_name}</div>
                             <div>${quotation.customerCompany || quotation.customer_company || ''}</div>
                             <div>${quotation.customerAddress || quotation.customer_address || ''}</div>
-                             ${(quotation.salesPerson || quotation.sales_person) ? `<div>Attn: ${quotation.salesPerson || quotation.sales_person}</div>` : ''}
+                             ${customerAttn ? `<div>Attn: ${customerAttn}</div>` : ''}
                         </div>
                     </div>
 
@@ -2274,6 +2278,10 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
         window.print();
     };
 
+    const preparedByName = String(
+        quotation.preparedBy || quotation.prepared_by || quotation.salesName || quotation.sales_name || quotation.salesPerson || quotation.sales_person || ''
+    ).trim();
+
     const formatCurrency = (value, currency = 'IDR') => {
         return currency === 'USD'
             ? `$${(value || 0).toLocaleString('id-ID')}`
@@ -2480,7 +2488,7 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                                 <div className="flex-1">
                                     <div className="h-20 border-b border-slate-300 mb-2"></div>
                                     <p className="font-semibold text-slate-900 text-sm">Prepared By</p>
-                                    <p className="text-xs text-slate-500">{quotation.salesPerson || 'Sales Representative'}</p>
+                                    <p className="text-xs text-slate-500">{preparedByName || '___________________'}</p>
                                 </div>
                                 <div className="flex-1">
                                     <div className="h-20 border-b border-slate-300 mb-2"></div>
