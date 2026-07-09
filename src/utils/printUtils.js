@@ -93,9 +93,10 @@ export const generateBLPrintHTML = (blData) => {
         const base = typeof window !== 'undefined' && window.location?.origin
             ? window.location.origin
             : 'https://bakhtera.app';
-        return `${base}/print/document?docNo=${encodeURIComponent(d.blNo || '')}&docType=${encodeURIComponent(isAirDocument ? 'AWB' : 'BL')}`;
+        return `${base}/print/document/${encodeURIComponent(isAirDocument ? 'AWB' : 'BL')}/${encodeURIComponent(d.blNo || '')}`;
     })();
-    const barcodeUrl = `https://barcode.tec-it.com/barcode.ashx?data=${encodeURIComponent(barcodeValue)}&code=Code128&dpi=96&translate-esc=on`;
+    const barcodeUrl = `https://bwipjs-api.metafloor.com/?bcid=code128&text=${encodeURIComponent(barcodeValue)}&scale=3&height=12&includetext=false`;
+    const barcodeFallbackUrl = `https://barcode.tec-it.com/barcode.ashx?data=${encodeURIComponent(barcodeValue)}&code=Code128&dpi=200&translate-esc=on`;
     const cargoRows = sourceCargoItems.length > 0
         ? sourceCargoItems.map((item, index) => (
             index === 0 && d.description
@@ -373,8 +374,8 @@ export const generateBLPrintHTML = (blData) => {
                 </div>
                 <div class="col" style="width: 48%; padding:0; display:flex; flex-direction:column;">
                     <div style="height:12mm; padding:2px 4px; border-bottom:0.8px solid #222; display:flex; justify-content:space-between; align-items:flex-start; gap:4px;">
-                        <div style="display:flex; flex-direction:column; align-items:flex-start; justify-content:flex-start; min-width:39mm;">
-                            <img src="${barcodeUrl}" alt="Barcode ${d.blNo}" style="height:8.4mm; width:38mm; object-fit:fill;" />
+                        <div style="display:flex; flex-direction:column; align-items:flex-start; justify-content:flex-start; min-width:40mm; background:#fff; padding:0.6mm 0.8mm; border-radius:1px;">
+                            <img src="${barcodeUrl}" alt="Barcode ${d.blNo}" onerror="this.onerror=null;this.src='${barcodeFallbackUrl}'" style="height:8.6mm; width:38.4mm; object-fit:contain;" />
                             <div style="font-size:5.1pt; color:#666; margin-top:0.35mm; line-height:1; letter-spacing:0.1px;">${d.blNo}</div>
                         </div>
                         <div class="doc-title" style="padding-top:0.55mm;">${documentTitle}</div>

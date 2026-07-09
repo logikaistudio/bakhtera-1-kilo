@@ -152,6 +152,7 @@ function App() {
                     {/* Main Dashboard */}
                     <Route path="/" element={<FreightDashboard />} />
                     <Route path="/print/document" element={<DocumentPrintResolver />} />
+                    <Route path="/print/document/:docType/:docNo" element={<DocumentPrintResolver />} />
 
                     {/* Centralized Modules — dilindungi per menuCode */}
                     <Route path="/vendors" element={<ProtectedRoute menuCode="central_vendors"><VendorManagement /></ProtectedRoute>} />

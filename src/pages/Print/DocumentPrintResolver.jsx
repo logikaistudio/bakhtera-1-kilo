@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { printBLCertificate } from '../../utils/printUtils';
 
@@ -141,13 +141,20 @@ const mapShipmentToPrintData = (shipment = {}, docType = 'BL') => {
 
 const DocumentPrintResolver = () => {
     const [searchParams] = useSearchParams();
+    const params = useParams();
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [printData, setPrintData] = useState(null);
     const hasTriggeredPrint = useRef(false);
 
-    const docNo = useMemo(() => (searchParams.get('docNo') || '').trim(), [searchParams]);
-    const docTypeRaw = useMemo(() => (searchParams.get('docType') || 'BL').trim().toUpperCase(), [searchParams]);
+    const docNo = useMemo(
+        () => String(params.docNo || searchParams.get('docNo') || '').trim(),
+        [params.docNo, searchParams]
+    );
+    const docTypeRaw = useMemo(
+        () => String(params.docType || searchParams.get('docType') || 'BL').trim().toUpperCase(),
+        [params.docType, searchParams]
+    );
     const docType = docTypeRaw.includes('AWB') ? 'AWB' : 'BL';
 
     useEffect(() => {
