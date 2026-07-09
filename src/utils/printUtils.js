@@ -84,7 +84,7 @@ export const generateBLPrintHTML = (blData) => {
         releaseType: blData.releaseType || null,
     };
 
-    const coLogo = blData.logo_url || blData.company_logo || blData.companyLogo || '';
+    const coLogo = blData.logo_url || blData.company_logo || blData.companyLogo || '/logo%20bakhtera%20lama.png';
     const modeUpper = String(d.mode || '').toUpperCase();
     const isAirDocument = modeUpper.includes('AWB') || modeUpper.includes('AIR');
     const documentTitle = isAirDocument ? 'AIR WAYBILL' : 'OCEAN BILL OF LADING';
@@ -373,14 +373,13 @@ export const generateBLPrintHTML = (blData) => {
                     <div class="value" style="font-size:6.6pt; line-height:1.08; white-space:pre-wrap; max-height:11mm; overflow:hidden;">${d.shipperAddr}</div>
                 </div>
                 <div class="col" style="width: 48%; padding:0; display:flex; flex-direction:column;">
-                    <div style="height:12mm; padding:2px 4px; border-bottom:0.8px solid #222; display:flex; justify-content:space-between; align-items:flex-start; gap:4px;">
-                        <div style="display:flex; flex-direction:column; align-items:flex-start; justify-content:flex-start; min-width:31mm; background:#fff; padding:0.8mm 1mm; border-radius:1px;">
+                    <div style="height:14mm; padding:2px 4px; border-bottom:0.8px solid #222; display:flex; justify-content:space-between; align-items:flex-start; gap:4px;">
+                        <div style="display:flex; flex-direction:column; align-items:flex-start; justify-content:flex-start; min-width:31mm; background:#fff; padding:0.4mm 0.9mm; border-radius:1px;">
                             <img src="${barcodeUrl}" alt="Barcode ${d.blNo}" onerror="this.onerror=null;this.src='${barcodeFallbackUrl}'" style="height:10.8mm; width:29.8mm; object-fit:contain;" />
-                            <div style="font-size:5.1pt; color:#666; margin-top:0.35mm; line-height:1; letter-spacing:0.1px;">${d.blNo}</div>
                         </div>
                         <div class="doc-title" style="padding-top:0.55mm;">${documentTitle}</div>
                     </div>
-                    <div style="height:13mm; display:flex; border-bottom:0.8px solid #222;">
+                    <div style="height:11mm; display:flex; border-bottom:0.8px solid #222;">
                         <div style="width:55%; border-right:0.8px solid #222; padding:3px 4px;">
                             <span class="label">Booking Number</span>
                             <div class="value-bold">${d.bookingNo}</div>
