@@ -129,7 +129,8 @@ export const APP_MENUS = {
             { code: 'bxpo_bl', label: 'Document BL/AWB', group: 'Operations', path: '/bxpo/operations/bl' },
             { code: 'bxpo_tracking', label: 'Tracking & Monitoring', group: 'Operations', path: '/bxpo/operations/tracking' },
             { code: 'bxpo_awb', label: 'AWB Management', group: 'Operations', path: '/bxpo/operations/awb' },
-            { code: 'bxpo_approval', label: 'Approval Center', group: 'Operations', path: '/bxpo/approvals' }
+            { code: 'bxpo_approval', label: 'Approval Center', group: 'Operations', path: '/bxpo/approvals' },
+            { code: 'bxpo_partners', label: 'Business Partners', group: 'Master Data', path: '/bxpo/master/partners' }
         ],
     },
 

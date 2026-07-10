@@ -361,6 +361,13 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                 { path: '/bxpo/approvals', label: 'Approval Center', menuCode: 'bxpo_approval', showBadge: true },
             ]
         },
+
+        // Master Data Category
+        {
+            type: 'category', label: '⚙️ Master Data', items: [
+                { path: '/bxpo/master/partners', label: 'Business Partners', menuCode: 'bxpo_partners' },
+            ]
+        },
     ];
 
     const hasBxpoAccess = () => {

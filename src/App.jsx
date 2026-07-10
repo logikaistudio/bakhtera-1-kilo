@@ -187,6 +187,7 @@ function App() {
                     <Route path="/bxpo/operations/tracking" element={<ProtectedRoute menuCode="bxpo_tracking"><TrackingMonitoring /></ProtectedRoute>} />
                     <Route path="/bxpo/operations/awb" element={<ProtectedRoute menuCode="bxpo_awb"><AWBManagement /></ProtectedRoute>} />
                     <Route path="/bxpo/operations/bl" element={<ProtectedRoute menuCode="bxpo_bl"><BLManagement /></ProtectedRoute>} />
+                    <Route path="/bxpo/master/partners" element={<ProtectedRoute menuCode="bxpo_partners" menuCodes={['blink_partners']}><PartnerManagement /></ProtectedRoute>} />
                     <Route path="/bxpo/approvals" element={<ProtectedRoute menuCode="bxpo_approval"><BlinkApproval /></ProtectedRoute>} />
 
                     {/* Blink Finance Module */}

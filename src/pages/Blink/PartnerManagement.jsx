@@ -12,6 +12,9 @@ import {
 } from 'lucide-react';
 
 const PartnerManagement = () => {
+    const activeDivision = getActiveDivision();
+    const isBxpoDivision = activeDivision === 'bxpo';
+    const partnerMenuCode = isBxpoDivision ? 'bxpo_partners' : 'blink_partners';
     const [partners, setPartners] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -57,13 +60,105 @@ const PartnerManagement = () => {
     });
 
     useEffect(() => {
-        fetchPartners();
-    }, []);
+        const initPage = async () => {
+            await autoFixLegacyBxpoPartners();
+            await fetchPartners();
+        };
+        initPage();
+    }, [activeDivision]);
+
+    const getAutoFixStorageKey = () => {
+        const userId = user?.id || 'anonymous';
+        return `partner-autofix-bxpo-v1-${userId}`;
+    };
+
+    const getCutoffIso = (daysBack = 180) => {
+        const cutoff = new Date(Date.now() - (daysBack * 24 * 60 * 60 * 1000));
+        return cutoff.toISOString();
+    };
+
+    const loadReferencedPartnerIds = async () => {
+        const [opsRes, salesRes] = await Promise.all([
+            supabase.from('blink_quotations').select('partner_id').not('partner_id', 'is', null),
+            supabase.from('blink_sales_quotations').select('partner_id').not('partner_id', 'is', null)
+        ]);
+
+        if (opsRes.error) throw opsRes.error;
+        if (salesRes.error) throw salesRes.error;
+
+        const ids = [
+            ...(opsRes.data || []).map(r => r.partner_id).filter(Boolean),
+            ...(salesRes.data || []).map(r => r.partner_id).filter(Boolean)
+        ];
+
+        return new Set(ids);
+    };
+
+    const updateDivisionInChunks = async (ids = [], targetDivision = 'bxpo') => {
+        if (!ids.length) return 0;
+        const chunkSize = 100;
+        let moved = 0;
+
+        for (let i = 0; i < ids.length; i += chunkSize) {
+            const chunk = ids.slice(i, i + chunkSize);
+            const { error } = await supabase
+                .from('blink_business_partners')
+                .update({ owner_division: targetDivision, updated_at: new Date().toISOString() })
+                .in('id', chunk);
+
+            if (error) throw error;
+            moved += chunk.length;
+        }
+
+        return moved;
+    };
+
+    const autoFixLegacyBxpoPartners = async () => {
+        if (!isBxpoDivision) return;
+
+        const storageKey = getAutoFixStorageKey();
+        if (typeof window !== 'undefined' && window.localStorage?.getItem(storageKey) === 'done') {
+            return;
+        }
+
+        try {
+            const referencedPartnerIds = await loadReferencedPartnerIds();
+            const cutoffIso = getCutoffIso(180);
+
+            const { data: candidates, error } = await supabase
+                .from('blink_business_partners')
+                .select('id, owner_division, is_shared, is_customer, status, created_at')
+                .eq('owner_division', 'blink')
+                .eq('is_shared', false)
+                .eq('is_customer', true)
+                .eq('status', 'active')
+                .gte('created_at', cutoffIso)
+                .order('created_at', { ascending: false })
+                .limit(1000);
+
+            if (error) throw error;
+
+            const moveIds = (candidates || [])
+                .map(p => p.id)
+                .filter(Boolean)
+                .filter(id => !referencedPartnerIds.has(id));
+
+            if (moveIds.length > 0) {
+                const movedCount = await updateDivisionInChunks(moveIds, 'bxpo');
+                console.log(`[PartnerAutoFix] moved ${movedCount} legacy partners to BXPO division`);
+            }
+
+            if (typeof window !== 'undefined' && window.localStorage) {
+                window.localStorage.setItem(storageKey, 'done');
+            }
+        } catch (fixError) {
+            console.warn('[PartnerAutoFix] skipped due to error:', fixError?.message || fixError);
+        }
+    };
 
     const fetchPartners = async () => {
         try {
             setLoading(true);
-            const activeDivision = getActiveDivision();
             const { data, error } = await supabase
                 .from('blink_business_partners')
                 .select('*')
@@ -80,7 +175,7 @@ const PartnerManagement = () => {
         }
     };
 
-    const { isAdmin: isAdminUser, canDelete, isSuperAdmin } = useAuth();
+    const { user, isAdmin: isAdminUser, canDelete, isSuperAdmin } = useAuth();
     const { deleteBusinessPartner, deleteBusinessPartnersBulk, deleteAllBusinessPartners, addBusinessPartner, updateBusinessPartner } = useData();
 
     const handleSubmit = async (e) => {
@@ -112,7 +207,7 @@ const PartnerManagement = () => {
         }
     };
 
-    const canDeletePartner = isAdminUser() || canDelete('blink_partners');
+    const canDeletePartner = isAdminUser() || canDelete(partnerMenuCode);
     const canRunSuperAdminBatch = isSuperAdmin();
 
     const handleDelete = async (partnerId) => {
@@ -124,7 +219,7 @@ const PartnerManagement = () => {
         if (!confirm('Are you sure you want to delete mitra ini? Data transaksi terkait tidak akan terhapus.')) return;
 
         try {
-            const success = await deleteBusinessPartner(partnerId, 'blink_business_partners', 'blink_partners');
+            const success = await deleteBusinessPartner(partnerId, 'blink_business_partners', partnerMenuCode);
             if (!success) return;
             alert('✅ Partner deleted');
             fetchPartners();
@@ -153,7 +248,7 @@ const PartnerManagement = () => {
         try {
             setIsCleansing(true);
             setCleanseProgress('Memulai proses cleansing mitra...');
-            const success = await deleteAllBusinessPartners('blink_business_partners', 'blink_partners', {
+            const success = await deleteAllBusinessPartners('blink_business_partners', partnerMenuCode, {
                 onProgress: (message) => setCleanseProgress(message)
             });
             if (!success) return;
@@ -185,7 +280,7 @@ const PartnerManagement = () => {
         if (!confirm(`Yakin hapus ${selectedIds.length} mitra terpilih? Data transaksi terkait tidak akan terhapus.`)) return;
 
         try {
-            const success = await deleteBusinessPartnersBulk(selectedIds, 'blink_business_partners', 'blink_partners');
+            const success = await deleteBusinessPartnersBulk(selectedIds, 'blink_business_partners', partnerMenuCode);
             if (!success) return;
             alert(`✅ ${selectedIds.length} mitra berhasil dihapus`);
             setSelectedIds([]);
@@ -361,6 +456,10 @@ const PartnerManagement = () => {
                 <div>
                     <h1 className="text-3xl font-bold gradient-text">Manajemen Mitra Bisnis</h1>
                     <p className="text-silver-dark mt-1">Kelola Customer, Vendor, Agent, dan Partner lainnya</p>
+                    <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/15 border border-indigo-500/30">
+                        <span className="text-[11px] font-semibold tracking-wide text-indigo-300 uppercase">Konteks Divisi Aktif</span>
+                        <span className="text-xs font-bold text-indigo-200 uppercase">{activeDivision}</span>
+                    </div>
                 </div>
                 <div className="flex gap-2">
                     {canRunSuperAdminBatch && (

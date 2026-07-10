@@ -89,7 +89,8 @@ const PartnerPicker = ({
             }
 
             if (search && search.trim().length > 0) {
-                query = query.ilike('partner_name', `%${search.trim()}%`);
+                const q = search.trim();
+                query = query.or(`partner_name.ilike.%${q}%,partner_code.ilike.%${q}%`);
             }
 
             const { data, error } = await query.order('partner_name').limit(200);
@@ -205,6 +206,7 @@ const PartnerPicker = ({
                         ) : filteredPartners.length === 0 ? (
                             <div className={`p-4 text-center text-sm ${theme === 'light' ? 'text-gray-500' : 'text-silver-dark'}`}>
                                 {searchTerm ? 'Tidak ditemukan' : 'Belum ada mitra'}
+                                <p className="mt-1 text-[11px] opacity-80">Pastikan role Customer aktif, status Active, dan divisi sesuai konteks portal.</p>
                             </div>
                         ) : (
                                 filteredPartners.map(partner => (
