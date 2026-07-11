@@ -393,15 +393,16 @@ export const DataProvider = ({ children }) => {
                 // Load from unified blink_business_partners table
                 // ========================================
                 console.log('🔄 Fetching business partners from Supabase...');
+                const activeDivision = getActiveDivision();
                 const { data: partnerData, error: partnerError } = await supabase
                     .from('blink_business_partners')
-                    .select('*');
+                    .select('*')
+                    .or(`owner_division.eq.${activeDivision},is_shared.eq.true`);
 
                 if (partnerError) {
                     console.error('❌ Error fetching business partners:', partnerError);
                 } else if (partnerData) {
                     console.log(`✅ Loaded ${partnerData.length} business partners from Supabase`);
-                    const activeDivision = getActiveDivision();
                     const visiblePartners = partnerData.filter(p => canViewPartnerInDivision(p, activeDivision, isAdmin()));
                     setBusinessPartners(visiblePartners);
 

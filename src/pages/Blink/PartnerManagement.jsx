@@ -159,9 +159,12 @@ const PartnerManagement = () => {
     const fetchPartners = async () => {
         try {
             setLoading(true);
+            // Filter by active division so Blink sees Blink partners and BXPO sees BXPO partners.
+            // This applies equally to all users (superadmin included via their respective portal).
             const { data, error } = await supabase
                 .from('blink_business_partners')
                 .select('*')
+                .or(`owner_division.eq.${activeDivision},is_shared.eq.true`)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
