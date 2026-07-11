@@ -114,46 +114,9 @@ const PartnerManagement = () => {
     };
 
     const autoFixLegacyBxpoPartners = async () => {
-        if (!isBxpoDivision) return;
-
-        const storageKey = getAutoFixStorageKey();
-        if (typeof window !== 'undefined' && window.localStorage?.getItem(storageKey) === 'done') {
-            return;
-        }
-
-        try {
-            const referencedPartnerIds = await loadReferencedPartnerIds();
-            const cutoffIso = getCutoffIso(180);
-
-            const { data: candidates, error } = await supabase
-                .from('blink_business_partners')
-                .select('id, owner_division, is_shared, is_customer, status, created_at')
-                .eq('owner_division', 'blink')
-                .eq('is_shared', false)
-                .eq('is_customer', true)
-                .eq('status', 'active')
-                .gte('created_at', cutoffIso)
-                .order('created_at', { ascending: false })
-                .limit(1000);
-
-            if (error) throw error;
-
-            const moveIds = (candidates || [])
-                .map(p => p.id)
-                .filter(Boolean)
-                .filter(id => !referencedPartnerIds.has(id));
-
-            if (moveIds.length > 0) {
-                const movedCount = await updateDivisionInChunks(moveIds, 'bxpo');
-                console.log(`[PartnerAutoFix] moved ${movedCount} legacy partners to BXPO division`);
-            }
-
-            if (typeof window !== 'undefined' && window.localStorage) {
-                window.localStorage.setItem(storageKey, 'done');
-            }
-        } catch (fixError) {
-            console.warn('[PartnerAutoFix] skipped due to error:', fixError?.message || fixError);
-        }
+        // DISABLED: pemisahan divisi mitra harus dilakukan secara manual saat input.
+        // Fungsi ini dinonaktifkan agar tidak memindahkan mitra Blink ke BXPO secara otomatis.
+        return;
     };
 
     const fetchPartners = async () => {
