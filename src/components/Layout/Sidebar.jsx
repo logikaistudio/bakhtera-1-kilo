@@ -40,8 +40,12 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
     const location = useLocation();
     const navigate = useNavigate();
     const { user, logout, canAccess, isSuperAdmin, isAdmin } = useAuth();
-    // Helper: check if user can access a portal (admin/super_admin always can)
-    const canAccessPortal = (menuCode) => isSuperAdmin() || isAdmin() || canAccess(menuCode);
+    const canAccessPortal = (menuCode, menuCodes = []) => {
+        if (isSuperAdmin() || isAdmin()) return true;
+        if (menuCode && canAccess(menuCode)) return true;
+        if (Array.isArray(menuCodes) && menuCodes.some(code => canAccess(code))) return true;
+        return false;
+    };
     const { pendingApprovals = [] } = useData();
     const [isOpen, setIsOpen] = useState(false);
     const [expandedSection, setExpandedSection] = useState('');
@@ -310,7 +314,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
             type: 'category', label: '💰 Finance', items: [
                 // Subcategory: Transaksi
                 { type: 'divider', label: '📋 Transactions' },
-                { path: '/blink/finance/invoices', label: 'Invoice', menuCode: 'blink_invoices' },
+                { path: '/blink/finance/invoices', label: 'Invoice', menuCode: 'blink_invoices', menuCodes: ['blink_invoice', 'blink_finance'] },
                 { path: '/blink/finance/purchase-orders', label: 'Purchase Order', menuCode: 'blink_purchase_order' },
                 { path: '/blink/finance/ar', label: 'Account Receivables (AR)', menuCode: 'blink_ar' },
                 { path: '/blink/finance/ap', label: 'Account Payables (AP)', menuCode: 'blink_ap' },
@@ -365,7 +369,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
         // Master Data Category
         {
             type: 'category', label: '⚙️ Master Data', items: [
-                { path: '/bxpo/master/partners', label: 'Business Partners', menuCode: 'bxpo_partners' },
+                { path: '/bxpo/master/partners', label: 'Business Partners', menuCode: 'bxpo_partners', menuCodes: ['blink_partners'] },
             ]
         },
     ];
@@ -373,9 +377,9 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
     const hasBxpoAccess = () => {
         return bxpoSubMenuItems.some(subItem => {
             if (subItem.type === 'category') {
-                return subItem.items.some(menuItem => menuItem.menuCode && canAccessPortal(menuItem.menuCode));
+                return subItem.items.some(menuItem => menuItem.menuCode && canAccessPortal(menuItem.menuCode, menuItem.menuCodes));
             }
-            return subItem.menuCode && canAccessPortal(subItem.menuCode);
+            return subItem.menuCode && canAccessPortal(subItem.menuCode, subItem.menuCodes);
         });
     };
 
@@ -383,24 +387,24 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
         if (canAccessPortal('bridge_dashboard')) return true;
         return bridgeSubMenuItems.some(subItem => {
             if (subItem.type === 'category') {
-                return subItem.items.some(menuItem => menuItem.menuCode && canAccessPortal(menuItem.menuCode));
+                return subItem.items.some(menuItem => menuItem.menuCode && canAccessPortal(menuItem.menuCode, menuItem.menuCodes));
             }
-            return subItem.menuCode && canAccessPortal(subItem.menuCode);
+            return subItem.menuCode && canAccessPortal(subItem.menuCode, subItem.menuCodes);
         });
     };
 
     const hasPabeanAccess = () => {
         if (canAccessPortal('bridge_pabean')) return true;
-        return pabeanSubMenuItems.some(subItem => subItem.menuCode && canAccessPortal(subItem.menuCode));
+        return pabeanSubMenuItems.some(subItem => subItem.menuCode && canAccessPortal(subItem.menuCode, subItem.menuCodes));
     };
 
     const hasBlinkAccess = () => {
         if (canAccessPortal('blink_dashboard')) return true;
         return blinkSubMenuItems.some(subItem => {
             if (subItem.type === 'category') {
-                return subItem.items.some(menuItem => menuItem.menuCode && canAccessPortal(menuItem.menuCode));
+                return subItem.items.some(menuItem => menuItem.menuCode && canAccessPortal(menuItem.menuCode, menuItem.menuCodes));
             }
-            return subItem.menuCode && canAccessPortal(subItem.menuCode);
+            return subItem.menuCode && canAccessPortal(subItem.menuCode, subItem.menuCodes);
         });
     };
 
@@ -408,9 +412,9 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
         if (canAccessPortal('big_dashboard')) return true;
         return bigSubMenuItems.some(subItem => {
             if (subItem.type === 'category') {
-                return subItem.items.some(menuItem => menuItem.menuCode && canAccessPortal(menuItem.menuCode));
+                return subItem.items.some(menuItem => menuItem.menuCode && canAccessPortal(menuItem.menuCode, menuItem.menuCodes));
             }
-            return subItem.menuCode && canAccessPortal(subItem.menuCode);
+            return subItem.menuCode && canAccessPortal(subItem.menuCode, subItem.menuCodes);
         });
     };
 
@@ -547,7 +551,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
 
                                                             // Hide category if no accessible items
                                                             const accessibleItems = subItem.items.filter(menuItem =>
-                                                                !menuItem.menuCode || canAccessPortal(menuItem.menuCode)
+                                                                !menuItem.menuCode || canAccessPortal(menuItem.menuCode, menuItem.menuCodes)
                                                             );
                                                             if (accessibleItems.length === 0) return null;
 
@@ -613,7 +617,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                                                         }
 
                                                         // Standalone menu items (with access check)
-                                                        if (subItem.menuCode && !canAccessPortal(subItem.menuCode)) return null;
+                                                        if (subItem.menuCode && !canAccessPortal(subItem.menuCode, subItem.menuCodes)) return null;
                                                         return (
                                                             <Link
                                                                 key={subItem.path}
@@ -710,7 +714,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                                                     className="ml-8 mt-1 space-y-1 overflow-hidden"
                                                 >
                                                     {pabeanSubMenuItems.filter(subItem =>
-                                                        !subItem.menuCode || canAccessPortal(subItem.menuCode)
+                                                        !subItem.menuCode || canAccessPortal(subItem.menuCode, subItem.menuCodes)
                                                     ).map((subItem) => (
                                                         <Link
                                                             key={subItem.path}
@@ -807,7 +811,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                                                     {bigSubMenuItems.map((subItem, idx) => {
                                                         // Standalone menu items (Dashboard)
                                                         if (!subItem.type) {
-                                                            if (subItem.menuCode && !canAccessPortal(subItem.menuCode)) return null;
+                                                            if (subItem.menuCode && !canAccessPortal(subItem.menuCode, subItem.menuCodes)) return null;
                                                             return (
                                                                 <Link
                                                                     key={subItem.path}
@@ -831,7 +835,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
 
                                                             // Filter items yang bisa diakses
                                                             const accessibleItems = subItem.items.filter(menuItem =>
-                                                                !menuItem.menuCode || canAccessPortal(menuItem.menuCode)
+                                                                !menuItem.menuCode || canAccessPortal(menuItem.menuCode, menuItem.menuCodes)
                                                             );
                                                             if (accessibleItems.length === 0) return null;
 
@@ -976,7 +980,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                                                     {blinkSubMenuItems.map((subItem, idx) => {
                                                         // Standalone items (Dashboard)
                                                         if (!subItem.type) {
-                                                            if (subItem.menuCode && !canAccessPortal(subItem.menuCode)) return null;
+                                                            if (subItem.menuCode && !canAccessPortal(subItem.menuCode, subItem.menuCodes)) return null;
                                                             return (
                                                                 <Link
                                                                     key={subItem.path}
@@ -1001,7 +1005,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
 
                                                             // Filter items yang bisa diakses (skip dividers in filter)
                                                             const accessibleItems = subItem.items.filter(itemObj =>
-                                                                itemObj.type === 'divider' || !itemObj.menuCode || canAccessPortal(itemObj.menuCode)
+                                                                itemObj.type === 'divider' || !itemObj.menuCode || canAccessPortal(itemObj.menuCode, itemObj.menuCodes)
                                                             );
                                                             // Count actual menu items (non-divider) accessible
                                                             const hasAccessibleMenuItems = accessibleItems.some(itemObj => itemObj.type !== 'divider');
@@ -1132,7 +1136,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                                                     {bxpoSubMenuItems.map((subItem, idx) => {
                                                         // Standalone items (Dashboard)
                                                         if (!subItem.type) {
-                                                            if (subItem.menuCode && !canAccessPortal(subItem.menuCode)) return null;
+                                                            if (subItem.menuCode && !canAccessPortal(subItem.menuCode, subItem.menuCodes)) return null;
                                                             return (
                                                                 <Link
                                                                     key={subItem.path}
@@ -1157,7 +1161,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
 
                                                             // Filter items yang bisa diakses (skip dividers in filter)
                                                             const accessibleItems = subItem.items.filter(itemObj =>
-                                                                itemObj.type === 'divider' || !itemObj.menuCode || canAccessPortal(itemObj.menuCode)
+                                                                itemObj.type === 'divider' || !itemObj.menuCode || canAccessPortal(itemObj.menuCode, itemObj.menuCodes)
                                                             );
                                                             // Count actual menu items (non-divider) accessible
                                                             const hasAccessibleMenuItems = accessibleItems.some(itemObj => itemObj.type !== 'divider');

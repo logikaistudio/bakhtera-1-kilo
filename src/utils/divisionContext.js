@@ -20,9 +20,5 @@ export const getActiveDivision = () => {
 
 export const canViewPartnerInDivision = (partner, activeDivision, isAdminUser = false) => {
     if (!partner) return false;
-    if (isAdminUser) return true;
-
-    const ownerDivision = partner.owner_division || DIVISIONS.BLINK;
-    const isShared = partner.is_shared === true;
-    return ownerDivision === activeDivision || isShared;
+    return true; // Bypass division filtering to show complete data to all users (same as superadmin)
 };

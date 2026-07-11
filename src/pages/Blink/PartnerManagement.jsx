@@ -162,7 +162,6 @@ const PartnerManagement = () => {
             const { data, error } = await supabase
                 .from('blink_business_partners')
                 .select('*')
-                .or(isAdminUser() ? 'id.not.is.null' : `owner_division.eq.${activeDivision},is_shared.eq.true`)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
