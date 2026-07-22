@@ -49,7 +49,12 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
     const { pendingApprovals = [] } = useData();
     const [isOpen, setIsOpen] = useState(false);
     const [expandedSection, setExpandedSection] = useState('');
-    const [expandedCategories, setExpandedCategories] = useState(['blink-marketing', 'blink-operations', 'blink-finance', 'blink-costing', 'blink-profit', 'blink-data', 'blink-approval', 'bridge-operasional', 'bridge-finance', 'bridge-data', 'bridge-persetujuan', 'central-users']); // All expanded by default
+    const [expandedCategories, setExpandedCategories] = useState([
+        'blink-marketing', 'blink-operations', 'blink-costing', 'blink-profit', 'blink-data', 'blink-approval',
+        'bridge-operasional', 'bridge-finance', 'bridge-data', 'bridge-persetujuan',
+        'finance-blinkfinance', 'finance-bridgefinance', 'finance-bigfinance',
+        'central-users'
+    ]); // All expanded by default
     const [showChangePassword, setShowChangePassword] = useState(false);
 
     // Count pending approvals for badge (only relevant for bridge_manager and super_admin)
@@ -96,11 +101,13 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
     React.useEffect(() => {
         const path = location.pathname;
         const getSection = (p) => {
+            if (p.includes('/finance/') && !p.includes('/selling-buying')) return 'finance';
             if (p.startsWith('/bridge')) return 'bridge';
             if (p.startsWith('/pabean')) return 'pabean';
             if (p.startsWith('/big')) return 'big';
             if (p.startsWith('/blink')) return 'blink';
             if (p.startsWith('/bxpo')) return 'bxpo';
+            if (p.startsWith('/finance')) return 'finance';
             return '';
         };
 
@@ -150,6 +157,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
         { path: '/big', label: 'BIG', subtitle: 'Event Organizer', icon: Calendar },
         { path: '/bridge', label: 'BRIDGE', subtitle: 'Bounded Management', icon: Building2 },
         { path: '/pabean', label: 'Pabean', subtitle: 'Customs Portal', icon: Building2 },
+        { path: '/finance', label: 'FINANCE', subtitle: 'Financial Management Unit', icon: Wallet },
     ];
 
     const centralizedMenuItems = [];
@@ -277,7 +285,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
         },
     ];
 
-    // BLINK submenu - dengan Dashboard terpisah + 3 department categories + Master Data
+    // BLINK submenu - dengan Dashboard terpisah + department categories + Master Data
     const blinkSubMenuItems = [
         // Dashboard - Standalone (outside categories)
         { path: '/blink', label: 'Dashboard', icon: LayoutDashboard, menuCode: 'blink_dashboard' },
@@ -309,32 +317,6 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
             ]
         },
 
-        // Finance Category with Subcategories
-        {
-            type: 'category', label: '💰 Finance', items: [
-                // Subcategory: Transaksi
-                { type: 'divider', label: '📋 Transactions' },
-                { path: '/blink/finance/invoices', label: 'Invoice', menuCode: 'blink_invoices', menuCodes: ['blink_invoice', 'blink_finance'] },
-                { path: '/blink/finance/purchase-orders', label: 'Purchase Order', menuCode: 'blink_purchase_order' },
-                { path: '/blink/finance/ar', label: 'Account Receivables (AR)', menuCode: 'blink_ar' },
-                { path: '/blink/finance/ap', label: 'Account Payables (AP)', menuCode: 'blink_ap' },
-                // Subcategory: Pencatatan
-                { type: 'divider', label: '📝 Records' },
-                { path: '/blink/finance/auto-journal', label: 'Auto Jurnal (12 bulan)', menuCode: 'blink_auto_journal' },
-                { path: '/blink/finance/reversing-journal', label: 'Reversing Jurnal', menuCode: 'blink_reversing_journal' },
-                { path: '/blink/finance/general-journal', label: 'General Jurnal', menuCode: 'blink_journal' },
-                { path: '/blink/finance/noted-journal', label: 'Jurnal Noted (Audit)', menuCode: 'blink_noted_journal' },
-                { path: '/blink/finance/general-ledger', label: 'General Ledger', menuCode: 'blink_ledger' },
-                { path: '/blink/finance/trial-balance', label: 'Trial Balance', menuCode: 'blink_trial_balance' },
-                // Subcategory: Laporan
-                { type: 'divider', label: '📊 Reports' },
-                { path: '/blink/finance/profit-loss', label: 'Profit & Loss (P&L)', menuCode: 'blink_pnl' },
-                { path: '/blink/finance/profit-loss-detail', label: 'Detail P&L', menuCode: 'blink_pnl' },
-                { path: '/blink/finance/balance-sheet', label: 'Balance Sheet', menuCode: 'blink_balance_sheet' },
-                { path: '/blink/finance/exchange-rates', label: 'Kurs Referensi', menuCode: 'blink_exchange_rates' },
-            ]
-        },
-
         // Master Data Category
         {
             type: 'category', label: '⚙️ Master Data', items: [
@@ -343,6 +325,68 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                 { path: '/blink/master/settings', label: 'Module Settings', menuCode: 'blink_settings' },
             ]
         },
+    ];
+
+    // FINANCE submenu - terpusat untuk semua unit
+    const financeSubMenuItems = [
+        // Unit: BLINK Finance
+        {
+            type: 'category', label: '⚡ BLINK Finance', items: [
+                { type: 'divider', label: '📋 Transactions' },
+                { path: '/blink/finance/invoices', label: 'Invoice', menuCode: 'blink_invoices', menuCodes: ['blink_invoice', 'blink_finance'] },
+                { path: '/blink/finance/purchase-orders', label: 'Purchase Order', menuCode: 'blink_purchase_order' },
+                { path: '/blink/finance/ar', label: 'Account Receivables (AR)', menuCode: 'blink_ar' },
+                { path: '/blink/finance/ap', label: 'Account Payables (AP)', menuCode: 'blink_ap' },
+                { type: 'divider', label: '📝 Records' },
+                { path: '/blink/finance/auto-journal', label: 'Auto Jurnal (12 bulan)', menuCode: 'blink_auto_journal' },
+                { path: '/blink/finance/reversing-journal', label: 'Reversing Jurnal', menuCode: 'blink_reversing_journal' },
+                { path: '/blink/finance/general-journal', label: 'General Jurnal', menuCode: 'blink_journal' },
+                { path: '/blink/finance/noted-journal', label: 'Jurnal Noted (Audit)', menuCode: 'blink_noted_journal' },
+                { path: '/blink/finance/general-ledger', label: 'General Ledger', menuCode: 'blink_ledger' },
+                { path: '/blink/finance/trial-balance', label: 'Trial Balance', menuCode: 'blink_trial_balance' },
+                { type: 'divider', label: '📊 Reports' },
+                { path: '/blink/finance/profit-loss', label: 'Profit & Loss (P&L)', menuCode: 'blink_pnl' },
+                { path: '/blink/finance/profit-loss-detail', label: 'Detail P&L', menuCode: 'blink_pnl' },
+                { path: '/blink/finance/balance-sheet', label: 'Balance Sheet', menuCode: 'blink_balance_sheet' },
+                { path: '/blink/finance/exchange-rates', label: 'Kurs Referensi', menuCode: 'blink_exchange_rates' },
+            ]
+        },
+        // Unit: BRIDGE Finance
+        {
+            type: 'category', label: '🏢 BRIDGE Finance', items: [
+                { type: 'divider', label: '📋 Transaksi' },
+                { path: '/bridge/finance/invoices', label: 'Invoice', menuCode: 'bridge_finance', indent: true },
+                { path: '/bridge/finance/po', label: 'Purchase Order', menuCode: 'bridge_finance', indent: true },
+                { path: '/bridge/finance/ar', label: 'Account Receivable (AR)', menuCode: 'bridge_finance', indent: true },
+                { path: '/bridge/finance/ap', label: 'Account Payable (AP)', menuCode: 'bridge_finance', indent: true },
+                { type: 'divider', label: '📝 Pencatatan' },
+                { path: '/bridge/finance/general-journal', label: 'General Jurnal', menuCode: 'bridge_finance', indent: true },
+                { path: '/bridge/finance/general-ledger', label: 'General Ledger', menuCode: 'bridge_finance', indent: true },
+                { type: 'divider', label: '📊 Laporan' },
+                { path: '/bridge/finance/trial-balance', label: 'Trial Balance', menuCode: 'bridge_finance', indent: true },
+                { path: '/bridge/finance/profit-loss', label: 'Profit & Loss', menuCode: 'bridge_finance', indent: true },
+                { path: '/bridge/finance/balance-sheet', label: 'Balance Sheet', menuCode: 'bridge_finance', indent: true },
+            ]
+        },
+        // Unit: BIG Finance
+        {
+            type: 'category', label: '🎪 BIG Finance', items: [
+                { type: 'divider', label: '📋 Transaksi' },
+                { path: '/big/finance/invoices', label: 'Invoice', menuCode: 'big_finance', indent: true },
+                { path: '/big/finance/po', label: 'Purchase Order', menuCode: 'big_finance', indent: true },
+                { path: '/big/finance/ar', label: 'Account Receivable (AR)', menuCode: 'big_finance', indent: true },
+                { path: '/big/finance/ap', label: 'Account Payable (AP)', menuCode: 'big_finance', indent: true },
+                { type: 'divider', label: '📝 Pencatatan' },
+                { path: '/big/finance/general-journal', label: 'General Jurnal', menuCode: 'big_finance', indent: true },
+                { path: '/big/finance/general-ledger', label: 'General Ledger', menuCode: 'big_finance', indent: true },
+                { type: 'divider', label: '📊 Laporan' },
+                { path: '/big/finance/trial-balance', label: 'Trial Balance', menuCode: 'big_finance', indent: true },
+                { path: '/big/finance/profit-loss', label: 'Profit & Loss', menuCode: 'big_finance', indent: true },
+                { path: '/big/finance/balance-sheet', label: 'Balance Sheet', menuCode: 'big_finance', indent: true },
+                { type: 'divider', label: '🗂️ Master' },
+                { path: '/big/finance/coa', label: 'COA Master', menuCode: 'big_coa', indent: true },
+            ]
+        }
     ];
 
     // BXPO submenu - Duplikasi menu sales sampai operation
@@ -411,6 +455,15 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
     const hasBigAccess = () => {
         if (canAccessPortal('big_dashboard')) return true;
         return bigSubMenuItems.some(subItem => {
+            if (subItem.type === 'category') {
+                return subItem.items.some(menuItem => menuItem.menuCode && canAccessPortal(menuItem.menuCode, menuItem.menuCodes));
+            }
+            return subItem.menuCode && canAccessPortal(subItem.menuCode, subItem.menuCodes);
+        });
+    };
+
+    const hasFinanceAccess = () => {
+        return financeSubMenuItems.some(subItem => {
             if (subItem.type === 'category') {
                 return subItem.items.some(menuItem => menuItem.menuCode && canAccessPortal(menuItem.menuCode, menuItem.menuCodes));
             }
@@ -1228,6 +1281,132 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                                                                                                     {pendingCount > 99 ? '99+' : pendingCount}
                                                                                                 </span>
                                                                                             )}
+                                                                                        </Link>
+                                                                                    );
+                                                                                })}
+                                                                            </motion.div>
+                                                                        )}
+                                                                    </AnimatePresence>
+                                                                </div>
+                                                            );
+                                                        }
+
+                                                        return null;
+                                                    })}
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
+                                );
+                            }
+
+                            // Special handling for FINANCE with submenu
+                            if (item.path === '/finance') {
+                                if (!hasFinanceAccess()) return null;
+                                const isExpanded = expandedSection === 'finance';
+                                const isFinanceActive = location.pathname.includes('/finance/') && !location.pathname.includes('/selling-buying');
+
+                                return (
+                                    <div key={item.path}>
+                                        <div className="flex items-center gap-1" id="menu-finance">
+                                            <button
+                                                onClick={() => {
+                                                    const isCurrentlyExpanded = expandedSection === 'finance';
+                                                    setExpandedSection(isCurrentlyExpanded ? '' : 'finance');
+                                                    if (!isCurrentlyExpanded) scrollToElement('menu-finance');
+                                                }}
+                                                className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition text-sm text-left ${isFinanceActive
+                                                    ? 'text-silver-light font-medium'
+                                                    : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface'
+                                                    }`}
+                                            >
+                                                <item.icon className="w-5 h-5 flex-shrink-0" />
+                                                <div className="flex-1 text-left">
+                                                    <div className="font-medium">{item.label}</div>
+                                                    <div className="text-xs text-silver-dark">
+                                                        {item.subtitle}
+                                                    </div>
+                                                </div>
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    const newState = isExpanded ? '' : 'finance';
+                                                    setExpandedSection(newState);
+                                                    if (newState === 'finance') scrollToElement('menu-finance');
+                                                }}
+                                                className="p-2 hover:bg-dark-surface rounded-lg smooth-transition"
+                                            >
+                                                <ChevronRight className={`w-4 h-4 transition-transform text-silver-dark ${isExpanded ? 'rotate-90' : ''}`} />
+                                            </button>
+                                        </div>
+
+                                        <AnimatePresence>
+                                            {isExpanded && (
+                                                <motion.div
+                                                    initial={{ height: 0, opacity: 0 }}
+                                                    animate={{ height: 'auto', opacity: 1 }}
+                                                    exit={{ height: 0, opacity: 0 }}
+                                                    className="ml-8 mt-1 space-y-1 overflow-hidden"
+                                                >
+                                                    {financeSubMenuItems.map((subItem, idx) => {
+                                                        // Render category dengan nested items
+                                                        if (subItem.type === 'category') {
+                                                            const categoryKey = 'finance-' + subItem.label.toLowerCase().replace(/[^a-z0-9]/g, '');
+                                                            const isCategoryExpanded = expandedCategories.includes(categoryKey);
+
+                                                            // Filter items yang bisa diakses
+                                                            const accessibleItems = subItem.items.filter(itemObj =>
+                                                                itemObj.type === 'divider' || !itemObj.menuCode || canAccessPortal(itemObj.menuCode, itemObj.menuCodes)
+                                                            );
+                                                            const hasAccessibleMenuItems = accessibleItems.some(itemObj => itemObj.type !== 'divider');
+                                                            if (!hasAccessibleMenuItems) return null;
+
+                                                            return (
+                                                                <div key={`category-${idx}`}>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setExpandedCategories(prev =>
+                                                                                prev.includes(categoryKey)
+                                                                                    ? prev.filter(c => c !== categoryKey)
+                                                                                    : [...prev, categoryKey]
+                                                                            );
+                                                                        }}
+                                                                        className="w-full flex items-center justify-between px-4 py-2 text-sm font-semibold text-silver hover:text-silver-light smooth-transition"
+                                                                    >
+                                                                        <span>{subItem.label}</span>
+                                                                        <ChevronRight className={`w-3 h-3 transition-transform ${isCategoryExpanded ? 'rotate-90' : ''}`} />
+                                                                    </button>
+
+                                                                    <AnimatePresence>
+                                                                        {isCategoryExpanded && (
+                                                                            <motion.div
+                                                                                initial={{ height: 0, opacity: 0 }}
+                                                                                animate={{ height: 'auto', opacity: 1 }}
+                                                                                exit={{ height: 0, opacity: 0 }}
+                                                                                className="overflow-hidden"
+                                                                            >
+                                                                                {accessibleItems.map((itemObj, itemIdx) => {
+                                                                                    if (itemObj.type === 'divider') {
+                                                                                        return (
+                                                                                            <div key={`divider-${itemIdx}`} className="pl-8 pr-4 pt-3 pb-1 border-t border-dark-border/30 mt-2 first:mt-0 first:border-t-0">
+                                                                                                <span className="text-xs font-bold text-silver-light uppercase tracking-widest">
+                                                                                                    {itemObj.label}
+                                                                                                </span>
+                                                                                            </div>
+                                                                                        );
+                                                                                    }
+
+                                                                                    return (
+                                                                                        <Link
+                                                                                            key={itemObj.path}
+                                                                                            to={itemObj.path}
+                                                                                            onClick={() => isMobile && setIsOpen(false)}
+                                                                                            className={`flex items-center ${itemObj.indent ? 'pl-16' : 'pl-14'} pr-4 py-2 text-sm smooth-transition border-l-2 ml-2 ${isActive(itemObj.path)
+                                                                                                ? 'bg-white/20 text-white font-medium border-white sidebar-active-item'
+                                                                                                : 'text-silver-dark hover:text-white hover:bg-white/10 border-transparent hover:border-white/50'
+                                                                                                }`}
+                                                                                        >
+                                                                                            <span className="flex-1">{itemObj.label}</span>
                                                                                         </Link>
                                                                                     );
                                                                                 })}

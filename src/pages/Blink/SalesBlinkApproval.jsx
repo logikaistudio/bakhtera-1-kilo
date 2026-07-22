@@ -789,7 +789,16 @@ const SalesBlinkApproval = () => {
                             {selectedItem.notes && (
                                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
                                     <p style={{ color: '#4B5563' }} className="text-xs mb-1">Notes</p>
-                                    <p style={{ color: '#111827' }} className="text-sm">{selectedItem.notes}</p>
+                                    <div
+                                        style={{ color: '#111827' }}
+                                        className="text-sm prose prose-sm max-w-none"
+                                        dangerouslySetInnerHTML={{
+                                            __html: (selectedItem.notes || '')
+                                                .replace(/<!--\[if[\s\S]*?<!\[endif\]-->/gi, '')
+                                                .replace(/<xml[\s\S]*?<\/xml>/gi, '')
+                                                .replace(/<\/?w:[^>]*>/gi, '')
+                                        }}
+                                    />
                                 </div>
                             )}
 

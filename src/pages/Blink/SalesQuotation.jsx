@@ -87,12 +87,28 @@ const escapeHtml = (unsafe = '') => String(unsafe)
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 
+const cleanWordHtml = (html = '') => {
+    if (!html) return '';
+    return html
+        .replace(/<!--\[if[\s\S]*?<!\[endif\]-->/gi, '')
+        .replace(/<xml[\s\S]*?<\/xml>/gi, '')
+        .replace(/<\/?w:[^>]*>/gi, '');
+};
+
 const normalizeNotesHtml = (value = '') => {
-    const raw = String(value || '').trim();
+    let raw = String(value || '').trim();
     if (!raw) return '';
 
-    // Keep existing rich text if already HTML-like.
-    if (/[<][a-z/!][^>]*>/i.test(raw)) {
+    // Clean MS Word XML & conditional comments
+    raw = cleanWordHtml(raw);
+
+    // Unescape accumulated double/multi-encoded entities (e.g. &amp;amp;nbsp; -> &nbsp;)
+    while (/&amp;(nbsp|amp|lt|gt|quot|#039);/i.test(raw)) {
+        raw = raw.replace(/&amp;(nbsp|amp|lt|gt|quot|#039);/gi, '&$1');
+    }
+
+    // Keep existing rich text if already HTML-like or contains HTML entities.
+    if (/[<][a-z/!][^>]*>/i.test(raw) || /&[a-z0-9#]+;/i.test(raw)) {
         return raw;
     }
 
@@ -209,6 +225,15 @@ const RichTextEditor = ({ value, onChange, rows = 4, placeholder = '' }) => {
         onChange(editorRef.current.innerHTML);
     };
 
+    const handlePaste = (e) => {
+        e.preventDefault();
+        const text = e.clipboardData.getData('text/plain');
+        document.execCommand('insertText', false, text);
+        if (editorRef.current) {
+            onChange(editorRef.current.innerHTML || '');
+        }
+    };
+
     const minHeight = `${rows * 24}px`;
 
     return (
@@ -250,6 +275,7 @@ const RichTextEditor = ({ value, onChange, rows = 4, placeholder = '' }) => {
                 contentEditable
                 suppressContentEditableWarning
                 onInput={() => onChange(editorRef.current?.innerHTML || '')}
+                onPaste={handlePaste}
                 data-placeholder={placeholder}
                 className="w-full px-3 py-2 text-black text-sm focus:outline-none"
                 style={{ minHeight }}

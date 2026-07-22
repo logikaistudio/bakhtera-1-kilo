@@ -1,0 +1,226 @@
+{
+  "generated_at": "2026-07-12T23:43:18.193Z",
+  "summary": {
+    "total": 30,
+    "blink": 9,
+    "bxpo": 21,
+    "shared": 0,
+    "null_division": 0,
+    "suspicious_bxpo": 0,
+    "orphan_bxpo": 21
+  },
+  "suspicious_bxpo_partners": [],
+  "orphan_bxpo_partners": [
+    {
+      "id": "1f1b729d-e679-4aaf-a7f0-23a434f1eea9",
+      "partner_name": "TRIBU NV",
+      "partner_code": "BP-2607-0008",
+      "owner_division": "bxpo",
+      "is_shared": false,
+      "is_customer": true,
+      "status": "active",
+      "created_at": "2026-07-06T09:55:50.322+00:00"
+    },
+    {
+      "id": "91a46e2d-7b4e-4062-88b4-2ce56bab6b5a",
+      "partner_name": "TRANS - CONTINENTAL LOGISTICS N.V.",
+      "partner_code": "BP-2607-0009",
+      "owner_division": "bxpo",
+      "is_shared": false,
+      "is_customer": true,
+      "status": "active",
+      "created_at": "2026-07-06T09:58:17.148+00:00"
+    },
+    {
+      "id": "3593b14d-e894-48ec-8a79-7b984a487408",
+      "partner_name": "SRVC FREIGHT SERVICES (CAMBODIA) CO., LTD.",
+      "partner_code": "BP-2607-0010",
+      "owner_division": "bxpo",
+      "is_shared": false,
+      "is_customer": true,
+      "status": "active",
+      "created_at": "2026-07-06T10:00:46.263+00:00"
+    },
+    {
+      "id": "cb29e205-e29c-4b05-a385-a685733fb6d5",
+      "partner_name": "TITANI ALAM SEMESTA, PT",
+      "partner_code": "BP-2607-0012",
+      "owner_division": "bxpo",
+      "is_shared": false,
+      "is_customer": true,
+      "status": "active",
+      "created_at": "2026-07-06T10:04:09.195+00:00"
+    },
+    {
+      "id": "930d5824-29fc-43e7-b1a4-c67c3d22fdb2",
+      "partner_name": "NUTRADIA SA",
+      "partner_code": "BP-2607-0013",
+      "owner_division": "bxpo",
+      "is_shared": false,
+      "is_customer": true,
+      "status": "active",
+      "created_at": "2026-07-06T10:05:32.029+00:00"
+    },
+    {
+      "id": "5c63a99d-74fa-4192-8437-f094f6daa2b1",
+      "partner_name": "PHILNESIA INTERNATIONAL, PT",
+      "partner_code": "BP-2607-0014",
+      "owner_division": "bxpo",
+      "is_shared": false,
+      "is_customer": true,
+      "status": "active",
+      "created_at": "2026-07-06T10:11:47.022+00:00"
+    },
+    {
+      "id": "b6e0982d-3894-4dc1-b339-ff2987d75a3f",
+      "partner_name": "XIAMNEN LIANXU ELECTRONICS CO.,LTD",
+      "partner_code": "BP-2607-0003",
+      "owner_division": "bxpo",
+      "is_shared": false,
+      "is_customer": true,
+      "status": "active",
+      "created_at": "2026-07-06T09:33:08.105+00:00"
+    },
+    {
+      "id": "3ae218c8-fce8-4f8e-b4a6-282261ba1eb0",
+      "partner_name": "JADI ABADI CORAK BISCUIT FACTORY INDONESIA, PT",
+      "partner_code": "BP-2607-0016",
+      "owner_division": "bxpo",
+      "is_shared": false,
+      "is_customer": true,
+      "status": "active",
+      "created_at": "2026-07-07T02:44:11.216+00:00"
+    },
+    {
+      "id": "569d6483-0fe5-47e9-9569-6844c955ed23",
+      "partner_name": "SINO-PASIFIC INTER HOLDING (SINGAPORE)",
+      "partner_code": "BP-2607-0017",
+      "owner_division": "bxpo",
+      "is_shared": false,
+      "is_customer": true,
+      "status": "active",
+      "created_at": "2026-07-07T02:45:42.972+00:00"
+    },
+    {
+      "id": "7941ade4-e686-4d41-97b8-11ad3d747884",
+      "partner_name": "SUNRISE BUMTI TEXTILES PT ",
+      "partner_code": "BP-2607-0018",
+      "owner_division": "bxpo",
+      "is_shared": false,
+      "is_customer": true,
+      "status": "active",
+      "created_at": "2026-07-07T07:54:49.466+00:00"
+    },
+    {
+      "id": "5928606a-0756-4d79-96b4-a5069a2a0108",
+      "partner_name": "TRUETZSCHLER GROUP SE ",
+      "partner_code": "BP-2607-0019",
+      "owner_division": "bxpo",
+      "is_shared": false,
+      "is_customer": true,
+      "status": "active",
+      "created_at": "2026-07-07T07:56:01.005+00:00"
+    },
+    {
+      "id": "d0456069-c515-4174-8e0a-e675ba0052c2",
+      "partner_name": "DSL INDONESIA PT ",
+      "partner_code": "BP-2607-0022",
+      "owner_division": "bxpo",
+      "is_shared": false,
+      "is_customer": true,
+      "status": "active",
+      "created_at": "2026-07-07T09:12:03.291+00:00"
+    },
+    {
+      "id": "a30462e8-57d1-459f-a4f0-84d1838ad24d",
+      "partner_name": "OGAWA INDONESIA PT ",
+      "partner_code": "BP-2607-0024",
+      "owner_division": "bxpo",
+      "is_shared": false,
+      "is_customer": true,
+      "status": "active",
+      "created_at": "2026-07-07T09:52:26.692+00:00"
+    },
+    {
+      "id": "d04ba256-2a16-446e-bd60-fb3516116ba2",
+      "partner_name": "Moreno Soeprapto",
+      "partner_code": "BP-2607-0026",
+      "owner_division": "bxpo",
+      "is_shared": false,
+      "is_customer": true,
+      "status": "active",
+      "created_at": "2026-07-08T03:00:18.139+00:00"
+    },
+    {
+      "id": "f40120a2-d052-4ee2-a259-723a0cee6af3",
+      "partner_name": "PT. MGPA NUSANTARA JAYA",
+      "partner_code": "BP-2607-0027",
+      "owner_division": "bxpo",
+      "is_shared": false,
+      "is_customer": true,
+      "status": "active",
+      "created_at": "2026-07-08T03:08:01.397+00:00"
+    },
+    {
+      "id": "2bda435f-faa0-4ca7-b4b9-05bbb6609137",
+      "partner_name": "VLS WORLDWIDE SHIPPING",
+      "partner_code": "BP-2607-0028",
+      "owner_division": "bxpo",
+      "is_shared": false,
+      "is_customer": true,
+      "status": "active",
+      "created_at": "2026-07-08T03:13:56.944+00:00"
+    },
+    {
+      "id": "a73762a2-43e9-4626-89ab-a79b27dec54b",
+      "partner_name": "A test",
+      "partner_code": "BP-2607-0030",
+      "owner_division": "bxpo",
+      "is_shared": false,
+      "is_customer": true,
+      "status": "active",
+      "created_at": "2026-07-10T08:45:59.607+00:00"
+    },
+    {
+      "id": "860fb469-b32c-4d1f-a9d9-3793eb31621f",
+      "partner_name": "MANDIRI ABADI, CV",
+      "partner_code": "BP-2607-0002",
+      "owner_division": "bxpo",
+      "is_shared": false,
+      "is_customer": true,
+      "status": "active",
+      "created_at": "2026-07-06T09:17:51.618+00:00"
+    },
+    {
+      "id": "1efb29cc-8519-4c6b-901e-39d2a44eed93",
+      "partner_name": "GUNTNER INDONESIA, PT",
+      "partner_code": "BP-2607-0005",
+      "owner_division": "bxpo",
+      "is_shared": false,
+      "is_customer": true,
+      "status": "active",
+      "created_at": "2026-07-06T09:48:57.39+00:00"
+    },
+    {
+      "id": "2378a6bb-b5b6-40bd-a823-316cbe98dd60",
+      "partner_name": "NARAYANI, CV",
+      "partner_code": "BP-2607-0006",
+      "owner_division": "bxpo",
+      "is_shared": false,
+      "is_customer": true,
+      "status": "active",
+      "created_at": "2026-07-06T09:50:41.52+00:00"
+    },
+    {
+      "id": "2e7dc67c-7876-47a6-8a16-a161bb39d032",
+      "partner_name": "EC REFRIGERATION CO., LTD",
+      "partner_code": "BP-2607-0007",
+      "owner_division": "bxpo",
+      "is_shared": false,
+      "is_customer": true,
+      "status": "active",
+      "created_at": "2026-07-06T09:51:00.724+00:00"
+    }
+  ],
+  "null_division_partners": []
+}

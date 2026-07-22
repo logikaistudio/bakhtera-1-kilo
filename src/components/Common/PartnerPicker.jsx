@@ -25,7 +25,7 @@ const PartnerPicker = ({
     theme = 'dark',
     onPartnerLoad
 }) => {
-    const { isAdmin } = useAuth();
+    const { isAdmin, canAccess } = useAuth();
     const [partners, setPartners] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -75,13 +75,19 @@ const PartnerPicker = ({
         try {
             setLoading(true);
             const activeDivision = getActiveDivision();
+            const isBxpoContext = activeDivision === 'bxpo';
+            const hasPartnerAccess = isAdmin() || canAccess('bxpo_partners') || canAccess('blink_partners');
             let query = supabase
                 .from('blink_business_partners')
                 .select('*')
                 .eq('status', 'active');
 
-            if (!isAdmin()) {
+            if (!hasPartnerAccess && !isBxpoContext) {
                 query = query.or(`owner_division.eq.${activeDivision},is_shared.eq.true`);
+            }
+
+            if (!hasPartnerAccess && isBxpoContext) {
+                query = query.or(`owner_division.eq.bxpo,is_shared.eq.true`);
             }
 
             if (roleFilter !== 'all') {
@@ -93,7 +99,7 @@ const PartnerPicker = ({
                 query = query.or(`partner_name.ilike.%${q}%,partner_code.ilike.%${q}%`);
             }
 
-            const { data, error } = await query.order('partner_name').limit(200);
+            const { data, error } = await query.order('partner_name').limit(1000);
 
             if (error) throw error;
             setPartners(data || []);
