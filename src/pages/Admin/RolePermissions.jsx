@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import {
     Shield, Plus, Save, AlertCircle, CheckCircle2, Trash2, X, Edit2,
     ChevronDown, ChevronRight, Check, Minus, Plane, Building2, Calendar, Layers,
-    RefreshCw, Database, Info
+    RefreshCw, Database, Info, Wallet
 } from 'lucide-react';
 import { APP_MENUS } from '../../config/menuConfig';
 import { syncRolePermissionsWithMenus } from '../../services/rolePermissionSyncService';
@@ -16,8 +16,10 @@ import { syncRolePermissionsWithMenus } from '../../services/rolePermissionSyncS
 const MODULE_ICON_MAP = {
     Bridge: Building2,
     Blink: Plane,
+    BXPO: Layers,
     Big: Calendar,
     Pusat: Layers,
+    Finance: Wallet,
 };
 
 // Bangun MODULE_MENUS dari APP_MENUS (single source of truth)
@@ -52,8 +54,10 @@ const DEFAULT_PERMS = () => ({
 const MODULE_STYLES = {
     Bridge: { bg: 'bg-blue-500/10', border: 'border-blue-500/30', text: 'text-blue-400', badge: 'bg-blue-500/20 text-blue-300' },
     Blink: { bg: 'bg-cyan-500/10', border: 'border-cyan-500/30', text: 'text-cyan-400', badge: 'bg-cyan-500/20 text-cyan-300' },
+    BXPO: { bg: 'bg-indigo-500/10', border: 'border-indigo-500/30', text: 'text-indigo-400', badge: 'bg-indigo-500/20 text-indigo-300' },
     Big: { bg: 'bg-orange-500/10', border: 'border-orange-500/30', text: 'text-orange-400', badge: 'bg-orange-500/20 text-orange-300' },
     Pusat: { bg: 'bg-purple-500/10', border: 'border-purple-500/30', text: 'text-purple-400', badge: 'bg-purple-500/20 text-purple-300' },
+    Finance: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', text: 'text-emerald-400', badge: 'bg-emerald-500/20 text-emerald-300' },
 };
 
 /* ─────────────────────────────────────────────
@@ -644,6 +648,7 @@ const RolePermissions = () => {
                                 BXPO: { active: '#eef2ff', border: '#c7d2fe', text: '#4338ca' },
                                 Big: { active: '#fff7ed', border: '#fed7aa', text: '#c2410c' },
                                 Pusat: { active: '#faf5ff', border: '#ddd6fe', text: '#6d28d9' },
+                                Finance: { active: '#ecfdf5', border: '#a7f3d0', text: '#047857' },
                             };
                             const mc = modColors[modName] || { active: '#f9fafb', border: '#e5e7eb', text: '#374151' };
                             return (

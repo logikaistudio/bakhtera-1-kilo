@@ -82,16 +82,17 @@ export const syncRolePermissionsWithMenus = async ({ pruneStale = true } = {}) =
         validMenuCodes.forEach((menuCode) => {
             const key = `${roleId}::${menuCode}`;
             if (!existingKeySet.has(key)) {
+                const isManagement = ['direksi', 'chief', 'manager'].includes(roleId);
                 missingRows.push({
                     role_id: roleId,
                     role_label: roleLabel,
                     menu_code: menuCode,
-                    can_access: false,
-                    can_view: false,
-                    can_create: false,
-                    can_edit: false,
-                    can_delete: false,
-                    can_approve: false,
+                    can_access: isManagement,
+                    can_view: isManagement,
+                    can_create: isManagement,
+                    can_edit: isManagement,
+                    can_delete: roleId === 'direksi',
+                    can_approve: isManagement,
                     updated_at: now,
                 });
             }

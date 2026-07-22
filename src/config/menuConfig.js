@@ -152,6 +152,33 @@ export const APP_MENUS = {
             { code: 'big_settings', label: 'Pengaturan Modul', group: 'Master Data', path: '/big/master/settings' },
         ],
     },
+
+    Finance: {
+        label: 'Finance',
+        color: 'emerald',
+        menus: [
+            // ─── BLINK Finance ───
+            { code: 'blink_invoices', label: 'BLINK — Invoice', group: 'BLINK Finance', path: '/blink/finance/invoices' },
+            { code: 'blink_purchase_order', label: 'BLINK — Purchase Order', group: 'BLINK Finance', path: '/blink/finance/purchase-orders' },
+            { code: 'blink_ar', label: 'BLINK — Piutang (AR)', group: 'BLINK Finance', path: '/blink/finance/ar' },
+            { code: 'blink_ap', label: 'BLINK — Hutang (AP)', group: 'BLINK Finance', path: '/blink/finance/ap' },
+            { code: 'blink_auto_journal', label: 'BLINK — Auto Jurnal (12 bulan)', group: 'BLINK Finance', path: '/blink/finance/auto-journal' },
+            { code: 'blink_reversing_journal', label: 'BLINK — Reversing Jurnal', group: 'BLINK Finance', path: '/blink/finance/reversing-journal' },
+            { code: 'blink_journal', label: 'BLINK — Jurnal Umum', group: 'BLINK Finance', path: '/blink/finance/general-journal' },
+            { code: 'blink_noted_journal', label: 'BLINK — Jurnal Noted (Audit)', group: 'BLINK Finance', path: '/blink/finance/noted-journal' },
+            { code: 'blink_ledger', label: 'BLINK — Buku Besar', group: 'BLINK Finance', path: '/blink/finance/general-ledger' },
+            { code: 'blink_trial_balance', label: 'BLINK — Neraca Saldo', group: 'BLINK Finance', path: '/blink/finance/trial-balance' },
+            { code: 'blink_pnl', label: 'BLINK — Laba Rugi', group: 'BLINK Finance', path: '/blink/finance/profit-loss' },
+            { code: 'blink_balance_sheet', label: 'BLINK — Neraca', group: 'BLINK Finance', path: '/blink/finance/balance-sheet' },
+            { code: 'blink_exchange_rates', label: 'BLINK — Kurs Referensi', group: 'BLINK Finance', path: '/blink/finance/exchange-rates' },
+            // ─── BRIDGE Finance ───
+            { code: 'bridge_finance', label: 'BRIDGE — Keuangan (Invoice/PO/AR/AP)', group: 'BRIDGE Finance', path: '/bridge/finance/invoices' },
+            { code: 'bridge_coa', label: 'BRIDGE — Code of Account', group: 'BRIDGE Finance', path: '/bridge/code-of-account' },
+            // ─── BIG Finance ───
+            { code: 'big_finance', label: 'BIG — Keuangan (Invoice/PO/AR/AP)', group: 'BIG Finance', path: '/big/finance/invoices' },
+            { code: 'big_coa', label: 'BIG — COA Master', group: 'BIG Finance', path: '/big/finance/coa' },
+        ],
+    },
 };
 
 
