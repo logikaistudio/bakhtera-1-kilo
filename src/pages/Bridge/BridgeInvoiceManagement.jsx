@@ -3,7 +3,7 @@ import { createInvoiceJournal, createCOGSJournal, createARPaymentJournal, getAll
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useData } from '../../context/DataContext';
-import { generateInvoiceNumber, generateBridgeInvoiceNumber } from '../../utils/documentNumbers';
+import { generateInvoiceNumber, generateBridgeInvoiceNumber, generateAdditionalInvoiceNumber } from '../../utils/documentNumbers';
 import { getCurrencySymbol } from '../../utils/currencyFormatter';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
@@ -599,10 +599,98 @@ const BridgeInvoiceManagement = () => {
         return { subtotal, taxAmount, total, cogsSubtotal, grossProfit, profitMargin };
     };
 
+    const handleOpenAdditionalInvoiceModal = async (sourceInvoice) => {
+        if (!sourceInvoice) return;
+        const dueDate = new Date();
+        const terms = sourceInvoice.payment_terms || 'NET 30';
+        const days = parseInt(String(terms).replace('NET ', '')) || 30;
+        dueDate.setDate(dueDate.getDate() + days);
+
+        // Precompute expected additional invoice number (e.g. BRG-INV-2607-0001-v1)
+        const nextInvNumber = await generateAdditionalInvoiceNumber(sourceInvoice.invoice_number, 'bridge_invoices');
+
+        // Find reference shipment or quotation if available
+        const refShipment = shipments.find(s => s.id === sourceInvoice.shipment_id || s.job_number === sourceInvoice.job_number);
+        const refQuotation = quotations.find(q => q.id === sourceInvoice.quotation_id || q.quotation_number === sourceInvoice.quotation_number);
+
+        if (refShipment) {
+            setSelectedShipment(refShipment);
+            setSelectedQuotation(null);
+        } else if (refQuotation) {
+            setSelectedQuotation(refQuotation);
+            setSelectedShipment(null);
+        }
+
+        setFormData({
+            is_additional_invoice: true,
+            parent_invoice_id: sourceInvoice.id,
+            parent_invoice_number: sourceInvoice.invoice_number,
+            preview_invoice_number: nextInvNumber,
+            quotation_id: sourceInvoice.quotation_id || (refQuotation?.id || ''),
+            shipment_id: sourceInvoice.shipment_id || (refShipment?.id || ''),
+            job_number: sourceInvoice.job_number || '',
+            so_number: sourceInvoice.so_number || sourceInvoice.job_number || '',
+            payment_terms: terms,
+            invoice_date: new Date().toISOString().split('T')[0],
+            due_date: dueDate.toISOString().split('T')[0],
+            billing_currency: sourceInvoice.currency || 'IDR',
+            exchange_rate: sourceInvoice.exchange_rate || 1,
+            payment_bank_id: sourceInvoice.payment_bank_id || '',
+            customer_id: sourceInvoice.customer_id || '',
+            customer_name: sourceInvoice.customer_name || '',
+            customer_company: sourceInvoice.customer_company || '',
+            customer_address: sourceInvoice.customer_address || '',
+            customer_email: sourceInvoice.customer_email || '',
+            customer_phone: sourceInvoice.customer_phone || '',
+            origin: sourceInvoice.origin || '',
+            destination: sourceInvoice.destination || '',
+            service_type: sourceInvoice.service_type || '',
+            cargo_details: sourceInvoice.cargo_details || null,
+            consignor: sourceInvoice.consignor || '',
+            consignee: sourceInvoice.consignee || '',
+            order_reference: sourceInvoice.order_reference || '',
+            goods_description: sourceInvoice.goods_description || '',
+            import_broker: sourceInvoice.import_broker || '',
+            chargeable_weight: sourceInvoice.chargeable_weight || '',
+            packages: sourceInvoice.packages || '',
+            vessel_name: sourceInvoice.vessel_name || '',
+            voyage_number: sourceInvoice.voyage_number || '',
+            ocean_bl: sourceInvoice.ocean_bl || '',
+            house_bl: sourceInvoice.house_bl || '',
+            etd: sourceInvoice.etd || '',
+            eta: sourceInvoice.eta || '',
+            containers: sourceInvoice.containers || '',
+            tax_rate: sourceInvoice.tax_rate ?? 11.00,
+            discount_amount: 0,
+            customer_notes: '',
+            notes: `[INVOICE TAMBAHAN] Mengikuti pengajuan ${sourceInvoice.job_number || sourceInvoice.invoice_number}`,
+            invoice_items: [
+                {
+                    item_name: 'Freight / Biaya Tambahan',
+                    description: `Biaya Tambahan untuk Pengajuan ${sourceInvoice.job_number || sourceInvoice.invoice_number}`,
+                    qty: 1,
+                    unit: 'Job',
+                    rate: 0,
+                    amount: 0,
+                    tax_rate: sourceInvoice.tax_rate ?? 11.00,
+                    tax_amount: 0,
+                    currency: sourceInvoice.currency || 'IDR',
+                    coa_id: null,
+                    coa_code: null
+                }
+            ],
+            cogs_items: []
+        });
+
+        setIsEditingInvoice(false);
+        setEditInvoiceId(null);
+        setShowCreateModal(true);
+    };
+
     const handleCreateInvoice = async (e) => {
         e.preventDefault();
 
-        if (!formData.quotation_id && !formData.shipment_id) {
+        if (!formData.quotation_id && !formData.shipment_id && !formData.is_additional_invoice) {
             alert('Please select a reference (Quotation or Shipment)');
             return;
         }
@@ -634,9 +722,8 @@ const BridgeInvoiceManagement = () => {
         };
 
         try {
-            // 1. Validate duplicates for the same SO / shipment reference.
-            // Memperketat: Hanya boleh 1 invoice per mata uang (currency) untuk SO/Job yang sama.
-            if (formData.job_number) {
+            // 1. Validate duplicates for standard invoice (skip for additional invoice)
+            if (!formData.is_additional_invoice && formData.job_number) {
                 const { data: allInvoices, error: allCheckError } = await supabase
                     .from('bridge_invoices')
                     .select('id, invoice_number, status, currency, exchange_rate, shipment_id, so_number, job_number, created_at')
@@ -665,7 +752,7 @@ const BridgeInvoiceManagement = () => {
                     const duplicateInv = sameCurrencyInvoices[0];
                     alert(
                         `Tidak bisa membuat invoice: Invoice dengan mata uang ${selectedCurrency} sudah terdaftar sebelumnya (${duplicateInv.invoice_number || '-'}) untuk SO/Job ini.\n\n` +
-                        `Hanya diperbolehkan maksimal 1 invoice untuk setiap mata uang.`
+                        `Hanya diperbolehkan maksimal 1 invoice untuk setiap mata uang. Untuk biaya tambahan, gunakan tombol "Invoice Tambahan".`
                     );
                     return;
                 }
@@ -673,13 +760,19 @@ const BridgeInvoiceManagement = () => {
 
             const { subtotal, taxAmount, total, cogsSubtotal, grossProfit, profitMargin } = calculateTotals();
 
-            // 2. Generate unique invoice number (async)
-            // If previous invocies were cancelled, this will auto-generate suffix (e.g. -1)
-            const quotationNum = selectedQuotation?.quotation_number || selectedQuotation?.quotationNumber || formData.job_number;
-            const invoiceNumber = await generateBridgeInvoiceNumber(quotationNum);
+            // 2. Generate unique invoice number (versioned suffix for additional invoice, or standard sequence)
+            let invoiceNumber;
+            if (formData.is_additional_invoice) {
+                invoiceNumber = await generateAdditionalInvoiceNumber(formData.parent_invoice_number || formData.job_number, 'bridge_invoices');
+            } else {
+                const quotationNum = selectedQuotation?.quotation_number || selectedQuotation?.quotationNumber || formData.job_number;
+                invoiceNumber = await generateBridgeInvoiceNumber(quotationNum);
+            }
 
             const newInvoice = {
                 invoice_number: invoiceNumber,
+                is_additional: formData.is_additional_invoice || false,
+                parent_invoice_id: formData.parent_invoice_id || null,
                 quotation_id: selectedQuotation?.id || null,
                 shipment_id: selectedShipment?.id || null,
                 job_number: formData.job_number,
@@ -1853,12 +1946,13 @@ const BridgeInvoiceManagement = () => {
                                 <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">Amount</th>
                                 <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">Outstanding</th>
                                 <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap">Status</th>
+                                <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap">Aksi</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
                             {filteredInvoices.length === 0 ? (
                                 <tr>
-                                    <td colSpan="10" className="px-3 py-8 text-center text-silver-dark">
+                                    <td colSpan="11" className="px-3 py-8 text-center text-silver-dark">
                                         <FileText className="w-10 h-10 text-silver-dark mx-auto mb-2 opacity-50" />
                                         <p className="text-sm">
                                             {filter === 'all'
@@ -1886,7 +1980,16 @@ const BridgeInvoiceManagement = () => {
                                             />
                                         </td>
                                         <td className="px-3 py-2 whitespace-nowrap">
-                                            <span className="font-medium text-accent-orange">{invoice.invoice_number}</span>
+                                            <div className="flex flex-col">
+                                                <span className="font-medium text-accent-orange flex items-center gap-1">
+                                                    {invoice.invoice_number}
+                                                    {invoice.is_additional && (
+                                                        <span className="bg-purple-500/20 text-purple-300 text-[9px] px-1 py-0.2 rounded border border-purple-500/30">
+                                                            Versi
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            </div>
                                         </td>
                                         <td className="px-3 py-2 whitespace-nowrap">
                                             <span className="text-silver-light">{invoice.job_number}</span>
@@ -1917,6 +2020,16 @@ const BridgeInvoiceManagement = () => {
                                             <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${statusConfig[invoice.status]?.color || 'bg-gray-500/20 text-gray-400'}`}>
                                                 {statusConfig[invoice.status]?.label || invoice.status}
                                             </span>
+                                        </td>
+                                        <td className="px-3 py-2 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                            <button
+                                                onClick={() => handleOpenAdditionalInvoiceModal(invoice)}
+                                                className="px-2.5 py-1 bg-purple-600/30 hover:bg-purple-600/60 text-purple-300 border border-purple-500/50 rounded text-xs font-medium inline-flex items-center gap-1 smooth-transition"
+                                                title="Buat invoice tambahan (v1, v2, dsb) untuk pengajuan ini"
+                                            >
+                                                <Plus className="w-3 h-3" />
+                                                Invoice Tambahan
+                                            </button>
                                         </td>
                                     </tr>
                                 ))

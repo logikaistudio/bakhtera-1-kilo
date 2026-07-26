@@ -235,6 +235,50 @@ export const generateBridgeInvoiceNumber = async (quotationNumber) => {
 };
 
 /**
+ * Generate Additional (Versioned) Invoice Number
+ * @param {string} sourceInvoiceNumber - Base invoice number
+ * @param {string} tableName - DB table name ('blink_invoices' or 'bridge_invoices')
+ * @returns {Promise<string>} e.g. "INV-BLK2607-0001-v1", "INV-BLK2607-0001-v2"
+ */
+export const generateAdditionalInvoiceNumber = async (sourceInvoiceNumber, tableName = 'blink_invoices') => {
+    if (!sourceInvoiceNumber) return '';
+
+    // Strip existing version suffix if any (e.g., -v1, -v2, v1, etc.)
+    const rootBase = sourceInvoiceNumber.replace(/[-_]?v\d+$/i, '');
+
+    try {
+        const { data, error } = await supabase
+            .from(tableName)
+            .select('invoice_number')
+            .like('invoice_number', `${rootBase}%`);
+
+        if (error) throw error;
+
+        let maxVersion = 0;
+        if (data && data.length > 0) {
+            data.forEach(row => {
+                const num = row.invoice_number || '';
+                const escapedRoot = rootBase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const regex = new RegExp(`^${escapedRoot}[-_]?v(\\d+)$`, 'i');
+                const match = num.match(regex);
+                if (match) {
+                    const ver = parseInt(match[1], 10);
+                    if (!isNaN(ver) && ver > maxVersion) {
+                        maxVersion = ver;
+                    }
+                }
+            });
+        }
+
+        return `${rootBase}-v${maxVersion + 1}`;
+    } catch (error) {
+        console.error('Error generating additional invoice number:', error);
+        return `${rootBase}-v1`;
+    }
+};
+
+
+/**
  * Generate PO Number
  * Format: PO-BLKYYMM-XXXX
  * @returns {Promise<string>} Generated PO number
