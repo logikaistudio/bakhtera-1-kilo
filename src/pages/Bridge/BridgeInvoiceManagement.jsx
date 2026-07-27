@@ -12,7 +12,7 @@ import { logTransaction, TRANSACTION_TYPES, MODULES, ACTIONS } from '../../servi
 import {
     FileText, DollarSign, Calendar, User, Clock, CheckCircle, XCircle,
     Plus, Send, AlertCircle, Download, Eye, Edit, Trash, Receipt,
-    TrendingUp, AlertTriangle, Search, Filter, X, Package, Circle, PlaySquare
+    TrendingUp, AlertTriangle, Search, Filter, X, Package, Circle, PlaySquare, RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import InvoiceProfitSummary from '../../components/Bridge/InvoiceProfitSummary';
@@ -37,6 +37,8 @@ const BridgeInvoiceManagement = () => {
     const [financeMigrationRan, setFinanceMigrationRan] = useState(false);
     const [showReimbursementModal, setShowReimbursementModal] = useState(false);
     const [reimbursementInvoice, setReimbursementInvoice] = useState(null);
+    const [showRecreateRateModal, setShowRecreateRateModal] = useState(false);
+    const [recreateRateSourceInvoice, setRecreateRateSourceInvoice] = useState(null);
     const [previewInvoiceData, setPreviewInvoiceData] = useState(null);
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([]);
@@ -1673,6 +1675,148 @@ const BridgeInvoiceManagement = () => {
         }
     };
 
+    const handleCreateRecreateRate = async (invoice, newInvoiceDate, newExchangeRate, recreateNote) => {
+        if (!canEdit('bridge_invoices')) {
+            alert('Anda tidak memiliki hak akses untuk memanipulasi (Edit) invoice.');
+            return;
+        }
+
+        const rateParsed = Number(newExchangeRate);
+        if (!newInvoiceDate) {
+            alert('Tanggal invoice baru wajib diisi.');
+            return;
+        }
+        if (!Number.isFinite(rateParsed) || rateParsed <= 0) {
+            alert('Kurs baru wajib angka lebih besar dari 0.');
+            return;
+        }
+
+        try {
+            const timestamp = new Date().toISOString();
+            const sourceInvoiceNumber = String(invoice.invoice_number || '').trim();
+            const recreateBase = sourceInvoiceNumber.replace(/[-_]?FX\d+$/i, '');
+            const escapedBase = recreateBase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+            const { data: existingRows, error: recreateNumberErr } = await supabase
+                .from('bridge_invoices')
+                .select('invoice_number')
+                .like('invoice_number', `${recreateBase}-FX%`);
+            if (recreateNumberErr) throw recreateNumberErr;
+
+            let maxFxVersion = 0;
+            (existingRows || []).forEach(row => {
+                const invoiceNo = String(row.invoice_number || '');
+                const match = invoiceNo.match(new RegExp(`^${escapedBase}-FX(\\d+)$`, 'i'));
+                if (!match) return;
+                const parsed = parseInt(match[1], 10);
+                if (!Number.isNaN(parsed) && parsed > maxFxVersion) maxFxVersion = parsed;
+            });
+
+            const recreatedInvoiceNumber = `${recreateBase}-FX${maxFxVersion + 1}`;
+            const oldRate = Number(invoice.exchange_rate || 1);
+            const invoiceDateObj = new Date(newInvoiceDate);
+            const terms = String(invoice.payment_terms || 'NET 30');
+            const days = parseInt(terms.replace('NET ', ''), 10);
+            const dueDateObj = Number.isFinite(days)
+                ? new Date(invoiceDateObj.getTime() + (days * 24 * 60 * 60 * 1000))
+                : invoiceDateObj;
+            const newDueDate = dueDateObj.toISOString().split('T')[0];
+
+            const internalNote =
+                `[RECREATE KURS ${timestamp.slice(0, 10)}] Source: ${invoice.invoice_number}. ` +
+                `Kurs lama ${oldRate} -> kurs baru ${rateParsed}. New: ${recreatedInvoiceNumber}. ` +
+                `${recreateNote?.trim() || 'Penyesuaian kurs invoice.'}`;
+
+            const newInvoice = {
+                job_number: invoice.job_number || null,
+                quotation_id: invoice.quotation_id || null,
+                shipment_id: invoice.shipment_id || null,
+                so_number: invoice.so_number || null,
+                customer_id: invoice.customer_id || null,
+                customer_name: invoice.customer_name || null,
+                customer_company: invoice.customer_company || null,
+                customer_address: invoice.customer_address || null,
+                customer_email: invoice.customer_email || null,
+                customer_phone: invoice.customer_phone || null,
+                invoice_number: recreatedInvoiceNumber,
+                invoice_date: newInvoiceDate,
+                due_date: newDueDate,
+                payment_terms: invoice.payment_terms || 'NET 30',
+                currency: invoice.currency || 'IDR',
+                exchange_rate: rateParsed,
+                invoice_items: invoice.invoice_items || [],
+                cogs_items: invoice.cogs_items || [],
+                subtotal: Number(invoice.subtotal) || 0,
+                tax_amount: Number(invoice.tax_amount) || 0,
+                tax_rate: Number(invoice.tax_rate) || 0,
+                discount_amount: Number(invoice.discount_amount) || 0,
+                total_amount: Number(invoice.total_amount) || 0,
+                paid_amount: 0,
+                outstanding_amount: Number(invoice.total_amount) || 0,
+                status: 'draft',
+                payment_bank_id: invoice.payment_bank_id || null,
+                cogs_subtotal: Number(invoice.cogs_subtotal) || 0,
+                gross_profit: Number(invoice.gross_profit) || 0,
+                profit_margin: Number(invoice.profit_margin) || 0,
+                customer_notes: invoice.customer_notes || null,
+                notes: internalNote,
+                consignor: invoice.consignor || null,
+                consignee: invoice.consignee || null,
+                order_reference: invoice.order_reference || null,
+                goods_description: invoice.goods_description || null,
+                import_broker: invoice.import_broker || null,
+                chargeable_weight: invoice.chargeable_weight || null,
+                packages: invoice.packages || null,
+                vessel_name: invoice.vessel_name || null,
+                voyage_number: invoice.voyage_number || null,
+                ocean_bl: invoice.ocean_bl || null,
+                house_bl: invoice.house_bl || null,
+                etd: invoice.etd || null,
+                eta: invoice.eta || null,
+                containers: invoice.containers || null,
+                created_at: timestamp,
+                updated_at: timestamp,
+            };
+
+            const { data: insertedData, error: insertError } = await supabase
+                .from('bridge_invoices')
+                .insert([newInvoice])
+                .select();
+            if (insertError) throw insertError;
+
+            const sourceHistoryNote =
+                `[RECREATE KURS CREATED ${timestamp.slice(0, 10)}] Draft ${recreatedInvoiceNumber} dibuat dari ${invoice.invoice_number}. ` +
+                `Kurs: ${oldRate} -> ${rateParsed}.`;
+            const mergedSourceNotes = invoice.notes
+                ? `${invoice.notes}\n${sourceHistoryNote}`
+                : sourceHistoryNote;
+
+            await supabase
+                .from('bridge_invoices')
+                .update({ notes: mergedSourceNotes, updated_at: timestamp })
+                .eq('id', invoice.id);
+
+            await fetchInvoices();
+            setShowRecreateRateModal(false);
+            setRecreateRateSourceInvoice(null);
+            setShowViewModal(false);
+            setSelectedInvoice(null);
+
+            const created = insertedData?.[0];
+            alert(
+                `✅ Recreate kurs draft berhasil dibuat.\n\n` +
+                `Source Invoice: ${invoice.invoice_number}\n` +
+                `New Draft ID: ${created?.id || '-'}\n` +
+                `Invoice Number: ${created?.invoice_number || '-'}\n` +
+                `Kurs Baru: ${rateParsed}\n` +
+                `Invoice Date: ${newInvoiceDate}`
+            );
+        } catch (error) {
+            console.error('Error creating recreate-rate invoice:', error);
+            alert('Failed to recreate invoice with new exchange rate: ' + error.message);
+        }
+    };
+
 
 
     const filteredInvoices = invoices.filter(inv => {
@@ -2022,14 +2166,35 @@ const BridgeInvoiceManagement = () => {
                                             </span>
                                         </td>
                                         <td className="px-3 py-2 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                                            <button
-                                                onClick={() => handleOpenAdditionalInvoiceModal(invoice)}
-                                                className="px-2.5 py-1 bg-purple-600/30 hover:bg-purple-600/60 text-purple-300 border border-purple-500/50 rounded text-xs font-medium inline-flex items-center gap-1 smooth-transition"
-                                                title="Buat invoice tambahan (v1, v2, dsb) untuk pengajuan ini"
-                                            >
-                                                <Plus className="w-3 h-3" />
-                                                Invoice Tambahan
-                                            </button>
+                                            <div className="flex items-center justify-center gap-1.5">
+                                                <button
+                                                    onClick={() => {
+                                                        setRecreateRateSourceInvoice(invoice);
+                                                        setShowRecreateRateModal(true);
+                                                    }}
+                                                    disabled={invoice.status === 'cancelled'}
+                                                    className={`px-2.5 py-1 rounded text-xs font-medium inline-flex items-center gap-1 smooth-transition ${invoice.status === 'cancelled'
+                                                        ? 'bg-gray-600/20 text-gray-500 border border-gray-500/40 cursor-not-allowed'
+                                                        : 'bg-cyan-600/20 hover:bg-cyan-600/40 text-cyan-300 border border-cyan-500/50'
+                                                        }`}
+                                                    title={invoice.status === 'cancelled'
+                                                        ? 'Invoice cancelled tidak dapat di-recreate kurs'
+                                                        : 'Buat ulang invoice dengan kurs berbeda (pengajuan sama)'
+                                                    }
+                                                >
+                                                    <RefreshCw className="w-3 h-3" />
+                                                    Recreate Kurs
+                                                </button>
+
+                                                <button
+                                                    onClick={() => handleOpenAdditionalInvoiceModal(invoice)}
+                                                    className="px-2.5 py-1 bg-purple-600/30 hover:bg-purple-600/60 text-purple-300 border border-purple-500/50 rounded text-xs font-medium inline-flex items-center gap-1 smooth-transition"
+                                                    title="Buat invoice tambahan (v1, v2, dsb) untuk pengajuan ini"
+                                                >
+                                                    <Plus className="w-3 h-3" />
+                                                    Invoice Tambahan
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))
@@ -2102,6 +2267,10 @@ const BridgeInvoiceManagement = () => {
                             setReimbursementInvoice(selectedInvoice);
                             setShowReimbursementModal(true);
                         }}
+                        onRecreateRate={() => {
+                            setRecreateRateSourceInvoice(selectedInvoice);
+                            setShowRecreateRateModal(true);
+                        }}
                         statusConfig={statusConfig}
                         canEditInvoice={canEdit('bridge_invoices')}
                         canSubmitInvoice={canCreate('bridge_invoices') || canEdit('bridge_invoices')}
@@ -2157,6 +2326,19 @@ const BridgeInvoiceManagement = () => {
                             setReimbursementInvoice(null);
                         }}
                         onSave={handleCreateReimbursement}
+                    />
+                )
+            }
+
+            {
+                showRecreateRateModal && recreateRateSourceInvoice && (
+                    <RecreateRateModal
+                        invoice={recreateRateSourceInvoice}
+                        onClose={() => {
+                            setShowRecreateRateModal(false);
+                            setRecreateRateSourceInvoice(null);
+                        }}
+                        onSave={handleCreateRecreateRate}
                     />
                 )
             }
@@ -3015,7 +3197,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
 };
 
 // Invoice View Modal Component
-const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint, onPreview, onSubmit, onAddItem, statusConfig, canEditInvoice, canSubmitInvoice, bankAccounts, onInvoiceUpdate, onEdit }) => {
+const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint, onPreview, onSubmit, onAddItem, onRecreateRate, statusConfig, canEditInvoice, canSubmitInvoice, bankAccounts, onInvoiceUpdate, onEdit }) => {
     const [payments, setPayments] = useState([]);
     const [loadingPayments, setLoadingPayments] = useState(true);
     const [selectedBankId, setSelectedBankId] = useState(invoice.payment_bank_id || '');
@@ -3417,6 +3599,17 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                             >
                                 <Plus className="w-4 h-4" />
                                 Create Reimbursement
+                            </button>
+                        )}
+
+                        {onRecreateRate && canEditInvoice && invoice.status !== 'cancelled' && (
+                            <button
+                                onClick={onRecreateRate}
+                                className="flex items-center gap-2 px-4 py-2 border border-cyan-500 text-cyan-400 rounded-lg hover:bg-cyan-500/10 smooth-transition font-semibold"
+                                title="Create new draft invoice from this invoice with different exchange rate"
+                            >
+                                <RefreshCw className="w-4 h-4" />
+                                Recreate Kurs
                             </button>
                         )}
 
@@ -4538,6 +4731,94 @@ const ReimbursementModal = ({ invoice, formatCurrency, revenueAccounts, onClose,
                         ) : (
                             <><Plus className="w-4 h-4" /> Create Reimbursement Invoice</>
                         )}
+                    </button>
+                </div>
+            </div>
+        </Modal>
+    );
+};
+
+const RecreateRateModal = ({ invoice, onClose, onSave }) => {
+    const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
+    const [newRate, setNewRate] = useState(String(invoice?.exchange_rate || 1));
+    const [internalNote, setInternalNote] = useState('Penyesuaian kurs untuk invoice dengan pengajuan yang sama.');
+    const [saving, setSaving] = useState(false);
+
+    const handleSave = async () => {
+        setSaving(true);
+        await onSave(invoice, invoiceDate, newRate, internalNote);
+        setSaving(false);
+    };
+
+    return (
+        <Modal isOpen={true} onClose={onClose} maxWidth="max-w-2xl">
+            <div className="p-6">
+                <div className="mb-5">
+                    <h2 className="text-xl font-bold gradient-text">Recreate Invoice Dengan Kurs Baru</h2>
+                    <p className="text-silver-dark text-sm mt-1">
+                        Source: {invoice.invoice_number} - {invoice.customer_name}
+                    </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
+                    <div className="glass-card p-3 rounded-lg border border-dark-border">
+                        <p className="text-[10px] text-silver-dark uppercase tracking-wider">Source Rate</p>
+                        <p className="text-sm font-mono font-bold text-silver-light mt-1">{Number(invoice.exchange_rate || 1).toLocaleString('id-ID')}</p>
+                        <p className="text-[10px] text-silver-dark mt-1">Nomor baru otomatis suffix FX (FX1, FX2, dst).</p>
+                    </div>
+                    <div className="glass-card p-3 rounded-lg border border-dark-border">
+                        <p className="text-[10px] text-silver-dark uppercase tracking-wider">Currency</p>
+                        <p className="text-sm font-bold text-cyan-300 mt-1">{invoice.currency || 'IDR'}</p>
+                    </div>
+                </div>
+
+                <div className="mb-4">
+                    <label className="block text-sm text-silver-dark mb-1">Invoice Date (baru)</label>
+                    <input
+                        type="date"
+                        value={invoiceDate}
+                        onChange={(e) => setInvoiceDate(e.target.value)}
+                        className="w-full bg-dark-surface border border-dark-border rounded-lg px-3 py-2 text-silver-light"
+                    />
+                </div>
+
+                <div className="mb-4">
+                    <label className="block text-sm text-silver-dark mb-1">Kurs Baru</label>
+                    <input
+                        type="number"
+                        min="0.000001"
+                        step="any"
+                        value={newRate}
+                        onChange={(e) => setNewRate(e.target.value)}
+                        className="w-full bg-dark-surface border border-dark-border rounded-lg px-3 py-2 text-silver-light"
+                    />
+                </div>
+
+                <div className="mb-5">
+                    <label className="block text-sm text-silver-dark mb-1">Internal Note</label>
+                    <textarea
+                        rows={3}
+                        value={internalNote}
+                        onChange={(e) => setInternalNote(e.target.value)}
+                        className="w-full bg-dark-surface border border-dark-border rounded-lg px-3 py-2 text-silver-light"
+                        placeholder="Contoh: Kurs revisi sesuai tanggal invoice customer"
+                    />
+                </div>
+
+                <div className="flex justify-end gap-3 border-t border-dark-border pt-4">
+                    <button
+                        onClick={onClose}
+                        disabled={saving}
+                        className="px-5 py-2 border border-dark-border text-silver-light rounded-lg hover:bg-dark-surface smooth-transition"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="px-6 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg smooth-transition font-semibold disabled:opacity-50"
+                    >
+                        {saving ? 'Creating...' : 'Create Recreate Kurs Draft'}
                     </button>
                 </div>
             </div>

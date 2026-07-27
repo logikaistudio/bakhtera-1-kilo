@@ -291,10 +291,21 @@ export function buildJERow({
     isKBITransaction = false
 }) {
     const period = getPeriodFromDate(date);
+    const normalizedCurrency = String(currency || 'IDR').toUpperCase();
+    const normalizedRate = Number(exchangeRate) > 0 ? Number(exchangeRate) : 1;
+    const rawDebit = Number(debit) || 0;
+    const rawCredit = Number(credit) || 0;
+    const isForeign = normalizedCurrency !== 'IDR';
+
+    // Hardening: all ledger postings are persisted in IDR, while foreign
+    // transaction value/currency are retained for traceability.
+    const debitIDR = isForeign ? roundToTwo(rawDebit * normalizedRate) : roundToTwo(rawDebit);
+    const creditIDR = isForeign ? roundToTwo(rawCredit * normalizedRate) : roundToTwo(rawCredit);
+
     const computedForeignAmount = typeof foreignAmount === 'number'
-        ? foreignAmount
-        : currency && currency.toUpperCase() !== 'IDR'
-            ? roundToTwo(debit + credit)
+        ? roundToTwo(foreignAmount)
+        : isForeign
+            ? roundToTwo(rawDebit + rawCredit)
             : null;
     const resolvedJournalType = journalType || (source === 'manual' ? 'general' : 'auto');
 
@@ -307,12 +318,12 @@ export function buildJERow({
         reference_number: refNumber || null,
         account_code: coa?.code || accountCodeFallback,
         account_name: coa?.name || accountNameFallback,
-        debit,
-        credit,
-        currency,
-        exchange_rate: exchangeRate,
+        debit: debitIDR,
+        credit: creditIDR,
+        currency: 'IDR',
+        exchange_rate: 1,
         foreign_amount: computedForeignAmount,
-        foreign_currency: foreignCurrency || currency,
+        foreign_currency: isForeign ? normalizedCurrency : (foreignCurrency || 'IDR'),
         journal_type: resolvedJournalType,
         cash_direction: cashDirection,
         period_month: periodMonth ?? period.periodMonth,

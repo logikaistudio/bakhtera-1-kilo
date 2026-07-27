@@ -5,7 +5,7 @@ import Button from '../../../components/Common/Button';
 import Modal from '../../../components/Common/Modal';
 import {
     FileText, Plus, Send, CheckCircle, XCircle, DollarSign,
-    AlertCircle, Clock, Search, Trash, Edit, Eye, X, Package, Download
+    AlertCircle, Clock, Search, Trash, Edit, Eye, X, Package, Download, RefreshCw
 } from 'lucide-react';
 
 const fmtIDR = (v) => v != null ? 'Rp ' + Number(v).toLocaleString('id-ID') : '-';
@@ -24,6 +24,80 @@ const STATUS_CONFIG = {
 const EMPTY_ITEM = { description: '', qty: 1, unit: 'Job', unit_price: 0, amount: 0, tax_rate: 0, tax_amount: 0, coa_id: null };
 
 const PAYMENT_TERMS = ['NET 7', 'NET 14', 'NET 30', 'NET 45', 'NET 60', 'COD'];
+
+const RecreateRateModal = ({ invoice, onClose, onSave }) => {
+    const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
+    const [newRate, setNewRate] = useState('1');
+    const [internalNote, setInternalNote] = useState('Penyesuaian kurs untuk invoice dengan pengajuan yang sama.');
+    const [saving, setSaving] = useState(false);
+
+    const handleSave = async () => {
+        setSaving(true);
+        await onSave(invoice, invoiceDate, newRate, internalNote);
+        setSaving(false);
+    };
+
+    return (
+        <Modal isOpen onClose={onClose} maxWidth="max-w-2xl">
+            <div className="p-6">
+                <div className="mb-5">
+                    <h2 className="text-xl font-bold gradient-text">Recreate Invoice Dengan Kurs Baru</h2>
+                    <p className="text-silver-dark text-sm mt-1">Source: {invoice.invoice_number} - {invoice.customer_name}</p>
+                </div>
+
+                <div className="mb-4">
+                    <label className="block text-sm text-silver-dark mb-1">Invoice Date (baru)</label>
+                    <input
+                        type="date"
+                        value={invoiceDate}
+                        onChange={(e) => setInvoiceDate(e.target.value)}
+                        className="w-full bg-dark-surface border border-dark-border rounded-lg px-3 py-2 text-silver-light"
+                    />
+                </div>
+
+                <div className="mb-4">
+                    <label className="block text-sm text-silver-dark mb-1">Kurs Baru</label>
+                    <input
+                        type="number"
+                        min="0.000001"
+                        step="any"
+                        value={newRate}
+                        onChange={(e) => setNewRate(e.target.value)}
+                        className="w-full bg-dark-surface border border-dark-border rounded-lg px-3 py-2 text-silver-light"
+                    />
+                </div>
+
+                <div className="mb-5">
+                    <label className="block text-sm text-silver-dark mb-1">Internal Note</label>
+                    <textarea
+                        rows={3}
+                        value={internalNote}
+                        onChange={(e) => setInternalNote(e.target.value)}
+                        className="w-full bg-dark-surface border border-dark-border rounded-lg px-3 py-2 text-silver-light"
+                        placeholder="Contoh: Kurs revisi sesuai tanggal invoice customer"
+                    />
+                </div>
+
+                <div className="flex justify-end gap-3 border-t border-dark-border pt-4">
+                    <button
+                        onClick={onClose}
+                        disabled={saving}
+                        className="px-5 py-2 border border-dark-border text-silver-light rounded-lg hover:bg-dark-surface smooth-transition"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="px-6 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg smooth-transition font-semibold disabled:opacity-50"
+                    >
+                        {saving ? 'Creating...' : 'Create Recreate Kurs Draft'}
+                    </button>
+                </div>
+            </div>
+        </Modal>
+    );
+};
 
 // ─── Item Row ────────────────────────────────────────────────────────────────
 const ItemRow = ({ item, idx, coaList, canEdit, onChange, onRemove }) => {
@@ -297,6 +371,8 @@ const BigInvoiceManagement = () => {
     const [filterStatus, setFilterStatus] = useState('all');
     const [showForm, setShowForm] = useState(false);
     const [editInvoice, setEditInvoice] = useState(null);
+    const [showRecreateRateModal, setShowRecreateRateModal] = useState(false);
+    const [recreateRateSourceInvoice, setRecreateRateSourceInvoice] = useState(null);
 
     useEffect(() => { fetchAll(); }, []);
 
@@ -324,6 +400,91 @@ const BigInvoiceManagement = () => {
         if (!canEdit('big_finance')) return alert('Tidak ada akses.');
         await supabase.from('big_invoices').update({ status: 'cancelled' }).eq('id', id);
         fetchAll();
+    };
+
+    const handleCreateRecreateRate = async (invoice, newInvoiceDate, newExchangeRate, recreateNote) => {
+        if (!canEdit('big_finance')) return alert('Tidak ada akses.');
+        const rateParsed = Number(newExchangeRate);
+        if (!newInvoiceDate) return alert('Tanggal invoice baru wajib diisi.');
+        if (!Number.isFinite(rateParsed) || rateParsed <= 0) return alert('Kurs baru wajib angka lebih besar dari 0.');
+
+        try {
+            const timestamp = new Date().toISOString();
+            const sourceInvoiceNumber = String(invoice.invoice_number || '').trim();
+            const recreateBase = sourceInvoiceNumber.replace(/[-_]?FX\d+$/i, '');
+            const escapedBase = recreateBase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+            const { data: existingRows, error: existingErr } = await supabase
+                .from('big_invoices')
+                .select('invoice_number')
+                .like('invoice_number', `${recreateBase}-FX%`);
+            if (existingErr) throw existingErr;
+
+            let maxFxVersion = 0;
+            (existingRows || []).forEach(row => {
+                const invoiceNo = String(row.invoice_number || '');
+                const match = invoiceNo.match(new RegExp(`^${escapedBase}-FX(\\d+)$`, 'i'));
+                if (!match) return;
+                const parsed = parseInt(match[1], 10);
+                if (!Number.isNaN(parsed) && parsed > maxFxVersion) maxFxVersion = parsed;
+            });
+
+            const recreatedInvoiceNumber = `${recreateBase}-FX${maxFxVersion + 1}`;
+
+            const payload = {
+                invoice_number: recreatedInvoiceNumber,
+                invoice_date: newInvoiceDate,
+                due_date: invoice.due_date || null,
+                payment_terms: invoice.payment_terms || 'NET 30',
+                customer_name: invoice.customer_name || null,
+                customer_address: invoice.customer_address || null,
+                customer_id: invoice.customer_id || null,
+                currency: invoice.currency || 'IDR',
+                invoice_items: invoice.invoice_items || [],
+                subtotal: Number(invoice.subtotal) || 0,
+                tax_amount: Number(invoice.tax_amount) || 0,
+                discount_amount: Number(invoice.discount_amount) || 0,
+                grand_total: Number(invoice.grand_total ?? invoice.total_amount) || 0,
+                total_amount: Number(invoice.total_amount ?? invoice.grand_total) || 0,
+                paid_amount: 0,
+                outstanding_amount: Number(invoice.total_amount ?? invoice.grand_total) || 0,
+                status: 'draft',
+                notes: `[RECREATE KURS ${timestamp.slice(0, 10)}] Source: ${invoice.invoice_number}. Kurs baru: ${rateParsed}. ${recreateNote || ''}`,
+                created_at: timestamp,
+                updated_at: timestamp,
+            };
+
+            const { data: insertedData, error: insertError } = await supabase
+                .from('big_invoices')
+                .insert([payload])
+                .select();
+            if (insertError) throw insertError;
+
+            await supabase
+                .from('big_invoices')
+                .update({
+                    notes: `${invoice.notes || ''}\n[RECREATE KURS CREATED ${timestamp.slice(0, 10)}] Draft ${recreatedInvoiceNumber} dibuat dari ${invoice.invoice_number}. Kurs baru: ${rateParsed}.`.trim(),
+                    updated_at: timestamp,
+                })
+                .eq('id', invoice.id);
+
+            setShowRecreateRateModal(false);
+            setRecreateRateSourceInvoice(null);
+            await fetchAll();
+
+            const created = insertedData?.[0];
+            alert(
+                `✅ Recreate kurs draft berhasil dibuat.\n\n` +
+                `Source Invoice: ${invoice.invoice_number}\n` +
+                `New Draft ID: ${created?.id || '-'}\n` +
+                `Invoice Number: ${created?.invoice_number || '-'}\n` +
+                `Kurs Baru: ${rateParsed}\n` +
+                `Invoice Date: ${newInvoiceDate}`
+            );
+        } catch (error) {
+            console.error('Error creating recreate-rate invoice (Big):', error);
+            alert('Failed to recreate invoice with new exchange rate: ' + error.message);
+        }
     };
 
     const filtered = invoices.filter(inv => {
@@ -435,6 +596,12 @@ const BigInvoiceManagement = () => {
                                                             <Edit className="w-4 h-4" />
                                                         </button>
                                                     )}
+                                                    {canEdit('big_finance') && inv.status !== 'cancelled' && (
+                                                        <button onClick={() => { setRecreateRateSourceInvoice(inv); setShowRecreateRateModal(true); }}
+                                                            className="text-cyan-400 hover:text-cyan-300 p-1" title="Recreate Kurs">
+                                                            <RefreshCw className="w-4 h-4" />
+                                                        </button>
+                                                    )}
                                                     {canDelete('big_finance') && inv.status === 'draft' && (
                                                         <button onClick={() => handleDelete(inv.id)}
                                                             className="text-red-400 hover:text-red-300 p-1" title="Hapus">
@@ -465,6 +632,17 @@ const BigInvoiceManagement = () => {
                     coaList={coaList}
                     onClose={() => { setShowForm(false); setEditInvoice(null); }}
                     onSave={() => { setShowForm(false); setEditInvoice(null); fetchAll(); }}
+                />
+            )}
+
+            {showRecreateRateModal && recreateRateSourceInvoice && (
+                <RecreateRateModal
+                    invoice={recreateRateSourceInvoice}
+                    onClose={() => {
+                        setShowRecreateRateModal(false);
+                        setRecreateRateSourceInvoice(null);
+                    }}
+                    onSave={handleCreateRecreateRate}
                 />
             )}
         </div>
