@@ -99,6 +99,67 @@ const RecreateRateModal = ({ invoice, onClose, onSave }) => {
     );
 };
 
+const ReinvoiceModal = ({ invoice, onClose, onSave }) => {
+    const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
+    const [internalNote, setInternalNote] = useState('Perubahan terhadap invoice lama.');
+    const [saving, setSaving] = useState(false);
+
+    const handleSave = async () => {
+        setSaving(true);
+        await onSave(invoice, invoiceDate, internalNote);
+        setSaving(false);
+    };
+
+    return (
+        <Modal isOpen onClose={onClose} maxWidth="max-w-2xl">
+            <div className="p-6">
+                <div className="mb-5">
+                    <h2 className="text-xl font-bold gradient-text">Create Reinvoice Draft</h2>
+                    <p className="text-silver-dark text-sm mt-1">Source: {invoice.invoice_number} - {invoice.customer_name}</p>
+                </div>
+
+                <div className="mb-4">
+                    <label className="block text-sm text-silver-dark mb-1">Invoice Date (baru)</label>
+                    <input
+                        type="date"
+                        value={invoiceDate}
+                        onChange={(e) => setInvoiceDate(e.target.value)}
+                        className="w-full bg-dark-surface border border-dark-border rounded-lg px-3 py-2 text-silver-light"
+                    />
+                </div>
+
+                <div className="mb-5">
+                    <label className="block text-sm text-silver-dark mb-1">Internal Note</label>
+                    <textarea
+                        rows={3}
+                        value={internalNote}
+                        onChange={(e) => setInternalNote(e.target.value)}
+                        className="w-full bg-dark-surface border border-dark-border rounded-lg px-3 py-2 text-silver-light"
+                        placeholder="Contoh: Revisi nominal karena koreksi item handling"
+                    />
+                </div>
+
+                <div className="flex justify-end gap-3 border-t border-dark-border pt-4">
+                    <button
+                        onClick={onClose}
+                        disabled={saving}
+                        className="px-5 py-2 border border-dark-border text-silver-light rounded-lg hover:bg-dark-surface smooth-transition"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg smooth-transition font-semibold disabled:opacity-50"
+                    >
+                        {saving ? 'Creating...' : 'Create Reinvoice Draft'}
+                    </button>
+                </div>
+            </div>
+        </Modal>
+    );
+};
+
 // ─── Item Row ────────────────────────────────────────────────────────────────
 const ItemRow = ({ item, idx, coaList, canEdit, onChange, onRemove }) => {
     const handleChange = (field, val) => {
@@ -371,6 +432,8 @@ const BigInvoiceManagement = () => {
     const [filterStatus, setFilterStatus] = useState('all');
     const [showForm, setShowForm] = useState(false);
     const [editInvoice, setEditInvoice] = useState(null);
+    const [showReinvoiceModal, setShowReinvoiceModal] = useState(false);
+    const [reinvoiceSourceInvoice, setReinvoiceSourceInvoice] = useState(null);
     const [showRecreateRateModal, setShowRecreateRateModal] = useState(false);
     const [recreateRateSourceInvoice, setRecreateRateSourceInvoice] = useState(null);
 
@@ -487,6 +550,88 @@ const BigInvoiceManagement = () => {
         }
     };
 
+    const handleCreateReinvoice = async (invoice, newInvoiceDate, reinvoiceNote) => {
+        if (!canEdit('big_finance')) return alert('Tidak ada akses.');
+        if (!newInvoiceDate) return alert('Tanggal invoice baru wajib diisi.');
+
+        try {
+            const timestamp = new Date().toISOString();
+            const sourceInvoiceNumber = String(invoice.invoice_number || '').trim();
+            const reinvoiceBase = sourceInvoiceNumber.replace(/[-_]?R\d+$/i, '');
+            const escapedBase = reinvoiceBase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+            const { data: existingRows, error: existingErr } = await supabase
+                .from('big_invoices')
+                .select('invoice_number')
+                .like('invoice_number', `${reinvoiceBase}-R%`);
+            if (existingErr) throw existingErr;
+
+            let maxVersion = 0;
+            (existingRows || []).forEach(row => {
+                const invoiceNo = String(row.invoice_number || '');
+                const match = invoiceNo.match(new RegExp(`^${escapedBase}-R(\\d+)$`, 'i'));
+                if (!match) return;
+                const parsed = parseInt(match[1], 10);
+                if (!Number.isNaN(parsed) && parsed > maxVersion) maxVersion = parsed;
+            });
+
+            const reinvoiceNumber = `${reinvoiceBase}-R${maxVersion + 1}`;
+
+            const payload = {
+                invoice_number: reinvoiceNumber,
+                invoice_date: newInvoiceDate,
+                due_date: invoice.due_date || null,
+                payment_terms: invoice.payment_terms || 'NET 30',
+                customer_name: invoice.customer_name || null,
+                customer_address: invoice.customer_address || null,
+                customer_id: invoice.customer_id || null,
+                currency: invoice.currency || 'IDR',
+                invoice_items: invoice.invoice_items || [],
+                subtotal: Number(invoice.subtotal) || 0,
+                tax_amount: Number(invoice.tax_amount) || 0,
+                discount_amount: Number(invoice.discount_amount) || 0,
+                grand_total: Number(invoice.grand_total ?? invoice.total_amount) || 0,
+                total_amount: Number(invoice.total_amount ?? invoice.grand_total) || 0,
+                paid_amount: 0,
+                outstanding_amount: Number(invoice.total_amount ?? invoice.grand_total) || 0,
+                status: 'draft',
+                notes: `[REINVOICE ${timestamp.slice(0, 10)}] Source: ${invoice.invoice_number}. New: ${reinvoiceNumber}. ${reinvoiceNote || ''}`,
+                created_at: timestamp,
+                updated_at: timestamp,
+            };
+
+            const { data: insertedData, error: insertError } = await supabase
+                .from('big_invoices')
+                .insert([payload])
+                .select();
+            if (insertError) throw insertError;
+
+            await supabase
+                .from('big_invoices')
+                .update({
+                    notes: `${invoice.notes || ''}\n[REINVOICE CREATED ${timestamp.slice(0, 10)}] Draft ${reinvoiceNumber} dibuat dari ${invoice.invoice_number}.`.trim(),
+                    updated_at: timestamp,
+                })
+                .eq('id', invoice.id);
+
+            setShowReinvoiceModal(false);
+            setReinvoiceSourceInvoice(null);
+            await fetchAll();
+
+            const created = insertedData?.[0];
+            alert(
+                `✅ Reinvoicing draft berhasil dibuat.\n\n` +
+                `Source Invoice: ${invoice.invoice_number}\n` +
+                `New Draft ID: ${created?.id || '-'}\n` +
+                `Invoice Number: ${created?.invoice_number || '-'}\n` +
+                `Invoice Date: ${newInvoiceDate}`
+            );
+        } catch (error) {
+            console.error('Error creating reinvoice (Big):', error);
+            alert('Failed to create reinvoice: ' + error.message);
+        }
+    };
+
     const filtered = invoices.filter(inv => {
         const matchSearch = !searchTerm ||
             inv.invoice_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -578,7 +723,21 @@ const BigInvoiceManagement = () => {
                                     const isOverdue = inv.due_date && new Date(inv.due_date) < new Date() && inv.status === 'sent';
                                     return (
                                         <tr key={inv.id} className="hover:bg-white/5 smooth-transition">
-                                            <td className="px-4 py-3 font-mono text-accent-orange text-xs">{inv.invoice_number}</td>
+                                            <td className="px-4 py-3 text-xs">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="font-mono text-accent-orange">{inv.invoice_number}</span>
+                                                    {/-R\d+$/i.test(inv.invoice_number || '') && (
+                                                        <span className="bg-orange-500/20 text-orange-300 text-[9px] px-1 py-0.2 rounded border border-orange-500/30">
+                                                            Reinvoice
+                                                        </span>
+                                                    )}
+                                                    {/-FX\d+$/i.test(inv.invoice_number || '') && (
+                                                        <span className="bg-cyan-500/20 text-cyan-300 text-[9px] px-1 py-0.2 rounded border border-cyan-500/30">
+                                                            Recreate Kurs
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
                                             <td className="px-4 py-3 text-silver-light font-medium">{inv.customer_name}</td>
                                             <td className="px-4 py-3 text-silver-dark">{inv.invoice_date}</td>
                                             <td className={`px-4 py-3 ${isOverdue ? 'text-red-400 font-semibold' : 'text-silver-dark'}`}>{inv.due_date || '-'}</td>
@@ -594,6 +753,12 @@ const BigInvoiceManagement = () => {
                                                         <button onClick={() => { setEditInvoice(inv); setShowForm(true); }}
                                                             className="text-blue-400 hover:text-blue-300 p-1" title="Edit">
                                                             <Edit className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                    {canEdit('big_finance') && inv.status !== 'cancelled' && (
+                                                        <button onClick={() => { setReinvoiceSourceInvoice(inv); setShowReinvoiceModal(true); }}
+                                                            className="text-orange-400 hover:text-orange-300 p-1" title="Reinvoice">
+                                                            <FileText className="w-4 h-4" />
                                                         </button>
                                                     )}
                                                     {canEdit('big_finance') && inv.status !== 'cancelled' && (
@@ -632,6 +797,17 @@ const BigInvoiceManagement = () => {
                     coaList={coaList}
                     onClose={() => { setShowForm(false); setEditInvoice(null); }}
                     onSave={() => { setShowForm(false); setEditInvoice(null); fetchAll(); }}
+                />
+            )}
+
+            {showReinvoiceModal && reinvoiceSourceInvoice && (
+                <ReinvoiceModal
+                    invoice={reinvoiceSourceInvoice}
+                    onClose={() => {
+                        setShowReinvoiceModal(false);
+                        setReinvoiceSourceInvoice(null);
+                    }}
+                    onSave={handleCreateReinvoice}
                 />
             )}
 

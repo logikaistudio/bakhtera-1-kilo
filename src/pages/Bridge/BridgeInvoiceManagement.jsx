@@ -37,6 +37,8 @@ const BridgeInvoiceManagement = () => {
     const [financeMigrationRan, setFinanceMigrationRan] = useState(false);
     const [showReimbursementModal, setShowReimbursementModal] = useState(false);
     const [reimbursementInvoice, setReimbursementInvoice] = useState(null);
+    const [showReinvoiceModal, setShowReinvoiceModal] = useState(false);
+    const [reinvoiceSourceInvoice, setReinvoiceSourceInvoice] = useState(null);
     const [showRecreateRateModal, setShowRecreateRateModal] = useState(false);
     const [recreateRateSourceInvoice, setRecreateRateSourceInvoice] = useState(null);
     const [previewInvoiceData, setPreviewInvoiceData] = useState(null);
@@ -1817,6 +1819,142 @@ const BridgeInvoiceManagement = () => {
         }
     };
 
+    const handleCreateReinvoice = async (invoice, newInvoiceDate, reinvoiceNote) => {
+        if (!canEdit('bridge_invoices')) {
+            alert('Anda tidak memiliki hak akses untuk memanipulasi (Edit) invoice.');
+            return;
+        }
+
+        if (!newInvoiceDate) {
+            alert('Tanggal invoice baru wajib diisi.');
+            return;
+        }
+
+        try {
+            const timestamp = new Date().toISOString();
+            const sourceInvoiceNumber = String(invoice.invoice_number || '').trim();
+            const reinvoiceBase = sourceInvoiceNumber.replace(/[-_]?R\d+$/i, '');
+            const escapedBase = reinvoiceBase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+            const { data: existingReinvoiceRows, error: reinvoiceNumberErr } = await supabase
+                .from('bridge_invoices')
+                .select('invoice_number')
+                .like('invoice_number', `${reinvoiceBase}-R%`);
+
+            if (reinvoiceNumberErr) throw reinvoiceNumberErr;
+
+            let maxReinvoiceVersion = 0;
+            (existingReinvoiceRows || []).forEach(row => {
+                const invoiceNo = String(row.invoice_number || '');
+                const match = invoiceNo.match(new RegExp(`^${escapedBase}-R(\\d+)$`, 'i'));
+                if (!match) return;
+                const parsed = parseInt(match[1], 10);
+                if (!Number.isNaN(parsed) && parsed > maxReinvoiceVersion) {
+                    maxReinvoiceVersion = parsed;
+                }
+            });
+
+            const reinvoiceNumber = `${reinvoiceBase}-R${maxReinvoiceVersion + 1}`;
+            const invoiceDateObj = new Date(newInvoiceDate);
+            const terms = String(invoice.payment_terms || 'NET 30');
+            const days = parseInt(terms.replace('NET ', ''), 10);
+            const dueDateObj = Number.isFinite(days)
+                ? new Date(invoiceDateObj.getTime() + (days * 24 * 60 * 60 * 1000))
+                : invoiceDateObj;
+            const newDueDate = dueDateObj.toISOString().split('T')[0];
+
+            const internalReinvoiceNote =
+                `[REINVOICE ${timestamp.slice(0, 10)}] Source: ${invoice.invoice_number}. New: ${reinvoiceNumber}. ` +
+                `${reinvoiceNote?.trim() || 'Perubahan terhadap invoice lama.'}`;
+
+            const newInvoice = {
+                job_number: invoice.job_number || null,
+                quotation_id: invoice.quotation_id || null,
+                shipment_id: invoice.shipment_id || null,
+                so_number: invoice.so_number || null,
+                customer_id: invoice.customer_id || null,
+                customer_name: invoice.customer_name || null,
+                customer_company: invoice.customer_company || null,
+                customer_address: invoice.customer_address || null,
+                customer_email: invoice.customer_email || null,
+                customer_phone: invoice.customer_phone || null,
+                invoice_number: reinvoiceNumber,
+                invoice_date: newInvoiceDate,
+                due_date: newDueDate,
+                payment_terms: invoice.payment_terms || 'NET 30',
+                currency: invoice.currency || 'IDR',
+                exchange_rate: invoice.exchange_rate || 1,
+                invoice_items: invoice.invoice_items || [],
+                cogs_items: invoice.cogs_items || [],
+                subtotal: Number(invoice.subtotal) || 0,
+                tax_amount: Number(invoice.tax_amount) || 0,
+                tax_rate: Number(invoice.tax_rate) || 0,
+                discount_amount: Number(invoice.discount_amount) || 0,
+                total_amount: Number(invoice.total_amount) || 0,
+                paid_amount: 0,
+                outstanding_amount: Number(invoice.total_amount) || 0,
+                status: 'draft',
+                payment_bank_id: invoice.payment_bank_id || null,
+                cogs_subtotal: Number(invoice.cogs_subtotal) || 0,
+                gross_profit: Number(invoice.gross_profit) || 0,
+                profit_margin: Number(invoice.profit_margin) || 0,
+                customer_notes: invoice.customer_notes || null,
+                notes: internalReinvoiceNote,
+                consignor: invoice.consignor || null,
+                consignee: invoice.consignee || null,
+                order_reference: invoice.order_reference || null,
+                goods_description: invoice.goods_description || null,
+                import_broker: invoice.import_broker || null,
+                chargeable_weight: invoice.chargeable_weight || null,
+                packages: invoice.packages || null,
+                vessel_name: invoice.vessel_name || null,
+                voyage_number: invoice.voyage_number || null,
+                ocean_bl: invoice.ocean_bl || null,
+                house_bl: invoice.house_bl || null,
+                etd: invoice.etd || null,
+                eta: invoice.eta || null,
+                containers: invoice.containers || null,
+                created_at: timestamp,
+                updated_at: timestamp,
+            };
+
+            const { data: insertedData, error: insertError } = await supabase
+                .from('bridge_invoices')
+                .insert([newInvoice])
+                .select();
+            if (insertError) throw insertError;
+
+            const sourceHistoryNote =
+                `[REINVOICE CREATED ${timestamp.slice(0, 10)}] Draft reinvoice ${reinvoiceNumber} dibuat dari invoice ${invoice.invoice_number} dengan tanggal baru ${newInvoiceDate}.`;
+            const mergedSourceNotes = invoice.notes
+                ? `${invoice.notes}\n${sourceHistoryNote}`
+                : sourceHistoryNote;
+
+            await supabase
+                .from('bridge_invoices')
+                .update({ notes: mergedSourceNotes, updated_at: timestamp })
+                .eq('id', invoice.id);
+
+            await fetchInvoices();
+            setShowReinvoiceModal(false);
+            setReinvoiceSourceInvoice(null);
+            setShowViewModal(false);
+            setSelectedInvoice(null);
+
+            const created = insertedData?.[0];
+            alert(
+                `✅ Reinvoicing draft berhasil dibuat.\n\n` +
+                `Source Invoice: ${invoice.invoice_number}\n` +
+                `New Draft ID: ${created?.id || '-'}\n` +
+                `Invoice Number: ${created?.invoice_number || '-'}\n` +
+                `Invoice Date: ${newInvoiceDate}`
+            );
+        } catch (error) {
+            console.error('Error creating reinvoice:', error);
+            alert('Failed to create reinvoice: ' + error.message);
+        }
+    };
+
 
 
     const filteredInvoices = invoices.filter(inv => {
@@ -2127,6 +2265,16 @@ const BridgeInvoiceManagement = () => {
                                             <div className="flex flex-col">
                                                 <span className="font-medium text-accent-orange flex items-center gap-1">
                                                     {invoice.invoice_number}
+                                                    {/-R\d+$/i.test(invoice.invoice_number || '') && (
+                                                        <span className="bg-orange-500/20 text-orange-300 text-[9px] px-1 py-0.2 rounded border border-orange-500/30">
+                                                            Reinvoice
+                                                        </span>
+                                                    )}
+                                                    {/-FX\d+$/i.test(invoice.invoice_number || '') && (
+                                                        <span className="bg-cyan-500/20 text-cyan-300 text-[9px] px-1 py-0.2 rounded border border-cyan-500/30">
+                                                            Recreate Kurs
+                                                        </span>
+                                                    )}
                                                     {invoice.is_additional && (
                                                         <span className="bg-purple-500/20 text-purple-300 text-[9px] px-1 py-0.2 rounded border border-purple-500/30">
                                                             Versi
@@ -2167,6 +2315,25 @@ const BridgeInvoiceManagement = () => {
                                         </td>
                                         <td className="px-3 py-2 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                                             <div className="flex items-center justify-center gap-1.5">
+                                                <button
+                                                    onClick={() => {
+                                                        setReinvoiceSourceInvoice(invoice);
+                                                        setShowReinvoiceModal(true);
+                                                    }}
+                                                    disabled={invoice.status === 'cancelled'}
+                                                    className={`px-2.5 py-1 rounded text-xs font-medium inline-flex items-center gap-1 smooth-transition ${invoice.status === 'cancelled'
+                                                        ? 'bg-gray-600/20 text-gray-500 border border-gray-500/40 cursor-not-allowed'
+                                                        : 'bg-orange-600/20 hover:bg-orange-600/40 text-orange-300 border border-orange-500/50'
+                                                        }`}
+                                                    title={invoice.status === 'cancelled'
+                                                        ? 'Invoice cancelled tidak dapat direinvoice'
+                                                        : 'Buat draft reinvoice dari invoice ini'
+                                                    }
+                                                >
+                                                    <FileText className="w-3 h-3" />
+                                                    Reinvoice
+                                                </button>
+
                                                 <button
                                                     onClick={() => {
                                                         setRecreateRateSourceInvoice(invoice);
@@ -2267,6 +2434,10 @@ const BridgeInvoiceManagement = () => {
                             setReimbursementInvoice(selectedInvoice);
                             setShowReimbursementModal(true);
                         }}
+                        onReinvoice={() => {
+                            setReinvoiceSourceInvoice(selectedInvoice);
+                            setShowReinvoiceModal(true);
+                        }}
                         onRecreateRate={() => {
                             setRecreateRateSourceInvoice(selectedInvoice);
                             setShowRecreateRateModal(true);
@@ -2326,6 +2497,19 @@ const BridgeInvoiceManagement = () => {
                             setReimbursementInvoice(null);
                         }}
                         onSave={handleCreateReimbursement}
+                    />
+                )
+            }
+
+            {
+                showReinvoiceModal && reinvoiceSourceInvoice && (
+                    <ReinvoiceModal
+                        invoice={reinvoiceSourceInvoice}
+                        onClose={() => {
+                            setShowReinvoiceModal(false);
+                            setReinvoiceSourceInvoice(null);
+                        }}
+                        onSave={handleCreateReinvoice}
                     />
                 )
             }
@@ -3197,7 +3381,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
 };
 
 // Invoice View Modal Component
-const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint, onPreview, onSubmit, onAddItem, onRecreateRate, statusConfig, canEditInvoice, canSubmitInvoice, bankAccounts, onInvoiceUpdate, onEdit }) => {
+const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint, onPreview, onSubmit, onAddItem, onReinvoice, onRecreateRate, statusConfig, canEditInvoice, canSubmitInvoice, bankAccounts, onInvoiceUpdate, onEdit }) => {
     const [payments, setPayments] = useState([]);
     const [loadingPayments, setLoadingPayments] = useState(true);
     const [selectedBankId, setSelectedBankId] = useState(invoice.payment_bank_id || '');
@@ -3610,6 +3794,17 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                             >
                                 <RefreshCw className="w-4 h-4" />
                                 Recreate Kurs
+                            </button>
+                        )}
+
+                        {onReinvoice && canEditInvoice && invoice.status !== 'cancelled' && (
+                            <button
+                                onClick={onReinvoice}
+                                className="flex items-center gap-2 px-4 py-2 border border-orange-500 text-orange-400 rounded-lg hover:bg-orange-500/10 smooth-transition font-semibold"
+                                title="Create new draft reinvoice from this invoice"
+                            >
+                                <FileText className="w-4 h-4" />
+                                Create Reinvoice
                             </button>
                         )}
 
@@ -4731,6 +4926,81 @@ const ReimbursementModal = ({ invoice, formatCurrency, revenueAccounts, onClose,
                         ) : (
                             <><Plus className="w-4 h-4" /> Create Reimbursement Invoice</>
                         )}
+                    </button>
+                </div>
+            </div>
+        </Modal>
+    );
+};
+
+const ReinvoiceModal = ({ invoice, onClose, onSave }) => {
+    const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
+    const [internalNote, setInternalNote] = useState('Perubahan terhadap invoice lama.');
+    const [saving, setSaving] = useState(false);
+
+    const handleSave = async () => {
+        setSaving(true);
+        await onSave(invoice, invoiceDate, internalNote);
+        setSaving(false);
+    };
+
+    return (
+        <Modal isOpen={true} onClose={onClose} maxWidth="max-w-2xl">
+            <div className="p-6">
+                <div className="mb-5">
+                    <h2 className="text-xl font-bold gradient-text">Create Reinvoice Draft</h2>
+                    <p className="text-silver-dark text-sm mt-1">
+                        Source: {invoice.invoice_number} - {invoice.customer_name}
+                    </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
+                    <div className="glass-card p-3 rounded-lg border border-dark-border">
+                        <p className="text-[10px] text-silver-dark uppercase tracking-wider">Invoice Number</p>
+                        <p className="text-sm font-mono font-bold text-silver-light mt-1">{invoice.invoice_number}-R*</p>
+                        <p className="text-[10px] text-silver-dark mt-1">Nomor reinvoice akan dibuat otomatis (R1, R2, dst) untuk menghindari duplikasi nomor invoice.</p>
+                    </div>
+                    <div className="glass-card p-3 rounded-lg border border-dark-border">
+                        <p className="text-[10px] text-silver-dark uppercase tracking-wider">Source Status</p>
+                        <p className="text-sm font-bold text-green-400 mt-1">{invoice.status || 'paid'}</p>
+                    </div>
+                </div>
+
+                <div className="mb-4">
+                    <label className="block text-sm text-silver-dark mb-1">Invoice Date (baru)</label>
+                    <input
+                        type="date"
+                        value={invoiceDate}
+                        onChange={(e) => setInvoiceDate(e.target.value)}
+                        className="w-full bg-dark-surface border border-dark-border rounded-lg px-3 py-2 text-silver-light"
+                    />
+                </div>
+
+                <div className="mb-5">
+                    <label className="block text-sm text-silver-dark mb-1">Internal Note</label>
+                    <textarea
+                        rows={3}
+                        value={internalNote}
+                        onChange={(e) => setInternalNote(e.target.value)}
+                        className="w-full bg-dark-surface border border-dark-border rounded-lg px-3 py-2 text-silver-light"
+                        placeholder="Contoh: Revisi nominal karena koreksi item handling"
+                    />
+                </div>
+
+                <div className="flex justify-end gap-3 border-t border-dark-border pt-4">
+                    <button
+                        onClick={onClose}
+                        disabled={saving}
+                        className="px-5 py-2 border border-dark-border text-silver-light rounded-lg hover:bg-dark-surface smooth-transition"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg smooth-transition font-semibold disabled:opacity-50"
+                    >
+                        {saving ? 'Creating...' : 'Create Reinvoice Draft'}
                     </button>
                 </div>
             </div>

@@ -2479,6 +2479,16 @@ const InvoiceManagement = () => {
                                             <div className="flex flex-col">
                                                 <span className="font-medium text-accent-orange flex items-center gap-1">
                                                     {invoice.invoice_number}
+                                                    {/-R\d+$/i.test(invoice.invoice_number || '') && (
+                                                        <span className="bg-orange-500/20 text-orange-300 text-[9px] px-1 py-0.2 rounded border border-orange-500/30">
+                                                            Reinvoice
+                                                        </span>
+                                                    )}
+                                                    {/-FX\d+$/i.test(invoice.invoice_number || '') && (
+                                                        <span className="bg-cyan-500/20 text-cyan-300 text-[9px] px-1 py-0.2 rounded border border-cyan-500/30">
+                                                            Recreate Kurs
+                                                        </span>
+                                                    )}
                                                     {invoice.is_additional && (
                                                         <span className="bg-purple-500/20 text-purple-300 text-[9px] px-1 py-0.2 rounded border border-purple-500/30">
                                                             Versi
