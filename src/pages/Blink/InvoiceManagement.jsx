@@ -2806,6 +2806,52 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
         return activeInvoicesForJob.map(inv => inv.currency || 'IDR');
     };
 
+    const handleCurrencyChange = (newCurrency) => {
+        if (!newCurrency) return;
+        let defaultRate = 1;
+        if (newCurrency !== 'IDR') {
+            if (selectedQuotation && (selectedQuotation.currency === newCurrency || selectedQuotation.billing_currency === newCurrency)) {
+                defaultRate = selectedQuotation.exchange_rate || selectedQuotation.exchangeRate || 1;
+            } else if (selectedShipment && (selectedShipment.currency === newCurrency || selectedShipment.billing_currency === newCurrency)) {
+                defaultRate = selectedShipment.exchange_rate || selectedShipment.exchangeRate || 1;
+            } else if (formData.exchange_rate && parseFloat(formData.exchange_rate) > 1) {
+                defaultRate = parseFloat(formData.exchange_rate);
+            } else {
+                defaultRate = 16000;
+            }
+        }
+        setFormData(prev => {
+            const oldCurrency = prev.billing_currency || 'IDR';
+            const oldExchangeRate = parseFloat(prev.exchange_rate) || 1;
+            const newExchangeRate = newCurrency === 'IDR' ? 1 : (defaultRate || prev.exchange_rate || 16000);
+
+            const convertRate = (oldRate) => {
+                if (oldCurrency === newCurrency) return oldRate;
+                const rateInIdr = oldCurrency === 'IDR' ? oldRate : (oldRate * oldExchangeRate);
+                const finalRate = newCurrency === 'IDR' ? rateInIdr : (rateInIdr / newExchangeRate);
+                return parseFloat(finalRate.toFixed(4)) || 0;
+            };
+
+            return {
+                ...prev,
+                billing_currency: newCurrency,
+                exchange_rate: newExchangeRate,
+                invoice_items: (prev.invoice_items || []).map(item => {
+                    const updatedRate = convertRate(item.rate || 0);
+                    const updatedAmount = (item.qty || 1) * updatedRate;
+                    const updatedTaxAmount = updatedAmount * ((item.tax_rate || 0) / 100);
+                    return {
+                        ...item,
+                        currency: newCurrency,
+                        rate: updatedRate,
+                        amount: updatedAmount,
+                        tax_amount: updatedTaxAmount
+                    };
+                })
+            };
+        });
+    };
+
     // Local UI state for COA dropdowns within the modal
     const [coaSearchMapInv, setCoaSearchMapInv] = useState({});    // { [itemIndex]: searchTerm }
     const [coaDropdownMapInv, setCoaDropdownMapInv] = useState({}); // { [itemIndex]: boolean open }
@@ -2900,7 +2946,12 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
 
                     {/* Existing Invoices Indicator */}
                     {(selectedShipment || selectedQuotation) && (
-                        <ExistingInvoicesIndicator jobNumber={formData.job_number} />
+                        <ExistingInvoicesIndicator
+                            jobNumber={formData.job_number}
+                            isAdditional={formData.is_additional_invoice}
+                            selectedCurrency={formData.billing_currency}
+                            onSelectCurrency={handleCurrencyChange}
+                        />
                     )}
 
 
@@ -3134,47 +3185,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                             </label>
                             <select
                                 value={formData.billing_currency}
-                                onChange={(e) => {
-                                    const newCurrency = e.target.value;
-                                    let defaultRate = 1;
-                                    if (newCurrency !== 'IDR') {
-                                        if (selectedQuotation && (selectedQuotation.currency === newCurrency || selectedQuotation.billing_currency === newCurrency)) {
-                                            defaultRate = selectedQuotation.exchange_rate || selectedQuotation.exchangeRate || 1;
-                                        } else if (selectedShipment && (selectedShipment.currency === newCurrency || selectedShipment.billing_currency === newCurrency)) {
-                                            defaultRate = selectedShipment.exchange_rate || selectedShipment.exchangeRate || 1;
-                                        }
-                                    }
-                                    setFormData(prev => {
-                                        const oldCurrency = prev.billing_currency || 'IDR';
-                                        const oldExchangeRate = parseFloat(prev.exchange_rate) || 1;
-                                        const newExchangeRate = newCurrency === 'IDR' ? 1 : (defaultRate || prev.exchange_rate || 1);
-                                        
-                                        const convertRate = (oldRate) => {
-                                            if (oldCurrency === newCurrency) return oldRate;
-                                            const rateInIdr = oldCurrency === 'IDR' ? oldRate : (oldRate * oldExchangeRate);
-                                            const finalRate = newCurrency === 'IDR' ? rateInIdr : (rateInIdr / newExchangeRate);
-                                            return parseFloat(finalRate.toFixed(4)) || 0;
-                                        };
-
-                                        return {
-                                            ...prev,
-                                            billing_currency: newCurrency,
-                                            exchange_rate: newExchangeRate,
-                                            invoice_items: (prev.invoice_items || []).map(item => {
-                                                const updatedRate = convertRate(item.rate || 0);
-                                                const updatedAmount = (item.qty || 1) * updatedRate;
-                                                const updatedTaxAmount = updatedAmount * ((item.tax_rate || 0) / 100);
-                                                return {
-                                                    ...item,
-                                                    currency: newCurrency,
-                                                    rate: updatedRate,
-                                                    amount: updatedAmount,
-                                                    tax_amount: updatedTaxAmount
-                                                };
-                                            })
-                                        };
-                                    });
-                                }}
+                                onChange={(e) => handleCurrencyChange(e.target.value)}
                                 className="w-full px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
                                 required
                             >
@@ -4854,7 +4865,7 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
 };
 
 // Existing Invoices Indicator Component
-const ExistingInvoicesIndicator = ({ jobNumber }) => {
+const ExistingInvoicesIndicator = ({ jobNumber, isAdditional = false, selectedCurrency = 'IDR', onSelectCurrency }) => {
     const [existingInvoices, setExistingInvoices] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -4889,73 +4900,120 @@ const ExistingInvoicesIndicator = ({ jobNumber }) => {
 
     const idrInvoice = existingInvoices.find(inv => inv.currency === 'IDR');
     const usdInvoice = existingInvoices.find(inv => inv.currency === 'USD');
-    const canCreateIDR = !idrInvoice;
-    const canCreateUSD = !usdInvoice;
+    const canCreateIDR = isAdditional || !idrInvoice;
+    const canCreateUSD = isAdditional || !usdInvoice;
 
     return (
         <div className="glass-card p-3 rounded-lg border border-accent-orange/30 bg-accent-orange/5">
             <div className="flex items-start gap-2 mb-2">
                 <AlertCircle className="w-4 h-4 text-accent-orange mt-0.5 flex-shrink-0" />
                 <div className="flex-1">
-                    <h4 className="text-xs font-semibold text-accent-orange mb-1">
+                    <h4 className="text-xs font-semibold text-accent-orange mb-0.5">
                         Existing Invoices for Job {jobNumber}
                     </h4>
-                    <p className="text-[10px] text-silver-dark mb-2">
-                        Beda kurs aktif: invoice baru per mata uang harus menggunakan kurs yang berbeda
+                    <p className="text-[10px] text-silver-dark mb-1">
+                        {isAdditional 
+                            ? 'Klik kartu mata uang di bawah untuk memilih mata uang invoice tambahan (bebas pilih IDR/USD):'
+                            : 'Klik kartu mata uang di bawah untuk memilih mata uang invoice:'
+                        }
                     </p>
                 </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
-                {/* IDR Status */}
-                <div className={`p-2 rounded border ${idrInvoice ? 'bg-green-500/10 border-green-500/30' : 'bg-dark-surface border-dark-border'}`}>
-                    <div className="flex items-center gap-1.5 mb-1">
-                        {idrInvoice ? (
-                            <CheckCircle className="w-3.5 h-3.5 text-green-400" />
-                        ) : (
-                            <Circle className="w-3.5 h-3.5 text-silver-dark" />
+                {/* IDR Status Card */}
+                <div
+                    onClick={() => {
+                        if (onSelectCurrency) onSelectCurrency('IDR');
+                    }}
+                    className={`p-2.5 rounded-lg border transition-all cursor-pointer ${
+                        selectedCurrency === 'IDR'
+                            ? 'bg-blue-500/20 border-blue-500 ring-2 ring-blue-500/40 shadow-md'
+                            : idrInvoice
+                                ? 'bg-green-500/10 border-green-500/30 hover:border-green-500/60'
+                                : 'bg-dark-surface border-dark-border hover:border-silver-dark'
+                    }`}
+                >
+                    <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-1.5">
+                            {selectedCurrency === 'IDR' ? (
+                                <CheckCircle className="w-4 h-4 text-blue-400" />
+                            ) : idrInvoice ? (
+                                <CheckCircle className="w-3.5 h-3.5 text-green-400" />
+                            ) : (
+                                <Circle className="w-3.5 h-3.5 text-silver-dark" />
+                            )}
+                            <span className={`text-[11px] font-bold ${selectedCurrency === 'IDR' ? 'text-blue-300' : 'text-silver-light'}`}>
+                                IDR Invoice
+                            </span>
+                        </div>
+                        {selectedCurrency === 'IDR' && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500/30 text-blue-300 uppercase">
+                                Selected
+                            </span>
                         )}
-                        <span className="text-[10px] font-semibold text-silver-light">IDR Invoice</span>
                     </div>
                     {idrInvoice ? (
-                        <div className="text-[9px] text-silver-dark space-y-0.5">
-                            <div className="font-mono text-green-400">{idrInvoice.invoice_number}</div>
+                        <div className="text-[9px] text-silver-dark space-y-0.5 pl-5">
+                            <div className="font-mono text-green-400 font-semibold">{idrInvoice.invoice_number}</div>
                             <div>Rp {idrInvoice.total_amount?.toLocaleString('id-ID')}</div>
                             <div>Kurs: {Number(idrInvoice.exchange_rate || 1).toLocaleString('id-ID')}</div>
-                            <div className="text-[8px] opacity-70">{idrInvoice.status}</div>
+                            <div className="text-[8px] opacity-70 uppercase">{idrInvoice.status}</div>
                         </div>
                     ) : (
-                        <div className="text-[9px] text-silver-dark">Available to create</div>
+                        <div className="text-[9px] text-silver-dark pl-5">Available to create (Klik untuk pilih)</div>
                     )}
                 </div>
 
-                {/* USD Status */}
-                <div className={`p-2 rounded border ${usdInvoice ? 'bg-green-500/10 border-green-500/30' : 'bg-dark-surface border-dark-border'}`}>
-                    <div className="flex items-center gap-1.5 mb-1">
-                        {usdInvoice ? (
-                            <CheckCircle className="w-3.5 h-3.5 text-green-400" />
-                        ) : (
-                            <Circle className="w-3.5 h-3.5 text-silver-dark" />
+                {/* USD Status Card */}
+                <div
+                    onClick={() => {
+                        if (onSelectCurrency) onSelectCurrency('USD');
+                    }}
+                    className={`p-2.5 rounded-lg border transition-all cursor-pointer ${
+                        selectedCurrency === 'USD'
+                            ? 'bg-blue-500/20 border-blue-500 ring-2 ring-blue-500/40 shadow-md'
+                            : usdInvoice
+                                ? 'bg-green-500/10 border-green-500/30 hover:border-green-500/60'
+                                : 'bg-dark-surface border-dark-border hover:border-silver-dark'
+                    }`}
+                >
+                    <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-1.5">
+                            {selectedCurrency === 'USD' ? (
+                                <CheckCircle className="w-4 h-4 text-blue-400" />
+                            ) : usdInvoice ? (
+                                <CheckCircle className="w-3.5 h-3.5 text-green-400" />
+                            ) : (
+                                <Circle className="w-3.5 h-3.5 text-silver-dark" />
+                            )}
+                            <span className={`text-[11px] font-bold ${selectedCurrency === 'USD' ? 'text-blue-300' : 'text-silver-light'}`}>
+                                USD Invoice
+                            </span>
+                        </div>
+                        {selectedCurrency === 'USD' && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500/30 text-blue-300 uppercase">
+                                Selected
+                            </span>
                         )}
-                        <span className="text-[10px] font-semibold text-silver-light">USD Invoice</span>
                     </div>
                     {usdInvoice ? (
-                        <div className="text-[9px] text-silver-dark space-y-0.5">
-                            <div className="font-mono text-green-400">{usdInvoice.invoice_number}</div>
+                        <div className="text-[9px] text-silver-dark space-y-0.5 pl-5">
+                            <div className="font-mono text-green-400 font-semibold">{usdInvoice.invoice_number}</div>
                             <div>${usdInvoice.total_amount?.toLocaleString('id-ID')}</div>
                             <div>Kurs: {Number(usdInvoice.exchange_rate || 1).toLocaleString('id-ID')}</div>
-                            <div className="text-[8px] opacity-70">{usdInvoice.status}</div>
+                            <div className="text-[8px] opacity-70 uppercase">{usdInvoice.status}</div>
                         </div>
                     ) : (
-                        <div className="text-[9px] text-silver-dark">Available to create</div>
+                        <div className="text-[9px] text-silver-dark pl-5">Available to create (Klik untuk pilih)</div>
                     )}
                 </div>
             </div>
 
-            {!canCreateIDR && !canCreateUSD && (
+            {!isAdditional && !canCreateIDR && !canCreateUSD && (
                 <div className="mt-2 p-2 bg-red-500/10 border border-red-500/30 rounded">
                     <p className="text-[9px] text-red-400">
-                        ⚠️ Both IDR and USD invoices already exist. Cancel one to create a replacement.
+                        ⚠️ Both IDR and USD standard invoices already exist. Cancel one to create a replacement, or use "Invoice Tambahan" for additional versioned invoices.
                     </p>
                 </div>
             )}
