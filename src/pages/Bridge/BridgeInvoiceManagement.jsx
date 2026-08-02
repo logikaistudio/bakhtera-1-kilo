@@ -3051,14 +3051,14 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                         </div>
 
                         <div className="overflow-x-auto pb-40">
-                            <table className="min-w-[1100px] table-fixed w-full">
+                            <table className="min-w-[1300px] w-full">
                                 <thead className="bg-accent-orange">
                                     <tr>
                                         <th className="px-2 py-2 text-center text-xs text-white w-10 font-normal">No</th>
-                                        <th className="px-2 py-2 text-left text-xs text-white min-w-[200px] font-normal">Item (COA)</th>
-                                        <th className="px-2 py-2 text-left text-xs text-white min-w-[200px] font-normal">Description</th>
-                                        <th className="px-2 py-2 text-center text-xs text-white w-32 font-normal">Qty</th>
-                                        <th className="px-2 py-2 text-center text-xs text-white w-28 font-normal">Unit</th>
+                                        <th className="px-2 py-2 text-left text-xs text-white min-w-[220px] font-normal">Item (COA)</th>
+                                        <th className="px-2 py-2 text-left text-xs text-white min-w-[400px] font-normal">Description</th>
+                                        <th className="px-2 py-2 text-center text-xs text-white min-w-[120px] font-normal">Qty</th>
+                                        <th className="px-2 py-2 text-center text-xs text-white min-w-[120px] font-normal">Unit</th>
                                         <th className="px-2 py-2 text-center text-xs text-white w-20 font-normal">Curr</th>
                                         <th className="px-2 py-2 text-right text-xs text-white min-w-[140px] font-normal">Price</th>
                                         <th className="px-2 py-2 text-right text-xs text-white min-w-[80px] font-normal">Tax %</th>
@@ -3131,33 +3131,33 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                                     )}
                                                 </div>
                                             </td>
-                                            <td className="px-3 py-2 min-w-[200px]">
+                                            <td className="px-3 py-2 min-w-[400px]">
                                                 <input
                                                     type="text"
                                                     value={item.description}
                                                     onChange={(e) => updateInvoiceItem(index, 'description', e.target.value)}
-                                                    className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm"
+                                                    className="w-full min-w-[380px] px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm"
                                                     placeholder="Deskripsi layanan"
                                                     required
                                                 />
                                             </td>
-                                            <td className="px-3 py-2 w-32 text-center">
+                                            <td className="px-3 py-2 min-w-[120px] text-center">
                                                 <input
                                                     type="number"
                                                     value={item.qty}
                                                     onChange={(e) => updateInvoiceItem(index, 'qty', parseFloat(e.target.value) || 0)}
-                                                    className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm text-center"
+                                                    className="w-full min-w-[100px] px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm text-center"
                                                     min="0"
                                                     step="0.01"
                                                     required
                                                 />
                                             </td>
-                                            <td className="px-3 py-2 w-28 text-center">
+                                            <td className="px-3 py-2 min-w-[120px] text-center">
                                                 <input
                                                     type="text"
                                                     value={item.unit}
                                                     onChange={(e) => updateInvoiceItem(index, 'unit', e.target.value)}
-                                                    className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm text-center"
+                                                    className="w-full min-w-[100px] px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm text-center"
                                                     placeholder="Unit"
                                                     required
                                                 />
