@@ -665,10 +665,28 @@ const InvoiceManagement = () => {
             }));
         }
     };
-
     const updateInvoiceItem = (index, field, value) => {
         setFormData(prev => {
             const items = [...prev.invoice_items];
+            const oldItem = items[index];
+
+            // Handle currency change conversion
+            if (field === 'currency') {
+                const oldCurrency = oldItem.currency || prev.billing_currency || 'IDR';
+                const newCurrency = value;
+                const exchangeRate = parseFloat(prev.exchange_rate) || 1;
+
+                if (oldCurrency !== newCurrency) {
+                    let oldRate = oldItem.rate || 0;
+                    const rateInIdr = oldCurrency === 'IDR' ? oldRate : (oldRate * exchangeRate);
+                    const newRate = newCurrency === 'IDR' ? rateInIdr : (rateInIdr / exchangeRate);
+
+                    items[index].rate = parseFloat(newRate.toFixed(4)) || 0;
+                    items[index].amount = items[index].qty * items[index].rate;
+                    items[index].tax_amount = items[index].amount * ((items[index].tax_rate || 0) / 100);
+                }
+            }
+
             items[index][field] = value;
 
             // Auto-map COA if item_name changes
@@ -694,7 +712,6 @@ const InvoiceManagement = () => {
             return { ...prev, invoice_items: items };
         });
     };
-
     const handleGlobalTaxRateChange = (rate) => {
         setFormData(prev => ({
             ...prev,
@@ -1022,7 +1039,6 @@ const InvoiceManagement = () => {
             setSelectedQuotation(null);
             setSelectedShipment(null);
         }
-
         // Migrate tax logic for older invoices
         const migratedItems = (invoice.invoice_items || []).map(it => {
             const amount = parseFloat(it.amount) || 0;
@@ -1030,11 +1046,11 @@ const InvoiceManagement = () => {
             const taxRate = typeof it.tax_rate !== 'undefined' ? Number(it.tax_rate) : (amount > 0 ? (taxAmount / amount) * 100 : (invoice.tax_rate || 0));
             return {
                 ...it,
+                currency: it.currency || invoice.currency || 'IDR',
                 tax_amount: taxAmount,
                 tax_rate: taxRate
             };
         });
-
         setFormData({
             quotation_id: invoice.quotation_id || '',
             job_number: invoice.job_number || '',
@@ -2773,6 +2789,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
     const { subtotal, taxAmount, total, cogsSubtotal, grossProfit, profitMargin } = calculateTotals();
 
     const getUsedCurrenciesForSelectedJob = () => {
+        if (formData.is_additional_invoice) return [];
         const targetJobNumber = formData.job_number;
         const targetShipmentId = formData.shipment_id;
         const targetSoNumber = formData.so_number;
@@ -3127,11 +3144,36 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                             defaultRate = selectedShipment.exchange_rate || selectedShipment.exchangeRate || 1;
                                         }
                                     }
-                                    setFormData(prev => ({
-                                        ...prev,
-                                        billing_currency: newCurrency,
-                                        exchange_rate: newCurrency === 'IDR' ? 1 : (defaultRate || prev.exchange_rate || 1)
-                                    }));
+                                    setFormData(prev => {
+                                        const oldCurrency = prev.billing_currency || 'IDR';
+                                        const oldExchangeRate = parseFloat(prev.exchange_rate) || 1;
+                                        const newExchangeRate = newCurrency === 'IDR' ? 1 : (defaultRate || prev.exchange_rate || 1);
+                                        
+                                        const convertRate = (oldRate) => {
+                                            if (oldCurrency === newCurrency) return oldRate;
+                                            const rateInIdr = oldCurrency === 'IDR' ? oldRate : (oldRate * oldExchangeRate);
+                                            const finalRate = newCurrency === 'IDR' ? rateInIdr : (rateInIdr / newExchangeRate);
+                                            return parseFloat(finalRate.toFixed(4)) || 0;
+                                        };
+
+                                        return {
+                                            ...prev,
+                                            billing_currency: newCurrency,
+                                            exchange_rate: newExchangeRate,
+                                            invoice_items: (prev.invoice_items || []).map(item => {
+                                                const updatedRate = convertRate(item.rate || 0);
+                                                const updatedAmount = (item.qty || 1) * updatedRate;
+                                                const updatedTaxAmount = updatedAmount * ((item.tax_rate || 0) / 100);
+                                                return {
+                                                    ...item,
+                                                    currency: newCurrency,
+                                                    rate: updatedRate,
+                                                    amount: updatedAmount,
+                                                    tax_amount: updatedTaxAmount
+                                                };
+                                            })
+                                        };
+                                    });
                                 }}
                                 className="w-full px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
                                 required
