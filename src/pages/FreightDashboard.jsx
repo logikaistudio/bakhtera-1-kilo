@@ -9,6 +9,12 @@ import {
     DollarSign, Loader2, RefreshCw, Ship, Plane, Truck
 } from 'lucide-react';
 
+const BRANCH_SUMMARY = [
+    { id: 'CBG-JKT', name: 'Cabang Jakarta', salesOrders: 86, invoices: 41, revenue: 1450000000, ar: 210000000 },
+    { id: 'CBG-SBY', name: 'Cabang Surabaya', salesOrders: 57, invoices: 33, revenue: 980000000, ar: 130000000 },
+    { id: 'CBG-DPS', name: 'Cabang Denpasar', salesOrders: 28, invoices: 19, revenue: 460000000, ar: 72000000 },
+];
+
 const MONTHS_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 
 const fmtIDR = (v) => {
@@ -200,6 +206,17 @@ const FreightDashboard = () => {
         ...agingData.slice(3),
         buildTotalRow('AP'),
     ];
+
+    const branchSummaryTotals = BRANCH_SUMMARY.reduce(
+        (acc, row) => {
+            acc.salesOrders += row.salesOrders;
+            acc.invoices += row.invoices;
+            acc.revenue += row.revenue;
+            acc.ar += row.ar;
+            return acc;
+        },
+        { salesOrders: 0, invoices: 0, revenue: 0, ar: 0 }
+    );
 
     if (loading) {
         return (
@@ -473,6 +490,63 @@ const FreightDashboard = () => {
                                     </tr>
                                 );
                             })}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* ── Ringkasan Cabang (HQ) ─────────────────────────────────────── */}
+            <div className="glass-card p-6 rounded-lg">
+                <div className="flex items-center justify-between gap-3 mb-5">
+                    <div>
+                        <h2 className="text-xl font-bold text-silver-light">Ringkasan Cabang</h2>
+                        <p className="text-xs text-silver-dark mt-1">Konsolidasi Sales dan Finance level cabang.</p>
+                    </div>
+                    <span className="text-xs text-cyan-300 bg-cyan-500/10 border border-cyan-500/30 px-2 py-1 rounded-md">
+                        Level setara BXPO / BLINK / BIG
+                    </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-5">
+                    <div className="rounded-lg p-3 bg-blue-500/10 border border-blue-500/30">
+                        <p className="text-xs text-silver-dark">Sales Order</p>
+                        <p className="text-xl font-bold text-blue-300 mt-1">{branchSummaryTotals.salesOrders}</p>
+                    </div>
+                    <div className="rounded-lg p-3 bg-emerald-500/10 border border-emerald-500/30">
+                        <p className="text-xs text-silver-dark">Invoice</p>
+                        <p className="text-xl font-bold text-emerald-300 mt-1">{branchSummaryTotals.invoices}</p>
+                    </div>
+                    <div className="rounded-lg p-3 bg-orange-500/10 border border-orange-500/30">
+                        <p className="text-xs text-silver-dark">Revenue Cabang</p>
+                        <p className="text-xl font-bold text-orange-300 mt-1">{fmtIDR(branchSummaryTotals.revenue)}</p>
+                    </div>
+                    <div className="rounded-lg p-3 bg-amber-500/10 border border-amber-500/30">
+                        <p className="text-xs text-silver-dark">AR Outstanding</p>
+                        <p className="text-xl font-bold text-amber-300 mt-1">{fmtIDR(branchSummaryTotals.ar)}</p>
+                    </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="border-b border-white/10">
+                                <th className="text-left py-2.5 px-3 text-silver-dark font-medium">Cabang</th>
+                                <th className="text-right py-2.5 px-3 text-silver-dark font-medium">SO</th>
+                                <th className="text-right py-2.5 px-3 text-silver-dark font-medium">Invoice</th>
+                                <th className="text-right py-2.5 px-3 text-silver-dark font-medium">Revenue</th>
+                                <th className="text-right py-2.5 px-3 text-silver-dark font-medium">AR Outstanding</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {BRANCH_SUMMARY.map((row) => (
+                                <tr key={row.id} className="border-b border-white/5 hover:bg-white/5 smooth-transition">
+                                    <td className="py-2.5 px-3 text-silver-light">{row.name}</td>
+                                    <td className="text-right py-2.5 px-3 text-blue-300">{row.salesOrders}</td>
+                                    <td className="text-right py-2.5 px-3 text-emerald-300">{row.invoices}</td>
+                                    <td className="text-right py-2.5 px-3 text-orange-300">{fmtIDR(row.revenue)}</td>
+                                    <td className="text-right py-2.5 px-3 text-amber-300">{fmtIDR(row.ar)}</td>
+                                </tr>
+                            ))}
                         </tbody>
                     </table>
                 </div>

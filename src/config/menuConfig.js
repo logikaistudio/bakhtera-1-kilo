@@ -153,6 +153,24 @@ export const APP_MENUS = {
         ],
     },
 
+    Cabang: {
+        label: 'Cabang',
+        color: 'teal',
+        menus: [
+            // ─── Utama ───
+            { code: 'cabang_dashboard', label: 'Dashboard Cabang', group: 'Utama', path: '/cabang' },
+            // ─── Sales ───
+            { code: 'cabang_sales_orders', label: 'Sales Order Cabang', group: 'Sales', path: '/cabang/sales/orders' },
+            { code: 'cabang_sales_customers', label: 'Pelanggan Cabang', group: 'Sales', path: '/cabang/sales/customers' },
+            // ─── Finance ───
+            { code: 'cabang_finance_invoices', label: 'Invoice Cabang', group: 'Finance', path: '/cabang/finance/invoices' },
+            { code: 'cabang_finance_arap', label: 'AR/AP Cabang', group: 'Finance', path: '/cabang/finance/ar-ap' },
+            // ─── Manajemen Cabang ───
+            { code: 'cabang_management', label: 'Manajemen Cabang', group: 'Manajemen Cabang', path: '/cabang/management' },
+            { code: 'cabang_create', label: 'Create Cabang (Admin HQ)', group: 'Manajemen Cabang', path: '/cabang/management/new' },
+        ],
+    },
+
     Finance: {
         label: 'Finance',
         color: 'emerald',

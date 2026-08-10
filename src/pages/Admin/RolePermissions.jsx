@@ -18,6 +18,7 @@ const MODULE_ICON_MAP = {
     Blink: Plane,
     BXPO: Layers,
     Big: Calendar,
+    Cabang: Building2,
     Pusat: Layers,
     Finance: Wallet,
 };
@@ -56,6 +57,7 @@ const MODULE_STYLES = {
     Blink: { bg: 'bg-cyan-500/10', border: 'border-cyan-500/30', text: 'text-cyan-400', badge: 'bg-cyan-500/20 text-cyan-300' },
     BXPO: { bg: 'bg-indigo-500/10', border: 'border-indigo-500/30', text: 'text-indigo-400', badge: 'bg-indigo-500/20 text-indigo-300' },
     Big: { bg: 'bg-orange-500/10', border: 'border-orange-500/30', text: 'text-orange-400', badge: 'bg-orange-500/20 text-orange-300' },
+    Cabang: { bg: 'bg-teal-500/10', border: 'border-teal-500/30', text: 'text-teal-400', badge: 'bg-teal-500/20 text-teal-300' },
     Pusat: { bg: 'bg-purple-500/10', border: 'border-purple-500/30', text: 'text-purple-400', badge: 'bg-purple-500/20 text-purple-300' },
     Finance: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', text: 'text-emerald-400', badge: 'bg-emerald-500/20 text-emerald-300' },
 };
@@ -647,6 +649,7 @@ const RolePermissions = () => {
                                 Blink: { active: '#ecfeff', border: '#a5f3fc', text: '#0e7490' },
                                 BXPO: { active: '#eef2ff', border: '#c7d2fe', text: '#4338ca' },
                                 Big: { active: '#fff7ed', border: '#fed7aa', text: '#c2410c' },
+                                Cabang: { active: '#f0fdfa', border: '#99f6e4', text: '#0f766e' },
                                 Pusat: { active: '#faf5ff', border: '#ddd6fe', text: '#6d28d9' },
                                 Finance: { active: '#ecfdf5', border: '#a7f3d0', text: '#047857' },
                             };
@@ -732,6 +735,7 @@ const RolePermissions = () => {
                                         const GROUP_COLORS = {
                                             'Operasional': '#dbeafe',
                                             'Finance': '#dcfce7',
+                                            'Manajemen Cabang': '#ccfbf1',
                                             'Master Data': '#fef3c7',
                                             'Pabean': '#ede9fe',
                                             'Persetujuan & Log': '#fee2e2',

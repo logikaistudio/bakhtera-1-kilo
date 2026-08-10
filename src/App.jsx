@@ -106,6 +106,12 @@ import BigBalanceSheet from './pages/Big/Finance/BigBalanceSheet';
 import BigCompanySettings from './pages/Big/CompanySettings'; // New
 import BigCodeOfAccount from './pages/Big/Finance/BigCodeOfAccount';
 
+// Cabang Module
+import CabangDashboard from './pages/Cabang/CabangDashboard';
+import CabangSales from './pages/Cabang/CabangSales';
+import CabangFinance from './pages/Cabang/CabangFinance';
+import CabangManagement from './pages/Cabang/CabangManagement';
+
 // Pabean Module
 import PabeanDashboard from './pages/Bridge/Pabean/PabeanDashboard';
 import BarangMasuk from './pages/Bridge/Pabean/BarangMasuk';
@@ -274,6 +280,15 @@ function App() {
                     <Route path="/big/finance/trial-balance" element={<ProtectedRoute menuCode="big_finance"><BigTrialBalance /></ProtectedRoute>} />
                     <Route path="/big/finance/profit-loss" element={<ProtectedRoute menuCode="big_finance"><BigProfitLoss /></ProtectedRoute>} />
                     <Route path="/big/finance/balance-sheet" element={<ProtectedRoute menuCode="big_finance"><BigBalanceSheet /></ProtectedRoute>} />
+
+                    {/* Cabang Module */}
+                    <Route path="/cabang" element={<ProtectedRoute menuCode="cabang_dashboard"><CabangDashboard /></ProtectedRoute>} />
+                    <Route path="/cabang/sales/orders" element={<ProtectedRoute menuCode="cabang_sales_orders"><CabangSales /></ProtectedRoute>} />
+                    <Route path="/cabang/sales/customers" element={<ProtectedRoute menuCode="cabang_sales_customers"><CabangSales /></ProtectedRoute>} />
+                    <Route path="/cabang/finance/invoices" element={<ProtectedRoute menuCode="cabang_finance_invoices"><CabangFinance /></ProtectedRoute>} />
+                    <Route path="/cabang/finance/ar-ap" element={<ProtectedRoute menuCode="cabang_finance_arap"><CabangFinance /></ProtectedRoute>} />
+                    <Route path="/cabang/management" element={<ProtectedRoute menuCode="cabang_management"><CabangManagement /></ProtectedRoute>} />
+                    <Route path="/cabang/management/new" element={<ProtectedRoute menuCode="cabang_create"><CabangManagement /></ProtectedRoute>} />
 
                     {/* Pabean Module */}
                     <Route path="/bridge/pabean" element={<ProtectedRoute menuCode="bridge_pabean"><PabeanDashboard /></ProtectedRoute>} />

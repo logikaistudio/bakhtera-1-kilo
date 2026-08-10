@@ -9,6 +9,7 @@ import {
     Users,
     UserCircle,
     Wallet,
+    GitBranch,
     Menu,
     X,
     ChevronRight,
@@ -56,6 +57,8 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
         'central-users'
     ]); // All expanded by default
     const [showChangePassword, setShowChangePassword] = useState(false);
+    const userLevel = String(user?.user_level || '').toLowerCase();
+    const isAdminHq = isSuperAdmin() || isAdmin() || userLevel === 'admin_hq';
 
     // Count pending approvals for badge (only relevant for bridge_manager and super_admin)
     const isApprover = ['super_admin', 'bridge_manager', 'admin'].includes(user?.user_level);
@@ -105,6 +108,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
             if (p.startsWith('/bridge')) return 'bridge';
             if (p.startsWith('/pabean')) return 'pabean';
             if (p.startsWith('/big')) return 'big';
+            if (p.startsWith('/cabang')) return 'cabang';
             if (p.startsWith('/blink')) return 'blink';
             if (p.startsWith('/bxpo')) return 'bxpo';
             if (p.startsWith('/finance')) return 'finance';
@@ -155,6 +159,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
         { path: '/blink', label: 'BLINK', subtitle: 'Freight & Forward Management', icon: Plane },
         { path: '/bxpo', label: 'BXPO', subtitle: 'Sales & Operation', icon: Layers },
         { path: '/big', label: 'BIG', subtitle: 'Event Organizer', icon: Calendar },
+        { path: '/cabang', label: 'CABANG', subtitle: 'Branch Sales & Finance', icon: GitBranch },
         { path: '/bridge', label: 'BRIDGE', subtitle: 'Bounded Management', icon: Building2 },
         { path: '/pabean', label: 'Pabean', subtitle: 'Customs Portal', icon: Building2 },
         { path: '/finance', label: 'FINANCE', subtitle: 'Financial Management Unit', icon: Wallet },
@@ -389,6 +394,28 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
         }
     ];
 
+    const cabangSubMenuItems = [
+        { path: '/cabang', label: 'Dashboard Cabang', icon: LayoutDashboard, menuCode: 'cabang_dashboard' },
+        {
+            type: 'category', label: '📋 Sales', items: [
+                { path: '/cabang/sales/orders', label: 'Sales Order', menuCode: 'cabang_sales_orders' },
+                { path: '/cabang/sales/customers', label: 'Customers', menuCode: 'cabang_sales_customers' },
+            ]
+        },
+        {
+            type: 'category', label: '💰 Finance', items: [
+                { path: '/cabang/finance/invoices', label: 'Invoice', menuCode: 'cabang_finance_invoices' },
+                { path: '/cabang/finance/ar-ap', label: 'AR / AP', menuCode: 'cabang_finance_arap' },
+            ]
+        },
+        {
+            type: 'category', label: '🏢 Manajemen Cabang', items: [
+                { path: '/cabang/management', label: 'Daftar Cabang', menuCode: 'cabang_management' },
+                { path: '/cabang/management/new', label: 'Create Cabang (Admin HQ)', menuCode: 'cabang_create', adminHqOnly: true },
+            ]
+        },
+    ];
+
     // BXPO submenu - Duplikasi menu sales sampai operation
     const bxpoSubMenuItems = [
         // Sales & Marketing Category
@@ -466,6 +493,19 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
         return financeSubMenuItems.some(subItem => {
             if (subItem.type === 'category') {
                 return subItem.items.some(menuItem => menuItem.menuCode && canAccessPortal(menuItem.menuCode, menuItem.menuCodes));
+            }
+            return subItem.menuCode && canAccessPortal(subItem.menuCode, subItem.menuCodes);
+        });
+    };
+
+    const hasCabangAccess = () => {
+        if (canAccessPortal('cabang_dashboard')) return true;
+        return cabangSubMenuItems.some(subItem => {
+            if (subItem.type === 'category') {
+                return subItem.items.some(menuItem => {
+                    if (menuItem.adminHqOnly && !isAdminHq) return false;
+                    return menuItem.menuCode && canAccessPortal(menuItem.menuCode, menuItem.menuCodes);
+                });
             }
             return subItem.menuCode && canAccessPortal(subItem.menuCode, subItem.menuCodes);
         });
@@ -1122,6 +1162,161 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                                                                                         </Link>
                                                                                     );
                                                                                 })}
+                                                                            </motion.div>
+                                                                        )}
+                                                                    </AnimatePresence>
+                                                                </div>
+                                                            );
+                                                        }
+
+                                                        return null;
+                                                    })}
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
+                                );
+                            }
+
+                            // Special handling for CABANG with submenu
+                            if (item.path === '/cabang') {
+                                if (!hasCabangAccess()) return null;
+                                const isExpanded = expandedSection === 'cabang';
+                                const isCabangActive = location.pathname.startsWith('/cabang');
+                                const hasDashboardAccess = canAccessPortal('cabang_dashboard');
+
+                                return (
+                                    <div key={item.path}>
+                                        <div className="flex items-center gap-1" id="menu-cabang">
+                                            {hasDashboardAccess ? (
+                                                <Link
+                                                    to={item.path}
+                                                    onClick={() => {
+                                                        if (isMobile) setIsOpen(false);
+                                                        const isCurrentlyExpanded = expandedSection === 'cabang';
+                                                        setExpandedSection(isCurrentlyExpanded ? '' : 'cabang');
+                                                        if (!isCurrentlyExpanded) scrollToElement('menu-cabang');
+                                                    }}
+                                                    className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition text-sm ${isCabangActive
+                                                        ? 'text-silver-light'
+                                                        : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface'
+                                                        }`}
+                                                >
+                                                    <item.icon className="w-5 h-5 flex-shrink-0" />
+                                                    <div className="flex-1 text-left">
+                                                        <div className="font-medium">{item.label}</div>
+                                                        <div className="text-xs text-silver-dark">
+                                                            {item.subtitle}
+                                                        </div>
+                                                    </div>
+                                                </Link>
+                                            ) : (
+                                                <button
+                                                    onClick={() => {
+                                                        const isCurrentlyExpanded = expandedSection === 'cabang';
+                                                        setExpandedSection(isCurrentlyExpanded ? '' : 'cabang');
+                                                        if (!isCurrentlyExpanded) scrollToElement('menu-cabang');
+                                                    }}
+                                                    className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition text-sm text-left ${isCabangActive
+                                                        ? 'text-silver-light'
+                                                        : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface'
+                                                        }`}
+                                                >
+                                                    <item.icon className="w-5 h-5 flex-shrink-0" />
+                                                    <div className="flex-1 text-left">
+                                                        <div className="font-medium">{item.label}</div>
+                                                        <div className="text-xs text-silver-dark">
+                                                            {item.subtitle}
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={() => {
+                                                    const newState = isExpanded ? '' : 'cabang';
+                                                    setExpandedSection(newState);
+                                                    if (newState === 'cabang') scrollToElement('menu-cabang');
+                                                }}
+                                                className="p-2 hover:bg-dark-surface rounded-lg smooth-transition"
+                                            >
+                                                <ChevronRight className={`w-4 h-4 transition-transform text-silver-dark ${isExpanded ? 'rotate-90' : ''}`} />
+                                            </button>
+                                        </div>
+
+                                        <AnimatePresence>
+                                            {isExpanded && (
+                                                <motion.div
+                                                    initial={{ height: 0, opacity: 0 }}
+                                                    animate={{ height: 'auto', opacity: 1 }}
+                                                    exit={{ height: 0, opacity: 0 }}
+                                                    className="ml-8 mt-1 space-y-1 overflow-hidden"
+                                                >
+                                                    {cabangSubMenuItems.map((subItem, idx) => {
+                                                        if (!subItem.type) {
+                                                            if (subItem.menuCode && !canAccessPortal(subItem.menuCode, subItem.menuCodes)) return null;
+                                                            return (
+                                                                <Link
+                                                                    key={subItem.path}
+                                                                    to={subItem.path}
+                                                                    onClick={() => isMobile && setIsOpen(false)}
+                                                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm smooth-transition ${isActive(subItem.path)
+                                                                        ? 'bg-white/20 text-white font-medium'
+                                                                        : 'text-silver-dark hover:text-white hover:bg-white/10'
+                                                                        }`}
+                                                                >
+                                                                    {subItem.icon && <subItem.icon className="w-4 h-4" />}
+                                                                    <span>{subItem.label}</span>
+                                                                </Link>
+                                                            );
+                                                        }
+
+                                                        if (subItem.type === 'category') {
+                                                            const categoryKey = 'cabang-' + subItem.label.toLowerCase().replace(/[^a-z0-9]/g, '');
+                                                            const isCategoryExpanded = expandedCategories.includes(categoryKey);
+
+                                                            const accessibleItems = subItem.items.filter(itemObj => {
+                                                                if (itemObj.adminHqOnly && !isAdminHq) return false;
+                                                                return !itemObj.menuCode || canAccessPortal(itemObj.menuCode, itemObj.menuCodes);
+                                                            });
+                                                            if (accessibleItems.length === 0) return null;
+
+                                                            return (
+                                                                <div key={`category-${idx}`}>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setExpandedCategories(prev =>
+                                                                                prev.includes(categoryKey)
+                                                                                    ? prev.filter(c => c !== categoryKey)
+                                                                                    : [...prev, categoryKey]
+                                                                            );
+                                                                        }}
+                                                                        className="w-full flex items-center justify-between px-4 py-2 text-sm font-semibold text-silver hover:text-silver-light smooth-transition"
+                                                                    >
+                                                                        <span>{subItem.label}</span>
+                                                                        <ChevronRight className={`w-3 h-3 transition-transform ${isCategoryExpanded ? 'rotate-90' : ''}`} />
+                                                                    </button>
+
+                                                                    <AnimatePresence>
+                                                                        {isCategoryExpanded && (
+                                                                            <motion.div
+                                                                                initial={{ height: 0, opacity: 0 }}
+                                                                                animate={{ height: 'auto', opacity: 1 }}
+                                                                                exit={{ height: 0, opacity: 0 }}
+                                                                                className="overflow-hidden"
+                                                                            >
+                                                                                {accessibleItems.map((itemObj) => (
+                                                                                    <Link
+                                                                                        key={itemObj.path}
+                                                                                        to={itemObj.path}
+                                                                                        onClick={() => isMobile && setIsOpen(false)}
+                                                                                        className={`flex items-center pl-14 pr-4 py-2 text-sm smooth-transition border-l-2 ml-2 ${isActive(itemObj.path)
+                                                                                            ? 'bg-white/20 text-white font-medium border-white sidebar-active-item'
+                                                                                            : 'text-silver-dark hover:text-white hover:bg-white/10 border-transparent hover:border-white/50'
+                                                                                            }`}
+                                                                                    >
+                                                                                        <span className="flex-1">{itemObj.label}</span>
+                                                                                    </Link>
+                                                                                ))}
                                                                             </motion.div>
                                                                         )}
                                                                     </AnimatePresence>
