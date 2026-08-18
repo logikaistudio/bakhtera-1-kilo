@@ -381,10 +381,14 @@ const SalesQuotation = () => {
         const permissionChecker = actionMap[action];
         if (!permissionChecker) return false;
 
-        const isBxpoPage = typeof window !== 'undefined' && window.location.pathname.startsWith('/bxpo');
+        const path = typeof window !== 'undefined' && window.location ? window.location.pathname : '';
+        const isBxpoPage = path.startsWith('/bxpo');
+        const isCabangPage = path.startsWith('/cabang');
         const menuCandidates = isBxpoPage
             ? ['bxpo_sales_quotations', 'bxpo_sales']
-            : ['blink_sales_quotations', 'blink_sales'];
+            : isCabangPage
+                ? ['cabang_sales_quotations', 'cabang_sales']
+                : ['blink_sales_quotations', 'blink_sales'];
 
         return menuCandidates.some((menuCode) => permissionChecker(menuCode));
     };
@@ -1630,8 +1634,9 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
 
             // Navigate to appropriate shipments page (BXPO or Blink)
             const isBxpoPage = window.location.pathname.startsWith('/bxpo');
+            const isCabangPage = window.location.pathname.startsWith('/cabang');
             setTimeout(() => {
-                navigate(isBxpoPage ? '/bxpo/shipments' : '/blink/shipments');
+                navigate(isBxpoPage ? '/bxpo/shipments' : isCabangPage ? '/cabang/shipments' : '/blink/shipments');
             }, 1000);
 
         } catch (error) {

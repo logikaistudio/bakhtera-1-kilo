@@ -159,12 +159,32 @@ export const APP_MENUS = {
         menus: [
             // ─── Utama ───
             { code: 'cabang_dashboard', label: 'Dashboard Cabang', group: 'Utama', path: '/cabang' },
-            // ─── Sales ───
-            { code: 'cabang_sales_orders', label: 'Sales Order Cabang', group: 'Sales', path: '/cabang/sales/orders' },
-            { code: 'cabang_sales_customers', label: 'Pelanggan Cabang', group: 'Sales', path: '/cabang/sales/customers' },
+            // ─── Sales & Marketing ───
+            { code: 'cabang_sales_quotations', label: 'Sales Quotation', group: 'Sales & Marketing', path: '/cabang/sales-quotations' },
+            { code: 'cabang_flow_monitor', label: 'Flow Monitor', group: 'Sales & Marketing', path: '/cabang/flow-monitor' },
+            { code: 'cabang_sales', label: 'Sales Achievement', group: 'Sales & Marketing', path: '/cabang/sales-achievement' },
+            { code: 'cabang_sales_approval', label: 'Sales Approval Center', group: 'Sales & Marketing', path: '/cabang/sales-approvals' },
+            // ─── Operations ───
+            { code: 'cabang_quotations', label: 'Quotation', group: 'Operations', path: '/cabang/operations/quotations' },
+            { code: 'cabang_shipments', label: 'Sales Order Management', group: 'Operations', path: '/cabang/shipments' },
+            { code: 'cabang_bl', label: 'Document BL/AWB', group: 'Operations', path: '/cabang/operations/bl' },
+            { code: 'cabang_approval', label: 'Approval Center', group: 'Operations', path: '/cabang/approvals' },
             // ─── Finance ───
-            { code: 'cabang_finance_invoices', label: 'Invoice Cabang', group: 'Finance', path: '/cabang/finance/invoices' },
-            { code: 'cabang_finance_arap', label: 'AR/AP Cabang', group: 'Finance', path: '/cabang/finance/ar-ap' },
+            { code: 'cabang_invoices', label: 'Invoice', group: 'Finance', path: '/cabang/finance/invoices' },
+            { code: 'cabang_purchase_order', label: 'Purchase Order', group: 'Finance', path: '/cabang/finance/purchase-orders' },
+            { code: 'cabang_ar', label: 'Piutang (AR)', group: 'Finance', path: '/cabang/finance/ar' },
+            { code: 'cabang_ap', label: 'Hutang (AP)', group: 'Finance', path: '/cabang/finance/ap' },
+            { code: 'cabang_auto_journal', label: 'Auto Jurnal (12 bulan)', group: 'Finance', path: '/cabang/finance/auto-journal' },
+            { code: 'cabang_reversing_journal', label: 'Reversing Jurnal', group: 'Finance', path: '/cabang/finance/reversing-journal' },
+            { code: 'cabang_journal', label: 'Jurnal Umum', group: 'Finance', path: '/cabang/finance/general-journal' },
+            { code: 'cabang_noted_journal', label: 'Jurnal Noted (Audit)', group: 'Finance', path: '/cabang/finance/noted-journal' },
+            { code: 'cabang_ledger', label: 'Buku Besar', group: 'Finance', path: '/cabang/finance/general-ledger' },
+            { code: 'cabang_trial_balance', label: 'Neraca Saldo', group: 'Finance', path: '/cabang/finance/trial-balance' },
+            { code: 'cabang_pnl', label: 'Laba Rugi', group: 'Finance', path: '/cabang/finance/profit-loss' },
+            { code: 'cabang_balance_sheet', label: 'Neraca', group: 'Finance', path: '/cabang/finance/balance-sheet' },
+            { code: 'cabang_exchange_rates', label: 'Kurs Referensi', group: 'Finance', path: '/cabang/finance/exchange-rates' },
+            // ─── Master Data ───
+            { code: 'cabang_partners', label: 'Business Partners', group: 'Master Data', path: '/cabang/master/partners' },
             // ─── Manajemen Cabang ───
             { code: 'cabang_management', label: 'Manajemen Cabang', group: 'Manajemen Cabang', path: '/cabang/management' },
             { code: 'cabang_create', label: 'Create Cabang (Admin HQ)', group: 'Manajemen Cabang', path: '/cabang/management/new' },

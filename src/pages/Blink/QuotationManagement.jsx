@@ -978,7 +978,9 @@ const QuotationManagement = () => {
 
             // Navigate to shipments page
             setTimeout(() => {
-                navigate('/blink/shipments');
+                const isBxpoPage = window.location.pathname.startsWith('/bxpo');
+                const isCabangPage = window.location.pathname.startsWith('/cabang');
+                navigate(isBxpoPage ? '/bxpo/shipments' : isCabangPage ? '/cabang/shipments' : '/blink/shipments');
             }, 1000);
 
         } catch (error) {

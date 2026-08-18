@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { login as loginService, logout as logoutService, validateSession, getUserPermissions } from '../services/authService';
 import { syncRolePermissionsWithMenus } from '../services/rolePermissionSyncService';
+import { getActiveDivision } from '../utils/divisionContext';
 
 /**
  * Auth Context
@@ -153,13 +154,58 @@ export const AuthProvider = ({ children }) => {
      */
     const isAdmin = () => user?.user_level === 'super_admin' || user?.user_level === 'admin';
 
+    const CABANG_PERMISSION_ALIAS = {
+        blink_dashboard: 'cabang_dashboard',
+        blink_sales_quotations: 'cabang_sales_quotations',
+        blink_flow_monitor: 'cabang_flow_monitor',
+        blink_sales: 'cabang_sales',
+        blink_sales_approval: 'cabang_sales_approval',
+        blink_quotations: 'cabang_quotations',
+        blink_shipments: 'cabang_shipments',
+        blink_bl: 'cabang_bl',
+        blink_approval: 'cabang_approval',
+        blink_partners: 'cabang_partners',
+        blink_invoices: 'cabang_invoices',
+        blink_purchase_order: 'cabang_purchase_order',
+        blink_ar: 'cabang_ar',
+        blink_ap: 'cabang_ap',
+        blink_auto_journal: 'cabang_auto_journal',
+        blink_reversing_journal: 'cabang_reversing_journal',
+        blink_journal: 'cabang_journal',
+        blink_noted_journal: 'cabang_noted_journal',
+        blink_ledger: 'cabang_ledger',
+        blink_trial_balance: 'cabang_trial_balance',
+        blink_pnl: 'cabang_pnl',
+        blink_balance_sheet: 'cabang_balance_sheet',
+        blink_exchange_rates: 'cabang_exchange_rates',
+        bxpo_sales_quotations: 'cabang_sales_quotations',
+        bxpo_flow_monitor: 'cabang_flow_monitor',
+        bxpo_sales: 'cabang_sales',
+        bxpo_quotations: 'cabang_quotations',
+        bxpo_shipments: 'cabang_shipments',
+        bxpo_bl: 'cabang_bl',
+        bxpo_approval: 'cabang_approval',
+        bxpo_partners: 'cabang_partners'
+    };
+
+    const getPermissionCandidates = (menuCode) => {
+        if (!menuCode) return [];
+        const candidates = [menuCode];
+        const activeDivision = getActiveDivision();
+        if (activeDivision === 'cabang') {
+            const alias = CABANG_PERMISSION_ALIAS[menuCode];
+            if (alias) candidates.push(alias);
+        }
+        return [...new Set(candidates)];
+    };
+
     /**
      * Check if user can access a menu
      * @param {string} menuCode - Menu code
      */
     const canAccess = (menuCode) => {
         if (isSuperAdmin() || isAdmin()) return true;
-        return permissions[menuCode]?.can_access || false;
+        return getPermissionCandidates(menuCode).some(code => permissions[code]?.can_access) || false;
     };
 
     /**
@@ -168,7 +214,7 @@ export const AuthProvider = ({ children }) => {
      */
     const canView = (menuCode) => {
         if (isSuperAdmin() || isAdmin()) return true;
-        return permissions[menuCode]?.can_view || false;
+        return getPermissionCandidates(menuCode).some(code => permissions[code]?.can_view) || false;
     };
 
     /**
@@ -178,7 +224,7 @@ export const AuthProvider = ({ children }) => {
     const canCreate = (menuCode) => {
         if (isSuperAdmin() || isAdmin()) return true;
         if (user?.user_level === 'view_only') return false;
-        return permissions[menuCode]?.can_create || false;
+        return getPermissionCandidates(menuCode).some(code => permissions[code]?.can_create) || false;
     };
 
     /**
@@ -188,7 +234,7 @@ export const AuthProvider = ({ children }) => {
     const canEdit = (menuCode) => {
         if (isSuperAdmin() || isAdmin()) return true;
         if (user?.user_level === 'view_only') return false;
-        return permissions[menuCode]?.can_edit || false;
+        return getPermissionCandidates(menuCode).some(code => permissions[code]?.can_edit) || false;
     };
 
     /**
@@ -198,7 +244,7 @@ export const AuthProvider = ({ children }) => {
     const canDelete = (menuCode) => {
         if (isSuperAdmin() || isAdmin()) return true;
         if (user?.user_level === 'view_only') return false;
-        return permissions[menuCode]?.can_delete || false;
+        return getPermissionCandidates(menuCode).some(code => permissions[code]?.can_delete) || false;
     };
 
     /**
@@ -208,7 +254,7 @@ export const AuthProvider = ({ children }) => {
     const canApprove = (menuCode) => {
         if (isSuperAdmin() || isAdmin()) return true;
         if (user?.user_level === 'view_only') return false;
-        return permissions[menuCode]?.can_approve || false;
+        return getPermissionCandidates(menuCode).some(code => permissions[code]?.can_approve) || false;
     };
 
     /**
@@ -217,7 +263,7 @@ export const AuthProvider = ({ children }) => {
      */
     const requiresApprovalForEdit = (menuCode) => {
         if (isSuperAdmin() || isAdmin()) return false;
-        return permissions[menuCode]?.requires_approval_for_edit || false;
+        return getPermissionCandidates(menuCode).some(code => permissions[code]?.requires_approval_for_edit) || false;
     };
 
     /**
@@ -226,7 +272,7 @@ export const AuthProvider = ({ children }) => {
      */
     const requiresApprovalForDelete = (menuCode) => {
         if (isSuperAdmin() || isAdmin()) return false;
-        return permissions[menuCode]?.requires_approval_for_delete || false;
+        return getPermissionCandidates(menuCode).some(code => permissions[code]?.requires_approval_for_delete) || false;
     };
 
     /**

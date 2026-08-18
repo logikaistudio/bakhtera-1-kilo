@@ -36,8 +36,9 @@ const ShipmentManagement = () => {
     const location = useLocation();
     // Detect if running in BXPO portal for permission & navigation context
     const isBxpo = location.pathname.startsWith('/bxpo');
+    const isCabang = location.pathname.startsWith('/cabang');
     const activeDivision = getActiveDivision();
-    const poMenuCode = isBxpo ? 'bxpo_shipments' : 'blink_purchase_order'; // BXPO users have shipment access = can create PO
+    const poMenuCode = isBxpo ? 'bxpo_shipments' : isCabang ? 'cabang_purchase_order' : 'blink_purchase_order';
 
     // PO generation from list
     const [showListPOModal, setShowListPOModal] = useState(false);

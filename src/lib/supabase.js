@@ -57,7 +57,9 @@ const SHARED_TRANSACTION_TABLES = new Set([
 
 const getDivision = () => {
     if (typeof window !== 'undefined' && window.location && window.location.pathname) {
-        return window.location.pathname.startsWith('/bxpo') ? 'bxpo' : 'blink';
+        if (window.location.pathname.startsWith('/bxpo')) return 'bxpo';
+        if (window.location.pathname.startsWith('/cabang')) return 'cabang';
+        return 'blink';
     }
     return 'blink';
 };

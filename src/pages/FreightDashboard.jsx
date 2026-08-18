@@ -9,12 +9,6 @@ import {
     DollarSign, Loader2, RefreshCw, Ship, Plane, Truck
 } from 'lucide-react';
 
-const BRANCH_SUMMARY = [
-    { id: 'CBG-JKT', name: 'Cabang Jakarta', salesOrders: 86, invoices: 41, revenue: 1450000000, ar: 210000000 },
-    { id: 'CBG-SBY', name: 'Cabang Surabaya', salesOrders: 57, invoices: 33, revenue: 980000000, ar: 130000000 },
-    { id: 'CBG-DPS', name: 'Cabang Denpasar', salesOrders: 28, invoices: 19, revenue: 460000000, ar: 72000000 },
-];
-
 const MONTHS_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 
 const fmtIDR = (v) => {
@@ -61,6 +55,7 @@ const FreightDashboard = () => {
     const [bigRevenue, setBigRevenue] = useState(0);
     const [monthlyData, setMonthlyData] = useState([]);
     const [agingData, setAgingData] = useState([]);
+    const [branchSummaryRows, setBranchSummaryRows] = useState([]);
     const [shipmentBreakdown, setShipmentBreakdown] = useState({
         import:   { count: 0, revenue: 0 },
         export:   { count: 0, revenue: 0 },
@@ -78,9 +73,58 @@ const FreightDashboard = () => {
         setLoading(true);
         try {
             await Promise.all([fetchRevenue(), fetchAging(), fetchShipmentBreakdown()]);
+            await fetchBranchSummary();
         } finally {
             setLoading(false);
         }
+    };
+
+    const fetchBranchSummary = async () => {
+        const [branchesRes, soRes, invRes, arRes] = await Promise.all([
+            supabase.from('branches').select('code,name,status').eq('status', 'active').order('name', { ascending: true }),
+            supabase.from('blink_shipments').select('id,branch_code').eq('division', 'cabang').neq('status', 'cancelled'),
+            supabase.from('blink_invoices').select('id,total_amount,branch_code,status').eq('division', 'cabang').not('status', 'in', '("draft","cancelled")'),
+            supabase.from('blink_ar_transactions').select('outstanding_amount,branch_code,status').eq('division', 'cabang').neq('status', 'paid'),
+        ]);
+
+        if (branchesRes.error) throw branchesRes.error;
+        if (soRes.error) throw soRes.error;
+        if (invRes.error) throw invRes.error;
+        if (arRes.error) throw arRes.error;
+
+        const byBranch = new Map();
+        (branchesRes.data || []).forEach((branch) => {
+            byBranch.set(branch.code, {
+                id: branch.code,
+                name: branch.name,
+                salesOrders: 0,
+                invoices: 0,
+                revenue: 0,
+                ar: 0,
+            });
+        });
+
+        (soRes.data || []).forEach((row) => {
+            const code = row.branch_code || 'UNASSIGNED';
+            if (!byBranch.has(code)) byBranch.set(code, { id: code, name: code === 'UNASSIGNED' ? 'Belum Dipetakan' : code, salesOrders: 0, invoices: 0, revenue: 0, ar: 0 });
+            byBranch.get(code).salesOrders += 1;
+        });
+
+        (invRes.data || []).forEach((row) => {
+            const code = row.branch_code || 'UNASSIGNED';
+            if (!byBranch.has(code)) byBranch.set(code, { id: code, name: code === 'UNASSIGNED' ? 'Belum Dipetakan' : code, salesOrders: 0, invoices: 0, revenue: 0, ar: 0 });
+            const branch = byBranch.get(code);
+            branch.invoices += 1;
+            branch.revenue += Number(row.total_amount || 0);
+        });
+
+        (arRes.data || []).forEach((row) => {
+            const code = row.branch_code || 'UNASSIGNED';
+            if (!byBranch.has(code)) byBranch.set(code, { id: code, name: code === 'UNASSIGNED' ? 'Belum Dipetakan' : code, salesOrders: 0, invoices: 0, revenue: 0, ar: 0 });
+            byBranch.get(code).ar += Number(row.outstanding_amount || 0);
+        });
+
+        setBranchSummaryRows(Array.from(byBranch.values()).sort((a, b) => b.revenue - a.revenue));
     };
 
     const fetchShipmentBreakdown = async () => {
@@ -207,7 +251,7 @@ const FreightDashboard = () => {
         buildTotalRow('AP'),
     ];
 
-    const branchSummaryTotals = BRANCH_SUMMARY.reduce(
+    const branchSummaryTotals = branchSummaryRows.reduce(
         (acc, row) => {
             acc.salesOrders += row.salesOrders;
             acc.invoices += row.invoices;
@@ -538,7 +582,7 @@ const FreightDashboard = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {BRANCH_SUMMARY.map((row) => (
+                            {branchSummaryRows.map((row) => (
                                 <tr key={row.id} className="border-b border-white/5 hover:bg-white/5 smooth-transition">
                                     <td className="py-2.5 px-3 text-silver-light">{row.name}</td>
                                     <td className="text-right py-2.5 px-3 text-blue-300">{row.salesOrders}</td>

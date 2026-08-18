@@ -1,11 +1,13 @@
 export const DIVISIONS = {
     BLINK: 'blink',
-    BXPO: 'bxpo'
+    BXPO: 'bxpo',
+    CABANG: 'cabang'
 };
 
 export const resolveDivisionFromPathname = (pathname = '') => {
     if (typeof pathname !== 'string') return DIVISIONS.BLINK;
     if (pathname.startsWith('/bxpo')) return DIVISIONS.BXPO;
+    if (pathname.startsWith('/cabang')) return DIVISIONS.CABANG;
     return DIVISIONS.BLINK;
 };
 
@@ -14,6 +16,7 @@ export const getActiveDivision = () => {
     const params = new URLSearchParams(window.location?.search || '');
     const requested = (params.get('division') || '').toLowerCase();
     if (requested === DIVISIONS.BXPO) return DIVISIONS.BXPO;
+    if (requested === DIVISIONS.CABANG) return DIVISIONS.CABANG;
     if (requested === DIVISIONS.BLINK) return DIVISIONS.BLINK;
     return resolveDivisionFromPathname(window.location?.pathname || '');
 };

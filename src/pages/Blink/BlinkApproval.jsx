@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { createPOApprovalJournal, createInvoiceJournal, ensureJournalSuccess, getAllCOA } from '../../utils/journalHelper';
 import { generateAPNumber, generateARNumber } from '../../utils/documentNumbers';
+import { getActiveDivision } from '../../utils/divisionContext';
 
 /**
  * ✅ BLINK APPROVAL CENTER
@@ -150,9 +151,12 @@ const recordApprovalHistory = async (item, action, reason = null, approverName =
     // IMPORTANT: This function must NEVER throw or block the approval flow.
     // History logging is secondary; the actual approval update is primary.
     try {
-        const approvalModule = typeof window !== 'undefined' && window.location && window.location.pathname.startsWith('/bxpo')
+        const activeDivision = getActiveDivision();
+        const approvalModule = activeDivision === 'bxpo'
             ? 'bxpo_operations'
-            : 'blink_operations';
+            : activeDivision === 'cabang'
+                ? 'cabang_operations'
+                : 'blink_operations';
         
         const payload = {
             document_number: item.refNumber || item.jobNumber || '-',
@@ -261,13 +265,11 @@ const BlinkApproval = () => {
     const fetchSubmissions = async () => {
         try {
             setLoading(true);
-            const division = typeof window !== 'undefined' && window.location && window.location.pathname.startsWith('/bxpo')
-                ? 'bxpo'
-                : 'blink';
+            const division = getActiveDivision();
 
-            // Fetch pending sales quotations (only for BXPO)
+            // Fetch pending sales quotations for divisions that use sales quotation approval flow
             let salesQuotations = [];
-            if (division === 'bxpo') {
+            if (division === 'bxpo' || division === 'cabang') {
                 const { data, error } = await supabase
                     .from('blink_sales_quotations')
                     .select('*')
@@ -429,7 +431,11 @@ const BlinkApproval = () => {
             // Fetch History - ISOLATED for Blink / BXPO
             let historyData = [];
             let histErr = null;
-            const historyModule = division === 'bxpo' ? 'bxpo_operations' : 'blink_operations';
+            const historyModule = division === 'bxpo'
+                ? 'bxpo_operations'
+                : division === 'cabang'
+                    ? 'cabang_operations'
+                    : 'blink_operations';
 
             // Try with module filter first
             const histRes = await supabase
@@ -473,7 +479,7 @@ const BlinkApproval = () => {
                     .from('blink_quotations')
                     .select('id, quotation_number, job_number, updated_at, created_at, rejection_reason')
                     .eq('status', 'cancelled'),
-                division === 'bxpo'
+                (division === 'bxpo' || division === 'cabang')
                     ? supabase
                         .from('blink_sales_quotations')
                         .select('id, quotation_number, job_number, updated_at, created_at, rejection_reason')
@@ -535,7 +541,7 @@ const BlinkApproval = () => {
                 })));
             }
 
-            if (division === 'bxpo' && cancelSalesQuotRes && !cancelSalesQuotRes.error) {
+            if ((division === 'bxpo' || division === 'cabang') && cancelSalesQuotRes && !cancelSalesQuotRes.error) {
                 cancellationLogs.push(...(cancelSalesQuotRes.data || []).map((row) => ({
                     id: `cancel-sales-quotation-${row.id}`,
                     approved_at: row.updated_at || row.created_at || new Date().toISOString(),
@@ -1006,8 +1012,12 @@ const BlinkApproval = () => {
                 setSelectedItem(null);
                 fetchSubmissions();
 
-                const isBxpo = window.location.pathname.startsWith('/bxpo');
-                const shipmentsPath = isBxpo ? '/bxpo/shipments' : '/blink/shipments';
+                const activeDivision = getActiveDivision();
+                const shipmentsPath = activeDivision === 'bxpo'
+                    ? '/bxpo/shipments'
+                    : activeDivision === 'cabang'
+                        ? '/cabang/shipments'
+                        : '/blink/shipments';
 
                 alert(`✅ Sales Quotation ${item.refNumber} disetujui!\n\n📦 Sales Order ${soNumber} berhasil dibuat.`);
                 setTimeout(() => navigate(shipmentsPath), 1000);
@@ -1111,8 +1121,13 @@ const BlinkApproval = () => {
                 fetchSubmissions();
 
                 alert(`✅ Quotation ${item.refNumber} disetujui!\n\n📦 Sales Order ${soNumber} berhasil dibuat.\n\n⚠️ Langkah berikutnya: Buka Sales Order Management → Submit for Approval → setelah disetujui manajer, tombol Generate PO & Invoice akan terbuka.`);
-                const isBxpoCtx = window.location.pathname.startsWith('/bxpo');
-                setTimeout(() => navigate(isBxpoCtx ? '/bxpo/shipments' : '/blink/shipments'), 1000);
+                const activeDivisionCtx = getActiveDivision();
+                const redirectPath = activeDivisionCtx === 'bxpo'
+                    ? '/bxpo/shipments'
+                    : activeDivisionCtx === 'cabang'
+                        ? '/cabang/shipments'
+                        : '/blink/shipments';
+                setTimeout(() => navigate(redirectPath), 1000);
                 return; // skip the generic alert below
             }
 
@@ -1705,18 +1720,23 @@ const BlinkApproval = () => {
                             {/* Link to quotation/PO page */}
                             <button
                                 onClick={() => {
-                                    // Finance is shared/global — always use /blink/finance/
+                                    const activeDivision = getActiveDivision();
+                                    const financeBasePath = activeDivision === 'cabang'
+                                        ? '/cabang/finance'
+                                        : '/blink/finance';
+
                                     if (selectedItem?.type === 'po') {
-                                        navigate('/blink/finance/purchase-orders');
+                                        navigate(`${financeBasePath}/purchase-orders`);
                                     } else if (selectedItem?.type === 'invoice') {
-                                        navigate('/blink/finance/invoices');
+                                        navigate(`${financeBasePath}/invoices`);
                                     } else {
                                         // Sales & Ops routes are division-aware
-                                        const isBxpoPortal = window.location.pathname.startsWith('/bxpo');
+                                        const isBxpoPortal = activeDivision === 'bxpo';
+                                        const isCabangPortal = activeDivision === 'cabang';
                                         if (selectedItem?.type === 'sales_quotation') {
-                                            navigate(isBxpoPortal ? '/bxpo/sales-quotations' : '/blink/sales-quotations');
+                                            navigate(isBxpoPortal ? '/bxpo/sales-quotations' : isCabangPortal ? '/cabang/sales-quotations' : '/blink/sales-quotations');
                                         } else {
-                                            navigate(isBxpoPortal ? '/bxpo/operations/quotations' : '/blink/operations/quotations');
+                                            navigate(isBxpoPortal ? '/bxpo/operations/quotations' : isCabangPortal ? '/cabang/operations/quotations' : '/blink/operations/quotations');
                                         }
                                     }
                                     closeModal();

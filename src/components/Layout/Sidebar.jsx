@@ -50,6 +50,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
     const { pendingApprovals = [] } = useData();
     const [isOpen, setIsOpen] = useState(false);
     const [expandedSection, setExpandedSection] = useState('');
+    const [branches, setBranches] = useState([]);
     const [expandedCategories, setExpandedCategories] = useState([
         'blink-marketing', 'blink-operations', 'blink-costing', 'blink-profit', 'blink-data', 'blink-approval',
         'bridge-operasional', 'bridge-finance', 'bridge-data', 'bridge-persetujuan',
@@ -72,7 +73,8 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
         const fetchBlinkPending = async () => {
             try {
                 const { supabase } = await import('../../lib/supabase');
-                const division = typeof window !== 'undefined' && window.location && window.location.pathname.startsWith('/bxpo') ? 'bxpo' : 'blink';
+                const path = typeof window !== 'undefined' && window.location ? window.location.pathname : '';
+                const division = path.startsWith('/bxpo') ? 'bxpo' : path.startsWith('/cabang') ? 'cabang' : 'blink';
                 
                 // Fetch Operations Pending
                 const [qRes, sRes, iRes, pRes] = await Promise.all([
@@ -98,6 +100,24 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
             window.removeEventListener('blink_approval_updated', fetchBlinkPending);
         };
     }, [location.pathname]);
+
+    // Load active branches for dynamic Cabang menu
+    React.useEffect(() => {
+        let mounted = true;
+        const loadBranches = async () => {
+            try {
+                const { supabase } = await import('../../lib/supabase');
+                const { data } = await supabase.from('branches').select('code,name,status').eq('status', 'active').order('name', { ascending: true });
+                if (!mounted) return;
+                setBranches(data || []);
+            } catch (e) {
+                // ignore
+            }
+        };
+        loadBranches();
+        const interval = setInterval(loadBranches, 60000);
+        return () => { mounted = false; clearInterval(interval); };
+    }, []);
     const lastPathRef = React.useRef(null);
 
     // Initial check and Listener for path changes
@@ -397,15 +417,41 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
     const cabangSubMenuItems = [
         { path: '/cabang', label: 'Dashboard Cabang', icon: LayoutDashboard, menuCode: 'cabang_dashboard' },
         {
-            type: 'category', label: '📋 Sales', items: [
-                { path: '/cabang/sales/orders', label: 'Sales Order', menuCode: 'cabang_sales_orders' },
-                { path: '/cabang/sales/customers', label: 'Customers', menuCode: 'cabang_sales_customers' },
+            type: 'category', label: '📋 Sales & Marketing', items: [
+                { path: '/cabang/sales-quotations', label: 'Sales Quotation', menuCode: 'cabang_sales_quotations' },
+                { path: '/cabang/flow-monitor', label: 'Flow Monitor', menuCode: 'cabang_flow_monitor' },
+                { path: '/cabang/sales-achievement', label: 'Sales Achievement', menuCode: 'cabang_sales' },
+                { path: '/cabang/sales-approvals', label: 'Approval Sales', menuCode: 'cabang_sales_approval', showBadge: true },
+            ]
+        },
+        {
+            type: 'category', label: '🚚 Operations', items: [
+                { path: '/cabang/operations/quotations', label: 'Quotation', menuCode: 'cabang_quotations' },
+                { path: '/cabang/shipments', label: 'Sales Order Management', menuCode: 'cabang_shipments' },
+                { path: '/cabang/operations/bl', label: 'BL/AWB Documents', menuCode: 'cabang_bl' },
+                { path: '/cabang/approvals', label: 'Approval Center', menuCode: 'cabang_approval', showBadge: true },
             ]
         },
         {
             type: 'category', label: '💰 Finance', items: [
-                { path: '/cabang/finance/invoices', label: 'Invoice', menuCode: 'cabang_finance_invoices' },
-                { path: '/cabang/finance/ar-ap', label: 'AR / AP', menuCode: 'cabang_finance_arap' },
+                { path: '/cabang/finance/invoices', label: 'Invoice', menuCode: 'cabang_invoices' },
+                { path: '/cabang/finance/purchase-orders', label: 'Purchase Order', menuCode: 'cabang_purchase_order' },
+                { path: '/cabang/finance/ar', label: 'Account Receivable (AR)', menuCode: 'cabang_ar' },
+                { path: '/cabang/finance/ap', label: 'Account Payable (AP)', menuCode: 'cabang_ap' },
+                { path: '/cabang/finance/auto-journal', label: 'Auto Jurnal', menuCode: 'cabang_auto_journal' },
+                { path: '/cabang/finance/reversing-journal', label: 'Reversing Jurnal', menuCode: 'cabang_reversing_journal' },
+                { path: '/cabang/finance/general-journal', label: 'General Jurnal', menuCode: 'cabang_journal' },
+                { path: '/cabang/finance/noted-journal', label: 'Jurnal Noted', menuCode: 'cabang_noted_journal' },
+                { path: '/cabang/finance/general-ledger', label: 'General Ledger', menuCode: 'cabang_ledger' },
+                { path: '/cabang/finance/trial-balance', label: 'Trial Balance', menuCode: 'cabang_trial_balance' },
+                { path: '/cabang/finance/profit-loss', label: 'Profit & Loss', menuCode: 'cabang_pnl' },
+                { path: '/cabang/finance/balance-sheet', label: 'Balance Sheet', menuCode: 'cabang_balance_sheet' },
+                { path: '/cabang/finance/exchange-rates', label: 'Kurs Referensi', menuCode: 'cabang_exchange_rates' },
+            ]
+        },
+        {
+            type: 'category', label: '⚙️ Master Data', items: [
+                { path: '/cabang/master/partners', label: 'Business Partners', menuCode: 'cabang_partners' },
             ]
         },
         {
@@ -827,6 +873,306 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                                     </div>
                                 );
                             }
+
+                                    // Special handling for Cabang: render each branch as top-level when branches exist
+                                    if (item.path === '/cabang') {
+                                        // If no branches created yet, show the legacy CABANG menu
+                                        if (!branches || branches.length === 0) {
+                                            if (!hasCabangAccess()) return null;
+                                            const isExpanded = expandedSection === 'cabang';
+                                            const isCabangActive = location.pathname.startsWith('/cabang');
+                                            const hasDashboardAccess = canAccessPortal('cabang_dashboard');
+
+                                            return (
+                                                <div key={item.path}>
+                                                    <div className="flex items-center gap-1" id="menu-cabang">
+                                                        {hasDashboardAccess ? (
+                                                            <Link
+                                                                to={item.path}
+                                                                onClick={() => {
+                                                                    if (isMobile) setIsOpen(false);
+                                                                    const isCurrentlyExpanded = expandedSection === 'cabang';
+                                                                    setExpandedSection(isCurrentlyExpanded ? '' : 'cabang');
+                                                                    if (!isCurrentlyExpanded) scrollToElement('menu-cabang');
+                                                                }}
+                                                                className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition text-sm ${isCabangActive
+                                                                    ? 'bg-white/20 text-white'
+                                                                    : 'text-silver-dark hover:text-white hover:bg-white/10'
+                                                                    }`}
+                                                            >
+                                                                <item.icon className="w-5 h-5 flex-shrink-0" />
+                                                                <div className="flex-1 text-left">
+                                                                    <div className="font-medium">{item.label}</div>
+                                                                    <div className={`text-xs ${isCabangActive ? 'text-white/70' : 'text-silver-dark'}`}>{item.subtitle}</div>
+                                                                </div>
+                                                            </Link>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => {
+                                                                    const isCurrentlyExpanded = expandedSection === 'cabang';
+                                                                    setExpandedSection(isCurrentlyExpanded ? '' : 'cabang');
+                                                                    if (!isCurrentlyExpanded) scrollToElement('menu-cabang');
+                                                                }}
+                                                                className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition text-sm text-left ${isCabangActive
+                                                                    ? 'bg-white/20 text-white'
+                                                                    : 'text-silver-dark hover:text-white hover:bg-white/10'
+                                                                    }`}
+                                                            >
+                                                                <item.icon className="w-5 h-5 flex-shrink-0" />
+                                                                <div className="flex-1 text-left">
+                                                                    <div className="font-medium">{item.label}</div>
+                                                                    <div className="text-xs text-silver-dark">{item.subtitle}</div>
+                                                                </div>
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            onClick={() => {
+                                                                const newState = isExpanded ? '' : 'cabang';
+                                                                setExpandedSection(newState);
+                                                                if (newState === 'cabang') scrollToElement('menu-cabang');
+                                                            }}
+                                                            className="p-2 hover:bg-dark-surface rounded-lg smooth-transition"
+                                                        >
+                                                            <ChevronRight className={`w-4 h-4 transition-transform text-silver-dark ${isExpanded ? 'rotate-90' : ''}`} />
+                                                        </button>
+                                                    </div>
+
+                                                    <AnimatePresence>
+                                                        {isExpanded && (
+                                                            <motion.div
+                                                                initial={{ height: 0, opacity: 0 }}
+                                                                animate={{ height: 'auto', opacity: 1 }}
+                                                                exit={{ height: 0, opacity: 0 }}
+                                                                className="ml-8 mt-1 space-y-1 overflow-hidden"
+                                                            >
+                                                                {cabangSubMenuItems.map((subItem, idx) => {
+                                                                    // categories are rendered as before
+                                                                    if (subItem.type === 'category') {
+                                                                        const categoryKey = 'cabang-' + subItem.label.toLowerCase().split(' ').pop();
+                                                                        const isCategoryExpanded = expandedCategories.includes(categoryKey);
+                                                                        const accessibleItems = subItem.items.filter(menuItem => {
+                                                                            if (menuItem.adminHqOnly && !isAdminHq) return false;
+                                                                            return !menuItem.menuCode || canAccessPortal(menuItem.menuCode, menuItem.menuCodes);
+                                                                        });
+                                                                        if (accessibleItems.length === 0) return null;
+
+                                                                        return (
+                                                                            <div key={`category-${idx}`}>
+                                                                                <button
+                                                                                    onClick={() => {
+                                                                                        setExpandedCategories(prev =>
+                                                                                            prev.includes(categoryKey)
+                                                                                                ? prev.filter(c => c !== categoryKey)
+                                                                                                : [...prev, categoryKey]
+                                                                                        );
+                                                                                    }}
+                                                                                    className="w-full flex items-center justify-between px-4 py-2 text-sm font-semibold text-silver hover:text-silver-light smooth-transition"
+                                                                                >
+                                                                                    <span>{subItem.label}</span>
+                                                                                    <ChevronRight className={`w-3 h-3 transition-transform ${isCategoryExpanded ? 'rotate-90' : ''}`} />
+                                                                                </button>
+
+                                                                                <AnimatePresence>
+                                                                                    {isCategoryExpanded && (
+                                                                                        <motion.div
+                                                                                            initial={{ height: 0, opacity: 0 }}
+                                                                                            animate={{ height: 'auto', opacity: 1 }}
+                                                                                            exit={{ height: 0, opacity: 0 }}
+                                                                                            className="overflow-hidden"
+                                                                                        >
+                                                                                            {accessibleItems.map((menuItem, itemIdx) => {
+                                                                                                if (menuItem.type === 'divider') {
+                                                                                                    return (
+                                                                                                        <div key={`divider-${itemIdx}`} className="pl-8 pr-4 pt-3 pb-1 border-t border-dark-border/30 mt-2 first:mt-0 first:border-t-0">
+                                                                                                            <span className="text-xs font-bold text-silver-light uppercase tracking-widest">
+                                                                                                                {menuItem.label}
+                                                                                                            </span>
+                                                                                                        </div>
+                                                                                                    );
+                                                                                                }
+
+                                                                                                // Build branch-aware path
+                                                                                                const branchPathSuffix = menuItem.path.startsWith('/cabang') ? menuItem.path.substring('/cabang'.length) : menuItem.path;
+                                                                                                // Use first branch as example for URL template in category view
+                                                                                                const branchUrl = (branches[0] && branches[0].code) ? `/cabang/${branches[0].code}${branchPathSuffix}` : menuItem.path;
+
+                                                                                                return (
+                                                                                                    <Link
+                                                                                                        key={menuItem.path + '-' + itemIdx}
+                                                                                                        to={branchUrl}
+                                                                                                        onClick={() => isMobile && setIsOpen(false)}
+                                                                                                        className={`flex items-center ${menuItem.indent ? 'pl-16' : 'pl-14'} pr-4 py-2 text-sm smooth-transition border-l-2 ml-2 ${isActive(menuItem.path)
+                                                                                                            ? 'bg-white/20 text-white font-medium border-white sidebar-active-item'
+                                                                                                            : 'text-silver-dark hover:text-white hover:bg-white/10 border-transparent hover:border-white/50'
+                                                                                                            }`}
+                                                                                                    >
+                                                                                                        <span className="flex-1">{menuItem.label}</span>
+                                                                                                    </Link>
+                                                                                                );
+                                                                                            })}
+                                                                                        </motion.div>
+                                                                                    )}
+                                                                                </AnimatePresence>
+                                                                            </div>
+                                                                        );
+                                                                    }
+
+                                                                    // Standalone items for cabang (dashboard etc.)
+                                                                    if (subItem.menuCode && !canAccessPortal(subItem.menuCode, subItem.menuCodes)) return null;
+                                                                    // For branch-level rendering, link to first branch as example
+                                                                    const pathForFirst = (branches[0] && branches[0].code) ? `/cabang/${branches[0].code}${subItem.path.replace('/cabang', '')}` : subItem.path;
+                                                                    return (
+                                                                        <Link
+                                                                            key={subItem.path}
+                                                                            to={pathForFirst}
+                                                                            onClick={() => isMobile && setIsOpen(false)}
+                                                                            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm smooth-transition ${isActive(subItem.path)
+                                                                                ? 'bg-white/20 text-white font-medium'
+                                                                                : 'text-silver-dark hover:text-white hover:bg-white/10'
+                                                                                }`}
+                                                                        >
+                                                                            {subItem.icon && <subItem.icon className="w-4 h-4" />}
+                                                                            <span>{subItem.label}</span>
+                                                                        </Link>
+                                                                    );
+                                                                })}
+                                                            </motion.div>
+                                                        )}
+                                                    </AnimatePresence>
+                                                </div>
+                                            );
+                                        }
+
+                                        // If branches exist render each branch as its own top-level menu
+                                        return branches.map((branch) => {
+                                            const isExpandedBranch = expandedSection === `cabang_${branch.code}`;
+                                            const isBranchActive = location.pathname.startsWith(`/cabang/${branch.code}`) || location.pathname.startsWith('/cabang');
+                                            return (
+                                                <div key={branch.code}>
+                                                    <div className="flex items-center gap-1" id={`menu-cabang-${branch.code}`}>
+                                                        <button
+                                                            onClick={() => {
+                                                                const isCurrentlyExpanded = expandedSection === `cabang_${branch.code}`;
+                                                                setExpandedSection(isCurrentlyExpanded ? '' : `cabang_${branch.code}`);
+                                                                if (!isCurrentlyExpanded) scrollToElement(`menu-cabang-${branch.code}`);
+                                                            }}
+                                                            className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-lg smooth-transition text-sm ${isBranchActive
+                                                                ? 'bg-white/20 text-white'
+                                                                : 'text-silver-dark hover:text-white hover:bg-white/10'
+                                                                }`}
+                                                        >
+                                                            <GitBranch className="w-5 h-5 flex-shrink-0" />
+                                                            <div className="flex-1 text-left">
+                                                                <div className="font-medium">{branch.name}</div>
+                                                                <div className="text-xs text-silver-dark">Cabang (kode: {branch.code})</div>
+                                                            </div>
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setExpandedSection(isExpandedBranch ? '' : `cabang_${branch.code}`)}
+                                                            className="p-2 hover:bg-dark-surface rounded-lg smooth-transition"
+                                                        >
+                                                            <ChevronRight className={`w-4 h-4 transition-transform text-silver-dark ${isExpandedBranch ? 'rotate-90' : ''}`} />
+                                                        </button>
+                                                    </div>
+
+                                                    <AnimatePresence>
+                                                        {isExpandedBranch && (
+                                                            <motion.div
+                                                                initial={{ height: 0, opacity: 0 }}
+                                                                animate={{ height: 'auto', opacity: 1 }}
+                                                                exit={{ height: 0, opacity: 0 }}
+                                                                className="ml-8 mt-1 space-y-1 overflow-hidden"
+                                                            >
+                                                                {cabangSubMenuItems.map((subItem, idx) => {
+                                                                    if (subItem.type === 'category') {
+                                                                        const categoryKey = `cabang-${branch.code}-${subItem.label.toLowerCase().split(' ').pop()}`;
+                                                                        const isCategoryExpanded = expandedCategories.includes(categoryKey);
+                                                                        const accessibleItems = subItem.items.filter(menuItem => {
+                                                                            if (menuItem.adminHqOnly && !isAdminHq) return false;
+                                                                            return !menuItem.menuCode || canAccessPortal(menuItem.menuCode, menuItem.menuCodes);
+                                                                        });
+                                                                        if (accessibleItems.length === 0) return null;
+
+                                                                        return (
+                                                                            <div key={`branch-category-${branch.code}-${idx}`}>
+                                                                                <button
+                                                                                    onClick={() => {
+                                                                                        setExpandedCategories(prev =>
+                                                                                            prev.includes(categoryKey)
+                                                                                                ? prev.filter(c => c !== categoryKey)
+                                                                                                : [...prev, categoryKey]
+                                                                                        );
+                                                                                    }}
+                                                                                    className="w-full flex items-center justify-between px-4 py-2 text-sm font-semibold text-silver hover:text-silver-light smooth-transition"
+                                                                                >
+                                                                                    <span>{subItem.label}</span>
+                                                                                    <ChevronRight className={`w-3 h-3 transition-transform ${isCategoryExpanded ? 'rotate-90' : ''}`} />
+                                                                                </button>
+
+                                                                                <AnimatePresence>
+                                                                                    {isCategoryExpanded && (
+                                                                                        <motion.div
+                                                                                            initial={{ height: 0, opacity: 0 }}
+                                                                                            animate={{ height: 'auto', opacity: 1 }}
+                                                                                            exit={{ height: 0, opacity: 0 }}
+                                                                                            className="overflow-hidden"
+                                                                                        >
+                                                                                            {accessibleItems.map((menuItem, itemIdx) => {
+                                                                                                if (menuItem.type === 'divider') return (
+                                                                                                    <div key={`div-${itemIdx}`} className="pl-8 pr-4 pt-3 pb-1 border-t border-dark-border/30 mt-2 first:mt-0 first:border-t-0">
+                                                                                                        <span className="text-xs font-bold text-silver-light uppercase tracking-widest">{menuItem.label}</span>
+                                                                                                    </div>
+                                                                                                );
+
+                                                                                                const branchPathSuffix = menuItem.path.startsWith('/cabang') ? menuItem.path.substring('/cabang'.length) : menuItem.path;
+                                                                                                const url = `/cabang/${branch.code}${branchPathSuffix}`;
+
+                                                                                                return (
+                                                                                                    <Link
+                                                                                                        key={`${branch.code}-${menuItem.path}-${itemIdx}`}
+                                                                                                        to={url}
+                                                                                                        onClick={() => isMobile && setIsOpen(false)}
+                                                                                                        className={`flex items-center ${menuItem.indent ? 'pl-16' : 'pl-14'} pr-4 py-2 text-sm smooth-transition border-l-2 ml-2 ${isActive(url)
+                                                                                                            ? 'bg-white/20 text-white font-medium border-white sidebar-active-item'
+                                                                                                            : 'text-silver-dark hover:text-white hover:bg-white/10 border-transparent hover:border-white/50'
+                                                                                                            }`}
+                                                                                                    >
+                                                                                                        <span className="flex-1">{menuItem.label}</span>
+                                                                                                    </Link>
+                                                                                                );
+                                                                                            })}
+                                                                                        </motion.div>
+                                                                                    )}
+                                                                                </AnimatePresence>
+                                                                            </div>
+                                                                        );
+                                                                    }
+
+                                                                    // Standalone items
+                                                                    if (subItem.menuCode && !canAccessPortal(subItem.menuCode, subItem.menuCodes)) return null;
+                                                                    const url = `/cabang/${branch.code}${subItem.path.replace('/cabang', '')}`;
+                                                                    return (
+                                                                        <Link
+                                                                            key={`${branch.code}-${subItem.path}`}
+                                                                            to={url}
+                                                                            onClick={() => isMobile && setIsOpen(false)}
+                                                                            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm smooth-transition ${isActive(url)
+                                                                                ? 'bg-white/20 text-white font-medium'
+                                                                                : 'text-silver-dark hover:text-white hover:bg-white/10'
+                                                                                }`}
+                                                                        >
+                                                                            {subItem.icon && <subItem.icon className="w-4 h-4" />}
+                                                                            <span>{subItem.label}</span>
+                                                                        </Link>
+                                                                    );
+                                                                })}
+                                                            </motion.div>
+                                                        )}
+                                                    </AnimatePresence>
+                                                </div>
+                                            );
+                                        });
+                                    }
 
                             // Special handling for BIG with submenu
                             if (item.path === '/big') {
@@ -1304,19 +1650,34 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                                                                                 exit={{ height: 0, opacity: 0 }}
                                                                                 className="overflow-hidden"
                                                                             >
-                                                                                {accessibleItems.map((itemObj) => (
-                                                                                    <Link
-                                                                                        key={itemObj.path}
-                                                                                        to={itemObj.path}
-                                                                                        onClick={() => isMobile && setIsOpen(false)}
-                                                                                        className={`flex items-center pl-14 pr-4 py-2 text-sm smooth-transition border-l-2 ml-2 ${isActive(itemObj.path)
-                                                                                            ? 'bg-white/20 text-white font-medium border-white sidebar-active-item'
-                                                                                            : 'text-silver-dark hover:text-white hover:bg-white/10 border-transparent hover:border-white/50'
-                                                                                            }`}
-                                                                                    >
-                                                                                        <span className="flex-1">{itemObj.label}</span>
-                                                                                    </Link>
-                                                                                ))}
+                                                                                {accessibleItems.map((itemObj) => {
+                                                                                    const isSalesApproval = itemObj.menuCode === 'cabang_sales_approval';
+                                                                                    const isOpsApproval = itemObj.menuCode === 'cabang_approval';
+                                                                                    const pendingCount = isSalesApproval
+                                                                                        ? blinkSalesPendingCount
+                                                                                        : isOpsApproval
+                                                                                            ? blinkOpsPendingCount
+                                                                                            : 0;
+
+                                                                                    return (
+                                                                                        <Link
+                                                                                            key={itemObj.path}
+                                                                                            to={itemObj.path}
+                                                                                            onClick={() => isMobile && setIsOpen(false)}
+                                                                                            className={`flex items-center pl-14 pr-4 py-2 text-sm smooth-transition border-l-2 ml-2 ${isActive(itemObj.path)
+                                                                                                ? 'bg-white/20 text-white font-medium border-white sidebar-active-item'
+                                                                                                : 'text-silver-dark hover:text-white hover:bg-white/10 border-transparent hover:border-white/50'
+                                                                                                }`}
+                                                                                        >
+                                                                                            <span className="flex-1">{itemObj.label}</span>
+                                                                                            {itemObj.showBadge && pendingCount > 0 && (
+                                                                                                <span className="ml-2 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-yellow-500 text-white text-[10px] font-bold px-1 animate-pulse">
+                                                                                                    {pendingCount > 99 ? '99+' : pendingCount}
+                                                                                                </span>
+                                                                                            )}
+                                                                                        </Link>
+                                                                                    );
+                                                                                })}
                                                                             </motion.div>
                                                                         )}
                                                                     </AnimatePresence>

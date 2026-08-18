@@ -1,40 +1,70 @@
 import React, { useMemo, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Building2, PlusCircle, ShieldCheck, XCircle } from 'lucide-react';
-
-const INITIAL_BRANCHES = [
-    { code: 'CBG-JKT', name: 'Cabang Jakarta', city: 'Jakarta', status: 'active', mode: 'standalone' },
-    { code: 'CBG-SBY', name: 'Cabang Surabaya', city: 'Surabaya', status: 'active', mode: 'standalone' },
-    { code: 'CBG-DPS', name: 'Cabang Denpasar', city: 'Denpasar', status: 'active', mode: 'shared' },
-];
+import { supabase } from '../../lib/supabase';
 
 const CabangManagement = () => {
     const { user, isAdmin, isSuperAdmin } = useAuth();
-    const [branches, setBranches] = useState(INITIAL_BRANCHES);
+    const [branches, setBranches] = useState([]);
     const [form, setForm] = useState({ code: '', name: '', city: '', mode: 'standalone' });
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
 
     const isAdminHq = useMemo(() => {
         const level = String(user?.user_level || '').toLowerCase();
         return isSuperAdmin() || isAdmin() || level === 'admin_hq';
     }, [isAdmin, isSuperAdmin, user?.user_level]);
 
-    const handleCreate = (e) => {
+    const fetchBranches = React.useCallback(async () => {
+        try {
+            setLoading(true);
+            const { data, error } = await supabase
+                .from('branches')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            setBranches(data || []);
+        } catch (error) {
+            console.error('Failed to load branches:', error);
+            alert(`Gagal memuat data cabang: ${error.message}`);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    React.useEffect(() => {
+        fetchBranches();
+    }, [fetchBranches]);
+
+    const handleCreate = async (e) => {
         e.preventDefault();
         if (!isAdminHq) return;
         if (!form.code.trim() || !form.name.trim()) return;
 
-        setBranches((prev) => [
-            {
+        try {
+            setSaving(true);
+            const payload = {
                 code: form.code.trim().toUpperCase(),
                 name: form.name.trim(),
-                city: form.city.trim() || '-',
-                status: 'active',
+                city: form.city.trim() || null,
                 mode: form.mode,
-            },
-            ...prev,
-        ]);
+                status: 'active',
+                created_by: user?.id || null,
+            };
 
-        setForm({ code: '', name: '', city: '', mode: 'standalone' });
+            const { error } = await supabase.from('branches').insert([payload]);
+            if (error) throw error;
+
+            setForm({ code: '', name: '', city: '', mode: 'standalone' });
+            await fetchBranches();
+            alert('Cabang berhasil dibuat.');
+        } catch (error) {
+            console.error('Create branch failed:', error);
+            alert(`Gagal membuat cabang: ${error.message}`);
+        } finally {
+            setSaving(false);
+        }
     };
 
     return (
@@ -110,11 +140,11 @@ const CabangManagement = () => {
 
                 <button
                     type="submit"
-                    disabled={!isAdminHq}
+                    disabled={!isAdminHq || saving}
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-blue text-white text-sm font-medium hover:bg-accent-blue/90 smooth-transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     <Building2 className="w-4 h-4" />
-                    Simpan Cabang
+                    {saving ? 'Menyimpan...' : 'Simpan Cabang'}
                 </button>
             </form>
 
@@ -134,11 +164,21 @@ const CabangManagement = () => {
                             </tr>
                         </thead>
                         <tbody>
+                            {!loading && branches.length === 0 && (
+                                <tr>
+                                    <td colSpan={5} className="px-5 py-8 text-center text-silver-dark">Belum ada data cabang.</td>
+                                </tr>
+                            )}
+                            {loading && (
+                                <tr>
+                                    <td colSpan={5} className="px-5 py-8 text-center text-silver-dark">Memuat data cabang...</td>
+                                </tr>
+                            )}
                             {branches.map((item) => (
                                 <tr key={item.code} className="border-b border-dark-border/40 hover:bg-dark-surface/40 smooth-transition">
                                     <td className="px-5 py-3 text-silver-light font-medium">{item.code}</td>
                                     <td className="px-5 py-3 text-silver">{item.name}</td>
-                                    <td className="px-5 py-3 text-silver">{item.city}</td>
+                                    <td className="px-5 py-3 text-silver">{item.city || '-'}</td>
                                     <td className="px-5 py-3">
                                         <span className={`inline-flex px-2 py-1 rounded-md text-xs border ${item.mode === 'standalone'
                                             ? 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30'

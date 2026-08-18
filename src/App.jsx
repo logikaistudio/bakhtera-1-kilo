@@ -108,8 +108,6 @@ import BigCodeOfAccount from './pages/Big/Finance/BigCodeOfAccount';
 
 // Cabang Module
 import CabangDashboard from './pages/Cabang/CabangDashboard';
-import CabangSales from './pages/Cabang/CabangSales';
-import CabangFinance from './pages/Cabang/CabangFinance';
 import CabangManagement from './pages/Cabang/CabangManagement';
 
 // Pabean Module
@@ -283,10 +281,35 @@ function App() {
 
                     {/* Cabang Module */}
                     <Route path="/cabang" element={<ProtectedRoute menuCode="cabang_dashboard"><CabangDashboard /></ProtectedRoute>} />
-                    <Route path="/cabang/sales/orders" element={<ProtectedRoute menuCode="cabang_sales_orders"><CabangSales /></ProtectedRoute>} />
-                    <Route path="/cabang/sales/customers" element={<ProtectedRoute menuCode="cabang_sales_customers"><CabangSales /></ProtectedRoute>} />
-                    <Route path="/cabang/finance/invoices" element={<ProtectedRoute menuCode="cabang_finance_invoices"><CabangFinance /></ProtectedRoute>} />
-                    <Route path="/cabang/finance/ar-ap" element={<ProtectedRoute menuCode="cabang_finance_arap"><CabangFinance /></ProtectedRoute>} />
+                    {/* Cabang Sales Flow (setara Blink/BXPO) */}
+                    <Route path="/cabang/sales-quotations" element={<ProtectedRoute menuCode="cabang_sales_quotations"><SalesQuotation /></ProtectedRoute>} />
+                    <Route path="/cabang/operations/quotations" element={<ProtectedRoute menuCode="cabang_quotations"><QuotationManagement /></ProtectedRoute>} />
+                    <Route path="/cabang/flow-monitor" element={<ProtectedRoute menuCode="cabang_flow_monitor"><FlowMonitor /></ProtectedRoute>} />
+                    <Route path="/cabang/sales-achievement" element={<ProtectedRoute menuCode="cabang_sales"><SalesAchievement /></ProtectedRoute>} />
+                    <Route path="/cabang/sales-approvals" element={<ProtectedRoute menuCode="cabang_sales_approval"><SalesBlinkApproval /></ProtectedRoute>} />
+                    <Route path="/cabang/shipments" element={<ProtectedRoute menuCode="cabang_shipments"><ShipmentManagement /></ProtectedRoute>} />
+                    <Route path="/cabang/operations/tracking" element={<ProtectedRoute menuCode="cabang_shipments"><TrackingMonitoring /></ProtectedRoute>} />
+                    <Route path="/cabang/operations/awb" element={<ProtectedRoute menuCode="cabang_shipments"><AWBManagement /></ProtectedRoute>} />
+                    <Route path="/cabang/operations/bl" element={<ProtectedRoute menuCode="cabang_bl"><BLManagement /></ProtectedRoute>} />
+                    <Route path="/cabang/master/partners" element={<ProtectedRoute menuCode="cabang_partners"><PartnerManagement /></ProtectedRoute>} />
+                    <Route path="/cabang/approvals" element={<ProtectedRoute menuCode="cabang_approval"><BlinkApproval /></ProtectedRoute>} />
+
+                    {/* Cabang Finance Flow (terisolasi dari Blink via division=cabang) */}
+                    <Route path="/cabang/finance/invoices" element={<ProtectedRoute menuCode="cabang_invoices"><InvoiceManagement /></ProtectedRoute>} />
+                    <Route path="/cabang/finance/purchase-orders" element={<ProtectedRoute menuCode="cabang_purchase_order"><PurchaseOrder /></ProtectedRoute>} />
+                    <Route path="/cabang/finance/auto-journal" element={<ProtectedRoute menuCode="cabang_auto_journal"><AutoJournal /></ProtectedRoute>} />
+                    <Route path="/cabang/finance/reversing-journal" element={<ProtectedRoute menuCode="cabang_reversing_journal"><ReversingJournal /></ProtectedRoute>} />
+                    <Route path="/cabang/finance/general-journal" element={<ProtectedRoute menuCode="cabang_journal"><GeneralJournal /></ProtectedRoute>} />
+                    <Route path="/cabang/finance/noted-journal" element={<ProtectedRoute menuCode="cabang_noted_journal"><NotedJournal /></ProtectedRoute>} />
+                    <Route path="/cabang/finance/general-ledger" element={<ProtectedRoute menuCode="cabang_ledger"><GeneralLedger /></ProtectedRoute>} />
+                    <Route path="/cabang/finance/trial-balance" element={<ProtectedRoute menuCode="cabang_trial_balance"><TrialBalance /></ProtectedRoute>} />
+                    <Route path="/cabang/finance/ar" element={<ProtectedRoute menuCode="cabang_ar"><AccountsReceivable /></ProtectedRoute>} />
+                    <Route path="/cabang/finance/ap" element={<ProtectedRoute menuCode="cabang_ap"><AccountsPayable /></ProtectedRoute>} />
+                    <Route path="/cabang/finance/profit-loss" element={<ProtectedRoute menuCode="cabang_pnl"><ProfitLoss /></ProtectedRoute>} />
+                    <Route path="/cabang/finance/profit-loss-detail" element={<ProtectedRoute menuCode="cabang_pnl"><ProfitLossDetail /></ProtectedRoute>} />
+                    <Route path="/cabang/finance/balance-sheet" element={<ProtectedRoute menuCode="cabang_balance_sheet"><BalanceSheet /></ProtectedRoute>} />
+                    <Route path="/cabang/finance/exchange-rates" element={<ProtectedRoute menuCode="cabang_exchange_rates"><ExchangeRates /></ProtectedRoute>} />
+
                     <Route path="/cabang/management" element={<ProtectedRoute menuCode="cabang_management"><CabangManagement /></ProtectedRoute>} />
                     <Route path="/cabang/management/new" element={<ProtectedRoute menuCode="cabang_create"><CabangManagement /></ProtectedRoute>} />
 
