@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { syncRolePermissionsWithMenus } from '../../services/rolePermissionSyncService';
+import {
+    syncRolePermissionsWithMenus,
+    buildRoleOptionsFromPermissionRows,
+} from '../../services/rolePermissionSyncService';
 import { getAllUsers, createUser, updateUser, resetPassword, toggleUserActive, deleteUser, bulkResetLegacyPasswords } from '../../services/userService';
 import { generatePassword } from '../../services/passwordService';
 import { Users, Plus, Edit, Key, Ban, CheckCircle, Shield, RefreshCw, Trash2, Download, Eye, EyeOff } from 'lucide-react';
@@ -22,16 +25,6 @@ const ROLE_COLORS = {
     staff: { bg: '#f0fdf4', text: '#16a34a', border: '#bbf7d0' },
     viewer: { bg: '#f9fafb', text: '#6b7280', border: '#e5e7eb' },
 };
-
-// Default roles sebagai fallback — selalu tersedia
-const FALLBACK_ROLES = [
-    { id: 'super_admin', label: 'Super Admin' },
-    { id: 'direksi',     label: 'Direksi' },
-    { id: 'chief',       label: 'Chief' },
-    { id: 'manager',     label: 'Manager' },
-    { id: 'staff',       label: 'Staff' },
-    { id: 'viewer',      label: 'Viewer' },
-];
 
 const getDefaultColor = () => ({ bg: '#f0f9ff', text: '#0284c7', border: '#bae6fd' });
 
@@ -70,7 +63,7 @@ const UserManagement = () => {
     const loadRoles = useCallback(async () => {
         try {
             try {
-                await syncRolePermissionsWithMenus({ pruneStale: true });
+                await syncRolePermissionsWithMenus({ pruneStale: false });
             } catch (syncErr) {
                 console.warn('⚠️ role/menu auto-sync skipped:', syncErr.message);
             }
@@ -83,41 +76,18 @@ const UserManagement = () => {
             if (error) {
                 console.warn('⚠️ loadRoles query error (using fallback):', error.message);
                 // Jika error (mis. RLS belum di-fix), gunakan fallback
-                setAvailableRoles(FALLBACK_ROLES);
+                setAvailableRoles(buildRoleOptionsFromPermissionRows({
+                    rows: [],
+                    includeSuperAdmin: true,
+                    includeDefaults: true,
+                }));
                 return;
             }
 
-            // Deduplicate by role_id — satu role bisa punya banyak menu_code
-            const roleMap = new Map();
-
-            // Selalu masukkan default roles terlebih dulu
-            FALLBACK_ROLES.forEach(r => roleMap.set(r.id, r.label));
-
-            // Override/tambah dengan data dari DB (termasuk custom roles)
-            if (data && Array.isArray(data)) {
-                data.forEach(d => {
-                    if (d.role_id) {
-                        const label = d.role_label?.trim() ||
-                            d.role_id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                        // Hanya update label jika belum ada atau kosong
-                        if (!roleMap.has(d.role_id) || label !== d.role_id) {
-                            roleMap.set(d.role_id, label);
-                        }
-                    }
-                });
-            }
-
-            const roles = Array.from(roleMap, ([id, label]) => ({ id, label })).sort((a, b) => {
-                if (a.id === 'super_admin') return -1;
-                if (b.id === 'super_admin') return 1;
-                // Urutkan default roles di atas custom roles
-                const defaultOrder = ['direksi', 'chief', 'manager', 'staff', 'viewer'];
-                const aIdx = defaultOrder.indexOf(a.id);
-                const bIdx = defaultOrder.indexOf(b.id);
-                if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
-                if (aIdx !== -1) return -1;
-                if (bIdx !== -1) return 1;
-                return a.label.localeCompare(b.label);
+            const roles = buildRoleOptionsFromPermissionRows({
+                rows: data || [],
+                includeSuperAdmin: true,
+                includeDefaults: true,
             });
 
             setAvailableRoles(roles);
@@ -125,7 +95,11 @@ const UserManagement = () => {
         } catch (err) {
             console.error('❌ loadRoles error:', err.message);
             // Selalu tampilkan fallback agar dropdown tidak pernah kosong
-            setAvailableRoles(FALLBACK_ROLES);
+            setAvailableRoles(buildRoleOptionsFromPermissionRows({
+                rows: [],
+                includeSuperAdmin: true,
+                includeDefaults: true,
+            }));
         }
     }, []);
 

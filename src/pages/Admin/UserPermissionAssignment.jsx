@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
-import { syncRolePermissionsWithMenus } from '../../services/rolePermissionSyncService';
+import {
+    syncRolePermissionsWithMenus,
+    buildRoleOptionsFromPermissionRows,
+} from '../../services/rolePermissionSyncService';
 import {
     Users, Shield, CheckCircle2, AlertCircle, Edit2, Save, X,
     UserCheck, UserX, Info, RefreshCw
@@ -69,7 +72,7 @@ const UserPermissionAssignment = () => {
     const loadRoles = useCallback(async () => {
         try {
             try {
-                await syncRolePermissionsWithMenus({ pruneStale: true });
+                await syncRolePermissionsWithMenus({ pruneStale: false });
             } catch (syncErr) {
                 console.warn('⚠️ role/menu auto-sync skipped:', syncErr.message);
             }
@@ -85,39 +88,21 @@ const UserPermissionAssignment = () => {
                 throw error;
             }
 
-            // ✅ Deduplicate by role_id
-            const roleMap = new Map();
-            roleMap.set('super_admin', 'Super Admin');
-            
-            if (data && Array.isArray(data)) {
-                data.forEach(d => {
-                    if (!roleMap.has(d.role_id) && d.role_id) {
-                        const label = d.role_label?.trim() || d.role_id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                        roleMap.set(d.role_id, label);
-                    }
-                });
-            }
-
-            const rolesArray = Array.from(roleMap, ([id, label]) => ({ id, label })).sort((a, b) => {
-                if (a.id === 'super_admin') return -1;
-                if (b.id === 'super_admin') return 1;
-                return a.label.localeCompare(b.label);
+            const rolesArray = buildRoleOptionsFromPermissionRows({
+                rows: data || [],
+                includeSuperAdmin: true,
+                includeDefaults: true,
             });
 
             setRoles(rolesArray);
             console.log('✅ Roles loaded in UserPermissionAssignment:', rolesArray);
         } catch (err) {
             console.error('❌ loadRoles error:', err.message);
-            // ✅ Fixed: Use fallback with console warning
-            const defaultRoles = [
-                { id: 'super_admin', label: 'Super Admin' },
-                { id: 'direksi', label: 'Direksi' },
-                { id: 'chief', label: 'Chief' },
-                { id: 'manager', label: 'Manager' },
-                { id: 'staff', label: 'Staff' },
-                { id: 'viewer', label: 'Viewer' },
-            ];
-            setRoles(defaultRoles);
+            setRoles(buildRoleOptionsFromPermissionRows({
+                rows: [],
+                includeSuperAdmin: true,
+                includeDefaults: true,
+            }));
             console.warn('⚠️  Using fallback roles due to error:', err.message);
         }
     }, []);

@@ -7,7 +7,10 @@ import {
     RefreshCw, Database, Info, Wallet
 } from 'lucide-react';
 import { APP_MENUS } from '../../config/menuConfig';
-import { syncRolePermissionsWithMenus } from '../../services/rolePermissionSyncService';
+import {
+    syncRolePermissionsWithMenus,
+    buildRoleOptionsFromPermissionRows,
+} from '../../services/rolePermissionSyncService';
 
 /* ─────────────────────────────────────────────
    MODULE_MENUS — derived dari APP_MENUS (menuConfig.js)
@@ -108,7 +111,7 @@ const RolePermissions = () => {
     }, []);
 
     const runMenuSync = async ({ showNotification = false } = {}) => {
-        const summary = await syncRolePermissionsWithMenus({ pruneStale: true });
+        const summary = await syncRolePermissionsWithMenus({ pruneStale: false });
 
         setSyncAudit({
             lastSyncedAt: new Date().toISOString(),
@@ -138,7 +141,7 @@ const RolePermissions = () => {
     const loadPermissions = async () => {
         setLoading(true);
         try {
-            // Auto-sync agar menu baru langsung punya role item, dan menu usang dibersihkan.
+            // Auto-sync agar menu baru langsung punya role item.
             await runMenuSync();
 
             const { data, error } = await supabase
@@ -162,19 +165,15 @@ const RolePermissions = () => {
                 return;
             }
 
-            // ── Deteksi custom roles dari DB ──────────────────────────
-            const defaultIds = new Set(DEFAULT_ROLES.map(r => r.id));
-            const dbRoleIds = [...new Set((data || []).map(d => d.role_id))];
-            const customRoles = dbRoleIds
-                .filter(id => !defaultIds.has(id))
-                .map(id => {
-                    // Ambil label dari kolom role_label yang tersimpan di DB
-                    const sample = data.find(d => d.role_id === id);
-                    const label = sample?.role_label || id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                    return { id, label, color: 'gray' };
-                });
-
-            const allRoles = [...DEFAULT_ROLES, ...customRoles];
+            // Gunakan normalisasi role terpusat agar konsisten dengan halaman admin lain.
+            const allRoles = buildRoleOptionsFromPermissionRows({
+                rows: data || [],
+                includeSuperAdmin: false,
+                includeDefaults: true,
+            }).map((role) => ({
+                ...role,
+                color: DEFAULT_ROLES.find((defaultRole) => defaultRole.id === role.id)?.color || 'gray',
+            }));
             setRoles(allRoles);
 
             // ── Build permissions untuk semua role ────────────────────
@@ -247,27 +246,6 @@ const RolePermissions = () => {
 
     const isModuleFullyGranted = (roleId, moduleName) =>
         MODULE_MENUS[moduleName].menus.every(m => isMenuFullyGranted(roleId, m.code));
-
-    /**
-     * syncMenusToDatabase — pastikan semua menu yang ada di APP_MENUS
-     * sudah punya baris di tabel role_permissions untuk setiap role,
-     * dan menu usang dihapus agar role item tetap bersih.
-     */
-    const syncMenusToDatabase = async () => {
-        setSaving(true);
-        try {
-            await runMenuSync({ showNotification: true });
-            notifyRoleConfigUpdated();
-            await loadPermissions();
-        } catch (err) {
-            console.error('❌ Sync error:', err);
-            // ✅ Fixed: Show actual error message
-            setNotification({ type: 'error', message: `Gagal sync menu: ${err.message || 'Unknown error'}` });
-        } finally {
-            setSaving(false);
-            setTimeout(() => setNotification(null), 5000);
-        }
-    };
 
     const savePermissions = async () => {
         setSaving(true);
@@ -449,15 +427,6 @@ const RolePermissions = () => {
                     <p className="text-sm text-silver-dark mt-1">Atur hak akses per role untuk setiap modul dan menu</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <button
-                        onClick={syncMenusToDatabase}
-                        disabled={saving}
-                        title="Sinkronkan menu aktif ke role item dan bersihkan menu usang"
-                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-dark-surface border border-dark-border text-silver hover:text-silver-light hover:border-accent-cyan smooth-transition text-sm disabled:opacity-60"
-                    >
-                        <Database className="w-4 h-4" />
-                        Sync Menu Item
-                    </button>
                     <button
                         onClick={() => setShowAddRole(true)}
                         className="flex items-center gap-2 px-4 py-2 rounded-lg bg-dark-surface border border-dark-border text-silver hover:text-silver-light hover:border-accent-blue smooth-transition text-sm"

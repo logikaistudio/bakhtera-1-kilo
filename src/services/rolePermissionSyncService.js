@@ -11,6 +11,14 @@ const DEFAULT_ROLE_LABELS = {
 
 const EXCLUDED_AUTO_ROLES = new Set(['super_admin', 'admin']);
 
+export const DEFAULT_ROLE_OPTIONS = [
+    { id: 'direksi', label: 'Direksi' },
+    { id: 'chief', label: 'Chief' },
+    { id: 'manager', label: 'Manager' },
+    { id: 'staff', label: 'Staff' },
+    { id: 'viewer', label: 'Viewer' },
+];
+
 const normalizeRoleLabel = (roleId) =>
     roleId
         ?.replace(/_/g, ' ')
@@ -22,6 +30,44 @@ const chunkArray = (items, size = 500) => {
         chunks.push(items.slice(i, i + size));
     }
     return chunks;
+};
+
+export const buildRoleOptionsFromPermissionRows = ({
+    rows = [],
+    includeSuperAdmin = false,
+    includeDefaults = true,
+}) => {
+    const defaultOrder = ['direksi', 'chief', 'manager', 'staff', 'viewer'];
+    const roleMap = new Map();
+
+    if (includeDefaults) {
+        DEFAULT_ROLE_OPTIONS.forEach((role) => roleMap.set(role.id, role.label));
+    }
+
+    if (includeSuperAdmin) {
+        roleMap.set('super_admin', 'Super Admin');
+    }
+
+    (rows || []).forEach((row) => {
+        if (!row?.role_id) return;
+        const roleId = row.role_id;
+        const label = row.role_label?.trim() || DEFAULT_ROLE_LABELS[roleId] || normalizeRoleLabel(roleId);
+        roleMap.set(roleId, label);
+    });
+
+    const roles = Array.from(roleMap, ([id, label]) => ({ id, label }));
+
+    return roles.sort((a, b) => {
+        if (a.id === 'super_admin') return -1;
+        if (b.id === 'super_admin') return 1;
+
+        const aIdx = defaultOrder.indexOf(a.id);
+        const bIdx = defaultOrder.indexOf(b.id);
+        if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+        if (aIdx !== -1) return -1;
+        if (bIdx !== -1) return 1;
+        return a.label.localeCompare(b.label);
+    });
 };
 
 /**
