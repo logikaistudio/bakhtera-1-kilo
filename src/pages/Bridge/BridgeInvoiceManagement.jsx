@@ -29,6 +29,7 @@ const BridgeInvoiceManagement = () => {
     const [filter, setFilter] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [soSearchTerm, setSoSearchTerm] = useState('');
+    const [activeInvoicePage, setActiveInvoicePage] = useState('invoice-list');
 
     // Modals
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -2246,21 +2247,50 @@ const BridgeInvoiceManagement = () => {
                 </div>
             </div>
 
-            {/* Search - Full Width */}
-            <div className="w-full">
-                <div className="relative">
-                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
-                    <input
-                        type="text"
-                        placeholder="Search invoice, job number, atau customer..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-12 pr-4 py-3 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-base"
-                    />
+            {/* Invoice Sub Pages */}
+            <div className="glass-card p-2 rounded-lg">
+                <div className="flex flex-wrap gap-2">
+                    <button
+                        onClick={() => setActiveInvoicePage('so-ready')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium smooth-transition ${activeInvoicePage === 'so-ready'
+                            ? 'bg-accent-blue text-white'
+                            : 'bg-dark-surface text-silver-dark hover:text-silver'
+                            }`}
+                    >
+                        SO Siap Invoice ({filteredReadySOShipments.length})
+                    </button>
+                    <button
+                        onClick={() => setActiveInvoicePage('invoice-list')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium smooth-transition ${activeInvoicePage === 'invoice-list'
+                            ? 'bg-accent-orange text-white'
+                            : 'bg-dark-surface text-silver-dark hover:text-silver'
+                            }`}
+                    >
+                        List Invoice ({filteredInvoices.length})
+                    </button>
                 </div>
             </div>
 
+            {activeInvoicePage === 'invoice-list' && (
+                <>
+                    {/* Search - Full Width */}
+                    <div className="w-full">
+                        <div className="relative">
+                            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
+                            <input
+                                type="text"
+                                placeholder="Search invoice, job number, atau customer..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full pl-12 pr-4 py-3 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-base"
+                            />
+                        </div>
+                    </div>
+                </>
+            )}
+
             {/* Sales Order Ready to Invoice Table */}
+            {activeInvoicePage === 'so-ready' && (
             <div className="glass-card rounded-lg overflow-hidden">
                 <div className="px-4 py-3 border-b border-dark-border flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                     <div>
@@ -2344,8 +2374,10 @@ const BridgeInvoiceManagement = () => {
                     </table>
                 </div>
             </div>
+            )}
 
             {/* Invoices Table */}
+            {activeInvoicePage === 'invoice-list' && (
             <div className="glass-card rounded-lg overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
@@ -2511,6 +2543,7 @@ const BridgeInvoiceManagement = () => {
                     </table>
                 </div>
             </div>
+            )}
 
             {/* Create Invoice Modal */}
             {

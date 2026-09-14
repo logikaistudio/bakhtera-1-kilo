@@ -434,6 +434,7 @@ const BigInvoiceManagement = () => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [readySearchTerm, setReadySearchTerm] = useState('');
+    const [activeInvoicePage, setActiveInvoicePage] = useState('invoice-list');
     const [filterStatus, setFilterStatus] = useState('all');
     const [showForm, setShowForm] = useState(false);
     const [editInvoice, setEditInvoice] = useState(null);
@@ -751,22 +752,51 @@ const BigInvoiceManagement = () => {
                 ))}
             </div>
 
-            {/* Filters */}
-            <div className="glass-card p-4 rounded-xl flex flex-col md:flex-row gap-3">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-silver-dark" />
-                    <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                        placeholder="Cari nomor invoice atau customer..."
-                        className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm" />
+            {/* Invoice Sub Pages */}
+            <div className="glass-card p-2 rounded-lg">
+                <div className="flex flex-wrap gap-2">
+                    <button
+                        onClick={() => setActiveInvoicePage('so-ready')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium smooth-transition ${activeInvoicePage === 'so-ready'
+                            ? 'bg-accent-blue text-white'
+                            : 'bg-dark-surface text-silver-dark hover:text-silver'
+                            }`}
+                    >
+                        SO Siap Invoice ({filteredReadyQuotations.length})
+                    </button>
+                    <button
+                        onClick={() => setActiveInvoicePage('invoice-list')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium smooth-transition ${activeInvoicePage === 'invoice-list'
+                            ? 'bg-accent-orange text-white'
+                            : 'bg-dark-surface text-silver-dark hover:text-silver'
+                            }`}
+                    >
+                        List Invoice ({filtered.length})
+                    </button>
                 </div>
-                <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-                    className="bg-dark-surface border border-dark-border rounded-lg px-3 py-2 text-silver-light text-sm">
-                    <option value="all">Semua Status</option>
-                    {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-                </select>
             </div>
 
+            {activeInvoicePage === 'invoice-list' && (
+                <>
+                    {/* Filters */}
+                    <div className="glass-card p-4 rounded-xl flex flex-col md:flex-row gap-3">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-silver-dark" />
+                            <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+                                placeholder="Cari nomor invoice atau customer..."
+                                className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm" />
+                        </div>
+                        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+                            className="bg-dark-surface border border-dark-border rounded-lg px-3 py-2 text-silver-light text-sm">
+                            <option value="all">Semua Status</option>
+                            {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                        </select>
+                    </div>
+                </>
+            )}
+
             {/* Ready to Invoice List */}
+            {activeInvoicePage === 'so-ready' && (
             <div className="glass-card rounded-xl overflow-hidden">
                 <div className="px-4 py-3 border-b border-dark-border flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                     <div>
@@ -829,8 +859,10 @@ const BigInvoiceManagement = () => {
                     </table>
                 </div>
             </div>
+            )}
 
             {/* Table */}
+            {activeInvoicePage === 'invoice-list' && (
             <div className="glass-card rounded-xl overflow-hidden">
                 {loading ? (
                     <div className="text-center py-16 text-silver-dark">Memuat data...</div>
@@ -924,6 +956,7 @@ const BigInvoiceManagement = () => {
                     </div>
                 )}
             </div>
+            )}
 
             {/* Form Modal */}
             {showForm && (
