@@ -770,16 +770,16 @@ const BigInvoiceManagement = () => {
             <div className="glass-card rounded-xl overflow-hidden">
                 <div className="px-4 py-3 border-b border-dark-border flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                     <div>
-                        <h2 className="text-base font-semibold text-silver-light">List Quotation Siap Dibuatkan Invoice</h2>
+                        <h2 className="text-base font-semibold text-silver-light">List SO Siap Dibuatkan Invoice</h2>
                         <p className="text-xs text-silver-dark mt-0.5">
-                            Quotation approved yang sudah dibuatkan invoice otomatis tidak tampil di tabel ini.
+                            SO dari quotation approved yang sudah dibuatkan invoice otomatis tidak tampil di tabel ini.
                         </p>
                     </div>
                     <div className="w-full md:w-96 relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-silver-dark" />
                         <input
                             type="text"
-                            placeholder="Cari quotation number atau customer..."
+                            placeholder="Cari SO/quotation number atau customer..."
                             value={readySearchTerm}
                             onChange={(e) => setReadySearchTerm(e.target.value)}
                             className="w-full pl-10 pr-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm"
