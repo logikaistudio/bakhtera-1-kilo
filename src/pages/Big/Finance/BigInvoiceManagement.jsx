@@ -222,21 +222,24 @@ const ItemRow = ({ item, idx, coaList, canEdit, onChange, onRemove }) => {
 };
 
 // ─── Create / Edit Modal ─────────────────────────────────────────────────────
-const InvoiceFormModal = ({ invoice, coaList, onClose, onSave }) => {
+const InvoiceFormModal = ({ invoice, seedData, coaList, onClose, onSave }) => {
     const { canEdit } = useAuth();
-    const isEdit = !!invoice;
+    const isEdit = !!invoice?.id;
+    const sourceData = invoice || seedData || {};
 
     const [form, setForm] = useState({
-        invoice_number: invoice?.invoice_number || genNumber(),
-        invoice_date: invoice?.invoice_date || today(),
-        due_date: invoice?.due_date || '',
-        payment_terms: invoice?.payment_terms || 'NET 30',
-        customer_name: invoice?.customer_name || '',
-        customer_address: invoice?.customer_address || '',
-        currency: invoice?.currency || 'IDR',
-        notes: invoice?.notes || '',
-        discount_amount: invoice?.discount_amount || 0,
-        invoice_items: invoice?.invoice_items || [{ ...EMPTY_ITEM }],
+        quotation_id: sourceData.quotation_id || null,
+        customer_id: sourceData.customer_id || null,
+        invoice_number: sourceData.invoice_number || genNumber(),
+        invoice_date: sourceData.invoice_date || today(),
+        due_date: sourceData.due_date || '',
+        payment_terms: sourceData.payment_terms || 'NET 30',
+        customer_name: sourceData.customer_name || '',
+        customer_address: sourceData.customer_address || '',
+        currency: sourceData.currency || 'IDR',
+        notes: sourceData.notes || '',
+        discount_amount: sourceData.discount_amount || 0,
+        invoice_items: sourceData.invoice_items || [{ ...EMPTY_ITEM }],
     });
     const [saving, setSaving] = useState(false);
 
@@ -426,12 +429,15 @@ const InvoiceFormModal = ({ invoice, coaList, onClose, onSave }) => {
 const BigInvoiceManagement = () => {
     const { canCreate, canEdit, canDelete } = useAuth();
     const [invoices, setInvoices] = useState([]);
+    const [quotations, setQuotations] = useState([]);
     const [coaList, setCoaList] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [readySearchTerm, setReadySearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('all');
     const [showForm, setShowForm] = useState(false);
     const [editInvoice, setEditInvoice] = useState(null);
+    const [seedInvoiceData, setSeedInvoiceData] = useState(null);
     const [showReinvoiceModal, setShowReinvoiceModal] = useState(false);
     const [reinvoiceSourceInvoice, setReinvoiceSourceInvoice] = useState(null);
     const [showRecreateRateModal, setShowRecreateRateModal] = useState(false);
@@ -442,14 +448,61 @@ const BigInvoiceManagement = () => {
     const fetchAll = async () => {
         setLoading(true);
         try {
-            const [{ data: inv }, { data: coa }] = await Promise.all([
+            const [{ data: inv }, { data: coa }, { data: q }] = await Promise.all([
                 supabase.from('big_invoices').select('*').order('created_at', { ascending: false }),
-                supabase.from('big_coa').select('id,code,name,type').eq('is_active', true).order('code')
+                supabase.from('big_coa').select('id,code,name,type').eq('is_active', true).order('code'),
+                supabase
+                    .from('big_quotations')
+                    .select('id, quotation_number, client_id, status, total_amount, valid_until, notes, client:freight_customers(name, address), items:big_quotation_items(description, quantity, unit, unit_price, amount, sort_order)')
+                    .eq('status', 'approved')
+                    .order('created_at', { ascending: false })
             ]);
             setInvoices(inv || []);
             setCoaList(coa || []);
+            setQuotations(q || []);
         } catch (err) { console.error(err); }
         finally { setLoading(false); }
+    };
+
+    const handleCreateFromReadyQuotation = (quotation) => {
+        if (!canCreate('big_finance') && !canEdit('big_finance')) {
+            alert('Anda tidak memiliki akses untuk membuat invoice.');
+            return;
+        }
+
+        const sourceItems = Array.isArray(quotation.items) && quotation.items.length > 0
+            ? quotation.items
+            : [{ description: `Invoice for quotation ${quotation.quotation_number || '-'}`, quantity: 1, unit: 'Job', unit_price: quotation.total_amount || 0, amount: quotation.total_amount || 0 }];
+
+        const due = new Date();
+        due.setDate(due.getDate() + 30);
+
+        setEditInvoice(null);
+        setSeedInvoiceData({
+            quotation_id: quotation.id,
+            customer_id: quotation.client_id || null,
+            customer_name: quotation.client?.name || '-',
+            customer_address: quotation.client?.address || '',
+            invoice_date: today(),
+            due_date: due.toISOString().split('T')[0],
+            payment_terms: 'NET 30',
+            currency: 'IDR',
+            notes: `Auto draft from approved quotation ${quotation.quotation_number || '-'}`,
+            discount_amount: 0,
+            invoice_items: sourceItems
+                .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+                .map((item) => ({
+                    description: item.description || 'Service',
+                    qty: Number(item.quantity) || 1,
+                    unit: item.unit || 'Job',
+                    unit_price: Number(item.unit_price) || 0,
+                    amount: Number(item.amount) || ((Number(item.quantity) || 1) * (Number(item.unit_price) || 0)),
+                    tax_rate: 0,
+                    tax_amount: 0,
+                    coa_id: null,
+                })),
+        });
+        setShowForm(true);
     };
 
     const handleDelete = async (id) => {
@@ -640,6 +693,24 @@ const BigInvoiceManagement = () => {
         return matchSearch && matchStatus;
     });
 
+    const activeQuotedIds = new Set(
+        invoices
+            .filter((inv) => !['cancelled'].includes(inv.status))
+            .map((inv) => inv.quotation_id)
+            .filter(Boolean)
+    );
+
+    const readyQuotations = quotations.filter((q) => !activeQuotedIds.has(q.id));
+
+    const filteredReadyQuotations = readyQuotations.filter((q) => {
+        if (!readySearchTerm) return true;
+        const keyword = readySearchTerm.toLowerCase();
+        return (
+            (q.quotation_number || '').toLowerCase().includes(keyword) ||
+            (q.client?.name || '').toLowerCase().includes(keyword)
+        );
+    });
+
     const totalInvoiced = filtered.filter(i => i.status !== 'cancelled').reduce((s, i) => s + (i.grand_total || i.total_amount || 0), 0);
     const totalPaid = filtered.reduce((s, i) => s + (i.paid_amount || 0), 0);
     const totalOutstanding = filtered.filter(i => i.status !== 'cancelled' && i.status !== 'paid').reduce((s, i) => s + (i.outstanding_amount || 0), 0);
@@ -655,7 +726,7 @@ const BigInvoiceManagement = () => {
                     <p className="text-silver-dark mt-1">Kelola invoice tagihan Big module</p>
                 </div>
                 {canCreate('big_finance') && (
-                    <Button icon={Plus} onClick={() => { setEditInvoice(null); setShowForm(true); }}>
+                    <Button icon={Plus} onClick={() => { setEditInvoice(null); setSeedInvoiceData(null); setShowForm(true); }}>
                         Buat Invoice
                     </Button>
                 )}
@@ -693,6 +764,70 @@ const BigInvoiceManagement = () => {
                     <option value="all">Semua Status</option>
                     {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                 </select>
+            </div>
+
+            {/* Ready to Invoice List */}
+            <div className="glass-card rounded-xl overflow-hidden">
+                <div className="px-4 py-3 border-b border-dark-border flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                    <div>
+                        <h2 className="text-base font-semibold text-silver-light">List Quotation Siap Dibuatkan Invoice</h2>
+                        <p className="text-xs text-silver-dark mt-0.5">
+                            Quotation approved yang sudah dibuatkan invoice otomatis tidak tampil di tabel ini.
+                        </p>
+                    </div>
+                    <div className="w-full md:w-96 relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-silver-dark" />
+                        <input
+                            type="text"
+                            placeholder="Cari quotation number atau customer..."
+                            value={readySearchTerm}
+                            onChange={(e) => setReadySearchTerm(e.target.value)}
+                            className="w-full pl-10 pr-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm"
+                        />
+                    </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead className="bg-accent-blue text-white">
+                            <tr>
+                                <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Quotation #</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Customer</th>
+                                <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Total</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Valid Until</th>
+                                <th className="px-4 py-3 text-center text-xs font-semibold uppercase">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-dark-border/40">
+                            {filteredReadyQuotations.length === 0 ? (
+                                <tr>
+                                    <td colSpan={5} className="text-center py-10 text-silver-dark italic">
+                                        Tidak ada quotation siap invoice saat ini
+                                    </td>
+                                </tr>
+                            ) : (
+                                filteredReadyQuotations.map((q) => (
+                                    <tr key={q.id} className="hover:bg-white/5 smooth-transition">
+                                        <td className="px-4 py-3 font-mono text-accent-orange">{q.quotation_number || '-'}</td>
+                                        <td className="px-4 py-3 text-silver-light">{q.client?.name || '-'}</td>
+                                        <td className="px-4 py-3 text-right font-mono text-silver-light">{fmtIDR(q.total_amount || 0)}</td>
+                                        <td className="px-4 py-3 text-silver-dark">{q.valid_until || '-'}</td>
+                                        <td className="px-4 py-3 text-center">
+                                            <button
+                                                onClick={() => handleCreateFromReadyQuotation(q)}
+                                                disabled={!canCreate('big_finance') && !canEdit('big_finance')}
+                                                className="px-2.5 py-1 bg-accent-orange/25 hover:bg-accent-orange/40 text-accent-orange border border-accent-orange/50 rounded text-xs font-medium inline-flex items-center gap-1 smooth-transition disabled:opacity-40 disabled:cursor-not-allowed"
+                                            >
+                                                <Plus className="w-3 h-3" />
+                                                Buat Invoice
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             {/* Table */}
@@ -794,9 +929,10 @@ const BigInvoiceManagement = () => {
             {showForm && (
                 <InvoiceFormModal
                     invoice={editInvoice}
+                    seedData={seedInvoiceData}
                     coaList={coaList}
-                    onClose={() => { setShowForm(false); setEditInvoice(null); }}
-                    onSave={() => { setShowForm(false); setEditInvoice(null); fetchAll(); }}
+                    onClose={() => { setShowForm(false); setEditInvoice(null); setSeedInvoiceData(null); }}
+                    onSave={() => { setShowForm(false); setEditInvoice(null); setSeedInvoiceData(null); fetchAll(); }}
                 />
             )}
 

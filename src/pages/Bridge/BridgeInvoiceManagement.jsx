@@ -28,6 +28,7 @@ const BridgeInvoiceManagement = () => {
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
+    const [soSearchTerm, setSoSearchTerm] = useState('');
 
     // Modals
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -510,6 +511,23 @@ const BridgeInvoiceManagement = () => {
                 due_date: dueDate.toISOString().split('T')[0]
             };
         });
+    };
+
+    const handleCreateFromReadySO = (shipment) => {
+        if (!canCreate('bridge_invoices') && !canEdit('bridge_invoices')) {
+            alert('Anda tidak memiliki akses untuk membuat invoice.');
+            return;
+        }
+
+        if (!shipment?.id) {
+            alert('Data SO tidak valid.');
+            return;
+        }
+
+        resetForm();
+        setReferenceType('so');
+        handleShipmentSelect({ target: { value: shipment.id } });
+        setShowCreateModal(true);
     };
 
     const addInvoiceItem = () => {
@@ -1975,6 +1993,44 @@ const BridgeInvoiceManagement = () => {
         return inv.status === filter;
     });
 
+    const normalizeRefKey = (value) => String(value || '').trim().toLowerCase();
+    const activeInvoiceReferenceKeys = new Set(
+        invoices
+            .filter((inv) => !['cancelled', 'rejected'].includes(inv.status))
+            .flatMap((inv) => {
+                const shipmentKey = inv.shipment_id ? `shipment:${normalizeRefKey(inv.shipment_id)}` : null;
+                const jobKey = inv.job_number ? `job:${normalizeRefKey(inv.job_number)}` : null;
+                const soKey = inv.so_number ? `so:${normalizeRefKey(inv.so_number)}` : null;
+                return [shipmentKey, jobKey, soKey].filter(Boolean);
+            })
+    );
+
+    const readySOShipments = shipments
+        .filter((shipment) => {
+            if (!shipment?.id) return false;
+
+            const shipmentKey = `shipment:${normalizeRefKey(shipment.id)}`;
+            const jobKey = shipment.job_number ? `job:${normalizeRefKey(shipment.job_number)}` : null;
+            const soKey = shipment.so_number ? `so:${normalizeRefKey(shipment.so_number)}` : null;
+            const referenceKeys = [shipmentKey, jobKey, soKey].filter(Boolean);
+
+            return !referenceKeys.some((key) => activeInvoiceReferenceKeys.has(key));
+        })
+        .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+
+    const filteredReadySOShipments = readySOShipments.filter((shipment) => {
+        if (!soSearchTerm) return true;
+        const keyword = soSearchTerm.toLowerCase();
+        const customerName = shipment.customer || shipment.customer_name || '';
+        const route = `${shipment.origin || ''} ${shipment.destination || ''}`;
+        return (
+            (shipment.so_number || '').toLowerCase().includes(keyword) ||
+            (shipment.job_number || '').toLowerCase().includes(keyword) ||
+            customerName.toLowerCase().includes(keyword) ||
+            route.toLowerCase().includes(keyword)
+        );
+    });
+
     const isAllFilteredSelected = filteredInvoices.length > 0 && filteredInvoices.every(inv => selectedInvoiceIds.includes(inv.id));
 
     const toggleSelectInvoice = (invoiceId) => {
@@ -2201,6 +2257,91 @@ const BridgeInvoiceManagement = () => {
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-12 pr-4 py-3 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-base"
                     />
+                </div>
+            </div>
+
+            {/* Sales Order Ready to Invoice Table */}
+            <div className="glass-card rounded-lg overflow-hidden">
+                <div className="px-4 py-3 border-b border-dark-border flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                    <div>
+                        <h2 className="text-base font-semibold text-silver-light">List SO Siap Dibuatkan Invoice</h2>
+                        <p className="text-xs text-silver-dark mt-0.5">
+                            SO yang sudah dibuatkan invoice otomatis tidak tampil di tabel ini.
+                        </p>
+                    </div>
+                    <div className="w-full md:w-96 relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-silver-dark" />
+                        <input
+                            type="text"
+                            placeholder="Cari SO, Job Number, customer, atau route..."
+                            value={soSearchTerm}
+                            onChange={(e) => setSoSearchTerm(e.target.value)}
+                            className="w-full pl-10 pr-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm"
+                        />
+                    </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead className="bg-accent-blue">
+                            <tr>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">SO Number</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Job Number</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Customer</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Route</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Service</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Tanggal SO</th>
+                                <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-dark-border">
+                            {filteredReadySOShipments.length === 0 ? (
+                                <tr>
+                                    <td colSpan="7" className="px-3 py-8 text-center text-silver-dark">
+                                        <Package className="w-10 h-10 text-silver-dark mx-auto mb-2 opacity-50" />
+                                        <p className="text-sm">Tidak ada SO yang siap invoice saat ini.</p>
+                                    </td>
+                                </tr>
+                            ) : (
+                                filteredReadySOShipments.map((shipment) => {
+                                    const customerName = shipment.customer || shipment.customer_name || '-';
+                                    const route = `${shipment.origin || '-'} → ${shipment.destination || '-'}`;
+                                    return (
+                                        <tr key={shipment.id} className="hover:bg-dark-surface smooth-transition">
+                                            <td className="px-3 py-2 whitespace-nowrap text-silver-light font-medium">
+                                                {shipment.so_number || '-'}
+                                            </td>
+                                            <td className="px-3 py-2 whitespace-nowrap text-silver-light">
+                                                {shipment.job_number || '-'}
+                                            </td>
+                                            <td className="px-3 py-2 whitespace-nowrap text-silver-light">
+                                                {customerName}
+                                            </td>
+                                            <td className="px-3 py-2 whitespace-nowrap text-silver-dark">
+                                                {route}
+                                            </td>
+                                            <td className="px-3 py-2 whitespace-nowrap text-silver-dark uppercase">
+                                                {shipment.service_type || '-'}
+                                            </td>
+                                            <td className="px-3 py-2 whitespace-nowrap text-silver-dark">
+                                                {shipment.created_at ? new Date(shipment.created_at).toLocaleDateString('id-ID') : '-'}
+                                            </td>
+                                            <td className="px-3 py-2 text-center whitespace-nowrap">
+                                                <button
+                                                    onClick={() => handleCreateFromReadySO(shipment)}
+                                                    disabled={!canCreate('bridge_invoices') && !canEdit('bridge_invoices')}
+                                                    className="px-2.5 py-1 bg-accent-orange/25 hover:bg-accent-orange/40 text-accent-orange border border-accent-orange/50 rounded text-xs font-medium inline-flex items-center gap-1 smooth-transition disabled:opacity-40 disabled:cursor-not-allowed"
+                                                >
+                                                    <Plus className="w-3 h-3" />
+                                                    Buat Invoice
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            )}
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
