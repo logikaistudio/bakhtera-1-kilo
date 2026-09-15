@@ -701,7 +701,11 @@ const BigInvoiceManagement = () => {
             .filter(Boolean)
     );
 
-    const readyQuotations = quotations.filter((q) => !activeQuotedIds.has(q.id));
+    const readyQuotations = quotations.filter((q) => {
+        const status = String(q.status || '').toLowerCase();
+        const isFullApproved = status === 'approved' || status === 'full_approved' || status === 'fully_approved';
+        return isFullApproved && !activeQuotedIds.has(q.id);
+    });
 
     const filteredReadyQuotations = readyQuotations.filter((q) => {
         if (!readySearchTerm) return true;
@@ -753,25 +757,25 @@ const BigInvoiceManagement = () => {
             </div>
 
             {/* Invoice Sub Pages */}
-            <div className="glass-card p-2 rounded-lg">
-                <div className="flex flex-wrap gap-2">
+            <div className="border-b border-dark-border px-1">
+                <div className="flex flex-wrap items-end gap-2">
                     <button
                         onClick={() => setActiveInvoicePage('so-ready')}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium smooth-transition ${activeInvoicePage === 'so-ready'
-                            ? 'bg-accent-blue text-white'
-                            : 'bg-dark-surface text-silver-dark hover:text-silver'
+                        className={`px-5 py-2.5 rounded-t-xl border border-dark-border border-b-0 text-sm font-semibold smooth-transition ${activeInvoicePage === 'so-ready'
+                            ? 'bg-[#0b1726] text-silver-light'
+                            : 'bg-dark-surface/80 text-silver-dark hover:text-silver-light'
                             }`}
                     >
-                        SO Siap Invoice ({filteredReadyQuotations.length})
+                        SO List ({filteredReadyQuotations.length})
                     </button>
                     <button
                         onClick={() => setActiveInvoicePage('invoice-list')}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium smooth-transition ${activeInvoicePage === 'invoice-list'
-                            ? 'bg-accent-orange text-white'
-                            : 'bg-dark-surface text-silver-dark hover:text-silver'
+                        className={`px-5 py-2.5 rounded-t-xl border border-dark-border border-b-0 text-sm font-semibold smooth-transition ${activeInvoicePage === 'invoice-list'
+                            ? 'bg-[#0b1726] text-silver-light'
+                            : 'bg-dark-surface/80 text-silver-dark hover:text-silver-light'
                             }`}
                     >
-                        List Invoice ({filtered.length})
+                        Invoice ({filtered.length})
                     </button>
                 </div>
             </div>
@@ -800,9 +804,9 @@ const BigInvoiceManagement = () => {
             <div className="glass-card rounded-xl overflow-hidden">
                 <div className="px-4 py-3 border-b border-dark-border flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                     <div>
-                        <h2 className="text-base font-semibold text-silver-light">List SO Siap Dibuatkan Invoice</h2>
+                        <h2 className="text-base font-semibold text-silver-light">SO List</h2>
                         <p className="text-xs text-silver-dark mt-0.5">
-                            SO dari quotation approved yang sudah dibuatkan invoice otomatis tidak tampil di tabel ini.
+                            Hanya SO full approved yang belum memiliki invoice aktif.
                         </p>
                     </div>
                     <div className="w-full md:w-96 relative">
@@ -821,7 +825,7 @@ const BigInvoiceManagement = () => {
                     <table className="w-full text-sm">
                         <thead className="bg-accent-blue text-white">
                             <tr>
-                                <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Quotation #</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase">SO #</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Customer</th>
                                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Total</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Valid Until</th>
@@ -832,7 +836,7 @@ const BigInvoiceManagement = () => {
                             {filteredReadyQuotations.length === 0 ? (
                                 <tr>
                                     <td colSpan={5} className="text-center py-10 text-silver-dark italic">
-                                        Tidak ada quotation siap invoice saat ini
+                                        Tidak ada SO siap invoice saat ini
                                     </td>
                                 </tr>
                             ) : (

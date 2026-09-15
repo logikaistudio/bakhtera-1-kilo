@@ -2240,6 +2240,22 @@ const InvoiceManagement = () => {
         return inv.status === filter;
     });
 
+    const isFullApprovedSO = (shipment) => {
+        const statusCandidates = [
+            shipment?.status,
+            shipment?.document_status,
+            shipment?.documentStatus,
+            shipment?.approval_status,
+            shipment?.approvalStatus,
+        ]
+            .map((value) => String(value || '').trim().toLowerCase())
+            .filter(Boolean);
+
+        return statusCandidates.includes('approved') ||
+            statusCandidates.includes('full_approved') ||
+            statusCandidates.includes('fully_approved');
+    };
+
     const normalizeRefKey = (value) => String(value || '').trim().toLowerCase();
     const activeInvoiceReferenceKeys = new Set(
         invoices
@@ -2255,6 +2271,7 @@ const InvoiceManagement = () => {
     const readySOShipments = shipments
         .filter((shipment) => {
             if (!shipment?.id) return false;
+            if (!isFullApprovedSO(shipment)) return false;
 
             const shipmentKey = `shipment:${normalizeRefKey(shipment.id)}`;
             const jobKey = shipment.job_number ? `job:${normalizeRefKey(shipment.job_number)}` : null;
@@ -2478,25 +2495,25 @@ const InvoiceManagement = () => {
             </div>
 
             {/* Invoice Sub Pages */}
-            <div className="glass-card p-2 rounded-lg">
-                <div className="flex flex-wrap gap-2">
+            <div className="border-b border-dark-border px-1">
+                <div className="flex flex-wrap items-end gap-2">
                     <button
                         onClick={() => setActiveInvoicePage('so-ready')}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium smooth-transition ${activeInvoicePage === 'so-ready'
-                            ? 'bg-accent-blue text-white'
-                            : 'bg-dark-surface text-silver-dark hover:text-silver'
+                        className={`px-5 py-2.5 rounded-t-xl border border-dark-border border-b-0 text-sm font-semibold smooth-transition ${activeInvoicePage === 'so-ready'
+                            ? 'bg-[#0b1726] text-silver-light'
+                            : 'bg-dark-surface/80 text-silver-dark hover:text-silver-light'
                             }`}
                     >
-                        SO Siap Invoice ({filteredReadySOShipments.length})
+                        SO List ({filteredReadySOShipments.length})
                     </button>
                     <button
                         onClick={() => setActiveInvoicePage('invoice-list')}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium smooth-transition ${activeInvoicePage === 'invoice-list'
-                            ? 'bg-accent-orange text-white'
-                            : 'bg-dark-surface text-silver-dark hover:text-silver'
+                        className={`px-5 py-2.5 rounded-t-xl border border-dark-border border-b-0 text-sm font-semibold smooth-transition ${activeInvoicePage === 'invoice-list'
+                            ? 'bg-[#0b1726] text-silver-light'
+                            : 'bg-dark-surface/80 text-silver-dark hover:text-silver-light'
                             }`}
                     >
-                        List Invoice ({filteredInvoices.length})
+                        Invoice ({filteredInvoices.length})
                     </button>
                 </div>
             </div>
@@ -2524,9 +2541,9 @@ const InvoiceManagement = () => {
             <div className="glass-card rounded-lg overflow-hidden">
                 <div className="px-4 py-3 border-b border-dark-border flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                     <div>
-                        <h2 className="text-base font-semibold text-silver-light">List SO Siap Dibuatkan Invoice</h2>
+                        <h2 className="text-base font-semibold text-silver-light">SO List</h2>
                         <p className="text-xs text-silver-dark mt-0.5">
-                            SO yang sudah dibuatkan invoice otomatis tidak tampil di tabel ini.
+                            Hanya SO full approved yang belum memiliki invoice aktif.
                         </p>
                     </div>
                     <div className="w-full md:w-96 relative">
