@@ -1003,10 +1003,22 @@ const InvoiceManagement = () => {
                 containers: formData.containers
             };
 
-            const { data, error } = await supabase
-                .from('blink_invoices')
-                .insert([newInvoice])
-                .select();
+            const tryInsertInvoice = async (payload) => {
+                return supabase
+                    .from('blink_invoices')
+                    .insert([payload])
+                    .select();
+            };
+
+            let { data, error } = await tryInsertInvoice(newInvoice);
+
+            // Backward compatibility for environments that have not applied
+            // migrations for additional-invoice columns yet.
+            if (error?.message?.includes("Could not find the 'is_additional' column")
+                || error?.message?.includes("Could not find the 'parent_invoice_id' column")) {
+                const { is_additional: _isAdditional, parent_invoice_id: _parentInvoiceId, ...legacyInvoice } = newInvoice;
+                ({ data, error } = await tryInsertInvoice(legacyInvoice));
+            }
 
             if (error) throw error;
 
