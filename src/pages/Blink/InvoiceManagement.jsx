@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { createInvoiceJournal, createARPaymentJournal, getAllCOA, generateUUID, migrateBlinkFinancialRecords } from '../../utils/journalHelper';
+import { createInvoiceJournal, createARPaymentJournal, getAllCOA, generateUUID } from '../../utils/journalHelper';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useData } from '../../context/DataContext';
@@ -11,7 +11,7 @@ import COAPicker from '../../components/Common/COAPicker';
 import { logTransaction, TRANSACTION_TYPES, MODULES, ACTIONS } from '../../services/transactionLogService';
 import {
     FileText, DollarSign, Calendar, User, Clock, CheckCircle, XCircle,
-    Plus, Send, AlertCircle, Download, Eye, Edit, Trash, Receipt,
+    Plus, Send, AlertCircle, Download, Eye, Edit, Trash,
     TrendingUp, AlertTriangle, Search, Filter, X, Package, Circle, PlaySquare, RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -2394,32 +2394,6 @@ const InvoiceManagement = () => {
         }).catch(err => console.error("Failed to load export utility", err));
     };
 
-    // --- Repair Missing Journals ---
-    const [isMigrating, setIsMigrating] = useState(false);
-    const runMigration = async () => {
-        if (!canRunSuperAdminBatch) {
-            alert('Akses Ditolak: Hanya Super Admin yang dapat menjalankan repair/migrate jurnal.');
-            return;
-        }
-        if (!confirm('Repair missing journals for approved invoices and purchase orders?')) return;
-        setIsMigrating(true);
-        try {
-            const { migratedInvoices, migratedPOs } = await migrateBlinkFinancialRecords();
-            await fetchInvoices();
-
-            if (migratedInvoices || migratedPOs) {
-                alert(`Repair completed. Invoice journals: ${migratedInvoices}, PO journals: ${migratedPOs}.`);
-            } else {
-                alert('No missing journals found. All approved invoices and POs are already posted.');
-            }
-        } catch (error) {
-            console.error(error);
-            alert('Repair missing journals failed: ' + error.message);
-        } finally {
-            setIsMigrating(false);
-        }
-    };
-
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -2431,14 +2405,6 @@ const InvoiceManagement = () => {
                 <div className="flex items-center gap-3">
                     {canRunSuperAdminBatch && (
                         <>
-                            <Button
-                                onClick={runMigration}
-                                variant="secondary"
-                                icon={Receipt}
-                                disabled={isMigrating}
-                            >
-                                {isMigrating ? 'Repairing...' : 'Repair Missing Journals'}
-                            </Button>
                             <Button
                                 onClick={handleDeleteSelectedInvoices}
                                 variant="danger"
@@ -2507,22 +2473,22 @@ const InvoiceManagement = () => {
             </div>
 
             {/* Invoice Sub Pages */}
-            <div className="border-b border-dark-border px-1">
+            <div className="border-b border-slate-300 px-1">
                 <div className="flex flex-wrap items-end gap-2">
                     <button
                         onClick={() => setActiveInvoicePage('so-ready')}
-                        className={`px-5 py-2.5 rounded-t-xl border border-dark-border border-b-0 text-sm font-semibold smooth-transition ${activeInvoicePage === 'so-ready'
-                            ? 'bg-[#0b1726] text-silver-light'
-                            : 'bg-dark-surface/80 text-silver-dark hover:text-silver-light'
+                        className={`px-5 py-2.5 rounded-t-xl border border-slate-300 border-b-0 text-sm font-semibold smooth-transition ${activeInvoicePage === 'so-ready'
+                            ? 'bg-slate-100 text-slate-900 border-slate-300'
+                            : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50 hover:text-slate-900'
                             }`}
                     >
                         SO List ({filteredReadySOShipments.length})
                     </button>
                     <button
                         onClick={() => setActiveInvoicePage('invoice-list')}
-                        className={`px-5 py-2.5 rounded-t-xl border border-dark-border border-b-0 text-sm font-semibold smooth-transition ${activeInvoicePage === 'invoice-list'
-                            ? 'bg-[#0b1726] text-silver-light'
-                            : 'bg-dark-surface/80 text-silver-dark hover:text-silver-light'
+                        className={`px-5 py-2.5 rounded-t-xl border border-slate-300 border-b-0 text-sm font-semibold smooth-transition ${activeInvoicePage === 'invoice-list'
+                            ? 'bg-slate-100 text-slate-900 border-slate-300'
+                            : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50 hover:text-slate-900'
                             }`}
                     >
                         Invoice ({filteredInvoices.length})
