@@ -166,6 +166,7 @@ export const AuthProvider = ({ children }) => {
         blink_approval: 'cabang_approval',
         blink_partners: 'cabang_partners',
         blink_invoices: 'cabang_invoices',
+        blink_finance_approval: 'cabang_finance_approval',
         blink_purchase_order: 'cabang_purchase_order',
         blink_ar: 'cabang_ar',
         blink_ap: 'cabang_ap',

@@ -216,7 +216,7 @@ function App() {
                     <Route path="/blink/invoices" element={<ProtectedRoute menuCode="blink_invoices" menuCodes={['blink_invoice', 'blink_finance']}><InvoiceManagement /></ProtectedRoute>} />
                     <Route path="/blink/finance/profit" element={<ProtectedRoute menuCode="blink_pnl"><ProfitAnalysis /></ProtectedRoute>} />
                     <Route path="/blink/approvals" element={<ProtectedRoute menuCode="blink_approval"><BlinkApproval scope="operations" /></ProtectedRoute>} />
-                    <Route path="/blink/finance/approvals" element={<ProtectedRoute menuCode="blink_invoices" menuCodes={['blink_invoice', 'blink_finance']}><BlinkApproval scope="finance" /></ProtectedRoute>} />
+                    <Route path="/blink/finance/approvals" element={<ProtectedRoute menuCode="blink_finance_approval"><BlinkApproval scope="finance" /></ProtectedRoute>} />
 
                     {/* Bridge Module */}
                     <Route path="/bridge" element={<ProtectedRoute menuCode="bridge_dashboard"><BridgeOverview /></ProtectedRoute>} />
@@ -297,7 +297,7 @@ function App() {
 
                     {/* Cabang Finance Flow (terisolasi dari Blink via division=cabang) */}
                     <Route path="/cabang/finance/invoices" element={<ProtectedRoute menuCode="cabang_invoices"><InvoiceManagement /></ProtectedRoute>} />
-                    <Route path="/cabang/finance/approvals" element={<ProtectedRoute menuCode="cabang_invoices"><BlinkApproval scope="finance" /></ProtectedRoute>} />
+                    <Route path="/cabang/finance/approvals" element={<ProtectedRoute menuCode="cabang_finance_approval"><BlinkApproval scope="finance" /></ProtectedRoute>} />
                     <Route path="/cabang/finance/purchase-orders" element={<ProtectedRoute menuCode="cabang_purchase_order"><PurchaseOrder /></ProtectedRoute>} />
                     <Route path="/cabang/finance/auto-journal" element={<ProtectedRoute menuCode="cabang_auto_journal"><AutoJournal /></ProtectedRoute>} />
                     <Route path="/cabang/finance/reversing-journal" element={<ProtectedRoute menuCode="cabang_reversing_journal"><ReversingJournal /></ProtectedRoute>} />

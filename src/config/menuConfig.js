@@ -95,6 +95,7 @@ export const APP_MENUS = {
             { code: 'blink_selling_buying', label: 'Selling vs Buying Analysis', group: 'Profit & Costing', path: '/blink/finance/selling-buying' },
             // ─── Finance ───
             { code: 'blink_invoices', label: 'Invoice', group: 'Finance', path: '/blink/finance/invoices' },
+            { code: 'blink_finance_approval', label: 'Finance Approval Center (Invoice)', group: 'Finance', path: '/blink/finance/approvals' },
             { code: 'blink_purchase_order', label: 'Purchase Order', group: 'Finance', path: '/blink/finance/purchase-orders' },
             { code: 'blink_ar', label: 'Piutang (AR)', group: 'Finance', path: '/blink/finance/ar' },
             { code: 'blink_ap', label: 'Hutang (AP)', group: 'Finance', path: '/blink/finance/ap' },
@@ -171,6 +172,7 @@ export const APP_MENUS = {
             { code: 'cabang_approval', label: 'Approval Center', group: 'Operations', path: '/cabang/approvals' },
             // ─── Finance ───
             { code: 'cabang_invoices', label: 'Invoice', group: 'Finance', path: '/cabang/finance/invoices' },
+            { code: 'cabang_finance_approval', label: 'Finance Approval Center (Invoice)', group: 'Finance', path: '/cabang/finance/approvals' },
             { code: 'cabang_purchase_order', label: 'Purchase Order', group: 'Finance', path: '/cabang/finance/purchase-orders' },
             { code: 'cabang_ar', label: 'Piutang (AR)', group: 'Finance', path: '/cabang/finance/ar' },
             { code: 'cabang_ap', label: 'Hutang (AP)', group: 'Finance', path: '/cabang/finance/ap' },
@@ -197,6 +199,7 @@ export const APP_MENUS = {
         menus: [
             // ─── BLINK Finance ───
             { code: 'blink_invoices', label: 'BLINK — Invoice', group: 'BLINK Finance', path: '/blink/finance/invoices' },
+            { code: 'blink_finance_approval', label: 'BLINK — Finance Approval Center (Invoice)', group: 'BLINK Finance', path: '/blink/finance/approvals' },
             { code: 'blink_purchase_order', label: 'BLINK — Purchase Order', group: 'BLINK Finance', path: '/blink/finance/purchase-orders' },
             { code: 'blink_ar', label: 'BLINK — Piutang (AR)', group: 'BLINK Finance', path: '/blink/finance/ar' },
             { code: 'blink_ap', label: 'BLINK — Hutang (AP)', group: 'BLINK Finance', path: '/blink/finance/ap' },

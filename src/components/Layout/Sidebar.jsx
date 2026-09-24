@@ -372,7 +372,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
             type: 'category', label: '⚡ BLINK Finance', items: [
                 { type: 'divider', label: '📋 Transactions' },
                 { path: '/blink/finance/invoices', label: 'Invoice', menuCode: 'blink_invoices', menuCodes: ['blink_invoice', 'blink_finance'] },
-                    { path: '/blink/finance/approvals', label: 'Approval Center (Invoice)', menuCode: 'blink_invoices', menuCodes: ['blink_invoice', 'blink_finance'], showBadge: true },
+                    { path: '/blink/finance/approvals', label: 'Approval Center (Invoice)', menuCode: 'blink_finance_approval', showBadge: true },
                 { path: '/blink/finance/purchase-orders', label: 'Purchase Order', menuCode: 'blink_purchase_order' },
                 { path: '/blink/finance/ar', label: 'Account Receivables (AR)', menuCode: 'blink_ar' },
                 { path: '/blink/finance/ap', label: 'Account Payables (AP)', menuCode: 'blink_ap' },
@@ -449,7 +449,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
         {
             type: 'category', label: '💰 Finance', items: [
                 { path: '/cabang/finance/invoices', label: 'Invoice', menuCode: 'cabang_invoices' },
-                { path: '/cabang/finance/approvals', label: 'Approval Center (Invoice)', menuCode: 'cabang_invoices', showBadge: true },
+                { path: '/cabang/finance/approvals', label: 'Approval Center (Invoice)', menuCode: 'cabang_finance_approval', showBadge: true },
                 { path: '/cabang/finance/purchase-orders', label: 'Purchase Order', menuCode: 'cabang_purchase_order' },
                 { path: '/cabang/finance/ar', label: 'Account Receivable (AR)', menuCode: 'cabang_ar' },
                 { path: '/cabang/finance/ap', label: 'Account Payable (AP)', menuCode: 'cabang_ap' },
