@@ -1819,7 +1819,8 @@ const InvoiceManagement = () => {
                 setSelectedInvoice({ ...selectedInvoice, status: 'manager_approval' });
             }
 
-            setSuccessSubmitMsg('✅ Invoice successfully submitted! Managers can review and approve it in the Approval Center.');
+            window.dispatchEvent(new Event('blink_approval_updated'));
+            setSuccessSubmitMsg('✅ Invoice successfully submitted! Managers can review and approve it in the Finance Approval Center.');
             setTimeout(() => setSuccessSubmitMsg(''), 3000);
         } catch (error) {
             console.error('Error submitting invoice:', error);

@@ -192,7 +192,7 @@ function App() {
                     <Route path="/bxpo/operations/awb" element={<ProtectedRoute menuCode="bxpo_awb"><AWBManagement /></ProtectedRoute>} />
                     <Route path="/bxpo/operations/bl" element={<ProtectedRoute menuCode="bxpo_bl"><BLManagement /></ProtectedRoute>} />
                     <Route path="/bxpo/master/partners" element={<ProtectedRoute menuCode="bxpo_partners" menuCodes={['blink_partners']}><PartnerManagement /></ProtectedRoute>} />
-                    <Route path="/bxpo/approvals" element={<ProtectedRoute menuCode="bxpo_approval"><BlinkApproval /></ProtectedRoute>} />
+                    <Route path="/bxpo/approvals" element={<ProtectedRoute menuCode="bxpo_approval"><BlinkApproval scope="operations" /></ProtectedRoute>} />
 
                     {/* Blink Finance Module */}
                     <Route path="/blink/finance/invoices" element={<ProtectedRoute menuCode="blink_invoices" menuCodes={['blink_invoice', 'blink_finance']}><InvoiceManagement /></ProtectedRoute>} />
@@ -215,7 +215,8 @@ function App() {
                     {/* Legacy Blink Routes - Redirects */}
                     <Route path="/blink/invoices" element={<ProtectedRoute menuCode="blink_invoices" menuCodes={['blink_invoice', 'blink_finance']}><InvoiceManagement /></ProtectedRoute>} />
                     <Route path="/blink/finance/profit" element={<ProtectedRoute menuCode="blink_pnl"><ProfitAnalysis /></ProtectedRoute>} />
-                    <Route path="/blink/approvals" element={<ProtectedRoute menuCode="blink_approval"><BlinkApproval /></ProtectedRoute>} />
+                    <Route path="/blink/approvals" element={<ProtectedRoute menuCode="blink_approval"><BlinkApproval scope="operations" /></ProtectedRoute>} />
+                    <Route path="/blink/finance/approvals" element={<ProtectedRoute menuCode="blink_invoices" menuCodes={['blink_invoice', 'blink_finance']}><BlinkApproval scope="finance" /></ProtectedRoute>} />
 
                     {/* Bridge Module */}
                     <Route path="/bridge" element={<ProtectedRoute menuCode="bridge_dashboard"><BridgeOverview /></ProtectedRoute>} />
@@ -292,10 +293,11 @@ function App() {
                     <Route path="/cabang/operations/awb" element={<ProtectedRoute menuCode="cabang_shipments"><AWBManagement /></ProtectedRoute>} />
                     <Route path="/cabang/operations/bl" element={<ProtectedRoute menuCode="cabang_bl"><BLManagement /></ProtectedRoute>} />
                     <Route path="/cabang/master/partners" element={<ProtectedRoute menuCode="cabang_partners"><PartnerManagement /></ProtectedRoute>} />
-                    <Route path="/cabang/approvals" element={<ProtectedRoute menuCode="cabang_approval"><BlinkApproval /></ProtectedRoute>} />
+                    <Route path="/cabang/approvals" element={<ProtectedRoute menuCode="cabang_approval"><BlinkApproval scope="operations" /></ProtectedRoute>} />
 
                     {/* Cabang Finance Flow (terisolasi dari Blink via division=cabang) */}
                     <Route path="/cabang/finance/invoices" element={<ProtectedRoute menuCode="cabang_invoices"><InvoiceManagement /></ProtectedRoute>} />
+                    <Route path="/cabang/finance/approvals" element={<ProtectedRoute menuCode="cabang_invoices"><BlinkApproval scope="finance" /></ProtectedRoute>} />
                     <Route path="/cabang/finance/purchase-orders" element={<ProtectedRoute menuCode="cabang_purchase_order"><PurchaseOrder /></ProtectedRoute>} />
                     <Route path="/cabang/finance/auto-journal" element={<ProtectedRoute menuCode="cabang_auto_journal"><AutoJournal /></ProtectedRoute>} />
                     <Route path="/cabang/finance/reversing-journal" element={<ProtectedRoute menuCode="cabang_reversing_journal"><ReversingJournal /></ProtectedRoute>} />

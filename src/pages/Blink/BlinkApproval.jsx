@@ -152,11 +152,18 @@ const recordApprovalHistory = async (item, action, reason = null, approverName =
     // History logging is secondary; the actual approval update is primary.
     try {
         const activeDivision = getActiveDivision();
-        const approvalModule = activeDivision === 'bxpo'
-            ? 'bxpo_operations'
-            : activeDivision === 'cabang'
-                ? 'cabang_operations'
-                : 'blink_operations';
+        const isInvoiceApproval = String(item?.type || '').toLowerCase() === 'invoice';
+        const approvalModule = isInvoiceApproval
+            ? (activeDivision === 'bxpo'
+                ? 'bxpo_finance'
+                : activeDivision === 'cabang'
+                    ? 'cabang_finance'
+                    : 'blink_finance')
+            : (activeDivision === 'bxpo'
+                ? 'bxpo_operations'
+                : activeDivision === 'cabang'
+                    ? 'cabang_operations'
+                    : 'blink_operations');
         
         const payload = {
             document_number: item.refNumber || item.jobNumber || '-',
@@ -194,9 +201,7 @@ const recordApprovalHistory = async (item, action, reason = null, approverName =
     }
     return true; // Always return true to not block approval
 };
-
-
-const BlinkApproval = () => {
+const BlinkApproval = ({ scope = 'operations' }) => {
     const navigate = useNavigate();
     const { user, isSuperAdmin, isAdmin } = useAuth();
     const [activeTab, setActiveTab] = useState('pending'); // 'pending' | 'history'
@@ -208,6 +213,7 @@ const BlinkApproval = () => {
     const [processing, setProcessing] = useState(false);
     const [rejectReason, setRejectReason] = useState('');
     const [showRejectInput, setShowRejectInput] = useState(false);
+    const isFinanceScope = scope === 'finance';
 
     const normalizeServiceType = (value) => {
         const source = String(value || '').toLowerCase();
@@ -249,7 +255,7 @@ const BlinkApproval = () => {
     }, []);
 
     useEffect(() => {
-        const channel = supabase.channel('approval-submissions')
+        const channel = supabase.channel(`approval-submissions-${scope}`)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'blink_quotations' }, () => fetchSubmissions())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'blink_purchase_orders' }, () => fetchSubmissions())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'blink_invoices' }, () => fetchSubmissions())
@@ -260,7 +266,7 @@ const BlinkApproval = () => {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, []);
+    }, [scope]);
 
     const fetchSubmissions = async () => {
         try {
@@ -269,7 +275,7 @@ const BlinkApproval = () => {
 
             // Fetch pending sales quotations for divisions that use sales quotation approval flow
             let salesQuotations = [];
-            if (division === 'bxpo' || division === 'cabang') {
+            if (!isFinanceScope && (division === 'bxpo' || division === 'cabang')) {
                 const { data, error } = await supabase
                     .from('blink_sales_quotations')
                     .select('*')
@@ -280,29 +286,41 @@ const BlinkApproval = () => {
             }
 
             // Fetch pending quotations
-            const { data: quotations, error: qErr } = await supabase
-                .from('blink_quotations')
-                .select('*')
-                .eq('status', 'manager_approval')
-                .order('created_at', { ascending: false });
-            if (qErr) console.error('Error fetching quotations:', qErr);
+            let quotations = [];
+            if (!isFinanceScope) {
+                const { data, error } = await supabase
+                    .from('blink_quotations')
+                    .select('*')
+                    .eq('status', 'manager_approval')
+                    .order('created_at', { ascending: false });
+                if (error) console.error('Error fetching quotations:', error);
+                else quotations = data || [];
+            }
 
             // Fetch pending Purchase Orders (filtered by division)
-            const { data: purchaseOrders, error: poErr } = await supabase
-                .from('blink_purchase_orders')
-                .select('*')
-                .in('status', ['submitted', 'manager_approval', 'pending', 'pending_approval'])
-                .eq('division', division)
-                .order('created_at', { ascending: false });
-            if (poErr) console.error('Error fetching POs:', poErr);
+            let purchaseOrders = [];
+            if (!isFinanceScope) {
+                const { data, error } = await supabase
+                    .from('blink_purchase_orders')
+                    .select('*')
+                    .in('status', ['submitted', 'manager_approval', 'pending', 'pending_approval'])
+                    .eq('division', division)
+                    .order('created_at', { ascending: false });
+                if (error) console.error('Error fetching POs:', error);
+                else purchaseOrders = data || [];
+            }
 
             // Fetch pending Shipments
-            const { data: shipments, error: shErr } = await supabase
-                .from('blink_shipments')
-                .select('*')
-                .or('bl_status.in.(submitted,manager_approval,pending,pending_approval),status.in.(submitted,manager_approval,pending,pending_approval)')
-                .order('created_at', { ascending: false });
-            if (shErr) console.error('Error fetching shipments:', shErr);
+            let shipments = [];
+            if (!isFinanceScope) {
+                const { data, error } = await supabase
+                    .from('blink_shipments')
+                    .select('*')
+                    .or('bl_status.in.(submitted,manager_approval,pending,pending_approval),status.in.(submitted,manager_approval,pending,pending_approval)')
+                    .order('created_at', { ascending: false });
+                if (error) console.error('Error fetching shipments:', error);
+                else shipments = data || [];
+            }
 
             // Fetch pending Invoices (filtered by division)
             const { data: invoices, error: invErr } = await supabase
@@ -426,16 +444,25 @@ const BlinkApproval = () => {
                 cargoType: '',
             }));
 
-            setSubmissions([...mappedSalesQuotations, ...mappedShipments, ...mappedPOs, ...mappedQuotations, ...mappedInvoices]);
+            const pendingSubmissions = isFinanceScope
+                ? [...mappedInvoices]
+                : [...mappedSalesQuotations, ...mappedShipments, ...mappedPOs, ...mappedQuotations];
+            setSubmissions(pendingSubmissions);
 
             // Fetch History - ISOLATED for Blink / BXPO
             let historyData = [];
             let histErr = null;
-            const historyModule = division === 'bxpo'
-                ? 'bxpo_operations'
-                : division === 'cabang'
-                    ? 'cabang_operations'
-                    : 'blink_operations';
+            const historyModule = isFinanceScope
+                ? (division === 'bxpo'
+                    ? 'bxpo_finance'
+                    : division === 'cabang'
+                        ? 'cabang_finance'
+                        : 'blink_finance')
+                : (division === 'bxpo'
+                    ? 'bxpo_operations'
+                    : division === 'cabang'
+                        ? 'cabang_operations'
+                        : 'blink_operations');
 
             // Try with module filter first
             const histRes = await supabase
@@ -655,7 +682,7 @@ const BlinkApproval = () => {
                             : mappedStatus === 'cancelled'
                                 ? 'Cancelled from invoice workflow'
                                 : 'Approved from invoice workflow',
-                        module: 'blink_sales'
+                        module: 'blink_finance'
                     };
                 }));
             }
@@ -685,11 +712,16 @@ const BlinkApproval = () => {
                 }));
             }
 
-            const mergedHistory = [...historyData, ...cancellationLogs, ...derivedLogs].sort((a, b) => {
-                const aDate = new Date(a.approved_at || a.created_at || 0).getTime();
-                const bDate = new Date(b.approved_at || b.created_at || 0).getTime();
-                return bDate - aDate;
-            });
+            const mergedHistory = [...historyData, ...cancellationLogs, ...derivedLogs]
+                .filter((row) => {
+                    const docType = String(row.document_type || '').toLowerCase();
+                    return isFinanceScope ? docType === 'invoice' : docType !== 'invoice';
+                })
+                .sort((a, b) => {
+                    const aDate = new Date(a.approved_at || a.created_at || 0).getTime();
+                    const bDate = new Date(b.approved_at || b.created_at || 0).getTime();
+                    return bDate - aDate;
+                });
 
             const seen = new Set();
             const combinedHistory = mergedHistory.filter((row) => {
@@ -1252,11 +1284,13 @@ const BlinkApproval = () => {
                     <div className="flex items-center gap-3">
                         <h1 style={{ color: '#111827' }} className="text-2xl font-bold flex items-center gap-2">
                             <CheckCircle className="w-6 h-6 text-blue-600" />
-                            Operation Approval Center
+                            {isFinanceScope ? 'Finance Approval Center' : 'Operation Approval Center'}
                         </h1>
                     </div>
                     <p style={{ color: '#4B5563' }} className="text-sm mt-1">
-                        Manage all operational document submissions in the BLINK module
+                        {isFinanceScope
+                            ? 'Manage all invoice approval submissions in the BLINK finance module'
+                            : 'Manage all operational document submissions in the BLINK module'}
                     </p>
                 </div>
                 <div className="flex items-center gap-3 bg-white p-1 rounded-xl shadow-sm border border-gray-100">
@@ -1421,6 +1455,7 @@ const BlinkApproval = () => {
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                     <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                         <h2 className="font-semibold text-gray-800">Historical Operational Approvals</h2>
+                                                <h2 className="font-semibold text-gray-800">{isFinanceScope ? 'Historical Finance Approvals' : 'Historical Operational Approvals'}</h2>
                         <div className="text-sm text-gray-500">Showing {historyLogs.length} records</div>
                     </div>
                     {historyLogs.length === 0 ? (

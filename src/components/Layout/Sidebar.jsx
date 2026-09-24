@@ -68,6 +68,18 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
         : 0;
     const [blinkOpsPendingCount, setBlinkOpsPendingCount] = React.useState(0);
     const [blinkSalesPendingCount, setBlinkSalesPendingCount] = React.useState(0);
+    const [blinkFinancePendingCount, setBlinkFinancePendingCount] = React.useState(0);
+
+    const getApprovalBadgeCount = (itemObj = {}) => {
+        const menuCode = itemObj.menuCode;
+        const path = itemObj.path || '';
+        if (menuCode === 'blink_sales_approval' || menuCode === 'cabang_sales_approval') return blinkSalesPendingCount;
+        if (menuCode === 'blink_approval' || menuCode === 'bxpo_approval' || menuCode === 'cabang_approval') {
+            return menuCode === 'bxpo_approval' ? (blinkOpsPendingCount + blinkSalesPendingCount) : blinkOpsPendingCount;
+        }
+        if (path === '/blink/finance/approvals' || path === '/cabang/finance/approvals') return blinkFinancePendingCount;
+        return 0;
+    };
     
     React.useEffect(() => {
         const fetchBlinkPending = async () => {
@@ -77,14 +89,15 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                 const division = path.startsWith('/bxpo') ? 'bxpo' : path.startsWith('/cabang') ? 'cabang' : 'blink';
                 
                 // Fetch Operations Pending
-                const [qRes, sRes, iRes, pRes] = await Promise.all([
+                const [qRes, sRes, pRes, iRes] = await Promise.all([
                     supabase.from('blink_quotations').select('id', { count: 'exact', head: true }).eq('status', 'manager_approval'),
                     supabase.from('blink_shipments').select('id', { count: 'exact', head: true }).eq('status', 'manager_approval'),
-                    supabase.from('blink_invoices').select('id', { count: 'exact', head: true }).eq('status', 'manager_approval').eq('division', division),
-                    supabase.from('blink_purchase_orders').select('id', { count: 'exact', head: true }).in('status', ['submitted', 'manager_approval']).eq('division', division)
+                    supabase.from('blink_purchase_orders').select('id', { count: 'exact', head: true }).in('status', ['submitted', 'manager_approval']).eq('division', division),
+                    supabase.from('blink_invoices').select('id', { count: 'exact', head: true }).in('status', ['submitted', 'manager_approval', 'pending', 'pending_approval']).eq('division', division)
                 ]);
-                const opsCount = (qRes.count || 0) + (sRes.count || 0) + (iRes.count || 0) + (pRes.count || 0);
+                const opsCount = (qRes.count || 0) + (sRes.count || 0) + (pRes.count || 0);
                 setBlinkOpsPendingCount(opsCount);
+                setBlinkFinancePendingCount(iRes.count || 0);
                 
                 // Fetch Sales Pending
                 const sqRes = await supabase.from('blink_sales_quotations').select('id', { count: 'exact', head: true }).eq('status', 'manager_approval');
@@ -359,6 +372,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
             type: 'category', label: '⚡ BLINK Finance', items: [
                 { type: 'divider', label: '📋 Transactions' },
                 { path: '/blink/finance/invoices', label: 'Invoice', menuCode: 'blink_invoices', menuCodes: ['blink_invoice', 'blink_finance'] },
+                    { path: '/blink/finance/approvals', label: 'Approval Center (Invoice)', menuCode: 'blink_invoices', menuCodes: ['blink_invoice', 'blink_finance'], showBadge: true },
                 { path: '/blink/finance/purchase-orders', label: 'Purchase Order', menuCode: 'blink_purchase_order' },
                 { path: '/blink/finance/ar', label: 'Account Receivables (AR)', menuCode: 'blink_ar' },
                 { path: '/blink/finance/ap', label: 'Account Payables (AP)', menuCode: 'blink_ap' },
@@ -435,6 +449,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
         {
             type: 'category', label: '💰 Finance', items: [
                 { path: '/cabang/finance/invoices', label: 'Invoice', menuCode: 'cabang_invoices' },
+                { path: '/cabang/finance/approvals', label: 'Approval Center (Invoice)', menuCode: 'cabang_invoices', showBadge: true },
                 { path: '/cabang/finance/purchase-orders', label: 'Purchase Order', menuCode: 'cabang_purchase_order' },
                 { path: '/cabang/finance/ar', label: 'Account Receivable (AR)', menuCode: 'cabang_ar' },
                 { path: '/cabang/finance/ap', label: 'Account Payable (AP)', menuCode: 'cabang_ap' },
@@ -1500,9 +1515,9 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                                                                                                 }`}
                                                                                         >
                                                                                             <span className="flex-1">{itemObj.label}</span>
-                                                                                            {itemObj.showBadge && (itemObj.menuCode === 'blink_sales_approval' ? blinkSalesPendingCount : blinkOpsPendingCount) > 0 && (
+                                                                                            {itemObj.showBadge && getApprovalBadgeCount(itemObj) > 0 && (
                                                                                                 <span className="ml-2 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-yellow-500 text-white text-[10px] font-bold px-1 animate-pulse">
-                                                                                                    {(itemObj.menuCode === 'blink_sales_approval' ? blinkSalesPendingCount : blinkOpsPendingCount) > 99 ? '99+' : (itemObj.menuCode === 'blink_sales_approval' ? blinkSalesPendingCount : blinkOpsPendingCount)}
+                                                                                                    {getApprovalBadgeCount(itemObj) > 99 ? '99+' : getApprovalBadgeCount(itemObj)}
                                                                                                 </span>
                                                                                             )}
                                                                                         </Link>
@@ -1651,13 +1666,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                                                                                 className="overflow-hidden"
                                                                             >
                                                                                 {accessibleItems.map((itemObj) => {
-                                                                                    const isSalesApproval = itemObj.menuCode === 'cabang_sales_approval';
-                                                                                    const isOpsApproval = itemObj.menuCode === 'cabang_approval';
-                                                                                    const pendingCount = isSalesApproval
-                                                                                        ? blinkSalesPendingCount
-                                                                                        : isOpsApproval
-                                                                                            ? blinkOpsPendingCount
-                                                                                            : 0;
+                                                                                    const pendingCount = getApprovalBadgeCount(itemObj);
 
                                                                                     return (
                                                                                         <Link
@@ -1813,13 +1822,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                                                                                         );
                                                                                     }
 
-                                                                                    const isSalesApproval = itemObj.menuCode === 'blink_sales_approval' || itemObj.menuCode === 'bxpo_sales_approval';
-                                                                                    const isOpsApproval = itemObj.menuCode === 'blink_approval' || itemObj.menuCode === 'bxpo_approval';
-                                                                                    const pendingCount = isSalesApproval
-                                                                                        ? blinkSalesPendingCount
-                                                                                        : isOpsApproval
-                                                                                            ? (blinkOpsPendingCount + (itemObj.menuCode === 'bxpo_approval' ? blinkSalesPendingCount : 0))
-                                                                                            : 0;
+                                                                                    const pendingCount = getApprovalBadgeCount(itemObj);
 
                                                                                     return (
                                                                                         <Link
@@ -1963,6 +1966,11 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                                                                                                 }`}
                                                                                         >
                                                                                             <span className="flex-1">{itemObj.label}</span>
+                                                                                            {itemObj.showBadge && getApprovalBadgeCount(itemObj) > 0 && (
+                                                                                                <span className="ml-2 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-yellow-500 text-white text-[10px] font-bold px-1 animate-pulse">
+                                                                                                    {getApprovalBadgeCount(itemObj) > 99 ? '99+' : getApprovalBadgeCount(itemObj)}
+                                                                                                </span>
+                                                                                            )}
                                                                                         </Link>
                                                                                     );
                                                                                 })}
