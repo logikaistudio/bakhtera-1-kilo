@@ -252,7 +252,7 @@ const BlinkApproval = ({ scope = 'operations' }) => {
 
     useEffect(() => {
         fetchSubmissions();
-    }, []);
+    }, [scope]);
 
     useEffect(() => {
         const channel = supabase.channel(`approval-submissions-${scope}`)
@@ -485,28 +485,33 @@ const BlinkApproval = ({ scope = 'operations' }) => {
                 historyData = histRes.data || [];
             }
 
-            // Fetch cancellation activity directly from operational tables.
-            // This keeps History tab complete without changing other menu flows.
+            // Fetch cancellation activity as history fallback by scope.
             const [cancelShipRes, cancelPoRes, cancelInvRes, cancelQuotRes, cancelSalesQuotRes] = await Promise.all([
-                supabase
-                    .from('blink_shipments')
-                    .select('id, job_number, so_number, updated_at, created_at, rejection_reason')
-                    .eq('status', 'cancelled'),
-                supabase
-                    .from('blink_purchase_orders')
-                    .select('id, po_number, updated_at, created_at, rejection_reason')
-                    .eq('status', 'cancelled')
-                    .eq('division', division),
+                isFinanceScope
+                    ? Promise.resolve({ data: [], error: null })
+                    : supabase
+                        .from('blink_shipments')
+                        .select('id, job_number, so_number, updated_at, created_at, rejection_reason')
+                        .eq('status', 'cancelled'),
+                isFinanceScope
+                    ? Promise.resolve({ data: [], error: null })
+                    : supabase
+                        .from('blink_purchase_orders')
+                        .select('id, po_number, updated_at, created_at, rejection_reason')
+                        .eq('status', 'cancelled')
+                        .eq('division', division),
                 supabase
                     .from('blink_invoices')
                     .select('id, invoice_number, updated_at, created_at, rejection_reason')
                     .eq('status', 'cancelled')
                     .eq('division', division),
-                supabase
-                    .from('blink_quotations')
-                    .select('id, quotation_number, job_number, updated_at, created_at, rejection_reason')
-                    .eq('status', 'cancelled'),
-                (division === 'bxpo' || division === 'cabang')
+                isFinanceScope
+                    ? Promise.resolve({ data: [], error: null })
+                    : supabase
+                        .from('blink_quotations')
+                        .select('id, quotation_number, job_number, updated_at, created_at, rejection_reason')
+                        .eq('status', 'cancelled'),
+                (!isFinanceScope && (division === 'bxpo' || division === 'cabang'))
                     ? supabase
                         .from('blink_sales_quotations')
                         .select('id, quotation_number, job_number, updated_at, created_at, rejection_reason')
@@ -581,36 +586,52 @@ const BlinkApproval = ({ scope = 'operations' }) => {
                 })));
             }
 
-            // Fallback history from document statuses (for environments where blink_approval_history
-            // is empty or insert/select is restricted). This affects display only, not business flow.
+            // Fallback history from document statuses by scope.
             const [histShipRes, histPoRes, histInvRes, histQuotRes] = await Promise.all([
-                supabase
-                    .from('blink_shipments')
-                    .select('id, job_number, so_number, status, bl_status, updated_at, created_at, rejection_reason')
-                    .or('status.in.(approved,rejected,cancelled),bl_status.in.(approved,rejected,cancelled)')
-                    .order('updated_at', { ascending: false })
-                    .limit(200),
-                supabase
-                    .from('blink_purchase_orders')
-                    .select('id, po_number, status, updated_at, created_at, rejection_reason')
-                    .or('status.in.(approved,cancelled),rejection_reason.not.is.null')
-                    .order('updated_at', { ascending: false })
-                    .limit(200),
+                isFinanceScope
+                    ? Promise.resolve({ data: [], error: null })
+                    : supabase
+                        .from('blink_shipments')
+                        .select('id, job_number, so_number, status, bl_status, updated_at, created_at, rejection_reason')
+                        .or('status.in.(approved,rejected,cancelled),bl_status.in.(approved,rejected,cancelled)')
+                        .order('updated_at', { ascending: false })
+                        .limit(200),
+                isFinanceScope
+                    ? Promise.resolve({ data: [], error: null })
+                    : supabase
+                        .from('blink_purchase_orders')
+                        .select('id, po_number, status, updated_at, created_at, rejection_reason')
+                        .or('status.in.(approved,cancelled),rejection_reason.not.is.null')
+                        .order('updated_at', { ascending: false })
+                        .limit(200),
                 supabase
                     .from('blink_invoices')
-                    .select('id, invoice_number, status, updated_at, created_at, rejection_reason')
+                    .select('id, invoice_number, status, updated_at, created_at, rejection_reason, division')
+                    .eq('division', division)
                     .in('status', ['approved', 'unpaid', 'paid', 'partially_paid', 'overdue', 'rejected', 'cancelled'])
                     .order('updated_at', { ascending: false })
                     .limit(200),
-                supabase
-                    .from('blink_quotations')
-                    .select('id, quotation_number, job_number, status, updated_at, created_at, rejection_reason')
-                    .in('status', ['converted', 'approved', 'rejected', 'cancelled'])
-                    .order('updated_at', { ascending: false })
-                    .limit(200)
+                isFinanceScope
+                    ? Promise.resolve({ data: [], error: null })
+                    : supabase
+                        .from('blink_quotations')
+                        .select('id, quotation_number, job_number, status, updated_at, created_at, rejection_reason')
+                        .in('status', ['converted', 'approved', 'rejected', 'cancelled'])
+                        .order('updated_at', { ascending: false })
+                        .limit(200)
             ]);
 
             const derivedLogs = [];
+            const derivedOpsModule = division === 'bxpo'
+                ? 'bxpo_operations'
+                : division === 'cabang'
+                    ? 'cabang_operations'
+                    : 'blink_operations';
+            const derivedFinanceModule = division === 'bxpo'
+                ? 'bxpo_finance'
+                : division === 'cabang'
+                    ? 'cabang_finance'
+                    : 'blink_finance';
 
             if (!histShipRes.error) {
                 derivedLogs.push(...(histShipRes.data || []).map((row) => {
@@ -632,7 +653,7 @@ const BlinkApproval = ({ scope = 'operations' }) => {
                             : mappedStatus === 'cancelled'
                                 ? (row.rejection_reason || 'Cancelled from shipment workflow')
                                 : 'Approved from shipment workflow',
-                        module: 'blink_operations'
+                        module: derivedOpsModule
                     };
                 }));
             }
@@ -657,7 +678,7 @@ const BlinkApproval = ({ scope = 'operations' }) => {
                             : mappedStatus === 'cancelled'
                                 ? 'Cancelled from PO workflow'
                                 : 'Approved from PO workflow',
-                        module: 'blink_operations'
+                        module: derivedOpsModule
                     };
                 }));
             }
@@ -682,7 +703,7 @@ const BlinkApproval = ({ scope = 'operations' }) => {
                             : mappedStatus === 'cancelled'
                                 ? 'Cancelled from invoice workflow'
                                 : 'Approved from invoice workflow',
-                        module: 'blink_finance'
+                        module: derivedFinanceModule
                     };
                 }));
             }
