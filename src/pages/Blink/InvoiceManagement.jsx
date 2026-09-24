@@ -2269,28 +2269,44 @@ const InvoiceManagement = () => {
     };
 
     const normalizeRefKey = (value) => String(value || '').trim().toLowerCase();
-    const activeInvoiceReferenceKeys = new Set(
-        invoices
-            .filter((inv) => !['cancelled', 'rejected'].includes(inv.status))
-            .flatMap((inv) => {
-                const shipmentKey = inv.shipment_id ? `shipment:${normalizeRefKey(inv.shipment_id)}` : null;
-                const jobKey = inv.job_number ? `job:${normalizeRefKey(inv.job_number)}` : null;
-                const soKey = inv.so_number ? `so:${normalizeRefKey(inv.so_number)}` : null;
-                return [shipmentKey, jobKey, soKey].filter(Boolean);
-            })
-    );
+    const activeInvoiceReferenceMap = invoices
+        .filter((inv) => !['cancelled', 'rejected'].includes(inv.status))
+        .reduce((acc, inv) => {
+            const shipmentKey = inv.shipment_id ? `shipment:${normalizeRefKey(inv.shipment_id)}` : null;
+            const jobKey = inv.job_number ? `job:${normalizeRefKey(inv.job_number)}` : null;
+            const soKey = inv.so_number ? `so:${normalizeRefKey(inv.so_number)}` : null;
+
+            [shipmentKey, jobKey, soKey].filter(Boolean).forEach((key) => {
+                if (!acc.has(key)) acc.set(key, []);
+                acc.get(key).push(inv);
+            });
+
+            return acc;
+        }, new Map());
+
+    const getShipmentReferenceKeys = (shipment) => {
+        const shipmentKey = shipment?.id ? `shipment:${normalizeRefKey(shipment.id)}` : null;
+        const jobKey = shipment?.job_number ? `job:${normalizeRefKey(shipment.job_number)}` : null;
+        const soKey = shipment?.so_number ? `so:${normalizeRefKey(shipment.so_number)}` : null;
+        return [shipmentKey, jobKey, soKey].filter(Boolean);
+    };
+
+    const getLinkedActiveInvoices = (shipment) => {
+        const seen = new Set();
+        return getShipmentReferenceKeys(shipment)
+            .flatMap((key) => activeInvoiceReferenceMap.get(key) || [])
+            .filter((inv) => {
+                if (!inv?.id || seen.has(inv.id)) return false;
+                seen.add(inv.id);
+                return true;
+            });
+    };
 
     const readySOShipments = shipments
         .filter((shipment) => {
             if (!shipment?.id) return false;
             if (!isFullApprovedSO(shipment)) return false;
-
-            const shipmentKey = `shipment:${normalizeRefKey(shipment.id)}`;
-            const jobKey = shipment.job_number ? `job:${normalizeRefKey(shipment.job_number)}` : null;
-            const soKey = shipment.so_number ? `so:${normalizeRefKey(shipment.so_number)}` : null;
-            const referenceKeys = [shipmentKey, jobKey, soKey].filter(Boolean);
-
-            return !referenceKeys.some((key) => activeInvoiceReferenceKeys.has(key));
+            return true;
         })
         .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
 
@@ -2521,7 +2537,7 @@ const InvoiceManagement = () => {
                     <div>
                         <h2 className="text-base font-semibold text-silver-light">SO List</h2>
                         <p className="text-xs text-silver-dark mt-0.5">
-                            Hanya SO full approved yang belum memiliki invoice aktif.
+                            Menampilkan SO full approved. Aksi berubah ke Revisi jika invoice sudah terbuat dan belum dibayar.
                         </p>
                     </div>
                     <div className="w-full md:w-96 relative">
@@ -2561,6 +2577,17 @@ const InvoiceManagement = () => {
                                 filteredReadySOShipments.map((shipment) => {
                                     const customerName = shipment.customer || shipment.customer_name || '-';
                                     const route = `${shipment.origin || '-'} → ${shipment.destination || '-'}`;
+                                    const linkedInvoices = getLinkedActiveInvoices(shipment);
+                                    const unpaidInvoice = linkedInvoices.find((inv) => {
+                                        const paidAmount = Number(inv.paid_amount || 0);
+                                        const status = String(inv.status || '').toLowerCase();
+                                        return paidAmount <= 0 && status !== 'paid';
+                                    });
+                                    const hasAnyActiveInvoice = linkedInvoices.length > 0;
+                                    const hasPaymentOnAnyInvoice = linkedInvoices.some((inv) => Number(inv.paid_amount || 0) > 0 || String(inv.status || '').toLowerCase() === 'paid');
+                                    const canCreateOrEdit = canCreate('blink_invoices') || canEdit('blink_invoices');
+                                    const canRevise = Boolean(unpaidInvoice) && canEdit('blink_invoices');
+
                                     return (
                                         <tr key={shipment.id} className="hover:bg-dark-surface smooth-transition">
                                             <td className="px-3 py-2 whitespace-nowrap text-silver-light font-medium">
@@ -2582,14 +2609,39 @@ const InvoiceManagement = () => {
                                                 {shipment.created_at ? new Date(shipment.created_at).toLocaleDateString('id-ID') : '-'}
                                             </td>
                                             <td className="px-3 py-2 text-center whitespace-nowrap">
-                                                <button
-                                                    onClick={() => handleCreateFromReadySO(shipment)}
-                                                    disabled={!canCreate('blink_invoices') && !canEdit('blink_invoices')}
-                                                    className="px-2.5 py-1 bg-accent-orange/25 hover:bg-accent-orange/40 text-accent-orange border border-accent-orange/50 rounded text-xs font-medium inline-flex items-center gap-1 smooth-transition disabled:opacity-40 disabled:cursor-not-allowed"
-                                                >
-                                                    <Plus className="w-3 h-3" />
-                                                    Buat Invoice
-                                                </button>
+                                                {unpaidInvoice ? (
+                                                    <button
+                                                        onClick={() => handleEditInvoice(unpaidInvoice)}
+                                                        disabled={!canRevise}
+                                                        className="px-2.5 py-1 bg-blue-100 hover:bg-blue-200 text-blue-800 border border-blue-300 rounded text-xs font-medium inline-flex items-center gap-1 smooth-transition disabled:opacity-40 disabled:cursor-not-allowed"
+                                                        title="Invoice sudah dibuat dan belum dibayar. Lanjutkan revisi invoice."
+                                                    >
+                                                        <Edit className="w-3 h-3" />
+                                                        Revisi
+                                                    </button>
+                                                ) : hasAnyActiveInvoice ? (
+                                                    <button
+                                                        type="button"
+                                                        disabled
+                                                        className="px-2.5 py-1 bg-slate-100 text-slate-500 border border-slate-300 rounded text-xs font-medium inline-flex items-center gap-1 cursor-not-allowed"
+                                                        title={hasPaymentOnAnyInvoice
+                                                            ? 'Invoice sudah memiliki pembayaran, revisi tidak diizinkan dari SO List.'
+                                                            : 'SO ini sudah memiliki invoice aktif.'
+                                                        }
+                                                    >
+                                                        <CheckCircle className="w-3 h-3" />
+                                                        {hasPaymentOnAnyInvoice ? 'Sudah Dibayar' : 'Sudah Diinvoice'}
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => handleCreateFromReadySO(shipment)}
+                                                        disabled={!canCreateOrEdit}
+                                                        className="px-2.5 py-1 bg-accent-orange/25 hover:bg-accent-orange/40 text-accent-orange border border-accent-orange/50 rounded text-xs font-medium inline-flex items-center gap-1 smooth-transition disabled:opacity-40 disabled:cursor-not-allowed"
+                                                    >
+                                                        <Plus className="w-3 h-3" />
+                                                        Buat Invoice
+                                                    </button>
+                                                )}
                                             </td>
                                         </tr>
                                     );
