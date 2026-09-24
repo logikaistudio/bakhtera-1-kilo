@@ -11,7 +11,7 @@ import COAPicker from '../../components/Common/COAPicker';
 import { logTransaction, TRANSACTION_TYPES, MODULES, ACTIONS } from '../../services/transactionLogService';
 import {
     FileText, DollarSign, Calendar, User, Clock, CheckCircle, XCircle,
-    Plus, Send, AlertCircle, Download, Eye, Edit, Trash,
+    Plus, Send, AlertCircle, Download, Eye, Edit, Trash, Receipt,
     TrendingUp, AlertTriangle, Search, Filter, X, Package, Circle, PlaySquare, RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
