@@ -11,6 +11,9 @@ const DEFAULT_ROLE_LABELS = {
 
 const EXCLUDED_AUTO_ROLES = new Set(['super_admin', 'admin']);
 
+const normalizeRoleId = (value) => String(value || '').trim();
+const normalizeMenuCode = (value) => String(value || '').trim();
+
 export const DEFAULT_ROLE_OPTIONS = [
     { id: 'direksi', label: 'Direksi' },
     { id: 'chief', label: 'Chief' },
@@ -49,8 +52,8 @@ export const buildRoleOptionsFromPermissionRows = ({
     }
 
     (rows || []).forEach((row) => {
-        if (!row?.role_id) return;
-        const roleId = row.role_id;
+        const roleId = normalizeRoleId(row?.role_id);
+        if (!roleId) return;
         const label = row.role_label?.trim() || DEFAULT_ROLE_LABELS[roleId] || normalizeRoleLabel(roleId);
         roleMap.set(roleId, label);
     });
@@ -94,11 +97,12 @@ export const syncRolePermissionsWithMenus = async ({ pruneStale = true } = {}) =
     const roleLabelMap = new Map(Object.entries(DEFAULT_ROLE_LABELS));
 
     (existingRows || []).forEach((row) => {
-        if (!row?.role_id || EXCLUDED_AUTO_ROLES.has(row.role_id)) return;
-        const fallbackLabel = DEFAULT_ROLE_LABELS[row.role_id] || normalizeRoleLabel(row.role_id);
+        const roleId = normalizeRoleId(row?.role_id);
+        if (!roleId || EXCLUDED_AUTO_ROLES.has(roleId)) return;
+        const fallbackLabel = DEFAULT_ROLE_LABELS[roleId] || normalizeRoleLabel(roleId);
         const nextLabel = row.role_label?.trim() || fallbackLabel;
-        if (!roleLabelMap.has(row.role_id)) {
-            roleLabelMap.set(row.role_id, nextLabel);
+        if (!roleLabelMap.has(roleId)) {
+            roleLabelMap.set(roleId, nextLabel);
         }
     });
 
@@ -109,7 +113,7 @@ export const syncRolePermissionsWithMenus = async ({ pruneStale = true } = {}) =
         .not('user_level', 'is', null);
 
     (userRoles || []).forEach((row) => {
-        const roleId = String(row?.user_level || '').trim();
+        const roleId = normalizeRoleId(row?.user_level);
         if (!roleId || EXCLUDED_AUTO_ROLES.has(roleId)) return;
         if (!roleLabelMap.has(roleId)) {
             roleLabelMap.set(roleId, DEFAULT_ROLE_LABELS[roleId] || normalizeRoleLabel(roleId));
@@ -122,7 +126,9 @@ export const syncRolePermissionsWithMenus = async ({ pruneStale = true } = {}) =
     }));
 
     const existingKeySet = new Set(
-        (existingRows || []).map((row) => `${row.role_id}::${row.menu_code}`)
+        (existingRows || [])
+            .map((row) => `${normalizeRoleId(row?.role_id)}::${normalizeMenuCode(row?.menu_code)}`)
+            .filter((key) => !key.startsWith('::') && !key.endsWith('::'))
     );
 
     const missingRows = [];
@@ -163,7 +169,7 @@ export const syncRolePermissionsWithMenus = async ({ pruneStale = true } = {}) =
         ? Array.from(
             new Set(
                 (existingRows || [])
-                    .map((row) => row.menu_code)
+                    .map((row) => normalizeMenuCode(row?.menu_code))
                     .filter((menuCode) => menuCode && !validMenuCodeSet.has(menuCode))
             )
         )

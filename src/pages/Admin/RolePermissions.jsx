@@ -52,6 +52,9 @@ const DEFAULT_PERMS = () => ({
     can_edit: false, can_delete: false, can_approve: false
 });
 
+const normalizeRoleId = (value) => String(value || '').trim();
+const normalizeMenuCode = (value) => String(value || '').trim();
+
 /* ─────────────────────────────────────────────
    MODULE COLOR HELPERS
    ───────────────────────────────────────────── */
@@ -180,9 +183,23 @@ const RolePermissions = () => {
                 includeDefaults: true,
             }).map((role) => ({
                 ...role,
+                id: normalizeRoleId(role.id),
                 color: DEFAULT_ROLES.find((defaultRole) => defaultRole.id === role.id)?.color || 'gray',
             }));
             setRoles(allRoles);
+
+            if (!allRoles.some((role) => role.id === activeRole)) {
+                setActiveRole(allRoles[0]?.id || 'direksi');
+            }
+
+            // Build lookup map to avoid repeated O(n) search and normalize dirty DB keys.
+            const rowMap = new Map();
+            (data || []).forEach((row) => {
+                const key = `${normalizeRoleId(row?.role_id)}::${normalizeMenuCode(row?.menu_code)}`;
+                if (!key.startsWith('::') && !key.endsWith('::')) {
+                    rowMap.set(key, row);
+                }
+            });
 
             // ── Build permissions untuk semua role ────────────────────
             const updated = {};
@@ -190,7 +207,7 @@ const RolePermissions = () => {
                 updated[role.id] = {};
                 Object.values(MODULE_MENUS).forEach(mod => {
                     mod.menus.forEach(menu => {
-                        const existing = (data || []).find(d => d.role_id === role.id && d.menu_code === menu.code);
+                        const existing = rowMap.get(`${role.id}::${menu.code}`);
                         if (existing) {
                             // Hanya ambil 6 field boolean, JANGAN spread seluruh row DB
                             updated[role.id][menu.code] = {
@@ -321,7 +338,7 @@ const RolePermissions = () => {
     const addRole = async () => {
         const trimmed = newRoleName.trim();
         if (!trimmed) return;
-        const id = trimmed.toLowerCase().replace(/\s+/g, '_');
+        const id = normalizeRoleId(trimmed.toLowerCase().replace(/\s+/g, '_'));
         if (roles.find(r => r.id === id)) {
             alert('Role dengan nama tersebut sudah ada.');
             return;
@@ -351,9 +368,20 @@ const RolePermissions = () => {
                 .upsert(rows, { onConflict: 'role_id,menu_code', ignoreDuplicates: false });
             if (error) throw error;
             setNotification({ type: 'success', message: `Role "${trimmed}" berhasil ditambahkan & disimpan!` });
+            await loadPermissions();
             notifyRoleConfigUpdated();
         } catch (err) {
             console.error('❌ addRole DB error:', err);
+            // Rollback optimistic UI change jika gagal simpan ke DB.
+            setRoles(prev => prev.filter(r => r.id !== id));
+            setPermissions(prev => {
+                const next = { ...prev };
+                delete next[id];
+                return next;
+            });
+            if (activeRole === id) {
+                setActiveRole(DEFAULT_ROLES[0]?.id || 'direksi');
+            }
             // ✅ Fixed: Show error notification with actual error message
             setNotification({ 
                 type: 'error', 
@@ -381,6 +409,7 @@ const RolePermissions = () => {
                 .eq('role_id', roleId);
             if (error) throw error;
             setNotification({ type: 'success', message: `Role "${roleName}" berhasil dihapus.` });
+            await loadPermissions();
             notifyRoleConfigUpdated();
         } catch (err) {
             console.error('❌ deleteRole DB error:', err);
@@ -422,6 +451,7 @@ const RolePermissions = () => {
 
             if (error) throw error;
             setNotification({ type: 'success', message: `Role diubah menjadi "${trimmed}"` });
+            await loadPermissions();
             notifyRoleConfigUpdated();
         } catch (err) {
             console.error('❌ editRole DB error:', err);
