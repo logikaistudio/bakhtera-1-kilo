@@ -130,11 +130,13 @@ const UserManagement = () => {
         return () => window.removeEventListener('role-config-updated', syncFromRoleManager);
     }, [loadUsers, loadRoles]);
 
-    const handleCreateUser = () => {
+    const handleCreateUser = async () => {
+        await loadRoles();
         setShowCreateModal(true);
     };
 
-    const handleEditUser = (userToEdit) => {
+    const handleEditUser = async (userToEdit) => {
+        await loadRoles();
         setSelectedUser(userToEdit);
         setShowEditModal(true);
     };

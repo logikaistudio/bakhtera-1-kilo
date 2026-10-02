@@ -49,6 +49,19 @@ const UserPermissionAssignment = () => {
     const [saving, setSaving] = useState(false);
     const [notification, setNotification] = useState(null);
 
+    const getEditableRoles = useCallback((currentRole) => {
+        const normalizedCurrentRole = String(currentRole || '').trim();
+        if (!normalizedCurrentRole) return roles;
+        if (roles.some(r => r.id === normalizedCurrentRole)) return roles;
+        return [
+            ...roles,
+            {
+                id: normalizedCurrentRole,
+                label: normalizedCurrentRole.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+            }
+        ];
+    }, [roles]);
+
     const showNotif = useCallback((type, message) => {
         setNotification({ type, message });
         setTimeout(() => setNotification(null), 4000);
@@ -126,7 +139,8 @@ const UserPermissionAssignment = () => {
         return () => window.removeEventListener('role-config-updated', syncFromRoleManager);
     }, [loadAll]);
 
-    const startEdit = (user) => {
+    const startEdit = async (user) => {
+        await loadRoles();
         setEditingId(user.id);
         setEditRole(user.user_level || 'viewer');
     };
@@ -286,6 +300,8 @@ const UserPermissionAssignment = () => {
                                 const isEditing = editingId === u.id;
                                 const roleCfg = DEFAULT_ROLE_COLORS[u.user_level] || fallbackColor;
 
+                                const editableRoles = getEditableRoles(u.user_level);
+
                                 return (
                                     <tr
                                         key={u.id}
@@ -331,7 +347,7 @@ const UserPermissionAssignment = () => {
                                                     }}
                                                     autoFocus
                                                 >
-                                                    {roles.map(r => (
+                                                    {editableRoles.map(r => (
                                                         <option key={r.id} value={r.id}>{r.label}</option>
                                                     ))}
                                                 </select>
