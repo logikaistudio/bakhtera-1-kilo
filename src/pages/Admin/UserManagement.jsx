@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import {
     syncRolePermissionsWithMenus,
     buildRoleOptionsFromPermissionRows,
+    fetchAllRolePermissionRows,
 } from '../../services/rolePermissionSyncService';
 import { getAllUsers, createUser, updateUser, resetPassword, toggleUserActive, deleteUser, bulkResetLegacyPasswords } from '../../services/userService';
 import { generatePassword } from '../../services/passwordService';
@@ -68,10 +69,13 @@ const UserManagement = () => {
                 console.warn('⚠️ role/menu auto-sync skipped:', syncErr.message);
             }
 
-            const { data, error } = await supabase
-                .from('role_permissions')
-                .select('role_id, role_label')
-                .order('role_id');
+            let data = [];
+            let error = null;
+            try {
+                data = await fetchAllRolePermissionRows('role_id, role_label');
+            } catch (fetchErr) {
+                error = fetchErr;
+            }
 
             const { data: userRoleRows, error: userRoleError } = await supabase
                 .from('users')

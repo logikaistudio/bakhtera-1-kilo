@@ -35,6 +35,32 @@ const chunkArray = (items, size = 500) => {
     return chunks;
 };
 
+export const fetchAllRolePermissionRows = async (
+    columns = 'role_id, role_label, menu_code, can_access, can_view, can_create, can_edit, can_delete, can_approve'
+) => {
+    const PAGE_SIZE = 1000;
+    let from = 0;
+    const rows = [];
+
+    while (true) {
+        const { data, error } = await supabase
+            .from('role_permissions')
+            .select(columns)
+            .order('role_id', { ascending: true })
+            .range(from, from + PAGE_SIZE - 1);
+
+        if (error) throw error;
+
+        const page = data || [];
+        rows.push(...page);
+
+        if (page.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+    }
+
+    return rows;
+};
+
 export const buildRoleOptionsFromPermissionRows = ({
     rows = [],
     includeSuperAdmin = false,

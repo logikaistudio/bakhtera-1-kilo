@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import {
     syncRolePermissionsWithMenus,
     buildRoleOptionsFromPermissionRows,
+    fetchAllRolePermissionRows,
 } from '../../services/rolePermissionSyncService';
 import {
     Users, Shield, CheckCircle2, AlertCircle, Edit2, Save, X,
@@ -91,10 +92,13 @@ const UserPermissionAssignment = () => {
             }
 
             // ✅ Fixed: Use simpler query and explicit deduplication
-            const { data, error } = await supabase
-                .from('role_permissions')
-                .select('role_id, role_label')
-                .order('role_id');
+            let data = [];
+            let error = null;
+            try {
+                data = await fetchAllRolePermissionRows('role_id, role_label');
+            } catch (fetchErr) {
+                error = fetchErr;
+            }
 
             const { data: userRoleRows, error: userRoleError } = await supabase
                 .from('users')

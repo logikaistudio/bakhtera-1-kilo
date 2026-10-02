@@ -10,6 +10,7 @@ import { APP_MENUS } from '../../config/menuConfig';
 import {
     syncRolePermissionsWithMenus,
     buildRoleOptionsFromPermissionRows,
+    fetchAllRolePermissionRows,
 } from '../../services/rolePermissionSyncService';
 
 /* ─────────────────────────────────────────────
@@ -155,9 +156,13 @@ const RolePermissions = () => {
                 });
             }
 
-            const { data, error } = await supabase
-                .from('role_permissions')
-                .select('*');
+            let data = [];
+            let error = null;
+            try {
+                data = await fetchAllRolePermissionRows('*');
+            } catch (fetchErr) {
+                error = fetchErr;
+            }
 
             if (error && error.code !== 'PGRST116') {
                 console.warn('role_permissions table may not exist yet:', error.message);
