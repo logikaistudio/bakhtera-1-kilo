@@ -73,6 +73,11 @@ const UserManagement = () => {
                 .select('role_id, role_label')
                 .order('role_id');
 
+            const { data: userRoleRows, error: userRoleError } = await supabase
+                .from('users')
+                .select('user_level')
+                .not('user_level', 'is', null);
+
             if (error) {
                 console.warn('⚠️ loadRoles query error (using fallback):', error.message);
                 // Jika error (mis. RLS belum di-fix), gunakan fallback
@@ -84,8 +89,27 @@ const UserManagement = () => {
                 return;
             }
 
+            if (userRoleError) {
+                console.warn('⚠️ loadRoles users role query warning:', userRoleError.message);
+            }
+
+            const mergedRows = [...(data || [])];
+            const existingRoleIds = new Set(
+                mergedRows.map((row) => String(row?.role_id || '').trim()).filter(Boolean)
+            );
+
+            (userRoleRows || []).forEach((row) => {
+                const roleId = String(row?.user_level || '').trim();
+                if (!roleId || existingRoleIds.has(roleId)) return;
+                existingRoleIds.add(roleId);
+                mergedRows.push({
+                    role_id: roleId,
+                    role_label: roleId.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+                });
+            });
+
             const roles = buildRoleOptionsFromPermissionRows({
-                rows: data || [],
+                rows: mergedRows,
                 includeSuperAdmin: true,
                 includeDefaults: true,
             });

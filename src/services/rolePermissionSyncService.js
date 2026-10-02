@@ -157,7 +157,10 @@ export const syncRolePermissionsWithMenus = async ({ pruneStale = true } = {}) =
     for (const chunk of chunkArray(missingRows, 500)) {
         const { error } = await supabase
             .from('role_permissions')
-            .insert(chunk);
+            .upsert(chunk, {
+                onConflict: 'role_id,menu_code',
+                ignoreDuplicates: true,
+            });
 
         if (error) {
             throw error;
