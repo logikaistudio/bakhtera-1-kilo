@@ -48,7 +48,7 @@ export const AuthProvider = ({ children }) => {
             if (!user || user.user_level !== 'super_admin') return;
 
             try {
-                await syncRolePermissionsWithMenus({ pruneStale: true });
+                await syncRolePermissionsWithMenus({ pruneStale: false });
                 const newPerms = await getUserPermissions(user.id, user.user_level);
                 setPermissions(newPerms);
                 console.log('[Auth] Role/menu auto-sync completed for super_admin');

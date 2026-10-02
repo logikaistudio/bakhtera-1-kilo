@@ -78,7 +78,7 @@ export const buildRoleOptionsFromPermissionRows = ({
  * - Inserts missing role x menu rows with all permissions false.
  * - Optionally prunes stale rows for menu codes that no longer exist in menuConfig.
  */
-export const syncRolePermissionsWithMenus = async ({ pruneStale = true } = {}) => {
+export const syncRolePermissionsWithMenus = async ({ pruneStale = false } = {}) => {
     const now = new Date().toISOString();
     const allMenus = getAllMenus();
     // Some menu codes intentionally appear in multiple module groups (e.g. Blink + Finance).
@@ -179,26 +179,9 @@ export const syncRolePermissionsWithMenus = async ({ pruneStale = true } = {}) =
         : [];
 
     let deletedCount = 0;
-    for (const staleChunk of chunkArray(staleMenuCodes, 100)) {
-        const { data: staleRows, error: countError } = await supabase
-            .from('role_permissions')
-            .select('role_id, menu_code')
-            .in('menu_code', staleChunk);
-
-        if (countError) {
-            throw countError;
-        }
-
-        const { error: deleteError } = await supabase
-            .from('role_permissions')
-            .delete()
-            .in('menu_code', staleChunk);
-
-        if (deleteError) {
-            throw deleteError;
-        }
-
-        deletedCount += (staleRows || []).length;
+    if (pruneStale && staleMenuCodes.length > 0) {
+        // Preserve historical/custom role items: never auto-delete stale menu rows.
+        console.warn('[RoleSync] pruneStale requested but deletion is disabled to preserve existing role items.');
     }
 
     return {
