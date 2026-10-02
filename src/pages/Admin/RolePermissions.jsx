@@ -142,7 +142,15 @@ const RolePermissions = () => {
         setLoading(true);
         try {
             // Auto-sync agar menu baru langsung punya role item.
-            await runMenuSync();
+            try {
+                await runMenuSync();
+            } catch (syncErr) {
+                console.warn('⚠️ role/menu auto-sync failed, continuing with existing data:', syncErr.message);
+                setNotification({
+                    type: 'error',
+                    message: `Sinkronisasi role/menu gagal, tetapi data akses tetap dimuat: ${syncErr.message || 'Unknown error'}`
+                });
+            }
 
             const { data, error } = await supabase
                 .from('role_permissions')
@@ -203,6 +211,23 @@ const RolePermissions = () => {
 
         } catch (err) {
             console.warn('Could not load permissions:', err.message);
+            // Keep UI editable with a safe local fallback so admin can still adjust access.
+            const fallbackRoles = DEFAULT_ROLES;
+            const fallbackPerms = {};
+            fallbackRoles.forEach(role => {
+                fallbackPerms[role.id] = {};
+                Object.values(MODULE_MENUS).forEach(mod => {
+                    mod.menus.forEach(menu => {
+                        fallbackPerms[role.id][menu.code] = DEFAULT_PERMS();
+                    });
+                });
+            });
+            setRoles(fallbackRoles);
+            setPermissions(fallbackPerms);
+            setNotification({
+                type: 'error',
+                message: `Gagal memuat permission dari database: ${err.message || 'Unknown error'}. Menampilkan fallback lokal.`
+            });
         } finally {
             setLoading(false);
         }

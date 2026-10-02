@@ -78,7 +78,9 @@ export const buildRoleOptionsFromPermissionRows = ({
 export const syncRolePermissionsWithMenus = async ({ pruneStale = true } = {}) => {
     const now = new Date().toISOString();
     const allMenus = getAllMenus();
-    const validMenuCodes = allMenus.map((menu) => menu.code);
+    // Some menu codes intentionally appear in multiple module groups (e.g. Blink + Finance).
+    // Deduplicate here so role_permissions sync does not generate duplicate insert rows.
+    const validMenuCodes = Array.from(new Set(allMenus.map((menu) => menu.code)));
     const validMenuCodeSet = new Set(validMenuCodes);
 
     const { data: existingRows, error: existingError } = await supabase
@@ -107,7 +109,7 @@ export const syncRolePermissionsWithMenus = async ({ pruneStale = true } = {}) =
         .not('user_level', 'is', null);
 
     (userRoles || []).forEach((row) => {
-        const roleId = row?.user_level;
+        const roleId = String(row?.user_level || '').trim();
         if (!roleId || EXCLUDED_AUTO_ROLES.has(roleId)) return;
         if (!roleLabelMap.has(roleId)) {
             roleLabelMap.set(roleId, DEFAULT_ROLE_LABELS[roleId] || normalizeRoleLabel(roleId));
