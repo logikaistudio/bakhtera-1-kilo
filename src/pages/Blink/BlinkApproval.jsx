@@ -203,7 +203,7 @@ const recordApprovalHistory = async (item, action, reason = null, approverName =
 };
 const BlinkApproval = ({ scope = 'operations' }) => {
     const navigate = useNavigate();
-    const { user, isSuperAdmin, isAdmin } = useAuth();
+    const { user, isSuperAdmin, isAdmin, canApprove } = useAuth();
     const [activeTab, setActiveTab] = useState('pending'); // 'pending' | 'history'
     const [submissions, setSubmissions] = useState([]);
     const [historyLogs, setHistoryLogs] = useState([]);
@@ -247,8 +247,20 @@ const BlinkApproval = ({ scope = 'operations' }) => {
         return normalized;
     };
 
+    const resolveApprovalMenuCodes = () => {
+        const division = getActiveDivision();
+        if (isFinanceScope) {
+            if (division === 'cabang') return ['cabang_finance_approval', 'cabang_approval', 'cabang_invoices'];
+            return ['blink_finance_approval', 'blink_approval', 'blink_invoices', 'blink_finance'];
+        }
+
+        if (division === 'cabang') return ['cabang_approval'];
+        if (division === 'bxpo') return ['bxpo_approval'];
+        return ['blink_approval'];
+    };
+
     const isApprover = isSuperAdmin() || isAdmin() ||
-        ['manager', 'blink_manager', 'approver'].includes(user?.user_level);
+        resolveApprovalMenuCodes().some(code => canApprove(code));
 
     useEffect(() => {
         fetchSubmissions();
@@ -1760,7 +1772,7 @@ const BlinkApproval = ({ scope = 'operations' }) => {
                                     <div className="flex gap-3 pt-2 border-t border-gray-200">
                                         <button onClick={() => setShowRejectInput(true)}
                                             className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-50 text-red-700 border border-red-200 rounded-xl hover:bg-red-100 transition-colors text-sm font-medium">
-                                            <XCircle className="w-4 h-4" /> Reject
+                                            Role Anda belum memiliki izin approve untuk menu ini.
                                         </button>
                                         <button onClick={() => handleApprove(selectedItem)} disabled={processing}
                                             className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-50 text-green-700 border border-green-200 rounded-xl hover:bg-green-100 transition-colors text-sm font-medium disabled:opacity-50">
