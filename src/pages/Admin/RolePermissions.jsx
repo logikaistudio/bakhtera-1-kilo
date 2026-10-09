@@ -256,16 +256,37 @@ const RolePermissions = () => {
     };
 
     const togglePerm = (roleId, menuCode, permKey) => {
-        setPermissions(prev => ({
-            ...prev,
-            [roleId]: {
-                ...prev[roleId],
-                [menuCode]: {
-                    ...prev[roleId][menuCode],
-                    [permKey]: !prev[roleId][menuCode][permKey]
-                }
+        setPermissions(prev => {
+            const current = prev[roleId]?.[menuCode] || DEFAULT_PERMS();
+            const nextValue = !current[permKey];
+            const next = {
+                ...current,
+                [permKey]: nextValue,
+            };
+
+            // Any functional permission should imply access + view.
+            if (['can_create', 'can_edit', 'can_delete', 'can_approve'].includes(permKey) && nextValue) {
+                next.can_access = true;
+                next.can_view = true;
             }
-        }));
+
+            // Turning off access should also turn off other capabilities to keep state consistent.
+            if (permKey === 'can_access' && !nextValue) {
+                next.can_view = false;
+                next.can_create = false;
+                next.can_edit = false;
+                next.can_delete = false;
+                next.can_approve = false;
+            }
+
+            return {
+                ...prev,
+                [roleId]: {
+                    ...prev[roleId],
+                    [menuCode]: next
+                }
+            };
+        });
     };
 
     const setAllPermsForMenu = (roleId, menuCode, value) => {
