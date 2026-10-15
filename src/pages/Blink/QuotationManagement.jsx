@@ -524,8 +524,7 @@ const QuotationManagement = () => {
             if (poIds.length > 0) await supabase.from('blink_purchase_orders').delete().in('id', poIds);
 
             if (shipmentIds.length > 0) {
-                // Delete BLs explicitly to avoid constraint error
-                await supabase.from('blink_bl_documents').delete().in('shipment_id', shipmentIds);
+                // BL documents are stored on each shipment row.
                 await supabase.from('blink_shipments').delete().in('id', shipmentIds);
             }
 

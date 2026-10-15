@@ -42,7 +42,6 @@ const ISOLATED_TABLES = new Set([
     'blink_sales_quotations',
     'blink_quotations',
     'blink_shipments',
-    'blink_bl_documents',
     'blink_approval_history'
 ]);
 

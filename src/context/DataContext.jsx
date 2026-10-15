@@ -1402,9 +1402,7 @@ export const DataProvider = ({ children }) => {
             }
 
             if (shipmentIds.length > 0) {
-                emitProgress(onProgress, { stage: 5, totalStages: 8, label: 'Menghapus BL dan shipment...' });
-                const { error: delBlErr } = await supabase.from('blink_bl_documents').delete().in('shipment_id', shipmentIds);
-                assertNoError(delBlErr, 'Gagal menghapus BL terkait quotation');
+                emitProgress(onProgress, { stage: 5, totalStages: 8, label: 'Menghapus shipment dan dokumen terkait...' });
                 const { error: delShipErr } = await supabase.from('blink_shipments').delete().in('id', shipmentIds);
                 assertNoError(delShipErr, 'Gagal menghapus shipment terkait quotation');
             }
@@ -1683,10 +1681,8 @@ export const DataProvider = ({ children }) => {
                 assertNoError(delPoErr, 'Gagal menghapus PO terkait shipment');
             }
 
-            // delete BL documents and shipments
-            emitProgress(onProgress, { stage: 4, totalStages: 6, label: 'Menghapus BL documents...' });
-            const { error: delBlErr } = await supabase.from('blink_bl_documents').delete().in('shipment_id', ids);
-            assertNoError(delBlErr, 'Gagal menghapus BL terkait shipment');
+            // BL/document data is stored on the shipment row, so deleting it removes both.
+            emitProgress(onProgress, { stage: 4, totalStages: 6, label: 'Menghapus shipment dan dokumen terkait...' });
             emitProgress(onProgress, { stage: 5, totalStages: 6, label: 'Menghapus shipment utama...' });
             const { error: delShipErr } = await supabase.from('blink_shipments').delete().in('id', ids);
             assertNoError(delShipErr, 'Gagal menghapus shipment utama');
