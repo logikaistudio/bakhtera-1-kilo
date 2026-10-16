@@ -282,7 +282,7 @@ const TrialBalance = () => {
 
     const formatCurrency = (val) => {
         if (!val && val !== 0) return '-';
-        return val.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        return val.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
 
     // Helper to get color class for negative values (red instead of parentheses)
@@ -293,12 +293,12 @@ const TrialBalance = () => {
     // Helper to format money with color for negative (Credit) - no parentheses
     const formatBalance = (val) => {
         if (!val && val !== 0) return '-';
-        return Math.abs(val).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        return Math.abs(val).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
 
     const formatExportCurrency = (val) => {
         if (!val && val !== 0) return '-';
-        return val.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        return val.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
 
     const getExportData = () => {
@@ -556,7 +556,7 @@ const TrialBalance = () => {
                             {Object.entries(typeSummaries).map(([t, v]) => (
                                 <div key={t} className="flex justify-between text-xs py-1">
                                     <span>{t}</span>
-                                    <span className="font-mono">{(v.closing || 0).toLocaleString('id-ID')}</span>
+                                    <span className="font-mono">{(v.closing || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 </div>
                             ))}
                         </div>
@@ -565,14 +565,14 @@ const TrialBalance = () => {
                         <div className="text-xs text-silver-dark font-semibold">Accounts Receivable (AR)</div>
                         <div className="text-sm mt-2">
                             <div className="flex justify-between text-xs py-1"><span>Count</span><span className="font-mono">{arSummary.count}</span></div>
-                            <div className="flex justify-between text-xs py-1"><span>Closing</span><span className="font-mono">{(arSummary.closing || 0).toLocaleString('id-ID')}</span></div>
+                            <div className="flex justify-between text-xs py-1"><span>Closing</span><span className="font-mono">{(arSummary.closing || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                         </div>
                     </div>
                     <div className="glass-card p-3 rounded">
                         <div className="text-xs text-silver-dark font-semibold">Accounts Payable (AP)</div>
                         <div className="text-sm mt-2">
                             <div className="flex justify-between text-xs py-1"><span>Count</span><span className="font-mono">{apSummary.count}</span></div>
-                            <div className="flex justify-between text-xs py-1"><span>Closing</span><span className="font-mono">{(apSummary.closing || 0).toLocaleString('id-ID')}</span></div>
+                            <div className="flex justify-between text-xs py-1"><span>Closing</span><span className="font-mono">{(apSummary.closing || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                         </div>
                     </div>
                 </div>
@@ -583,7 +583,7 @@ const TrialBalance = () => {
                     <strong>Notice:</strong> Ditemukan akun dengan keyword "discount/diskon" yang diklasifikasikan sebagai REVENUE. Harap verifikasi klasifikasi akun ini.
                     <ul className="mt-2 text-xs">
                         {suspiciousAccounts.map(acc => (
-                            <li key={acc.id}>{acc.code} - {acc.name} — type: {acc.type} — balance: {(acc.closing || 0).toLocaleString('id-ID')}</li>
+                            <li key={acc.id}>{acc.code} - {acc.name} — type: {acc.type} — balance: {(acc.closing || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</li>
                         ))}
                     </ul>
                 </div>

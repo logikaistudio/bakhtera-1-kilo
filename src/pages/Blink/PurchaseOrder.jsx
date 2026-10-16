@@ -971,7 +971,7 @@ const PurchaseOrder = () => {
                                     <td class="value">${formatCurrency(po.subtotal || 0, po.currency)}</td>
                                 </tr>
                                 <tr>
-                                    <td class="label">Tax${po.tax_amount > 0 && po.tax_rate > 0 ? ` (${po.tax_rate}%)` : ''}</td>
+                                    <td class="label">VAT${po.tax_amount > 0 && po.tax_rate > 0 ? ` (${po.tax_rate}%)` : ''}</td>
                                     <td class="colon">:</td>
                                     <td class="value">${formatCurrency(po.tax_amount || 0, po.currency)}</td>
                                 </tr>
@@ -1363,9 +1363,10 @@ const PurchaseOrder = () => {
 
     const formatCurrency = (value, currency = 'IDR') => {
         const numValue = Number(value || 0);
+        const formatted = numValue.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         return currency === 'USD'
-            ? `$${numValue.toLocaleString('id-ID')} `
-            : `Rp ${numValue.toLocaleString('id-ID')} `;
+            ? `$${formatted} `
+            : `Rp ${formatted} `;
     };
 
     const filteredPOs = pos.filter(po => {
@@ -1444,7 +1445,7 @@ const PurchaseOrder = () => {
                     key: 'total_amount',
                     width: 20,
                     align: 'right',
-                    render: (item) => `${item.currency || 'IDR'} ${(item.total_amount || 0).toLocaleString('id-ID')}`
+                    render: (item) => formatCurrency(item.total_amount || 0, item.currency || 'IDR')
                 },
                 { header: 'Status', key: 'status', width: 15 }
             ];
@@ -1568,7 +1569,7 @@ const PurchaseOrder = () => {
                                 <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Vendor</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">PO Date</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Delivery Date</th>
-                                <th className="px-4 py-3 text-right text-xs font-bold text-white uppercase tracking-wider">Tax</th>
+                                <th className="px-4 py-3 text-right text-xs font-bold text-white uppercase tracking-wider">VAT</th>
                                 <th className="px-4 py-3 text-right text-xs font-bold text-white uppercase tracking-wider">Amount</th>
                                 <th className="px-4 py-3 text-center text-xs font-bold text-white uppercase tracking-wider">Status</th>
                                 <th className="px-4 py-3 text-center text-xs font-bold text-white uppercase tracking-wider">Actions</th>
@@ -2123,7 +2124,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                             <div className="flex items-center gap-4">
                                 {/* Global Tax Input */}
                                 <div className="flex items-center gap-2 bg-dark-surface px-3 py-1.5 rounded-lg border border-dark-border">
-                                    <span className="text-xs text-silver-dark font-medium">Set All Tax %:</span>
+                                    <span className="text-xs text-silver-dark font-medium">Set All VAT %:</span>
                                     <input
                                         type="number"
                                         className="w-16 px-2 py-1 bg-transparent border-b border-gray-600 text-silver-light text-sm text-center focus:outline-none focus:border-accent-orange"
@@ -2240,7 +2241,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                         </div>
                                     </div>
 
-                                    {/* ROW 2: Qty, Harga, Pajak, Total */}
+                                    {/* ROW 2: Qty, Harga, VAT, Total */}
                                     <div className="grid grid-cols-2 md:grid-cols-12 gap-3 items-start md:pr-8">
                                         <div className="md:col-span-2">
                                             <label className="text-[10px] font-semibold text-silver-dark uppercase mb-1 block">Qty</label>
@@ -2270,7 +2271,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                             </div>
                                         </div>
                                         <div className="md:col-span-3">
-                                            <label className="text-[10px] font-semibold text-silver-dark uppercase mb-1 block">Pajak %</label>
+                                            <label className="text-[10px] font-semibold text-silver-dark uppercase mb-1 block">VAT %</label>
                                             <div className="flex items-center gap-2">
                                                 <input
                                                     type="number"
@@ -2291,7 +2292,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                             )}
                                         </div>
                                         <div className="md:col-span-4">
-                                            <label className="text-[10px] font-semibold text-silver-dark uppercase mb-1 block text-right">Total (Subtotal + Pajak)</label>
+                                            <label className="text-[10px] font-semibold text-silver-dark uppercase mb-1 block text-right">Total (Subtotal + VAT)</label>
                                             <div className="px-3 py-1.5 bg-dark-surface/50 border border-dark-border rounded-lg text-sm text-right">
                                                 <div className="text-silver-dark text-[10px] leading-tight">Murni: {formatCurrency(item.amount, formData.currency)}</div>
                                                 <div className="text-silver-light font-bold text-base leading-tight">
@@ -2312,7 +2313,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                             <span className="font-semibold">{formatCurrency(subtotal, formData.currency)}</span>
                         </div>
                         <div className="flex justify-between text-silver-dark">
-                            <span>Tax (from items):</span>
+                            <span>VAT (from items):</span>
                             <span className="font-semibold">{formatCurrency(taxAmount, formData.currency)}</span>
                         </div>
                         <div className="flex justify-between text-xl font-bold text-silver-light">
@@ -2461,7 +2462,7 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                             <span className="font-semibold">{formatCurrency(po.subtotal, po.currency)}</span>
                         </div>
                         <div className="flex justify-between text-silver-dark">
-                            <span>Tax{po.tax_amount > 0 && po.tax_rate > 0 ? ` (${po.tax_rate}%)` : ''}:</span>
+                            <span>VAT{po.tax_amount > 0 && po.tax_rate > 0 ? ` (${po.tax_rate}%)` : ''}:</span>
                             <span className="font-semibold">{formatCurrency(po.tax_amount, po.currency)}</span>
                         </div>
                         <div className="flex justify-between text-xl font-bold text-silver-light">

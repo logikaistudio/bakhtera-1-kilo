@@ -239,7 +239,7 @@ const SellingVsBuying = () => {
                         <div>
                             <p className="text-xs text-silver-dark uppercase tracking-wider font-semibold">Total Selling</p>
                             <p className="text-xl font-bold text-green-400 mt-1">
-                                Rp {totals.selling.toLocaleString('id-ID')}
+                                Rp {totals.selling.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </p>
                         </div>
                         <TrendingUp className="w-8 h-8 text-green-400 opacity-80" />
@@ -251,7 +251,7 @@ const SellingVsBuying = () => {
                         <div>
                             <p className="text-xs text-silver-dark uppercase tracking-wider font-semibold">Total Buying (COGS)</p>
                             <p className="text-xl font-bold text-orange-400 mt-1">
-                                Rp {totals.buying.toLocaleString('id-ID')}
+                                Rp {totals.buying.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </p>
                         </div>
                         <TrendingDown className="w-8 h-8 text-orange-400 opacity-80" />
@@ -263,7 +263,7 @@ const SellingVsBuying = () => {
                         <div>
                             <p className="text-xs text-silver-dark uppercase tracking-wider font-semibold">Total Profit</p>
                             <p className={`text-xl font-bold mt-1 ${totals.profit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                Rp {totals.profit.toLocaleString('id-ID')}
+                                Rp {totals.profit.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </p>
                         </div>
                         <DollarSign className={`w-8 h-8 ${totals.profit >= 0 ? 'text-emerald-400' : 'text-red-400'} opacity-80`} />
@@ -383,17 +383,17 @@ const SellingVsBuying = () => {
                                             </td>
                                             <td className="px-4 py-2 text-right text-xs">
                                                 <span className="font-medium text-green-400 font-mono">
-                                                    {currencySymbol} {shipment.quotedAmount.toLocaleString('id-ID')}
+                                                    {currencySymbol} {shipment.quotedAmount.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </span>
                                             </td>
                                             <td className="px-4 py-2 text-right text-xs">
                                                 <span className="font-medium text-orange-400 font-mono">
-                                                    {currencySymbol} {shipment.totalCOGS.toLocaleString('id-ID')}
+                                                    {currencySymbol} {shipment.totalCOGS.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </span>
                                             </td>
                                             <td className="px-4 py-2 text-right text-xs">
                                                 <span className={`font-bold font-mono ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
-                                                    {currencySymbol} {shipment.profit.toLocaleString('id-ID')}
+                                                    {currencySymbol} {shipment.profit.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </span>
                                             </td>
                                             <td className="px-4 py-2 text-center text-xs">
@@ -416,14 +416,14 @@ const SellingVsBuying = () => {
                                         TOTAL ({filteredShipments.length} Shipments)
                                     </td>
                                     <td className="px-4 py-2 text-right font-bold text-xs text-green-400 font-mono">
-                                        Rp {totals.selling.toLocaleString('id-ID')}
+                                        Rp {totals.selling.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </td>
                                     <td className="px-4 py-2 text-right font-bold text-xs text-orange-400 font-mono">
-                                        Rp {totals.buying.toLocaleString('id-ID')}
+                                        Rp {totals.buying.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </td>
                                     <td className="px-4 py-2 text-right font-bold text-xs font-mono">
                                         <span className={totals.profit >= 0 ? 'text-emerald-400' : 'text-red-400'}>
-                                            Rp {totals.profit.toLocaleString('id-ID')}
+                                            Rp {totals.profit.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </span>
                                     </td>
                                     <td className="px-4 py-2 text-center font-bold text-xs">
@@ -449,4 +449,3 @@ const SellingVsBuying = () => {
 };
 
 export default SellingVsBuying;
-

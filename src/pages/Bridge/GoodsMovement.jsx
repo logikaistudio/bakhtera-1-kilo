@@ -13,7 +13,7 @@ const GoodsMovement = () => {
     const hasCreate = canCreate('bridge_movement');
     const hasEdit = canEdit('bridge_movement');
     const hasDelete = canDelete('bridge_movement');
-    const { mutationLogs = [], quotations = [], addMutationLog, updateMutationLog, updateInventoryStock, deleteMutationLog, companySettings, bridgeSettings, locations, getExhibitionLocation, isExhibitionLocation } = useData();
+    const { mutationLogs = [], quotations = [], addMutationLog, updateMutationLog, updateInventoryStock, deleteMutationLog, fetchMutationLogDetails, companySettings, bridgeSettings, locations, getExhibitionLocation, isExhibitionLocation } = useData();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedIds, setSelectedIds] = useState([]);
     const [selectedLog, setSelectedLog] = useState(null);
@@ -44,6 +44,19 @@ const GoodsMovement = () => {
     const formatLocation = (origin, destination) => {
         const capitalize = (str) => str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
         return `${capitalize(origin)} → ${capitalize(destination)}`;
+    };
+
+    const handleOpenLog = async (log) => {
+        setSelectedLog({ ...log, documents: [], documentsLoading: true });
+        try {
+            const details = await fetchMutationLogDetails(log.id);
+            setSelectedLog(current => current?.id === log.id ? details : current);
+        } catch (error) {
+            console.error('Error loading mutation documents:', error);
+            setSelectedLog(current => current?.id === log.id
+                ? { ...current, documentsLoading: false, documentsLoadError: true }
+                : current);
+        }
     };
 
 
@@ -325,7 +338,7 @@ const GoodsMovement = () => {
                                     <tr
                                         key={log.id}
                                         className="hover:bg-dark-surface/50 cursor-pointer"
-                                        onClick={() => setSelectedLog(log)}
+                                        onClick={() => handleOpenLog(log)}
                                         title="Klik untuk melihat rincian mutasi dan dokumen"
                                     >
                                         {hasDelete && (
@@ -380,15 +393,16 @@ const GoodsMovement = () => {
                                             {formatLocation(log.origin, log.destination)}
                                         </td>
                                         <td className="px-3 py-3 text-center">
-                                            {log.documents && log.documents.length > 0 ? (
-                                                <div className="flex justify-center">
-                                                    <span className="bg-sky-100 text-sky-700 px-2 py-1 rounded text-xs font-semibold flex items-center gap-1">
-                                                        <FileText className="w-3 h-3" /> {log.documents.length}
-                                                    </span>
-                                                </div>
-                                            ) : (
-                                                <span className="text-gray-400 text-xs">-</span>
-                                            )}
+                                            <button
+                                                onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    handleOpenLog(log);
+                                                }}
+                                                className="inline-flex items-center gap-1 text-sky-600 hover:text-sky-700 text-xs font-semibold"
+                                                title="Lihat detail dan dokumen"
+                                            >
+                                                <FileText className="w-3 h-3" /> Lihat
+                                            </button>
                                         </td>
                                         {hasDelete && (
                                             <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
@@ -590,7 +604,11 @@ const GoodsMovement = () => {
                                 {/* Documents Section */}
                                 <div className="mt-6 border border-gray-200 bg-white rounded-lg p-4">
                                     <h4 className="font-semibold text-gray-800 mb-3">Dokumen Pendukung Mutasi</h4>
-                                    {(!selectedLog.documents || selectedLog.documents.length === 0) ? (
+                                    {selectedLog.documentsLoading ? (
+                                        <p className="text-sm text-gray-500">Memuat dokumen...</p>
+                                    ) : selectedLog.documentsLoadError ? (
+                                        <p className="text-sm text-red-500">Dokumen gagal dimuat. Tutup lalu buka kembali detail mutasi.</p>
+                                    ) : (!selectedLog.documents || selectedLog.documents.length === 0) ? (
                                         <p className="text-sm text-gray-500">Tidak ada dokumen pendukung untuk mutasi ini.</p>
                                     ) : (
                                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">

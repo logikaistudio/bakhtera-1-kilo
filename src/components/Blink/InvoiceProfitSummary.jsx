@@ -145,7 +145,7 @@ const InvoiceProfitSummary = ({ invoice, formatCurrency }) => {
                                         {item.qty} {item.unit}
                                     </div>
                                     <div className="col-span-2 text-right font-mono">
-                                        {(item.rate || 0).toLocaleString('id-ID')}
+                                        {(item.rate || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </div>
                                     <div className="col-span-3 text-right font-mono font-semibold">
                                         {/* Display amount in invoice currency — no conversion needed */}
@@ -171,7 +171,7 @@ const InvoiceProfitSummary = ({ invoice, formatCurrency }) => {
                 <h4 className="text-xs font-semibold text-accent-orange mb-2">Profit Analysis Summary</h4>
                 <div className="space-y-1.5 text-[10px]">
                     <div className="flex justify-between">
-                        <span className="text-silver-dark">Revenue (incl. tax):</span>
+                        <span className="text-silver-dark">Revenue (incl. VAT):</span>
                         <span className="text-blue-400 font-semibold">{formatCurrency(totalRevenue, invCurrency)}</span>
                     </div>
                     <div className="flex justify-between">

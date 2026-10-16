@@ -662,8 +662,7 @@ const BlinkDashboard = () => {
     }, []);
 
     const formatCurrency = (val) => {
-        if (!val) return 'IDR 0';
-        return `IDR ${val.toLocaleString('id-ID')}`;
+        return `IDR ${Number(val || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
 
     // Format currency with symbol and amount — currency-aware
@@ -671,15 +670,14 @@ const BlinkDashboard = () => {
         const num = Number(amount || 0);
         const symbol = getCurrencySymbol(currency || 'IDR');
         if (currency === 'USD') {
-            return `${symbol} ${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            return `${symbol} ${num.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         }
-        return `${symbol} ${num.toLocaleString('id-ID')}`;
+        return `${symbol} ${num.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
 
     // Legacy formatIDR for backward compatibility
     const formatIDR = (val) => {
-        if (!val) return 'IDR 0';
-        return `IDR ${val.toLocaleString('id-ID')}`;
+        return `IDR ${Number(val || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
 
     const targetRevenue = 500000000; // 500 million target assumption

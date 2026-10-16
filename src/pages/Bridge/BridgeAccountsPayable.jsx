@@ -940,9 +940,10 @@ const BridgeAccountsPayable = () => {
 
     const formatCurrency = (value, currency = 'IDR') => {
         const numValue = Number(value || 0);
+        const formatted = numValue.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         return currency === 'USD'
-            ? `$${numValue.toLocaleString('id-ID')}`
-            : `Rp ${numValue.toLocaleString('id-ID')}`;
+            ? `$${formatted}`
+            : `Rp ${formatted}`;
     };
 
     // Calculate metrics - more comprehensive
@@ -994,21 +995,21 @@ const BridgeAccountsPayable = () => {
                     key: 'original_amount',
                     width: 20,
                     align: 'right',
-                    render: (item) => `${item.currency || 'IDR'} ${(item.original_amount || 0).toLocaleString('id-ID')}`
+                    render: (item) => `${item.currency || 'IDR'} ${(item.original_amount || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                 },
                 {
                     header: 'Paid Amount',
                     key: 'paid_amount',
                     width: 20,
                     align: 'right',
-                    render: (item) => `${item.currency || 'IDR'} ${(item.paid_amount || 0).toLocaleString('id-ID')}`
+                    render: (item) => `${item.currency || 'IDR'} ${(item.paid_amount || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                 },
                 {
                     header: 'Outstanding Amount',
                     key: 'outstanding_amount',
                     width: 20,
                     align: 'right',
-                    render: (item) => `${item.currency || 'IDR'} ${(item.outstanding_amount || 0).toLocaleString('id-ID')}`
+                    render: (item) => `${item.currency || 'IDR'} ${(item.outstanding_amount || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                 },
                 { header: 'Aging Bucket', key: 'aging_bucket', width: 15 },
                 { header: 'Status', key: 'status', width: 15 }

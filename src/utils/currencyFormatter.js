@@ -1,16 +1,15 @@
-// Helper function to format number to localized format
+// Format monetary values with Indonesian grouping and exactly two decimals.
 export const formatCurrency = (value) => {
     if (value === null || value === undefined || value === '') {
-        return '0';
+        return '0,00';
     }
 
     const num = typeof value === 'string' ? parseFloat(value) : Number(value);
-    if (isNaN(num)) return '0';
+    if (isNaN(num)) return '0,00';
 
-    // Standardize monetary display to 3 decimal places
     const options = {
-        minimumFractionDigits: 3,
-        maximumFractionDigits: 3
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
     };
 
     return num.toLocaleString('id-ID', options);

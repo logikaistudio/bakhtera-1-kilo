@@ -7,10 +7,7 @@ import {
 } from 'lucide-react';
 
 const fmtIDR = (v) => {
-    if (!v || v === 0) return 'Rp 0';
-    if (v >= 1e9) return `Rp ${(v / 1e9).toFixed(1)}M`;
-    if (v >= 1e6) return `Rp ${(v / 1e6).toFixed(0)}jt`;
-    return `Rp ${Number(v).toLocaleString('id-ID')}`;
+    return `Rp ${Number(v || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 const SalesAchievement = () => {
@@ -329,12 +326,12 @@ const SalesAchievement = () => {
 
 RINGKASAN PENCAPAIAN:
 ------------------------------------------------------------
-Target Per Tahun        : Rp ${yearlyTarget.toLocaleString('id-ID')}
-Target Per Bulan        : Rp ${Math.round(monthlyTarget).toLocaleString('id-ID')}
+Target Per Tahun        : Rp ${yearlyTarget.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+Target Per Bulan        : Rp ${monthlyTarget.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
 Total Quotations        : ${selectedSalesPerson.totalQuotations}
 SO Created              : ${selectedSalesPerson.convertedQuotations}
-Pencapaian Tahunan      : Rp ${selectedSalesPerson.paidValue.toLocaleString('id-ID')} (${totalPercent.toFixed(1)}%)
-Bulan Berjalan          : Rp ${selectedSalesPerson.monthlyPaidValue.toLocaleString('id-ID')} / ${MONTHS_ID[currentMonth]} (${monthlyPercent.toFixed(1)}%)
+Pencapaian Tahunan      : Rp ${selectedSalesPerson.paidValue.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${totalPercent.toFixed(1)}%)
+Bulan Berjalan          : Rp ${selectedSalesPerson.monthlyPaidValue.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / ${MONTHS_ID[currentMonth]} (${monthlyPercent.toFixed(1)}%)
 Payment Achievement     : ${paymentPercent.toFixed(1)}%
 
 ================================================================================
@@ -347,7 +344,7 @@ Payment Achievement     : ${paymentPercent.toFixed(1)}%
             selectedSalesPerson.details.forEach((detail, idx) => {
                 const quotationDate = detail.quotationDate ? new Date(detail.quotationDate).toLocaleDateString('id-ID') : '-';
                 const paymentDate = detail.paymentDate ? new Date(detail.paymentDate).toLocaleDateString('id-ID') : '-';
-                const paidAmount = detail.paidAmount > 0 ? `Rp ${detail.paidAmount.toLocaleString('id-ID')}` : '-';
+                const paidAmount = detail.paidAmount > 0 ? `Rp ${detail.paidAmount.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-';
 
                 txtContent += `
 ${idx + 1}. ${detail.quotationNo || '-'}
@@ -496,7 +493,7 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                         <div>
                             <p className="text-sm text-silver-dark">Total SO Value</p>
                             <p className="text-lg font-bold text-silver-light">
-                                Rp {paymentAchievement.totalAmount.toLocaleString('id-ID')}
+                                Rp {paymentAchievement.totalAmount.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </p>
                         </div>
                     </div>
@@ -508,7 +505,7 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                         <div>
                             <p className="text-sm text-silver-dark">Paid Value</p>
                             <p className="text-lg font-bold text-silver-light">
-                                Rp {paymentAchievement.paidAmount.toLocaleString('id-ID')}
+                                Rp {paymentAchievement.paidAmount.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </p>
                         </div>
                     </div>
@@ -895,7 +892,7 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                                                     {detail.paymentDate ? new Date(detail.paymentDate).toLocaleDateString('id-ID') : '-'}
                                                 </td>
                                                 <td className="px-6 py-3 text-sm text-right font-semibold text-green-400">
-                                                    {detail.paidAmount > 0 ? `Rp ${detail.paidAmount.toLocaleString('id-ID')}` : '-'}
+                                                    {detail.paidAmount > 0 ? `Rp ${detail.paidAmount.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
                                                 </td>
                                             </tr>
                                         ))

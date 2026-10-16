@@ -865,7 +865,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
             setShowPOVendorModal(false);
 
             if (createdPOs.length > 0) {
-                const summary = createdPOs.map(p => `• ${p.poNumber} — ${p.vendorName} (${cogsCurrency || 'IDR'} ${p.total.toLocaleString('id-ID')})`).join('\n');
+                const summary = createdPOs.map(p => `• ${p.poNumber} — ${p.vendorName} (${cogsCurrency || 'IDR'} ${p.total.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`).join('\n');
                 alert(
                     `✅ ${createdPOs.length} Purchase Order berhasil dibuat dan dikirim ke Approval Center!\n\n${summary}\n\n📋 Setelah disetujui Manager, AP (Hutang) dan Jurnal akan otomatis tercatat di Laporan Keuangan.` +
                     (hasError ? '\n\n⚠️ Sebagian PO gagal dibuat, periksa console untuk detail.' : '')
@@ -2876,8 +2876,8 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                 <div className="text-sm text-silver-dark">Quoted Amount</div>
                                                 <div className="text-2xl font-bold text-blue-400">
                                                     {shipment.currency === 'IDR'
-                                                        ? `Rp ${calculateQuotedAmount().toLocaleString('id-ID')}`
-                                                        : `$${calculateQuotedAmount().toLocaleString('id-ID')}`
+                                                        ? `Rp ${calculateQuotedAmount().toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                                        : `$${calculateQuotedAmount().toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                                                     }
                                                 </div>
                                                 <div className="text-xs text-silver-dark mt-1">{shipment.currency || 'USD'}</div>
@@ -2885,12 +2885,12 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                             <div className="glass-card p-4 rounded-lg">
                                                 <div className="text-sm text-silver-dark mb-1">Total COGS</div>
                                                 <div className="text-2xl font-bold text-orange-400">
-                                                    {cogsCurrency === 'USD' ? '$' : 'Rp '}{(calculateTotalCOGS() || 0).toLocaleString('id-ID', { minimumFractionDigits: 2 })}
+                                                    {cogsCurrency === 'USD' ? '$' : 'Rp '}{(calculateTotalCOGS() || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </div>
                                                 <div className="text-xs text-silver-dark mt-1">
                                                     {cogsCurrency}
                                                     {cogsCurrency !== (shipment?.currency || 'IDR') && exchangeRate && (
-                                                        <> ≈ {shipment?.currency === 'IDR' ? 'Rp' : '$'} {(calculateTotalCOGSConverted() || 0).toLocaleString('id-ID', { minimumFractionDigits: 2 })}</>
+                                                        <> ≈ {shipment?.currency === 'IDR' ? 'Rp' : '$'} {(calculateTotalCOGSConverted() || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</>
                                                     )}
                                                 </div>
                                             </div>
@@ -2898,8 +2898,8 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                 <div className="text-sm text-silver-dark mb-1">Profit/Loss</div>
                                                 <div className={`text-2xl font-bold ${calculateProfit() >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                                                     {shipment.currency === 'IDR'
-                                                        ? `Rp ${calculateProfit().toLocaleString('id-ID', { minimumFractionDigits: 2 })}`
-                                                        : `$${calculateProfit().toLocaleString('id-ID', { minimumFractionDigits: 2 })}`
+                                                        ? `Rp ${calculateProfit().toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                                        : `$${calculateProfit().toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                                                     }
                                                 </div>
                                                 <div className="text-xs text-silver-dark mt-1">{shipment.currency || 'USD'}</div>
@@ -3067,7 +3067,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                                     {isEditingCOGS ? (
                                                                         <input
                                                                             type="text"
-                                                                            value={item.rate !== undefined && item.rate !== null ? (typeof item.rate === 'string' ? item.rate : item.rate.toLocaleString('id-ID', { minimumFractionDigits: Number.isInteger(item.rate) ? 0 : 2, maximumFractionDigits: Number.isInteger(item.rate) ? 0 : 2 })) : ''}
+                                                                            value={item.rate !== undefined && item.rate !== null ? (typeof item.rate === 'string' ? item.rate : item.rate.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : ''}
                                                                             onChange={(e) => {
                                                                                 const rawValue = e.target.value.replace(/[^0-9.,-]/g, '');
                                                                                 const numVal = parseAmountValue(rawValue);
@@ -3080,12 +3080,12 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                                             placeholder="0"
                                                                         />
                                                                     ) : (
-                                                                        <span className="text-silver-light text-sm">{parseAmountValue(item.rate || 0).toLocaleString('id-ID', { minimumFractionDigits: Number.isInteger(parseAmountValue(item.rate || 0)) ? 0 : 2, maximumFractionDigits: Number.isInteger(parseAmountValue(item.rate || 0)) ? 0 : 2 })}</span>
+                                                                        <span className="text-silver-light text-sm">{parseAmountValue(item.rate || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                                     )}
                                                                 </td>
                                                                 <td className="px-2 py-2 text-right">
                                                                     <span className="text-silver-light text-sm font-medium">
-                                                                        {(item.currency || 'IDR') === 'USD' ? '$' : 'Rp '}{parseAmountValue(item.amount || 0).toLocaleString('id-ID', { minimumFractionDigits: Number.isInteger(parseAmountValue(item.amount || 0)) ? 0 : 2, maximumFractionDigits: Number.isInteger(parseAmountValue(item.amount || 0)) ? 0 : 2 })}
+                                                                        {(item.currency || 'IDR') === 'USD' ? '$' : 'Rp '}{parseAmountValue(item.amount || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                                     </span>
                                                                     {(item.currency || 'IDR') === 'USD' && exchangeRate && parseFloat(exchangeRate) > 0 && (
                                                                         <div className="text-xs text-silver-dark mt-0.5">
@@ -3383,7 +3383,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                 <td className="px-4 py-3 text-gray-600 dark:text-silver-light">{item.description}</td>
                                                 <td className="px-4 py-3 text-center text-gray-500 dark:text-silver-dark">{item.qty}</td>
                                                 <td className="px-4 py-3 text-right text-gray-900 dark:text-green-400 font-mono font-medium">
-                                                    {(item.amount || 0).toLocaleString('id-ID')}
+                                                    {(item.amount || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <select
@@ -3410,7 +3410,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                     <tr>
                                         <td colSpan="3" className="px-4 py-3 text-right font-bold text-gray-500 dark:text-silver-light text-xs tracking-wider">TOTAL</td>
                                         <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-accent-orange text-base font-mono">
-                                            {cogsCurrency} {pendingPOTotal.toLocaleString('id-ID')}
+                                            {cogsCurrency} {pendingPOTotal.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </td>
                                         <td />
                                     </tr>
@@ -3449,7 +3449,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                 <span className="font-mono text-accent-orange mr-1">{vendorCount > 1 ? `PO-xxx-${String.fromCharCode(65 + i)}` : 'PO-xxx'}</span>
                                                 → {vname} ({count} item)
                                             </span>
-                                            <span className="text-green-400 font-mono">{cogsCurrency} {total.toLocaleString('id-ID')}</span>
+                                            <span className="text-green-400 font-mono">{cogsCurrency} {total.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                         </div>
                                     ))}
                                 </div>

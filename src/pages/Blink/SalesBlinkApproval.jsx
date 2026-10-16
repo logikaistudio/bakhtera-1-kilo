@@ -379,7 +379,8 @@ const SalesBlinkApproval = () => {
         return new Intl.NumberFormat('id-ID', {
             style: 'currency',
             currency: curr || 'IDR',
-            minimumFractionDigits: 0
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
         }).format(amount || 0);
     };
 
@@ -704,21 +705,21 @@ const SalesBlinkApproval = () => {
                                     <div>
                                         <p style={{ color: '#4B5563' }} className="mb-0.5 font-medium">Total Revenue (Selling)</p>
                                         <p className="font-semibold text-gray-900 font-mono">
-                                            Rp {computedGrandTotalIDR.toLocaleString('id-ID')} <br/>
+                                            Rp {computedGrandTotalIDR.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <br/>
                                             $ {computedGrandTotalUSD.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </p>
                                     </div>
                                     <div>
                                         <p style={{ color: '#4B5563' }} className="mb-0.5 font-medium">Total Cost (Buying)</p>
                                         <p className="font-semibold text-gray-900 font-mono">
-                                            Rp {costGrandTotalIDR.toLocaleString('id-ID')} <br/>
+                                            Rp {costGrandTotalIDR.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <br/>
                                             $ {costGrandTotalUSD.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </p>
                                     </div>
                                     <div>
                                         <p style={{ color: '#4B5563' }} className="mb-0.5 font-medium">Estimated Margin</p>
                                         <p className={`font-bold font-mono ${marginIDR >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                                            Rp {marginIDR.toLocaleString('id-ID')} <br/>
+                                            Rp {marginIDR.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <br/>
                                             {marginPct.toFixed(1)}%
                                         </p>
                                     </div>

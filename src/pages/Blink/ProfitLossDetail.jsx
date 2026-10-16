@@ -174,7 +174,7 @@ const ProfitLossDetail = () => {
 
     const fmt = (amount) => {
         if (!amount || amount === 0) return '';
-        const s = Math.abs(amount).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        const s = Math.abs(amount).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         return s;
     };
 

@@ -1295,7 +1295,7 @@ const BlinkApproval = ({ scope = 'operations' }) => {
 
     const formatCurrency = (val, currency) => {
         const sym = currency === 'IDR' ? 'Rp' : currency === 'USD' ? '$' : currency || '';
-        return `${sym} ${(val || 0).toLocaleString('id-ID')}`;
+        return `${sym} ${(val || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
 
     const formatDate = (d) => d
@@ -1588,7 +1588,7 @@ const BlinkApproval = ({ scope = 'operations' }) => {
                                     { label: 'Job Number', value: selectedItem.origin },
                                     { label: 'PO Date', value: selectedItem.destination },
                                     { label: 'Currency', value: selectedItem.currency },
-                                    { label: 'Total Amount', value: `${selectedItem.currency} ${(selectedItem.amount || 0).toLocaleString('id-ID')}`, highlight: true },
+                                    { label: 'Total Amount', value: `${selectedItem.currency} ${(selectedItem.amount || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, highlight: true },
                                     { label: 'Submitted', value: formatDate(selectedItem.createdAt) },
                                 ] : selectedItem.type === 'invoice' ? [
                                     { label: 'Invoice Number', value: selectedItem.refNumber },
@@ -1597,7 +1597,7 @@ const BlinkApproval = ({ scope = 'operations' }) => {
                                     { label: 'Invoice Date', value: selectedItem.invoiceDate },
                                     { label: 'Due Date', value: selectedItem.dueDate },
                                     { label: 'Currency', value: selectedItem.currency },
-                                    { label: 'Total Amount', value: `${selectedItem.currency} ${(selectedItem.amount || 0).toLocaleString('id-ID')}`, highlight: true },
+                                    { label: 'Total Amount', value: `${selectedItem.currency} ${(selectedItem.amount || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, highlight: true },
                                     { label: 'Submitted', value: formatDate(selectedItem.createdAt) },
                                 ] : [
                                     { label: 'Customer', value: selectedItem.customerName },

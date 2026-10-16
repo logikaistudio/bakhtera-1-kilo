@@ -1316,7 +1316,7 @@ const InvoiceManagement = () => {
     };
 
     const formatCurrency = (value, currency = 'IDR') => {
-        return `${getCurrencySymbol(currency)} ${Number(value || 0).toLocaleString('id-ID')}`;
+        return `${getCurrencySymbol(currency)} ${Number(value || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
 
     // Resolve customer address from business partners by ID or name
@@ -1600,7 +1600,7 @@ const InvoiceManagement = () => {
 
                         <!-- Title -->
                         <div class="invoice-title-bar">
-                            <span>TAX INVOICE ${invoice.invoice_number}</span>
+                            <span>VAT INVOICE ${invoice.invoice_number}</span>
                              <span style="font-size: 10px; font-weight: normal; color: rgba(0,0,0,0.6);">Page 1 of 1</span>
                         </div>
 
@@ -1686,7 +1686,7 @@ const InvoiceManagement = () => {
                                     <th style="width: 35%; text-align: left; padding-left: 10px;">DESCRIPTION</th>
                                     <th style="width: 10%; text-align: center;">QTY</th>
                                     <th style="width: 15%; text-align: right;">UNIT PRICE</th>
-                                    <th style="width: 15%; text-align: right;">TAX</th>
+                                    <th style="width: 15%; text-align: right;">VAT</th>
                                     <th style="width: 20%; text-align: right; padding-right: 10px;">TOTAL</th>
                                 </tr>
                             </thead>
@@ -1702,7 +1702,7 @@ const InvoiceManagement = () => {
                                     <span>${formatCurrency(invoice.subtotal || 0, invoice.currency)}</span>
                                 </div>
                                 <div class="totals-row border-bottom">
-                                    <span>TAX Total</span>
+                                    <span>VAT Total</span>
                                     <span>${formatCurrency(invoice.tax_amount || 0, invoice.currency)}</span>
                                 </div>
                                  <div class="totals-row grand-total">
@@ -2395,14 +2395,14 @@ const InvoiceManagement = () => {
                     key: 'total_amount',
                     width: 20,
                     align: 'right',
-                    render: (item) => `${item.currency || 'USD'} ${(item.total_amount || 0).toLocaleString('id-ID')}`
+                    render: (item) => formatCurrency(item.total_amount || 0, item.currency || 'USD')
                 },
                 {
                     header: 'Outstanding',
                     key: 'outstanding_amount',
                     width: 20,
                     align: 'right',
-                    render: (item) => `${item.currency || 'USD'} ${(item.outstanding_amount || 0).toLocaleString('id-ID')}`
+                    render: (item) => formatCurrency(item.outstanding_amount || 0, item.currency || 'USD')
                 },
                 { header: 'Status', key: 'status', width: 15 }
             ];
@@ -2675,7 +2675,7 @@ const InvoiceManagement = () => {
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Customer</th>
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Date</th>
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Due Date</th>
-                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">Tax</th>
+                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">VAT</th>
                                 <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">Amount</th>
                                 <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">Outstanding</th>
                                 <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap">Status</th>
@@ -3544,8 +3544,8 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                         <th className="px-2 py-2 text-center text-xs text-white min-w-[120px] font-normal">Unit</th>
                                         <th className="px-2 py-2 text-center text-xs text-white w-20 font-normal">Curr</th>
                                         <th className="px-2 py-2 text-right text-xs text-white min-w-[140px] font-normal">Price</th>
-                                        <th className="px-2 py-2 text-right text-xs text-white min-w-[80px] font-normal">Tax %</th>
-                                        <th className="px-2 py-2 text-right text-xs text-white min-w-[100px] font-normal">Tax Amt</th>
+                                        <th className="px-2 py-2 text-right text-xs text-white min-w-[80px] font-normal">VAT %</th>
+                                        <th className="px-2 py-2 text-right text-xs text-white min-w-[100px] font-normal">VAT Amt</th>
                                         <th className="px-2 py-2 text-right text-xs text-white min-w-[100px] font-normal">Total</th>
                                         <th className="px-2 py-2 text-center text-xs text-white w-10 font-normal">Action</th>
                                     </tr>
@@ -3710,7 +3710,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-[11px] font-semibold text-silver-light mb-1">
-                                Global Tax Rate (%)
+                                Global VAT Rate (%)
                             </label>
                             <input
                                 type="number"
@@ -3751,7 +3751,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                 <span className="text-silver-light font-medium">{formatCurrency(subtotal, formData.currency)}</span>
                             </div>
                             <div className="flex justify-between text-sm">
-                                <span className="text-silver-dark">Tax (from items):</span>
+                                <span className="text-silver-dark">VAT (from items):</span>
                                 <span className="text-silver-light font-medium">{formatCurrency(taxAmount, formData.currency)}</span>
                             </div>
                             {formData.discount_amount > 0 && (
@@ -4087,7 +4087,7 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                                         <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-center w-20">Qty</th>
                                         <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-center w-24">Unit</th>
                                         <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right w-32">Rate</th>
-                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right w-32">Tax</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right w-32">VAT</th>
                                         <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right w-32 rounded-tr-lg">Amount</th>
                                     </tr>
                                 </thead>
@@ -4098,7 +4098,7 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                                             <td className="px-4 py-3 text-silver-light align-top">{item.description}</td>
                                             <td className="px-4 py-3 text-center text-silver-light align-top">{item.qty}</td>
                                             <td className="px-4 py-3 text-center text-silver-dark align-top">{item.unit}</td>
-                                            <td className="px-4 py-3 text-right text-silver-light align-top">{(parseFloat(item.rate) || 0).toLocaleString('id-ID')}</td>
+                                            <td className="px-4 py-3 text-right text-silver-light align-top">{(parseFloat(item.rate) || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                             <td className="px-4 py-3 text-right text-silver-light align-top">{formatCurrency(item.tax_amount || 0, invoice.currency)}</td>
                                             <td className="px-4 py-3 text-right text-silver-light font-medium align-top">{formatCurrency(item.amount, invoice.currency)}</td>
                                         </tr>
@@ -4127,7 +4127,7 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                                     <span className="text-silver-light">{formatCurrency(invoice.subtotal, invoice.currency)}</span>
                                 </div>
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-silver-dark">Tax (from items):</span>
+                                    <span className="text-silver-dark">VAT (from items):</span>
                                     <span className="text-silver-light">{formatCurrency(invoice.tax_amount, invoice.currency)}</span>
                                 </div>
                                 {invoice.discount_amount > 0 && (
@@ -4713,7 +4713,7 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                         </div>
 
                         <div className="flex items-center gap-2 bg-dark-bg p-2 rounded-lg border border-dark-border">
-                            <label className="text-xs text-silver-light font-medium whitespace-nowrap">Tax Rate (%):</label>
+                            <label className="text-xs text-silver-light font-medium whitespace-nowrap">VAT Rate (%):</label>
                             <input
                                 type="number"
                                 step="0.01"
@@ -4849,7 +4849,7 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                             backgroundColor: '#FF9B00', color: '#000000', padding: '8px 10px', marginBottom: '15px',
                             fontWeight: 'bold', fontSize: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
                         }}>
-                            <span>TAX INVOICE {invoice.invoice_number}</span>
+                            <span>VAT INVOICE {invoice.invoice_number}</span>
                             <span style={{ fontSize: '10px', fontWeight: 'normal', color: 'rgba(0,0,0,0.6)' }}>Page 1 of 1</span>
                         </div>
 
@@ -4945,7 +4945,7 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                                     <th style={{ borderBottom: '1px solid #000', borderRight: '1px solid #ccc', padding: '6px 8px', textAlign: 'left', fontWeight: 'bold', fontSize: '11px', width: '35%', paddingLeft: '10px' }}>DESCRIPTION</th>
                                     <th style={{ borderBottom: '1px solid #000', borderRight: '1px solid #ccc', padding: '6px 8px', textAlign: 'center', fontWeight: 'bold', fontSize: '11px', width: '10%' }}>QTY</th>
                                     <th style={{ borderBottom: '1px solid #000', borderRight: '1px solid #ccc', padding: '6px 8px', textAlign: 'right', fontWeight: 'bold', fontSize: '11px', width: '15%' }}>UNIT PRICE</th>
-                                    <th style={{ borderBottom: '1px solid #000', borderRight: '1px solid #ccc', padding: '6px 8px', textAlign: 'right', fontWeight: 'bold', fontSize: '11px', width: '15%' }}>TAX</th>
+                                    <th style={{ borderBottom: '1px solid #000', borderRight: '1px solid #ccc', padding: '6px 8px', textAlign: 'right', fontWeight: 'bold', fontSize: '11px', width: '15%' }}>VAT</th>
                                     <th style={{ borderBottom: '1px solid #000', padding: '6px 8px', textAlign: 'right', fontWeight: 'bold', fontSize: '11px', width: '20%', paddingRight: '10px' }}>TOTAL ({printCurrency})</th>
                                 </tr>
                             </thead>
@@ -5014,7 +5014,7 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                                     <span>{formatCurrency(splitSubtotal, printCurrency)}</span>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', fontWeight: 'bold', fontSize: '11px', borderBottom: '1px solid #ccc' }}>
-                                    <span>TAX Total</span>
+                                    <span>VAT Total</span>
                                     <span>{formatCurrency(splitTax, printCurrency)}</span>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', fontWeight: 'bold', fontSize: '13px', background: '#FF9B00', color: 'black' }}>
@@ -5178,7 +5178,7 @@ const ExistingInvoicesIndicator = ({ jobNumber, isAdditional = false, selectedCu
                     {idrInvoice ? (
                         <div className="text-[9px] text-silver-dark space-y-0.5 pl-5">
                             <div className="font-mono text-green-400 font-semibold">{idrInvoice.invoice_number}</div>
-                            <div>Rp {idrInvoice.total_amount?.toLocaleString('id-ID')}</div>
+                            <div>Rp {Number(idrInvoice.total_amount || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                             <div>Kurs: {Number(idrInvoice.exchange_rate || 1).toLocaleString('id-ID')}</div>
                             <div className="text-[8px] opacity-70 uppercase">{idrInvoice.status}</div>
                         </div>
@@ -5222,7 +5222,7 @@ const ExistingInvoicesIndicator = ({ jobNumber, isAdditional = false, selectedCu
                     {usdInvoice ? (
                         <div className="text-[9px] text-silver-dark space-y-0.5 pl-5">
                             <div className="font-mono text-green-400 font-semibold">{usdInvoice.invoice_number}</div>
-                            <div>${usdInvoice.total_amount?.toLocaleString('id-ID')}</div>
+                            <div>$ {Number(usdInvoice.total_amount || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                             <div>Kurs: {Number(usdInvoice.exchange_rate || 1).toLocaleString('id-ID')}</div>
                             <div className="text-[8px] opacity-70 uppercase">{usdInvoice.status}</div>
                         </div>
@@ -5343,7 +5343,7 @@ const ReimbursementModal = ({ invoice, formatCurrency, revenueAccounts, onClose,
                         <table className="w-full text-xs">
                             <thead className="bg-dark-surface">
                                 <tr>
-                                    {['Item Name', 'Description', 'Qty', 'Unit', 'Rate', 'Tax', 'Amount', 'COA', ''].map((h, i) => (
+                                    {['Item Name', 'Description', 'Qty', 'Unit', 'Rate', 'VAT', 'Amount', 'COA', ''].map((h, i) => (
                                         <th key={i} className="px-3 py-2 text-left text-silver-dark font-semibold uppercase text-[10px]">{h}</th>
                                     ))}
                                 </tr>
@@ -5381,10 +5381,10 @@ const ReimbursementModal = ({ invoice, formatCurrency, revenueAccounts, onClose,
                                         <td className="px-2 py-1.5 w-28">
                                             <input type="number" value={item.tax_amount} min="0"
                                                 onChange={e => updateItem(idx, 'tax_amount', e.target.value)}
-                                                className="w-full bg-dark-surface border border-dark-border rounded px-2 py-1 text-silver-light text-xs text-right focus:border-yellow-500/60 outline-none" placeholder="Pajak" />
+                                                className="w-full bg-dark-surface border border-dark-border rounded px-2 py-1 text-silver-light text-xs text-right focus:border-yellow-500/60 outline-none" placeholder="VAT" />
                                         </td>
                                         <td className="px-2 py-1.5 w-28 text-right font-mono text-yellow-400 font-semibold">
-                                            {(parseFloat(item.amount) || 0).toLocaleString('id-ID')}
+                                            {(parseFloat(item.amount) || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </td>
                                         <td className="px-2 py-1.5 w-36">
                                             <select value={item.coa_id || ''}
@@ -5430,11 +5430,11 @@ const ReimbursementModal = ({ invoice, formatCurrency, revenueAccounts, onClose,
                                 <p className="font-mono font-bold text-green-400">{formatCurrency(newItemsSubtotal, invoice.currency)}</p>
                             </div>
                             <div>
-                                <p className="text-[10px] text-silver-dark">Tax Amount</p>
+                                <p className="text-[10px] text-silver-dark">VAT Amount</p>
                                 <p className="font-mono font-bold text-silver-light">{formatCurrency(preview.tax, invoice.currency)}</p>
                             </div>
                             <div>
-                                <p className="text-[10px] text-silver-dark">Total (incl. tax)</p>
+                                <p className="text-[10px] text-silver-dark">Total (incl. VAT)</p>
                                 <p className="font-mono font-bold text-accent-orange">{formatCurrency(preview.total, invoice.currency)}</p>
                             </div>
                             <div>

@@ -35,8 +35,8 @@ const fmt = (value, currency = 'IDR') => {
     const abs = Math.abs(value);
     const neg = value < 0;
     const str = currency === 'USD'
-        ? `$${abs.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-        : `Rp ${abs.toLocaleString('id-ID')}`;
+        ? `$${abs.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+        : `Rp ${abs.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     return neg ? `(${str})` : str;
 };
 
@@ -48,7 +48,7 @@ const hasRealRate = (currency, exchangeRate) => {
 const fmtAmount = (value, currency, exchangeRate) => {
     if (!value || value === 0) return '-';
     if (hasRealRate(currency, exchangeRate)) {
-        return `Rp ${Math.abs((value || 0) * exchangeRate).toLocaleString('id-ID')}`;
+        return `Rp ${Math.abs((value || 0) * exchangeRate).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
     return fmt(value, currency);
 };
@@ -61,7 +61,7 @@ const toIDR = (value, currency, exchangeRate) => {
 
 const fmtIDR = (value) => {
     if (!value || value === 0) return '-';
-    return `Rp ${Math.abs(value).toLocaleString('id-ID')}`;
+    return `Rp ${Math.abs(value).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 // ─── Main Component ──────────────────────────────────────────────────────────
@@ -230,8 +230,8 @@ const AutoJournal = () => {
             if (!v || v === 0) return '-';
             const abs = Math.abs(v);
             return cur && cur !== 'IDR'
-                ? `$${abs.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-                : `Rp ${abs.toLocaleString('id-ID')}`;
+                ? `$${abs.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                : `Rp ${abs.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         };
 
         const groupsHTML = groupedEntries.map(group => {
@@ -264,16 +264,16 @@ const AutoJournal = () => {
             <div class="summary-grid" style="grid-template-columns:repeat(3,1fr)">
                 <div class="summary-card green-card">
                     <div class="label">Total Debit</div>
-                    <div class="value">Rp ${Math.round(totals.totalDebit).toLocaleString('id-ID')}</div>
+                    <div class="value">Rp ${totals.totalDebit.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                 </div>
                 <div class="summary-card blue-card">
                     <div class="label">Total Credit</div>
                     <p className="text-xs text-blue-300 mt-1">Data ditampilkan sesuai divisi aktif: {activeDivision?.toUpperCase()}</p>
-                    <div class="value">Rp ${Math.round(totals.totalCredit).toLocaleString('id-ID')}</div>
+                    <div class="value">Rp ${totals.totalCredit.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                 </div>
                 <div class="summary-card ${Math.abs(totals.balance) < 1 ? '' : 'red-card'}">
                     <div class="label">Balance (D−C)</div>
-                    <div class="value">Rp ${Math.round(Math.abs(totals.balance)).toLocaleString('id-ID')}</div>
+                    <div class="value">Rp ${Math.abs(totals.balance).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                 </div>
             </div>
             <table>
@@ -290,8 +290,8 @@ const AutoJournal = () => {
                 <tfoot>
                     <tr>
                         <td colspan="3" style="text-align:right;text-transform:uppercase">Grand Total</td>
-                        <td class="text-right">Rp ${Math.round(totals.totalDebit).toLocaleString('id-ID')}</td>
-                        <td class="text-right">Rp ${Math.round(totals.totalCredit).toLocaleString('id-ID')}</td>
+                        <td class="text-right">Rp ${totals.totalDebit.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td class="text-right">Rp ${totals.totalCredit.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     </tr>
                 </tfoot>
             </table>`;

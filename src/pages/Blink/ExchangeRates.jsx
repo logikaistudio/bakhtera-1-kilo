@@ -275,7 +275,7 @@ const ExchangeRates = () => {
                     <div>
                         <p className="text-xs text-silver-dark uppercase tracking-wider font-semibold">Kurs Saat Ini (Terbaru)</p>
                         <p className="text-3xl font-bold text-accent-orange mt-2">
-                            {latestRateObj ? `Rp ${parseFloat(latestRateObj.rate).toLocaleString('id-ID', { minimumFractionDigits: 2 })}` : 'Tidak Ada'}
+                            {latestRateObj ? `Rp ${parseFloat(latestRateObj.rate).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Tidak Ada'}
                         </p>
                         <p className="text-xs text-silver-dark mt-1">
                             {latestRateObj ? `Mulai Berlaku: ${new Date(latestRateObj.effective_date).toLocaleDateString('id-ID')}` : '-'}
@@ -369,7 +369,7 @@ const ExchangeRates = () => {
                                             })}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-silver-light font-mono font-bold">
-                                            Rp {parseFloat(r.rate).toLocaleString('id-ID', { minimumFractionDigits: 2 })}
+                                            Rp {parseFloat(r.rate).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-silver-dark">
                                             {r.created_by || '-'}

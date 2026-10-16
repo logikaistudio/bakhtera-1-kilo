@@ -274,19 +274,19 @@ const BridgeTrialBalance = () => {
 
     const formatCurrency = (val) => {
         if (!val && val !== 0) return '-';
-        return val.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        return val.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
 
     // Helper to format money with Parenthesis if negative (Credit)
     const formatBalance = (val) => {
         if (!val && val !== 0) return '-';
-        const formatted = Math.abs(val).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        const formatted = Math.abs(val).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         return val < 0 ? `(${formatted})` : formatted;
     };
 
     const formatExportCurrency = (val) => {
         if (!val && val !== 0) return '-';
-        return val.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        return val.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
 
     const getExportData = () => {
@@ -543,7 +543,7 @@ const BridgeTrialBalance = () => {
                             {Object.entries(typeSummaries).map(([t, v]) => (
                                 <div key={t} className="flex justify-between text-xs py-1">
                                     <span>{t}</span>
-                                    <span className="font-mono">{(v.closing || 0).toLocaleString('id-ID')}</span>
+                                    <span className="font-mono">{(v.closing || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 </div>
                             ))}
                         </div>
@@ -552,14 +552,14 @@ const BridgeTrialBalance = () => {
                         <div className="text-xs text-silver-dark font-semibold">Accounts Receivable (AR)</div>
                         <div className="text-sm mt-2">
                             <div className="flex justify-between text-xs py-1"><span>Count</span><span className="font-mono">{arSummary.count}</span></div>
-                            <div className="flex justify-between text-xs py-1"><span>Closing</span><span className="font-mono">{(arSummary.closing || 0).toLocaleString('id-ID')}</span></div>
+                            <div className="flex justify-between text-xs py-1"><span>Closing</span><span className="font-mono">{(arSummary.closing || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                         </div>
                     </div>
                     <div className="glass-card p-3 rounded">
                         <div className="text-xs text-silver-dark font-semibold">Accounts Payable (AP)</div>
                         <div className="text-sm mt-2">
                             <div className="flex justify-between text-xs py-1"><span>Count</span><span className="font-mono">{apSummary.count}</span></div>
-                            <div className="flex justify-between text-xs py-1"><span>Closing</span><span className="font-mono">{(apSummary.closing || 0).toLocaleString('id-ID')}</span></div>
+                            <div className="flex justify-between text-xs py-1"><span>Closing</span><span className="font-mono">{(apSummary.closing || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                         </div>
                     </div>
                 </div>
@@ -570,7 +570,7 @@ const BridgeTrialBalance = () => {
                     <strong>Notice:</strong> Ditemukan akun dengan nama terkait discount/air yang tidak diklasifikasikan sebagai COGS.
                     <ul className="mt-2 text-xs">
                         {suspiciousAccounts.map(acc => (
-                            <li key={acc.id}>{acc.code} - {acc.name} — type: {acc.type} — balance: {(acc.closing || 0).toLocaleString('id-ID')}</li>
+                            <li key={acc.id}>{acc.code} - {acc.name} — type: {acc.type} — balance: {(acc.closing || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</li>
                         ))}
                     </ul>
                 </div>

@@ -711,8 +711,8 @@ const QuotationManagement = () => {
 
             const formatCurrency = (value, currency = 'IDR') => {
                 return currency === 'USD'
-                    ? `$${(value || 0).toLocaleString('id-ID')}`
-                    : `Rp ${(value || 0).toLocaleString('id-ID')}`;
+                    ? `$${(value || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    : `Rp ${(value || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             };
 
             const items = quotation.serviceItems || quotation.service_items || [];
@@ -823,7 +823,7 @@ const QuotationManagement = () => {
                                 const rate = quotation.exchange_rate || quotation.exchangeRate || 16000;
                                 const idr = quotation.total_idr ?? (quotation.totalAmount ? ((quotation.currency === 'IDR') ? quotation.totalAmount : quotation.totalAmount * rate) : (quotation.total_amount ? (quotation.currency === 'IDR' ? quotation.total_amount : quotation.total_amount * rate) : 0));
                                 const usd = quotation.total_usd ?? (quotation.totalAmount ? ((quotation.currency === 'USD') ? quotation.totalAmount : (rate ? quotation.totalAmount / rate : 0)) : (quotation.total_amount ? ((quotation.currency === 'USD') ? quotation.total_amount : (rate ? quotation.total_amount / rate : 0)) : 0));
-                                return `<span style="font-weight: bold;">${quotation.currency === 'USD' ? `$ ${usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `Rp ${idr.toLocaleString('id-ID')}`}</span>`;
+                                return `<span style="font-weight: bold;">${quotation.currency === 'USD' ? `$ ${usd.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `Rp ${idr.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</span>`;
                             })()}
                         </div>
                     </div>
@@ -1027,7 +1027,7 @@ const QuotationManagement = () => {
                         const rate = item.exchange_rate || item.exchangeRate || 16000;
                         const idr = item.total_idr ?? (item.totalAmount ? ((item.currency === 'IDR') ? item.totalAmount : item.totalAmount * rate) : (item.total_amount ? (item.currency === 'IDR' ? item.total_amount : item.total_amount * rate) : 0));
                         const usd = item.total_usd ?? (item.totalAmount ? ((item.currency === 'USD') ? item.totalAmount : (rate ? item.totalAmount / rate : 0)) : (item.total_amount ? ((item.currency === 'USD') ? item.total_amount : (rate ? item.total_amount / rate : 0)) : 0));
-                        return item.currency === 'USD' ? `USD ${usd.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : `IDR ${idr.toLocaleString('id-ID')}`;
+                        return item.currency === 'USD' ? `USD ${usd.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `IDR ${idr.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                     }
                 },
                 { header: 'Valid Until', key: 'validUntil', width: 15 },
@@ -1232,7 +1232,7 @@ const QuotationManagement = () => {
                                                         const rate = quote.exchange_rate || quote.exchangeRate || 16000;
                                                         const idr = quote.total_idr ?? (quote.totalAmount ? ((quote.currency === 'IDR') ? quote.totalAmount : quote.totalAmount * rate) : (quote.total_amount ? (quote.currency === 'IDR' ? quote.total_amount : quote.total_amount * rate) : 0));
                                                         const usd = quote.total_usd ?? (quote.totalAmount ? ((quote.currency === 'USD') ? quote.totalAmount : (rate ? quote.totalAmount / rate : 0)) : (quote.total_amount ? ((quote.currency === 'USD') ? quote.total_amount : (rate ? quote.total_amount / rate : 0)) : 0));
-                                                        return quote.currency === 'USD' ? `$${usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `Rp ${idr.toLocaleString('id-ID')}`;
+                                                        return quote.currency === 'USD' ? `$${usd.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `Rp ${idr.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                                                     })()}
                                                 </div>
                                             </td>
@@ -2285,8 +2285,8 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
 
     const formatCurrency = (value, currency = 'IDR') => {
         return currency === 'USD'
-            ? `$${(value || 0).toLocaleString('id-ID')}`
-            : `Rp ${(value || 0).toLocaleString('id-ID')}`;
+            ? `$${(value || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+            : `Rp ${(value || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
 
     return (
@@ -2456,11 +2456,11 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                                         const rate = quotation.exchange_rate || quotation.exchangeRate || 16000;
                                         const idr = quotation.total_idr ?? (quotation.totalAmount ? ((quotation.currency === 'IDR') ? quotation.totalAmount : quotation.totalAmount * rate) : (quotation.total_amount ? (quotation.currency === 'IDR' ? quotation.total_amount : quotation.total_amount * rate) : 0));
                                         const usd = quotation.total_usd ?? (quotation.totalAmount ? ((quotation.currency === 'USD') ? quotation.totalAmount : (rate ? quotation.totalAmount / rate : 0)) : (quotation.total_amount ? ((quotation.currency === 'USD') ? quotation.total_amount : (rate ? quotation.total_amount / rate : 0)) : 0));
-                                        return <span className="font-mono text-slate-700">{quotation.currency === 'USD' ? `$ ${usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `Rp ${idr.toLocaleString('id-ID')}`}</span>
+                                        return <span className="font-mono text-slate-700">{quotation.currency === 'USD' ? `$ ${usd.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `Rp ${idr.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</span>
                                     })()}
                                 </div>
                                 <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-200">
-                                    <span className="text-slate-500 text-sm">Tax (0%)</span>
+                                    <span className="text-slate-500 text-sm">VAT (0%)</span>
                                     <span className="font-mono text-slate-700">-</span>
                                 </div>
                                 <div className="flex justify-between items-center">
@@ -2469,7 +2469,7 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                                                 const rate = quotation.exchange_rate || quotation.exchangeRate || 16000;
                                                 const idr = quotation.total_idr ?? (quotation.totalAmount ? ((quotation.currency === 'IDR') ? quotation.totalAmount : quotation.totalAmount * rate) : (quotation.total_amount ? (quotation.currency === 'IDR' ? quotation.total_amount : quotation.total_amount * rate) : 0));
                                                 const usd = quotation.total_usd ?? (quotation.totalAmount ? ((quotation.currency === 'USD') ? quotation.totalAmount : (rate ? quotation.totalAmount / rate : 0)) : (quotation.total_amount ? ((quotation.currency === 'USD') ? quotation.total_amount : (rate ? quotation.total_amount / rate : 0)) : 0));
-                                                return (quotation.currency === 'USD' ? `$ ${usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `Rp ${idr.toLocaleString('id-ID')}`);
+                                                return (quotation.currency === 'USD' ? `$ ${usd.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `Rp ${idr.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
                                             })()}</span>
                                 </div>
                             </div>

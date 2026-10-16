@@ -167,7 +167,7 @@ const SalesRevenue = () => {
     };
 
     const formatCurrency = (value) => {
-        return `Rp ${value.toLocaleString('id-ID')}`;
+        return `Rp ${Number(value || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
 
     const COLORS = ['#3b82f6', '#f59e0b'];

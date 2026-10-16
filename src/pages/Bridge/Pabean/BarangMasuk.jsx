@@ -471,10 +471,10 @@ const BarangMasuk = () => {
                                         </td>
                                         <td className="px-2 py-1.5 text-center text-silver text-xs whitespace-nowrap">{row.itemCurrency}</td>
                                         <td className="px-2 py-1.5 text-right text-silver-light font-medium text-xs whitespace-nowrap">
-                                            {row.nominalBarang ? Number(row.nominalBarang).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '-'}
+                                            {row.nominalBarang ? Number(row.nominalBarang).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
                                         </td>
                                         <td className="px-2 py-1.5 text-right text-accent-green font-medium text-xs whitespace-nowrap">
-                                            {row.nilaiBarang ? Number(row.nilaiBarang).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '-'}
+                                            {row.nilaiBarang ? Number(row.nilaiBarang).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
                                         </td>
                                         <td className="px-2 py-1.5 text-center">
                                             <button

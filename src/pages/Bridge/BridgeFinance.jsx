@@ -234,7 +234,7 @@ const BridgeFinance = () => {
     
     <div class="summary">
         ${document.discount ? `<div class="summary-row"><span>Diskon:</span><span>Rp ${formatCurrency(document.discount)}</span></div>` : ''}
-        ${document.vat ? `<div class="summary-row"><span>PPN:</span><span>Rp ${formatCurrency(document.vat)}</span></div>` : ''}
+        ${document.vat ? `<div class="summary-row"><span>VAT:</span><span>Rp ${formatCurrency(document.vat)}</span></div>` : ''}
         <div class="summary-row total"><span>TOTAL:</span><span>Rp ${formatCurrency(document.grandTotal)}</span></div>
     </div>
     
@@ -1369,7 +1369,7 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
 
                             {/* Tax */}
                             <div className="flex justify-between items-center w-full text-silver">
-                                <span>Tax (PPN)</span>
+                                <span>VAT</span>
                                 <div className="flex items-center gap-2">
                                     <input
                                         type="number"
@@ -1591,7 +1591,7 @@ const PurchaseFormModal = ({ onClose, onSubmit, vendors }) => {
                             <span className="text-silver-light font-semibold">Rp {formatCurrency(subtotal)}</span>
                         </div>
                         <div className="flex justify-between items-center text-sm">
-                            <span className="text-silver-dark">Pajak (PPN):</span>
+                            <span className="text-silver-dark">VAT:</span>
                             <div className="flex items-center gap-2">
                                 <input
                                     type="number"

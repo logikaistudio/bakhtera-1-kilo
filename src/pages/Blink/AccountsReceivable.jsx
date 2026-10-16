@@ -137,10 +137,11 @@ const AccountsReceivable = () => {
     };
 
     const formatCurrency = (value, currency = 'IDR') => {
+        const amount = Number(value || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         if (currency === 'USD') {
-            return '$' + value.toLocaleString('id-ID');
+            return '$' + amount;
         }
-        return 'Rp ' + value.toLocaleString('id-ID');
+        return 'Rp ' + amount;
     };
 
     // Calculate metrics with currency breakdown
@@ -195,21 +196,21 @@ const AccountsReceivable = () => {
                     key: 'original_amount',
                     width: 20,
                     align: 'right',
-                    render: (item) => `${item.currency || 'USD'} ${(item.original_amount || 0).toLocaleString('id-ID')}`
+                    render: (item) => `${item.currency || 'USD'} ${(item.original_amount || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                 },
                 {
                     header: 'Paid Amount',
                     key: 'paid_amount',
                     width: 20,
                     align: 'right',
-                    render: (item) => `${item.currency || 'USD'} ${(item.paid_amount || 0).toLocaleString('id-ID')}`
+                    render: (item) => `${item.currency || 'USD'} ${(item.paid_amount || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                 },
                 {
                     header: 'Outstanding Amount',
                     key: 'outstanding_amount',
                     width: 20,
                     align: 'right',
-                    render: (item) => `${item.currency || 'USD'} ${(item.outstanding_amount || 0).toLocaleString('id-ID')}`
+                    render: (item) => `${item.currency || 'USD'} ${(item.outstanding_amount || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                 },
                 { header: 'Aging Bucket', key: 'aging_bucket', width: 15 },
                 { header: 'Status', key: 'status', width: 15 }
@@ -401,8 +402,8 @@ const AccountsReceivable = () => {
                 if (currRows.length === 0) return null;
 
                 const fmtAmt = (v) => currency === 'USD'
-                    ? `$ ${Number(v).toLocaleString('id-ID')}`
-                    : `Rp ${Number(v).toLocaleString('id-ID')}`;
+                    ? `$ ${Number(v).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    : `Rp ${Number(v).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
                 // Totals
                 const totOrig = currRows.reduce((s, r) => s + (r.original_amount || 0), 0);

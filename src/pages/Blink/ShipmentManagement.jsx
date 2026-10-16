@@ -1064,7 +1064,7 @@ const ShipmentManagement = () => {
                                                 <tr key={idx}>
                                                     <td className="px-3 py-2 text-blue-300 font-medium">{item.item_name}</td>
                                                     <td className="px-3 py-2 text-silver-light">{item.description}</td>
-                                                    <td className="px-3 py-2 text-right text-green-400 font-mono">{item.amount.toLocaleString('id-ID')}</td>
+                                                    <td className="px-3 py-2 text-right text-green-400 font-mono">{Number(item.amount || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                                 </tr>
                                             ))}
                                         </tbody>

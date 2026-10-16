@@ -47,7 +47,7 @@ const fmtIDR = (value, showSign = false) => {
     if (value === undefined || value === null) return '-';
     const neg = value < 0;
     const abs = Math.abs(value);
-    const str = `Rp ${abs.toLocaleString('id-ID')}`;
+    const str = `Rp ${abs.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     if (neg) return `(${str})`;
     if (showSign && value > 0) return `+${str}`;
     return str;
@@ -55,7 +55,7 @@ const fmtIDR = (value, showSign = false) => {
 
 const fmtUSD = (value) => {
     if (!value || value === 0) return null;
-    return `$${Math.abs(value).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+    return `$${Math.abs(value).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 const hasRealRate = (currency, exchangeRate) => {
@@ -75,10 +75,10 @@ const toIDR = (value, currency, exchangeRate) => {
 const fmtAmount = (value, currency, exchangeRate) => {
     if (!value || value === 0) return null;
     if (hasRealRate(currency, exchangeRate)) {
-        return { primary: `Rp ${Math.abs((value || 0) * exchangeRate).toLocaleString('id-ID')}`, secondary: fmtUSD(value) };
+        return { primary: `Rp ${Math.abs((value || 0) * exchangeRate).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, secondary: fmtUSD(value) };
     }
-    if (currency === 'USD') return { primary: `$${Math.abs(value).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, secondary: null };
-    return { primary: `Rp ${Math.abs(value).toLocaleString('id-ID')}`, secondary: null };
+    if (currency === 'USD') return { primary: `$${Math.abs(value).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, secondary: null };
+    return { primary: `Rp ${Math.abs(value).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, secondary: null };
 };
 
 // Mini sparkline SVG
@@ -105,15 +105,15 @@ const exportToPDF = (selectedAccount, accountInfo, dateRange, openingBalance, to
     const fmtP = (v) => {
         if (v === undefined || v === null) return '-';
         const neg = v < 0;
-        const s = `Rp ${Math.abs(v).toLocaleString('id-ID')}`;
+        const s = `Rp ${Math.abs(v).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         return neg ? `(${s})` : s;
     };
     const fmtAmt = (value, currency, exchangeRate) => {
         if (!value || value === 0) return '';
         if (currency && currency !== 'IDR' && (exchangeRate || 1) > 1)
-            return `Rp ${Math.abs(value * exchangeRate).toLocaleString('id-ID')}`;
-        if (currency === 'USD') return `$${Math.abs(value).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-        return `Rp ${Math.abs(value).toLocaleString('id-ID')}`;
+            return `Rp ${Math.abs(value * exchangeRate).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        if (currency === 'USD') return `$${Math.abs(value).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        return `Rp ${Math.abs(value).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
 
     const bodyHTML = `

@@ -1171,9 +1171,9 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
             const formatNumberByCurrency = (value, currency = 'IDR') => {
                 const numeric = Number(value) || 0;
                 if (String(currency).toUpperCase() === 'USD') {
-                    return numeric.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    return numeric.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                 }
-                return numeric.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+                return numeric.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             };
 
             const formatRateParts = (value, currency = 'IDR') => {
@@ -1244,8 +1244,8 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                     <span style="text-align: right; flex: 1;">${rateParts.amount}</span>
                                 </div>
                             </td>
-                            <td style="text-align: right; font-family: monospace;">${amtIDR > 0 ? amtIDR.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '-'}</td>
-                            <td style="text-align: right; font-family: monospace;">${amtUSD > 0 ? amtUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
+                            <td style="text-align: right; font-family: monospace;">${amtIDR > 0 ? amtIDR.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
+                            <td style="text-align: right; font-family: monospace;">${amtUSD > 0 ? amtUSD.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
                             <td style="text-align: center;">${item.remarks || '-'}</td>
                         </tr>
                     `;
@@ -2000,7 +2000,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                                         const rate = quote.exchange_rate || quote.exchangeRate || 16000;
                                                         const idr = quote.total_idr ?? (quote.totalAmount ? ((quote.currency === 'IDR') ? quote.totalAmount : quote.totalAmount * rate) : (quote.total_amount ? (quote.currency === 'IDR' ? quote.total_amount : quote.total_amount * rate) : 0));
                                                         const usd = quote.total_usd ?? (quote.totalAmount ? ((quote.currency === 'USD') ? quote.totalAmount : (rate ? quote.totalAmount / rate : 0)) : (quote.total_amount ? ((quote.currency === 'USD') ? quote.total_amount : (rate ? quote.total_amount / rate : 0)) : 0));
-                                                        return quote.currency === 'USD' ? `${getCurrencySymbol('USD')} ${usd.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : `${getCurrencySymbol('IDR')} ${idr.toLocaleString('id-ID')}`;
+                                                        return quote.currency === 'USD' ? `${getCurrencySymbol('USD')} ${usd.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `${getCurrencySymbol('IDR')} ${idr.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                                                     })()}
                                                 </div>
                                             </td>
@@ -3493,18 +3493,18 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                         {/* Selling Total */}
                                         <div className="p-4 bg-white/70 backdrop-blur-sm rounded-lg border border-orange-200/40">
                                             <p className="text-[10px] font-bold text-orange-600 uppercase tracking-wider mb-1">Total Selling (Revenue)</p>
-                                            <p className="text-xl font-bold text-orange-700">Rp {Number(selling.totalIdr || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
+                                            <p className="text-xl font-bold text-orange-700">Rp {Number(selling.totalIdr || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                                             <p className="text-xs text-gray-500 font-semibold mt-1">
-                                                {rate > 1 ? `$ ${Number(selling.totalUsd || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                                                {rate > 1 ? `$ ${Number(selling.totalUsd || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
                                             </p>
                                         </div>
 
                                         {/* Buying Total */}
                                         <div className="p-4 bg-white/70 backdrop-blur-sm rounded-lg border border-blue-200/40">
                                             <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-1">Total Buying (COGS)</p>
-                                            <p className="text-xl font-bold text-blue-700">Rp {Number(buying.totalIdr || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
+                                            <p className="text-xl font-bold text-blue-700">Rp {Number(buying.totalIdr || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                                             <p className="text-xs text-gray-500 font-semibold mt-1">
-                                                {rate > 1 ? `$ ${Number(buying.totalUsd || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                                                {rate > 1 ? `$ ${Number(buying.totalUsd || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
                                             </p>
                                         </div>
 
@@ -3512,10 +3512,10 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                         <div className="p-4 bg-white/80 backdrop-blur-sm rounded-lg border border-emerald-200">
                                             <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1">Est. Profit Margin ({marginPct.toFixed(1)}%)</p>
                                             <p className="text-xl font-bold text-emerald-700">
-                                                {marginIdr >= 0 ? '+' : ''} Rp {Number(marginIdr || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
+                                                {marginIdr >= 0 ? '+' : ''} Rp {Number(marginIdr || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </p>
                                             <p className="text-xs text-gray-500 font-semibold mt-1">
-                                                {rate > 1 ? `${marginUsd >= 0 ? '+' : ''} $ ${Number(marginUsd || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                                                {rate > 1 ? `${marginUsd >= 0 ? '+' : ''} $ ${Number(marginUsd || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
                                             </p>
                                         </div>
                                     </div>
@@ -3660,9 +3660,9 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
     const formatNumberByCurrency = (value, currency = 'IDR') => {
         const numeric = Number(value) || 0;
         if (String(currency).toUpperCase() === 'USD') {
-            return numeric.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            return numeric.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
-        return numeric.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        return numeric.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
 
     const formatRateParts = (value, currency = 'IDR') => {
@@ -3930,10 +3930,10 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                                                             </div>
                                                         </td>
                                                         <td className="py-2 text-right text-slate-600 font-mono">
-                                                            {amtIDR > 0 ? amtIDR.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '-'}
+                                                            {amtIDR > 0 ? amtIDR.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
                                                         </td>
                                                         <td className="py-2 text-right text-slate-900 font-bold font-mono">
-                                                            {amtUSD > 0 ? amtUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
+                                                            {amtUSD > 0 ? amtUSD.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
                                                         </td>
                                                         <td className="py-2 text-center text-slate-500 pr-4 text-[10px]">
                                                             {item.remarks || '-'}

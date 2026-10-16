@@ -301,7 +301,7 @@ const AtaCarnet = () => {
                                         </td>
                                         <td className="px-4 py-3 text-right">
                                             <div className="text-xs text-silver-light font-bold">{item.quantity} Units</div>
-                                            <div className="text-xs text-silver-dark">{item.currency} {Number(item.value).toLocaleString()}</div>
+                                            <div className="text-xs text-silver-dark">{item.currency} {Number(item.value || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                                         </td>
                                         <td className="px-4 py-3 text-silver-light text-sm">{item.destination}</td>
                                         <td className="px-4 py-3 text-center">

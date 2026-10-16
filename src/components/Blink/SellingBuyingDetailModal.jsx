@@ -178,13 +178,13 @@ const SellingBuyingDetailModal = ({ isOpen, onClose, shipment }) => {
         });
 
         // Profit Card
-        drawCard(startX + cardWidth + gap, "Profit", `${currency} ${profit.toLocaleString('id-ID')}`, { bg: '#ffffff', text: isLoss ? '#dc2626' : '#1f2937' });
+        drawCard(startX + cardWidth + gap, "Profit", `${currency} ${profit.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, { bg: '#ffffff', text: isLoss ? '#dc2626' : '#1f2937' });
 
         // Selling Card
-        drawCard(startX + (cardWidth + gap) * 2, "Selling", `${currency} ${comparisonData.grandTotalS.toLocaleString('id-ID')}`, { bg: '#ffffff', text: '#1f2937' });
+        drawCard(startX + (cardWidth + gap) * 2, "Selling", `${currency} ${comparisonData.grandTotalS.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, { bg: '#ffffff', text: '#1f2937' });
 
         // Buying Card
-        drawCard(startX + (cardWidth + gap) * 3, "Buying", `${currency} ${comparisonData.grandTotalB.toLocaleString('id-ID')}`, { bg: '#ffffff', text: '#1f2937' });
+        drawCard(startX + (cardWidth + gap) * 3, "Buying", `${currency} ${comparisonData.grandTotalB.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, { bg: '#ffffff', text: '#1f2937' });
 
         // Table Data Prep
         const tableBody = [];
@@ -204,9 +204,9 @@ const SellingBuyingDetailModal = ({ isOpen, onClose, shipment }) => {
                 tableBody.push([
                     i === 0 ? cat.label : '',
                     sItem ? sItem.name : '',
-                    sItem ? sItem.amount.toLocaleString('id-ID') : '',
+                    sItem ? sItem.amount.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '',
                     bItem ? bItem.name : '',
-                    bItem ? bItem.amount.toLocaleString('id-ID') : ''
+                    bItem ? bItem.amount.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''
                 ]);
             }
 
@@ -215,9 +215,9 @@ const SellingBuyingDetailModal = ({ isOpen, onClose, shipment }) => {
                 tableBody.push([
                     { content: '', styles: { cellPadding: 1 } },
                     { content: '', styles: { cellPadding: 1 } },
-                    { content: cat.totalS.toLocaleString('id-ID'), styles: { fontStyle: 'bold', textColor: [22, 163, 74], halign: 'right', fontSize: 7 } },
+                    { content: cat.totalS.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), styles: { fontStyle: 'bold', textColor: [22, 163, 74], halign: 'right', fontSize: 7 } },
                     { content: '', styles: { cellPadding: 1 } },
-                    { content: cat.totalB.toLocaleString('id-ID'), styles: { fontStyle: 'bold', textColor: [234, 88, 12], halign: 'right', fontSize: 7 } }
+                    { content: cat.totalB.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), styles: { fontStyle: 'bold', textColor: [234, 88, 12], halign: 'right', fontSize: 7 } }
                 ]);
                 // Add a spacer/border row implied by autoTable themes/grid
             }
@@ -300,7 +300,7 @@ const SellingBuyingDetailModal = ({ isOpen, onClose, shipment }) => {
                         <div className="bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border p-4 rounded-xl shadow-sm">
                             <p className="text-[10px] uppercase text-gray-500 dark:text-silver-dark font-semibold tracking-wider mb-2">Profit</p>
                             <p className={`text-2xl font-bold ${isLoss ? 'text-red-600 dark:text-red-400' : 'text-gray-800 dark:text-white'}`}>
-                                {currency} {profit.toLocaleString('id-ID')}
+                                {currency} {profit.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </p>
                         </div>
 
@@ -308,7 +308,7 @@ const SellingBuyingDetailModal = ({ isOpen, onClose, shipment }) => {
                         <div className="bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border p-4 rounded-xl shadow-sm">
                             <p className="text-[10px] uppercase text-gray-500 dark:text-silver-dark font-semibold tracking-wider mb-2">Selling</p>
                             <p className="text-2xl font-bold text-gray-800 dark:text-white">
-                                {currency} {comparisonData.grandTotalS.toLocaleString('id-ID')}
+                                {currency} {comparisonData.grandTotalS.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </p>
                         </div>
 
@@ -316,7 +316,7 @@ const SellingBuyingDetailModal = ({ isOpen, onClose, shipment }) => {
                         <div className="bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border p-4 rounded-xl shadow-sm">
                             <p className="text-[10px] uppercase text-gray-500 dark:text-silver-dark font-semibold tracking-wider mb-2">Buying</p>
                             <p className="text-2xl font-bold text-gray-800 dark:text-white">
-                                {currency} {comparisonData.grandTotalB.toLocaleString('id-ID')}
+                                {currency} {comparisonData.grandTotalB.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </p>
                         </div>
                     </div>
@@ -359,7 +359,7 @@ const SellingBuyingDetailModal = ({ isOpen, onClose, shipment }) => {
                                                                     <>
                                                                         <span className="text-gray-700 dark:text-silver-light font-medium truncate mr-4 tracking-wide">{sItem.name}</span>
                                                                         <span className="text-green-600 dark:text-green-400 font-bold font-mono whitespace-nowrap">
-                                                                            {sItem.amount.toLocaleString('id-ID')}
+                                                                            {sItem.amount.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                                         </span>
                                                                     </>
                                                                 ) : <span className="text-gray-300 dark:text-silver-dark/30 italic">-</span>}
@@ -371,7 +371,7 @@ const SellingBuyingDetailModal = ({ isOpen, onClose, shipment }) => {
                                                                     <>
                                                                         <span className="text-gray-700 dark:text-silver-light font-medium truncate mr-4 tracking-wide">{bItem.name}</span>
                                                                         <span className="text-orange-600 dark:text-orange-400 font-bold font-mono whitespace-nowrap">
-                                                                            {bItem.amount.toLocaleString('id-ID')}
+                                                                            {bItem.amount.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                                         </span>
                                                                     </>
                                                                 ) : <span className="text-gray-300 dark:text-silver-dark/30 italic">-</span>}
@@ -385,12 +385,12 @@ const SellingBuyingDetailModal = ({ isOpen, onClose, shipment }) => {
                                                     <React.Fragment>
                                                         <div className="col-span-1 border-r border-gray-100 dark:border-dark-border/30 pr-4 pt-3 mt-1 border-t border-gray-100 dark:border-dark-border/30 flex justify-end">
                                                             <span className="text-[10px] text-green-600/60 dark:text-green-500/60 font-bold">
-                                                                {cat.totalS.toLocaleString('id-ID')}
+                                                                {cat.totalS.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                             </span>
                                                         </div>
                                                         <div className="col-span-1 pl-4 pt-3 mt-1 border-t border-gray-100 dark:border-dark-border/30 flex justify-end">
                                                             <span className="text-[10px] text-orange-600/60 dark:text-orange-500/60 font-bold">
-                                                                {cat.totalB.toLocaleString('id-ID')}
+                                                                {cat.totalB.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                             </span>
                                                         </div>
                                                     </React.Fragment>

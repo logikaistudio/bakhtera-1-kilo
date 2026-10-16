@@ -266,7 +266,7 @@ const BridgeProfitLoss = () => {
 
     const fmt = (amount) => {
         if (!amount || amount === 0) return '';
-        const s = Math.abs(amount).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        const s = Math.abs(amount).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         return s;
     };
 
@@ -408,7 +408,7 @@ const BridgeProfitLoss = () => {
         const fmtAmt = (v) => {
             if (!v || v === 0) return '-';
             const neg = v < 0;
-            const s = Math.abs(v).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+            const s = Math.abs(v).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             return neg ? `<span style="color:#dc2626">(${s})</span>` : s;
         };
         const mSum = (groups, m) => groups.reduce((sum, group) => (
