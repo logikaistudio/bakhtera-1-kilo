@@ -119,6 +119,35 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    useEffect(() => {
+        if (!user?.id || !user?.user_level || ['super_admin', 'admin'].includes(user.user_level)) return;
+
+        let refreshInProgress = false;
+        const refreshWhenActive = async () => {
+            if (document.visibilityState === 'hidden' || refreshInProgress) return;
+
+            refreshInProgress = true;
+            try {
+                const newPerms = await getUserPermissions(user.id, user.user_level);
+                setPermissions(prev => JSON.stringify(prev) === JSON.stringify(newPerms) ? prev : newPerms);
+            } catch (error) {
+                console.error('Error refreshing permissions on focus:', error);
+            } finally {
+                refreshInProgress = false;
+            }
+        };
+
+        window.addEventListener('focus', refreshWhenActive);
+        document.addEventListener('visibilitychange', refreshWhenActive);
+        // Poll so role changes made by an admin apply without re-login or tab switch.
+        const intervalId = setInterval(refreshWhenActive, 30000);
+        return () => {
+            clearInterval(intervalId);
+            window.removeEventListener('focus', refreshWhenActive);
+            document.removeEventListener('visibilitychange', refreshWhenActive);
+        };
+    }, [user?.id, user?.user_level]);
+
     /**
      * Refresh user session and permissions
      */
@@ -189,6 +218,14 @@ export const AuthProvider = ({ children }) => {
         bxpo_partners: 'cabang_partners'
     };
 
+    // Menu codes that guard the same underlying feature/page but are referenced under different codes.
+    const PERMISSION_EQUIVALENT_GROUPS = [
+        ['central_coa', 'blink_coa', 'big_coa', 'bridge_coa'],
+        ['central_vendors', 'blink_partners', 'bxpo_partners', 'cabang_partners', 'bridge_partners'],
+        ['bridge_finance', 'bridge_invoices'],
+        ['blink_invoices', 'blink_invoice', 'blink_finance'],
+    ];
+
     const getPermissionCandidates = (menuCode) => {
         if (!menuCode) return [];
         const candidates = [menuCode];
@@ -197,6 +234,9 @@ export const AuthProvider = ({ children }) => {
             const alias = CABANG_PERMISSION_ALIAS[menuCode];
             if (alias) candidates.push(alias);
         }
+        PERMISSION_EQUIVALENT_GROUPS.forEach((group) => {
+            if (group.includes(menuCode)) candidates.push(...group);
+        });
         return [...new Set(candidates)];
     };
 
