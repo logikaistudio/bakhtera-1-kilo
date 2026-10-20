@@ -188,7 +188,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
     };
 
     const mainMenuItems = [
-        { path: '/', label: 'Dashboard BakhteraOne', icon: LayoutDashboard },
+        { path: '/', label: 'Dashboard BakhteraOne', icon: LayoutDashboard, menuCode: 'main_dashboard' },
         { path: '/blink', label: 'BLINK', subtitle: 'Freight & Forward Management', icon: Plane },
         { path: '/bxpo', label: 'BXPO', subtitle: 'Sales & Operation', icon: Layers },
         { path: '/big', label: 'BIG', subtitle: 'Event Organizer', icon: Calendar },
@@ -1990,6 +1990,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                                 );
                             }
 
+                            if (item.menuCode && !canAccessPortal(item.menuCode)) return null;
                             return <MenuLink key={item.path} item={item} isMobile={isMobile} />;
                         })}
                     </div>

@@ -31,6 +31,7 @@ export const APP_MENUS = {
         label: 'Pusat',
         color: 'purple',
         menus: [
+            { code: 'main_dashboard', label: 'Dashboard BakhteraOne', group: 'Utama', path: '/' },
             { code: 'central_vendors', label: 'Vendor Management', group: 'Fungsi Terpusat', path: '/vendors' },
             { code: 'central_customers', label: 'Customer Management', group: 'Fungsi Terpusat', path: '/customers' },
             { code: 'central_finance', label: 'Finance Center', group: 'Fungsi Terpusat', path: '/finance' },

@@ -162,7 +162,8 @@ export const syncRolePermissionsWithMenus = async ({ pruneStale = false } = {}) 
         validMenuCodes.forEach((menuCode) => {
             const key = `${roleId}::${menuCode}`;
             if (!existingKeySet.has(key)) {
-                const isManagement = ['direksi', 'chief', 'manager'].includes(roleId);
+                // main_dashboard harus selalu dicentang manual, termasuk untuk management
+                const isManagement = menuCode !== 'main_dashboard' && ['direksi', 'chief', 'manager'].includes(roleId);
                 missingRows.push({
                     role_id: roleId,
                     role_label: roleLabel,

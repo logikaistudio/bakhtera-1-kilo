@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { DataProvider } from './context/DataContext';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { APP_MENUS } from './config/menuConfig';
 import MainLayout from './components/Layout/MainLayout';
 import { testSupabaseConnection, getSupabaseStatus } from './lib/supabase';
 
@@ -117,6 +118,23 @@ import BarangKeluar from './pages/Bridge/Pabean/BarangKeluar';
 import BarangReject from './pages/Bridge/Pabean/BarangReject';
 import PergerakanBarang from './pages/Bridge/Pabean/PergerakanBarang';
 
+const HomeRoute = () => {
+  const { canAccess } = useAuth();
+  if (canAccess('main_dashboard')) return <FreightDashboard />;
+  const firstAllowed = Object.values(APP_MENUS)
+    .flatMap((mod) => mod.menus)
+    .find((menu) => menu.path && menu.path !== '/' && canAccess(menu.code));
+  if (firstAllowed) return <Navigate to={firstAllowed.path} replace />;
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="text-center">
+        <h1 className="text-4xl font-bold text-red-600 mb-4">Access Denied</h1>
+        <p className="text-gray-600">You do not have permission to access any module.</p>
+      </div>
+    </div>
+  );
+};
+
 function App() {
   // Test Supabase connection on app initialization
   useEffect(() => {
@@ -157,7 +175,7 @@ function App() {
                 <MainLayout>
                   <Routes>
                     {/* Main Dashboard */}
-                    <Route path="/" element={<FreightDashboard />} />
+                    <Route path="/" element={<HomeRoute />} />
 
                     {/* Centralized Modules — dilindungi per menuCode */}
                     <Route path="/vendors" element={<ProtectedRoute menuCode="central_vendors"><VendorManagement /></ProtectedRoute>} />
