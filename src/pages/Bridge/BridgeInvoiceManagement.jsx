@@ -21,7 +21,8 @@ import InvoiceProfitSummary from '../../components/Bridge/InvoiceProfitSummary';
 const BridgeInvoiceManagement = () => {
     const navigate = useNavigate();
     const { canCreate, canEdit, canDelete, canApprove, isSuperAdmin, user } = useAuth();
-    const { companySettings, bankAccounts, quotations: ctxQuotations = [], shipments: ctxShipments = [], bridgeBusinessPartners = [], deleteBridgeInvoiceCascade } = useData();
+    const { companySettings: blinkCompanySettings, bridgeSettings, bankAccounts, quotations: ctxQuotations = [], shipments: ctxShipments = [], bridgeBusinessPartners = [], deleteBridgeInvoiceCascade } = useData();
+    const companySettings = bridgeSettings || blinkCompanySettings;
     const [invoices, setInvoices] = useState([]);
     const [quotations, setQuotations] = useState([]);
     const [shipments, setShipments] = useState([]);
@@ -1162,7 +1163,7 @@ const BridgeInvoiceManagement = () => {
     };
 
     const formatCurrency = (value, currency = 'IDR') => {
-        return `${getCurrencySymbol(currency)} ${Number(value || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        return `${currency || 'IDR'} ${Number(value || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
 
     const handlePrintInvoice = (invoice) => {
@@ -1355,7 +1356,7 @@ const BridgeInvoiceManagement = () => {
                                 <strong>${companySettings?.company_name || 'PT. Freight One Indonesia'}</strong><br>
                                 ${(companySettings?.company_address || '').replace(/\n/g, '<br>')}<br>
                                 Phone: ${companySettings?.company_phone || '-'}<br>
-                                Email: ${companySettings?.company_email || '-'}
+                                Email: ${companySettings?.company_email || '-'}${companySettings?.company_npwp ? `<br>NPWP: ${companySettings.company_npwp}` : ''}
                             </div>
                         </div>
 
@@ -3188,7 +3189,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                     ? 'Tidak diperlukan untuk IDR'
                                     : parseFloat(formData.exchange_rate) <= 0
                                         ? `⚠️ Kurs rate harus lebih besar dari 0`
-                                        : `1 ${formData.billing_currency} = Rp ${Number(formData.exchange_rate || 1).toLocaleString('id-ID')}`
+                                        : `1 ${formData.billing_currency} = IDR ${Number(formData.exchange_rate || 1).toLocaleString('id-ID')}`
                                 }
                             </p>
                         </div>
@@ -4555,6 +4556,7 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                                 {(companySettings?.company_address || '').split('\n').map((line, i) => <span key={i}>{line}<br /></span>)}
                                 Phone: {companySettings?.company_phone || '-'}<br />
                                 Email: {companySettings?.company_email || '-'}
+                                {companySettings?.company_npwp && <><br />NPWP: {companySettings.company_npwp}</>}
                             </div>
                         </div>
 
@@ -4701,13 +4703,13 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                                                     {item.splitQty} {item.unit}
                                                 </td>
                                                 <td style={{ borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textAlign: 'right' }}>
-                                                    {formatCurrency(item.splitRate, printCurrency).replace('Rp ', '').replace('$', '')}
+                                                    {formatCurrency(item.splitRate, printCurrency).replace(/^[A-Z]{3}\s/, '')}
                                                 </td>
                                                 <td style={{ borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textAlign: 'right' }}>
-                                                    {formatCurrency(calcTax, printCurrency).replace('Rp ', '').replace('$', '')}
+                                                    {formatCurrency(calcTax, printCurrency).replace(/^[A-Z]{3}\s/, '')}
                                                 </td>
                                                 <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', verticalAlign: 'top', textAlign: 'right', paddingRight: '10px' }}>
-                                                    {formatCurrency(calcAmount, printCurrency).replace('Rp ', '').replace('$', '')}
+                                                    {formatCurrency(calcAmount, printCurrency).replace(/^[A-Z]{3}\s/, '')}
                                                 </td>
                                             </tr>
                                         );
@@ -4871,7 +4873,7 @@ const ExistingInvoicesIndicator = ({ jobNumber }) => {
                     {idrInvoice ? (
                         <div className="text-[9px] text-silver-dark space-y-0.5">
                             <div className="font-mono text-green-400">{idrInvoice.invoice_number}</div>
-                            <div>Rp {Number(idrInvoice.total_amount || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                            <div>IDR {Number(idrInvoice.total_amount || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                             <div>Kurs: {Number(idrInvoice.exchange_rate || 1).toLocaleString('id-ID')}</div>
                             <div className="text-[8px] opacity-70">{idrInvoice.status}</div>
                         </div>
@@ -4893,7 +4895,7 @@ const ExistingInvoicesIndicator = ({ jobNumber }) => {
                     {usdInvoice ? (
                         <div className="text-[9px] text-silver-dark space-y-0.5">
                             <div className="font-mono text-green-400">{usdInvoice.invoice_number}</div>
-                            <div>$ {Number(usdInvoice.total_amount || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                            <div>USD {Number(usdInvoice.total_amount || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                             <div>Kurs: {Number(usdInvoice.exchange_rate || 1).toLocaleString('id-ID')}</div>
                             <div className="text-[8px] opacity-70">{usdInvoice.status}</div>
                         </div>

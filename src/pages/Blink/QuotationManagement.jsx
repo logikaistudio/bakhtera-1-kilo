@@ -781,6 +781,7 @@ const QuotationManagement = () => {
                             <div>${(companySettings?.company_address || 'Jakarta, Indonesia').replace(/\n/g, '<br/>')}</div>
                             ${companySettings?.company_phone ? `<div>Tel: ${companySettings.company_phone}</div>` : ''}
                             ${companySettings?.company_email ? `<div>Email: ${companySettings.company_email}</div>` : ''}
+                            ${companySettings?.company_npwp ? `<div>NPWP: ${companySettings.company_npwp}</div>` : ''}
                         </div>
                         <div>
                             <h3 style="font-size: 14px; font-weight: bold; margin-bottom: 10px; color: #555;">TO:</h3>

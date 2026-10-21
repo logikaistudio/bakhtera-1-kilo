@@ -883,6 +883,7 @@ const PurchaseOrder = () => {
                                 Jakarta Barat 11610
                                 ${companySettings?.company_phone ? '<br/>Tel: ' + companySettings.company_phone : ''}
                                 ${companySettings?.company_email ? ' &nbsp;|&nbsp; ' + companySettings.company_email : ''}
+                                ${companySettings?.company_npwp ? '<br/>NPWP: ' + companySettings.company_npwp : ''}
                             </div>
                         </div>
                         <div class="doc-header-right">
@@ -1364,9 +1365,7 @@ const PurchaseOrder = () => {
     const formatCurrency = (value, currency = 'IDR') => {
         const numValue = Number(value || 0);
         const formatted = numValue.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        return currency === 'USD'
-            ? `$${formatted} `
-            : `Rp ${formatted} `;
+        return `${currency || 'IDR'} ${formatted}`;
     };
 
     const filteredPOs = pos.filter(po => {
@@ -2057,7 +2056,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                             <p className="text-xs text-silver-dark mt-1">
                                 {formData.currency === 'IDR'
                                     ? 'Not needed for IDR transactions'
-                                    : `1 ${formData.currency} = Rp ${(formData.exchange_rate || 0).toLocaleString('id-ID')}`}
+                                    : `1 ${formData.currency} = IDR ${(formData.exchange_rate || 0).toLocaleString('id-ID')}`}
                             </p>
                         </div>
                     </div>
@@ -2267,7 +2266,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                                     min="0"
                                                     required
                                                 />
-                                                <span className="absolute left-3 top-2 text-silver-dark text-sm font-medium">{formData.currency === 'IDR' ? 'Rp' : formData.currency}</span>
+                                                <span className="absolute left-3 top-2 text-silver-dark text-sm font-medium">{formData.currency || 'IDR'}</span>
                                             </div>
                                         </div>
                                         <div className="md:col-span-3">

@@ -8,7 +8,7 @@ import {
     AlertCircle, Search, Trash, Edit, Send, DollarSign
 } from 'lucide-react';
 
-const fmtIDR = (v) => v != null ? 'Rp ' + Number(v).toLocaleString('id-ID') : '-';
+const fmtIDR = (v) => v != null ? 'IDR ' + Number(v).toLocaleString('id-ID') : '-';
 const today = () => new Date().toISOString().split('T')[0];
 const genNumber = () => `BRG-PO-${new Date().toISOString().slice(2,10).replace(/-/g,'')}-${String(Date.now()).slice(-5)}`;
 const EMPTY_ITEM = { description: '', qty: 1, unit: 'Unit', unit_price: 0, amount: 0, tax_rate: 0, tax_amount: 0, coa_id: null };
@@ -205,7 +205,7 @@ const POFormModal = ({ po, coaList, onClose, onSave }) => {
                                     <th className="px-3 py-2 text-right w-20">Qty</th>
                                     <th className="px-3 py-2 text-left w-20">Unit</th>
                                     <th className="px-3 py-2 text-right w-32">Harga Satuan</th>
-                                    <th className="px-3 py-2 text-right w-16">PPN%</th>
+                                    <th className="px-3 py-2 text-right w-16">VAT %</th>
                                     <th className="px-3 py-2 text-right w-36">Total</th>
                                     <th className="px-3 py-2 w-48">COA Big (Beban)</th>
                                     <th className="px-3 py-2 w-10"></th>
@@ -229,7 +229,7 @@ const POFormModal = ({ po, coaList, onClose, onSave }) => {
                                     <span>Subtotal</span><span className="font-mono">{fmtIDR(subtotal)}</span>
                                 </div>
                                 <div className="flex justify-between text-silver-dark">
-                                    <span>Total PPN</span><span className="font-mono">{fmtIDR(taxTotal)}</span>
+                                    <span>Total VAT</span><span className="font-mono">{fmtIDR(taxTotal)}</span>
                                 </div>
                                 <div className="flex justify-between text-silver-dark items-center gap-2">
                                     <span>Diskon</span>

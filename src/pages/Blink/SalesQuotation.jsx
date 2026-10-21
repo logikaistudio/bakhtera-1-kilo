@@ -1335,6 +1335,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                             <div>${(companySettings?.company_address || 'Jakarta, Indonesia').replace(/\n/g, '<br/>')}</div>
                             ${companySettings?.company_phone ? `<div>Tel: ${companySettings.company_phone}</div>` : ''}
                             ${companySettings?.company_email ? `<div>Email: ${companySettings.company_email}</div>` : ''}
+                            ${companySettings?.company_npwp ? `<div>NPWP: ${companySettings.company_npwp}</div>` : ''}
                             ${resolvedCreatorName ? `<div>Created By: ${resolvedCreatorName}</div>` : ''}
                         </div>
                         <div>

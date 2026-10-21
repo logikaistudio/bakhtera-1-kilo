@@ -8,7 +8,7 @@ import {
     AlertCircle, Clock, Search, Trash, Edit, Eye, X, Package, Download, RefreshCw
 } from 'lucide-react';
 
-const fmtIDR = (v) => v != null ? 'Rp ' + Number(v).toLocaleString('id-ID') : '-';
+const fmtIDR = (v) => v != null ? 'IDR ' + Number(v).toLocaleString('id-ID') : '-';
 const today = () => new Date().toISOString().split('T')[0];
 const genNumber = () => `BRG-INV-${new Date().toISOString().slice(2,10).replace(/-/g,'')}-${String(Date.now()).slice(-5)}`;
 
@@ -361,7 +361,7 @@ const InvoiceFormModal = ({ invoice, seedData, coaList, onClose, onSave }) => {
                                     <th className="px-3 py-2 text-right w-20">Qty</th>
                                     <th className="px-3 py-2 text-left w-20">Unit</th>
                                     <th className="px-3 py-2 text-right w-32">Harga Satuan</th>
-                                    <th className="px-3 py-2 text-right w-16">PPN%</th>
+                                    <th className="px-3 py-2 text-right w-16">VAT %</th>
                                     <th className="px-3 py-2 text-right w-36">Total</th>
                                     <th className="px-3 py-2 w-48">COA Big</th>
                                     <th className="px-3 py-2 w-10"></th>
@@ -388,7 +388,7 @@ const InvoiceFormModal = ({ invoice, seedData, coaList, onClose, onSave }) => {
                                     <span>Subtotal</span><span className="font-mono">{fmtIDR(subtotal)}</span>
                                 </div>
                                 <div className="flex justify-between text-silver-dark">
-                                    <span>Total PPN</span><span className="font-mono">{fmtIDR(taxTotal)}</span>
+                                    <span>Total VAT</span><span className="font-mono">{fmtIDR(taxTotal)}</span>
                                 </div>
                                 <div className="flex justify-between text-silver-dark items-center gap-2">
                                     <span>Diskon</span>
