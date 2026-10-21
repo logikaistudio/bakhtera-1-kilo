@@ -9,14 +9,24 @@ import {
     DollarSign, Loader2, RefreshCw, Ship, Plane, Truck
 } from 'lucide-react';
 
-const MONTHS_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+import { useLanguage, getLanguage } from '../i18n/LanguageContext';
+
+const MONTHS = {
+    en: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+    id: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'],
+};
+
+// Compact amounts: English uses B/M, Indonesian uses M(iliar)/jt.
+const compactUnits = () => (getLanguage() === 'id' ? { big: 'M', mid: 'jt' } : { big: 'B', mid: 'M' });
 
 const fmtIDR = (v) => {
-    if (!v && v !== 0) return 'Rp 0';
+    if (!v && v !== 0) return 'IDR 0';
     const n = Number(v);
-    if (n >= 1_000_000_000) return `Rp ${(n / 1_000_000_000).toFixed(2)}M`;
-    if (n >= 1_000_000) return `Rp ${(n / 1_000_000).toFixed(1)}jt`;
-    return `Rp ${n.toLocaleString('id-ID')}`;
+    const u = compactUnits();
+    const decimal = (x, d) => (getLanguage() === 'id' ? x.toFixed(d).replace('.', ',') : x.toFixed(d));
+    if (n >= 1_000_000_000) return `IDR ${decimal(n / 1_000_000_000, 2)}${u.big}`;
+    if (n >= 1_000_000) return `IDR ${decimal(n / 1_000_000, 1)}${u.mid}`;
+    return `IDR ${n.toLocaleString(getLanguage() === 'id' ? 'id-ID' : 'en-US')}`;
 };
 
 const calcAgingBucket = (dueDate) => {
@@ -42,6 +52,9 @@ const CHART_TOOLTIP_STYLE = {
 };
 
 const FreightDashboard = () => {
+    const { t, language } = useLanguage();
+    const numLocale = language === 'id' ? 'id-ID' : 'en-US';
+    const compactUnitsNow = compactUnits();
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth() + 1;
     const weeksElapsed = Math.max(1, Math.ceil(
@@ -186,7 +199,7 @@ const FreightDashboard = () => {
         setBridgeRevenue(brm.reduce((a, b) => a + b, 0));
         setBigRevenue(bgm.reduce((a, b) => a + b, 0));
 
-        setMonthlyData(MONTHS_ID.map((month, i) => ({
+        setMonthlyData(MONTHS.en.map((month, i) => ({
             month,
             Blink: Math.round(bm[i]),
             Bridge: Math.round(brm[i]),
@@ -225,6 +238,8 @@ const FreightDashboard = () => {
             buildRow('Big AP', 'AP', bigAP.data),
         ]);
     };
+
+    const chartData = monthlyData.map((d, i) => ({ ...d, month: MONTHS[language][i] }));
 
     const totalRevenue = blinkRevenue + bridgeRevenue + bigRevenue;
     const avgMonthly = totalRevenue / monthsElapsed;
@@ -266,7 +281,7 @@ const FreightDashboard = () => {
         return (
             <div className="flex items-center justify-center h-64">
                 <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
-                <span className="ml-3 text-silver-dark">Memuat data dashboard...</span>
+                <span className="ml-3 text-silver-dark">{t('Loading dashboard data...')}</span>
             </div>
         );
     }
@@ -276,14 +291,14 @@ const FreightDashboard = () => {
             {/* ── Header ──────────────────────────────────────────────────────── */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-4xl font-bold gradient-text mb-2">Dashboard BakhteraOne</h1>
+                    <h1 className="text-4xl font-bold gradient-text mb-2">{t('Dashboard BakhteraOne')}</h1>
                 </div>
                 <button
                     onClick={fetchAllData}
                     className="flex items-center gap-2 px-4 py-2 glass-card rounded-lg text-silver-dark hover:text-silver-light smooth-transition text-sm"
                 >
                     <RefreshCw className="w-4 h-4" />
-                    Refresh
+                    {t('Refresh')}
                 </button>
             </div>
 
@@ -296,7 +311,7 @@ const FreightDashboard = () => {
                             <DollarSign className="w-5 h-5 text-emerald-400" />
                         </div>
                         <p className="text-xs text-silver-dark uppercase tracking-wide font-medium">
-                            Total Revenue {currentYear}
+                            {t('Total Revenue')} {currentYear}
                         </p>
                     </div>
                     <p className="text-3xl font-bold text-emerald-400 mb-5 mt-2">
@@ -311,7 +326,7 @@ const FreightDashboard = () => {
                             <div key={label} className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <span className={`w-2.5 h-2.5 rounded-full ${dot}`} />
-                                    <span className="text-sm text-silver-dark">{label}</span>
+                                    <span className="text-sm text-silver-dark">{t(label)}</span>
                                 </div>
                                 <span className={`text-sm font-semibold ${color}`}>{fmtIDR(value)}</span>
                             </div>
@@ -326,19 +341,19 @@ const FreightDashboard = () => {
                             <Calendar className="w-5 h-5 text-blue-400" />
                         </div>
                         <p className="text-xs text-silver-dark uppercase tracking-wide font-medium">
-                            Rata-rata Pendapatan
+                            {t('Average Revenue')}
                         </p>
                     </div>
                     <div className="space-y-5">
                         <div>
-                            <p className="text-xs text-silver-dark mb-1">Per Bulan (rata-rata)</p>
+                            <p className="text-xs text-silver-dark mb-1">{t('Per Month (average)')}</p>
                             <p className="text-2xl font-bold text-blue-400">{fmtIDR(avgMonthly)}</p>
-                            <p className="text-xs text-silver-dark mt-1">{monthsElapsed} bulan berjalan</p>
+                            <p className="text-xs text-silver-dark mt-1">{t('{n} months elapsed', { n: monthsElapsed })}</p>
                         </div>
                         <div className="border-t border-white/10 pt-4">
-                            <p className="text-xs text-silver-dark mb-1">Per Minggu (rata-rata)</p>
+                            <p className="text-xs text-silver-dark mb-1">{t('Per Week (average)')}</p>
                             <p className="text-2xl font-bold text-cyan-400">{fmtIDR(avgWeekly)}</p>
-                            <p className="text-xs text-silver-dark mt-1">{weeksElapsed} minggu berjalan</p>
+                            <p className="text-xs text-silver-dark mt-1">{t('{n} weeks elapsed', { n: weeksElapsed })}</p>
                         </div>
                     </div>
                 </div>
@@ -350,7 +365,7 @@ const FreightDashboard = () => {
                             <Percent className="w-5 h-5 text-amber-400" />
                         </div>
                         <p className="text-xs text-silver-dark uppercase tracking-wide font-medium">
-                            Komposisi Revenue
+                            {t('Revenue Composition')}
                         </p>
                     </div>
                     <div className="space-y-4">
@@ -361,7 +376,7 @@ const FreightDashboard = () => {
                         ].map(({ label, pct, bar, text }) => (
                             <div key={label}>
                                 <div className="flex justify-between mb-1.5">
-                                    <span className="text-sm text-silver-dark">{label}</span>
+                                    <span className="text-sm text-silver-dark">{t(label)}</span>
                                     <span className={`text-sm font-semibold ${text}`}>{pct.toFixed(1)}%</span>
                                 </div>
                                 <div className="w-full bg-white/10 rounded-full h-2">
@@ -381,11 +396,11 @@ const FreightDashboard = () => {
                 <div className="flex items-center gap-3 mb-6">
                     <TrendingUp className="w-5 h-5 text-indigo-400" />
                     <h2 className="text-xl font-bold text-silver-light">
-                        Grafik Revenue Tahun {currentYear}
+                        {t('Revenue Chart')} {currentYear}
                     </h2>
                 </div>
                 <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={monthlyData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                    <LineChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                         <XAxis
                             dataKey="month"
@@ -398,15 +413,15 @@ const FreightDashboard = () => {
                             axisLine={false}
                             tickLine={false}
                             tickFormatter={(v) =>
-                                v >= 1e9 ? `${(v / 1e9).toFixed(1)}M`
-                                    : v >= 1e6 ? `${(v / 1e6).toFixed(0)}jt`
+                                v >= 1e9 ? `${(v / 1e9).toFixed(1)}${compactUnitsNow.big}`
+                                    : v >= 1e6 ? `${(v / 1e6).toFixed(0)}${compactUnitsNow.mid}`
                                         : v
                             }
                             width={55}
                         />
                         <Tooltip
                             {...CHART_TOOLTIP_STYLE}
-                            formatter={(v, name) => [`Rp ${Number(v).toLocaleString('id-ID')}`, name]}
+                            formatter={(v, name) => [`IDR ${Number(v).toLocaleString(numLocale)}`, name]}
                         />
                         <Legend wrapperStyle={{ color: '#9ca3af', fontSize: 12 }} />
                         <Line type="monotone" dataKey="Total" stroke="#6366f1" strokeWidth={2.5} dot={{ r: 3, fill: '#6366f1' }} activeDot={{ r: 5 }} />
@@ -421,13 +436,13 @@ const FreightDashboard = () => {
             <div className="glass-card p-6 rounded-lg">
                 <div className="flex items-center gap-3 mb-5">
                     <Ship className="w-5 h-5 text-blue-400" />
-                    <h2 className="text-xl font-bold text-silver-light">Volume Pengiriman Blink</h2>
-                    <span className="text-xs text-silver-dark ml-1">(berdasarkan arah &amp; moda angkutan)</span>
+                    <h2 className="text-xl font-bold text-silver-light">{t('Blink Shipment Volume')}</h2>
+                    <span className="text-xs text-silver-dark ml-1">{t('(by direction & transport mode)')}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-6">
                     {/* Arah Pengiriman */}
                     <div>
-                        <p className="text-xs text-silver-dark uppercase tracking-wide font-medium mb-3">Arah Pengiriman</p>
+                        <p className="text-xs text-silver-dark uppercase tracking-wide font-medium mb-3">{t('Shipment Direction')}</p>
                         <div className="grid grid-cols-3 gap-3">
                             {[
                                 { label: 'Import', data: shipmentBreakdown.import, color: 'text-blue-400', dot: 'bg-blue-400', bg: 'bg-blue-500/10' },
@@ -437,7 +452,7 @@ const FreightDashboard = () => {
                                 <div key={label} className={`${bg} rounded-lg p-3 text-center`}>
                                     <div className={`w-2 h-2 rounded-full ${dot} mx-auto mb-2`} />
                                     <p className={`text-xl font-bold ${color}`}>{data.count}</p>
-                                    <p className="text-xs text-silver-dark mt-0.5">{label}</p>
+                                    <p className="text-xs text-silver-dark mt-0.5">{t(label)}</p>
                                     <p className={`text-xs font-medium ${color} mt-1.5`}>{fmtIDR(data.revenue)}</p>
                                 </div>
                             ))}
@@ -448,7 +463,7 @@ const FreightDashboard = () => {
                     </div>
                     {/* Moda Angkutan */}
                     <div>
-                        <p className="text-xs text-silver-dark uppercase tracking-wide font-medium mb-3">Moda Angkutan</p>
+                        <p className="text-xs text-silver-dark uppercase tracking-wide font-medium mb-3">{t('Transport Mode')}</p>
                         <div className="grid grid-cols-3 gap-3">
                             {[
                                 { label: 'Sea', icon: Ship, data: shipmentBreakdown.sea, color: 'text-blue-400', bg: 'bg-blue-500/10' },
@@ -458,7 +473,7 @@ const FreightDashboard = () => {
                                 <div key={label} className={`${bg} rounded-lg p-3 text-center`}>
                                     <Icon className={`w-4 h-4 ${color} mx-auto mb-2`} />
                                     <p className={`text-xl font-bold ${color}`}>{data.count}</p>
-                                    <p className="text-xs text-silver-dark mt-0.5">{label}</p>
+                                    <p className="text-xs text-silver-dark mt-0.5">{t(label)}</p>
                                     <p className={`text-xs font-medium ${color} mt-1.5`}>{fmtIDR(data.revenue)}</p>
                                 </div>
                             ))}
@@ -472,19 +487,19 @@ const FreightDashboard = () => {
             <div className="glass-card p-6 rounded-lg">
                 <div className="flex items-center gap-3 mb-6">
                     <AlertTriangle className="w-5 h-5 text-amber-400" />
-                    <h2 className="text-xl font-bold text-silver-light">Aging AR / AP</h2>
-                    <span className="text-xs text-silver-dark ml-1">(saldo outstanding belum lunas)</span>
+                    <h2 className="text-xl font-bold text-silver-light">{t('Aging AR / AP')}</h2>
+                    <span className="text-xs text-silver-dark ml-1">{t('(unpaid outstanding balance)')}</span>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="border-b border-white/10">
-                                <th className="text-left py-2.5 px-3 text-silver-dark font-medium">Modul</th>
-                                <th className="text-right py-2.5 px-3 text-silver-dark font-medium">Outstanding</th>
-                                <th className="text-right py-2.5 px-3 text-green-400 font-medium">0–30 hr</th>
-                                <th className="text-right py-2.5 px-3 text-yellow-400 font-medium">31–60 hr</th>
-                                <th className="text-right py-2.5 px-3 text-orange-400 font-medium">61–90 hr</th>
-                                <th className="text-right py-2.5 px-3 text-red-400 font-medium">90+ hr</th>
+                                <th className="text-left py-2.5 px-3 text-silver-dark font-medium">{t('Module')}</th>
+                                <th className="text-right py-2.5 px-3 text-silver-dark font-medium">{t('Outstanding')}</th>
+                                <th className="text-right py-2.5 px-3 text-green-400 font-medium">0–30 {t('days')}</th>
+                                <th className="text-right py-2.5 px-3 text-yellow-400 font-medium">31–60 {t('days')}</th>
+                                <th className="text-right py-2.5 px-3 text-orange-400 font-medium">61–90 {t('days')}</th>
+                                <th className="text-right py-2.5 px-3 text-red-400 font-medium">90+ {t('days')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -512,7 +527,7 @@ const FreightDashboard = () => {
                                                     {row.type}
                                                 </span>
                                                 <span className={isTotal ? 'text-silver-light' : 'text-silver'}>
-                                                    {row.label}
+                                                    {row.type === 'AR' || row.type === 'AP' ? row.label.replace(/^Total/, t('Total')) : row.label}
                                                 </span>
                                             </span>
                                         </td>
@@ -543,29 +558,29 @@ const FreightDashboard = () => {
             <div className="glass-card p-6 rounded-lg">
                 <div className="flex items-center justify-between gap-3 mb-5">
                     <div>
-                        <h2 className="text-xl font-bold text-silver-light">Ringkasan Cabang</h2>
-                        <p className="text-xs text-silver-dark mt-1">Konsolidasi Sales dan Finance level cabang.</p>
+                        <h2 className="text-xl font-bold text-silver-light">{t('Branch Summary')}</h2>
+                        <p className="text-xs text-silver-dark mt-1">{t('Consolidated branch-level Sales and Finance.')}</p>
                     </div>
                     <span className="text-xs text-cyan-300 bg-cyan-500/10 border border-cyan-500/30 px-2 py-1 rounded-md">
-                        Level setara BXPO / BLINK / BIG
+                        {t('Same level as BXPO / BLINK / BIG')}
                     </span>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-5">
                     <div className="rounded-lg p-3 bg-blue-500/10 border border-blue-500/30">
-                        <p className="text-xs text-silver-dark">Sales Order</p>
+                        <p className="text-xs text-silver-dark">{t('Sales Order')}</p>
                         <p className="text-xl font-bold text-blue-300 mt-1">{branchSummaryTotals.salesOrders}</p>
                     </div>
                     <div className="rounded-lg p-3 bg-emerald-500/10 border border-emerald-500/30">
-                        <p className="text-xs text-silver-dark">Invoice</p>
+                        <p className="text-xs text-silver-dark">{t('Invoice')}</p>
                         <p className="text-xl font-bold text-emerald-300 mt-1">{branchSummaryTotals.invoices}</p>
                     </div>
                     <div className="rounded-lg p-3 bg-orange-500/10 border border-orange-500/30">
-                        <p className="text-xs text-silver-dark">Revenue Cabang</p>
+                        <p className="text-xs text-silver-dark">{t('Branch Revenue')}</p>
                         <p className="text-xl font-bold text-orange-300 mt-1">{fmtIDR(branchSummaryTotals.revenue)}</p>
                     </div>
                     <div className="rounded-lg p-3 bg-amber-500/10 border border-amber-500/30">
-                        <p className="text-xs text-silver-dark">AR Outstanding</p>
+                        <p className="text-xs text-silver-dark">{t('AR Outstanding')}</p>
                         <p className="text-xl font-bold text-amber-300 mt-1">{fmtIDR(branchSummaryTotals.ar)}</p>
                     </div>
                 </div>
@@ -574,17 +589,17 @@ const FreightDashboard = () => {
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="border-b border-white/10">
-                                <th className="text-left py-2.5 px-3 text-silver-dark font-medium">Cabang</th>
+                                <th className="text-left py-2.5 px-3 text-silver-dark font-medium">{t('Branch')}</th>
                                 <th className="text-right py-2.5 px-3 text-silver-dark font-medium">SO</th>
-                                <th className="text-right py-2.5 px-3 text-silver-dark font-medium">Invoice</th>
+                                <th className="text-right py-2.5 px-3 text-silver-dark font-medium">{t('Invoice')}</th>
                                 <th className="text-right py-2.5 px-3 text-silver-dark font-medium">Revenue</th>
-                                <th className="text-right py-2.5 px-3 text-silver-dark font-medium">AR Outstanding</th>
+                                <th className="text-right py-2.5 px-3 text-silver-dark font-medium">{t('AR Outstanding')}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {branchSummaryRows.map((row) => (
                                 <tr key={row.id} className="border-b border-white/5 hover:bg-white/5 smooth-transition">
-                                    <td className="py-2.5 px-3 text-silver-light">{row.name}</td>
+                                    <td className="py-2.5 px-3 text-silver-light">{row.id === 'UNASSIGNED' ? t('Unassigned') : row.name}</td>
                                     <td className="text-right py-2.5 px-3 text-blue-300">{row.salesOrders}</td>
                                     <td className="text-right py-2.5 px-3 text-emerald-300">{row.invoices}</td>
                                     <td className="text-right py-2.5 px-3 text-orange-300">{fmtIDR(row.revenue)}</td>

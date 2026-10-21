@@ -34,10 +34,13 @@ import {
 import { changePassword } from '../../services/userService';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
+import { useLanguage } from '../../i18n/LanguageContext';
+import LanguageSwitcher from '../../i18n/LanguageSwitcher';
 
 
 
 const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
+    const { t } = useLanguage();
     const location = useLocation();
     const navigate = useNavigate();
     const { user, logout, canAccess, isSuperAdmin, isAdmin } = useAuth();
@@ -187,7 +190,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
         navigate('/login');
     };
 
-    const mainMenuItems = [
+    const mainMenuItemsRaw = [
         { path: '/', label: 'Dashboard BakhteraOne', icon: LayoutDashboard, menuCode: 'main_dashboard' },
         { path: '/blink', label: 'BLINK', subtitle: 'Freight & Forward Management', icon: Plane },
         { path: '/bxpo', label: 'BXPO', subtitle: 'Sales & Operation', icon: Layers },
@@ -202,7 +205,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
 
 
     // Bridge submenu items (with menuCode for per-menu access control)
-    const bridgeSubMenuItems = [
+    const bridgeSubMenuItemsRaw = [
         // Dashboard standalone
         { path: '/bridge', label: 'Dashboard Bridge', icon: LayoutDashboard, menuCode: 'bridge_dashboard' },
 
@@ -262,7 +265,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
     ];
 
     // Pabean submenu items (with menuCode for per-menu access control)
-    const pabeanSubMenuItems = [
+    const pabeanSubMenuItemsRaw = [
         { path: '/bridge/pabean', label: 'Dashboard Pabean', menuCode: 'bridge_pabean' },
         { path: '/bridge/pabean/barang-masuk', label: 'Barang Masuk', menuCode: 'bridge_barang_masuk' },
         { path: '/bridge/pabean/barang-keluar', label: 'Barang Keluar', menuCode: 'bridge_barang_keluar' },
@@ -270,7 +273,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
     ];
 
     // BIG submenu - Event Organizer
-    const bigSubMenuItems = [
+    const bigSubMenuItemsRaw = [
         { path: '/big', label: 'Dashboard BIG', icon: LayoutDashboard, menuCode: 'big_dashboard' },
 
         // Sales Category
@@ -324,7 +327,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
     ];
 
     // BLINK submenu - dengan Dashboard terpisah + department categories + Master Data
-    const blinkSubMenuItems = [
+    const blinkSubMenuItemsRaw = [
         // Dashboard - Standalone (outside categories)
         { path: '/blink', label: 'Dashboard', icon: LayoutDashboard, menuCode: 'blink_dashboard' },
 
@@ -366,7 +369,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
     ];
 
     // FINANCE submenu - terpusat untuk semua unit
-    const financeSubMenuItems = [
+    const financeSubMenuItemsRaw = [
         // Unit: BLINK Finance
         {
             type: 'category', label: '⚡ BLINK Finance', items: [
@@ -428,7 +431,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
         }
     ];
 
-    const cabangSubMenuItems = [
+    const cabangSubMenuItemsRaw = [
         { path: '/cabang', label: 'Dashboard Cabang', icon: LayoutDashboard, menuCode: 'cabang_dashboard' },
         {
             type: 'category', label: '📋 Sales & Marketing', items: [
@@ -478,7 +481,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
     ];
 
     // BXPO submenu - Duplikasi menu sales sampai operation
-    const bxpoSubMenuItems = [
+    const bxpoSubMenuItemsRaw = [
         // Sales & Marketing Category
         {
             type: 'category', label: '📋 Sales & Marketing', items: [
@@ -505,6 +508,22 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
             ]
         },
     ];
+
+    // Menu data is declared with source labels; translate them once per language.
+    const localizeMenu = (items) => items.map((entry) => ({
+        ...entry,
+        ...(entry.label ? { label: t(entry.label) } : {}),
+        ...(entry.subtitle ? { subtitle: t(entry.subtitle) } : {}),
+        ...(Array.isArray(entry.items) ? { items: localizeMenu(entry.items) } : {}),
+    }));
+    const mainMenuItems = localizeMenu(mainMenuItemsRaw);
+    const bridgeSubMenuItems = localizeMenu(bridgeSubMenuItemsRaw);
+    const pabeanSubMenuItems = localizeMenu(pabeanSubMenuItemsRaw);
+    const bigSubMenuItems = localizeMenu(bigSubMenuItemsRaw);
+    const blinkSubMenuItems = localizeMenu(blinkSubMenuItemsRaw);
+    const financeSubMenuItems = localizeMenu(financeSubMenuItemsRaw);
+    const cabangSubMenuItems = localizeMenu(cabangSubMenuItemsRaw);
+    const bxpoSubMenuItems = localizeMenu(bxpoSubMenuItemsRaw);
 
     const hasBxpoAccess = () => {
         return bxpoSubMenuItems.some(subItem => {
@@ -602,13 +621,13 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                         <span className="text-white">BAKHTERA</span>
                         <span className="text-orange-400">ONE</span>
                     </h1>
-                    <p className="text-xs text-silver-dark mt-1">Freight & Asset Management</p>
+                    <p className="text-xs text-silver-dark mt-1">{t('Freight & Asset Management')}</p>
                 </div>
                 {!isMobile && setIsSidebarOpen && (
                     <button
                         onClick={() => setIsSidebarOpen(false)}
                         className="p-1.5 rounded-lg text-silver-dark hover:text-silver hover:bg-dark-surface smooth-transition"
-                        title="Sembunyikan Sidebar"
+                        title={t('Hide Sidebar')}
                     >
                         <ChevronLeft className="w-5 h-5" />
                     </button>
@@ -620,7 +639,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                 {/* Modul Utama */}
                 <div>
                     <h3 className="px-4 mb-3 text-xs font-semibold text-silver-dark uppercase tracking-wider">
-                        Modul Utama
+                        {t('Main Modules')}
                     </h3>
                     <div className="space-y-1">
                         {mainMenuItems.map((item) => {
@@ -2015,7 +2034,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                             >
                                 <div className="flex items-center gap-2">
                                     <Shield className="w-4 h-4 text-red-400" />
-                                    <span>User Management</span>
+                                    <span>{t('User Management')}</span>
                                 </div>
                                 <ChevronRight className={`w-3 h-3 transition-transform ${expandedCategories.includes('central-users') ? 'rotate-90' : ''}`} />
                             </button>
@@ -2046,7 +2065,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                                                 : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface/50 border-transparent hover:border-silver-dark/50'
                                                 }`}
                                         >
-                                            Manajemen Role & Akses
+                                            {t('Role & Access Management')}
                                         </Link>
                                         <Link
                                             to="/admin/user-permissions"
@@ -2056,7 +2075,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                                                 : 'text-silver-dark hover:text-silver-light hover:bg-dark-surface/50 border-transparent hover:border-silver-dark/50'
                                                 }`}
                                         >
-                                            Penugasan Role User
+                                            {t('User Role Assignment')}
                                         </Link>
                                     </motion.div>
                                 )}
@@ -2083,13 +2102,16 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                     </div>
                 </div>
 
+                {/* Language switcher */}
+                <LanguageSwitcher variant="dark" className="px-3 py-2" />
+
                 {/* Logout button */}
                 <button
                     onClick={handleLogout}
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 smooth-transition font-medium"
                 >
                     <LogOut className="w-4 h-4 flex-shrink-0" />
-                    <span>Keluar</span>
+                    <span>{t('Logout')}</span>
                 </button>
 
                 {/* Change Password button */}
@@ -2098,7 +2120,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-accent-blue hover:text-blue-300 hover:bg-blue-500/10 smooth-transition font-medium"
                 >
                     <Key className="w-4 h-4 flex-shrink-0" />
-                    <span>Ubah Password</span>
+                    <span>{t('Change Password')}</span>
                 </button>
 
                 {/* Branding */}
@@ -2175,6 +2197,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
  * CHANGE PASSWORD MODAL
  * ============================================================================= */
 const ChangePasswordModal = ({ userId, onClose }) => {
+    const { t } = useLanguage();
     const [oldPassword, setOldPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -2190,7 +2213,7 @@ const ChangePasswordModal = ({ userId, onClose }) => {
         setSuccess('');
 
         if (newPassword !== confirmPassword) {
-            setError('Konfirmasi password tidak cocok');
+            setError(t('Password confirmation does not match'));
             return;
         }
 
@@ -2215,7 +2238,7 @@ const ChangePasswordModal = ({ userId, onClose }) => {
                 <div className="flex items-center justify-between mb-5">
                     <h2 className="text-lg font-semibold text-silver-light flex items-center gap-2">
                         <Key className="w-5 h-5 text-accent-blue" />
-                        Ubah Password
+                        {t('Change Password')}
                     </h2>
                     <button onClick={onClose} className="text-silver-dark hover:text-silver-light smooth-transition">
                         <X className="w-5 h-5" />
@@ -2239,14 +2262,14 @@ const ChangePasswordModal = ({ userId, onClose }) => {
                 <form onSubmit={handleSubmit} className="space-y-4">
                     {/* Old Password */}
                     <div>
-                        <label className="block text-sm text-silver-dark mb-1.5">Password Lama</label>
+                        <label className="block text-sm text-silver-dark mb-1.5">{t('Old Password')}</label>
                         <div className="relative">
                             <input
                                 type={showOld ? 'text' : 'password'}
                                 value={oldPassword}
                                 onChange={e => setOldPassword(e.target.value)}
                                 className="w-full px-3 py-2.5 pr-10 rounded-lg bg-dark-surface border border-dark-border text-silver-light text-sm focus:outline-none focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue/50"
-                                placeholder="Masukkan password saat ini"
+                                placeholder={t('Enter current password')}
                                 required
                                 autoFocus
                             />
@@ -2262,14 +2285,14 @@ const ChangePasswordModal = ({ userId, onClose }) => {
 
                     {/* New Password */}
                     <div>
-                        <label className="block text-sm text-silver-dark mb-1.5">Password Baru</label>
+                        <label className="block text-sm text-silver-dark mb-1.5">{t('New Password')}</label>
                         <div className="relative">
                             <input
                                 type={showNew ? 'text' : 'password'}
                                 value={newPassword}
                                 onChange={e => setNewPassword(e.target.value)}
                                 className="w-full px-3 py-2.5 pr-10 rounded-lg bg-dark-surface border border-dark-border text-silver-light text-sm focus:outline-none focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue/50"
-                                placeholder="Min 8 karakter, huruf & angka"
+                                placeholder={t('Min 8 characters, letters & numbers')}
                                 required
                                 minLength={8}
                             />
@@ -2297,10 +2320,10 @@ const ChangePasswordModal = ({ userId, onClose }) => {
                                 <p className={`text-[11px] ${newPassword.length >= 8 && /[a-zA-Z]/.test(newPassword) && /[0-9]/.test(newPassword)
                                     ? 'text-green-400' : 'text-silver-dark'
                                     }`}>
-                                    {newPassword.length < 8 ? `${8 - newPassword.length} karakter lagi` :
-                                        !/[a-zA-Z]/.test(newPassword) ? 'Tambahkan huruf' :
-                                            !/[0-9]/.test(newPassword) ? 'Tambahkan angka' :
-                                                '✓ Password kuat'}
+                                    {newPassword.length < 8 ? t('{n} more characters', { n: 8 - newPassword.length }) :
+                                        !/[a-zA-Z]/.test(newPassword) ? t('Add letters') :
+                                            !/[0-9]/.test(newPassword) ? t('Add numbers') :
+                                                `✓ ${t('Strong password')}`}
                                 </p>
                             </div>
                         )}
@@ -2308,7 +2331,7 @@ const ChangePasswordModal = ({ userId, onClose }) => {
 
                     {/* Confirm Password */}
                     <div>
-                        <label className="block text-sm text-silver-dark mb-1.5">Konfirmasi Password Baru</label>
+                        <label className="block text-sm text-silver-dark mb-1.5">{t('Confirm New Password')}</label>
                         <input
                             type={showNew ? 'text' : 'password'}
                             value={confirmPassword}
@@ -2319,11 +2342,11 @@ const ChangePasswordModal = ({ userId, onClose }) => {
                                     ? 'border-green-500/50'
                                     : 'border-dark-border'
                                 }`}
-                            placeholder="Ketik ulang password baru"
+                            placeholder={t('Retype new password')}
                             required
                         />
                         {confirmPassword && confirmPassword !== newPassword && (
-                            <p className="text-[11px] text-red-400 mt-1">Password tidak cocok</p>
+                            <p className="text-[11px] text-red-400 mt-1">{t('Passwords do not match')}</p>
                         )}
                     </div>
 
@@ -2334,14 +2357,14 @@ const ChangePasswordModal = ({ userId, onClose }) => {
                             onClick={onClose}
                             className="px-4 py-2 text-sm text-silver-dark hover:text-silver-light smooth-transition rounded-lg hover:bg-dark-surface"
                         >
-                            Batal
+                            {t('Cancel')}
                         </button>
                         <button
                             type="submit"
                             disabled={loading || !oldPassword || !newPassword || newPassword !== confirmPassword}
                             className="px-4 py-2 text-sm font-medium bg-accent-blue text-white rounded-lg hover:bg-accent-blue/90 smooth-transition disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            {loading ? 'Menyimpan...' : 'Ubah Password'}
+                            {loading ? t('Saving...') : t('Change Password')}
                         </button>
                     </div>
                 </form>

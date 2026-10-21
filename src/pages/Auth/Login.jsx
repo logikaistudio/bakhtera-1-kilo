@@ -3,8 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { forgotPasswordSelfService } from '../../services/userService';
 import { Eye, EyeOff, LogIn, Lock, User, AlertCircle } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
+import LanguageSwitcher from '../../i18n/LanguageSwitcher';
 
 const Login = () => {
+    const { t } = useLanguage();
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -35,10 +38,10 @@ const Login = () => {
                     navigate('/');
                 }
             } else {
-                setError(result.error || 'Login gagal. Periksa kembali username dan password Anda.');
+                setError(result.error ? t(result.error) : t('Login failed. Please check your username and password.'));
             }
         } catch (err) {
-            setError('Terjadi kesalahan. Silakan coba lagi.');
+            setError(t('An error occurred. Please try again.'));
             console.error('Login error:', err);
         } finally {
             setLoading(false);
@@ -76,13 +79,13 @@ const Login = () => {
                 return;
             }
 
-            setForgotSuccessMessage(result.message || 'Password baru berhasil dibuat.');
+            setForgotSuccessMessage(result.message || t('New password generated successfully.'));
             setGeneratedPassword(result.generatedPassword || '');
             setPassword(result.generatedPassword || '');
             setUsername(forgotUsername);
         } catch (err) {
             console.error('Forgot password error:', err);
-            setForgotError('Terjadi kesalahan saat reset password. Silakan coba lagi.');
+            setForgotError(t('An error occurred while resetting the password. Please try again.'));
         } finally {
             setForgotLoading(false);
         }
@@ -122,7 +125,8 @@ const Login = () => {
                     <h1 className="text-3xl font-bold text-white tracking-tight drop-shadow-sm">
                         Bakhtera<span className="text-orange-400">One</span>
                     </h1>
-                    <p className="text-sm text-blue-100/80 mt-1 font-medium">Freight Management Portal</p>
+                    <p className="text-sm text-blue-100/80 mt-1 font-medium">{t('Freight Management Portal')}</p>
+                    <LanguageSwitcher variant="dark" className="mt-3 justify-center" />
                 </div>
 
                 {/* Card */}
@@ -135,7 +139,7 @@ const Login = () => {
                         />
                     </div>
                     <div className="mb-6 text-center">
-                        <h2 className="text-xl font-semibold text-sky-500">LOGIN</h2>
+                        <h2 className="text-xl font-semibold text-sky-500">{t('LOGIN')}</h2>
                     </div>
 
                     {/* Error alert */}
@@ -165,7 +169,7 @@ const Login = () => {
                                     value={username}
                                     onChange={(e) => setUsername(e.target.value)}
                                     disabled={loading}
-                                    placeholder="Masukkan username"
+                                    placeholder={t('Enter username')}
                                     className="w-full pl-10 pr-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-800 placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400 transition-all disabled:opacity-50"
                                 />
                             </div>
@@ -189,7 +193,7 @@ const Login = () => {
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     disabled={loading}
-                                    placeholder="Masukkan password"
+                                    placeholder={t('Enter password')}
                                     className="w-full pl-10 pr-12 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-800 placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400 transition-all disabled:opacity-50"
                                 />
                                 <button
@@ -232,7 +236,7 @@ const Login = () => {
                             onClick={openForgotModal}
                             className="text-blue-500 font-semibold hover:text-blue-600 text-sm"
                         >
-                            Lupa password? Reset mandiri di sini
+                            {t('Forgot password? Self-reset here')}
                         </button>
                     </div>
 
@@ -250,7 +254,7 @@ const Login = () => {
             {showForgotModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
                     <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-                        <h3 className="text-lg font-semibold text-gray-900">Reset Password Mandiri</h3>
+                        <h3 className="text-lg font-semibold text-gray-900">{t('Self-Service Password Reset')}</h3>
                         <p className="mt-1 text-sm text-gray-500">
                             Verifikasi data Anda. Sistem akan membuat password baru tanpa email, lalu tampilkan di layar.
                         </p>
@@ -313,7 +317,7 @@ const Login = () => {
                                     disabled={forgotLoading}
                                     className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
                                 >
-                                    {forgotLoading ? 'Memproses...' : 'Reset Password'}
+                                    {forgotLoading ? t('Processing...') : t('Reset Password')}
                                 </button>
                             </div>
                         </form>
