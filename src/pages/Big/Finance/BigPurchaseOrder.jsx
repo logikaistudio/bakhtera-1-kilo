@@ -3,6 +3,7 @@ import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../context/AuthContext';
 import Button from '../../../components/Common/Button';
 import Modal from '../../../components/Common/Modal';
+import { useLanguage } from '../../../i18n/LanguageContext';
 import {
     ShoppingCart, Plus, CheckCircle, XCircle, Clock,
     AlertCircle, Search, Trash, Edit, Send, DollarSign
@@ -25,6 +26,7 @@ const STATUS_CONFIG = {
 
 // ─── PO Item Row ──────────────────────────────────────────────────────────────
 const POItemRow = ({ item, idx, coaList, canEdit, onChange, onRemove }) => {
+    const { t } = useLanguage();
     const h = (field, val) => {
         const u = { ...item, [field]: val };
         if (field === 'qty' || field === 'unit_price') {
@@ -38,7 +40,7 @@ const POItemRow = ({ item, idx, coaList, canEdit, onChange, onRemove }) => {
         <tr className="border-b border-dark-border/40 hover:bg-white/5">
             <td className="px-3 py-2">
                 <input value={item.description} onChange={e => h('description', e.target.value)}
-                    className="w-full bg-transparent text-silver-light text-sm border-b border-dark-border focus:outline-none" placeholder="Deskripsi item / jasa" />
+                    className="w-full bg-transparent text-silver-light text-sm border-b border-dark-border focus:outline-none" placeholder={t('Description')} />
             </td>
             <td className="px-3 py-2 w-20">
                 <input type="number" value={item.qty} min="0" step="any" onChange={e => h('qty', e.target.value)}
@@ -63,7 +65,7 @@ const POItemRow = ({ item, idx, coaList, canEdit, onChange, onRemove }) => {
                 <select value={item.coa_id || ''} disabled={!canEdit}
                     onChange={e => h('coa_id', e.target.value || null)}
                     className="w-full bg-dark-surface border border-dark-border rounded px-1 py-1 text-xs text-silver-light">
-                    <option value="">— Pilih COA —</option>
+                    <option value="">{t('Select COA')}</option>
                     {coaList.map(c => <option key={c.id} value={c.id}>{c.code} - {c.name}</option>)}
                 </select>
             </td>
@@ -80,6 +82,7 @@ const POItemRow = ({ item, idx, coaList, canEdit, onChange, onRemove }) => {
 
 // ─── PO Form Modal ────────────────────────────────────────────────────────────
 const POFormModal = ({ po, coaList, onClose, onSave }) => {
+    const { t } = useLanguage();
     const { canEdit } = useAuth();
     const isEdit = !!po;
 
@@ -115,8 +118,8 @@ const POFormModal = ({ po, coaList, onClose, onSave }) => {
     const grandTotal = subtotal + taxTotal - (parseFloat(form.discount_amount) || 0);
 
     const handleSave = async (status = 'draft') => {
-        if (!form.vendor_name.trim()) return alert('Nama vendor wajib diisi');
-        if (form.po_items.length === 0) return alert('Tambah minimal 1 item');
+        if (!form.vendor_name.trim()) return alert(t('Vendor name is required'));
+        if (form.po_items.length === 0) return alert(t('Add at least 1 item'));
         setSaving(true);
         try {
             const payload = {
@@ -144,7 +147,7 @@ const POFormModal = ({ po, coaList, onClose, onSave }) => {
     return (
         <Modal isOpen onClose={onClose} maxWidth="max-w-6xl">
             <div className="p-6 space-y-6">
-                <h2 className="text-2xl font-bold gradient-text">{isEdit ? 'Edit Purchase Order' : 'Buat Purchase Order Baru'}</h2>
+                <h2 className="text-2xl font-bold gradient-text">{isEdit ? t('Edit Purchase Order') : t('Create New Purchase Order')}</h2>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
@@ -217,7 +220,7 @@ const POFormModal = ({ po, coaList, onClose, onSave }) => {
                                         canEdit={canEdit('big_finance')} onChange={updateItem} onRemove={removeItem} />
                                 ))}
                                 {form.po_items.length === 0 && (
-                                    <tr><td colSpan={8} className="text-center py-6 text-silver-dark text-sm italic">Belum ada item</td></tr>
+                                    <tr><td colSpan={8} className="text-center py-6 text-silver-dark text-sm italic">{t('No items')}</td></tr>
                                 )}
                             </tbody>
                         </table>
@@ -232,7 +235,7 @@ const POFormModal = ({ po, coaList, onClose, onSave }) => {
                                     <span>Total VAT</span><span className="font-mono">{fmtIDR(taxTotal)}</span>
                                 </div>
                                 <div className="flex justify-between text-silver-dark items-center gap-2">
-                                    <span>Diskon</span>
+                                    <span>{t('Discount')}</span>
                                     <input type="number" value={form.discount_amount} min="0"
                                         onChange={e => setForm(p => ({ ...p, discount_amount: parseFloat(e.target.value) || 0 }))}
                                         className="w-32 bg-dark-surface border border-dark-border rounded px-2 py-1 text-right text-silver-light text-sm font-mono" />
@@ -247,18 +250,18 @@ const POFormModal = ({ po, coaList, onClose, onSave }) => {
                 </div>
 
                 <div>
-                    <label className="block text-xs text-silver-dark mb-1">Catatan</label>
+                    <label className="block text-xs text-silver-dark mb-1">{t('Notes')}</label>
                     <textarea rows={2} value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
                         className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-silver-light text-sm" />
                 </div>
 
                 <div className="flex gap-3 justify-end pt-4 border-t border-dark-border">
-                    <Button variant="secondary" onClick={onClose}>Batal</Button>
+                    <Button variant="secondary" onClick={onClose}>{t('Cancel')}</Button>
                     <Button variant="ghost" onClick={() => handleSave('draft')} disabled={saving}>
-                        {saving ? 'Menyimpan...' : 'Simpan Draft'}
+                        {saving ? t('Saving...') : t('Save Draft')}
                     </Button>
                     <Button onClick={() => handleSave('submitted')} disabled={saving} icon={Send}>
-                        {saving ? 'Mengirim...' : 'Submit untuk Approval'}
+                        {saving ? t('Processing...') : t('Submit for Approval')}
                     </Button>
                 </div>
             </div>
@@ -268,6 +271,7 @@ const POFormModal = ({ po, coaList, onClose, onSave }) => {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 const BigPurchaseOrder = () => {
+    const { t } = useLanguage();
     const { canCreate, canEdit, canDelete, canApprove } = useAuth();
     const [pos, setPOs] = useState([]);
     const [coaList, setCoaList] = useState([]);
@@ -293,20 +297,20 @@ const BigPurchaseOrder = () => {
     };
 
     const handleApprove = async (id) => {
-        if (!canApprove('big_finance')) return alert('Tidak ada akses untuk menyetujui PO.');
+        if (!canApprove('big_finance')) return alert(t('No access to approve PO.'));
         await supabase.from('big_pos').update({ status: 'approved', approval_status: 'approved' }).eq('id', id);
         fetchAll();
     };
 
     const handleReject = async (id) => {
-        if (!canApprove('big_finance')) return alert('Tidak ada akses.');
+        if (!canApprove('big_finance')) return alert(t('Access denied.'));
         await supabase.from('big_pos').update({ status: 'rejected', approval_status: 'rejected' }).eq('id', id);
         fetchAll();
     };
 
     const handleDelete = async (id) => {
-        if (!canDelete('big_finance')) return alert('Tidak ada akses.');
-        if (!confirm('Hapus PO ini?')) return;
+        if (!canDelete('big_finance')) return alert(t('Access denied.'));
+        if (!confirm(t('Delete this PO?'))) return;
         await supabase.from('big_pos').delete().eq('id', id);
         fetchAll();
     };
@@ -328,21 +332,21 @@ const BigPurchaseOrder = () => {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold gradient-text flex items-center gap-2">
-                        <ShoppingCart className="w-8 h-8" /> Purchase Order Big
+                        <ShoppingCart className="w-8 h-8" /> {t('Purchase Order Big')}
                     </h1>
-                    <p className="text-silver-dark mt-1">Kelola pembelian dan pengeluaran Big module</p>
+                    <p className="text-silver-dark mt-1">{t('Manage purchases and expenses for Big module')}</p>
                 </div>
                 {canCreate('big_finance') && (
-                    <Button icon={Plus} onClick={() => { setEditPO(null); setShowForm(true); }}>Buat PO</Button>
+                    <Button icon={Plus} onClick={() => { setEditPO(null); setShowForm(true); }}>{t('Create PO')}</Button>
                 )}
             </div>
 
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {[
-                    { label: 'Total PO', value: fmtIDR(totalPO), color: 'text-blue-400' },
-                    { label: 'Total Terbayar', value: fmtIDR(totalPaid), color: 'text-green-400' },
-                    { label: 'Outstanding (Approved)', value: fmtIDR(totalOutstanding), color: 'text-red-400' },
+                    { label: t('Total PO'), value: fmtIDR(totalPO), color: 'text-blue-400' },
+                    { label: t('Total Paid'), value: fmtIDR(totalPaid), color: 'text-green-400' },
+                    { label: t('Outstanding (Approved)'), value: fmtIDR(totalOutstanding), color: 'text-red-400' },
                 ].map(c => (
                     <div key={c.label} className="glass-card p-5 rounded-xl">
                         <p className="text-silver-dark text-sm">{c.label}</p>
@@ -356,12 +360,12 @@ const BigPurchaseOrder = () => {
                 <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-silver-dark" />
                     <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                        placeholder="Cari nomor PO atau vendor..."
+                        placeholder={t('Search PO number or vendor...')}
                         className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm" />
                 </div>
                 <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
                     className="bg-dark-surface border border-dark-border rounded-lg px-3 py-2 text-silver-light text-sm">
-                    <option value="all">Semua Status</option>
+                    <option value="all">{t('All Status')}</option>
                     {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                 </select>
             </div>
@@ -377,7 +381,7 @@ const BigPurchaseOrder = () => {
                                 <tr>
                                     <th className="px-4 py-3 text-left">No PO</th>
                                     <th className="px-4 py-3 text-left">Vendor</th>
-                                    <th className="px-4 py-3 text-left">Tgl PO</th>
+                                    <th className="px-4 py-3 text-left">{t('PO Date')}</th>
                                     <th className="px-4 py-3 text-left">Jatuh Tempo</th>
                                     <th className="px-4 py-3 text-right">Grand Total</th>
                                     <th className="px-4 py-3 text-right">Terbayar</th>
@@ -388,7 +392,7 @@ const BigPurchaseOrder = () => {
                             </thead>
                             <tbody className="divide-y divide-dark-border/40">
                                 {filtered.length === 0 ? (
-                                    <tr><td colSpan={9} className="text-center py-10 text-silver-dark italic">Tidak ada data PO</td></tr>
+                                    <tr><td colSpan={9} className="text-center py-10 text-silver-dark italic">{t('No data')}</td></tr>
                                 ) : filtered.map(po => {
                                     const st = STATUS_CONFIG[po.status] || STATUS_CONFIG.draft;
                                     return (
