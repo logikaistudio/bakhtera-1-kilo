@@ -3,6 +3,7 @@ import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../context/AuthContext';
 import Button from '../../../components/Common/Button';
 import Modal from '../../../components/Common/Modal';
+import { useLanguage } from '../../../i18n/LanguageContext';
 import {
     FileText, Plus, Send, CheckCircle, XCircle, DollarSign,
     AlertCircle, Clock, Search, Trash, Edit, Eye, X, Package, Download, RefreshCw
@@ -26,9 +27,10 @@ const EMPTY_ITEM = { description: '', qty: 1, unit: 'Job', unit_price: 0, amount
 const PAYMENT_TERMS = ['NET 7', 'NET 14', 'NET 30', 'NET 45', 'NET 60', 'COD'];
 
 const RecreateRateModal = ({ invoice, onClose, onSave }) => {
+    const { t } = useLanguage();
     const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
     const [newRate, setNewRate] = useState('1');
-    const [internalNote, setInternalNote] = useState('Penyesuaian kurs untuk invoice dengan pengajuan yang sama.');
+    const [internalNote, setInternalNote] = useState(t('Exchange-rate adjustment for invoice with the same submission.'));
     const [saving, setSaving] = useState(false);
 
     const handleSave = async () => {
@@ -41,12 +43,12 @@ const RecreateRateModal = ({ invoice, onClose, onSave }) => {
         <Modal isOpen onClose={onClose} maxWidth="max-w-2xl">
             <div className="p-6">
                 <div className="mb-5">
-                    <h2 className="text-xl font-bold gradient-text">Recreate Invoice Dengan Kurs Baru</h2>
+                    <h2 className="text-xl font-bold gradient-text">{t('Recreate Invoice with New Exchange Rate')}</h2>
                     <p className="text-silver-dark text-sm mt-1">Source: {invoice.invoice_number} - {invoice.customer_name}</p>
                 </div>
 
                 <div className="mb-4">
-                    <label className="block text-sm text-silver-dark mb-1">Invoice Date (baru)</label>
+                    <label className="block text-sm text-silver-dark mb-1">{t('Invoice Date (new)')}</label>
                     <input
                         type="date"
                         value={invoiceDate}
@@ -56,7 +58,7 @@ const RecreateRateModal = ({ invoice, onClose, onSave }) => {
                 </div>
 
                 <div className="mb-4">
-                    <label className="block text-sm text-silver-dark mb-1">Kurs Baru</label>
+                    <label className="block text-sm text-silver-dark mb-1">{t('New Exchange Rate')}</label>
                     <input
                         type="number"
                         min="0.000001"
@@ -74,7 +76,7 @@ const RecreateRateModal = ({ invoice, onClose, onSave }) => {
                         value={internalNote}
                         onChange={(e) => setInternalNote(e.target.value)}
                         className="w-full bg-dark-surface border border-dark-border rounded-lg px-3 py-2 text-silver-light"
-                        placeholder="Contoh: Kurs revisi sesuai tanggal invoice customer"
+                        placeholder={t('Example: revised exchange rate based on customer invoice date')}
                     />
                 </div>
 
@@ -91,7 +93,7 @@ const RecreateRateModal = ({ invoice, onClose, onSave }) => {
                         disabled={saving}
                         className="px-6 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg smooth-transition font-semibold disabled:opacity-50"
                     >
-                        {saving ? 'Creating...' : 'Create Recreate Kurs Draft'}
+                        {saving ? t('Creating...') : t('Create Recreate Rate Draft')}
                     </button>
                 </div>
             </div>
@@ -100,8 +102,9 @@ const RecreateRateModal = ({ invoice, onClose, onSave }) => {
 };
 
 const ReinvoiceModal = ({ invoice, onClose, onSave }) => {
+    const { t } = useLanguage();
     const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
-    const [internalNote, setInternalNote] = useState('Perubahan terhadap invoice lama.');
+    const [internalNote, setInternalNote] = useState(t('Changes to previous invoice.'));
     const [saving, setSaving] = useState(false);
 
     const handleSave = async () => {
@@ -119,7 +122,7 @@ const ReinvoiceModal = ({ invoice, onClose, onSave }) => {
                 </div>
 
                 <div className="mb-4">
-                    <label className="block text-sm text-silver-dark mb-1">Invoice Date (baru)</label>
+                    <label className="block text-sm text-silver-dark mb-1">{t('Invoice Date (new)')}</label>
                     <input
                         type="date"
                         value={invoiceDate}
@@ -135,7 +138,7 @@ const ReinvoiceModal = ({ invoice, onClose, onSave }) => {
                         value={internalNote}
                         onChange={(e) => setInternalNote(e.target.value)}
                         className="w-full bg-dark-surface border border-dark-border rounded-lg px-3 py-2 text-silver-light"
-                        placeholder="Contoh: Revisi nominal karena koreksi item handling"
+                        placeholder={t('Example: nominal revision due to item handling correction')}
                     />
                 </div>
 
@@ -223,6 +226,7 @@ const ItemRow = ({ item, idx, coaList, canEdit, onChange, onRemove }) => {
 
 // ─── Create / Edit Modal ─────────────────────────────────────────────────────
 const InvoiceFormModal = ({ invoice, seedData, coaList, onClose, onSave }) => {
+    const { t } = useLanguage();
     const { canEdit } = useAuth();
     const isEdit = !!invoice?.id;
     const sourceData = invoice || seedData || {};
@@ -267,8 +271,8 @@ const InvoiceFormModal = ({ invoice, seedData, coaList, onClose, onSave }) => {
     const grandTotal = subtotal + taxTotal - (parseFloat(form.discount_amount) || 0);
 
     const handleSave = async (status = 'draft') => {
-        if (!form.customer_name.trim()) return alert('Nama customer wajib diisi');
-        if (form.invoice_items.length === 0) return alert('Tambah minimal 1 item');
+        if (!form.customer_name.trim()) return alert(t('Customer name is required'));
+        if (form.invoice_items.length === 0) return alert(t('Add at least 1 item'));
         setSaving(true);
         try {
             const payload = {
@@ -299,39 +303,39 @@ const InvoiceFormModal = ({ invoice, seedData, coaList, onClose, onSave }) => {
     return (
         <Modal isOpen onClose={onClose} maxWidth="max-w-6xl">
             <div className="p-6 space-y-6">
-                <h2 className="text-2xl font-bold gradient-text">{isEdit ? 'Edit Invoice' : 'Buat Invoice Baru'}</h2>
+                <h2 className="text-2xl font-bold gradient-text">{isEdit ? t('Edit Invoice') : t('Create New Invoice')}</h2>
 
                 {/* Header fields */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
-                        <label className="block text-xs text-silver-dark mb-1">Nomor Invoice</label>
+                        <label className="block text-xs text-silver-dark mb-1">{t('Invoice Number')}</label>
                         <input value={form.invoice_number} onChange={e => setForm(p => ({ ...p, invoice_number: e.target.value }))}
                             className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-silver-light text-sm" />
                     </div>
                     <div>
-                        <label className="block text-xs text-silver-dark mb-1">Tanggal Invoice *</label>
+                        <label className="block text-xs text-silver-dark mb-1">{t('Invoice Date')} *</label>
                         <input type="date" value={form.invoice_date} onChange={e => setForm(p => ({ ...p, invoice_date: e.target.value }))}
                             className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-silver-light text-sm" />
                     </div>
                     <div>
-                        <label className="block text-xs text-silver-dark mb-1">Term Pembayaran</label>
+                        <label className="block text-xs text-silver-dark mb-1">{t('Payment Terms')}</label>
                         <select value={form.payment_terms} onChange={e => handleTermsChange(e.target.value)}
                             className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-silver-light text-sm">
                             {PAYMENT_TERMS.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                     </div>
                     <div>
-                        <label className="block text-xs text-silver-dark mb-1">Jatuh Tempo</label>
+                        <label className="block text-xs text-silver-dark mb-1">{t('Due Date')}</label>
                         <input type="date" value={form.due_date} onChange={e => setForm(p => ({ ...p, due_date: e.target.value }))}
                             className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-silver-light text-sm" />
                     </div>
                     <div className="col-span-2">
-                        <label className="block text-xs text-silver-dark mb-1">Nama Customer *</label>
+                        <label className="block text-xs text-silver-dark mb-1">{t('Customer')} *</label>
                         <input value={form.customer_name} onChange={e => setForm(p => ({ ...p, customer_name: e.target.value }))}
-                            className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-silver-light text-sm" placeholder="Nama customer / perusahaan" />
+                            className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-silver-light text-sm" placeholder={t('Customer / company name')} />
                     </div>
                     <div>
-                        <label className="block text-xs text-silver-dark mb-1">Mata Uang</label>
+                        <label className="block text-xs text-silver-dark mb-1">{t('Currency')}</label>
                         <select value={form.currency} onChange={e => setForm(p => ({ ...p, currency: e.target.value }))}
                             className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-silver-light text-sm">
                             <option value="IDR">IDR</option>
@@ -339,7 +343,7 @@ const InvoiceFormModal = ({ invoice, seedData, coaList, onClose, onSave }) => {
                         </select>
                     </div>
                     <div className="col-span-2">
-                        <label className="block text-xs text-silver-dark mb-1">Alamat Customer</label>
+                        <label className="block text-xs text-silver-dark mb-1">{t('Address')}</label>
                         <input value={form.customer_address} onChange={e => setForm(p => ({ ...p, customer_address: e.target.value }))}
                             className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-silver-light text-sm" />
                     </div>
@@ -348,9 +352,9 @@ const InvoiceFormModal = ({ invoice, seedData, coaList, onClose, onSave }) => {
                 {/* Items */}
                 <div className="glass-card rounded-xl overflow-hidden">
                     <div className="flex items-center justify-between px-4 py-3 bg-[#0070BB]">
-                        <span className="text-white font-semibold text-sm">Item Invoice</span>
+                        <span className="text-white font-semibold text-sm">{t('Invoice Items')}</span>
                         <button onClick={addItem} className="flex items-center gap-1 text-white text-xs hover:text-yellow-300">
-                            <Plus className="w-4 h-4" /> Tambah Item
+                            <Plus className="w-4 h-4" /> {t('Add Item')}
                         </button>
                     </div>
                     <div className="overflow-x-auto">
@@ -427,6 +431,7 @@ const InvoiceFormModal = ({ invoice, seedData, coaList, onClose, onSave }) => {
 
 // ─── Main Page ───────────────────────────────────────────────────────────────
 const BigInvoiceManagement = () => {
+    const { t } = useLanguage();
     const { canCreate, canEdit, canDelete } = useAuth();
     const [invoices, setInvoices] = useState([]);
     const [quotations, setQuotations] = useState([]);
@@ -467,7 +472,7 @@ const BigInvoiceManagement = () => {
 
     const handleCreateFromReadyQuotation = (quotation) => {
         if (!canCreate('big_finance') && !canEdit('big_finance')) {
-            alert('Anda tidak memiliki akses untuk membuat invoice.');
+            alert(t('You do not have access to create invoice.'));
             return;
         }
 
@@ -507,23 +512,23 @@ const BigInvoiceManagement = () => {
     };
 
     const handleDelete = async (id) => {
-        if (!canDelete('big_finance')) return alert('Tidak ada akses untuk menghapus.');
-        if (!confirm('Hapus invoice ini?')) return;
+        if (!canDelete('big_finance')) return alert(t('No access to delete.'));
+        if (!confirm(t('Delete this invoice?'))) return;
         await supabase.from('big_invoices').delete().eq('id', id);
         fetchAll();
     };
 
     const handleCancel = async (id) => {
-        if (!canEdit('big_finance')) return alert('Tidak ada akses.');
+        if (!canEdit('big_finance')) return alert(t('Access denied.'));
         await supabase.from('big_invoices').update({ status: 'cancelled' }).eq('id', id);
         fetchAll();
     };
 
     const handleCreateRecreateRate = async (invoice, newInvoiceDate, newExchangeRate, recreateNote) => {
-        if (!canEdit('big_finance')) return alert('Tidak ada akses.');
+        if (!canEdit('big_finance')) return alert(t('Access denied.'));
         const rateParsed = Number(newExchangeRate);
-        if (!newInvoiceDate) return alert('Tanggal invoice baru wajib diisi.');
-        if (!Number.isFinite(rateParsed) || rateParsed <= 0) return alert('Kurs baru wajib angka lebih besar dari 0.');
+        if (!newInvoiceDate) return alert(t('New invoice date is required.'));
+        if (!Number.isFinite(rateParsed) || rateParsed <= 0) return alert(t('New exchange rate must be a number greater than 0.'));
 
         try {
             const timestamp = new Date().toISOString();
@@ -726,13 +731,13 @@ const BigInvoiceManagement = () => {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold gradient-text flex items-center gap-2">
-                        <FileText className="w-8 h-8" /> Invoice Big
+                        <FileText className="w-8 h-8" /> {t('Invoice Big')}
                     </h1>
-                    <p className="text-silver-dark mt-1">Kelola invoice tagihan Big module</p>
+                    <p className="text-silver-dark mt-1">{t('Manage billing invoices for Big module')}</p>
                 </div>
                 {canCreate('big_finance') && (
                     <Button icon={Plus} onClick={() => { setEditInvoice(null); setSeedInvoiceData(null); setShowForm(true); }}>
-                        Buat Invoice
+                        {t('Create Invoice')}
                     </Button>
                 )}
             </div>
@@ -787,7 +792,7 @@ const BigInvoiceManagement = () => {
                         <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-silver-dark" />
                             <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                                placeholder="Cari nomor invoice atau customer..."
+                                placeholder={t('Search invoice number or customer...')}
                                 className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm" />
                         </div>
                         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
@@ -877,7 +882,7 @@ const BigInvoiceManagement = () => {
                                 <tr>
                                     <th className="px-4 py-3 text-left">No Invoice</th>
                                     <th className="px-4 py-3 text-left">Customer</th>
-                                    <th className="px-4 py-3 text-left">Tgl Invoice</th>
+                                    <th className="px-4 py-3 text-left">{t('Invoice Date')}</th>
                                     <th className="px-4 py-3 text-left">Jatuh Tempo</th>
                                     <th className="px-4 py-3 text-right">Grand Total</th>
                                     <th className="px-4 py-3 text-right">Terbayar</th>
@@ -888,7 +893,7 @@ const BigInvoiceManagement = () => {
                             </thead>
                             <tbody className="divide-y divide-dark-border/40">
                                 {filtered.length === 0 ? (
-                                    <tr><td colSpan={9} className="text-center py-10 text-silver-dark italic">Tidak ada data invoice</td></tr>
+                                    <tr><td colSpan={9} className="text-center py-10 text-silver-dark italic">{t('No data')}</td></tr>
                                 ) : filtered.map(inv => {
                                     const st = STATUS_CONFIG[inv.status] || STATUS_CONFIG.draft;
                                     const isOverdue = inv.due_date && new Date(inv.due_date) < new Date() && inv.status === 'sent';
