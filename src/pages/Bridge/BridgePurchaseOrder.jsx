@@ -11,6 +11,7 @@ import {
     XCircle, Clock, Package, DollarSign, TrendingUp, AlertCircle, X, Edit, Save, History, AlertTriangle, Trash2
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const isMissingTableError = (error) => {
     const message = String(error?.message || error?.details || error || '').toLowerCase();
@@ -51,6 +52,7 @@ const recordApprovalHistory = async (po, action, reason = null, approverName = '
 };
 
 const BridgePurchaseOrder = () => {
+    const { t, language } = useLanguage();
     const { user, canCreate, canEdit, canDelete, canView, canApprove } = useAuth();
     const { companySettings: blinkCompanySettings, bridgeSettings, bridgeBusinessPartners, deleteBridgePurchaseOrderCascade } = useData();
     const companySettings = bridgeSettings || blinkCompanySettings;
@@ -98,13 +100,23 @@ const BridgePurchaseOrder = () => {
     const canCleanseBridgePO = canDelete('bridge_finance');
     const [isCleansing, setIsCleansing] = useState(false);
     const [cleanseProgress, setCleanseProgress] = useState('');
+    const dateLocale = language === 'id' ? 'id-ID' : 'en-US';
+    const localizePrintContent = (html) => {
+        const labels = [
+            'PURCHASE ORDER', 'Vendor', 'PO Date', 'Delivery Date', 'Payment Terms',
+            'Currency', 'Job / SO No.', 'Order Items', 'Description', 'Qty',
+            'Unit Price', 'Amount', 'Approved By', 'Approved Date', 'Subtotal',
+            'VAT', 'TOTAL', 'Notes:', 'Cetak Dokumen', 'Tutup'
+        ];
+        return labels.reduce((result, label) => result.split(label).join(t(label)), html);
+    };
 
     const statusConfig = {
-        draft: { label: 'Draft', color: 'bg-gray-600 text-gray-100', icon: FileText },
-        submitted: { label: 'Pending Approval', color: 'bg-yellow-600 text-yellow-100', icon: Clock },
-        approved: { label: 'Approved', color: 'bg-green-600 text-green-100', icon: CheckCircle },
-        received: { label: 'Received', color: 'bg-purple-600 text-purple-100', icon: Package },
-        cancelled: { label: 'Cancelled', color: 'bg-red-600 text-red-100', icon: XCircle }
+        draft: { label: t('Draft'), color: 'bg-gray-600 text-gray-100', icon: FileText },
+        submitted: { label: t('Pending Approval'), color: 'bg-yellow-600 text-yellow-100', icon: Clock },
+        approved: { label: t('Approved'), color: 'bg-green-600 text-green-100', icon: CheckCircle },
+        received: { label: t('Received'), color: 'bg-purple-600 text-purple-100', icon: Package },
+        cancelled: { label: t('Cancelled'), color: 'bg-red-600 text-red-100', icon: XCircle }
     };
 
     useEffect(() => {
@@ -594,7 +606,7 @@ const BridgePurchaseOrder = () => {
             `;
         }).join('');
 
-        const approvalDate = po.approved_at ? new Date(po.approved_at).toLocaleDateString('id-ID') : '-';
+        const approvalDate = po.approved_at ? new Date(po.approved_at).toLocaleDateString(dateLocale) : '-';
         const approvedBy = po.approved_by || '-';
 
         const printContent = `
@@ -898,12 +910,12 @@ const BridgePurchaseOrder = () => {
                         <tr>
                             <td class="label">PO Date</td>
                             <td class="colon">:</td>
-                            <td class="value">${po.po_date ? new Date(po.po_date).toLocaleDateString('id-ID') : '-'}</td>
+                            <td class="value">${po.po_date ? new Date(po.po_date).toLocaleDateString(dateLocale) : '-'}</td>
                         </tr>
                         <tr>
                             <td class="label">Delivery Date</td>
                             <td class="colon">:</td>
-                            <td class="value">${po.delivery_date ? new Date(po.delivery_date).toLocaleDateString('id-ID') : '-'}</td>
+                            <td class="value">${po.delivery_date ? new Date(po.delivery_date).toLocaleDateString(dateLocale) : '-'}</td>
                         </tr>
                         <tr>
                             <td class="label">Payment Terms</td>
@@ -1000,14 +1012,14 @@ const BridgePurchaseOrder = () => {
             `;
 
         // ✅ Blob URL approach — fixes blank print (document.write doesn't render for printing)
-        const blob = new Blob([printContent], { type: 'text/html; charset=UTF-8' });
+        const blob = new Blob([localizePrintContent(printContent)], { type: 'text/html; charset=UTF-8' });
         const blobUrl = URL.createObjectURL(blob);
 
         if (autoPrint) {
             // Print PO: open and auto-trigger print dialog when loaded
             const printWindow = window.open(blobUrl, '_blank');
             if (!printWindow) {
-                alert('Pop-up diblokir! Izinkan pop-up untuk situs ini.');
+                alert(t('Pop-up blocked! Please allow pop-ups for this site.'));
                 URL.revokeObjectURL(blobUrl);
                 return;
             }
@@ -1023,7 +1035,7 @@ const BridgePurchaseOrder = () => {
             // Print Preview: just open the document to view
             const previewWindow = window.open(blobUrl, '_blank');
             if (!previewWindow) {
-                alert('Pop-up diblokir! Izinkan pop-up untuk situs ini.');
+                alert(t('Pop-up blocked! Please allow pop-ups for this site.'));
                 URL.revokeObjectURL(blobUrl);
                 return;
             }

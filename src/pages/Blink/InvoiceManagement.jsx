@@ -17,10 +17,12 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import InvoiceProfitSummary from '../../components/Blink/InvoiceProfitSummary';
 import { getActiveDivision } from '../../utils/divisionContext';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 
 const InvoiceManagement = () => {
     const navigate = useNavigate();
+    const { t, language } = useLanguage();
     const { canCreate, canEdit, canDelete, canApprove, isSuperAdmin, user } = useAuth();
     const { companySettings, bankAccounts, businessPartners, deleteInvoiceCascade } = useData();
     const activeDivision = getActiveDivision();
@@ -191,17 +193,29 @@ const InvoiceManagement = () => {
         shipment.hawb_number,
         shipment.house_bl
     );
+    const dateLocale = language === 'id' ? 'id-ID' : 'en-US';
+    const stripCurrencyPrefix = (value = '') => String(value).replace(/^[A-Z]{3}\s/, '');
+    const localizePrintContent = (html) => {
+        const labels = [
+            'VAT INVOICE', 'INVOICE DATE', 'BILL TO', 'SHIPMENT DETAILS',
+            'VESSEL / VOYAGE', 'ORIGIN (POL)', 'DESTINATION (POD)', 'IMPORT BROKER',
+            'CHARGES DETAILS', 'DESCRIPTION', 'QTY', 'RATE', 'TAX', 'AMOUNT',
+            'PAYMENT INSTRUCTIONS', 'BANK ACCOUNT', 'ACCOUNT NAME', 'ACCOUNT NUMBER',
+            'PAYMENT TERMS', 'NOTES', 'SUBTOTAL', 'TOTAL', 'PRINT INVOICE', 'No items'
+        ];
+        return labels.reduce((result, label) => result.split(label).join(t(label)), html);
+    };
 
     const statusConfig = {
-        draft: { label: 'Draft', color: 'bg-gray-500/20 text-gray-400', icon: FileText },
-        sent: { label: 'Sent', color: 'bg-blue-500/20 text-blue-400', icon: Send },
-        partially_paid: { label: 'Partial Payment', color: 'bg-yellow-500/20 text-yellow-400', icon: DollarSign },
-        paid: { label: 'Paid', color: 'bg-green-500/20 text-green-400', icon: CheckCircle },
-        overdue: { label: 'Overdue', color: 'bg-red-500/20 text-red-400', icon: AlertCircle },
-        rejected: { label: 'Rejected', color: 'bg-red-500/20 text-red-400', icon: XCircle },
-        cancelled: { label: 'Cancelled', color: 'bg-gray-500/20 text-gray-400', icon: XCircle },
-        unpaid: { label: 'Unpaid', color: 'bg-orange-500/20 text-orange-400', icon: Clock },
-        manager_approval: { label: 'Manager Approval', color: 'bg-yellow-500/20 text-yellow-400', icon: Clock }
+        draft: { label: t('Draft'), color: 'bg-gray-500/20 text-gray-400', icon: FileText },
+        sent: { label: t('Sent'), color: 'bg-blue-500/20 text-blue-400', icon: Send },
+        partially_paid: { label: t('Partial Payment'), color: 'bg-yellow-500/20 text-yellow-400', icon: DollarSign },
+        paid: { label: t('Paid'), color: 'bg-green-500/20 text-green-400', icon: CheckCircle },
+        overdue: { label: t('Overdue'), color: 'bg-red-500/20 text-red-400', icon: AlertCircle },
+        rejected: { label: t('Rejected'), color: 'bg-red-500/20 text-red-400', icon: XCircle },
+        cancelled: { label: t('Cancelled'), color: 'bg-gray-500/20 text-gray-400', icon: XCircle },
+        unpaid: { label: t('Unpaid'), color: 'bg-orange-500/20 text-orange-400', icon: Clock },
+        manager_approval: { label: t('Manager Approval'), color: 'bg-yellow-500/20 text-yellow-400', icon: Clock }
     };
 
     useEffect(() => {
@@ -1408,13 +1422,13 @@ const InvoiceManagement = () => {
             const printWindow = window.open('', '_blank');
 
             if (!printWindow) {
-                alert('Pop-up blocked! Please allow pop-ups for this site.');
+                alert(t('Pop-up blocked! Please allow pop-ups for this site.'));
                 return;
             }
 
             // Helper for empty fields default
             const safeStr = (str) => str || '-';
-            const safeDate = (date) => date ? new Date(date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
+            const safeDate = (date) => date ? new Date(date).toLocaleDateString(dateLocale, { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
             
             // Generate items rows
             const stripCoaPrefix = (str) => {
@@ -1450,12 +1464,12 @@ const InvoiceManagement = () => {
                         <span style="color: #444;">${finalDesc}</span>
                     </td>
                     <td style="text-align: center; vertical-align: top; border-bottom: 1px solid #ccc; border-right: 1px solid #ccc; padding: 4px 8px;">${item.qty || 1} ${item.unit || ''}</td>
-                    <td style="text-align: right; vertical-align: top; border-bottom: 1px solid #ccc; border-right: 1px solid #ccc; padding: 4px 8px;">${formatCurrency(item.rate || item.amount || 0, invoice.currency).replace('Rp ', '').replace('$', '')}</td>
-                    <td style="text-align: right; vertical-align: top; border-bottom: 1px solid #ccc; border-right: 1px solid #ccc; padding: 4px 8px;">${formatCurrency(typeof item.tax_amount !== 'undefined' ? Number(item.tax_amount) : ((item.amount || 0) * (invoice.tax_rate || 0) / 100), invoice.currency).replace('Rp ', '').replace('$', '')}</td>
-                    <td style="text-align: right; vertical-align: top; border-bottom: 1px solid #ccc; padding: 4px 8px; padding-right: 10px;">${formatCurrency(item.amount || 0, invoice.currency).replace('Rp ', '').replace('$', '')}</td>
+                    <td style="text-align: right; vertical-align: top; border-bottom: 1px solid #ccc; border-right: 1px solid #ccc; padding: 4px 8px;">${stripCurrencyPrefix(formatCurrency(item.rate || item.amount || 0, invoice.currency))}</td>
+                    <td style="text-align: right; vertical-align: top; border-bottom: 1px solid #ccc; border-right: 1px solid #ccc; padding: 4px 8px;">${stripCurrencyPrefix(formatCurrency(typeof item.tax_amount !== 'undefined' ? Number(item.tax_amount) : ((item.amount || 0) * (invoice.tax_rate || 0) / 100), invoice.currency))}</td>
+                    <td style="text-align: right; vertical-align: top; border-bottom: 1px solid #ccc; padding: 4px 8px; padding-right: 10px;">${stripCurrencyPrefix(formatCurrency(item.amount || 0, invoice.currency))}</td>
                 </tr>
                 `;
-            }).join('') || '<tr><td colspan="6" style="text-align: center; padding: 10px;">No items</td></tr>';
+            }).join('') || `<tr><td colspan="6" style="text-align: center; padding: 10px;">${t('No items')}</td></tr>`;
 
             const printContent = `
                 <!DOCTYPE html>
@@ -1770,11 +1784,11 @@ const InvoiceManagement = () => {
                 </html>
             `;
 
-            printWindow.document.write(printContent);
+            printWindow.document.write(localizePrintContent(printContent));
             printWindow.document.close();
         } catch (error) {
             console.error('Print error:', error);
-            alert('Error generating print preview');
+            alert(t('Error generating print preview'));
         }
     };
 
@@ -4625,10 +4639,11 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
 
 // Print Preview Modal Component - Updated to match handlePrintInvoice layout
 const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companySettings, bankAccounts, businessPartners }) => {
+    const { t, language } = useLanguage();
 
     // Helper for empty fields default
     const safeStr = (str) => str || '-';
-    const safeDate = (date) => date ? new Date(date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
+    const safeDate = (date) => date ? new Date(date).toLocaleDateString(language === 'id' ? 'id-ID' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
 
     const [splitItems, setSplitItems] = useState(() =>
         invoice.invoice_items ? invoice.invoice_items.map(item => ({ ...item, isSelected: true, splitQty: item.qty || 1, splitRate: item.rate || 0 })) : []
@@ -4680,7 +4695,7 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
         // The user can print the preview directly!
         const printWindow = window.open('', '_blank');
         if (!printWindow) {
-            alert('Pop-up blocked! Please allow pop-ups for this site.');
+            alert(t('Pop-up blocked! Please allow pop-ups for this site.'));
             return;
         }
         printWindow.document.write('<html><head><title>Print Invoice</title>');
@@ -4996,7 +5011,7 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                                         );
                                     })
                                 ) : (
-                                    <tr><td colSpan="4" style={{ textAlign: 'center', padding: '10px', fontSize: '11px' }}>No items</td></tr>
+                                    <tr><td colSpan="4" style={{ textAlign: 'center', padding: '10px', fontSize: '11px' }}>{t('No items')}</td></tr>
                                 )}
                             </tbody>
                         </table>
