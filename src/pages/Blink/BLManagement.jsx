@@ -22,8 +22,10 @@ import { printBLCertificate } from '../../utils/printUtils';
 import { useData } from '../../context/DataContext';
 import { validateSOType, formatSOType, getSOTypeDescription } from '../../utils/orderTypeDetection';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const BLManagement = () => {
+    const { t } = useLanguage();
     const { canEdit, canDelete, canApprove } = useAuth();
     const [bls, setBls] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -398,7 +400,7 @@ const BLManagement = () => {
                 : `Change status to "${statusLabel}"?`;
 
         if (!canApprove('blink_bl')) {
-            alert('Anda tidak memiliki hak akses untuk mengubah status BL/AWB.');
+            alert(t("Anda tidak memiliki hak akses untuk mengubah status BL/AWB."));
             return;
         }
         if (!confirm(confirmMsg)) return;
@@ -443,19 +445,19 @@ const BLManagement = () => {
 
     const handleDeleteBL = async (blId) => {
         if (!canDelete('blink_bl')) {
-            alert('Anda tidak memiliki hak akses untuk menghapus BL/AWB.');
+            alert(t("Anda tidak memiliki hak akses untuk menghapus BL/AWB."));
             return;
         }
-        if (!confirm('Are you sure you want to delete this BL? Data will be cleared from the shipment.')) return;
+        if (!confirm(t("Are you sure you want to delete this BL? Data will be cleared from the shipment."))) return;
         try {
             const { error } = await supabase.from('blink_shipments')
                 .update({ bl_number: null, bl_type: null, bl_status: null }).eq('id', blId);
             if (error) throw error;
-            alert('✅ BL deleted successfully');
+            alert(t("✅ BL deleted successfully"));
             fetchBLs();
         } catch (error) {
             console.error('Error deleting BL:', error);
-            alert('❌ Failed to delete BL');
+            alert(t("❌ Failed to delete BL"));
         }
     };
 
@@ -465,7 +467,7 @@ const BLManagement = () => {
             alert(`Certificate exported: ${filename}`);
         } catch (error) {
             console.error('Export error:', error);
-            alert('Failed to export certificate');
+            alert(t("Failed to export certificate"));
         }
     };
 
@@ -475,7 +477,7 @@ const BLManagement = () => {
             alert(`Report exported: ${filename}`);
         } catch (error) {
             console.error('Export error:', error);
-            alert('Failed to export report');
+            alert(t("Failed to export report"));
         }
     };
 
@@ -484,7 +486,7 @@ const BLManagement = () => {
             printBLCertificate({ ...bl, logo_url: companySettings?.logo_url || '', watermark: printWatermark || null, releaseType: printReleaseType || null });
         } catch (error) {
             console.error('Print error:', error);
-            alert('Failed to print BL');
+            alert(t("Failed to print BL"));
         }
     };
 
@@ -533,7 +535,7 @@ const BLManagement = () => {
             printBLCertificate({ ...printData, logo_url: companySettings?.logo_url || '', watermark: printWatermark || null, releaseType: printReleaseType || null });
         } catch (error) {
             console.error('Print Preview error:', error);
-            alert('Failed to print preview');
+            alert(t("Failed to print preview"));
         }
     };
 
@@ -550,9 +552,9 @@ const BLManagement = () => {
             <div className="space-y-6">
                 <div className="glass-card p-8 rounded-lg text-center">
                     <div className="text-red-400 text-2xl mb-4">⚠️</div>
-                    <h3 className="text-xl font-semibold text-silver-light mb-2">Error Loading BL Data</h3>
+                    <h3 className="text-xl font-semibold text-silver-light mb-2">{t("Error Loading BL Data")}</h3>
                     <p className="text-silver-dark mb-4">{error}</p>
-                    <Button onClick={fetchBLs}>Retry</Button>
+                    <Button onClick={fetchBLs}>{t("Retry")}</Button>
                 </div>
             </div>
         );
@@ -560,7 +562,7 @@ const BLManagement = () => {
 
     const handleUpdateBL = async () => {
         if (!canEdit('blink_bl')) {
-            alert('Anda tidak memiliki hak akses untuk memanipulasi (Edit) BL/AWB.');
+            alert(t("Anda tidak memiliki hak akses untuk memanipulasi (Edit) BL/AWB."));
             return;
         }
         try {
@@ -653,7 +655,7 @@ const BLManagement = () => {
 
             if (error) throw error;
 
-            alert('✅ Document updated successfully');
+            alert(t("✅ Document updated successfully"));
             setIsEditing(false);
             fetchBLs();
             setShowEditModal(false);
@@ -891,8 +893,8 @@ const BLManagement = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text">Document BL/AWB</h1>
-                    <p className="text-silver-dark mt-1">Bill of Lading & Air Waybill Management</p>
+                    <h1 className="text-3xl font-bold gradient-text">{t("Document BL/AWB")}</h1>
+                    <p className="text-silver-dark mt-1">{t("Bill of Lading & Air Waybill Management")}</p>
                 </div>
                 <div className="flex gap-3">
                     <Button
@@ -901,7 +903,7 @@ const BLManagement = () => {
                         onClick={handleExportAllReport}
                         disabled={bls.length === 0}
                     >
-                        Export All
+                        {t("Export All")}
                     </Button>
                 </div>
             </div>
@@ -909,17 +911,17 @@ const BLManagement = () => {
             {/* Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="glass-card p-4 rounded-lg">
-                    <p className="text-xs text-silver-dark">Total BLs</p>
+                    <p className="text-xs text-silver-dark">{t("Total BLs")}</p>
                     <p className="text-2xl font-bold text-silver-light mt-1">{bls.length}</p>
                 </div>
                 <div className="glass-card p-4 rounded-lg">
-                    <p className="text-xs text-silver-dark">Master BL</p>
+                    <p className="text-xs text-silver-dark">{t("Master BL")}</p>
                     <p className="text-2xl font-bold text-blue-400 mt-1">
                         {bls.filter(b => b.blType === 'MBL').length}
                     </p>
                 </div>
                 <div className="glass-card p-4 rounded-lg">
-                    <p className="text-xs text-silver-dark">House BL</p>
+                    <p className="text-xs text-silver-dark">{t("House BL")}</p>
                     <p className="text-2xl font-bold text-orange-400 mt-1">
                         {bls.filter(b => b.blType === 'HBL').length}
                     </p>
@@ -931,7 +933,7 @@ const BLManagement = () => {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                 <input
                     type="text"
-                    placeholder="Search BL Number, Job Number, SO Number, or Consignee..."
+                    placeholder={t("Search BL Number, Job Number, SO Number, or Consignee...")}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded-lg text-gray-900 dark:text-silver-light"
@@ -944,13 +946,13 @@ const BLManagement = () => {
                     <table className="w-full whitespace-nowrap">
                         <thead className="bg-accent-orange">
                             <tr>
-                                <th className="px-4 py-2 text-left text-[10px] font-bold text-white uppercase tracking-wider">No. AWB/BL</th>
-                                <th className="px-4 py-2 text-left text-[10px] font-bold text-white uppercase tracking-wider">Date</th>
+                                <th className="px-4 py-2 text-left text-[10px] font-bold text-white uppercase tracking-wider">{t("No. AWB/BL")}</th>
+                                <th className="px-4 py-2 text-left text-[10px] font-bold text-white uppercase tracking-wider">{t("Date")}</th>
                                 <th className="px-4 py-2 text-left text-[10px] font-bold text-white uppercase tracking-wider">No. SO</th>
-                                <th className="px-4 py-2 text-left text-[10px] font-bold text-white uppercase tracking-wider">Consignee</th>
-                                <th className="px-4 py-2 text-left text-[10px] font-bold text-white uppercase tracking-wider">Route</th>
-                                <th className="px-4 py-2 text-center text-[10px] font-bold text-white uppercase tracking-wider">Type</th>
-                                <th className="px-4 py-2 text-center text-[10px] font-bold text-white uppercase tracking-wider">Status</th>
+                                <th className="px-4 py-2 text-left text-[10px] font-bold text-white uppercase tracking-wider">{t("Consignee")}</th>
+                                <th className="px-4 py-2 text-left text-[10px] font-bold text-white uppercase tracking-wider">{t("Route")}</th>
+                                <th className="px-4 py-2 text-center text-[10px] font-bold text-white uppercase tracking-wider">{t("Type")}</th>
+                                <th className="px-4 py-2 text-center text-[10px] font-bold text-white uppercase tracking-wider">{t("Status")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
@@ -1040,11 +1042,11 @@ const BLManagement = () => {
                             <div>
                                 <h2 className="text-xl font-bold text-gray-900 dark:text-silver-light flex items-center gap-2">
                                     <Ship className="w-5 h-5 text-accent-orange" />
-                                    Document Editor (BL/AWB)
+                                    {t("Document Editor (BL/AWB)")}
                                 </h2>
                                 <div className="flex items-center gap-3 mt-1">
                                     <p className="text-xs text-gray-500 dark:text-silver-dark font-mono">
-                                        JOB: {selectedBL.jobNumber} | TYPE: {selectedBL.blType}
+                                        {t("JOB:")} {selectedBL.jobNumber} {t("| TYPE:")} {selectedBL.blType}
                                         {selectedBL.soNumber && <> | SO: {selectedBL.soNumber}</>}
                                     </p>
                                     {soTypeValidation?.actualSOType && (
@@ -1053,7 +1055,7 @@ const BLManagement = () => {
                                                 ? 'bg-green-500/20 text-green-600 dark:text-green-400' 
                                                 : 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
                                         }`}>
-                                            SO Type: {soTypeValidation.actualSOType}
+                                            {t("SO Type:")} {soTypeValidation.actualSOType}
                                         </p>
                                     )}
                                     <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusConfig[normalizeBLStatus(editForm.status || selectedBL.status)]?.color || 'bg-gray-500/20 text-gray-400'}`}>
@@ -1080,12 +1082,12 @@ const BLManagement = () => {
                                 )}
                                 {isEditing ? (
                                     <>
-                                        <Button size="sm" onClick={handleUpdateBL}>Save Changes</Button>
-                                        <Button size="sm" variant="secondary" onClick={() => setIsEditing(false)}>Cancel Edit</Button>
+                                        <Button size="sm" onClick={handleUpdateBL}>{t("Save Changes")}</Button>
+                                        <Button size="sm" variant="secondary" onClick={() => setIsEditing(false)}>{t("Cancel Edit")}</Button>
                                     </>
                                 ) : (
                                     canEdit('blink_bl') && (
-                                        <Button size="sm" variant="secondary" onClick={() => setIsEditing(true)}>Edit Document</Button>
+                                        <Button size="sm" variant="secondary" onClick={() => setIsEditing(true)}>{t("Edit Document")}</Button>
                                     )
                                 )}
                                 <button
@@ -1129,7 +1131,7 @@ const BLManagement = () => {
                             {activeTab === 'header' && (
                                 <div className="animate-fade-in space-y-4">
                                     <div className="p-3 bg-blue-50/50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-900/30 mb-4">
-                                        <h3 className="text-sm font-bold text-blue-500 mb-2">Basic Information</h3>
+                                        <h3 className="text-sm font-bold text-blue-500 mb-2">{t("Basic Information")}</h3>
                                         <div className="grid grid-cols-3 gap-4">
                                             {renderInput('BL Number', 'blNumber')}
                                             {renderSelect('Status', 'status', [
@@ -1151,7 +1153,7 @@ const BLManagement = () => {
 
                                     {/* Document Numbers */}
                                     <div className="p-3 bg-green-50/50 dark:bg-green-900/10 rounded-lg border border-green-100 dark:border-green-900/30 mb-4">
-                                        <h3 className="text-sm font-bold text-green-500 mb-2">Document Numbers</h3>
+                                        <h3 className="text-sm font-bold text-green-500 mb-2">{t("Document Numbers")}</h3>
                                         <div className="grid grid-cols-4 gap-4">
                                             {renderInput('MBL No.', 'mbl', 'text', 'Master B/L Number')}
                                             {renderInput('HBL No.', 'hbl', 'text', 'House B/L Number')}
@@ -1177,17 +1179,17 @@ const BLManagement = () => {
                                     <div className="col-span-1 border-r border-dashed border-gray-300 pr-6">
                                         <div className="flex items-center gap-2 text-gray-800 font-bold uppercase text-sm tracking-wider mb-3">
                                             <User className="w-4 h-4 text-gray-600" />
-                                            <span>Shipper / Exporter</span>
+                                            <span>{t("Shipper / Exporter")}</span>
                                         </div>
                                         {isEditing && (
                                             <div className="mb-3">
-                                                <label className="block text-xs text-gray-600 mb-1">Select from Business Partners</label>
+                                                <label className="block text-xs text-gray-600 mb-1">{t("Select from Business Partners")}</label>
                                                 <PartnerPicker
                                                     value={""}
                                                     onChange={() => { }}
                                                     onPartnerLoad={handleLoadShipper}
                                                     roleFilter="all"
-                                                    placeholder="🔍 Search & select shipper..."
+                                                    placeholder={t("🔍 Search & select shipper...")}
                                                     size="sm"
                                                     theme="light"
                                                 />
@@ -1195,7 +1197,7 @@ const BLManagement = () => {
                                         )}
                                         <div className="space-y-4">
                                             <div className="mb-4">
-                                                <label className="block text-xs text-gray-600 font-semibold uppercase mb-1">Name</label>
+                                                <label className="block text-xs text-gray-600 font-semibold uppercase mb-1">{t("Name")}</label>
                                                 {isEditing ? (
                                                     <input
                                                         type="text"
@@ -1208,7 +1210,7 @@ const BLManagement = () => {
                                                 )}
                                             </div>
                                             <div className="mb-4">
-                                                <label className="block text-xs text-gray-600 font-semibold uppercase mb-1">Address</label>
+                                                <label className="block text-xs text-gray-600 font-semibold uppercase mb-1">{t("Address")}</label>
                                                 {isEditing ? (
                                                     <textarea
                                                         value={editForm.shipperAddress || ''}
@@ -1225,17 +1227,17 @@ const BLManagement = () => {
                                     <div className="col-span-1 border-r border-dashed border-gray-300 pr-6">
                                         <div className="flex items-center gap-2 text-gray-800 font-bold uppercase text-sm tracking-wider mb-3">
                                             <User className="w-4 h-4 text-gray-600" />
-                                            <span>Consignee</span>
+                                            <span>{t("Consignee")}</span>
                                         </div>
                                         {isEditing && (
                                             <div className="mb-3">
-                                                <label className="block text-xs text-gray-600 mb-1">Select from Business Partners</label>
+                                                <label className="block text-xs text-gray-600 mb-1">{t("Select from Business Partners")}</label>
                                                 <PartnerPicker
                                                     value={""}
                                                     onChange={() => { }}
                                                     onPartnerLoad={handleLoadConsignee}
                                                     roleFilter="all"
-                                                    placeholder="🔍 Search & select consignee..."
+                                                    placeholder={t("🔍 Search & select consignee...")}
                                                     size="sm"
                                                     theme="light"
                                                 />
@@ -1243,7 +1245,7 @@ const BLManagement = () => {
                                         )}
                                         <div className="space-y-4">
                                             <div className="mb-4">
-                                                <label className="block text-xs text-gray-600 font-semibold uppercase mb-1">Name</label>
+                                                <label className="block text-xs text-gray-600 font-semibold uppercase mb-1">{t("Name")}</label>
                                                 {isEditing ? (
                                                     <input
                                                         type="text"
@@ -1256,7 +1258,7 @@ const BLManagement = () => {
                                                 )}
                                             </div>
                                             <div className="mb-4">
-                                                <label className="block text-xs text-gray-600 font-semibold uppercase mb-1">Address</label>
+                                                <label className="block text-xs text-gray-600 font-semibold uppercase mb-1">{t("Address")}</label>
                                                 {isEditing ? (
                                                     <textarea
                                                         value={editForm.consigneeAddress || ''}
@@ -1273,17 +1275,17 @@ const BLManagement = () => {
                                     <div className="col-span-1">
                                         <div className="flex items-center gap-2 text-gray-800 font-bold uppercase text-sm tracking-wider mb-3">
                                             <User className="w-4 h-4 text-gray-600" />
-                                            <span>Notify Party</span>
+                                            <span>{t("Notify Party")}</span>
                                         </div>
                                         {isEditing && (
                                             <div className="mb-3">
-                                                <label className="block text-xs text-gray-600 mb-1">Select from Business Partners</label>
+                                                <label className="block text-xs text-gray-600 mb-1">{t("Select from Business Partners")}</label>
                                                 <PartnerPicker
                                                     value={""}
                                                     onChange={() => { }}
                                                     onPartnerLoad={handleLoadNotifyParty}
                                                     roleFilter="all"
-                                                    placeholder="🔍 Search & select notify party..."
+                                                    placeholder={t("🔍 Search & select notify party...")}
                                                     size="sm"
                                                     theme="light"
                                                 />
@@ -1291,7 +1293,7 @@ const BLManagement = () => {
                                         )}
                                         <div className="space-y-4">
                                             <div className="mb-4">
-                                                <label className="block text-xs text-gray-600 font-semibold uppercase mb-1">Name</label>
+                                                <label className="block text-xs text-gray-600 font-semibold uppercase mb-1">{t("Name")}</label>
                                                 {isEditing ? (
                                                     <input
                                                         type="text"
@@ -1304,7 +1306,7 @@ const BLManagement = () => {
                                                 )}
                                             </div>
                                             <div className="mb-4">
-                                                <label className="block text-xs text-gray-600 font-semibold uppercase mb-1">Address</label>
+                                                <label className="block text-xs text-gray-600 font-semibold uppercase mb-1">{t("Address")}</label>
                                                 {isEditing ? (
                                                     <textarea
                                                         value={editForm.notifyPartyAddress || ''}
@@ -1333,11 +1335,11 @@ const BLManagement = () => {
                                         {renderInput('Place of Delivery', 'placeOfDelivery')}
                                     </div>
                                     <div className="border-t border-gray-200 dark:border-dark-border pt-4 mt-4">
-                                        <h3 className="text-xs font-bold text-silver-dark uppercase mb-3">Print-Specific Fields</h3>
+                                        <h3 className="text-xs font-bold text-silver-dark uppercase mb-3">{t("Print-Specific Fields")}</h3>
                                         <div className="grid grid-cols-2 gap-x-8 gap-y-4">
                                             {renderInput('Type of Move', 'typeOfMove', 'text', 'e.g. FCL/FCL, LCL/LCL, CY/CY')}
                                             <div>
-                                                <label className="block text-xs text-gray-500 dark:text-silver-dark font-semibold uppercase mb-1">Containerized</label>
+                                                <label className="block text-xs text-gray-500 dark:text-silver-dark font-semibold uppercase mb-1">{t("Containerized")}</label>
                                                 {isEditing ? (
                                                     <div className="inline-flex rounded border border-gray-300 dark:border-dark-border overflow-hidden bg-white dark:bg-dark-surface">
                                                         {['YES', 'NO'].map((option) => (
@@ -1366,7 +1368,7 @@ const BLManagement = () => {
                                     {/* Container List */}
                                     <div className="bg-gray-50 dark:bg-dark-bg/30 p-4 rounded-lg">
                                         <div className="flex justify-between items-center mb-3">
-                                            <h3 className="font-bold text-gray-500 dark:text-silver-dark text-xs uppercase">Containers ({editForm.containers?.length || 0})</h3>
+                                            <h3 className="font-bold text-gray-500 dark:text-silver-dark text-xs uppercase">{t("Containers (")}{editForm.containers?.length || 0})</h3>
                                             {isEditing && (
                                                 <button
                                                     type="button"
@@ -1376,7 +1378,7 @@ const BLManagement = () => {
                                                     })}
                                                     className="text-xs bg-accent-orange text-white px-2 py-1 rounded hover:bg-orange-600"
                                                 >
-                                                    + Add Container
+                                                    {t("+ Add Container")}
                                                 </button>
                                             )}
                                         </div>
@@ -1395,7 +1397,7 @@ const BLManagement = () => {
                                                                         newContainers[idx].containerNumber = e.target.value;
                                                                         setEditForm({ ...editForm, containers: newContainers });
                                                                     }}
-                                                                    placeholder="Container No"
+                                                                    placeholder={t("Container No")}
                                                                     className="flex-1 px-2 py-1 text-xs bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded"
                                                                 />
                                                                 <input
@@ -1406,7 +1408,7 @@ const BLManagement = () => {
                                                                         newContainers[idx].sealNumber = e.target.value;
                                                                         setEditForm({ ...editForm, containers: newContainers });
                                                                     }}
-                                                                    placeholder="Seal No"
+                                                                    placeholder={t("Seal No")}
                                                                     className="w-32 px-2 py-1 text-xs bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded"
                                                                 />
                                                                 <button
@@ -1430,16 +1432,16 @@ const BLManagement = () => {
                                                 ))}
                                             </div>
                                         ) : (
-                                            <div className="text-xs text-gray-400 italic">No containers added</div>
+                                            <div className="text-xs text-gray-400 italic">{t("No containers added")}</div>
                                         )}
                                     </div>
 
                                     <div className="grid grid-cols-12 gap-6">
                                         <div className="col-span-8">
-                                            <h3 className="font-bold text-gray-500 dark:text-silver-dark text-xs uppercase mb-3 border-b border-gray-200 dark:border-dark-border pb-1">Marks & Description</h3>
+                                            <h3 className="font-bold text-gray-500 dark:text-silver-dark text-xs uppercase mb-3 border-b border-gray-200 dark:border-dark-border pb-1">{t("Marks & Description")}</h3>
                                             <div className="grid grid-cols-5 gap-4">
                                                 <div className="col-span-2">
-                                                    <label className="block text-xs text-gray-500 dark:text-silver-dark font-semibold uppercase mb-1">Marks & Numbers</label>
+                                                    <label className="block text-xs text-gray-500 dark:text-silver-dark font-semibold uppercase mb-1">{t("Marks & Numbers")}</label>
                                                     {isEditing ? (
                                                         <textarea
                                                             value={editForm.marksNumbers || ''}
@@ -1455,14 +1457,14 @@ const BLManagement = () => {
                                                     )}
                                                 </div>
                                                 <div className="col-span-3">
-                                                    <label className="block text-xs text-gray-500 dark:text-silver-dark font-semibold uppercase mb-1">Description of Packages and Goods</label>
+                                                    <label className="block text-xs text-gray-500 dark:text-silver-dark font-semibold uppercase mb-1">{t("Description of Packages and Goods")}</label>
                                                     {isEditing ? (
                                                         <textarea
                                                             value={editForm.descriptionPackages || ''}
                                                             onChange={(e) => setEditForm({ ...editForm, descriptionPackages: e.target.value })}
                                                             className="w-full px-3 py-2 bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded text-sm text-gray-900 dark:text-silver-light focus:border-accent-orange font-mono"
                                                             style={{ minHeight: '200px' }}
-                                                            placeholder="FULL DESCRIPTION OF GOODS&#10;Container 1: ...&#10;Container 2: ..."
+                                                            placeholder={t("FULL DESCRIPTION OF GOODS\nContainer 1: ...\nContainer 2: ...")}
                                                         />
                                                     ) : (
                                                         <div className="text-xs text-gray-900 dark:text-silver-light font-medium p-2 bg-gray-50 dark:bg-dark-bg/50 rounded border border-transparent whitespace-pre-wrap font-mono" style={{ minHeight: '200px' }}>
@@ -1479,7 +1481,7 @@ const BLManagement = () => {
                                             </div>
                                         </div>
                                         <div className="col-span-4">
-                                            <h3 className="font-bold text-gray-500 dark:text-silver-dark text-xs uppercase mb-3 border-b border-gray-200 dark:border-dark-border pb-1">Weight & Volume</h3>
+                                            <h3 className="font-bold text-gray-500 dark:text-silver-dark text-xs uppercase mb-3 border-b border-gray-200 dark:border-dark-border pb-1">{t("Weight & Volume")}</h3>
                                             {renderInput('Gross Weight', 'grossWeight', 'text', 'e.g. 18,500 KGS')}
                                             {renderInput('Measurement', 'measurement', 'text', 'e.g. 33.20 CBM')}
                                         </div>
@@ -1492,7 +1494,7 @@ const BLManagement = () => {
                                 <div className="animate-fade-in space-y-6">
                                     {/* Freight & Charges Section */}
                                     <div>
-                                        <h3 className="text-sm font-bold text-accent-orange mb-3">Freight & Charges</h3>
+                                        <h3 className="text-sm font-bold text-accent-orange mb-3">{t("Freight & Charges")}</h3>
                                         <div className="grid grid-cols-4 gap-4">
                                             {renderInput('Freight & Charges', 'freightCharges', 'text', 'e.g. AS ARRANGED')}
                                             {renderInput('Prepaid', 'prepaid', 'text', 'Prepaid amount/text')}
@@ -1503,7 +1505,7 @@ const BLManagement = () => {
 
                                     {/* Issue & Signature Section */}
                                     <div>
-                                        <h3 className="text-sm font-bold text-accent-orange mb-3">Issuance Details</h3>
+                                        <h3 className="text-sm font-bold text-accent-orange mb-3">{t("Issuance Details")}</h3>
                                         <div className="grid grid-cols-2 gap-6">
                                             <div className="bg-gray-50 dark:bg-dark-bg/30 p-4 rounded-lg">
                                                 {renderInput('Number of Original BLs', 'numberOfOriginals')}
@@ -1514,7 +1516,7 @@ const BLManagement = () => {
                                                 {renderInput('Shipped on Board Date', 'shippedOnBoardDate', 'date')}
                                                 <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/10 rounded border border-yellow-200 dark:border-yellow-900/30">
                                                     <p className="text-xs text-yellow-600 dark:text-yellow-400">
-                                                        ⚠️ "Shipped on Board Date" appears at the bottom-left of the BL print. Leave blank if not yet shipped.
+                                                        {t("⚠️ \"Shipped on Board Date\" appears at the bottom-left of the BL print. Leave blank if not yet shipped.")}
                                                     </p>
                                                 </div>
                                             </div>
@@ -1567,27 +1569,27 @@ const BLManagement = () => {
                                 <div className="flex items-center gap-3">
                                     {/* Print Options */}
                                     <div className="flex items-center gap-2 border border-dark-border rounded px-3 py-1.5 bg-dark-surface">
-                                        <span className="text-xs text-silver-dark whitespace-nowrap">Watermark:</span>
+                                        <span className="text-xs text-silver-dark whitespace-nowrap">{t("Watermark:")}</span>
                                         <select
                                             value={printWatermark}
                                             onChange={(e) => setPrintWatermark(e.target.value)}
                                             className="text-xs bg-transparent text-silver-light border-none outline-none cursor-pointer"
                                         >
-                                            <option value="">— None —</option>
-                                            <option value="ORIGINAL">ORIGINAL</option>
-                                            <option value="COPY NON-NEGOTIABLE">COPY NON-NEGOTIABLE</option>
+                                            <option value="">{t("— None —")}</option>
+                                            <option value="ORIGINAL">{t("ORIGINAL")}</option>
+                                            <option value="COPY NON-NEGOTIABLE">{t("COPY NON-NEGOTIABLE")}</option>
                                         </select>
                                     </div>
                                     <div className="flex items-center gap-2 border border-dark-border rounded px-3 py-1.5 bg-dark-surface">
-                                        <span className="text-xs text-silver-dark whitespace-nowrap">Status:</span>
+                                        <span className="text-xs text-silver-dark whitespace-nowrap">{t("Status:")}</span>
                                         <select
                                             value={printReleaseType}
                                             onChange={(e) => setPrintReleaseType(e.target.value)}
                                             className="text-xs bg-transparent text-silver-light border-none outline-none cursor-pointer"
                                         >
-                                            <option value="">— None —</option>
-                                            <option value="TELEX RELEASE">TELEX RELEASE</option>
-                                            <option value="SURRENDER">SURRENDER</option>
+                                            <option value="">{t("— None —")}</option>
+                                            <option value="TELEX RELEASE">{t("TELEX RELEASE")}</option>
+                                            <option value="SURRENDER">{t("SURRENDER")}</option>
                                         </select>
                                     </div>
                                     <Button
@@ -1595,7 +1597,7 @@ const BLManagement = () => {
                                         icon={Printer}
                                         onClick={handlePrintPreview}
                                     >
-                                        Print Preview
+                                        {t("Print Preview")}
                                     </Button>
                                     <Button
                                         onClick={() => {
@@ -1603,7 +1605,7 @@ const BLManagement = () => {
                                             setSelectedBL(null);
                                         }}
                                     >
-                                        Close
+                                        {t("Close")}
                                     </Button>
                                 </div>
                             </div>

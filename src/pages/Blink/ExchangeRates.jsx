@@ -15,8 +15,10 @@ import {
     RefreshCw,
     Search
 } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const ExchangeRates = () => {
+    const { t } = useLanguage();
     const { user, canDelete, isSuperAdmin } = useAuth();
     const hasDelete = canDelete('blink_exchange_rates');
     const canRunSuperAdminBatch = isSuperAdmin();
@@ -83,12 +85,12 @@ const ExchangeRates = () => {
         
         const rateVal = parseFloat(formData.rate);
         if (isNaN(rateVal) || rateVal <= 0) {
-            alert('Nilai kurs harus berupa angka positif!');
+            alert(t("Nilai kurs harus berupa angka positif!"));
             return;
         }
 
         if (!formData.effective_date) {
-            alert('Tanggal berlaku wajib diisi!');
+            alert(t("Tanggal berlaku wajib diisi!"));
             return;
         }
 
@@ -110,7 +112,7 @@ const ExchangeRates = () => {
                     }]);
 
                 if (error) throw error;
-                alert('✅ Kurs referensi berhasil ditambahkan');
+                alert(t("✅ Kurs referensi berhasil ditambahkan"));
             } else {
                 const { error } = await supabase
                     .from('blink_exchange_rates')
@@ -121,7 +123,7 @@ const ExchangeRates = () => {
                     .eq('id', selectedId);
 
                 if (error) throw error;
-                alert('✅ Kurs referensi berhasil diperbarui');
+                alert(t("✅ Kurs referensi berhasil diperbarui"));
             }
 
             setShowModal(false);
@@ -136,7 +138,7 @@ const ExchangeRates = () => {
 
     const handleDelete = async (id, date) => {
         if (!hasDelete) {
-            alert('Anda tidak memiliki izin untuk menghapus kurs referensi.');
+            alert(t("Anda tidak memiliki izin untuk menghapus kurs referensi."));
             return;
         }
         if (!confirm(`Apakah Anda yakin ingin menghapus kurs referensi untuk tanggal ${date}?`)) {
@@ -150,7 +152,7 @@ const ExchangeRates = () => {
                 .eq('id', id);
 
             if (error) throw error;
-            alert('✅ Kurs referensi berhasil dihapus');
+            alert(t("✅ Kurs referensi berhasil dihapus"));
             fetchRates();
         } catch (error) {
             console.error('Error deleting exchange rate:', error);
@@ -212,11 +214,11 @@ const ExchangeRates = () => {
     const handleDeleteAll = async () => {
         if (!canRunSuperAdminBatch) return;
         if (rates.length === 0) {
-            alert('Tidak ada data kurs untuk dihapus.');
+            alert(t("Tidak ada data kurs untuk dihapus."));
             return;
         }
         if (!confirm(`Hapus seluruh data kurs referensi (${rates.length} baris)?`)) return;
-        if (!confirm('Konfirmasi terakhir: seluruh data kurs akan dihapus permanen. Lanjutkan?')) return;
+        if (!confirm(t("Konfirmasi terakhir: seluruh data kurs akan dihapus permanen. Lanjutkan?"))) return;
 
         try {
             const { error } = await supabase
@@ -225,7 +227,7 @@ const ExchangeRates = () => {
                 .neq('id', '00000000-0000-0000-0000-000000000000');
 
             if (error) throw error;
-            alert('✅ Seluruh data kurs berhasil dihapus');
+            alert(t("✅ Seluruh data kurs berhasil dihapus"));
             setSelectedIds([]);
             fetchRates();
         } catch (error) {
@@ -243,28 +245,28 @@ const ExchangeRates = () => {
                 <div>
                     <h1 className="text-3xl font-bold gradient-text flex items-center gap-2">
                         <Coins className="w-8 h-8 text-accent-orange" />
-                        Kurs Referensi
+                        {t("Kurs Referensi")}
                     </h1>
                     <p className="text-sm text-silver-dark mt-1">
-                        Kelola kurs patokan USD ke IDR beserta tanggal berlakunya
+                        {t("Kelola kurs patokan USD ke IDR beserta tanggal berlakunya")}
                     </p>
                 </div>
                 <div className="flex gap-2">
                     {canRunSuperAdminBatch && (
                         <>
                             <Button size="sm" variant="danger" icon={Trash2} onClick={handleDeleteSelected} disabled={selectedIds.length === 0}>
-                                Hapus Terpilih ({selectedIds.length})
+                                {t("Hapus Terpilih (")}{selectedIds.length})
                             </Button>
                             <Button size="sm" variant="danger" icon={Trash2} onClick={handleDeleteAll} disabled={rates.length === 0}>
-                                Bersihkan Semua Data
+                                {t("Bersihkan Semua Data")}
                             </Button>
                         </>
                     )}
                     <Button size="sm" variant="secondary" icon={RefreshCw} onClick={fetchRates} disabled={loading}>
-                        Refresh
+                        {t("Refresh")}
                     </Button>
                     <Button size="sm" variant="primary" icon={Plus} onClick={handleOpenAdd}>
-                        Tambah Kurs
+                        {t("Tambah Kurs")}
                     </Button>
                 </div>
             </div>
@@ -273,7 +275,7 @@ const ExchangeRates = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="glass-card p-5 rounded-lg flex items-center justify-between">
                     <div>
-                        <p className="text-xs text-silver-dark uppercase tracking-wider font-semibold">Kurs Saat Ini (Terbaru)</p>
+                        <p className="text-xs text-silver-dark uppercase tracking-wider font-semibold">{t("Kurs Saat Ini (Terbaru)")}</p>
                         <p className="text-3xl font-bold text-accent-orange mt-2">
                             {latestRateObj ? `Rp ${parseFloat(latestRateObj.rate).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Tidak Ada'}
                         </p>
@@ -287,15 +289,15 @@ const ExchangeRates = () => {
                 </div>
 
                 <div className="glass-card p-5 rounded-lg">
-                    <p className="text-xs text-silver-dark uppercase tracking-wider font-semibold">Jumlah Riwayat Kurs</p>
+                    <p className="text-xs text-silver-dark uppercase tracking-wider font-semibold">{t("Jumlah Riwayat Kurs")}</p>
                     <p className="text-3xl font-bold text-silver-light mt-2">{rates.length}</p>
-                    <p className="text-xs text-silver-dark mt-1">Total data tersimpan di database</p>
+                    <p className="text-xs text-silver-dark mt-1">{t("Total data tersimpan di database")}</p>
                 </div>
 
                 <div className="glass-card p-5 rounded-lg">
-                    <p className="text-xs text-silver-dark uppercase tracking-wider font-semibold">Mata Uang Acuan</p>
-                    <p className="text-3xl font-bold text-blue-400 mt-2">USD ↔ IDR</p>
-                    <p className="text-xs text-silver-dark mt-1">Penyetaraan nilai 1 USD dalam Rupiah</p>
+                    <p className="text-xs text-silver-dark uppercase tracking-wider font-semibold">{t("Mata Uang Acuan")}</p>
+                    <p className="text-3xl font-bold text-blue-400 mt-2">{t("USD ↔ IDR")}</p>
+                    <p className="text-xs text-silver-dark mt-1">{t("Penyetaraan nilai 1 USD dalam Rupiah")}</p>
                 </div>
             </div>
 
@@ -306,7 +308,7 @@ const ExchangeRates = () => {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Cari berdasarkan tanggal (YYYY-MM-DD), nilai kurs, atau pembuat..."
+                    placeholder={t("Cari berdasarkan tanggal (YYYY-MM-DD), nilai kurs, atau pembuat...")}
                     className="flex-1 bg-transparent border-none outline-none text-silver-light placeholder-silver-dark text-sm"
                 />
                 {searchQuery && (
@@ -320,13 +322,13 @@ const ExchangeRates = () => {
             {loading ? (
                 <div className="glass-card p-12 text-center">
                     <div className="w-8 h-8 border-2 border-accent-orange border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                    <p className="text-silver-dark text-sm">Memuat data kurs...</p>
+                    <p className="text-silver-dark text-sm">{t("Memuat data kurs...")}</p>
                 </div>
             ) : filteredRates.length === 0 ? (
                 <div className="glass-card p-12 text-center">
                     <Coins className="w-12 h-12 text-silver-dark mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-silver-light mb-1">Tidak Ada Data</h3>
-                    <p className="text-silver-dark text-sm">Belum ada data kurs referensi yang cocok.</p>
+                    <h3 className="text-lg font-semibold text-silver-light mb-1">{t("Tidak Ada Data")}</h3>
+                    <p className="text-silver-dark text-sm">{t("Belum ada data kurs referensi yang cocok.")}</p>
                 </div>
             ) : (
                 <div className="glass-card rounded-lg overflow-hidden">
@@ -342,11 +344,11 @@ const ExchangeRates = () => {
                                             className="w-4 h-4"
                                         />
                                     </th>
-                                    <th className="px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Tanggal Berlaku</th>
-                                    <th className="px-6 py-3 text-right text-xs font-semibold text-white uppercase tracking-wider">Nilai Tukar (USD ↔ IDR)</th>
-                                    <th className="px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Dibuat Oleh</th>
-                                    <th className="px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Tanggal Input</th>
-                                    <th className="px-6 py-3 text-center text-xs font-semibold text-white uppercase tracking-wider w-32">Aksi</th>
+                                    <th className="px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">{t("Tanggal Berlaku")}</th>
+                                    <th className="px-6 py-3 text-right text-xs font-semibold text-white uppercase tracking-wider">{t("Nilai Tukar (USD ↔ IDR)")}</th>
+                                    <th className="px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">{t("Dibuat Oleh")}</th>
+                                    <th className="px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">{t("Tanggal Input")}</th>
+                                    <th className="px-6 py-3 text-center text-xs font-semibold text-white uppercase tracking-wider w-32">{t("Aksi")}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-dark-border">
@@ -382,14 +384,14 @@ const ExchangeRates = () => {
                                                 <button
                                                     onClick={() => handleOpenEdit(r)}
                                                     className="p-1.5 bg-dark-surface hover:bg-dark-border border border-dark-border text-blue-400 hover:text-blue-300 rounded smooth-transition"
-                                                    title="Ubah Kurs"
+                                                    title={t("Ubah Kurs")}
                                                 >
                                                     <Edit className="w-4 h-4" />
                                                 </button>
                                                 <button
                                                     onClick={() => handleDelete(r.id, r.effective_date)}
                                                     className="p-1.5 bg-dark-surface hover:bg-red-500/10 border border-dark-border text-red-500 hover:text-red-400 rounded smooth-transition"
-                                                    title="Hapus Kurs"
+                                                    title={t("Hapus Kurs")}
                                                 >
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>
@@ -419,7 +421,7 @@ const ExchangeRates = () => {
                         <form onSubmit={handleSave}>
                             <div className="p-6 space-y-4">
                                 <div>
-                                    <label className="block text-xs text-silver-dark uppercase font-semibold mb-1">Tanggal Berlaku</label>
+                                    <label className="block text-xs text-silver-dark uppercase font-semibold mb-1">{t("Tanggal Berlaku")}</label>
                                     <div className="relative">
                                         <input
                                             type="date"
@@ -432,7 +434,7 @@ const ExchangeRates = () => {
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs text-silver-dark uppercase font-semibold mb-1">Nilai Kurs (USD to IDR)</label>
+                                    <label className="block text-xs text-silver-dark uppercase font-semibold mb-1">{t("Nilai Kurs (USD to IDR)")}</label>
                                     <div className="relative flex items-center">
                                         <span className="absolute left-3 text-silver-dark text-sm font-semibold">Rp</span>
                                         <input
@@ -447,16 +449,16 @@ const ExchangeRates = () => {
                                         />
                                     </div>
                                     <p className="text-[10px] text-silver-dark mt-1">
-                                        Penyetaraan nilai 1 USD ke dalam Rupiah (IDR).
+                                        {t("Penyetaraan nilai 1 USD ke dalam Rupiah (IDR).")}
                                     </p>
                                 </div>
                             </div>
                             <div className="px-6 py-4 border-t border-dark-border flex justify-end gap-2 bg-dark-surface rounded-b-xl">
                                 <Button variant="secondary" size="sm" type="button" onClick={() => setShowModal(false)}>
-                                    Batal
+                                    {t("Batal")}
                                 </Button>
                                 <Button variant="primary" size="sm" type="submit" icon={Save}>
-                                    Simpan
+                                    {t("Simpan")}
                                 </Button>
                             </div>
                         </form>

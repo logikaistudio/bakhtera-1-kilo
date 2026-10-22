@@ -10,6 +10,7 @@ import {
 import { supabase } from '../../lib/supabase';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadialBarChart, RadialBar, Legend, Cell } from 'recharts';
 import { getCurrencySymbol, formatCurrency } from '../../utils/currencyFormatter';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 // ─── Table definitions with order of deletion (child → parent) ───────────────
 const BLINK_TABLES = [
@@ -103,6 +104,7 @@ const CATEGORY_LABELS = {
 
 // ─── Reset Modal ──────────────────────────────────────────────────────────────
 const ResetDataModal = ({ onClose }) => {
+    const { t } = useLanguage();
     const [step, setStep] = useState(1); // 1=select, 2=confirm, 3=processing, 4=done
     const [selectedKeys, setSelectedKeys] = useState(new Set());
     const [selectAll, setSelectAll] = useState(false);
@@ -199,8 +201,8 @@ const ResetDataModal = ({ onClose }) => {
                             <Trash2 className="w-5 h-5 text-red-600" />
                         </div>
                         <div>
-                            <h2 className="text-lg font-bold text-red-800">Reset Data Development</h2>
-                            <p className="text-xs text-red-600">Hapus data percobaan dari modul BLINK</p>
+                            <h2 className="text-lg font-bold text-red-800">{t("Reset Data Development")}</h2>
+                            <p className="text-xs text-red-600">{t("Hapus data percobaan dari modul BLINK")}</p>
                         </div>
                     </div>
                     {step !== 3 && (
@@ -219,8 +221,7 @@ const ResetDataModal = ({ onClose }) => {
                             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
                                 <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
                                 <p className="text-xs text-amber-800">
-                                    Fitur ini khusus untuk <strong>development</strong>. Centang tabel yang ingin dihapus
-                                    datanya. Data yang dihapus <strong>tidak dapat dikembalikan</strong>.
+                                    {t("Fitur ini khusus untuk")} <strong>{t("development")}</strong>{t(". Centang tabel yang ingin dihapus datanya. Data yang dihapus")} <strong>{t("tidak dapat dikembalikan")}</strong>.
                                 </p>
                             </div>
 
@@ -233,8 +234,8 @@ const ResetDataModal = ({ onClose }) => {
                                     className="w-4 h-4 accent-red-600"
                                 />
                                 <Database className="w-4 h-4 text-red-500" />
-                                <span className="text-sm font-semibold text-gray-800">Pilih Semua Tabel</span>
-                                <span className="ml-auto text-xs text-gray-500">{BLINK_TABLES.length} tabel</span>
+                                <span className="text-sm font-semibold text-gray-800">{t("Pilih Semua Tabel")}</span>
+                                <span className="ml-auto text-xs text-gray-500">{BLINK_TABLES.length} {t("tabel")}</span>
                             </label>
 
                             {/* Grouped by category */}
@@ -285,10 +286,10 @@ const ResetDataModal = ({ onClose }) => {
                             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                                 <h3 className="text-sm font-bold text-red-800 mb-2 flex items-center gap-2">
                                     <AlertTriangle className="w-4 h-4 text-red-600" />
-                                    Konfirmasi Penghapusan
+                                    {t("Konfirmasi Penghapusan")}
                                 </h3>
                                 <p className="text-xs text-red-700 mb-3">
-                                    Anda akan menghapus data dari <strong>{selectedCount} tabel</strong> berikut:
+                                    {t("Anda akan menghapus data dari")} <strong>{selectedCount} {t("tabel")}</strong> {t("berikut:")}
                                 </p>
                                 <ul className="space-y-1">
                                     {BLINK_TABLES.filter(t => selectedKeys.has(t.key)).map(t => (
@@ -302,7 +303,7 @@ const ResetDataModal = ({ onClose }) => {
 
                             <div className="space-y-2">
                                 <label className="text-xs text-gray-600">
-                                    Ketik <strong className="text-red-600 font-mono">{CONFIRM_KEYWORD}</strong> untuk mengkonfirmasi:
+                                    {t("Ketik")} <strong className="text-red-600 font-mono">{CONFIRM_KEYWORD}</strong> {t("untuk mengkonfirmasi:")}
                                 </label>
                                 <input
                                     type="text"
@@ -321,7 +322,7 @@ const ResetDataModal = ({ onClose }) => {
                         <div className="space-y-3">
                             <div className="text-center py-2">
                                 <Loader2 className="w-8 h-8 text-red-500 animate-spin mx-auto mb-2" />
-                                <p className="text-sm text-gray-600">Menghapus data...</p>
+                                <p className="text-sm text-gray-600">{t("Menghapus data...")}</p>
                             </div>
                             {results.map(r => (
                                 <div key={r.key} className="flex items-center gap-3 p-2.5 rounded-lg bg-gray-50 border border-gray-100">
@@ -330,7 +331,7 @@ const ResetDataModal = ({ onClose }) => {
                                         : <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
                                     }
                                     <span className="text-sm text-gray-700 flex-1">{r.label}</span>
-                                    <span className="text-xs text-gray-500">{r.count} baris dihapus</span>
+                                    <span className="text-xs text-gray-500">{r.count} {t("baris dihapus")}</span>
                                 </div>
                             ))}
                             {BLINK_TABLES.filter(t => selectedKeys.has(t.key) && !results.find(r => r.key === t.key)).map(t => (
@@ -348,8 +349,8 @@ const ResetDataModal = ({ onClose }) => {
                         <div className="space-y-3">
                             <div className="text-center py-2">
                                 <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto mb-2" />
-                                <p className="text-base font-semibold text-gray-800">Penghapusan Selesai</p>
-                                <p className="text-xs text-gray-500 mt-1">Semua proses telah selesai</p>
+                                <p className="text-base font-semibold text-gray-800">{t("Penghapusan Selesai")}</p>
+                                <p className="text-xs text-gray-500 mt-1">{t("Semua proses telah selesai")}</p>
                             </div>
                             {results.map(r => (
                                 <div key={r.key} className={`flex items-center gap-3 p-2.5 rounded-lg ${r.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
@@ -359,8 +360,8 @@ const ResetDataModal = ({ onClose }) => {
                                     }
                                     <span className="text-sm text-gray-700 flex-1">{r.icon} {r.label}</span>
                                     {r.success
-                                        ? <span className="text-xs text-green-600">{r.count} baris</span>
-                                        : <span className="text-xs text-red-600 truncate max-w-[120px]" title={r.error}>Error</span>
+                                        ? <span className="text-xs text-green-600">{r.count} {t("baris")}</span>
+                                        : <span className="text-xs text-red-600 truncate max-w-[120px]" title={r.error}>{t("Error")}</span>
                                     }
                                 </div>
                             ))}
@@ -376,7 +377,7 @@ const ResetDataModal = ({ onClose }) => {
                                 onClick={onClose}
                                 className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors bg-white"
                             >
-                                Batal
+                                {t("Batal")}
                             </button>
                             <button
                                 onClick={() => setStep(2)}
@@ -384,7 +385,7 @@ const ResetDataModal = ({ onClose }) => {
                                 className="px-5 py-2 text-sm font-semibold bg-red-600 hover:bg-red-700 disabled:bg-gray-300 disabled:text-gray-500 text-white rounded-lg transition-colors flex items-center gap-2"
                             >
                                 <Trash2 className="w-4 h-4" />
-                                Lanjut ({selectedCount} tabel)
+                                {t("Lanjut (")}{selectedCount} {t("tabel)")}
                             </button>
                         </>
                     )}
@@ -394,7 +395,7 @@ const ResetDataModal = ({ onClose }) => {
                                 onClick={() => setStep(1)}
                                 className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors bg-white"
                             >
-                                Kembali
+                                {t("Kembali")}
                             </button>
                             <button
                                 onClick={handleExecuteDelete}
@@ -402,7 +403,7 @@ const ResetDataModal = ({ onClose }) => {
                                 className="px-5 py-2 text-sm font-semibold bg-red-600 hover:bg-red-700 disabled:bg-gray-300 disabled:text-gray-500 text-white rounded-lg transition-colors flex items-center gap-2"
                             >
                                 <Trash2 className="w-4 h-4" />
-                                Hapus Sekarang
+                                {t("Hapus Sekarang")}
                             </button>
                         </>
                     )}
@@ -411,7 +412,7 @@ const ResetDataModal = ({ onClose }) => {
                             onClick={onClose}
                             className="px-5 py-2 text-sm font-semibold bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg transition-colors"
                         >
-                            Tutup
+                            {t("Tutup")}
                         </button>
                     )}
                 </div>
@@ -421,6 +422,7 @@ const ResetDataModal = ({ onClose }) => {
 };
 
 const BlinkDashboard = () => {
+    const { t } = useLanguage();
     const [showResetModal, setShowResetModal] = useState(false);
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
@@ -695,7 +697,7 @@ const BlinkDashboard = () => {
             <div className={`flex items-center gap-1 text-xs font-semibold ${isPositive ? 'text-green-600' : 'text-red-500'}`}>
                 {isPositive ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
                 <span>{isPositive ? '+' : ''}{value.toFixed(1)}%</span>
-                <span className="text-slate-400 font-normal ml-1">vs Last Month</span>
+                <span className="text-slate-400 font-normal ml-1">{t("vs Last Month")}</span>
             </div>
         );
     };
@@ -713,8 +715,8 @@ const BlinkDashboard = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-white/50 backdrop-blur-sm p-4 rounded-xl border border-slate-200/60 shadow-sm">
                 <div>
-                    <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight">Dashboard Overview</h1>
-                    <p className="text-slate-500 text-sm mt-0.5">Freight & Forward Management Portal</p>
+                    <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight">{t("Dashboard Overview")}</h1>
+                    <p className="text-slate-500 text-sm mt-0.5">{t("Freight & Forward Management Portal")}</p>
                 </div>
             </div>
 
@@ -722,7 +724,7 @@ const BlinkDashboard = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-start justify-between mb-3">
-                        <p className="text-sm font-semibold text-slate-500">Total Revenue</p>
+                        <p className="text-sm font-semibold text-slate-500">{t("Total Revenue")}</p>
                         <div className="p-2 bg-blue-50 rounded-lg"><DollarSign className="w-5 h-5 text-blue-600" /></div>
                     </div>
                     <h3 className="text-xl lg:text-2xl font-extrabold text-slate-800 mb-2 truncate" title={formatCurrency(stats.totalRevenue)}>{formatCurrency(stats.totalRevenue)}</h3>
@@ -731,7 +733,7 @@ const BlinkDashboard = () => {
 
                 <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-start justify-between mb-3">
-                        <p className="text-sm font-semibold text-slate-500">Active Shipments</p>
+                        <p className="text-sm font-semibold text-slate-500">{t("Active Shipments")}</p>
                         <div className="p-2 bg-emerald-50 rounded-lg"><Ship className="w-5 h-5 text-emerald-600" /></div>
                     </div>
                     <h3 className="text-3xl font-extrabold text-slate-800 mb-2">{stats.activeShipments}</h3>
@@ -740,7 +742,7 @@ const BlinkDashboard = () => {
 
                 <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-start justify-between mb-3">
-                        <p className="text-sm font-semibold text-slate-500">Total Invoices</p>
+                        <p className="text-sm font-semibold text-slate-500">{t("Total Invoices")}</p>
                         <div className="p-2 bg-purple-50 rounded-lg"><FileText className="w-5 h-5 text-purple-600" /></div>
                     </div>
                     <h3 className="text-3xl font-extrabold text-slate-800 mb-2">{stats.totalInvoices}</h3>
@@ -749,7 +751,7 @@ const BlinkDashboard = () => {
 
                 <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-start justify-between mb-3">
-                        <p className="text-sm font-semibold text-slate-500">Purchase Orders</p>
+                        <p className="text-sm font-semibold text-slate-500">{t("Purchase Orders")}</p>
                         <div className="p-2 bg-orange-50 rounded-lg"><ShoppingCart className="w-5 h-5 text-orange-600" /></div>
                     </div>
                     <h3 className="text-3xl font-extrabold text-slate-800 mb-2">{stats.purchaseOrders}</h3>
@@ -762,7 +764,7 @@ const BlinkDashboard = () => {
                 {/* Line Chart Area (Span 2 cols) */}
                 <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                     <div className="flex items-center justify-between mb-6">
-                        <h3 className="text-base font-bold text-slate-800">Revenue Trend (2026)</h3>
+                        <h3 className="text-base font-bold text-slate-800">{t("Revenue Trend (2026)")}</h3>
                         <span className="text-[11px] font-bold text-slate-500 bg-slate-50 px-2 py-1 rounded border border-slate-100">(x1000)</span>
                     </div>
                     <div className="h-64 w-full">
@@ -803,10 +805,10 @@ const BlinkDashboard = () => {
                 {/* Radial Chart Area (Span 1 col) */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-between">
                     <div className="w-full flex items-center justify-between mb-2">
-                        <h3 className="text-base font-bold text-slate-800">Target vs Pencapaian</h3>
+                        <h3 className="text-base font-bold text-slate-800">{t("Target vs Pencapaian")}</h3>
                         <Target className="w-5 h-5 text-slate-400" />
                     </div>
-                    <p className="text-xs text-slate-500 w-full mb-2">Target Tahun Ini: {formatCurrency(targetRevenue)}</p>
+                    <p className="text-xs text-slate-500 w-full mb-2">{t("Target Tahun Ini:")} {formatCurrency(targetRevenue)}</p>
                     
                     <div className="relative h-56 w-full flex items-center justify-center">
                         <ResponsiveContainer width="100%" height="100%">
@@ -835,13 +837,13 @@ const BlinkDashboard = () => {
                         </ResponsiveContainer>
                         <div className="absolute top-[55%] left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
                             <span className="text-4xl font-extrabold text-slate-800">{completionPercentage}%</span>
-                            <p className="text-[10px] font-bold text-slate-500 mt-1 uppercase tracking-wider">Pencapaian</p>
+                            <p className="text-[10px] font-bold text-slate-500 mt-1 uppercase tracking-wider">{t("Pencapaian")}</p>
                         </div>
                     </div>
                     
                     <div className="w-full text-center mt-auto pt-2 border-t border-slate-100">
                         <p className="text-lg font-bold text-slate-800">{formatCurrency(stats.totalRevenue)}</p>
-                        <p className="text-xs text-slate-500">Total Pendapatan (YTD)</p>
+                        <p className="text-xs text-slate-500">{t("Total Pendapatan (YTD)")}</p>
                     </div>
                 </div>
             </div>
@@ -852,7 +854,7 @@ const BlinkDashboard = () => {
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                     <div className="flex items-center gap-2 mb-5">
                         <Ship className="w-5 h-5 text-blue-600" />
-                        <h3 className="text-base font-bold text-slate-800">Arah Pengiriman (Import / Export)</h3>
+                        <h3 className="text-base font-bold text-slate-800">{t("Arah Pengiriman (Import / Export)")}</h3>
                     </div>
                     <div className="grid grid-cols-3 gap-4">
                         {[
@@ -868,7 +870,7 @@ const BlinkDashboard = () => {
                         ))}
                     </div>
                     {shipmentStats.untagged > 0 && (
-                        <p className="mt-4 text-xs text-slate-400 text-center">{shipmentStats.untagged} shipment belum ditag arah pengiriman</p>
+                        <p className="mt-4 text-xs text-slate-400 text-center">{shipmentStats.untagged} {t("shipment belum ditag arah pengiriman")}</p>
                     )}
                 </div>
 
@@ -876,7 +878,7 @@ const BlinkDashboard = () => {
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                     <div className="flex items-center gap-2 mb-5">
                         <BarChart3 className="w-5 h-5 text-purple-600" />
-                        <h3 className="text-base font-bold text-slate-800">Moda Angkutan</h3>
+                        <h3 className="text-base font-bold text-slate-800">{t("Moda Angkutan")}</h3>
                     </div>
                     <div className="grid grid-cols-3 gap-4">
                         {[
@@ -892,7 +894,7 @@ const BlinkDashboard = () => {
                             </div>
                         ))}
                     </div>
-                    <p className="mt-4 text-xs text-slate-400 text-center">Total {shipmentStats.total} shipment</p>
+                    <p className="mt-4 text-xs text-slate-400 text-center">{t("Total")} {shipmentStats.total} {t("shipment")}</p>
                 </div>
             </div>
 
@@ -900,26 +902,26 @@ const BlinkDashboard = () => {
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                 <div className="px-6 py-5 border-b border-slate-100">
                     <div>
-                        <h3 className="text-base font-bold text-slate-800">Monitoring Aging AR/AP</h3>
-                        <p className="text-xs text-slate-500 mt-1">Daftar Tagihan dan Hutang Menunggu Pembayaran</p>
+                        <h3 className="text-base font-bold text-slate-800">{t("Monitoring Aging AR/AP")}</h3>
+                        <p className="text-xs text-slate-500 mt-1">{t("Daftar Tagihan dan Hutang Menunggu Pembayaran")}</p>
                     </div>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
                         <thead className="bg-slate-50/50">
                             <tr>
-                                <th className="px-6 py-3 font-semibold text-slate-500">Tipe</th>
-                                <th className="px-6 py-3 font-semibold text-slate-500">No. Dokumen</th>
-                                <th className="px-6 py-3 font-semibold text-slate-500">Klien / Vendor</th>
-                                <th className="px-6 py-3 font-semibold text-slate-500">Jumlah</th>
-                                <th className="px-6 py-3 font-semibold text-slate-500">Jatuh Tempo</th>
-                                <th className="px-6 py-3 font-semibold text-slate-500">Status Aging</th>
+                                <th className="px-6 py-3 font-semibold text-slate-500">{t("Tipe")}</th>
+                                <th className="px-6 py-3 font-semibold text-slate-500">{t("No. Dokumen")}</th>
+                                <th className="px-6 py-3 font-semibold text-slate-500">{t("Klien / Vendor")}</th>
+                                <th className="px-6 py-3 font-semibold text-slate-500">{t("Jumlah")}</th>
+                                <th className="px-6 py-3 font-semibold text-slate-500">{t("Jatuh Tempo")}</th>
+                                <th className="px-6 py-3 font-semibold text-slate-500">{t("Status Aging")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {agingData.length === 0 ? (
                                 <tr>
-                                    <td colSpan="6" className="px-6 py-8 text-center text-slate-500 italic">Tidak ada data hutang/piutang yang belum dibayar.</td>
+                                    <td colSpan="6" className="px-6 py-8 text-center text-slate-500 italic">{t("Tidak ada data hutang/piutang yang belum dibayar.")}</td>
                                 </tr>
                             ) : (
                                 agingData.map((item) => {
@@ -954,8 +956,8 @@ const BlinkDashboard = () => {
                                                     {isOverdue ? (
                                                         <>
                                                             <div className="flex items-center justify-between text-[11px] font-bold text-red-600 uppercase tracking-wider">
-                                                                <span>Overdue</span>
-                                                                <span>{item.days_overdue} Hari</span>
+                                                                <span>{t("Overdue")}</span>
+                                                                <span>{item.days_overdue} {t("Hari")}</span>
                                                             </div>
                                                             <div className="w-full bg-red-100 rounded-full h-1.5 overflow-hidden">
                                                                 <div 
@@ -967,8 +969,8 @@ const BlinkDashboard = () => {
                                                     ) : (
                                                         <>
                                                             <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                                                                <span>Sisa Waktu</span>
-                                                                <span>{Math.abs(item.days_overdue)} Hari</span>
+                                                                <span>{t("Sisa Waktu")}</span>
+                                                                <span>{Math.abs(item.days_overdue)} {t("Hari")}</span>
                                                             </div>
                                                             <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
                                                                 <div 

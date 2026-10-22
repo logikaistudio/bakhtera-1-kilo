@@ -3,6 +3,7 @@ import { dashboardPairs } from './dictionaries/dashboard';
 import { financeDocPairs } from './dictionaries/financeDocs';
 import { financeDocsSweepPairs } from './dictionaries/financeDocsSweep';
 import { quotationArApPairs } from './dictionaries/quotationArAp';
+import { blinkPagePairs } from './dictionaries/blinkPages';
 
 const allPairs = [
     ...commonPairs,
@@ -12,6 +13,7 @@ const allPairs = [
     ...financeDocPairs,
     ...financeDocsSweepPairs,
     ...quotationArApPairs,
+    ...blinkPagePairs,
 ];
 
 const en = {};

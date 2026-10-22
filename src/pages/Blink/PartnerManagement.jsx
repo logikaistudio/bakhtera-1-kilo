@@ -10,8 +10,10 @@ import {
     Users, Plus, Search, Edit, Trash2, Building2, User,
     Phone, Mail, MapPin, CreditCard, Filter, X, Check, Download, Upload
 } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const PartnerManagement = () => {
+    const { t } = useLanguage();
     const activeDivision = getActiveDivision();
     const isBxpoDivision = activeDivision === 'bxpo';
     const partnerMenuCode = isBxpoDivision ? 'bxpo_partners' : 'blink_partners';
@@ -153,7 +155,7 @@ const PartnerManagement = () => {
                     is_shared: isAdminUser() ? Boolean(formData.is_shared) : Boolean(editingPartner.is_shared)
                 });
                 if (!success) throw new Error('Failed to update partner');
-                alert('✅ Partner updated successfully');
+                alert(t("✅ Partner updated successfully"));
             } else {
                 const inserted = await addBusinessPartner({
                     ...formData,
@@ -161,7 +163,7 @@ const PartnerManagement = () => {
                     is_shared: isAdminUser() ? Boolean(formData.is_shared) : false,
                 });
                 if (!inserted) throw new Error('Failed to create partner');
-                alert('✅ Partner created successfully');
+                alert(t("✅ Partner created successfully"));
             }
 
             fetchPartners();
@@ -177,16 +179,16 @@ const PartnerManagement = () => {
 
     const handleDelete = async (partnerId) => {
         if (!canDeletePartner) {
-            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus partner.');
+            alert(t("Akses Ditolak: Anda tidak memiliki hak untuk menghapus partner."));
             return;
         }
 
-        if (!confirm('Are you sure you want to delete mitra ini? Data transaksi terkait tidak akan terhapus.')) return;
+        if (!confirm(t("Are you sure you want to delete mitra ini? Data transaksi terkait tidak akan terhapus."))) return;
 
         try {
             const success = await deleteBusinessPartner(partnerId, 'blink_business_partners', partnerMenuCode);
             if (!success) return;
-            alert('✅ Partner deleted');
+            alert(t("✅ Partner deleted"));
             fetchPartners();
         } catch (error) {
             console.error('Error deleting partner:', error);
@@ -196,18 +198,18 @@ const PartnerManagement = () => {
 
     const handleCleanseAll = async () => {
         if (!canRunSuperAdminBatch) {
-            alert('Akses Ditolak: Hanya Super Admin yang dapat cleansing data partner.');
+            alert(t("Akses Ditolak: Hanya Super Admin yang dapat cleansing data partner."));
             return;
         }
         if (partners.length === 0) {
-            alert('Tidak ada data mitra untuk dihapus.');
+            alert(t("Tidak ada data mitra untuk dihapus."));
             return;
         }
 
         const firstConfirm = confirm(`Cleansing akan menghapus SEMUA data mitra (${partners.length} baris). Lanjutkan?`);
         if (!firstConfirm) return;
 
-        const secondConfirm = confirm('Konfirmasi terakhir: semua data mitra akan dihapus permanen. Yakin lanjut?');
+        const secondConfirm = confirm(t("Konfirmasi terakhir: semua data mitra akan dihapus permanen. Yakin lanjut?"));
         if (!secondConfirm) return;
 
         try {
@@ -217,7 +219,7 @@ const PartnerManagement = () => {
                 onProgress: (message) => setCleanseProgress(message)
             });
             if (!success) return;
-            alert('✅ Cleansing selesai: semua data mitra berhasil dihapus.');
+            alert(t("✅ Cleansing selesai: semua data mitra berhasil dihapus."));
             fetchPartners();
         } catch (error) {
             console.error('Error cleansing business partners:', error);
@@ -362,7 +364,7 @@ const PartnerManagement = () => {
             }
 
             if (result.partners.length === 0) {
-                alert('❌ No valid partners to import');
+                alert(t("❌ No valid partners to import"));
                 return;
             }
 
@@ -412,17 +414,17 @@ const PartnerManagement = () => {
         }
     };
 
-    if (loading) return <div className="p-12 text-center text-silver-dark">Loading...</div>;
+    if (loading) return <div className="p-12 text-center text-silver-dark">{t("Loading...")}</div>;
 
     return (
         <div className="space-y-6">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text">Manajemen Mitra Bisnis</h1>
-                    <p className="text-silver-dark mt-1">Kelola Customer, Vendor, Agent, dan Partner lainnya</p>
+                    <h1 className="text-3xl font-bold gradient-text">{t("Manajemen Mitra Bisnis")}</h1>
+                    <p className="text-silver-dark mt-1">{t("Kelola Customer, Vendor, Agent, dan Partner lainnya")}</p>
                     <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/15 border border-indigo-500/30">
-                        <span className="text-[11px] font-semibold tracking-wide text-indigo-300 uppercase">Konteks Divisi Aktif</span>
+                        <span className="text-[11px] font-semibold tracking-wide text-indigo-300 uppercase">{t("Konteks Divisi Aktif")}</span>
                         <span className="text-xs font-bold text-indigo-200 uppercase">{activeDivision}</span>
                     </div>
                 </div>
@@ -436,10 +438,10 @@ const PartnerManagement = () => {
                                     ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
                                     : 'bg-dark-surface text-silver-dark cursor-not-allowed opacity-60'
                                     }`}
-                                title="Hapus mitra terpilih"
+                                title={t("Hapus mitra terpilih")}
                             >
                                 <Trash2 className="w-4 h-4" />
-                                Hapus Terpilih ({selectedIds.length})
+                                {t("Hapus Terpilih (")}{selectedIds.length})
                             </button>
                             <button
                                 onClick={handleCleanseAll}
@@ -448,7 +450,7 @@ const PartnerManagement = () => {
                                     ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
                                     : 'bg-dark-surface text-silver-dark cursor-not-allowed opacity-60'
                                     }`}
-                                title="Hapus semua data mitra"
+                                title={t("Hapus semua data mitra")}
                             >
                                 <Trash2 className="w-4 h-4" />
                                 {isCleansing ? 'Cleansing...' : 'Bersihkan Semua Data'}
@@ -468,7 +470,7 @@ const PartnerManagement = () => {
                             className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition-colors flex items-center gap-2 text-sm"
                         >
                             <Upload className="w-4 h-4" />
-                            Import Excel
+                            {t("Import Excel")}
                         </button>
                     </div>
                     <button
@@ -476,65 +478,65 @@ const PartnerManagement = () => {
                         className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-colors flex items-center gap-2 text-sm"
                     >
                         <Download className="w-4 h-4" />
-                        Template
+                        {t("Template")}
                     </button>
                     <button
                         onClick={handleExportTemplate}
                         className="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-colors flex items-center gap-2 text-sm"
                     >
                         <Download className="w-4 h-4" />
-                        Export All
+                        {t("Export All")}
                     </button>
                     <Button onClick={() => setShowModal(true)} icon={Plus}>
-                        Tambah Mitra Baru
+                        {t("Tambah Mitra Baru")}
                     </Button>
                 </div>
             </div>
 
             {isCleansing && (
                 <div className="glass-card px-4 py-2 rounded-lg border border-amber-500/30 bg-amber-500/10">
-                    <p className="text-xs text-amber-300">Progress Cleansing: {cleanseProgress || 'Sedang memproses...'}</p>
+                    <p className="text-xs text-amber-300">{t("Progress Cleansing:")} {cleanseProgress || 'Sedang memproses...'}</p>
                 </div>
             )}
 
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
                 <div className="glass-card p-4 rounded-lg">
-                    <p className="text-xs text-silver-dark">Total Mitra</p>
+                    <p className="text-xs text-silver-dark">{t("Total Mitra")}</p>
                     <p className="text-2xl font-bold text-silver-light mt-1">{partners.length}</p>
                 </div>
                 <div className="glass-card p-4 rounded-lg">
-                    <p className="text-xs text-silver-dark">Customer</p>
+                    <p className="text-xs text-silver-dark">{t("Customer")}</p>
                     <p className="text-2xl font-bold text-green-400 mt-1">
                         {partners.filter(p => p.is_customer).length}
                     </p>
                 </div>
                 <div className="glass-card p-4 rounded-lg">
-                    <p className="text-xs text-silver-dark">Vendor</p>
+                    <p className="text-xs text-silver-dark">{t("Vendor")}</p>
                     <p className="text-2xl font-bold text-blue-400 mt-1">
                         {partners.filter(p => p.is_vendor).length}
                     </p>
                 </div>
                 <div className="glass-card p-4 rounded-lg">
-                    <p className="text-xs text-silver-dark">Agent</p>
+                    <p className="text-xs text-silver-dark">{t("Agent")}</p>
                     <p className="text-2xl font-bold text-purple-400 mt-1">
                         {partners.filter(p => p.is_agent).length}
                     </p>
                 </div>
                 <div className="glass-card p-4 rounded-lg">
-                    <p className="text-xs text-silver-dark">Transporter</p>
+                    <p className="text-xs text-silver-dark">{t("Transporter")}</p>
                     <p className="text-2xl font-bold text-orange-400 mt-1">
                         {partners.filter(p => p.is_transporter).length}
                     </p>
                 </div>
                 <div className="glass-card p-4 rounded-lg">
-                    <p className="text-xs text-silver-dark">Consignee</p>
+                    <p className="text-xs text-silver-dark">{t("Consignee")}</p>
                     <p className="text-2xl font-bold text-teal-400 mt-1">
                         {partners.filter(p => p.is_consignee).length}
                     </p>
                 </div>
                 <div className="glass-card p-4 rounded-lg">
-                    <p className="text-xs text-silver-dark">Shipper</p>
+                    <p className="text-xs text-silver-dark">{t("Shipper")}</p>
                     <p className="text-2xl font-bold text-indigo-400 mt-1">
                         {partners.filter(p => p.is_shipper).length}
                     </p>
@@ -547,7 +549,7 @@ const PartnerManagement = () => {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-silver-dark" />
                     <input
                         type="text"
-                        placeholder="Search nama, kode, atau email..."
+                        placeholder={t("Search nama, kode, atau email...")}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
@@ -558,20 +560,20 @@ const PartnerManagement = () => {
                     onChange={(e) => setRoleFilter(e.target.value)}
                     className="px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
                 >
-                    <option value="all">Semua Role</option>
-                    <option value="customer">Customer</option>
-                    <option value="vendor">Vendor</option>
-                    <option value="agent">Agent</option>
-                    <option value="transporter">Transporter</option>
-                    <option value="consignee">Consignee</option>
-                    <option value="shipper">Shipper</option>
+                    <option value="all">{t("Semua Role")}</option>
+                    <option value="customer">{t("Customer")}</option>
+                    <option value="vendor">{t("Vendor")}</option>
+                    <option value="agent">{t("Agent")}</option>
+                    <option value="transporter">{t("Transporter")}</option>
+                    <option value="consignee">{t("Consignee")}</option>
+                    <option value="shipper">{t("Shipper")}</option>
                 </select>
             </div>
 
             {/* Partners Table */}
             <div className="glass-card rounded-lg overflow-hidden">
                 <p className="text-xs text-silver-dark px-4 py-2 bg-dark-surface/50 border-b border-dark-border">
-                    💡 Klik baris untuk edit • Gunakan tombol hapus di kanan baris
+                    {t("💡 Klik baris untuk edit • Gunakan tombol hapus di kanan baris")}
                 </p>
                 <div className="overflow-x-auto">
                     <table className="w-full">
@@ -585,10 +587,10 @@ const PartnerManagement = () => {
                                         className="w-4 h-4"
                                     />
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">Kode</th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">Nama Mitra</th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">Kontak</th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">Role</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">{t("Kode")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">{t("Nama Mitra")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">{t("Kontak")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">{t("Role")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
@@ -657,7 +659,7 @@ const PartnerManagement = () => {
                                                     title={canDeletePartner ? 'Hapus Mitra' : 'Tidak ada akses hapus'}
                                                 >
                                                     <Trash2 className="w-3.5 h-3.5" />
-                                                    Hapus
+                                                    {t("Hapus")}
                                                 </button>
                                             </div>
                                         </td>
@@ -680,10 +682,10 @@ const PartnerManagement = () => {
                         <div className="space-y-6">
                             {/* Basic Info */}
                             <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
-                                <h3 className="text-sm font-bold text-blue-400 mb-3 uppercase">Informasi Dasar</h3>
+                                <h3 className="text-sm font-bold text-blue-400 mb-3 uppercase">{t("Informasi Dasar")}</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-xs text-silver-dark mb-1">Nama Mitra *</label>
+                                        <label className="block text-xs text-silver-dark mb-1">{t("Nama Mitra *")}</label>
                                         <input
                                             type="text"
                                             value={formData.partner_name}
@@ -693,14 +695,14 @@ const PartnerManagement = () => {
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs text-silver-dark mb-1">Tipe</label>
+                                        <label className="block text-xs text-silver-dark mb-1">{t("Tipe")}</label>
                                         <select
                                             value={formData.partner_type}
                                             onChange={(e) => setFormData({ ...formData, partner_type: e.target.value })}
                                             className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
                                         >
-                                            <option value="company">Company</option>
-                                            <option value="individual">Individual</option>
+                                            <option value="company">{t("Company")}</option>
+                                            <option value="individual">{t("Individual")}</option>
                                         </select>
                                     </div>
 
@@ -713,12 +715,12 @@ const PartnerManagement = () => {
                                                     onChange={(e) => setFormData({ ...formData, is_shared: e.target.checked })}
                                                     className="w-4 h-4"
                                                 />
-                                                Shared lintas divisi (Blink & BXPO)
+                                                {t("Shared lintas divisi (Blink & BXPO)")}
                                             </label>
                                         </div>
                                     )}
                                     <div>
-                                        <label className="block text-xs text-silver-dark mb-1">Contact Person</label>
+                                        <label className="block text-xs text-silver-dark mb-1">{t("Contact Person")}</label>
                                         <input
                                             type="text"
                                             value={formData.contact_person}
@@ -727,7 +729,7 @@ const PartnerManagement = () => {
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs text-silver-dark mb-1">NPWP</label>
+                                        <label className="block text-xs text-silver-dark mb-1">{t("NPWP")}</label>
                                         <input
                                             type="text"
                                             value={formData.tax_id}
@@ -740,7 +742,7 @@ const PartnerManagement = () => {
 
                             {/* Roles */}
                             <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
-                                <h3 className="text-sm font-bold text-purple-400 mb-3 uppercase">Role Partner (bisa lebih dari 1)</h3>
+                                <h3 className="text-sm font-bold text-purple-400 mb-3 uppercase">{t("Role Partner (bisa lebih dari 1)")}</h3>
                                 <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
                                     {[
                                         { key: 'is_customer', label: 'Customer', desc: 'Bisa ditagih Invoice' },
@@ -769,7 +771,7 @@ const PartnerManagement = () => {
                             {/* Contact */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs text-silver-dark mb-1">Email</label>
+                                    <label className="block text-xs text-silver-dark mb-1">{t("Email")}</label>
                                     <input
                                         type="email"
                                         value={formData.email}
@@ -778,7 +780,7 @@ const PartnerManagement = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs text-silver-dark mb-1">Phone</label>
+                                    <label className="block text-xs text-silver-dark mb-1">{t("Phone")}</label>
                                     <input
                                         type="text"
                                         value={formData.phone}
@@ -791,7 +793,7 @@ const PartnerManagement = () => {
                             {/* Address */}
                             <div className="space-y-3">
                                 <div>
-                                    <label className="block text-xs text-silver-dark mb-1">Alamat</label>
+                                    <label className="block text-xs text-silver-dark mb-1">{t("Alamat")}</label>
                                     <textarea
                                         value={formData.address_line1}
                                         onChange={(e) => setFormData({ ...formData, address_line1: e.target.value })}
@@ -804,21 +806,21 @@ const PartnerManagement = () => {
                                         type="text"
                                         value={formData.city}
                                         onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                                        placeholder="Kota"
+                                        placeholder={t("Kota")}
                                         className="px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
                                     />
                                     <input
                                         type="text"
                                         value={formData.postal_code}
                                         onChange={(e) => setFormData({ ...formData, postal_code: e.target.value })}
-                                        placeholder="Kode Pos"
+                                        placeholder={t("Kode Pos")}
                                         className="px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
                                     />
                                     <input
                                         type="text"
                                         value={formData.country}
                                         onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                                        placeholder="Negara"
+                                        placeholder={t("Negara")}
                                         className="px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
                                     />
                                 </div>
@@ -827,21 +829,21 @@ const PartnerManagement = () => {
                             {/* Financial */}
                             <div className="grid grid-cols-3 gap-4">
                                 <div>
-                                    <label className="block text-xs text-silver-dark mb-1">Payment Terms</label>
+                                    <label className="block text-xs text-silver-dark mb-1">{t("Payment Terms")}</label>
                                     <select
                                         value={formData.payment_terms}
                                         onChange={(e) => setFormData({ ...formData, payment_terms: e.target.value })}
                                         className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
                                     >
-                                        <option value="NET 7">NET 7</option>
-                                        <option value="NET 14">NET 14</option>
-                                        <option value="NET 30">NET 30</option>
-                                        <option value="NET 60">NET 60</option>
+                                        <option value="NET 7">{t("NET 7")}</option>
+                                        <option value="NET 14">{t("NET 14")}</option>
+                                        <option value="NET 30">{t("NET 30")}</option>
+                                        <option value="NET 60">{t("NET 60")}</option>
                                         <option value="COD">COD</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-xs text-silver-dark mb-1">Currency</label>
+                                    <label className="block text-xs text-silver-dark mb-1">{t("Currency")}</label>
                                     <select
                                         value={formData.currency}
                                         onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
@@ -853,7 +855,7 @@ const PartnerManagement = () => {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-xs text-silver-dark mb-1">Credit Limit</label>
+                                    <label className="block text-xs text-silver-dark mb-1">{t("Credit Limit")}</label>
                                     <input
                                         type="number"
                                         value={formData.credit_limit}
@@ -865,27 +867,27 @@ const PartnerManagement = () => {
 
                             {/* Bank Info */}
                             <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
-                                <h3 className="text-sm font-bold text-green-400 mb-3 uppercase">Informasi Bank (opsional)</h3>
+                                <h3 className="text-sm font-bold text-green-400 mb-3 uppercase">{t("Informasi Bank (opsional)")}</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                     <input
                                         type="text"
                                         value={formData.bank_name}
                                         onChange={(e) => setFormData({ ...formData, bank_name: e.target.value })}
-                                        placeholder="Nama Bank"
+                                        placeholder={t("Nama Bank")}
                                         className="px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
                                     />
                                     <input
                                         type="text"
                                         value={formData.bank_account_number}
                                         onChange={(e) => setFormData({ ...formData, bank_account_number: e.target.value })}
-                                        placeholder="No Rekening"
+                                        placeholder={t("No Rekening")}
                                         className="px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
                                     />
                                     <input
                                         type="text"
                                         value={formData.bank_account_holder}
                                         onChange={(e) => setFormData({ ...formData, bank_account_holder: e.target.value })}
-                                        placeholder="Nama Pemilik Rekening"
+                                        placeholder={t("Nama Pemilik Rekening")}
                                         className="px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
                                     />
                                 </div>
@@ -893,7 +895,7 @@ const PartnerManagement = () => {
 
                             {/* Notes */}
                             <div>
-                                <label className="block text-xs text-silver-dark mb-1">Notes</label>
+                                <label className="block text-xs text-silver-dark mb-1">{t("Notes")}</label>
                                 <textarea
                                     value={formData.notes}
                                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
@@ -906,7 +908,7 @@ const PartnerManagement = () => {
                         {/* Actions */}
                         <div className="flex gap-3 justify-end mt-6 pt-6 border-t border-dark-border">
                             <Button type="button" variant="secondary" onClick={handleCloseModal}>
-                                Batal
+                                {t("Batal")}
                             </Button>
                             <Button type="submit" icon={editingPartner ? Edit : Plus}>
                                 {editingPartner ? 'Update Mitra' : 'Simpan Mitra'}

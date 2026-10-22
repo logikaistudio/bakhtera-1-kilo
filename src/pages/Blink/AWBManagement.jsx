@@ -12,8 +12,10 @@ import {
 import { printBLCertificate } from '../../utils/printUtils'; // We can reuse print logic or create printAWBUtils later
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const AWBManagement = () => {
+    const { t } = useLanguage();
     const { canEdit } = useAuth();
     const [awbs, setAwbs] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -286,7 +288,7 @@ const AWBManagement = () => {
 
     const handleUpdateAWB = async () => {
         if (!canEdit('blink_awb')) {
-            alert('Anda tidak memiliki hak akses untuk memanipulasi (Edit) AWB.');
+            alert(t("Anda tidak memiliki hak akses untuk memanipulasi (Edit) AWB."));
             return;
         }
         try {
@@ -373,7 +375,7 @@ const AWBManagement = () => {
 
             if (error) throw error;
 
-            alert('✅ AWB Document updated successfully');
+            alert(t("✅ AWB Document updated successfully"));
             setIsEditing(false);
             fetchAWBs();
             setShowEditModal(false);
@@ -533,15 +535,15 @@ const AWBManagement = () => {
             awb.consigneeName?.toLowerCase().includes(searchTerm.toLowerCase());
     });
 
-    if (loading) return <div className="p-12 text-center text-silver-dark">Loading AWB data...</div>;
+    if (loading) return <div className="p-12 text-center text-silver-dark">{t("Loading AWB data...")}</div>;
 
     return (
         <div className="space-y-6">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text">AWB Management</h1>
-                    <p className="text-silver-dark mt-1">Air Waybill Documentation</p>
+                    <h1 className="text-3xl font-bold gradient-text">{t("AWB Management")}</h1>
+                    <p className="text-silver-dark mt-1">{t("Air Waybill Documentation")}</p>
                 </div>
             </div>
 
@@ -550,7 +552,7 @@ const AWBManagement = () => {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                 <input
                     type="text"
-                    placeholder="Search AWB, Job No, or Consignee..."
+                    placeholder={t("Search AWB, Job No, or Consignee...")}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded-lg text-gray-900 dark:text-silver-light"
@@ -562,17 +564,17 @@ const AWBManagement = () => {
                 <table className="w-full">
                     <thead className="bg-accent-orange">
                         <tr>
-                            <th className="px-4 py-2 text-left text-xs text-white font-bold">AWB Number</th>
-                            <th className="px-4 py-2 text-left text-xs text-white font-bold">Date</th>
-                            <th className="px-4 py-2 text-left text-xs text-white font-bold">Job No</th>
-                            <th className="px-4 py-2 text-left text-xs text-white font-bold">Shipper (Doc)</th>
-                            <th className="px-4 py-2 text-left text-xs text-white font-bold">Consignee (Doc)</th>
-                            <th className="px-4 py-2 text-center text-xs text-white font-bold">Pieces</th>
+                            <th className="px-4 py-2 text-left text-xs text-white font-bold">{t("AWB Number")}</th>
+                            <th className="px-4 py-2 text-left text-xs text-white font-bold">{t("Date")}</th>
+                            <th className="px-4 py-2 text-left text-xs text-white font-bold">{t("Job No")}</th>
+                            <th className="px-4 py-2 text-left text-xs text-white font-bold">{t("Shipper (Doc)")}</th>
+                            <th className="px-4 py-2 text-left text-xs text-white font-bold">{t("Consignee (Doc)")}</th>
+                            <th className="px-4 py-2 text-center text-xs text-white font-bold">{t("Pieces")}</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-dark-border">
                         {filteredAwbs.length === 0 ? (
-                            <tr><td colSpan="6" className="p-8 text-center text-silver-dark">No AWBs found</td></tr>
+                            <tr><td colSpan="6" className="p-8 text-center text-silver-dark">{t("No AWBs found")}</td></tr>
                         ) : filteredAwbs.map(awb => (
                             <tr
                                 key={awb.id}
@@ -604,25 +606,25 @@ const AWBManagement = () => {
                             <div>
                                 <h2 className="text-xl font-bold text-gray-900 dark:text-silver-light flex items-center gap-2">
                                     <Plane className="w-5 h-5 text-accent-orange" />
-                                    AWB Editor
+                                    {t("AWB Editor")}
                                 </h2>
                                 <p className="text-xs text-gray-500 dark:text-silver-dark mt-1 font-mono">
-                                    JOB: {selectedAWB.jobNumber} | Customer (Bill To): {selectedAWB.customerName}
+                                    {t("JOB:")} {selectedAWB.jobNumber} {t("| Customer (Bill To):")} {selectedAWB.customerName}
                                 </p>
                             </div>
                             <div className="flex gap-2">
                                 <Button size="sm" variant="secondary" onClick={handlePrintPreview}>
                                     <Printer className="w-4 h-4 mr-1" />
-                                    Print Preview
+                                    {t("Print Preview")}
                                 </Button>
                                 {isEditing ? (
                                     <>
-                                        <Button size="sm" onClick={handleUpdateAWB}>Save Changes</Button>
-                                        <Button size="sm" variant="secondary" onClick={() => setIsEditing(false)}>Cancel</Button>
+                                        <Button size="sm" onClick={handleUpdateAWB}>{t("Save Changes")}</Button>
+                                        <Button size="sm" variant="secondary" onClick={() => setIsEditing(false)}>{t("Cancel")}</Button>
                                     </>
                                 ) : (
                                     canEdit('blink_awb') && (
-                                        <Button size="sm" variant="secondary" onClick={() => setIsEditing(true)}>Edit Document</Button>
+                                        <Button size="sm" variant="secondary" onClick={() => setIsEditing(true)}>{t("Edit Document")}</Button>
                                     )
                                 )}
                                 <button onClick={() => setShowEditModal(false)} className="mx-2 text-gray-400 hover:text-white">✕</button>
@@ -669,14 +671,14 @@ const AWBManagement = () => {
                                 <div className="grid grid-cols-2 gap-8">
                                     <div className="border-r border-dashed pr-4 border-gray-700">
                                         <div className="flex items-center justify-between mb-3">
-                                            <h3 className="text-blue-400 font-bold uppercase text-xs">Shipper</h3>
+                                            <h3 className="text-blue-400 font-bold uppercase text-xs">{t("Shipper")}</h3>
                                             {isEditing && (
                                                 <button
                                                     type="button"
                                                     onClick={() => setShowShipperPicker(!showShipperPicker)}
                                                     className="text-xs px-2 py-1 bg-blue-500/20 text-blue-400 rounded hover:bg-blue-500/30 transition-colors"
                                                 >
-                                                    📋 Load
+                                                    {t("📋 Load")}
                                                 </button>
                                             )}
                                         </div>
@@ -687,7 +689,7 @@ const AWBManagement = () => {
                                                     onChange={() => { }}
                                                     onPartnerLoad={handleLoadShipper}
                                                     roleFilter="all"
-                                                    placeholder="Select shipper..."
+                                                    placeholder={t("Select shipper...")}
                                                     size="sm"
                                                 />
                                             </div>
@@ -698,8 +700,8 @@ const AWBManagement = () => {
                                     <div>
                                         <div className="flex items-center justify-between mb-3">
                                             <div>
-                                                <h3 className="text-green-400 font-bold uppercase text-xs">Consignee</h3>
-                                                <p className="text-[10px] text-gray-500 mt-0.5">Note: Often different from "Customer"</p>
+                                                <h3 className="text-green-400 font-bold uppercase text-xs">{t("Consignee")}</h3>
+                                                <p className="text-[10px] text-gray-500 mt-0.5">{t("Note: Often different from \"Customer\"")}</p>
                                             </div>
                                             {isEditing && (
                                                 <button
@@ -707,7 +709,7 @@ const AWBManagement = () => {
                                                     onClick={() => setShowConsigneePicker(!showConsigneePicker)}
                                                     className="text-xs px-2 py-1 bg-green-500/20 text-green-400 rounded hover:bg-green-500/30 transition-colors"
                                                 >
-                                                    📋 Load
+                                                    {t("📋 Load")}
                                                 </button>
                                             )}
                                         </div>
@@ -718,7 +720,7 @@ const AWBManagement = () => {
                                                     onChange={() => { }}
                                                     onPartnerLoad={handleLoadConsignee}
                                                     roleFilter="all"
-                                                    placeholder="Select consignee..."
+                                                    placeholder={t("Select consignee...")}
                                                     size="sm"
                                                 />
                                             </div>
@@ -727,7 +729,7 @@ const AWBManagement = () => {
                                         {renderInput('Consignee Address', 'consigneeAddress', 'textarea')}
                                     </div>
                                     <div className="col-span-2 border-t border-dashed border-gray-300 dark:border-gray-700 pt-4">
-                                        <h3 className="text-amber-500 font-bold uppercase text-xs mb-3">Notify Party</h3>
+                                        <h3 className="text-amber-500 font-bold uppercase text-xs mb-3">{t("Notify Party")}</h3>
                                         <div className="grid grid-cols-2 gap-4">
                                             {renderInput('Notify Party Name', 'notifyPartyName')}
                                             {renderInput('Notify Party Address', 'notifyPartyAddress', 'textarea')}
@@ -763,23 +765,23 @@ const AWBManagement = () => {
                                             <div>
                                                 <h3 className="text-sm font-bold text-gray-900 dark:text-silver-light flex items-center gap-2">
                                                     <Package className="w-4 h-4 text-accent-orange" />
-                                                    Document Cargo Items
+                                                    {t("Document Cargo Items")}
                                                 </h3>
-                                                <p className="text-xs text-gray-500 dark:text-silver-dark mt-1">Rows are populated from Sales Order item details.</p>
+                                                <p className="text-xs text-gray-500 dark:text-silver-dark mt-1">{t("Rows are populated from Sales Order item details.")}</p>
                                             </div>
                                             {isEditing && (
-                                                <Button size="sm" variant="secondary" onClick={addCargoItem}>Add Row</Button>
+                                                <Button size="sm" variant="secondary" onClick={addCargoItem}>{t("Add Row")}</Button>
                                             )}
                                         </div>
                                         <div className="overflow-x-auto">
                                             <table className="w-full min-w-[900px]">
                                                 <thead className="bg-gray-100 dark:bg-dark-bg/70">
                                                     <tr>
-                                                        <th className="px-3 py-2 text-left text-xs font-bold text-gray-600 dark:text-silver-dark uppercase w-[18%]">Marks & Numbers</th>
-                                                        <th className="px-3 py-2 text-left text-xs font-bold text-gray-600 dark:text-silver-dark uppercase w-[14%]">No. of Packages</th>
-                                                        <th className="px-3 py-2 text-left text-xs font-bold text-gray-600 dark:text-silver-dark uppercase">Description of Goods</th>
-                                                        <th className="px-3 py-2 text-left text-xs font-bold text-gray-600 dark:text-silver-dark uppercase w-[14%]">Gross Weight</th>
-                                                        <th className="px-3 py-2 text-left text-xs font-bold text-gray-600 dark:text-silver-dark uppercase w-[14%]">Measurement</th>
+                                                        <th className="px-3 py-2 text-left text-xs font-bold text-gray-600 dark:text-silver-dark uppercase w-[18%]">{t("Marks & Numbers")}</th>
+                                                        <th className="px-3 py-2 text-left text-xs font-bold text-gray-600 dark:text-silver-dark uppercase w-[14%]">{t("No. of Packages")}</th>
+                                                        <th className="px-3 py-2 text-left text-xs font-bold text-gray-600 dark:text-silver-dark uppercase">{t("Description of Goods")}</th>
+                                                        <th className="px-3 py-2 text-left text-xs font-bold text-gray-600 dark:text-silver-dark uppercase w-[14%]">{t("Gross Weight")}</th>
+                                                        <th className="px-3 py-2 text-left text-xs font-bold text-gray-600 dark:text-silver-dark uppercase w-[14%]">{t("Measurement")}</th>
                                                         {isEditing && <th className="px-3 py-2 w-12"></th>}
                                                     </tr>
                                                 </thead>
@@ -787,7 +789,7 @@ const AWBManagement = () => {
                                                     {(editForm.cargoItems || []).length === 0 ? (
                                                         <tr>
                                                             <td colSpan={isEditing ? 6 : 5} className="px-3 py-6 text-center text-sm text-gray-500 dark:text-silver-dark">
-                                                                No cargo rows available.
+                                                                {t("No cargo rows available.")}
                                                             </td>
                                                         </tr>
                                                     ) : (editForm.cargoItems || []).map((item, index) => (
@@ -819,7 +821,7 @@ const AWBManagement = () => {
                                                                         type="button"
                                                                         onClick={() => removeCargoItem(index)}
                                                                         className="p-1.5 rounded text-red-500 hover:bg-red-500/10"
-                                                                        title="Remove row"
+                                                                        title={t("Remove row")}
                                                                     >
                                                                         <Trash2 className="w-4 h-4" />
                                                                     </button>

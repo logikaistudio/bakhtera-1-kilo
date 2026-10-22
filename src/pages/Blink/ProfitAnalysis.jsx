@@ -9,8 +9,10 @@ import {
     PieChart, Pie, Cell
 } from 'recharts';
 import { getActiveDivision } from '../../utils/divisionContext';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const ProfitAnalysis = () => {
+    const { t } = useLanguage();
     const activeDivision = getActiveDivision();
     const [jobs, setJobs] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -141,9 +143,9 @@ const ProfitAnalysis = () => {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-3xl font-bold gradient-text">Job Profitability</h1>
-                <p className="text-silver-dark mt-1">Analisa Laba/Rugi per Pekerjaan (Job/Shipment)</p>
-                <p className="text-xs text-blue-300 mt-1">Data ditampilkan sesuai divisi aktif: {activeDivision?.toUpperCase()}</p>
+                <h1 className="text-3xl font-bold gradient-text">{t("Job Profitability")}</h1>
+                <p className="text-silver-dark mt-1">{t("Analisa Laba/Rugi per Pekerjaan (Job/Shipment)")}</p>
+                <p className="text-xs text-blue-300 mt-1">{t("Data ditampilkan sesuai divisi aktif:")} {activeDivision?.toUpperCase()}</p>
             </div>
 
             {/* Top Section: Summary & Charts */}
@@ -152,7 +154,7 @@ const ProfitAnalysis = () => {
                 <div className="space-y-4">
                     <div className="glass-card p-6 rounded-lg bg-gradient-to-br from-blue-500/10 to-transparent border border-blue-500/30">
                         <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm text-silver-dark">Total Revenue</span>
+                            <span className="text-sm text-silver-dark">{t("Total Revenue")}</span>
                             <DollarSign className="w-5 h-5 text-blue-400" />
                         </div>
                         <p className="text-3xl font-bold text-silver-light">{formatCurrency(summary.totalRevenue)}</p>
@@ -163,7 +165,7 @@ const ProfitAnalysis = () => {
 
                     <div className="glass-card p-6 rounded-lg bg-gradient-to-br from-orange-500/10 to-transparent border border-orange-500/30">
                         <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm text-silver-dark">Total Cost (PO)</span>
+                            <span className="text-sm text-silver-dark">{t("Total Cost (PO)")}</span>
                             <Briefcase className="w-5 h-5 text-orange-400" />
                         </div>
                         <p className="text-3xl font-bold text-silver-light">{formatCurrency(summary.totalCost)}</p>
@@ -174,13 +176,13 @@ const ProfitAnalysis = () => {
 
                     <div className="grid grid-cols-2 gap-4">
                         <div className="glass-card p-4 rounded-lg border-l-4 border-emerald-500">
-                            <p className="text-xs text-silver-dark mb-1">Gross Profit</p>
+                            <p className="text-xs text-silver-dark mb-1">{t("Gross Profit")}</p>
                             <p className={`text-xl font-bold ${summary.totalProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                                 {formatCurrency(summary.totalProfit)}
                             </p>
                         </div>
                         <div className="glass-card p-4 rounded-lg border-l-4 border-purple-500">
-                            <p className="text-xs text-silver-dark mb-1">Avg Margin</p>
+                            <p className="text-xs text-silver-dark mb-1">{t("Avg Margin")}</p>
                             <div className="flex items-center gap-1">
                                 <Activity className="w-4 h-4 text-purple-400" />
                                 <p className="text-xl font-bold text-purple-400">
@@ -195,7 +197,7 @@ const ProfitAnalysis = () => {
                 <div className="lg:col-span-2 glass-card p-6 rounded-lg">
                     <h3 className="text-lg font-bold text-silver-light mb-6 flex items-center gap-2">
                         <BarChart2 className="w-5 h-5 text-accent-orange" />
-                        Top 5 Most Profitable Jobs
+                        {t("Top 5 Most Profitable Jobs")}
                     </h3>
                     <div className="h-[300px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
@@ -223,7 +225,7 @@ const ProfitAnalysis = () => {
                 <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                 <input
                     type="text"
-                    placeholder="Search Job Number..."
+                    placeholder={t("Search Job Number...")}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full pl-12 pr-4 py-3 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
@@ -236,24 +238,24 @@ const ProfitAnalysis = () => {
                     <table className="w-full text-sm">
                         <thead className="bg-dark-surface border-b border-dark-border">
                             <tr>
-                                <th className="px-4 py-3 text-left font-semibold text-silver-light">Job Number</th>
-                                <th className="px-4 py-3 text-center font-semibold text-silver-light">Status</th>
-                                <th className="px-4 py-3 text-center font-semibold text-silver-light">Inv / PO</th>
-                                <th className="px-4 py-3 text-right font-semibold text-blue-400">Revenue</th>
-                                <th className="px-4 py-3 text-right font-semibold text-orange-400">Cost</th>
-                                <th className="px-4 py-3 text-right font-semibold text-emerald-400">Profit</th>
-                                <th className="px-4 py-3 text-right font-semibold text-purple-400">Margin</th>
+                                <th className="px-4 py-3 text-left font-semibold text-silver-light">{t("Job Number")}</th>
+                                <th className="px-4 py-3 text-center font-semibold text-silver-light">{t("Status")}</th>
+                                <th className="px-4 py-3 text-center font-semibold text-silver-light">{t("Inv / PO")}</th>
+                                <th className="px-4 py-3 text-right font-semibold text-blue-400">{t("Revenue")}</th>
+                                <th className="px-4 py-3 text-right font-semibold text-orange-400">{t("Cost")}</th>
+                                <th className="px-4 py-3 text-right font-semibold text-emerald-400">{t("Profit")}</th>
+                                <th className="px-4 py-3 text-right font-semibold text-purple-400">{t("Margin")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
                             {loading ? (
                                 <tr>
-                                    <td colSpan="7" className="px-4 py-8 text-center text-silver-dark">Loading data...</td>
+                                    <td colSpan="7" className="px-4 py-8 text-center text-silver-dark">{t("Loading data...")}</td>
                                 </tr>
                             ) : filteredJobs.length === 0 ? (
                                 <tr>
                                     <td colSpan="7" className="px-4 py-8 text-center text-silver-dark">
-                                        No data found. Start by creating Invoices and linking POs to Jobs.
+                                        {t("No data found. Start by creating Invoices and linking POs to Jobs.")}
                                     </td>
                                 </tr>
                             ) : (
@@ -271,11 +273,11 @@ const ProfitAnalysis = () => {
                                         </td>
                                         <td className="px-4 py-3 text-center">
                                             {job.profit < 0 ? (
-                                                <span className="px-2 py-0.5 rounded text-xs font-bold bg-red-500/20 text-red-400 border border-red-500/30">LOSS</span>
+                                                <span className="px-2 py-0.5 rounded text-xs font-bold bg-red-500/20 text-red-400 border border-red-500/30">{t("LOSS")}</span>
                                             ) : job.margin > 30 ? (
-                                                <span className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">HIGH</span>
+                                                <span className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">{t("HIGH")}</span>
                                             ) : (
-                                                <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">NORMAL</span>
+                                                <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">{t("NORMAL")}</span>
                                             )}
                                         </td>
                                         <td className="px-4 py-3 text-center text-silver-dark">

@@ -9,8 +9,10 @@ import {
     BarChart3
 } from 'lucide-react';
 import { getActiveDivision } from '../../utils/divisionContext';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const SalesRevenue = () => {
+    const { t } = useLanguage();
     const activeDivision = getActiveDivision();
     const [revenueData, setRevenueData] = useState({
         totalRevenue: 0,
@@ -175,25 +177,25 @@ const SalesRevenue = () => {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-3xl font-bold gradient-text">Sales & Revenue</h1>
-                <p className="text-silver-dark mt-1">Analisa revenue dari Regular Sales & Operation Sales</p>
-                <p className="text-xs text-blue-300 mt-1">Data ditampilkan sesuai divisi aktif: {activeDivision?.toUpperCase()}</p>
+                <h1 className="text-3xl font-bold gradient-text">{t("Sales & Revenue")}</h1>
+                <p className="text-silver-dark mt-1">{t("Analisa revenue dari Regular Sales & Operation Sales")}</p>
+                <p className="text-xs text-blue-300 mt-1">{t("Data ditampilkan sesuai divisi aktif:")} {activeDivision?.toUpperCase()}</p>
             </div>
 
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="glass-card p-6 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
-                        <p className="text-xs text-silver-dark">Total Revenue</p>
+                        <p className="text-xs text-silver-dark">{t("Total Revenue")}</p>
                         <DollarSign className="w-5 h-5 text-green-400" />
                     </div>
                     <p className="text-2xl font-bold text-green-400">{formatCurrency(revenueData.totalRevenue)}</p>
-                    <p className="text-xs text-silver-dark mt-1">All time</p>
+                    <p className="text-xs text-silver-dark mt-1">{t("All time")}</p>
                 </div>
 
                 <div className="glass-card p-6 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
-                        <p className="text-xs text-silver-dark">Revenue Bulan Ini</p>
+                        <p className="text-xs text-silver-dark">{t("Revenue Bulan Ini")}</p>
                         <Calendar className="w-5 h-5 text-blue-400" />
                     </div>
                     <p className="text-2xl font-bold text-blue-400">{formatCurrency(revenueData.monthlyRevenue)}</p>
@@ -202,7 +204,7 @@ const SalesRevenue = () => {
 
                 <div className="glass-card p-6 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
-                        <p className="text-xs text-silver-dark">Revenue Tahun Ini</p>
+                        <p className="text-xs text-silver-dark">{t("Revenue Tahun Ini")}</p>
                         <TrendingUp className="w-5 h-5 text-purple-400" />
                     </div>
                     <p className="text-2xl font-bold text-purple-400">{formatCurrency(revenueData.yearlyRevenue)}</p>
@@ -211,11 +213,11 @@ const SalesRevenue = () => {
 
                 <div className="glass-card p-6 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
-                        <p className="text-xs text-silver-dark">Conversion Rate</p>
+                        <p className="text-xs text-silver-dark">{t("Conversion Rate")}</p>
                         <CheckCircle className="w-5 h-5 text-orange-400" />
                     </div>
                     <p className="text-2xl font-bold text-orange-400">{revenueData.conversionRate.toFixed(1)}%</p>
-                    <p className="text-xs text-silver-dark mt-1">{revenueData.totalSO} SO dari {revenueData.totalQuotations} quotations</p>
+                    <p className="text-xs text-silver-dark mt-1">{revenueData.totalSO} {t("SO dari")} {revenueData.totalQuotations} {t("quotations")}</p>
                 </div>
             </div>
 
@@ -224,7 +226,7 @@ const SalesRevenue = () => {
                 <div className="glass-card p-6 rounded-lg md:col-span-1">
                     <h3 className="text-lg font-semibold text-silver-light mb-6 flex items-center gap-2">
                         <BarChart3 className="w-5 h-5 text-accent-orange" />
-                        Revenue by Sales Type
+                        {t("Revenue by Sales Type")}
                     </h3>
 
                     <div className="grid grid-cols-2 gap-6">
@@ -283,7 +285,7 @@ const SalesRevenue = () => {
                             </div>
 
                             <div className="mt-3 text-center">
-                                <p className="text-sm font-medium text-silver-light">Regular Sales</p>
+                                <p className="text-sm font-medium text-silver-light">{t("Regular Sales")}</p>
                                 <p className="text-xs text-blue-400 font-semibold">{formatCurrency(revenueData.regularRevenue)}</p>
                             </div>
                         </div>
@@ -343,7 +345,7 @@ const SalesRevenue = () => {
                             </div>
 
                             <div className="mt-3 text-center">
-                                <p className="text-sm font-medium text-silver-light">Operation Sales</p>
+                                <p className="text-sm font-medium text-silver-light">{t("Operation Sales")}</p>
                                 <p className="text-xs text-orange-400 font-semibold">{formatCurrency(revenueData.operationRevenue)}</p>
                             </div>
                         </div>
@@ -354,7 +356,7 @@ const SalesRevenue = () => {
                 <div className="glass-card p-6 rounded-lg md:col-span-2">
                     <h3 className="text-lg font-semibold text-silver-light mb-4 flex items-center gap-2">
                         <TrendingUp className="w-5 h-5 text-accent-orange" />
-                        Monthly Revenue Trend
+                        {t("Monthly Revenue Trend")}
                     </h3>
                     <div className="relative h-64">
                         {monthlyTrend.length > 0 && (() => {
@@ -460,24 +462,24 @@ const SalesRevenue = () => {
                 <div className="p-6 border-b border-dark-border">
                     <h3 className="text-lg font-semibold text-silver-light flex items-center gap-2">
                         <FileText className="w-5 h-5 text-accent-orange" />
-                        Top 5 Customers by Revenue
+                        {t("Top 5 Customers by Revenue")}
                     </h3>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead className="bg-dark-surface">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-bold text-silver uppercase">Rank</th>
-                                <th className="px-6 py-3 text-left text-xs font-bold text-silver uppercase">Customer</th>
-                                <th className="px-6 py-3 text-right text-xs font-bold text-silver uppercase">Total Revenue</th>
-                                <th className="px-6 py-3 text-center text-xs font-bold text-silver uppercase">Contribution</th>
+                                <th className="px-6 py-3 text-left text-xs font-bold text-silver uppercase">{t("Rank")}</th>
+                                <th className="px-6 py-3 text-left text-xs font-bold text-silver uppercase">{t("Customer")}</th>
+                                <th className="px-6 py-3 text-right text-xs font-bold text-silver uppercase">{t("Total Revenue")}</th>
+                                <th className="px-6 py-3 text-center text-xs font-bold text-silver uppercase">{t("Contribution")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
                             {topCustomers.length === 0 ? (
                                 <tr>
                                     <td colSpan="4" className="px-6 py-8 text-center text-silver-dark">
-                                        Belum ada data customer
+                                        {t("Belum ada data customer")}
                                     </td>
                                 </tr>
                             ) : (

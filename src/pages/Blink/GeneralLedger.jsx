@@ -13,6 +13,7 @@ import { journalEntriesHasColumn } from '../../utils/journalHelper';
 import { useData } from '../../context/DataContext';
 import { getActiveDivision } from '../../utils/divisionContext';
 import { filterActiveBlinkJournalEntries } from '../../utils/blinkJournalIntegrity';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 // ─── COA Type Config ─────────────────────────────────────────────────────────
 const COA_TYPE_CONFIG = {
@@ -195,6 +196,7 @@ const exportToPDF = (selectedAccount, accountInfo, dateRange, openingBalance, to
 
 // ─────────────────────────────────────────────────────────────────────────────
 const GeneralLedger = () => {
+    const { t } = useLanguage();
     const navigate = useNavigate();
     const location = useLocation();
     const { companySettings } = useData();
@@ -562,9 +564,9 @@ const GeneralLedger = () => {
                 <div className="flex items-center gap-2.5 shrink-0">
                     <BookOpen className="w-5 h-5 text-accent-orange" />
                     <div>
-                        <h1 className="text-base font-bold gradient-text leading-tight">General Ledger</h1>
-                        <p className="text-[10px] text-silver-dark">Per-account transaction detail with running balance</p>
-                        <p className="text-[10px] text-blue-300">Divisi aktif: {activeDivision?.toUpperCase()}</p>
+                        <h1 className="text-base font-bold gradient-text leading-tight">{t("General Ledger")}</h1>
+                        <p className="text-[10px] text-silver-dark">{t("Per-account transaction detail with running balance")}</p>
+                        <p className="text-[10px] text-blue-300">{t("Divisi aktif:")} {activeDivision?.toUpperCase()}</p>
                     </div>
                 </div>
                 <div className="w-px h-7 bg-dark-border hidden md:block mx-1 shrink-0" />
@@ -592,11 +594,11 @@ const GeneralLedger = () => {
                 <div className="flex items-center gap-1.5 shrink-0">
                     <button onClick={() => setShowSidebar(v => !v)}
                         className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded border text-xs smooth-transition ${showSidebar ? 'bg-accent-orange/10 border-accent-orange/40 text-accent-orange' : 'bg-dark-surface border-dark-border text-silver-dark hover:text-white'}`}>
-                        <Layers className="w-3.5 h-3.5" />{showSidebar ? 'Hide' : 'Show'} Accounts
+                        <Layers className="w-3.5 h-3.5" />{showSidebar ? 'Hide' : 'Show'} {t("Accounts")}
                     </button>
                     <button onClick={fetchLedgerData} disabled={!selectedAccount}
                         className="flex items-center gap-1 px-2.5 py-1.5 rounded border border-dark-border text-xs text-silver-dark hover:text-white hover:bg-dark-card smooth-transition disabled:opacity-40">
-                        <RefreshCw className="w-3.5 h-3.5" /> Refresh
+                        <RefreshCw className="w-3.5 h-3.5" /> {t("Refresh")}
                     </button>
                     <button onClick={exportCSV} disabled={!selectedAccount || loading}
                         className="flex items-center gap-1 px-2.5 py-1.5 rounded border border-dark-border text-xs text-silver-dark hover:text-white hover:bg-dark-card smooth-transition disabled:opacity-40">
@@ -604,7 +606,7 @@ const GeneralLedger = () => {
                     </button>
                     <button onClick={() => exportToPDF(selectedAccount, accountInfo, dateRange, openingBalance, totalDebit, totalCredit, closingBalance, rows, typeConfig, companySettings)} disabled={!selectedAccount || loading || rows.length === 0}
                         className="flex items-center gap-1 px-2.5 py-1.5 rounded border border-dark-border text-xs text-red-400 hover:text-red-300 hover:bg-dark-card smooth-transition disabled:opacity-40">
-                        <Printer className="w-3.5 h-3.5" /> Print PDF
+                        <Printer className="w-3.5 h-3.5" /> {t("Print PDF")}
                     </button>
                 </div>
             </div>
@@ -617,12 +619,12 @@ const GeneralLedger = () => {
                     <div className="w-80 shrink-0 glass-card rounded-xl border border-dark-border flex flex-col overflow-hidden">
                         <div className="px-3 pt-3 pb-2 border-b border-dark-border bg-dark-bg/80 shrink-0">
                             <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs font-bold text-silver-light uppercase tracking-widest">Chart of Accounts</span>
+                                <span className="text-xs font-bold text-silver-light uppercase tracking-widest">{t("Chart of Accounts")}</span>
                                 <span className="text-[10px] text-silver-dark bg-dark-surface px-1.5 py-0.5 rounded border border-dark-border">YTD</span>
                             </div>
                             <div className="relative">
                                 <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-silver-dark" />
-                                <input type="text" placeholder="Search account code or name..."
+                                <input type="text" placeholder={t("Search account code or name...")}
                                     value={coaSearchTerm} onChange={e => setCoaSearchTerm(e.target.value)}
                                     className="w-full pl-7 pr-5 py-2 bg-dark-surface border border-dark-border rounded text-xs text-silver-light placeholder:text-silver-dark/40 focus:border-accent-blue/50 smooth-transition" />
                                 {coaSearchTerm && (
@@ -638,7 +640,7 @@ const GeneralLedger = () => {
                             ) : Object.keys(groupedAccounts).length === 0 ? (
                                 <div className="py-8 px-3 text-center">
                                     <Search className="w-6 h-6 text-silver-dark/30 mx-auto mb-2" />
-                                    <p className="text-xs text-silver-dark">No results for "{coaSearchTerm}"</p>
+                                    <p className="text-xs text-silver-dark">{t("No results for \"")}{coaSearchTerm}"</p>
                                 </div>
                             ) : (
                                 Object.entries(groupedAccounts).map(([type, accs]) => {
@@ -689,12 +691,12 @@ const GeneralLedger = () => {
                             <div className="w-14 h-14 rounded-2xl bg-accent-orange/10 flex items-center justify-center mb-4">
                                 <BookOpen className="w-7 h-7 text-accent-orange/50" />
                             </div>
-                            <p className="text-sm font-semibold text-silver-light">Select a COA Account</p>
-                            <p className="text-xs text-silver-dark mt-1">Click an account in the left sidebar to view the ledger</p>
+                            <p className="text-sm font-semibold text-silver-light">{t("Select a COA Account")}</p>
+                            <p className="text-xs text-silver-dark mt-1">{t("Click an account in the left sidebar to view the ledger")}</p>
                             {!showSidebar && (
                                 <button onClick={() => setShowSidebar(true)}
                                     className="mt-4 px-4 py-2 bg-accent-orange/10 border border-accent-orange/30 text-accent-orange text-xs rounded-lg hover:bg-accent-orange/20 smooth-transition">
-                                    Show Account Sidebar
+                                    {t("Show Account Sidebar")}
                                 </button>
                             )}
                         </div>
@@ -705,8 +707,8 @@ const GeneralLedger = () => {
                                 <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold border ${typeConfig.color}`}>{typeConfig.label}</span>
                                 <span className="font-mono text-accent-blue text-xs font-bold">{accountInfo?.code}</span>
                                 <span className="text-silver-light font-semibold text-sm">{accountInfo?.name}</span>
-                                <span className="text-[10px] text-silver-dark border border-dark-border rounded px-1.5 py-0.5">Normal Balance: {typeConfig.normalBalance}</span>
-                                <span className="text-[10px] text-silver-dark">{filteredEntries.length} transactions</span>
+                                <span className="text-[10px] text-silver-dark border border-dark-border rounded px-1.5 py-0.5">{t("Normal Balance:")} {typeConfig.normalBalance}</span>
+                                <span className="text-[10px] text-silver-dark">{filteredEntries.length} {t("transactions")}</span>
                                 {sparkData.length > 1 && <span className="ml-auto"><Sparkline data={sparkData} color={typeConfig.accent} width={80} height={22} /></span>}
                             </div>
 
@@ -730,7 +732,7 @@ const GeneralLedger = () => {
                             <div className="flex gap-2 items-center flex-wrap">
                                 <div className="relative flex-1 min-w-[180px]">
                                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-silver-dark" />
-                                    <input type="text" placeholder="Search description, reference, party..."
+                                    <input type="text" placeholder={t("Search description, reference, party...")}
                                         value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
                                         className="w-full pl-7 pr-4 py-1.5 bg-dark-surface border border-dark-border rounded text-silver-light text-xs" />
                                     {searchTerm && (
@@ -741,16 +743,16 @@ const GeneralLedger = () => {
                                 </div>
                                 <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)}
                                     className="px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded text-silver-light text-xs">
-                                    <option value="all">All Sources</option>
+                                    <option value="all">{t("All Sources")}</option>
                                     {availableSources.map(s => <option key={s} value={s}>{SOURCE_CONFIG[s]?.label || s}</option>)}
                                 </select>
                                 {(searchTerm || sourceFilter !== 'all') && (
                                     <button onClick={() => { setSearchTerm(''); setSourceFilter('all'); }}
                                         className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-silver-dark border border-dark-border rounded hover:text-white smooth-transition">
-                                        <X className="w-2.5 h-2.5" /> Reset
+                                        <X className="w-2.5 h-2.5" /> {t("Reset")}
                                     </button>
                                 )}
-                                <span className="text-[10px] text-silver-dark ml-auto">{rows.length}/{entries.length} entries</span>
+                                <span className="text-[10px] text-silver-dark ml-auto">{rows.length}/{entries.length} {t("entries")}</span>
                             </div>
 
                             {/* Ledger Table */}
@@ -758,7 +760,7 @@ const GeneralLedger = () => {
                                 {loading ? (
                                     <div className="flex items-center justify-center py-12">
                                         <div className="animate-spin w-6 h-6 border-2 border-accent-orange border-t-transparent rounded-full mr-3" />
-                                        <span className="text-silver-dark text-xs">Loading ledger data...</span>
+                                        <span className="text-silver-dark text-xs">{t("Loading ledger data...")}</span>
                                     </div>
                                 ) : (
                                     <div className="overflow-x-auto">
@@ -774,15 +776,15 @@ const GeneralLedger = () => {
                                             <tbody className="divide-y divide-dark-border/40">
                                                 <tr className="bg-yellow-500/5 border-l-2 border-yellow-500">
                                                     <td className="px-3 py-1.5" colSpan={6}>
-                                                        <span className="font-semibold text-yellow-400">↑ Opening Balance</span>
-                                                        <span className="ml-2 text-silver-dark text-[10px]">(before {new Date(dateRange.start + 'T00:00:00').toLocaleDateString('en-GB', { dateStyle: 'medium' })})</span>
+                                                        <span className="font-semibold text-yellow-400">{t("↑ Opening Balance")}</span>
+                                                        <span className="ml-2 text-silver-dark text-[10px]">{t("(before")} {new Date(dateRange.start + 'T00:00:00').toLocaleDateString('en-GB', { dateStyle: 'medium' })})</span>
                                                     </td>
                                                     <td className="px-3 py-1.5" />
                                                     <td className="px-3 py-1.5" />
                                                     <td className="px-3 py-1.5 text-right font-bold text-yellow-400 font-mono">{fmtIDR(openingBalance)}</td>
                                                 </tr>
                                                 {rows.length === 0 ? (
-                                                    <tr><td colSpan={9} className="px-4 py-10 text-center text-silver-dark">Tidak ada transactions pada periode dan akun ini.</td></tr>
+                                                    <tr><td colSpan={9} className="px-4 py-10 text-center text-silver-dark">{t("Tidak ada transactions pada periode dan akun ini.")}</td></tr>
                                                 ) : rows.map((entry, idx) => {
                                                     const srcCfg = getSourceConfig(entry);
                                                     const isLinked = entry.reference_type && entry.reference_type !== 'adjustment' && entry.reference_number;
@@ -820,7 +822,7 @@ const GeneralLedger = () => {
                                                 {rows.length > 0 && (
                                                     <tr className="bg-purple-500/5 border-l-2 border-purple-500">
                                                         <td className="px-3 py-1.5" colSpan={6}>
-                                                            <span className="font-semibold text-purple-400">↓ Closing Balance</span>
+                                                            <span className="font-semibold text-purple-400">{t("↓ Closing Balance")}</span>
                                                             <span className="ml-2 text-silver-dark text-[10px]">({new Date(dateRange.end + 'T00:00:00').toLocaleDateString('en-GB', { dateStyle: 'medium' })})</span>
                                                         </td>
                                                         <td className="px-3 py-1.5 text-right font-bold text-green-400 font-mono">{fmtIDR(totalDebit)}</td>

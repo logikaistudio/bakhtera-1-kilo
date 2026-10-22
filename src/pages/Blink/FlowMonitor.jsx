@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { generateSONumber } from '../../utils/documentNumbers';
 import { Activity, Calendar, User, FileText, Package, Clock } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const FlowMonitor = () => {
+    const { t } = useLanguage();
     const [flows, setFlows] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -82,31 +84,31 @@ const FlowMonitor = () => {
             <div className="flex items-center gap-3 mb-6">
                 <Activity className="w-8 h-8 text-accent-orange" />
                 <div>
-                    <h1 className="text-2xl font-bold text-silver-light">Quotation Flow Monitor</h1>
-                    <p className="text-sm text-silver-dark">Track quotation lifecycle timestamps</p>
+                    <h1 className="text-2xl font-bold text-silver-light">{t("Quotation Flow Monitor")}</h1>
+                    <p className="text-sm text-silver-dark">{t("Track quotation lifecycle timestamps")}</p>
                 </div>
             </div>
 
             {loading ? (
                 <div className="glass-card p-12 text-center">
                     <Clock className="w-12 h-12 text-silver-dark mx-auto mb-4 animate-spin" />
-                    <p className="text-silver-dark">Loading flow data...</p>
+                    <p className="text-silver-dark">{t("Loading flow data...")}</p>
                 </div>
             ) : (
                 <div className="glass-card overflow-x-auto">
                     <table className="w-full">
                         <thead>
                             <tr className="border-b border-dark-border">
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver-dark uppercase">Quotation No.</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver-dark uppercase">Job Number</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver-dark uppercase">Created</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver-dark uppercase">Manager Approved</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver-dark uppercase">Revision</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver-dark uppercase">Sent to Customer</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver-dark uppercase">Customer Approved</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver-dark uppercase">SO Created</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver-dark uppercase">Status</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver-dark uppercase">Remark</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver-dark uppercase">{t("Quotation No.")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver-dark uppercase">{t("Job Number")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver-dark uppercase">{t("Created")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver-dark uppercase">{t("Manager Approved")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver-dark uppercase">{t("Revision")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver-dark uppercase">{t("Sent to Customer")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver-dark uppercase">{t("Customer Approved")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver-dark uppercase">{t("SO Created")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver-dark uppercase">{t("Status")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver-dark uppercase">{t("Remark")}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -114,7 +116,7 @@ const FlowMonitor = () => {
                                 <tr>
                                     <td colSpan="10" className="px-4 py-12 text-center text-silver-dark">
                                         <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                                        <p>No flow data available</p>
+                                        <p>{t("No flow data available")}</p>
                                     </td>
                                 </tr>
                             ) : (

@@ -11,6 +11,7 @@ import { printReport } from '../../utils/printPDF';
 import { useData } from '../../context/DataContext';
 import { getActiveDivision } from '../../utils/divisionContext';
 import { filterActiveBlinkJournalEntries } from '../../utils/blinkJournalIntegrity';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 // ── COA Group Definitions ────────────────────────────────────────────────────
 const ASSET_GROUPS = [
@@ -44,6 +45,7 @@ function groupAccounts(accounts, groupDefs) {
 }
 
 const BalanceSheet = () => {
+    const { t } = useLanguage();
     const navigate = useNavigate();
     const { companySettings } = useData();
     const activeDivision = getActiveDivision();
@@ -669,40 +671,40 @@ const BalanceSheet = () => {
                 <div>
                     <h1 className="text-3xl font-bold gradient-text flex items-center gap-2">
                         <Scale className="w-8 h-8" />
-                        Balance Sheet
+                        {t("Balance Sheet")}
                     </h1>
-                    <p className="text-silver-dark mt-1">Financial Position — Per {asOfLabel}</p>
-                    <p className="text-xs text-blue-300 mt-1">Data ditampilkan sesuai divisi aktif: {activeDivision?.toUpperCase()}</p>
+                    <p className="text-silver-dark mt-1">{t("Financial Position — Per")} {asOfLabel}</p>
+                    <p className="text-xs text-blue-300 mt-1">{t("Data ditampilkan sesuai divisi aktif:")} {activeDivision?.toUpperCase()}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button variant="secondary" icon={RefreshCw} onClick={fetchBalanceSheet}>Refresh</Button>
+                    <Button variant="secondary" icon={RefreshCw} onClick={fetchBalanceSheet}>{t("Refresh")}</Button>
                     <button onClick={exportToExcel}
                         className="flex items-center gap-2 px-3 py-2 bg-dark-surface text-green-400 hover:bg-dark-card smooth-transition rounded-lg border border-dark-border text-xs">
-                        <FileSpreadsheet className="w-4 h-4" /> Excel
+                        <FileSpreadsheet className="w-4 h-4" /> {t("Excel")}
                     </button>
                     <select
                         value={printOrientation}
                         onChange={(e) => setPrintOrientation(e.target.value)}
                         className="px-2 py-2 bg-dark-surface border border-dark-border rounded-lg text-xs text-silver-light hover:bg-dark-card smooth-transition"
-                        title="Orientasi cetak"
+                        title={t("Orientasi cetak")}
                     >
-                        <option value="auto">Auto</option>
-                        <option value="portrait">Portrait</option>
-                        <option value="landscape">Landscape</option>
+                        <option value="auto">{t("Auto")}</option>
+                        <option value="portrait">{t("Portrait")}</option>
+                        <option value="landscape">{t("Landscape")}</option>
                     </select>
                     <select
                         value={printPageSize}
                         onChange={(e) => setPrintPageSize(e.target.value)}
                         className="px-2 py-2 bg-dark-surface border border-dark-border rounded-lg text-xs text-silver-light hover:bg-dark-card smooth-transition"
-                        title="Ukuran kertas"
+                        title={t("Ukuran kertas")}
                     >
                         <option value="A4">A4</option>
-                        <option value="Letter">Letter</option>
-                        <option value="Legal">Legal</option>
+                        <option value="Letter">{t("Letter")}</option>
+                        <option value="Legal">{t("Legal")}</option>
                     </select>
                     <button onClick={handleExportPDF}
                         className="flex items-center gap-2 px-3 py-2 bg-dark-surface text-red-400 hover:bg-dark-card smooth-transition rounded-lg border border-dark-border text-xs">
-                        <Printer className="w-4 h-4" /> Print PDF
+                        <Printer className="w-4 h-4" /> {t("Print PDF")}
                     </button>
                 </div>
             </div>
@@ -712,7 +714,7 @@ const BalanceSheet = () => {
                 <div className="glass-card p-4 rounded-lg flex items-center gap-4 flex-1">
                     <Calendar className="w-5 h-5 text-accent-orange" />
                     <div>
-                        <label className="block text-xs text-silver-dark uppercase mb-1">As of Date</label>
+                        <label className="block text-xs text-silver-dark uppercase mb-1">{t("As of Date")}</label>
                         <input type="date" value={asOfDate}
                             onChange={e => setAsOfDate(e.target.value)}
                             className="bg-dark-bg border border-dark-border rounded px-3 py-1 text-silver-light text-sm" />
@@ -720,11 +722,11 @@ const BalanceSheet = () => {
                     <div className="flex gap-2 ml-auto">
                         <button onClick={() => setAsOfDate(new Date().toISOString().split('T')[0])}
                             className="px-3 py-1 bg-accent-orange text-white rounded text-xs hover:bg-accent-orange/80 smooth-transition">
-                            Today
+                            {t("Today")}
                         </button>
                         <button onClick={() => setAsOfDate(new Date(new Date().getFullYear(), 11, 31).toISOString().split('T')[0])}
                             className="px-3 py-1 bg-dark-surface border border-dark-border rounded text-xs text-silver-light hover:bg-dark-card smooth-transition">
-                            Year End
+                            {t("Year End")}
                         </button>
                     </div>
                 </div>
@@ -732,15 +734,15 @@ const BalanceSheet = () => {
                 {/* Summary Cards */}
                 <div className="flex gap-3">
                     <div className="glass-card p-3 rounded-lg border-l-4 border-green-500 min-w-[180px]">
-                        <p className="text-[10px] text-silver-dark uppercase">Total Assets</p>
+                        <p className="text-[10px] text-silver-dark uppercase">{t("Total Assets")}</p>
                         <p className="text-lg font-bold text-green-400 font-mono">{fmtCur(totals.totalAssets)}</p>
                     </div>
                     <div className="glass-card p-3 rounded-lg border-l-4 border-red-500 min-w-[180px]">
-                        <p className="text-[10px] text-silver-dark uppercase">Total Liabilities</p>
+                        <p className="text-[10px] text-silver-dark uppercase">{t("Total Liabilities")}</p>
                         <p className="text-lg font-bold text-red-400 font-mono">{fmtCur(totals.totalLiabilities)}</p>
                     </div>
                     <div className="glass-card p-3 rounded-lg border-l-4 border-blue-500 min-w-[180px]">
-                        <p className="text-[10px] text-silver-dark uppercase">Total Equity</p>
+                        <p className="text-[10px] text-silver-dark uppercase">{t("Total Equity")}</p>
                         <p className="text-lg font-bold text-blue-400 font-mono">{fmtCur(totals.totalEquity)}</p>
                     </div>
                 </div>
@@ -748,7 +750,7 @@ const BalanceSheet = () => {
 
             {/* Table Mode Toggle */}
             <div className="glass-card p-3 rounded-lg flex items-center gap-3">
-                <span className="text-xs text-silver-dark uppercase tracking-wide">Table Mode</span>
+                <span className="text-xs text-silver-dark uppercase tracking-wide">{t("Table Mode")}</span>
                 <div className="flex items-center gap-2">
                     <button
                         onClick={() => setTableMode('scontro')}
@@ -758,7 +760,7 @@ const BalanceSheet = () => {
                                 : 'bg-dark-surface text-silver-light border-dark-border hover:bg-dark-card'
                         }`}
                     >
-                        Scontro
+                        {t("Scontro")}
                     </button>
                     <button
                         onClick={() => setTableMode('stafel')}
@@ -768,13 +770,13 @@ const BalanceSheet = () => {
                                 : 'bg-dark-surface text-silver-light border-dark-border hover:bg-dark-card'
                         }`}
                     >
-                        Stafel
+                        {t("Stafel")}
                     </button>
                 </div>
             </div>
 
             {loading ? (
-                <div className="glass-card p-12 rounded-lg text-center text-silver-dark">Loading balance sheet...</div>
+                <div className="glass-card p-12 rounded-lg text-center text-silver-dark">{t("Loading balance sheet...")}</div>
             ) : reportData ? (
                 tableMode === 'stafel' ? (
                     <div className="glass-card rounded-lg overflow-hidden border border-dark-border/50">
@@ -794,7 +796,7 @@ const BalanceSheet = () => {
 
                         {/* Net Income line */}
                         <div className="flex justify-between items-center py-[3px] pl-8 pr-4 text-sm mt-2">
-                            <span className="text-silver-dark italic">LABA / RUGI Per {asOfLabel}</span>
+                            <span className="text-silver-dark italic">{t("LABA / RUGI Per")} {asOfLabel}</span>
                             <span className="font-mono text-silver-light text-xs min-w-[160px] text-right italic">{fmtCur(
                                 (() => {
                                     const niAcc = reportData.equity.find(a => a.id === 'net-income');
@@ -809,7 +811,7 @@ const BalanceSheet = () => {
 
                         {/* ── TOTAL LIABILITIES + EQUITY ── */}
                         <div className="py-4 pr-4 mt-2 mb-2 flex justify-end items-center bg-dark-surface/30">
-                            <span className="text-base font-extrabold text-accent-orange mr-6 tracking-wide">TOTAL LIABILITIES DAN EQUITY</span>
+                            <span className="text-base font-extrabold text-accent-orange mr-6 tracking-wide">{t("TOTAL LIABILITIES DAN EQUITY")}</span>
                             <div className="min-w-[160px] text-right">
                                 <span className="font-mono text-base font-extrabold text-accent-orange">{fmtCur(totals.totalLiabilities + totals.totalEquity)}</span>
                                 <div className="flex flex-col gap-[2px] mt-1 ml-auto" style={{ width: '160px' }}>
@@ -822,7 +824,7 @@ const BalanceSheet = () => {
                 ) : (
                     <div className="glass-card rounded-lg overflow-hidden border border-dark-border/50">
                         <div className="px-4 py-2 text-[11px] text-black border-b border-dark-border/40">
-                            Mode Scontro: sisi kiri ASSETS dan sisi kanan LIABILITIES + EQUITY ditampilkan berdampingan.
+                            {t("Mode Scontro: sisi kiri ASSETS dan sisi kanan LIABILITIES + EQUITY ditampilkan berdampingan.")}
                         </div>
                         <div className="overflow-x-auto">
                             <table className="balance-sheet-scontro-table w-full min-w-[1200px] text-sm table-auto">
@@ -835,9 +837,9 @@ const BalanceSheet = () => {
                                 </colgroup>
                                 <thead>
                                     <tr className="border-b border-dark-border/40 bg-transparent">
-                                        <th className="px-4 py-2.5 text-left text-xs text-white font-extrabold tracking-[1px] uppercase bg-[#0f6fb8]" colSpan={2}>ASSETS</th>
+                                        <th className="px-4 py-2.5 text-left text-xs text-white font-extrabold tracking-[1px] uppercase bg-[#0f6fb8]" colSpan={2}>{t("ASSETS")}</th>
                                         <th className="scontro-divider" />
-                                        <th className="px-4 py-2.5 text-left text-xs text-white font-extrabold tracking-[1px] uppercase bg-[#0f6fb8]" colSpan={2}>LIABILITIES & EQUITY</th>
+                                        <th className="px-4 py-2.5 text-left text-xs text-white font-extrabold tracking-[1px] uppercase bg-[#0f6fb8]" colSpan={2}>{t("LIABILITIES & EQUITY")}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -860,7 +862,7 @@ const BalanceSheet = () => {
             ) : null}
 
             <div className="text-center text-xs text-silver-dark mt-6 italic">
-                * Click on an account to view its transactions in the General Ledger. "LABA / RUGI PERIODE BERJALAN" is auto-calculated from Revenue minus Expenses.
+                {t("* Click on an account to view its transactions in the General Ledger. \"LABA / RUGI PERIODE BERJALAN\" is auto-calculated from Revenue minus Expenses.")}
             </div>
         </div>
     );

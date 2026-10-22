@@ -9,6 +9,7 @@ import { getQuotationTypeLabel } from '../../utils/orderTypeDetection';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { getActiveDivision } from '../../utils/divisionContext';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const normalizeServiceType = (value) => {
     const source = String(value || '').toLowerCase();
@@ -18,6 +19,7 @@ const normalizeServiceType = (value) => {
 };
 
 const ShipmentManagement = () => {
+    const { t } = useLanguage();
     const { canCreate, canEdit, canDelete, canView, canApprove, canAccess, isSuperAdmin } = useAuth();
     const { deleteShipmentCascade } = useData();
     const [filter, setFilter] = useState('all');
@@ -51,18 +53,18 @@ const ShipmentManagement = () => {
 
     const handleCleanseAllShipments = async () => {
         if (!canRunSuperAdminBatch) {
-            alert('Akses Ditolak: Hanya Super Admin yang dapat cleansing shipment.');
+            alert(t("Akses Ditolak: Hanya Super Admin yang dapat cleansing shipment."));
             return;
         }
         if (shipments.length === 0) {
-            alert('Tidak ada data shipment untuk dihapus.');
+            alert(t("Tidak ada data shipment untuk dihapus."));
             return;
         }
 
         const confirm1 = confirm(`Cleansing akan menghapus SEMUA shipment (${shipments.length} baris) beserta data turunannya. Lanjutkan?`);
         if (!confirm1) return;
 
-        const confirm2 = confirm('Konfirmasi terakhir: semua data shipment terkait akan dihapus permanen. Yakin lanjut?');
+        const confirm2 = confirm(t("Konfirmasi terakhir: semua data shipment terkait akan dihapus permanen. Yakin lanjut?"));
         if (!confirm2) return;
 
         try {
@@ -73,7 +75,7 @@ const ShipmentManagement = () => {
             });
             if (!success) return;
             await fetchShipments();
-            alert('✅ Cleansing shipment selesai.');
+            alert(t("✅ Cleansing shipment selesai."));
         } catch (error) {
             console.error('Error cleansing shipments:', error);
             alert('❌ Gagal cleansing shipment: ' + (error.message || error));
@@ -84,17 +86,17 @@ const ShipmentManagement = () => {
 
     const handleDeleteSelectedShipments = async () => {
         if (!canDelete('blink_shipments')) {
-            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus shipment terpilih.');
+            alert(t("Akses Ditolak: Anda tidak memiliki hak untuk menghapus shipment terpilih."));
             return;
         }
         if (selectedShipmentIds.length === 0) {
-            alert('Pilih minimal 1 shipment untuk dihapus.');
+            alert(t("Pilih minimal 1 shipment untuk dihapus."));
             return;
         }
 
         const confirm1 = confirm(`Hapus ${selectedShipmentIds.length} shipment terpilih beserta data turunannya?`);
         if (!confirm1) return;
-        const confirm2 = confirm('Konfirmasi terakhir: data terpilih akan dihapus permanen. Lanjutkan?');
+        const confirm2 = confirm(t("Konfirmasi terakhir: data terpilih akan dihapus permanen. Lanjutkan?"));
         if (!confirm2) return;
 
         try {
@@ -106,7 +108,7 @@ const ShipmentManagement = () => {
             if (!success) return;
             await fetchShipments();
             setSelectedShipmentIds([]);
-            alert('✅ Shipment terpilih berhasil dihapus.');
+            alert(t("✅ Shipment terpilih berhasil dihapus."));
         } catch (error) {
             console.error('Error deleting selected shipments:', error);
             alert('❌ Gagal hapus shipment terpilih: ' + (error.message || error));
@@ -385,13 +387,13 @@ const ShipmentManagement = () => {
         // Allow if user has access to either blink_purchase_order or bxpo_shipments (BXPO operators)
         const hasPOAccess = canCreate('blink_purchase_order') || canCreate('bxpo_shipments') || canCreate(poMenuCode);
         if (!hasPOAccess) {
-            alert('Anda tidak memiliki hak akses untuk membuat PO.');
+            alert(t("Anda tidak memiliki hak akses untuk membuat PO."));
             return;
         }
 
         // --- ENFORCE APPROVAL ---
         if (ship.status !== 'approved') {
-            alert('Purchase Order hanya dapat dibuat untuk Shipment yang sudah di-Approve oleh Manager.');
+            alert(t("Purchase Order hanya dapat dibuat untuk Shipment yang sudah di-Approve oleh Manager."));
             return;
         }
         try {
@@ -461,7 +463,7 @@ const ShipmentManagement = () => {
             });
 
             if (poItemsRaw.length === 0) {
-                alert('No actual cost items found for this shipment. Please add COGS/Actual Costs first.');
+                alert(t("No actual cost items found for this shipment. Please add COGS/Actual Costs first."));
                 return;
             }
 
@@ -491,7 +493,7 @@ const ShipmentManagement = () => {
     const handleConfirmListPO = async () => {
         try {
             if (!listPOSelectedVendor) {
-                alert('Please select a vendor.');
+                alert(t("Please select a vendor."));
                 return;
             }
             const vendor = listPOVendors.find(v => v.id === listPOSelectedVendor);
@@ -553,7 +555,7 @@ const ShipmentManagement = () => {
     // Handle update shipment
     const handleUpdateShipment = async (updatedShipment, skipDbUpdate = false) => {
         if (!canEdit('blink_shipments')) {
-            alert('Anda tidak memiliki hak akses untuk mengedit shipment ini.');
+            alert(t("Anda tidak memiliki hak akses untuk mengedit shipment ini."));
             return;
         }
         try {
@@ -730,7 +732,7 @@ const ShipmentManagement = () => {
                 .eq('division', activeDivision);
             if (poErr) console.warn('Note: No POs to cancel or error:', poErr);
 
-            alert('Shipment dan seluruh alur terkait berhasil dibatalkan.');
+            alert(t("Shipment dan seluruh alur terkait berhasil dibatalkan."));
             fetchShipments();
         } catch (error) {
             console.error('Error cancelling shipment:', error);
@@ -745,8 +747,8 @@ const ShipmentManagement = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text">Sales Order Management</h1>
-                            <p className="text-silver-dark mt-1">Kelola semua sales order</p>
+                    <h1 className="text-3xl font-bold gradient-text">{t("Sales Order Management")}</h1>
+                            <p className="text-silver-dark mt-1">{t("Kelola semua sales order")}</p>
                 </div>
                 <div className="flex gap-2">
                     {canDelete('blink_shipments') && (
@@ -757,7 +759,7 @@ const ShipmentManagement = () => {
                             onClick={handleDeleteSelectedShipments}
                             disabled={selectedShipmentIds.length === 0 || isCleansing}
                         >
-                            Hapus Terpilih ({selectedShipmentIds.length})
+                            {t("Hapus Terpilih (")}{selectedShipmentIds.length})
                         </Button>
                     )}
                     {canRunSuperAdminBatch && (
@@ -778,17 +780,17 @@ const ShipmentManagement = () => {
                         onClick={handleExportToExcel}
                         disabled={shipments.length === 0}
                     >
-                        Export Excel
+                        {t("Export Excel")}
                     </Button>
                     <Button size="sm" variant="secondary" icon={Filter} onClick={() => setShowFilters(!showFilters)}>
-                        Filters
+                        {t("Filters")}
                     </Button>
                 </div>
             </div>
 
             {isCleansing && (
                 <div className="glass-card px-4 py-2 rounded-lg border border-amber-500/30 bg-amber-500/10">
-                    <p className="text-xs text-amber-300">Progress Cleansing: {cleanseProgress || 'Sedang memproses...'}</p>
+                    <p className="text-xs text-amber-300">{t("Progress Cleansing:")} {cleanseProgress || 'Sedang memproses...'}</p>
                 </div>
             )}
 
@@ -800,7 +802,7 @@ const ShipmentManagement = () => {
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search by Job Number, Customer, Origin, Destination, SO Number..."
+                        placeholder={t("Search by Job Number, Customer, Origin, Destination, SO Number...")}
                         className="flex-1 bg-transparent border-none outline-none text-silver-light placeholder-silver-dark"
                     />
                     {searchQuery && (
@@ -814,38 +816,38 @@ const ShipmentManagement = () => {
             {/* Advanced Filters */}
             {showFilters && (
                 <div className="glass-card p-4 rounded-lg">
-                    <h4 className="text-sm font-semibold text-silver-light mb-3">Advanced Filters</h4>
+                    <h4 className="text-sm font-semibold text-silver-light mb-3">{t("Advanced Filters")}</h4>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                            <label className="text-xs text-silver-dark mb-1 block">Status</label>
+                            <label className="text-xs text-silver-dark mb-1 block">{t("Status")}</label>
                             <select
                                 value={statusFilter}
                                 onChange={(e) => setStatusFilter(e.target.value)}
                                 className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light text-sm"
                             >
-                                <option value="all">All Statuses</option>
-                                <option value="pending">Pending</option>
-                                <option value="confirmed">Confirmed</option>
-                                <option value="booked">Booked</option>
-                                <option value="in_transit">In Transit</option>
-                                <option value="arrived">Arrived</option>
-                                <option value="customs_clearance">Customs Clearance</option>
-                                <option value="delivered">Delivered</option>
-                                <option value="completed">Completed</option>
-                                <option value="cancelled">Cancelled</option>
+                                <option value="all">{t("All Statuses")}</option>
+                                <option value="pending">{t("Pending")}</option>
+                                <option value="confirmed">{t("Confirmed")}</option>
+                                <option value="booked">{t("Booked")}</option>
+                                <option value="in_transit">{t("In Transit")}</option>
+                                <option value="arrived">{t("Arrived")}</option>
+                                <option value="customs_clearance">{t("Customs Clearance")}</option>
+                                <option value="delivered">{t("Delivered")}</option>
+                                <option value="completed">{t("Completed")}</option>
+                                <option value="cancelled">{t("Cancelled")}</option>
                             </select>
                         </div>
                         <div>
-                            <label className="text-xs text-silver-dark mb-1 block">Service Type</label>
+                            <label className="text-xs text-silver-dark mb-1 block">{t("Service Type")}</label>
                             <select
                                 value={serviceFilter}
                                 onChange={(e) => setServiceFilter(e.target.value)}
                                 className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light text-sm"
                             >
-                                <option value="all">All Services</option>
-                                <option value="sea">Sea Freight</option>
-                                <option value="air">Air Freight</option>
-                                <option value="land">Land Transport</option>
+                                <option value="all">{t("All Services")}</option>
+                                <option value="sea">{t("Sea Freight")}</option>
+                                <option value="air">{t("Air Freight")}</option>
+                                <option value="land">{t("Land Transport")}</option>
                             </select>
                         </div>
                         <div className="flex items-end">
@@ -859,7 +861,7 @@ const ShipmentManagement = () => {
                                 }}
                                 className="w-full"
                             >
-                                Reset Filters
+                                {t("Reset Filters")}
                             </Button>
                         </div>
                     </div>
@@ -890,23 +892,23 @@ const ShipmentManagement = () => {
             {/* Stats */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="glass-card p-4 rounded-lg">
-                    <p className="text-xs text-silver-dark">Total Sales Orders</p>
+                    <p className="text-xs text-silver-dark">{t("Total Sales Orders")}</p>
                     <p className="text-2xl font-bold text-silver-light mt-1">{shipments.length}</p>
                 </div>
                 <div className="glass-card p-4 rounded-lg">
-                    <p className="text-xs text-silver-dark">Regular</p>
+                    <p className="text-xs text-silver-dark">{t("Regular")}</p>
                     <p className="text-2xl font-bold text-blue-400 mt-1">
                         {shipments.filter(s => getShipmentType(s) === 'regular').length}
                     </p>
                 </div>
                 <div className="glass-card p-4 rounded-lg">
-                    <p className="text-xs text-silver-dark">Project</p>
+                    <p className="text-xs text-silver-dark">{t("Project")}</p>
                     <p className="text-2xl font-bold text-indigo-400 mt-1">
                         {shipments.filter(s => getShipmentType(s) === 'project').length}
                     </p>
                 </div>
                 <div className="glass-card p-4 rounded-lg">
-                    <p className="text-xs text-silver-dark">Event</p>
+                    <p className="text-xs text-silver-dark">{t("Event")}</p>
                     <p className="text-2xl font-bold text-emerald-400 mt-1">
                         {shipments.filter(s => getShipmentType(s) === 'event').length}
                     </p>
@@ -918,13 +920,13 @@ const ShipmentManagement = () => {
                 <div className="glass-card rounded-lg p-12 text-center">
                     <Ship className="w-16 h-16 text-silver-dark mx-auto mb-4" />
                     <h3 className="text-xl font-semibold text-silver-light mb-2">
-                        No Sales Orders Found
+                        {t("No Sales Orders Found")}
                     </h3>
                     <p className="text-silver-dark mb-4">
-                        Sales Orders are automatically created from confirmed Sales Quotations
+                        {t("Sales Orders are automatically created from confirmed Sales Quotations")}
                     </p>
                     <p className="text-sm text-silver-dark">
-                        Flow: Quotation → <span className="text-accent-orange font-semibold">Sales Order</span>
+                        {t("Flow: Quotation →")} <span className="text-accent-orange font-semibold">{t("Sales Order")}</span>
                     </p>
                 </div>
             ) : (
@@ -942,12 +944,12 @@ const ShipmentManagement = () => {
                                             className="w-4 h-4"
                                         />
                                     </th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-white">Job Number</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-white">Customer</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-white">Route</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-white">Type</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-white">Service</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-white">Status</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-white">{t("Job Number")}</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-white">{t("Customer")}</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-white">{t("Route")}</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-white">{t("Type")}</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-white">{t("Service")}</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-white">{t("Status")}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-dark-border">
@@ -1034,7 +1036,7 @@ const ShipmentManagement = () => {
                         <div className="px-6 py-4 border-b border-dark-border flex justify-between items-center">
                             <div className="flex items-center gap-2">
                                 <ShoppingCart className="w-5 h-5 text-accent-orange" />
-                                <h3 className="text-lg font-bold text-silver-light">Generate Purchase Order</h3>
+                                <h3 className="text-lg font-bold text-silver-light">{t("Generate Purchase Order")}</h3>
                             </div>
                             <button onClick={() => setShowListPOModal(false)} className="p-1 hover:bg-white/10 rounded-full text-silver-dark">
                                 <X className="w-5 h-5" />
@@ -1043,20 +1045,20 @@ const ShipmentManagement = () => {
                         <div className="p-6 space-y-5">
                             {listPOShipment && (
                                 <div className="bg-dark-surface rounded-lg px-4 py-3 text-sm">
-                                    <p className="text-silver-dark text-xs mb-1">Shipment</p>
+                                    <p className="text-silver-dark text-xs mb-1">{t("Shipment")}</p>
                                     <p className="text-accent-orange font-bold">{listPOShipment.jobNumber}</p>
                                     <p className="text-silver-light text-xs mt-1">{listPOShipment.customer} • {listPOShipment.origin} → {listPOShipment.destination}</p>
                                 </div>
                             )}
                             <div>
-                                <p className="text-sm font-medium text-silver mb-2">Items ({listPOShipment?.pending_po_items?.length || 0})</p>
+                                <p className="text-sm font-medium text-silver mb-2">{t("Items (")}{listPOShipment?.pending_po_items?.length || 0})</p>
                                 <div className="max-h-40 overflow-y-auto rounded-lg border border-dark-border">
                                     <table className="w-full text-xs">
                                         <thead className="bg-dark-surface">
                                             <tr>
-                                                <th className="px-3 py-2 text-left text-silver-dark">Item</th>
-                                                <th className="px-3 py-2 text-left text-silver-dark">Description</th>
-                                                <th className="px-3 py-2 text-right text-silver-dark">Amount</th>
+                                                <th className="px-3 py-2 text-left text-silver-dark">{t("Item")}</th>
+                                                <th className="px-3 py-2 text-left text-silver-dark">{t("Description")}</th>
+                                                <th className="px-3 py-2 text-right text-silver-dark">{t("Amount")}</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-dark-border">
@@ -1072,16 +1074,16 @@ const ShipmentManagement = () => {
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-silver mb-2">Select Vendor (Blink Mitra) <span className="text-red-400">*</span></label>
+                                <label className="block text-sm font-medium text-silver mb-2">{t("Select Vendor (Blink Mitra)")} <span className="text-red-400">*</span></label>
                                 {listPOVendors.length === 0 ? (
-                                    <p className="text-yellow-400 text-sm">⚠️ No active vendor found in Blink Mitra.</p>
+                                    <p className="text-yellow-400 text-sm">{t("⚠️ No active vendor found in Blink Mitra.")}</p>
                                 ) : (
                                     <select
                                         value={listPOSelectedVendor}
                                         onChange={e => setListPOSelectedVendor(e.target.value)}
                                         className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:outline-none focus:border-accent-orange"
                                     >
-                                        <option value="">-- Select Vendor --</option>
+                                        <option value="">{t("-- Select Vendor --")}</option>
                                         {listPOVendors.map(v => (
                                             <option key={v.id} value={v.id}>{v.partner_name}{v.partner_code ? ` (${v.partner_code})` : ''}</option>
                                         ))}
@@ -1089,8 +1091,8 @@ const ShipmentManagement = () => {
                                 )}
                             </div>
                             <div className="flex justify-end gap-2 pt-2">
-                                <Button variant="secondary" onClick={() => setShowListPOModal(false)}>Cancel</Button>
-                                <Button onClick={handleConfirmListPO} disabled={!listPOSelectedVendor}>Generate PO</Button>
+                                <Button variant="secondary" onClick={() => setShowListPOModal(false)}>{t("Cancel")}</Button>
+                                <Button onClick={handleConfirmListPO} disabled={!listPOSelectedVendor}>{t("Generate PO")}</Button>
                             </div>
                         </div>
                     </div>

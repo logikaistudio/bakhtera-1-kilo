@@ -7,6 +7,7 @@ import {
     ChevronRight, RefreshCw, AlertCircle, Check, MapPin, 
     Ship, Activity, Plane, Truck, ShoppingBag, Receipt, Bell, Eye, X
 } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const isMissingTableError = (error) => {
     const message = String(error?.message || error?.details || error || '').toLowerCase();
@@ -38,6 +39,7 @@ const recordApprovalHistory = async (item, action, reason = null, approverName =
 };
 
 const SalesBlinkApproval = () => {
+    const { t } = useLanguage();
     const navigate = useNavigate();
     const { user, isSuperAdmin, isAdmin } = useAuth();
     
@@ -340,7 +342,7 @@ const SalesBlinkApproval = () => {
 
     const handleReject = async (item) => {
         if (!isApprover) return;
-        if (!rejectReason.trim()) { alert('Please provide a rejection reason'); return; }
+        if (!rejectReason.trim()) { alert(t("Please provide a rejection reason")); return; }
         try {
             setProcessing(true);
 
@@ -418,11 +420,11 @@ const SalesBlinkApproval = () => {
                     <div className="flex items-center gap-3">
                         <h1 style={{ color: '#111827' }} className="text-2xl font-bold flex items-center gap-2">
                             <CheckCircle className="w-6 h-6 text-blue-600" />
-                            Sales Approval Center
+                            {t("Sales Approval Center")}
                         </h1>
                     </div>
                     <p style={{ color: '#4B5563' }} className="text-sm mt-1">
-                        Manage all sales quotation document submissions
+                        {t("Manage all sales quotation document submissions")}
                     </p>
                 </div>
                 <div className="flex items-center gap-3 bg-white p-1 rounded-xl shadow-sm border border-gray-100">
@@ -435,7 +437,7 @@ const SalesBlinkApproval = () => {
                             }`}
                     >
                         <Clock className="w-4 h-4" />
-                        Pending Approvals
+                        {t("Pending Approvals")}
                         {pendingCount > 0 && (
                             <span className={`px-2 py-0.5 rounded-full text-xs ${activeTab === 'pending' ? 'bg-white/20' : 'bg-blue-100 text-blue-600'}`}>
                                 {pendingCount}
@@ -451,12 +453,12 @@ const SalesBlinkApproval = () => {
                             }`}
                     >
                         <FileText className="w-4 h-4" />
-                        Approval History
+                        {t("Approval History")}
                     </button>
                     <button
                         onClick={fetchSubmissions}
                         className="p-2.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors border-l border-gray-100 ml-1"
-                        title="Refresh"
+                        title={t("Refresh")}
                     >
                         <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                     </button>
@@ -468,9 +470,9 @@ const SalesBlinkApproval = () => {
                 <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-start gap-3">
                     <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
                     <div>
-                        <p style={{ color: '#111827' }} className="text-sm font-semibold">Access Restricted</p>
+                        <p style={{ color: '#111827' }} className="text-sm font-semibold">{t("Access Restricted")}</p>
                         <p style={{ color: '#4B5563' }} className="text-sm mt-0.5">
-                            Only Manager/Admin can approve or reject submissions.
+                            {t("Only Manager/Admin can approve or reject submissions.")}
                         </p>
                     </div>
                 </div>
@@ -481,15 +483,15 @@ const SalesBlinkApproval = () => {
                 <div className="flex items-center justify-center py-16">
                     <div className="text-center">
                         <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                        <p style={{ color: '#4B5563' }} className="text-sm">Loading data...</p>
+                        <p style={{ color: '#4B5563' }} className="text-sm">{t("Loading data...")}</p>
                     </div>
                 </div>
             ) : activeTab === 'pending' ? (
                 filtered.length === 0 ? (
                     <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50">
                         <Bell className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                        <p style={{ color: '#4B5563' }}>No submissions</p>
-                        <p style={{ color: '#9CA3AF' }} className="text-sm mt-1">All submissions have been processed</p>
+                        <p style={{ color: '#4B5563' }}>{t("No submissions")}</p>
+                        <p style={{ color: '#9CA3AF' }} className="text-sm mt-1">{t("All submissions have been processed")}</p>
                     </div>
                 ) : (
                 <div className="space-y-3">
@@ -521,7 +523,7 @@ const SalesBlinkApproval = () => {
                                             </span>
                                             {isPending && (
                                                 <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs rounded-full border border-yellow-200 font-semibold">
-                                                    ⚡ Action Needed
+                                                    {t("⚡ Action Needed")}
                                                 </span>
                                             )}
                                         </div>
@@ -558,21 +560,21 @@ const SalesBlinkApproval = () => {
                                             onClick={() => { setSelectedItem(item); setShowDetailModal(true); }}
                                             className="flex items-center gap-1 px-3 py-1.5 bg-gray-50 text-gray-600 text-xs rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
                                         >
-                                            <Eye className="w-3.5 h-3.5" /> View Details
+                                            <Eye className="w-3.5 h-3.5" /> {t("View Details")}
                                         </button>
                                         <button
                                             onClick={() => handleApprove(item)}
                                             disabled={processing}
                                             className="flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 text-xs rounded-lg border border-green-200 hover:bg-green-100 transition-colors disabled:opacity-50"
                                         >
-                                            <Check className="w-3.5 h-3.5" /> Approve
+                                            <Check className="w-3.5 h-3.5" /> {t("Approve")}
                                         </button>
                                         <button
                                             onClick={() => { setSelectedItem(item); setShowDetailModal(true); setShowRejectInput(true); }}
                                             disabled={processing}
                                             className="flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-700 text-xs rounded-lg border border-red-200 hover:bg-red-100 transition-colors disabled:opacity-50"
                                         >
-                                            <X className="w-3.5 h-3.5" /> Reject
+                                            <X className="w-3.5 h-3.5" /> {t("Reject")}
                                         </button>
                                     </div>
                                 )}
@@ -585,22 +587,22 @@ const SalesBlinkApproval = () => {
                 /* HISTORY TAB */
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                     <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                        <h2 className="font-semibold text-gray-800">Historical Sales Approvals</h2>
-                        <div className="text-sm text-gray-500">Showing {historyLogs.length} records</div>
+                        <h2 className="font-semibold text-gray-800">{t("Historical Sales Approvals")}</h2>
+                        <div className="text-sm text-gray-500">{t("Showing")} {historyLogs.length} {t("records")}</div>
                     </div>
                     {historyLogs.length === 0 ? (
-                        <div className="p-12 text-center text-gray-500">Belum ada riwayat approval.</div>
+                        <div className="p-12 text-center text-gray-500">{t("Belum ada riwayat approval.")}</div>
                     ) : (
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-sm whitespace-nowrap">
                                 <thead className="bg-gray-50 text-gray-600">
                                     <tr>
-                                        <th className="px-6 py-4 font-semibold uppercase tracking-wider text-xs">Tanggal</th>
-                                        <th className="px-6 py-4 font-semibold uppercase tracking-wider text-xs">No Dokumen</th>
-                                        <th className="px-6 py-4 font-semibold uppercase tracking-wider text-xs">Tipe</th>
-                                        <th className="px-6 py-4 font-semibold uppercase tracking-wider text-xs">Approver</th>
-                                        <th className="px-6 py-4 font-semibold uppercase tracking-wider text-xs">Status</th>
-                                        <th className="px-6 py-4 font-semibold uppercase tracking-wider text-xs">Alasan Reject</th>
+                                        <th className="px-6 py-4 font-semibold uppercase tracking-wider text-xs">{t("Tanggal")}</th>
+                                        <th className="px-6 py-4 font-semibold uppercase tracking-wider text-xs">{t("No Dokumen")}</th>
+                                        <th className="px-6 py-4 font-semibold uppercase tracking-wider text-xs">{t("Tipe")}</th>
+                                        <th className="px-6 py-4 font-semibold uppercase tracking-wider text-xs">{t("Approver")}</th>
+                                        <th className="px-6 py-4 font-semibold uppercase tracking-wider text-xs">{t("Status")}</th>
+                                        <th className="px-6 py-4 font-semibold uppercase tracking-wider text-xs">{t("Alasan Reject")}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
@@ -610,7 +612,7 @@ const SalesBlinkApproval = () => {
                                                 {new Date(log.approved_at || log.created_at || Date.now()).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                             </td>
                                             <td className="px-6 py-4 font-medium text-gray-900">{log.document_number}</td>
-                                            <td className="px-6 py-4 text-gray-600 capitalize">Sales Quotation</td>
+                                            <td className="px-6 py-4 text-gray-600 capitalize">{t("Sales Quotation")}</td>
                                             <td className="px-6 py-4 text-gray-600">{log.approver}</td>
                                             <td className="px-6 py-4">
                                                 {(() => {
@@ -655,7 +657,7 @@ const SalesBlinkApproval = () => {
                         {/* Modal Header */}
                         <div className="flex items-center justify-between p-6 border-b border-gray-200">
                             <div>
-                                <h2 style={{ color: '#111827' }} className="text-lg font-bold">Submission Details</h2>
+                                <h2 style={{ color: '#111827' }} className="text-lg font-bold">{t("Submission Details")}</h2>
                                 <p style={{ color: '#4B5563' }} className="text-xs mt-0.5">{selectedItem.typeLabel} · {selectedItem.refNumber}</p>
                             </div>
                             <button onClick={closeModal}
@@ -700,24 +702,24 @@ const SalesBlinkApproval = () => {
 
                             {/* Financial Summary Card */}
                             <div className="p-4 bg-gradient-to-r from-orange-500/10 via-amber-500/10 to-emerald-500/10 border border-orange-200/50 rounded-xl space-y-3">
-                                <h4 style={{ color: '#111827' }} className="text-xs font-bold uppercase tracking-wider">Financial Summary</h4>
+                                <h4 style={{ color: '#111827' }} className="text-xs font-bold uppercase tracking-wider">{t("Financial Summary")}</h4>
                                 <div className="grid grid-cols-3 gap-4 text-xs">
                                     <div>
-                                        <p style={{ color: '#4B5563' }} className="mb-0.5 font-medium">Total Revenue (Selling)</p>
+                                        <p style={{ color: '#4B5563' }} className="mb-0.5 font-medium">{t("Total Revenue (Selling)")}</p>
                                         <p className="font-semibold text-gray-900 font-mono">
                                             Rp {computedGrandTotalIDR.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <br/>
                                             $ {computedGrandTotalUSD.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </p>
                                     </div>
                                     <div>
-                                        <p style={{ color: '#4B5563' }} className="mb-0.5 font-medium">Total Cost (Buying)</p>
+                                        <p style={{ color: '#4B5563' }} className="mb-0.5 font-medium">{t("Total Cost (Buying)")}</p>
                                         <p className="font-semibold text-gray-900 font-mono">
                                             Rp {costGrandTotalIDR.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <br/>
                                             $ {costGrandTotalUSD.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </p>
                                     </div>
                                     <div>
-                                        <p style={{ color: '#4B5563' }} className="mb-0.5 font-medium">Estimated Margin</p>
+                                        <p style={{ color: '#4B5563' }} className="mb-0.5 font-medium">{t("Estimated Margin")}</p>
                                         <p className={`font-bold font-mono ${marginIDR >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                                             Rp {marginIDR.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <br/>
                                             {marginPct.toFixed(1)}%
@@ -729,14 +731,14 @@ const SalesBlinkApproval = () => {
                             {/* Service items */}
                             {selectedItem.serviceItems?.length > 0 && (
                                 <div>
-                                    <h3 style={{ color: '#111827' }} className="text-sm font-semibold mb-2">Revenue Breakdown (Selling)</h3>
+                                    <h3 style={{ color: '#111827' }} className="text-sm font-semibold mb-2">{t("Revenue Breakdown (Selling)")}</h3>
                                     <div className="bg-white rounded-lg overflow-hidden border border-gray-200">
                                         <table className="w-full text-sm">
                                             <thead>
                                                 <tr>
-                                                    <th className="text-left px-3 py-2 bg-gray-50">Description</th>
-                                                    <th className="text-right px-3 py-2 bg-gray-50">Qty</th>
-                                                    <th className="text-right px-3 py-2 bg-gray-50">Amount</th>
+                                                    <th className="text-left px-3 py-2 bg-gray-50">{t("Description")}</th>
+                                                    <th className="text-right px-3 py-2 bg-gray-50">{t("Qty")}</th>
+                                                    <th className="text-right px-3 py-2 bg-gray-50">{t("Amount")}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -759,14 +761,14 @@ const SalesBlinkApproval = () => {
                             {/* Cost items */}
                             {selectedItem.costItems?.length > 0 && (
                                 <div>
-                                    <h3 style={{ color: '#111827' }} className="text-sm font-semibold mb-2">Cost Breakdown (Buying)</h3>
+                                    <h3 style={{ color: '#111827' }} className="text-sm font-semibold mb-2">{t("Cost Breakdown (Buying)")}</h3>
                                     <div className="bg-white rounded-lg overflow-hidden border border-gray-200">
                                         <table className="w-full text-sm">
                                             <thead>
                                                 <tr>
-                                                    <th className="text-left px-3 py-2 bg-gray-50">Description</th>
-                                                    <th className="text-right px-3 py-2 bg-gray-50">Qty</th>
-                                                    <th className="text-right px-3 py-2 bg-gray-50">Amount</th>
+                                                    <th className="text-left px-3 py-2 bg-gray-50">{t("Description")}</th>
+                                                    <th className="text-right px-3 py-2 bg-gray-50">{t("Qty")}</th>
+                                                    <th className="text-right px-3 py-2 bg-gray-50">{t("Amount")}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -789,7 +791,7 @@ const SalesBlinkApproval = () => {
                             {/* Notes */}
                             {selectedItem.notes && (
                                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                                    <p style={{ color: '#4B5563' }} className="text-xs mb-1">Notes</p>
+                                    <p style={{ color: '#4B5563' }} className="text-xs mb-1">{t("Notes")}</p>
                                     <div
                                         style={{ color: '#111827' }}
                                         className="text-sm prose prose-sm max-w-none"
@@ -807,19 +809,19 @@ const SalesBlinkApproval = () => {
                             {showRejectInput && isApprover &&
                                 isApprovalPending(selectedItem.status) && (
                                     <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-3">
-                                        <p className="text-sm font-semibold text-red-700">Rejection Reason</p>
+                                        <p className="text-sm font-semibold text-red-700">{t("Rejection Reason")}</p>
                                         <textarea
                                             rows={3}
                                             value={rejectReason}
                                             onChange={e => setRejectReason(e.target.value)}
-                                            placeholder="Explain reason for rejection..."
+                                            placeholder={t("Explain reason for rejection...")}
                                             className="w-full px-3 py-2 bg-white border border-red-300 rounded-lg text-sm resize-none focus:outline-none focus:border-red-500"
                                             style={{ color: '#111827' }}
                                         />
                                         <div className="flex gap-2">
                                             <button onClick={() => setShowRejectInput(false)}
                                                 className="px-4 py-2 text-sm text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                                                Cancel
+                                                {t("Cancel")}
                                             </button>
                                             <button onClick={() => handleReject(selectedItem)} disabled={processing}
                                                 className="px-4 py-2 text-sm text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50">
@@ -827,7 +829,7 @@ const SalesBlinkApproval = () => {
                                                     ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                                     : <XCircle className="w-4 h-4" />
                                                 }
-                                                Confirm Reject
+                                                {t("Confirm Reject")}
                                             </button>
                                         </div>
                                     </div>
@@ -840,7 +842,7 @@ const SalesBlinkApproval = () => {
                                     <div className="flex gap-3 pt-2 border-t border-gray-200">
                                         <button onClick={() => setShowRejectInput(true)}
                                             className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-50 text-red-700 border border-red-200 rounded-xl hover:bg-red-100 transition-colors text-sm font-medium">
-                                            <XCircle className="w-4 h-4" /> Reject
+                                            <XCircle className="w-4 h-4" /> {t("Reject")}
                                         </button>
                                         <button onClick={() => handleApprove(selectedItem)} disabled={processing}
                                             className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-50 text-green-700 border border-green-200 rounded-xl hover:bg-green-100 transition-colors text-sm font-medium disabled:opacity-50">
@@ -848,7 +850,7 @@ const SalesBlinkApproval = () => {
                                                 ? <div className="w-4 h-4 border-2 border-green-400/40 border-t-green-600 rounded-full animate-spin" />
                                                 : <CheckCircle className="w-4 h-4" />
                                             }
-                                            Approve
+                                            {t("Approve")}
                                         </button>
                                     </div>
                                 )}
@@ -862,7 +864,7 @@ const SalesBlinkApproval = () => {
                                 className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-gray-700 transition-colors"
                             >
                                 <Eye className="w-4 h-4" />
-                                View in Quotation Page
+                                {t("View in Quotation Page")}
                                 <ChevronRight className="w-4 h-4" />
                             </button>
                         </div>

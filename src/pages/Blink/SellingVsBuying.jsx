@@ -19,8 +19,10 @@ import {
 import Button from '../../components/Common/Button';
 import SellingBuyingDetailModal from '../../components/Blink/SellingBuyingDetailModal';
 import { formatCurrency } from '../../utils/currencyFormatter';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const SellingVsBuying = () => {
+    const { t } = useLanguage();
     const [shipments, setShipments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -224,11 +226,11 @@ const SellingVsBuying = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text">Selling vs Buying</h1>
-                    <p className="text-silver-dark mt-1">Analisis perbandingan harga jual vs biaya modal per item</p>
+                    <h1 className="text-3xl font-bold gradient-text">{t("Selling vs Buying")}</h1>
+                    <p className="text-silver-dark mt-1">{t("Analisis perbandingan harga jual vs biaya modal per item")}</p>
                 </div>
                 <Button onClick={handleExport} icon={Download} variant="secondary">
-                    Export CSV
+                    {t("Export CSV")}
                 </Button>
             </div>
 
@@ -237,7 +239,7 @@ const SellingVsBuying = () => {
                 <div className="glass-card p-4 rounded-lg">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-xs text-silver-dark uppercase tracking-wider font-semibold">Total Selling</p>
+                            <p className="text-xs text-silver-dark uppercase tracking-wider font-semibold">{t("Total Selling")}</p>
                             <p className="text-xl font-bold text-green-400 mt-1">
                                 Rp {totals.selling.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </p>
@@ -249,7 +251,7 @@ const SellingVsBuying = () => {
                 <div className="glass-card p-4 rounded-lg">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-xs text-silver-dark uppercase tracking-wider font-semibold">Total Buying (COGS)</p>
+                            <p className="text-xs text-silver-dark uppercase tracking-wider font-semibold">{t("Total Buying (COGS)")}</p>
                             <p className="text-xl font-bold text-orange-400 mt-1">
                                 Rp {totals.buying.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </p>
@@ -261,7 +263,7 @@ const SellingVsBuying = () => {
                 <div className="glass-card p-4 rounded-lg">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-xs text-silver-dark uppercase tracking-wider font-semibold">Total Profit</p>
+                            <p className="text-xs text-silver-dark uppercase tracking-wider font-semibold">{t("Total Profit")}</p>
                             <p className={`text-xl font-bold mt-1 ${totals.profit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                                 Rp {totals.profit.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </p>
@@ -273,7 +275,7 @@ const SellingVsBuying = () => {
                 <div className="glass-card p-4 rounded-lg">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-xs text-silver-dark uppercase tracking-wider font-semibold">Overall Margin</p>
+                            <p className="text-xs text-silver-dark uppercase tracking-wider font-semibold">{t("Overall Margin")}</p>
                             <p className={`text-xl font-bold mt-1 ${parseFloat(overallMargin) >= 0 ? 'text-blue-400' : 'text-red-400'}`}>
                                 {overallMargin}%
                             </p>
@@ -296,7 +298,7 @@ const SellingVsBuying = () => {
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-silver-dark" />
                     <input
                         type="text"
-                        placeholder="Search Job Number, Customer, atau SO Number..."
+                        placeholder={t("Search Job Number, Customer, atau SO Number...")}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-9 pr-4 py-1.5 text-sm bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:outline-none focus:border-accent-orange"
@@ -311,10 +313,10 @@ const SellingVsBuying = () => {
                         onChange={(e) => setFilterStatus(e.target.value)}
                         className="px-3 py-1.5 text-sm bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:outline-none focus:border-accent-orange"
                     >
-                        <option value="all">Semua Status</option>
-                        <option value="profit">Profit</option>
-                        <option value="loss">Loss</option>
-                        <option value="break-even">Break Even</option>
+                        <option value="all">{t("Semua Status")}</option>
+                        <option value="profit">{t("Profit")}</option>
+                        <option value="loss">{t("Loss")}</option>
+                        <option value="break-even">{t("Break Even")}</option>
                     </select>
                 </div>
             </div>
@@ -325,14 +327,14 @@ const SellingVsBuying = () => {
                     <table className="w-full whitespace-nowrap">
                         <thead className="bg-accent-orange">
                             <tr>
-                                <th className="px-4 py-2 text-left text-[10px] font-bold text-white uppercase tracking-wider">Job Number</th>
-                                <th className="px-4 py-2 text-left text-[10px] font-bold text-white uppercase tracking-wider">Customer</th>
-                                <th className="px-4 py-2 text-left text-[10px] font-bold text-white uppercase tracking-wider">Route</th>
-                                <th className="px-4 py-2 text-center text-[10px] font-bold text-white uppercase tracking-wider">Service</th>
-                                <th className="px-4 py-2 text-right text-[10px] font-bold text-white uppercase tracking-wider">Selling</th>
-                                <th className="px-4 py-2 text-right text-[10px] font-bold text-white uppercase tracking-wider">Buying</th>
-                                <th className="px-4 py-2 text-right text-[10px] font-bold text-white uppercase tracking-wider">Profit</th>
-                                <th className="px-4 py-2 text-center text-[10px] font-bold text-white uppercase tracking-wider">Margin</th>
+                                <th className="px-4 py-2 text-left text-[10px] font-bold text-white uppercase tracking-wider">{t("Job Number")}</th>
+                                <th className="px-4 py-2 text-left text-[10px] font-bold text-white uppercase tracking-wider">{t("Customer")}</th>
+                                <th className="px-4 py-2 text-left text-[10px] font-bold text-white uppercase tracking-wider">{t("Route")}</th>
+                                <th className="px-4 py-2 text-center text-[10px] font-bold text-white uppercase tracking-wider">{t("Service")}</th>
+                                <th className="px-4 py-2 text-right text-[10px] font-bold text-white uppercase tracking-wider">{t("Selling")}</th>
+                                <th className="px-4 py-2 text-right text-[10px] font-bold text-white uppercase tracking-wider">{t("Buying")}</th>
+                                <th className="px-4 py-2 text-right text-[10px] font-bold text-white uppercase tracking-wider">{t("Profit")}</th>
+                                <th className="px-4 py-2 text-center text-[10px] font-bold text-white uppercase tracking-wider">{t("Margin")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
@@ -413,7 +415,7 @@ const SellingVsBuying = () => {
                             <tfoot className="bg-dark-surface border-t-2 border-accent-orange">
                                 <tr>
                                     <td colSpan="4" className="px-4 py-2 text-right font-bold text-xs text-silver-light uppercase tracking-wider">
-                                        TOTAL ({filteredShipments.length} Shipments)
+                                        {t("TOTAL (")}{filteredShipments.length} {t("Shipments)")}
                                     </td>
                                     <td className="px-4 py-2 text-right font-bold text-xs text-green-400 font-mono">
                                         Rp {totals.selling.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

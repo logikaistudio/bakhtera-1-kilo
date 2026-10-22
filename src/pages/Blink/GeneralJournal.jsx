@@ -15,6 +15,7 @@ import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { getActiveDivision } from '../../utils/divisionContext';
 import { filterActiveBlinkJournalEntries } from '../../utils/blinkJournalIntegrity';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 // ─── Source badge config ─────────────────────────────────────────────────────
 const SOURCE_CONFIG = {
@@ -79,6 +80,7 @@ const fmtIDR = (value) => {
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 const GeneralJournal = () => {
+    const { t } = useLanguage();
     const navigate = useNavigate();
     const { companySettings } = useData();
     const { canCreate, canDelete } = useAuth();
@@ -293,11 +295,11 @@ const GeneralJournal = () => {
 
     const saveEntry = async () => {
         if (!canCreate('blink_journal')) {
-            alert('Anda tidak memiliki hak akses untuk membuat entri jurnal manual.');
+            alert(t("Anda tidak memiliki hak akses untuk membuat entri jurnal manual."));
             return;
         }
-        if (!isBalanced()) { alert('Journal entry must balance! Total Debit must equal Total Credit.'); return; }
-        if (!newEntry.description) { alert('Description is required.'); return; }
+        if (!isBalanced()) { alert(t("Journal entry must balance! Total Debit must equal Total Credit.")); return; }
+        if (!newEntry.description) { alert(t("Description is required.")); return; }
         try {
             setSaving(true);
             // Base entry number for this journal batch (e.g. JE-2603-0001)
@@ -329,7 +331,7 @@ const GeneralJournal = () => {
             }));
 
             if (rows.length === 0) {
-                alert('Please fill in at least one valid journal line with an account and amount.');
+                alert(t("Please fill in at least one valid journal line with an account and amount."));
                 return;
             }
 
@@ -355,10 +357,10 @@ const GeneralJournal = () => {
     // ── Delete ──────────────────────────────────────────────────────────────────
     const deleteEntry = async (batchId) => {
         if (!canDelete('blink_journal')) {
-            alert('Anda tidak memiliki hak akses untuk menghapus entri jurnal manual.');
+            alert(t("Anda tidak memiliki hak akses untuk menghapus entri jurnal manual."));
             return;
         }
-        if (!confirm('Delete this journal entry? This cannot be undone.')) return;
+        if (!confirm(t("Delete this journal entry? This cannot be undone."))) return;
         try {
             const { error } = await supabase.from('blink_journal_entries').delete().eq('batch_id', batchId).eq('division', activeDivision);
             if (error) throw error;
@@ -498,21 +500,21 @@ const GeneralJournal = () => {
             {/* ── Header ── */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text">General Journal</h1>
-                    <p className="text-silver-dark mt-1">Double-entry transaction records from AR, AP, Invoices & PO</p>
-                    <p className="text-xs text-blue-300 mt-1">Data ditampilkan sesuai divisi aktif: {activeDivision?.toUpperCase()}</p>
+                    <h1 className="text-3xl font-bold gradient-text">{t("General Journal")}</h1>
+                    <p className="text-silver-dark mt-1">{t("Double-entry transaction records from AR, AP, Invoices & PO")}</p>
+                    <p className="text-xs text-blue-300 mt-1">{t("Data ditampilkan sesuai divisi aktif:")} {activeDivision?.toUpperCase()}</p>
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                    <Button variant="secondary" icon={RefreshCw} onClick={fetchEntries}>Refresh</Button>
+                    <Button variant="secondary" icon={RefreshCw} onClick={fetchEntries}>{t("Refresh")}</Button>
                     <button onClick={exportCSV} className="flex items-center gap-2 px-3 py-2 bg-dark-surface text-silver-light hover:bg-dark-card border border-dark-border rounded-lg smooth-transition text-xs">
                         <FileText className="w-4 h-4" /> CSV
                     </button>
                     <button onClick={exportToPDF} disabled={loading || groupedEntries.length === 0}
                         className="flex items-center gap-2 px-3 py-2 bg-dark-surface text-red-400 hover:bg-dark-card border border-dark-border rounded-lg smooth-transition text-xs disabled:opacity-40">
-                        <Printer className="w-4 h-4" /> Print PDF
+                        <Printer className="w-4 h-4" /> {t("Print PDF")}
                     </button>
                     {canCreate('blink_journal') && (
-                        <Button icon={Plus} onClick={() => setShowNewEntryModal(true)}>Manual Entry</Button>
+                        <Button icon={Plus} onClick={() => setShowNewEntryModal(true)}>{t("Manual Entry")}</Button>
                     )}
                 </div>
             </div>
@@ -521,37 +523,37 @@ const GeneralJournal = () => {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="glass-card p-4 rounded-lg border-l-4 border-green-500">
                     <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark uppercase tracking-wider">Total Debit</p>
+                        <p className="text-xs text-silver-dark uppercase tracking-wider">{t("Total Debit")}</p>
                         <ArrowUpRight className="w-4 h-4 text-green-400" />
                     </div>
-                    <p className="text-xl font-bold text-green-400">{fmtIDR(totals.totalDebit)}{totals.hasMixedCcy && <span className="text-sm text-amber-400 ml-1">(IDR)</span>}</p>
-                    <p className="text-xs text-silver-dark mt-1">{filteredEntries.filter(e => e.debit > 0).length} debit lines</p>
+                    <p className="text-xl font-bold text-green-400">{fmtIDR(totals.totalDebit)}{totals.hasMixedCcy && <span className="text-sm text-amber-400 ml-1">{t("(IDR)")}</span>}</p>
+                    <p className="text-xs text-silver-dark mt-1">{filteredEntries.filter(e => e.debit > 0).length} {t("debit lines")}</p>
                 </div>
                 <div className="glass-card p-4 rounded-lg border-l-4 border-blue-500">
                     <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark uppercase tracking-wider">Total Credit</p>
+                        <p className="text-xs text-silver-dark uppercase tracking-wider">{t("Total Credit")}</p>
                         <ArrowDownLeft className="w-4 h-4 text-blue-400" />
                     </div>
-                    <p className="text-xl font-bold text-blue-400">{fmtIDR(totals.totalCredit)}{totals.hasMixedCcy && <span className="text-sm text-amber-400 ml-1">(IDR)</span>}</p>
-                    <p className="text-xs text-silver-dark mt-1">{filteredEntries.filter(e => e.credit > 0).length} credit lines</p>
+                    <p className="text-xl font-bold text-blue-400">{fmtIDR(totals.totalCredit)}{totals.hasMixedCcy && <span className="text-sm text-amber-400 ml-1">{t("(IDR)")}</span>}</p>
+                    <p className="text-xs text-silver-dark mt-1">{filteredEntries.filter(e => e.credit > 0).length} {t("credit lines")}</p>
                 </div>
                 <div className="glass-card p-4 rounded-lg border-l-4 border-purple-500">
                     <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark uppercase tracking-wider">Balance Check</p>
+                        <p className="text-xs text-silver-dark uppercase tracking-wider">{t("Balance Check")}</p>
                         {Math.abs(totals.balance) < 1 ? <CheckCircle className="w-4 h-4 text-green-400" /> : <AlertCircle className="w-4 h-4 text-red-400" />}
                     </div>
                     <p className={`text-xl font-bold ${Math.abs(totals.balance) < 1 ? 'text-green-400' : 'text-red-400'}`}>
                         {totals.hasMixedCcy ? 'Mixed Currencies' : (Math.abs(totals.balance) < 1 ? 'Balanced ✓' : fmt(totals.balance))}
                     </p>
-                    <p className="text-xs text-silver-dark mt-1">Debit = Credit</p>
+                    <p className="text-xs text-silver-dark mt-1">{t("Debit = Credit")}</p>
                 </div>
                 <div className="glass-card p-4 rounded-lg border-l-4 border-accent-orange">
                     <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark uppercase tracking-wider">Total Batches</p>
+                        <p className="text-xs text-silver-dark uppercase tracking-wider">{t("Total Batches")}</p>
                         <Layers className="w-4 h-4 text-accent-orange" />
                     </div>
                     <p className="text-xl font-bold text-accent-orange">{groupedEntries.length}</p>
-                    <p className="text-xs text-silver-dark mt-1">{filteredEntries.length} total lines</p>
+                    <p className="text-xs text-silver-dark mt-1">{filteredEntries.length} {t("total lines")}</p>
                 </div>
             </div>
 
@@ -561,7 +563,7 @@ const GeneralJournal = () => {
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-silver-dark" />
                     <input
                         type="text"
-                        placeholder="Search entry number, description, account, party..."
+                        placeholder={t("Search entry number, description, account, party...")}
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
                         className="w-full pl-11 pr-4 py-2.5 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm"
@@ -589,29 +591,29 @@ const GeneralJournal = () => {
                 {loading ? (
                     <div className="flex items-center justify-center py-16">
                         <div className="animate-spin w-8 h-8 border-2 border-accent-orange border-t-transparent rounded-full mr-3" />
-                        <span className="text-silver-dark">Loading journal entries...</span>
+                        <span className="text-silver-dark">{t("Loading journal entries...")}</span>
                     </div>
                 ) : groupedEntries.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 opacity-60">
                         <BookOpen className="w-14 h-14 text-silver-dark mb-4" />
-                        <p className="text-silver-light font-medium">No journal entries found</p>
-                        <p className="text-silver-dark text-sm mt-1">Entries are auto-created when invoices, AR, and AP payments are processed</p>
+                        <p className="text-silver-light font-medium">{t("No journal entries found")}</p>
+                        <p className="text-silver-dark text-sm mt-1">{t("Entries are auto-created when invoices, AR, and AP payments are processed")}</p>
                     </div>
                 ) : (
                     <table className="w-full min-w-max text-sm">
                         <thead>
                             <tr className="bg-accent-orange">
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase" style={{ width: '32px' }}></th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '100px' }}>Date</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '220px' }}>Entry No.</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '120px' }}>Journal Type</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '110px' }}>Account Code</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '160px' }}>Account Name</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '200px' }}>Description</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '120px' }}>Party</th>
-                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '130px' }}>Debit</th>
-                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '130px' }}>Credit</th>
-                                <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '110px' }}>Source</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '100px' }}>{t("Date")}</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '220px' }}>{t("Entry No.")}</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '120px' }}>{t("Journal Type")}</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '110px' }}>{t("Account Code")}</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '160px' }}>{t("Account Name")}</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '200px' }}>{t("Description")}</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '120px' }}>{t("Party")}</th>
+                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '130px' }}>{t("Debit")}</th>
+                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '130px' }}>{t("Credit")}</th>
+                                <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '110px' }}>{t("Source")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
@@ -654,7 +656,7 @@ const GeneralJournal = () => {
                                                 )}
                                             </td>
                                             <td className="px-3 py-2.5 text-silver-dark text-xs whitespace-nowrap" colSpan={2}>
-                                                <span className="italic">{group.lines.length} line{group.lines.length > 1 ? 's' : ''}</span>
+                                                <span className="italic">{group.lines.length} {t("line")}{group.lines.length > 1 ? 's' : ''}</span>
                                             </td>
                                             <td className="px-3 py-2.5 text-silver-light text-xs" style={{ maxWidth: '200px' }}>
                                                 <div className="truncate" title={group.description}>{group.description}</div>
@@ -664,11 +666,11 @@ const GeneralJournal = () => {
                                             </td>
                                             <td className="px-3 py-2.5 text-right font-semibold text-green-400 whitespace-nowrap text-xs">
                                                 {groupDebitIDR > 0
-                                                    ? <>{fmtIDR(groupDebitIDR)}{isMultiCcy && !hasMixed && <div className="text-xs text-silver-dark font-normal">≈ IDR</div>}{hasMixed && <div className="text-xs text-amber-400 font-normal">IDR + {currencies.filter(c => c !== 'IDR').join('/')}</div>}</> : <span className="text-silver-dark">-</span>}
+                                                    ? <>{fmtIDR(groupDebitIDR)}{isMultiCcy && !hasMixed && <div className="text-xs text-silver-dark font-normal">{t("≈ IDR")}</div>}{hasMixed && <div className="text-xs text-amber-400 font-normal">{t("IDR +")} {currencies.filter(c => c !== 'IDR').join('/')}</div>}</> : <span className="text-silver-dark">-</span>}
                                             </td>
                                             <td className="px-3 py-2.5 text-right font-semibold text-blue-400 whitespace-nowrap text-xs">
                                                 {groupCreditIDR > 0
-                                                    ? <>{fmtIDR(groupCreditIDR)}{isMultiCcy && !hasMixed && <div className="text-xs text-silver-dark font-normal">≈ IDR</div>}{hasMixed && <div className="text-xs text-amber-400 font-normal">IDR + {currencies.filter(c => c !== 'IDR').join('/')}</div>}</> : <span className="text-silver-dark">-</span>}
+                                                    ? <>{fmtIDR(groupCreditIDR)}{isMultiCcy && !hasMixed && <div className="text-xs text-silver-dark font-normal">{t("≈ IDR")}</div>}{hasMixed && <div className="text-xs text-amber-400 font-normal">{t("IDR +")} {currencies.filter(c => c !== 'IDR').join('/')}</div>}</> : <span className="text-silver-dark">-</span>}
                                             </td>
                                             <td className="px-3 py-2.5 text-center">
                                                 <span className={`px-2 py-0.5 rounded text-xs font-semibold border ${badge.color}`}>
@@ -724,9 +726,9 @@ const GeneralJournal = () => {
                         {groupedEntries.length > 0 && (
                             <tfoot className="bg-dark-surface border-t-2 border-accent-orange">
                                 <tr>
-                                    <td colSpan={8} className="px-3 py-2 text-right font-bold text-silver-light uppercase text-xs">TOTAL</td>
-                                    <td className="px-3 py-2 text-right font-bold text-green-400 text-sm whitespace-nowrap">{fmtIDR(totals.totalDebit)}{totals.hasMixedCcy && <span className="text-xs text-amber-400 ml-1">IDR only</span>}</td>
-                                    <td className="px-3 py-2 text-right font-bold text-blue-400 text-sm whitespace-nowrap">{fmtIDR(totals.totalCredit)}{totals.hasMixedCcy && <span className="text-xs text-amber-400 ml-1">IDR only</span>}</td>
+                                    <td colSpan={8} className="px-3 py-2 text-right font-bold text-silver-light uppercase text-xs">{t("TOTAL")}</td>
+                                    <td className="px-3 py-2 text-right font-bold text-green-400 text-sm whitespace-nowrap">{fmtIDR(totals.totalDebit)}{totals.hasMixedCcy && <span className="text-xs text-amber-400 ml-1">{t("IDR only")}</span>}</td>
+                                    <td className="px-3 py-2 text-right font-bold text-blue-400 text-sm whitespace-nowrap">{fmtIDR(totals.totalCredit)}{totals.hasMixedCcy && <span className="text-xs text-amber-400 ml-1">{t("IDR only")}</span>}</td>
                                     <td />
                                 </tr>
                             </tfoot>
@@ -743,7 +745,7 @@ const GeneralJournal = () => {
                     <div className="p-6">
                         <div className="flex items-start justify-between mb-6">
                             <div>
-                                <h2 className="text-2xl font-bold gradient-text">Journal Entry Detail</h2>
+                                <h2 className="text-2xl font-bold gradient-text">{t("Journal Entry Detail")}</h2>
                                 <p className="text-silver-dark mt-1">
                                     #{selectedGroup.entry_number}
                                     {selectedGroup.reference_number && <span className="ml-2 text-accent-orange">• {selectedGroup.reference_number}</span>}
@@ -757,7 +759,7 @@ const GeneralJournal = () => {
                                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-accent-blue hover:bg-blue-500/10 rounded-lg border border-accent-blue/30 smooth-transition"
                                     >
                                         <ExternalLink className="w-3 h-3" />
-                                        View {selectedGroup.reference_type?.replace('_', ' ').toUpperCase()}
+                                        {t("View")} {selectedGroup.reference_type?.replace('_', ' ').toUpperCase()}
                                     </button>
                                 )}
                                 {/* Delete (manual only) */}
@@ -766,7 +768,7 @@ const GeneralJournal = () => {
                                         onClick={() => deleteEntry(selectedGroup.batch_id)}
                                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 rounded-lg border border-red-500/30 smooth-transition"
                                     >
-                                        <Trash2 className="w-3 h-3" /> Delete
+                                        <Trash2 className="w-3 h-3" /> {t("Delete")}
                                     </button>
                                 )}
                             </div>
@@ -790,7 +792,7 @@ const GeneralJournal = () => {
 
                         {/* Description */}
                         <div className="mb-5 p-3 bg-dark-surface rounded-lg border border-dark-border">
-                            <p className="text-xs text-silver-dark uppercase mb-1">Description / Memo</p>
+                            <p className="text-xs text-silver-dark uppercase mb-1">{t("Description / Memo")}</p>
                             <p className="text-sm text-silver-light">{selectedGroup.description || '-'}</p>
                         </div>
 
@@ -799,9 +801,9 @@ const GeneralJournal = () => {
                             <table className="w-full text-sm">
                                 <thead className="bg-dark-surface">
                                     <tr>
-                                        <th className="px-4 py-2.5 text-left text-xs text-silver-dark uppercase font-semibold">Account</th>
-                                        <th className="px-4 py-2.5 text-right text-xs text-silver-dark uppercase font-semibold w-36">Debit</th>
-                                        <th className="px-4 py-2.5 text-right text-xs text-silver-dark uppercase font-semibold w-36">Credit</th>
+                                        <th className="px-4 py-2.5 text-left text-xs text-silver-dark uppercase font-semibold">{t("Account")}</th>
+                                        <th className="px-4 py-2.5 text-right text-xs text-silver-dark uppercase font-semibold w-36">{t("Debit")}</th>
+                                        <th className="px-4 py-2.5 text-right text-xs text-silver-dark uppercase font-semibold w-36">{t("Credit")}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-dark-border">
@@ -822,7 +824,7 @@ const GeneralJournal = () => {
                                 </tbody>
                                 <tfoot className="bg-dark-surface border-t-2 border-dark-border">
                                     <tr>
-                                        <td className="px-4 py-2 text-right font-bold text-silver-light text-xs uppercase">Total</td>
+                                        <td className="px-4 py-2 text-right font-bold text-silver-light text-xs uppercase">{t("Total")}</td>
                                         <td className="px-4 py-2 text-right font-bold text-green-400">{fmt(selectedGroup.lines.reduce((s, e) => s + (e.debit || 0), 0))}</td>
                                         <td className="px-4 py-2 text-right font-bold text-blue-400">{fmt(selectedGroup.lines.reduce((s, e) => s + (e.credit || 0), 0))}</td>
                                     </tr>
@@ -831,7 +833,7 @@ const GeneralJournal = () => {
                         </div>
 
                         <div className="flex justify-end">
-                            <Button variant="secondary" onClick={() => setShowDetailModal(false)}>Close</Button>
+                            <Button variant="secondary" onClick={() => setShowDetailModal(false)}>{t("Close")}</Button>
                         </div>
                     </div>
                 </Modal>
@@ -843,18 +845,18 @@ const GeneralJournal = () => {
             {showNewEntryModal && (
                 <Modal isOpen={true} onClose={() => setShowNewEntryModal(false)} maxWidth="max-w-4xl">
                     <div className="p-6">
-                        <h2 className="text-2xl font-bold gradient-text mb-6">New Manual Journal Entry</h2>
+                        <h2 className="text-2xl font-bold gradient-text mb-6">{t("New Manual Journal Entry")}</h2>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                             <div>
-                                <label className="block text-sm font-medium text-silver-light mb-2">Date *</label>
+                                <label className="block text-sm font-medium text-silver-light mb-2">{t("Date *")}</label>
                                 <input type="date" value={newEntry.entry_date}
                                     onChange={e => setNewEntry({ ...newEntry, entry_date: e.target.value })}
                                     className="w-full px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light" />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-silver-light mb-2">Description *</label>
-                                <input type="text" placeholder="Transaction description..."
+                                <label className="block text-sm font-medium text-silver-light mb-2">{t("Description *")}</label>
+                                <input type="text" placeholder={t("Transaction description...")}
                                     value={newEntry.description}
                                     onChange={e => setNewEntry({ ...newEntry, description: e.target.value })}
                                     className="w-full px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light" />
@@ -863,17 +865,17 @@ const GeneralJournal = () => {
 
                         <div className="glass-card p-4 rounded-lg mb-4">
                             <div className="flex justify-between items-center mb-3">
-                                <h3 className="font-semibold text-silver-light">Journal Lines</h3>
+                                <h3 className="font-semibold text-silver-light">{t("Journal Lines")}</h3>
                                 <button onClick={addLine} className="flex items-center gap-1 text-sm text-accent-orange hover:text-accent-orange/80">
-                                    <Plus className="w-4 h-4" /> Add Line
+                                    <Plus className="w-4 h-4" /> {t("Add Line")}
                                 </button>
                             </div>
                             <table className="w-full">
                                 <thead>
                                     <tr className="text-left text-xs text-silver-dark uppercase">
-                                        <th className="pb-2 w-1/2">Account</th>
-                                        <th className="pb-2 w-1/4 text-right">Debit (IDR)</th>
-                                        <th className="pb-2 w-1/4 text-right">Credit (IDR)</th>
+                                        <th className="pb-2 w-1/2">{t("Account")}</th>
+                                        <th className="pb-2 w-1/4 text-right">{t("Debit (IDR)")}</th>
+                                        <th className="pb-2 w-1/4 text-right">{t("Credit (IDR)")}</th>
                                         <th className="pb-2 w-10" />
                                     </tr>
                                 </thead>
@@ -884,7 +886,7 @@ const GeneralJournal = () => {
                                                 <select value={line.coa_id}
                                                     onChange={e => handleLineChange(idx, 'coa_id', e.target.value)}
                                                     className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm">
-                                                    <option value="">-- Select Account --</option>
+                                                    <option value="">{t("-- Select Account --")}</option>
                                                     {accounts.map(acc => (
                                                         <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>
                                                     ))}
@@ -915,7 +917,7 @@ const GeneralJournal = () => {
                                 </tbody>
                                 <tfoot className="border-t-2 border-dark-border">
                                     <tr>
-                                        <td className="pt-3 font-semibold text-silver-light text-right text-sm">TOTAL</td>
+                                        <td className="pt-3 font-semibold text-silver-light text-right text-sm">{t("TOTAL")}</td>
                                         <td className="pt-3 text-right font-bold text-green-400">
                                             {fmt(newEntry.lines.reduce((s, l) => s + (l.debit || 0), 0))}
                                         </td>
@@ -930,9 +932,9 @@ const GeneralJournal = () => {
 
                         <div className={`p-3 rounded-lg mb-5 flex items-center gap-3 ${isBalanced() ? 'bg-green-500/10 border border-green-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
                             {isBalanced()
-                                ? <><CheckCircle className="w-5 h-5 text-green-400" /><span className="text-green-400 font-medium">Journal is Balanced ✓</span></>
+                                ? <><CheckCircle className="w-5 h-5 text-green-400" /><span className="text-green-400 font-medium">{t("Journal is Balanced ✓")}</span></>
                                 : <><AlertCircle className="w-5 h-5 text-red-400" /><span className="text-red-400 font-medium">
-                                    Unbalanced — Difference: {fmt(
+                                    {t("Unbalanced — Difference:")} {fmt(
                                         newEntry.lines.reduce((s, l) => s + (l.debit || 0), 0) -
                                         newEntry.lines.reduce((s, l) => s + (l.credit || 0), 0)
                                     )}
@@ -941,7 +943,7 @@ const GeneralJournal = () => {
                         </div>
 
                         <div className="flex justify-end gap-3">
-                            <Button variant="secondary" onClick={() => setShowNewEntryModal(false)}>Cancel</Button>
+                            <Button variant="secondary" onClick={() => setShowNewEntryModal(false)}>{t("Cancel")}</Button>
                             <Button onClick={saveEntry} disabled={!isBalanced() || saving}>
                                 {saving ? 'Saving...' : 'Save Entry'}
                             </Button>

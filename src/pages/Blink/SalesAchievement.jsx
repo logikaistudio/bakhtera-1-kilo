@@ -5,12 +5,14 @@ import {
     TrendingUp, Target, DollarSign, CheckCircle, Award, Users,
     X, Printer, ArrowLeft, Plus, Edit2, Trash2, Settings, Calendar
 } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const fmtIDR = (v) => {
     return `Rp ${Number(v || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 const SalesAchievement = () => {
+    const { t } = useLanguage();
     const { canCreate, canEdit, canDelete, isSuperAdmin } = useAuth();
     const canRunSuperAdminBatch = isSuperAdmin();
 
@@ -73,7 +75,7 @@ const SalesAchievement = () => {
         const name = targetForm.sales_name.trim();
         const target = Number(targetForm.yearly_target);
         if (!name || !target || target <= 0) {
-            alert('Isi nama sales dan target tahunan dengan benar.');
+            alert(t("Isi nama sales dan target tahunan dengan benar."));
             return;
         }
         setIsSavingTarget(true);
@@ -148,7 +150,7 @@ const SalesAchievement = () => {
     const handleDeleteAllTargets = async () => {
         if (!canRunSuperAdminBatch) return;
         if (targetList.length === 0) {
-            alert('Tidak ada target untuk dihapus.');
+            alert(t("Tidak ada target untuk dihapus."));
             return;
         }
         if (!window.confirm(`Hapus seluruh target sales (${targetList.length} baris)?`)) return;
@@ -428,8 +430,8 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
             {/* Header */}
             <div className="flex items-start justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text">Sales Achievement</h1>
-                    <p className="text-silver-dark mt-1">Track performance dari Quotation hingga Payment Closing</p>
+                    <h1 className="text-3xl font-bold gradient-text">{t("Sales Achievement")}</h1>
+                    <p className="text-silver-dark mt-1">{t("Track performance dari Quotation hingga Payment Closing")}</p>
                 </div>
                 {canCreate('blink_sales') && (
                     <button
@@ -437,7 +439,7 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                         className="flex items-center gap-2 px-4 py-2 bg-accent-orange hover:bg-accent-orange/80 text-white rounded-lg transition-colors text-sm font-medium"
                     >
                         <Settings className="w-4 h-4" />
-                        Kelola Target
+                        {t("Kelola Target")}
                     </button>
                 )}
             </div>
@@ -445,7 +447,7 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
             {/* Achievement Bars */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <AchievementBar
-                    title="SO Achievement"
+                    title={t("SO Achievement")}
                     subtitle="Quotation (Non-Operation) → Sales Order"
                     icon={Target}
                     achieved={soAchievement.soCreated}
@@ -455,7 +457,7 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                 />
 
                 <AchievementBar
-                    title="Payment Achievement"
+                    title={t("Payment Achievement")}
                     subtitle="Sales Order → Payment Closed"
                     icon={DollarSign}
                     achieved={paymentAchievement.paymentClosed}
@@ -471,7 +473,7 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                     <div className="flex items-center gap-3">
                         <CheckCircle className="w-8 h-8 text-green-400" />
                         <div>
-                            <p className="text-sm text-silver-dark">Total Quotations</p>
+                            <p className="text-sm text-silver-dark">{t("Total Quotations")}</p>
                             <p className="text-2xl font-bold text-silver-light">{soAchievement.totalQuotations}</p>
                         </div>
                     </div>
@@ -481,7 +483,7 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                     <div className="flex items-center gap-3">
                         <Target className="w-8 h-8 text-blue-400" />
                         <div>
-                            <p className="text-sm text-silver-dark">SO Created</p>
+                            <p className="text-sm text-silver-dark">{t("SO Created")}</p>
                             <p className="text-2xl font-bold text-silver-light">{soAchievement.soCreated}</p>
                         </div>
                     </div>
@@ -491,7 +493,7 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                     <div className="flex items-center gap-3">
                         <DollarSign className="w-8 h-8 text-yellow-400" />
                         <div>
-                            <p className="text-sm text-silver-dark">Total SO Value</p>
+                            <p className="text-sm text-silver-dark">{t("Total SO Value")}</p>
                             <p className="text-lg font-bold text-silver-light">
                                 Rp {paymentAchievement.totalAmount.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </p>
@@ -503,7 +505,7 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                     <div className="flex items-center gap-3">
                         <TrendingUp className="w-8 h-8 text-green-400" />
                         <div>
-                            <p className="text-sm text-silver-dark">Paid Value</p>
+                            <p className="text-sm text-silver-dark">{t("Paid Value")}</p>
                             <p className="text-lg font-bold text-silver-light">
                                 Rp {paymentAchievement.paidAmount.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </p>
@@ -518,26 +520,26 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                 <div className="p-6 border-b border-dark-border">
                     <h2 className="text-xl font-bold text-silver-light flex items-center gap-2">
                         <Users className="w-6 h-6 text-accent-orange" />
-                        Sales Person Achievement
+                        {t("Sales Person Achievement")}
                     </h2>
-                    <p className="text-sm text-silver-dark mt-1">Klik baris untuk lihat detail · Target berdasarkan data yang dikelola via tombol Kelola Target</p>
+                    <p className="text-sm text-silver-dark mt-1">{t("Klik baris untuk lihat detail · Target berdasarkan data yang dikelola via tombol Kelola Target")}</p>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead className="bg-dark-surface">
                             <tr>
-                                <th className="px-4 py-4 text-left text-xs font-bold text-silver uppercase">Nama Sales</th>
-                                <th className="px-4 py-4 text-right text-xs font-bold text-silver uppercase">Target / Tahun</th>
-                                <th className="px-4 py-4 text-center text-xs font-bold text-silver uppercase">Pencapaian Tahunan</th>
-                                <th className="px-4 py-4 text-center text-xs font-bold text-silver uppercase">Bulan Berjalan</th>
-                                <th className="px-4 py-4 text-center text-xs font-bold text-silver uppercase">% Target</th>
+                                <th className="px-4 py-4 text-left text-xs font-bold text-silver uppercase">{t("Nama Sales")}</th>
+                                <th className="px-4 py-4 text-right text-xs font-bold text-silver uppercase">{t("Target / Tahun")}</th>
+                                <th className="px-4 py-4 text-center text-xs font-bold text-silver uppercase">{t("Pencapaian Tahunan")}</th>
+                                <th className="px-4 py-4 text-center text-xs font-bold text-silver uppercase">{t("Bulan Berjalan")}</th>
+                                <th className="px-4 py-4 text-center text-xs font-bold text-silver uppercase">{t("% Target")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
                             {salesPersonData.length === 0 ? (
                                 <tr>
                                     <td colSpan="5" className="px-6 py-8 text-center text-silver-dark">
-                                        Belum ada data sales person
+                                        {t("Belum ada data sales person")}
                                     </td>
                                 </tr>
                             ) : (() => {
@@ -570,12 +572,12 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                                                         <div className="flex items-center gap-2">
                                                             <Users className="w-4 h-4 text-accent-orange" />
                                                             <span className="text-sm font-bold text-accent-orange uppercase tracking-wide">{divName}</span>
-                                                            <span className="text-xs text-silver-dark">({members.length} sales)</span>
+                                                            <span className="text-xs text-silver-dark">({members.length} {t("sales)")}</span>
                                                         </div>
                                                         <div className="flex gap-5 text-xs">
-                                                            <span className="text-silver-dark">Target: <span className="text-silver-light font-semibold">{fmtIDR(divTargetTotal)}</span></span>
-                                                            <span className="text-silver-dark">Tahunan: <span className="text-green-400 font-semibold">{fmtIDR(divAnnual)}</span></span>
-                                                            <span className="text-silver-dark">Bulan Ini: <span className="text-blue-400 font-semibold">{fmtIDR(divMonthly)}</span></span>
+                                                            <span className="text-silver-dark">{t("Target:")} <span className="text-silver-light font-semibold">{fmtIDR(divTargetTotal)}</span></span>
+                                                            <span className="text-silver-dark">{t("Tahunan:")} <span className="text-green-400 font-semibold">{fmtIDR(divAnnual)}</span></span>
+                                                            <span className="text-silver-dark">{t("Bulan Ini:")} <span className="text-blue-400 font-semibold">{fmtIDR(divMonthly)}</span></span>
                                                         </div>
                                                     </div>
                                                 </td>
@@ -604,7 +606,7 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                                                                 </div>
                                                                 <div>
                                                                     <p className="text-sm font-semibold text-silver-light">{sp.name}</p>
-                                                                    <p className="text-xs text-silver-dark">{sp.totalQuotations} quot · {sp.convertedQuotations} SO</p>
+                                                                    <p className="text-xs text-silver-dark">{sp.totalQuotations} {t("quot ·")} {sp.convertedQuotations} SO</p>
                                                                 </div>
                                                             </div>
                                                         </td>
@@ -612,10 +614,10 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                                                             {yearlyTarget > 0 ? (
                                                                 <div>
                                                                     <p className="text-sm font-semibold text-silver-light">{fmtIDR(yearlyTarget)}</p>
-                                                                    <p className="text-xs text-silver-dark">{fmtIDR(Math.round(monthlyTarget))}/bln</p>
+                                                                    <p className="text-xs text-silver-dark">{fmtIDR(Math.round(monthlyTarget))}{t("/bln")}</p>
                                                                 </div>
                                                             ) : (
-                                                                <span className="text-xs text-silver-dark italic">Belum diset</span>
+                                                                <span className="text-xs text-silver-dark italic">{t("Belum diset")}</span>
                                                             )}
                                                         </td>
                                                         <td className="px-4 py-4">
@@ -674,9 +676,9 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                             <div>
                                 <h2 className="text-xl font-bold text-silver-light flex items-center gap-2">
                                     <Target className="w-5 h-5 text-accent-orange" />
-                                    Kelola Target Sales
+                                    {t("Kelola Target Sales")}
                                 </h2>
-                                <p className="text-sm text-silver-dark mt-1">Atur target pendapatan tahunan per sales</p>
+                                <p className="text-sm text-silver-dark mt-1">{t("Atur target pendapatan tahunan per sales")}</p>
                             </div>
                             <button onClick={() => { setShowTargetModal(false); setEditingTargetId(null); setTargetForm({ sales_name: '', yearly_target: '' }); }}
                                 className="p-2 hover:bg-dark-surface rounded-lg transition-colors">
@@ -692,23 +694,23 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                                 </h3>
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                     <div>
-                                        <label className="block text-xs text-silver-dark mb-1">Nama Sales *</label>
+                                        <label className="block text-xs text-silver-dark mb-1">{t("Nama Sales *")}</label>
                                         <input
                                             type="text"
                                             value={targetForm.sales_name}
                                             onChange={e => setTargetForm(f => ({ ...f, sales_name: e.target.value }))}
-                                            placeholder="Contoh: Budi Santoso"
+                                            placeholder={t("Contoh: Budi Santoso")}
                                             className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-black placeholder:text-gray-400 text-sm focus:outline-none focus:border-accent-orange"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs text-silver-dark mb-1">Divisi</label>
+                                        <label className="block text-xs text-silver-dark mb-1">{t("Divisi")}</label>
                                         <input
                                             type="text"
                                             list="division-suggestions"
                                             value={targetForm.division}
                                             onChange={e => setTargetForm(f => ({ ...f, division: e.target.value }))}
-                                            placeholder="Contoh: Sea Freight"
+                                            placeholder={t("Contoh: Sea Freight")}
                                             className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-black placeholder:text-gray-400 text-sm focus:outline-none focus:border-accent-orange"
                                         />
                                         <datalist id="division-suggestions">
@@ -720,17 +722,17 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                                         </datalist>
                                     </div>
                                     <div>
-                                        <label className="block text-xs text-silver-dark mb-1">Target / Tahun (Rp) *</label>
+                                        <label className="block text-xs text-silver-dark mb-1">{t("Target / Tahun (Rp) *")}</label>
                                         <input
                                             type="number"
                                             value={targetForm.yearly_target}
                                             onChange={e => setTargetForm(f => ({ ...f, yearly_target: e.target.value }))}
-                                            placeholder="Contoh: 1000000000"
+                                            placeholder={t("Contoh: 1000000000")}
                                             className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-black placeholder:text-gray-400 text-sm focus:outline-none focus:border-accent-orange"
                                         />
                                         {targetForm.yearly_target && Number(targetForm.yearly_target) > 0 && (
                                             <p className="text-xs text-silver-dark mt-1">
-                                                = {fmtIDR(Number(targetForm.yearly_target))} · {fmtIDR(Math.round(Number(targetForm.yearly_target) / 12))}/bulan
+                                                = {fmtIDR(Number(targetForm.yearly_target))} · {fmtIDR(Math.round(Number(targetForm.yearly_target) / 12))}{t("/bulan")}
                                             </p>
                                         )}
                                     </div>
@@ -739,12 +741,12 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                                     {editingTargetId && (
                                         <button onClick={() => { setEditingTargetId(null); setTargetForm({ sales_name: '', yearly_target: '' }); }}
                                             className="px-4 py-2 text-sm bg-dark-card border border-dark-border text-silver-light rounded-lg hover:bg-dark-surface transition-colors">
-                                            Batal
+                                            {t("Batal")}
                                         </button>
                                     )}
                                     <button onClick={handleSaveTarget} disabled={isSavingTarget}
                                         className="flex items-center gap-2 px-4 py-2 text-sm bg-accent-orange hover:bg-accent-orange/80 text-white rounded-lg transition-colors disabled:opacity-50">
-                                        {isSavingTarget ? 'Menyimpan...' : (editingTargetId ? 'Simpan Perubahan' : <><Plus className="w-4 h-4" />Tambah Target</>)}
+                                        {isSavingTarget ? 'Menyimpan...' : (editingTargetId ? 'Simpan Perubahan' : <><Plus className="w-4 h-4" />{t("Tambah Target")}</>)}
                                     </button>
                                 </div>
                             </div>
@@ -752,7 +754,7 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                             {/* Daftar target */}
                             <div>
                                 <div className="flex items-center justify-between mb-3">
-                                    <h3 className="text-sm font-semibold text-silver-light">Daftar Target ({targetList.length})</h3>
+                                    <h3 className="text-sm font-semibold text-silver-light">{t("Daftar Target (")}{targetList.length})</h3>
                                     {canRunSuperAdminBatch && (
                                         <div className="flex gap-2">
                                             <button
@@ -760,20 +762,20 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                                                 disabled={selectedTargetIds.length === 0}
                                                 className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${selectedTargetIds.length > 0 ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-dark-surface text-silver-dark cursor-not-allowed opacity-60'}`}
                                             >
-                                                Hapus Terpilih ({selectedTargetIds.length})
+                                                {t("Hapus Terpilih (")}{selectedTargetIds.length})
                                             </button>
                                             <button
                                                 onClick={handleDeleteAllTargets}
                                                 disabled={targetList.length === 0}
                                                 className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${targetList.length > 0 ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-dark-surface text-silver-dark cursor-not-allowed opacity-60'}`}
                                             >
-                                                Bersihkan Semua Data
+                                                {t("Bersihkan Semua Data")}
                                             </button>
                                         </div>
                                     )}
                                 </div>
                                 {targetList.length === 0 ? (
-                                    <p className="text-sm text-silver-dark text-center py-6">Belum ada target yang diset</p>
+                                    <p className="text-sm text-silver-dark text-center py-6">{t("Belum ada target yang diset")}</p>
                                 ) : (
                                     <table className="w-full text-sm">
                                         <thead className="bg-dark-surface">
@@ -786,11 +788,11 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                                                         className="w-4 h-4"
                                                     />
                                                 </th>
-                                                <th className="px-3 py-2 text-left text-xs font-bold text-silver uppercase">Nama Sales</th>
-                                                <th className="px-3 py-2 text-left text-xs font-bold text-silver uppercase">Divisi</th>
-                                                <th className="px-3 py-2 text-right text-xs font-bold text-silver uppercase">Target / Tahun</th>
-                                                <th className="px-3 py-2 text-right text-xs font-bold text-silver uppercase">Target / Bulan</th>
-                                                <th className="px-3 py-2 text-center text-xs font-bold text-silver uppercase">Aksi</th>
+                                                <th className="px-3 py-2 text-left text-xs font-bold text-silver uppercase">{t("Nama Sales")}</th>
+                                                <th className="px-3 py-2 text-left text-xs font-bold text-silver uppercase">{t("Divisi")}</th>
+                                                <th className="px-3 py-2 text-right text-xs font-bold text-silver uppercase">{t("Target / Tahun")}</th>
+                                                <th className="px-3 py-2 text-right text-xs font-bold text-silver uppercase">{t("Target / Bulan")}</th>
+                                                <th className="px-3 py-2 text-center text-xs font-bold text-silver uppercase">{t("Aksi")}</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-dark-border">
@@ -840,16 +842,16 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                         <div className="p-6 border-b border-dark-border flex items-center justify-between">
                             <div>
                                 <h2 className="text-2xl font-bold text-silver-light">
-                                    Detail Pencapaian — {selectedSalesPerson.name}
+                                    {t("Detail Pencapaian —")} {selectedSalesPerson.name}
                                 </h2>
                                 <div className="flex gap-4 mt-1 text-sm text-silver-dark">
                                     {salesTargets[selectedSalesPerson.name]?.yearly_target > 0 && (
                                         <>
-                                            <span>Target: {fmtIDR(salesTargets[selectedSalesPerson.name]?.yearly_target)}/thn</span>
+                                            <span>{t("Target:")} {fmtIDR(salesTargets[selectedSalesPerson.name]?.yearly_target)}{t("/thn")}</span>
                                             <span>·</span>
-                                            <span>Tahunan: {fmtIDR(selectedSalesPerson.paidValue)} ({((selectedSalesPerson.paidValue / salesTargets[selectedSalesPerson.name]?.yearly_target) * 100).toFixed(1)}%)</span>
+                                            <span>{t("Tahunan:")} {fmtIDR(selectedSalesPerson.paidValue)} ({((selectedSalesPerson.paidValue / salesTargets[selectedSalesPerson.name]?.yearly_target) * 100).toFixed(1)}%)</span>
                                             <span>·</span>
-                                            <span>Bulan ini: {fmtIDR(selectedSalesPerson.monthlyPaidValue)}</span>
+                                            <span>{t("Bulan ini:")} {fmtIDR(selectedSalesPerson.monthlyPaidValue)}</span>
                                         </>
                                     )}
                                 </div>
@@ -858,12 +860,12 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                                 <button onClick={handlePrintTXT}
                                     className="flex items-center gap-2 px-4 py-2 bg-accent-orange hover:bg-accent-orange/80 text-white rounded-lg transition-colors">
                                     <Printer className="w-4 h-4" />
-                                    Cetak TXT
+                                    {t("Cetak TXT")}
                                 </button>
                                 <button onClick={() => setShowDetailModal(false)}
                                     className="flex items-center gap-2 px-4 py-2 bg-dark-surface hover:bg-dark-card border border-dark-border text-silver-light rounded-lg transition-colors">
                                     <ArrowLeft className="w-4 h-4" />
-                                    Kembali
+                                    {t("Kembali")}
                                 </button>
                             </div>
                         </div>
@@ -872,11 +874,11 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                             <table className="w-full">
                                 <thead className="bg-dark-surface sticky top-0">
                                     <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-bold text-silver uppercase">No. Quotation</th>
-                                        <th className="px-6 py-3 text-left text-xs font-bold text-silver uppercase">Tanggal</th>
-                                        <th className="px-6 py-3 text-left text-xs font-bold text-silver uppercase">Customer</th>
-                                        <th className="px-6 py-3 text-left text-xs font-bold text-silver uppercase">Tanggal Pembayaran</th>
-                                        <th className="px-6 py-3 text-right text-xs font-bold text-silver uppercase">Jumlah Terbayar</th>
+                                        <th className="px-6 py-3 text-left text-xs font-bold text-silver uppercase">{t("No. Quotation")}</th>
+                                        <th className="px-6 py-3 text-left text-xs font-bold text-silver uppercase">{t("Tanggal")}</th>
+                                        <th className="px-6 py-3 text-left text-xs font-bold text-silver uppercase">{t("Customer")}</th>
+                                        <th className="px-6 py-3 text-left text-xs font-bold text-silver uppercase">{t("Tanggal Pembayaran")}</th>
+                                        <th className="px-6 py-3 text-right text-xs font-bold text-silver uppercase">{t("Jumlah Terbayar")}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-dark-border">
@@ -899,7 +901,7 @@ Laporan dicetak pada: ${new Date().toLocaleString('id-ID')}
                                     ) : (
                                         <tr>
                                             <td colSpan="5" className="px-6 py-8 text-center text-silver-dark">
-                                                No quotation data available
+                                                {t("No quotation data available")}
                                             </td>
                                         </tr>
                                     )}

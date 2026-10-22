@@ -12,6 +12,7 @@ import { printReport, fmtDatePrint } from '../../utils/printPDF';
 import { useData } from '../../context/DataContext';
 import { getActiveDivision } from '../../utils/divisionContext';
 import { filterActiveBlinkJournalEntries } from '../../utils/blinkJournalIntegrity';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 // ─── Source badge config ─────────────────────────────────────────────────────
 const SOURCE_CONFIG = {
@@ -66,6 +67,7 @@ const fmtIDR = (value) => {
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 const AutoJournal = () => {
+    const { t } = useLanguage();
     const navigate = useNavigate();
     const { companySettings } = useData();
     const activeDivision = getActiveDivision();
@@ -311,17 +313,17 @@ const AutoJournal = () => {
             {/* ── Header ── */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text">📊 Auto Jurnal</h1>
-                    <p className="text-silver-dark mt-1">System-generated entries from AR, AP, Invoices & PO (Last 12 Months) • Read-Only</p>
+                    <h1 className="text-3xl font-bold gradient-text">{t("📊 Auto Jurnal")}</h1>
+                    <p className="text-silver-dark mt-1">{t("System-generated entries from AR, AP, Invoices & PO (Last 12 Months) • Read-Only")}</p>
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                    <Button variant="secondary" onClick={fetchEntries}>Refresh</Button>
+                    <Button variant="secondary" onClick={fetchEntries}>{t("Refresh")}</Button>
                     <button onClick={exportCSV} className="flex items-center gap-2 px-3 py-2 bg-dark-surface text-silver-light hover:bg-dark-card border border-dark-border rounded-lg smooth-transition text-xs">
                         <FileText className="w-4 h-4" /> CSV
                     </button>
                     <button onClick={exportToPDF} disabled={loading || groupedEntries.length === 0}
                         className="flex items-center gap-2 px-3 py-2 bg-dark-surface text-red-400 hover:bg-dark-card border border-dark-border rounded-lg smooth-transition text-xs disabled:opacity-40">
-                        <Printer className="w-4 h-4" /> Print PDF
+                        <Printer className="w-4 h-4" /> {t("Print PDF")}
                     </button>
                 </div>
             </div>
@@ -330,37 +332,37 @@ const AutoJournal = () => {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="glass-card p-4 rounded-lg border-l-4 border-green-500">
                     <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark uppercase tracking-wider">Total Debit</p>
+                        <p className="text-xs text-silver-dark uppercase tracking-wider">{t("Total Debit")}</p>
                         <ArrowUpRight className="w-4 h-4 text-green-400" />
                     </div>
                     <p className="text-xl font-bold text-green-400">{fmtIDR(totals.totalDebit)}</p>
-                    <p className="text-xs text-silver-dark mt-1">{filteredEntries.filter(e => e.debit > 0).length} debit lines</p>
+                    <p className="text-xs text-silver-dark mt-1">{filteredEntries.filter(e => e.debit > 0).length} {t("debit lines")}</p>
                 </div>
                 <div className="glass-card p-4 rounded-lg border-l-4 border-blue-500">
                     <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark uppercase tracking-wider">Total Credit</p>
+                        <p className="text-xs text-silver-dark uppercase tracking-wider">{t("Total Credit")}</p>
                         <ArrowDownLeft className="w-4 h-4 text-blue-400" />
                     </div>
                     <p className="text-xl font-bold text-blue-400">{fmtIDR(totals.totalCredit)}</p>
-                    <p className="text-xs text-silver-dark mt-1">{filteredEntries.filter(e => e.credit > 0).length} credit lines</p>
+                    <p className="text-xs text-silver-dark mt-1">{filteredEntries.filter(e => e.credit > 0).length} {t("credit lines")}</p>
                 </div>
                 <div className="glass-card p-4 rounded-lg border-l-4 border-purple-500">
                     <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark uppercase tracking-wider">Balance Check</p>
+                        <p className="text-xs text-silver-dark uppercase tracking-wider">{t("Balance Check")}</p>
                         {Math.abs(totals.balance) < 1 ? <CheckCircle className="w-4 h-4 text-green-400" /> : <AlertCircle className="w-4 h-4 text-red-400" />}
                     </div>
                     <p className={`text-xl font-bold ${Math.abs(totals.balance) < 1 ? 'text-green-400' : 'text-red-400'}`}>
                         {Math.abs(totals.balance) < 1 ? 'Balanced ✓' : fmt(totals.balance)}
                     </p>
-                    <p className="text-xs text-silver-dark mt-1">Debit = Credit</p>
+                    <p className="text-xs text-silver-dark mt-1">{t("Debit = Credit")}</p>
                 </div>
                 <div className="glass-card p-4 rounded-lg border-l-4 border-gray-500">
                     <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark uppercase tracking-wider">Total Batches</p>
+                        <p className="text-xs text-silver-dark uppercase tracking-wider">{t("Total Batches")}</p>
                         <Layers className="w-4 h-4 text-gray-400" />
                     </div>
                     <p className="text-xl font-bold text-gray-400">{groupedEntries.length}</p>
-                    <p className="text-xs text-silver-dark mt-1">{filteredEntries.length} total lines</p>
+                    <p className="text-xs text-silver-dark mt-1">{filteredEntries.length} {t("total lines")}</p>
                 </div>
             </div>
 
@@ -370,7 +372,7 @@ const AutoJournal = () => {
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-silver-dark" />
                     <input
                         type="text"
-                        placeholder="Search entry number, description, account, party..."
+                        placeholder={t("Search entry number, description, account, party...")}
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
                         className="w-full pl-11 pr-4 py-2.5 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm"
@@ -398,29 +400,29 @@ const AutoJournal = () => {
                 {loading ? (
                     <div className="flex items-center justify-center py-16">
                         <div className="animate-spin w-8 h-8 border-2 border-gray-400 border-t-transparent rounded-full mr-3" />
-                        <span className="text-silver-dark">Loading auto journal entries...</span>
+                        <span className="text-silver-dark">{t("Loading auto journal entries...")}</span>
                     </div>
                 ) : groupedEntries.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 opacity-60">
                         <BookOpen className="w-14 h-14 text-silver-dark mb-4" />
-                        <p className="text-silver-light font-medium">No auto journal entries found</p>
-                        <p className="text-silver-dark text-sm mt-1">Auto entries are generated when AR, AP payments, and invoices are processed</p>
+                        <p className="text-silver-light font-medium">{t("No auto journal entries found")}</p>
+                        <p className="text-silver-dark text-sm mt-1">{t("Auto entries are generated when AR, AP payments, and invoices are processed")}</p>
                     </div>
                 ) : (
                     <table className="w-full min-w-max text-sm">
                         <thead>
                             <tr className="bg-gray-700">
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase" style={{ width: '32px' }}></th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '100px' }}>Date</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '220px' }}>Entry No.</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '110px' }}>Account Code</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '160px' }}>Account Name</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '200px' }}>Description</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '120px' }}>Party</th>
-                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '130px' }}>Debit</th>
-                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '130px' }}>Credit</th>
-                                <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '110px' }}>Source</th>
-                                <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '60px' }}>Action</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '100px' }}>{t("Date")}</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '220px' }}>{t("Entry No.")}</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '110px' }}>{t("Account Code")}</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '160px' }}>{t("Account Name")}</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '200px' }}>{t("Description")}</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '120px' }}>{t("Party")}</th>
+                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '130px' }}>{t("Debit")}</th>
+                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '130px' }}>{t("Credit")}</th>
+                                <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '110px' }}>{t("Source")}</th>
+                                <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '60px' }}>{t("Action")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
@@ -457,7 +459,7 @@ const AutoJournal = () => {
                                                 <div className="font-bold text-gray-400">{group.entry_number}</div>
                                             </td>
                                             <td className="px-3 py-2.5 text-silver-dark text-xs whitespace-nowrap" colSpan={2}>
-                                                <span className="italic">{group.lines.length} line{group.lines.length > 1 ? 's' : ''}</span>
+                                                <span className="italic">{group.lines.length} {t("line")}{group.lines.length > 1 ? 's' : ''}</span>
                                             </td>
                                             <td className="px-3 py-2.5 text-silver-light text-xs" style={{ maxWidth: '200px' }}>
                                                 <div className="truncate" title={group.description}>{group.description}</div>
@@ -481,7 +483,7 @@ const AutoJournal = () => {
                                                     onClick={ev => { ev.stopPropagation(); navigateToSource(group); }}
                                                     className="p-1.5 text-silver-dark hover:text-gray-400 hover:bg-gray-500/10 rounded smooth-transition disabled:opacity-40"
                                                     disabled={!group.reference_type || group.reference_type === 'adjustment'}
-                                                    title="View Source Document"
+                                                    title={t("View Source Document")}
                                                 >
                                                     <ExternalLink className="w-3.5 h-3.5" />
                                                 </button>
@@ -520,7 +522,7 @@ const AutoJournal = () => {
                         {groupedEntries.length > 0 && (
                             <tfoot className="bg-dark-surface border-t-2 border-gray-700">
                                 <tr>
-                                    <td colSpan={8} className="px-3 py-2 text-right font-bold text-silver-light uppercase text-xs">TOTAL</td>
+                                    <td colSpan={8} className="px-3 py-2 text-right font-bold text-silver-light uppercase text-xs">{t("TOTAL")}</td>
                                     <td className="px-3 py-2 text-right font-bold text-green-400 text-sm whitespace-nowrap">{fmtIDR(totals.totalDebit)}</td>
                                     <td className="px-3 py-2 text-right font-bold text-blue-400 text-sm whitespace-nowrap">{fmtIDR(totals.totalCredit)}</td>
                                     <td colSpan={2} />

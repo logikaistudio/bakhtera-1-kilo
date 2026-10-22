@@ -15,6 +15,7 @@ import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { getActiveDivision } from '../../utils/divisionContext';
 import { filterActiveBlinkJournalEntries } from '../../utils/blinkJournalIntegrity';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 // ─── Source badge config ─────────────────────────────────────────────────────
 const SOURCE_CONFIG = {
@@ -64,6 +65,7 @@ const fmtIDR = (value) => {
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 const ReversingJournal = () => {
+    const { t } = useLanguage();
     const navigate = useNavigate();
     const { companySettings } = useData();
     const { canCreate, canDelete } = useAuth();
@@ -257,11 +259,11 @@ const ReversingJournal = () => {
 
     const saveEntry = async () => {
         if (!canCreate('blink_journal')) {
-            alert('Anda tidak memiliki hak akses untuk membuat entri jurnal reversal.');
+            alert(t("Anda tidak memiliki hak akses untuk membuat entri jurnal reversal."));
             return;
         }
-        if (!isBalanced()) { alert('Journal entry must balance!'); return; }
-        if (!newEntry.description) { alert('Description is required.'); return; }
+        if (!isBalanced()) { alert(t("Journal entry must balance!")); return; }
+        if (!newEntry.description) { alert(t("Description is required.")); return; }
         try {
             setSaving(true);
             const baseEntryNumber = await generateEntryNumber();
@@ -288,7 +290,7 @@ const ReversingJournal = () => {
             }));
 
             if (rows.length === 0) {
-                alert('Please fill in at least one valid journal line.');
+                alert(t("Please fill in at least one valid journal line."));
                 return;
             }
 
@@ -314,10 +316,10 @@ const ReversingJournal = () => {
     // ── Delete ──────────────────────────────────────────────────────────────────
     const deleteEntry = async (batchId) => {
         if (!canDelete('blink_journal')) {
-            alert('Anda tidak memiliki hak akses untuk menghapus entri jurnal.');
+            alert(t("Anda tidak memiliki hak akses untuk menghapus entri jurnal."));
             return;
         }
-        if (!confirm('Delete this reversing entry? This cannot be undone.')) return;
+        if (!confirm(t("Delete this reversing entry? This cannot be undone."))) return;
         try {
             const { error } = await supabase.from('blink_journal_entries').delete().eq('batch_id', batchId).eq('division', activeDivision);
             if (error) throw error;
@@ -432,20 +434,20 @@ const ReversingJournal = () => {
             {/* ── Header ── */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text">🔄 Reversing Jurnal</h1>
-                    <p className="text-silver-dark mt-1">Perbaikan & koreksi entry journal untuk membatalkan kesalahan</p>
+                    <h1 className="text-3xl font-bold gradient-text">{t("🔄 Reversing Jurnal")}</h1>
+                    <p className="text-silver-dark mt-1">{t("Perbaikan & koreksi entry journal untuk membatalkan kesalahan")}</p>
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                    <Button variant="secondary" onClick={fetchEntries}>Refresh</Button>
+                    <Button variant="secondary" onClick={fetchEntries}>{t("Refresh")}</Button>
                     <button onClick={exportCSV} className="flex items-center gap-2 px-3 py-2 bg-dark-surface text-silver-light hover:bg-dark-card border border-dark-border rounded-lg smooth-transition text-xs">
                         <FileText className="w-4 h-4" /> CSV
                     </button>
                     <button onClick={exportToPDF} disabled={loading || groupedEntries.length === 0}
                         className="flex items-center gap-2 px-3 py-2 bg-dark-surface text-red-400 hover:bg-dark-card border border-dark-border rounded-lg smooth-transition text-xs disabled:opacity-40">
-                        <Printer className="w-4 h-4" /> Print PDF
+                        <Printer className="w-4 h-4" /> {t("Print PDF")}
                     </button>
                     {canCreate('blink_journal') && (
-                        <Button icon={Plus} onClick={() => setShowNewEntryModal(true)}>Reversal Baru</Button>
+                        <Button icon={Plus} onClick={() => setShowNewEntryModal(true)}>{t("Reversal Baru")}</Button>
                     )}
                 </div>
             </div>
@@ -454,37 +456,37 @@ const ReversingJournal = () => {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="glass-card p-4 rounded-lg border-l-4 border-green-500">
                     <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark uppercase tracking-wider">Total Debit</p>
+                        <p className="text-xs text-silver-dark uppercase tracking-wider">{t("Total Debit")}</p>
                         <ArrowUpRight className="w-4 h-4 text-green-400" />
                     </div>
                     <p className="text-xl font-bold text-green-400">{fmtIDR(totals.totalDebit)}</p>
-                    <p className="text-xs text-silver-dark mt-1">{filteredEntries.filter(e => e.debit > 0).length} debit lines</p>
+                    <p className="text-xs text-silver-dark mt-1">{filteredEntries.filter(e => e.debit > 0).length} {t("debit lines")}</p>
                 </div>
                 <div className="glass-card p-4 rounded-lg border-l-4 border-blue-500">
                     <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark uppercase tracking-wider">Total Credit</p>
+                        <p className="text-xs text-silver-dark uppercase tracking-wider">{t("Total Credit")}</p>
                         <ArrowDownLeft className="w-4 h-4 text-blue-400" />
                     </div>
                     <p className="text-xl font-bold text-blue-400">{fmtIDR(totals.totalCredit)}</p>
-                    <p className="text-xs text-silver-dark mt-1">{filteredEntries.filter(e => e.credit > 0).length} credit lines</p>
+                    <p className="text-xs text-silver-dark mt-1">{filteredEntries.filter(e => e.credit > 0).length} {t("credit lines")}</p>
                 </div>
                 <div className="glass-card p-4 rounded-lg border-l-4 border-orange-500">
                     <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark uppercase tracking-wider">Balance Check</p>
+                        <p className="text-xs text-silver-dark uppercase tracking-wider">{t("Balance Check")}</p>
                         {Math.abs(totals.balance) < 1 ? <CheckCircle className="w-4 h-4 text-green-400" /> : <AlertCircle className="w-4 h-4 text-red-400" />}
                     </div>
                     <p className={`text-xl font-bold ${Math.abs(totals.balance) < 1 ? 'text-green-400' : 'text-red-400'}`}>
                         {Math.abs(totals.balance) < 1 ? 'Balanced ✓' : fmt(totals.balance)}
                     </p>
-                    <p className="text-xs text-silver-dark mt-1">Debit = Credit</p>
+                    <p className="text-xs text-silver-dark mt-1">{t("Debit = Credit")}</p>
                 </div>
                 <div className="glass-card p-4 rounded-lg border-l-4 border-accent-orange">
                     <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark uppercase tracking-wider">Total Entries</p>
+                        <p className="text-xs text-silver-dark uppercase tracking-wider">{t("Total Entries")}</p>
                         <Layers className="w-4 h-4 text-accent-orange" />
                     </div>
                     <p className="text-xl font-bold text-accent-orange">{groupedEntries.length}</p>
-                    <p className="text-xs text-silver-dark mt-1">{filteredEntries.length} total lines</p>
+                    <p className="text-xs text-silver-dark mt-1">{filteredEntries.length} {t("total lines")}</p>
                 </div>
             </div>
 
@@ -494,7 +496,7 @@ const ReversingJournal = () => {
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-silver-dark" />
                     <input
                         type="text"
-                        placeholder="Cari entry number, deskripsi, akun..."
+                        placeholder={t("Cari entry number, deskripsi, akun...")}
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
                         className="w-full pl-11 pr-4 py-2.5 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm"
@@ -515,27 +517,27 @@ const ReversingJournal = () => {
                 {loading ? (
                     <div className="flex items-center justify-center py-16">
                         <div className="animate-spin w-8 h-8 border-2 border-accent-orange border-t-transparent rounded-full mr-3" />
-                        <span className="text-silver-dark">Loading reversing journal entries...</span>
+                        <span className="text-silver-dark">{t("Loading reversing journal entries...")}</span>
                     </div>
                 ) : groupedEntries.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 opacity-60">
                         <BookOpen className="w-14 h-14 text-silver-dark mb-4" />
-                        <p className="text-silver-light font-medium">No reversing entries found</p>
-                        <p className="text-silver-dark text-sm mt-1">Create reversing entries to correct or cancel journal entries</p>
+                        <p className="text-silver-light font-medium">{t("No reversing entries found")}</p>
+                        <p className="text-silver-dark text-sm mt-1">{t("Create reversing entries to correct or cancel journal entries")}</p>
                     </div>
                 ) : (
                     <table className="w-full min-w-max text-sm">
                         <thead>
                             <tr className="bg-accent-orange">
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase" style={{ width: '32px' }}></th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '100px' }}>Date</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '220px' }}>Entry No. (RV)</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '110px' }}>Account Code</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '160px' }}>Account Name</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '200px' }}>Description</th>
-                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '130px' }}>Debit</th>
-                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '130px' }}>Credit</th>
-                                <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '80px' }}>Action</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '100px' }}>{t("Date")}</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '220px' }}>{t("Entry No. (RV)")}</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '110px' }}>{t("Account Code")}</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '160px' }}>{t("Account Name")}</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '200px' }}>{t("Description")}</th>
+                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '130px' }}>{t("Debit")}</th>
+                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '130px' }}>{t("Credit")}</th>
+                                <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap" style={{ minWidth: '80px' }}>{t("Action")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
@@ -566,7 +568,7 @@ const ReversingJournal = () => {
                                                 <div className="font-bold text-accent-orange">🔄 {group.entry_number}</div>
                                             </td>
                                             <td className="px-3 py-2.5 text-silver-dark text-xs whitespace-nowrap" colSpan={2}>
-                                                <span className="italic">{group.lines.length} line{group.lines.length > 1 ? 's' : ''}</span>
+                                                <span className="italic">{group.lines.length} {t("line")}{group.lines.length > 1 ? 's' : ''}</span>
                                             </td>
                                             <td className="px-3 py-2.5 text-silver-light text-xs" style={{ maxWidth: '200px' }}>
                                                 <div className="truncate" title={group.description}>{group.description}</div>
@@ -581,7 +583,7 @@ const ReversingJournal = () => {
                                                 <button
                                                     onClick={ev => { ev.stopPropagation(); setSelectedGroup(group); setShowDetailModal(true); }}
                                                     className="p-1.5 text-silver-dark hover:text-accent-orange hover:bg-orange-500/10 rounded smooth-transition"
-                                                    title="View Detail"
+                                                    title={t("View Detail")}
                                                 >
                                                     <Eye className="w-3.5 h-3.5" />
                                                 </button>
@@ -614,7 +616,7 @@ const ReversingJournal = () => {
                         {groupedEntries.length > 0 && (
                             <tfoot className="bg-dark-surface border-t-2 border-accent-orange">
                                 <tr>
-                                    <td colSpan={6} className="px-3 py-2 text-right font-bold text-silver-light uppercase text-xs">TOTAL</td>
+                                    <td colSpan={6} className="px-3 py-2 text-right font-bold text-silver-light uppercase text-xs">{t("TOTAL")}</td>
                                     <td className="px-3 py-2 text-right font-bold text-green-400 text-sm whitespace-nowrap">{fmtIDR(totals.totalDebit)}</td>
                                     <td className="px-3 py-2 text-right font-bold text-blue-400 text-sm whitespace-nowrap">{fmtIDR(totals.totalCredit)}</td>
                                     <td />
@@ -631,7 +633,7 @@ const ReversingJournal = () => {
                     <div className="p-6">
                         <div className="flex items-start justify-between mb-6">
                             <div>
-                                <h2 className="text-2xl font-bold gradient-text">Reversing Entry Detail</h2>
+                                <h2 className="text-2xl font-bold gradient-text">{t("Reversing Entry Detail")}</h2>
                                 <p className="text-silver-dark mt-1">🔄 #{selectedGroup.entry_number}</p>
                             </div>
                             {canDelete('blink_journal') && (
@@ -639,13 +641,13 @@ const ReversingJournal = () => {
                                     onClick={() => deleteEntry(selectedGroup.batch_id)}
                                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 rounded-lg border border-red-500/30 smooth-transition"
                                 >
-                                    <Trash2 className="w-3 h-3" /> Delete
+                                    <Trash2 className="w-3 h-3" /> {t("Delete")}
                                 </button>
                             )}
                         </div>
 
                         <div className="mb-5 p-3 bg-dark-surface rounded-lg border border-dark-border">
-                            <p className="text-xs text-silver-dark uppercase mb-1">Description</p>
+                            <p className="text-xs text-silver-dark uppercase mb-1">{t("Description")}</p>
                             <p className="text-sm text-silver-light">{selectedGroup.description || '-'}</p>
                         </div>
 
@@ -653,9 +655,9 @@ const ReversingJournal = () => {
                             <table className="w-full text-sm">
                                 <thead className="bg-dark-surface">
                                     <tr>
-                                        <th className="px-4 py-2.5 text-left text-xs text-silver-dark uppercase font-semibold">Account</th>
-                                        <th className="px-4 py-2.5 text-right text-xs text-silver-dark uppercase font-semibold w-36">Debit</th>
-                                        <th className="px-4 py-2.5 text-right text-xs text-silver-dark uppercase font-semibold w-36">Credit</th>
+                                        <th className="px-4 py-2.5 text-left text-xs text-silver-dark uppercase font-semibold">{t("Account")}</th>
+                                        <th className="px-4 py-2.5 text-right text-xs text-silver-dark uppercase font-semibold w-36">{t("Debit")}</th>
+                                        <th className="px-4 py-2.5 text-right text-xs text-silver-dark uppercase font-semibold w-36">{t("Credit")}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-dark-border">
@@ -676,7 +678,7 @@ const ReversingJournal = () => {
                                 </tbody>
                                 <tfoot className="bg-dark-surface border-t-2 border-dark-border">
                                     <tr>
-                                        <td className="px-4 py-2 text-right font-bold text-silver-light text-xs uppercase">Total</td>
+                                        <td className="px-4 py-2 text-right font-bold text-silver-light text-xs uppercase">{t("Total")}</td>
                                         <td className="px-4 py-2 text-right font-bold text-green-400">{fmt(selectedGroup.lines.reduce((s, e) => s + (e.debit || 0), 0))}</td>
                                         <td className="px-4 py-2 text-right font-bold text-blue-400">{fmt(selectedGroup.lines.reduce((s, e) => s + (e.credit || 0), 0))}</td>
                                     </tr>
@@ -685,7 +687,7 @@ const ReversingJournal = () => {
                         </div>
 
                         <div className="flex justify-end">
-                            <Button variant="secondary" onClick={() => setShowDetailModal(false)}>Close</Button>
+                            <Button variant="secondary" onClick={() => setShowDetailModal(false)}>{t("Close")}</Button>
                         </div>
                     </div>
                 </Modal>
@@ -695,18 +697,18 @@ const ReversingJournal = () => {
             {showNewEntryModal && (
                 <Modal isOpen={true} onClose={() => setShowNewEntryModal(false)} maxWidth="max-w-4xl">
                     <div className="p-6">
-                        <h2 className="text-2xl font-bold gradient-text mb-6">Reversing Entry Baru</h2>
+                        <h2 className="text-2xl font-bold gradient-text mb-6">{t("Reversing Entry Baru")}</h2>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                             <div>
-                                <label className="block text-sm font-medium text-silver-light mb-2">Date *</label>
+                                <label className="block text-sm font-medium text-silver-light mb-2">{t("Date *")}</label>
                                 <input type="date" value={newEntry.entry_date}
                                     onChange={e => setNewEntry({ ...newEntry, entry_date: e.target.value })}
                                     className="w-full px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light" />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-silver-light mb-2">Description (Alasan Koreksi) *</label>
-                                <input type="text" placeholder="Contoh: Koreksi invoice #12345..."
+                                <label className="block text-sm font-medium text-silver-light mb-2">{t("Description (Alasan Koreksi) *")}</label>
+                                <input type="text" placeholder={t("Contoh: Koreksi invoice #12345...")}
                                     value={newEntry.description}
                                     onChange={e => setNewEntry({ ...newEntry, description: e.target.value })}
                                     className="w-full px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light" />
@@ -715,17 +717,17 @@ const ReversingJournal = () => {
 
                         <div className="glass-card p-4 rounded-lg mb-4">
                             <div className="flex justify-between items-center mb-3">
-                                <h3 className="font-semibold text-silver-light">Journal Lines</h3>
+                                <h3 className="font-semibold text-silver-light">{t("Journal Lines")}</h3>
                                 <button onClick={addLine} className="flex items-center gap-1 text-sm text-accent-orange hover:text-accent-orange/80">
-                                    <Plus className="w-4 h-4" /> Add Line
+                                    <Plus className="w-4 h-4" /> {t("Add Line")}
                                 </button>
                             </div>
                             <table className="w-full">
                                 <thead>
                                     <tr className="text-left text-xs text-silver-dark uppercase">
-                                        <th className="pb-2 w-1/2">Account</th>
-                                        <th className="pb-2 w-1/4 text-right">Debit (IDR)</th>
-                                        <th className="pb-2 w-1/4 text-right">Credit (IDR)</th>
+                                        <th className="pb-2 w-1/2">{t("Account")}</th>
+                                        <th className="pb-2 w-1/4 text-right">{t("Debit (IDR)")}</th>
+                                        <th className="pb-2 w-1/4 text-right">{t("Credit (IDR)")}</th>
                                         <th className="pb-2 w-10" />
                                     </tr>
                                 </thead>
@@ -736,7 +738,7 @@ const ReversingJournal = () => {
                                                 <select value={line.coa_id}
                                                     onChange={e => handleLineChange(idx, 'coa_id', e.target.value)}
                                                     className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm">
-                                                    <option value="">-- Select Account --</option>
+                                                    <option value="">{t("-- Select Account --")}</option>
                                                     {accounts.map(acc => (
                                                         <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>
                                                     ))}
@@ -767,7 +769,7 @@ const ReversingJournal = () => {
                                 </tbody>
                                 <tfoot className="border-t-2 border-dark-border">
                                     <tr>
-                                        <td className="pt-3 font-semibold text-silver-light text-right text-sm">TOTAL</td>
+                                        <td className="pt-3 font-semibold text-silver-light text-right text-sm">{t("TOTAL")}</td>
                                         <td className="pt-3 text-right font-bold text-green-400">
                                             {fmt(newEntry.lines.reduce((s, l) => s + (l.debit || 0), 0))}
                                         </td>
@@ -782,13 +784,13 @@ const ReversingJournal = () => {
 
                         <div className={`p-3 rounded-lg mb-5 flex items-center gap-3 ${isBalanced() ? 'bg-green-500/10 border border-green-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
                             {isBalanced()
-                                ? <><CheckCircle className="w-5 h-5 text-green-400" /><span className="text-green-400 font-medium">Balanced ✓</span></>
-                                : <><AlertCircle className="w-5 h-5 text-red-400" /><span className="text-red-400 font-medium">Unbalanced — Difference: {fmt(newEntry.lines.reduce((s, l) => s + (l.debit || 0), 0) - newEntry.lines.reduce((s, l) => s + (l.credit || 0), 0))}</span></>
+                                ? <><CheckCircle className="w-5 h-5 text-green-400" /><span className="text-green-400 font-medium">{t("Balanced ✓")}</span></>
+                                : <><AlertCircle className="w-5 h-5 text-red-400" /><span className="text-red-400 font-medium">{t("Unbalanced — Difference:")} {fmt(newEntry.lines.reduce((s, l) => s + (l.debit || 0), 0) - newEntry.lines.reduce((s, l) => s + (l.credit || 0), 0))}</span></>
                             }
                         </div>
 
                         <div className="flex justify-end gap-3">
-                            <Button variant="secondary" onClick={() => setShowNewEntryModal(false)}>Cancel</Button>
+                            <Button variant="secondary" onClick={() => setShowNewEntryModal(false)}>{t("Cancel")}</Button>
                             <Button onClick={saveEntry} disabled={!isBalanced() || saving}>
                                 {saving ? 'Saving...' : 'Save Reversal'}
                             </Button>
