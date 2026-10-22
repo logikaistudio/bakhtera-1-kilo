@@ -53,7 +53,7 @@ const recordApprovalHistory = async (po, action, reason = null, approverName = '
 
 const BridgePurchaseOrder = () => {
     const { t, language } = useLanguage();
-    const { user, canCreate, canEdit, canDelete, canView, canApprove } = useAuth();
+    const { user, canCreate, canEdit, canDelete, canView, canApprove, isSuperAdmin } = useAuth();
     const { companySettings: blinkCompanySettings, bridgeSettings, bridgeBusinessPartners, deleteBridgePurchaseOrderCascade } = useData();
     const companySettings = bridgeSettings || blinkCompanySettings;
     const [pos, setPOs] = useState([]);
@@ -97,7 +97,7 @@ const BridgePurchaseOrder = () => {
     // Edit state
     const [isEditing, setIsEditing] = useState(false);
     const [editId, setEditId] = useState(null);
-    const canCleanseBridgePO = canDelete('bridge_finance');
+    const canCleanseBridgePO = isSuperAdmin();
     const [isCleansing, setIsCleansing] = useState(false);
     const [cleanseProgress, setCleanseProgress] = useState('');
     const dateLocale = language === 'id' ? 'id-ID' : 'en-US';

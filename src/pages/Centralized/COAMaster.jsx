@@ -14,7 +14,7 @@ const { read, utils } = XLSX;
 
     const COAMaster = () => {
     const { t } = useLanguage();
-    const { isAdmin, canDelete } = useAuth();
+    const { isAdmin, canDelete, isSuperAdmin } = useAuth();
     const { deleteCOA } = useData();
     const [accounts, setAccounts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -639,7 +639,7 @@ const { read, utils } = XLSX;
     };
 
     const handleDeleteAll = async () => {
-        if (!(isAdmin() || canDelete('central_coa'))) {
+        if (!isSuperAdmin()) {
             alert(t("Akses Ditolak: Anda tidak memiliki hak untuk menghapus seluruh COA."));
             return;
         }
@@ -810,6 +810,7 @@ const { read, utils } = XLSX;
                         <Upload className="w-3 h-3" />
                         {t("Import")}
                     </button>
+                    {isSuperAdmin() && (
                     <button
                         onClick={handleDeleteAll}
                         className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-red-600/80 text-white rounded-md hover:bg-red-700 transition-colors"
@@ -817,6 +818,7 @@ const { read, utils } = XLSX;
                         <Trash2 className="w-3 h-3" />
                         {t("Delete All")}
                     </button>
+                    )}
                     <button
                         onClick={() => { resetForm(); setShowModal(true); }}
                         className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-accent-blue text-white rounded-md hover:bg-accent-cyan transition-colors"

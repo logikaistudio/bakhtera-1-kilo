@@ -12,10 +12,11 @@ import { useLanguage } from '../../i18n/LanguageContext';
 
 const BridgePartnerManagement = () => {
     const { t } = useLanguage();
-    const { canCreate, canEdit, canDelete } = useAuth();
+    const { canCreate, canEdit, canDelete, isSuperAdmin } = useAuth();
     const hasCreate = canCreate('bridge_partners');
     const hasEdit = canEdit('bridge_partners');
     const hasDelete = canDelete('bridge_partners');
+    const canClearAll = hasDelete && isSuperAdmin();
     const [partners, setPartners] = useState([]);
     const [selectedIds, setSelectedIds] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -164,7 +165,7 @@ const BridgePartnerManagement = () => {
     };
 
     const handleCleanseAll = async () => {
-        if (!hasDelete) {
+        if (!canClearAll) {
             alert(t("Akses Ditolak: Anda tidak memiliki hak untuk cleansing data mitra."));
             return;
         }
@@ -307,7 +308,7 @@ const BridgePartnerManagement = () => {
                     <p className="text-silver-dark mt-1">{t("Kelola Customer, Vendor, Consignee, Shipper (TPB/Gudang Berikat)")}</p>
                 </div>
                 <div className="flex gap-2">
-                    {hasDelete && (
+                    {canClearAll && (
                         <Button
                             onClick={handleCleanseAll}
                             disabled={partners.length === 0 || isCleansing}

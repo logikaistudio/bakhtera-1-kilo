@@ -11,10 +11,11 @@ import { useLanguage } from '../../i18n/LanguageContext';
 const GoodsMovement = () => {
     const { t } = useLanguage();
     const navigate = useNavigate();
-    const { canCreate, canEdit, canDelete } = useAuth();
+    const { canCreate, canEdit, canDelete, isSuperAdmin } = useAuth();
     const hasCreate = canCreate('bridge_movement');
     const hasEdit = canEdit('bridge_movement');
     const hasDelete = canDelete('bridge_movement');
+    const canClearAll = hasDelete && isSuperAdmin();
     const { mutationLogs = [], quotations = [], addMutationLog, updateMutationLog, updateInventoryStock, deleteMutationLog, fetchMutationLogDetails, companySettings, bridgeSettings, locations, getExhibitionLocation, isExhibitionLocation } = useData();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedIds, setSelectedIds] = useState([]);
@@ -97,7 +98,7 @@ const GoodsMovement = () => {
     };
 
     const handleDeleteAll = async () => {
-        if (!hasDelete || mutationLogs.length === 0) return;
+        if (!canClearAll || mutationLogs.length === 0) return;
         if (!window.confirm(`Hapus semua data mutasi (${mutationLogs.length} baris)?`)) return;
         if (!window.confirm('Konfirmasi terakhir: semua data mutasi akan dihapus permanen. Lanjutkan?')) return;
         try {
@@ -454,9 +455,11 @@ const GoodsMovement = () => {
                     <Button onClick={handleDeleteSelected} variant="danger" disabled={selectedIds.length === 0} icon={Trash2}>
                         {t("Hapus Terpilih (")}{selectedIds.length})
                     </Button>
-                    <Button onClick={handleDeleteAll} variant="danger" disabled={mutationLogs.length === 0} icon={Trash2}>
-                        {t("Bersihkan Semua Data")}
-                    </Button>
+                    {canClearAll && (
+                        <Button onClick={handleDeleteAll} variant="danger" disabled={mutationLogs.length === 0} icon={Trash2}>
+                            {t("Bersihkan Semua Data")}
+                        </Button>
+                    )}
                 </div>
             )}
 

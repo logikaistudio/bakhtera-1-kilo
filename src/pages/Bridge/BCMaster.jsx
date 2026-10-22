@@ -8,10 +8,11 @@ import { useLanguage } from '../../i18n/LanguageContext';
 
 const BCMaster = () => {
     const { t } = useLanguage();
-    const { canCreate, canEdit, canDelete } = useAuth();
+    const { canCreate, canEdit, canDelete, isSuperAdmin } = useAuth();
     const hasCreate = canCreate('bridge_bc_master');
     const hasEdit = canEdit('bridge_bc_master');
     const hasDelete = canDelete('bridge_bc_master');
+    const canClearAll = hasDelete && isSuperAdmin();
     const { bcCodes, addBCCode, updateBCCode, deleteBCCode } = useData();
 
     const [showForm, setShowForm] = useState(false);
@@ -86,7 +87,7 @@ const BCMaster = () => {
     };
 
     const handleDeleteAll = () => {
-        if (!hasDelete || bcCodes.length === 0) return;
+        if (!canClearAll || bcCodes.length === 0) return;
         if (!window.confirm(`Hapus semua kode BC (${bcCodes.length} baris)?`)) return;
         if (!window.confirm('Konfirmasi terakhir: semua kode BC akan dihapus permanen. Lanjutkan?')) return;
         bcCodes.forEach(item => deleteBCCode(item.id));
@@ -128,9 +129,11 @@ const BCMaster = () => {
                             <Button onClick={handleDeleteSelected} variant="danger" disabled={selectedIds.length === 0}>
                                 <Trash2 className="w-4 h-4 mr-1" /> {t("Hapus Terpilih (")}{selectedIds.length})
                             </Button>
-                            <Button onClick={handleDeleteAll} variant="danger" disabled={bcCodes.length === 0}>
-                                <Trash2 className="w-4 h-4 mr-1" /> {t("Bersihkan Semua Data")}
-                            </Button>
+                            {canClearAll && (
+                                <Button onClick={handleDeleteAll} variant="danger" disabled={bcCodes.length === 0}>
+                                    <Trash2 className="w-4 h-4 mr-1" /> {t("Bersihkan Semua Data")}
+                                </Button>
+                            )}
                         </>
                     )}
                     {hasCreate && (

@@ -9,10 +9,11 @@ import { useLanguage } from '../../i18n/LanguageContext';
 
 const DeliveryNotes = () => {
     const { t } = useLanguage();
-    const { canCreate, canEdit, canDelete } = useAuth();
+    const { canCreate, canEdit, canDelete, isSuperAdmin } = useAuth();
     const hasCreate = canCreate('bridge_delivery');
     const hasEdit = canEdit('bridge_delivery');
     const hasDelete = canDelete('bridge_delivery');
+    const canClearAll = hasDelete && isSuperAdmin();
     const { quotations } = useData();
     const [deliveryNotes, setDeliveryNotes] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -156,7 +157,7 @@ const DeliveryNotes = () => {
     };
 
     const handleDeleteAll = async () => {
-        if (!hasDelete) return;
+        if (!canClearAll) return;
         if (deliveryNotes.length === 0) {
             alert(t("Tidak ada data surat jalan untuk dihapus."));
             return;
@@ -210,6 +211,7 @@ const DeliveryNotes = () => {
                                     <Trash2 className="w-4 h-4" />
                                     {t("Hapus Terpilih (")}{selectedIds.length})
                                 </button>
+                                {canClearAll && (
                                 <button
                                     onClick={handleDeleteAll}
                                     disabled={deliveryNotes.length === 0}
@@ -218,6 +220,7 @@ const DeliveryNotes = () => {
                                     <Trash2 className="w-4 h-4" />
                                     {t("Bersihkan Semua Data")}
                                 </button>
+                                )}
                             </>
                         )}
                         {hasCreate && (

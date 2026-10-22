@@ -6,7 +6,7 @@ import { useLanguage } from '../../i18n/LanguageContext';
 
 const AssetInventory = () => {
     const { t } = useLanguage();
-    const { canCreate, canEdit, canDelete, user } = useAuth();
+    const { canCreate, canEdit, canDelete, user, isSuperAdmin } = useAuth();
     const [assets, setAssets] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -118,7 +118,7 @@ const AssetInventory = () => {
     };
 
     const handleDeleteAll = async () => {
-        if (!canDelete('bridge_asset_inventory')) return;
+        if (!isSuperAdmin() || !canDelete('bridge_asset_inventory')) return;
         if (assets.length === 0) {
             alert(t("Tidak ada data aset untuk dihapus."));
             return;
@@ -233,6 +233,7 @@ const AssetInventory = () => {
                                 <Trash className="w-4 h-4" />
                                 {t("Hapus Terpilih (")}{selectedIds.length})
                             </button>
+                            {isSuperAdmin() && (
                             <button
                                 onClick={handleDeleteAll}
                                 disabled={assets.length === 0}
@@ -241,6 +242,7 @@ const AssetInventory = () => {
                                 <Trash className="w-4 h-4" />
                                 {t("Bersihkan Semua Data")}
                             </button>
+                            )}
                         </>
                     )}
                     {canCreate('bridge_asset_inventory') && (

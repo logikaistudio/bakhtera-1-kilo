@@ -19,10 +19,11 @@ import { useLanguage } from '../../i18n/LanguageContext';
 
 const CodeOfAccount = () => {
     const { t } = useLanguage();
-    const { canCreate, canEdit, canDelete } = useAuth();
+    const { canCreate, canEdit, canDelete, isSuperAdmin } = useAuth();
     const hasCreate = canCreate('bridge_coa');
     const hasEdit = canEdit('bridge_coa');
     const hasDelete = canDelete('bridge_coa');
+    const canClearAll = hasDelete && isSuperAdmin();
     const [accounts, setAccounts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -154,7 +155,7 @@ const CodeOfAccount = () => {
     };
 
     const handleDeleteAll = async () => {
-        if (!hasDelete) return;
+        if (!canClearAll) return;
         if (accounts.length === 0) return;
 
         const confirm1 = confirm(t("⚠️ PERINGATAN: Anda yakin ingin menghapus SELURUH data COA?\n\nSemua akun yang aktif saat ini akan dinonaktifkan."));
@@ -301,7 +302,7 @@ const CodeOfAccount = () => {
                             {t("Delete Selected (")}{selectedIds.length})
                         </Button>
                     )}
-                    {hasDelete && accounts.length > 0 && (
+                    {canClearAll && accounts.length > 0 && (
                         <Button
                             variant="danger"
                             icon={Trash2}

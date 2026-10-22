@@ -9,10 +9,11 @@ import { useLanguage } from '../../../i18n/LanguageContext';
 
 const BigCodeOfAccount = () => {
     const { t } = useLanguage();
-    const { canCreate, canEdit, canDelete } = useAuth();
+    const { canCreate, canEdit, canDelete, isSuperAdmin } = useAuth();
     const hasCreate = canCreate('big_coa');
     const hasEdit   = canEdit('big_coa');
     const hasDelete = canDelete('big_coa');
+    const canClearAll = hasDelete && isSuperAdmin();
 
     const [accounts, setAccounts]         = useState([]);
     const [loading, setLoading]           = useState(true);
@@ -142,7 +143,7 @@ const BigCodeOfAccount = () => {
     };
 
     const handleDeleteAll = async () => {
-        if (!hasDelete || accounts.length === 0) return;
+        if (!canClearAll || accounts.length === 0) return;
         if (!confirm(`⚠️ Hapus SELURUH ${accounts.length} akun COA Big? Tindakan ini tidak dapat dibatalkan.`)) return;
         if (prompt('Ketik "HAPUS" untuk konfirmasi:') !== 'HAPUS') {
             alert(t("Konfirmasi tidak sesuai. Dibatalkan."));
@@ -209,7 +210,7 @@ const BigCodeOfAccount = () => {
                     <p className="text-silver-dark mt-1">{t("Master data kode akun keuangan BIG (Event Organizer)")}</p>
                 </div>
                 <div className="flex gap-2">
-                    {hasDelete && accounts.length > 0 && (
+                    {canClearAll && accounts.length > 0 && (
                         <Button variant="danger" icon={Trash2} onClick={handleDeleteAll}>
                             {t("Hapus Semua")}
                         </Button>

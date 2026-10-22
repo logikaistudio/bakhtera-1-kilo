@@ -8,10 +8,11 @@ import { useLanguage } from '../../i18n/LanguageContext';
 
 const AtaCarnet = () => {
     const { t } = useLanguage();
-    const { canCreate, canEdit, canDelete } = useAuth();
+    const { canCreate, canEdit, canDelete, isSuperAdmin } = useAuth();
     const hasCreate = canCreate('bridge_ata_carnet');
     const hasEdit = canEdit('bridge_ata_carnet');
     const hasDelete = canDelete('bridge_ata_carnet');
+    const canClearAll = hasDelete && isSuperAdmin();
 
     // Dummy Data
     const [carnetList, setCarnetList] = useState([
@@ -145,7 +146,7 @@ const AtaCarnet = () => {
     };
 
     const handleDeleteAll = () => {
-        if (!hasDelete || carnetList.length === 0) return;
+        if (!canClearAll || carnetList.length === 0) return;
         if (!window.confirm(`Delete all Carnet documents (${carnetList.length} rows)?`)) return;
         if (!window.confirm('Final confirmation: all Carnet data will be permanently deleted. Continue?')) return;
         setCarnetList([]);
@@ -217,10 +218,12 @@ const AtaCarnet = () => {
                                 <Trash2 className="w-4 h-4 mr-2" />
                                 {t("Hapus Terpilih (")}{selectedIds.length})
                             </Button>
-                            <Button onClick={handleDeleteAll} variant="danger" disabled={carnetList.length === 0}>
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                {t("Bersihkan Semua Data")}
-                            </Button>
+                            {canClearAll && (
+                                <Button onClick={handleDeleteAll} variant="danger" disabled={carnetList.length === 0}>
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    {t("Bersihkan Semua Data")}
+                                </Button>
+                            )}
                         </>
                     )}
                     <Button onClick={handleExportExcel} variant="secondary">

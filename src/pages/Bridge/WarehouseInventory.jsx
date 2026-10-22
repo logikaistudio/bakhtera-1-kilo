@@ -12,9 +12,10 @@ import { useLanguage } from '../../i18n/LanguageContext';
 
 const WarehouseInventory = () => {
     const { t } = useLanguage();
-    const { canEdit, canDelete, user } = useAuth();
+    const { canEdit, canDelete, user, isSuperAdmin } = useAuth();
     const hasEdit = canEdit('bridge_inventory');
     const hasDelete = canDelete('bridge_inventory');
+    const canClearAll = hasDelete && isSuperAdmin();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const { quotations, updateQuotation, addMutationLog, mutationLogs = [], deleteMutationLog, updateInventoryStock, outboundTransactions = [], updateItemCheckout, requestApproval, isExhibitionLocation, getExhibitionLocation } = useData();
@@ -1292,7 +1293,7 @@ const WarehouseInventory = () => {
 
     // Handle delete ALL mutations for entire pengajuan
     const handleDeleteAllMutations = async () => {
-        if (!hasDelete) {
+        if (!canClearAll) {
             alert(t("Anda tidak memiliki izin untuk menghapus mutasi"));
             return;
         }
@@ -1472,7 +1473,7 @@ const WarehouseInventory = () => {
                                             {/* Only show mutation buttons for inbound pengajuan */}
                                             {selectedPengajuan.type !== 'outbound' && (
                                                 <>
-                                                    {hasDelete && (
+                                                    {canClearAll && (
                                                         <Button onClick={handleDeleteAllMutations} variant="secondary" icon={Trash2} className="text-sm text-red-600 hover:text-red-800">{t("Hapus Mutasi")}</Button>
                                                     )}
                                                     {hasEdit && (

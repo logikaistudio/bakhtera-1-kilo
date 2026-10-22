@@ -8,10 +8,11 @@ import { useLanguage } from '../../i18n/LanguageContext';
 
 const HSMaster = () => {
     const { t } = useLanguage();
-    const { canCreate, canEdit, canDelete } = useAuth();
+    const { canCreate, canEdit, canDelete, isSuperAdmin } = useAuth();
     const hasCreate = canCreate('bridge_hs_master');
     const hasEdit = canEdit('bridge_hs_master');
     const hasDelete = canDelete('bridge_hs_master');
+    const canClearAll = hasDelete && isSuperAdmin();
     const { hsCodes = [], addHSCode, updateHSCode, deleteHSCode } = useData();
     const [searchTerm, setSearchTerm] = useState('');
     const [showModal, setShowModal] = useState(false);
@@ -74,7 +75,7 @@ const HSMaster = () => {
     };
 
     const handleDeleteAll = () => {
-        if (!hasDelete || hsCodes.length === 0) return;
+        if (!canClearAll || hsCodes.length === 0) return;
         if (!window.confirm(`Hapus seluruh data Kode HS (${hsCodes.length} baris)?`)) return;
         if (!window.confirm('Konfirmasi terakhir: semua Kode HS akan dihapus permanen. Lanjutkan?')) return;
         hsCodes.forEach(item => deleteHSCode(item.id));
@@ -106,10 +107,12 @@ const HSMaster = () => {
                                 <Trash2 className="w-4 h-4 mr-2" />
                                 {t("Hapus Terpilih (")}{selectedIds.length})
                             </Button>
-                            <Button onClick={handleDeleteAll} variant="danger" disabled={hsCodes.length === 0}>
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                {t("Bersihkan Semua Data")}
-                            </Button>
+                            {canClearAll && (
+                                <Button onClick={handleDeleteAll} variant="danger" disabled={hsCodes.length === 0}>
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    {t("Bersihkan Semua Data")}
+                                </Button>
+                            )}
                         </>
                     )}
                     {hasCreate && (
