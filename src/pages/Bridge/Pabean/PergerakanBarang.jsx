@@ -150,6 +150,8 @@ const PergerakanBarang = () => {
                     assetName: item.itemName || item.name || item.assetName || item.description,
                     itemCode: item.itemCode || item.item_code || item.code,
                     originalQty: Number(item.quantity) || 0,
+                    currency: item.currency || q.invoiceCurrency || q.invoice_currency || 'IDR',
+                    totalValue: Number(item.totalPrice) || (Number(item.quantity) * Number(item.price)) || Number(item.value) || 0,
                     unit: item.uom || item.unit || 'pcs',
                     noUrut: itemIdx + 1,
                     notes: item.notes || q.notes,
@@ -215,6 +217,8 @@ const PergerakanBarang = () => {
             return {
                 ...inbound,
                 qtyMasuk: inbound.originalQty,
+                currency: inbound.currency,
+                totalValue: inbound.totalValue,
                 qtyKeluar: totalOut,
                 qtyAdjustment: adjustment,
                 latestOutboundDate: latestOutboundDate,
@@ -233,6 +237,12 @@ const PergerakanBarang = () => {
     const sumByUnit = (key) => filteredData.reduce((acc, i) => {
         const u = i.unit || 'pcs';
         acc[u] = (acc[u] || 0) + (Number(i[key]) || 0);
+        return acc;
+    }, {});
+
+    const valueByCurrency = filteredData.reduce((acc, i) => {
+        const c = i.currency || 'IDR';
+        acc[c] = (acc[c] || 0) + (Number(i.totalValue) || 0);
         return acc;
     }, {});
 
@@ -360,7 +370,7 @@ const PergerakanBarang = () => {
             </div>
 
             {/* Search & Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
                 <div className="md:col-span-2 glass-card p-4 rounded-lg flex flex-col gap-3">
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
@@ -414,6 +424,16 @@ const PergerakanBarang = () => {
                     <p className="text-[10px] text-silver-dark mt-1">
                         {Object.entries(sumByUnit('qtyKeluar')).map(([u, n]) => `${n.toLocaleString('id-ID', { maximumFractionDigits: 4 })} ${u}`).join(' · ') || '-'}
                     </p>
+                </div>
+
+                {/* Nilai Barang Masuk */}
+                <div className="glass-card p-4 rounded-lg border border-accent-green">
+                    <p className="text-xs text-silver-dark">{t("Nilai Barang")}</p>
+                    <div className="text-sm font-bold text-accent-green space-y-0.5">
+                        {Object.entries(valueByCurrency).map(([c, v]) => (
+                            <p key={c}>{c} {v.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                        ))}
+                    </div>
                 </div>
 
                 {/* Total Saldo Akhir */}
