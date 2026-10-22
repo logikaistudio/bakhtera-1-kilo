@@ -4,22 +4,19 @@ import { useLanguage } from '../../../i18n/LanguageContext';
 
 const PabeanDashboard = () => {
     const { t } = useLanguage();
-    const { inboundTransactions = [], outboundTransactions = [], quotations = [] } = useData();
+    const { quotations = [] } = useData();
 
     // 1. Calculate Totals (Detail Quantity)
-    const totalInbound = inboundTransactions.reduce((sum, t) => {
-        // Handle items array if present, else fallback to quantity
-        if (t.items && Array.isArray(t.items) && t.items.length > 0) {
-            return sum + t.items.reduce((itemSum, item) => itemSum + (Number(item.quantity) || 0), 0);
-        }
-        return sum + (Number(t.quantity) || 0);
-    }, 0);
+    // Sumber sama dengan modul Mutasi: jumlah unit (quantity) item pada pengajuan approved,
+    // bukan log freight_inbound yang bisa terduplikasi per pengajuan dan bukan nilai barang.
+    const isApproved = (q) => (q.documentStatus || q.document_status) === 'approved';
+    const totalInbound = quotations
+        .filter(q => q.type === 'inbound' && isApproved(q))
+        .reduce((sum, q) => sum + (q.packages || []).reduce((pkgSum, pkg) =>
+            pkgSum + (pkg.items || []).reduce((itemSum, item) => itemSum + (Number(item.quantity) || 0), 0), 0), 0);
 
-    // FIX: Calculate totalOutbound from outboundTransactions (same logic as inbound)
-    // FIX: Calculate totalOutbound from OUTBOUND QUOTATIONS (Bridge Source of Truth)
-    // Simple logic: Mutasi = Barang Masuk - Barang Keluar
     const totalOutbound = quotations
-        .filter(q => q.type === 'outbound' && ['submitted', 'approved', 'processed'].includes(q.outbound_status || q.documentStatus || q.document_status))
+        .filter(q => q.type === 'outbound' && isApproved(q))
         .reduce((sum, q) => {
             return sum + (q.packages || []).reduce((pkgSum, pkg) => {
                 return pkgSum + (pkg.items || []).reduce((itemSum, item) => {

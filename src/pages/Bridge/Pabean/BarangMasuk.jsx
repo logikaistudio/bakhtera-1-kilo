@@ -389,7 +389,7 @@ const BarangMasuk = () => {
                     </p>
                 </div>
                 <div className="glass-card p-4 rounded-lg border border-accent-green">
-                    <p className="text-xs text-silver-dark">{t("Jumlah Total")}</p>
+                    <p className="text-xs text-silver-dark">{t("Nilai Barang")}</p>
                     <p className="text-xl font-bold text-accent-green">
                         {formatCurrency(flatRows.reduce((sum, r) => sum + (r.nilaiBarang || 0), 0))}
                     </p>
