@@ -5,12 +5,14 @@ import Button from '../../../components/Common/Button';
 import { TrendingUp, RefreshCw, FileSpreadsheet, Printer } from 'lucide-react';
 import { useData } from '../../../context/DataContext';
 import { printReport } from '../../../utils/printPDF';
+import { useLanguage } from '../../../i18n/LanguageContext';
 
 const fmtIDR = (v) => v != null ? 'Rp ' + Number(v).toLocaleString('id-ID') : 'Rp 0';
 const getAmountColor = (amount) => amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-silver-light';
 const ensureArray = (value) => Array.isArray(value) ? value : [];
 
 const BigProfitLoss = () => {
+    const { t } = useLanguage();
     const { companySettings } = useData();
     const [data, setData] = useState({ revenue: [], cogs: [], expenses: [] });
     const [loading, setLoading] = useState(true);
@@ -159,7 +161,7 @@ const BigProfitLoss = () => {
             <table className="w-full text-sm">
                 <tbody className="divide-y divide-dark-border/30">
                     {ensureArray(items).length === 0 ? (
-                        <tr><td colSpan={2} className="px-4 py-3 text-silver-dark italic text-xs">Tidak ada transaksi</td></tr>
+                        <tr><td colSpan={2} className="px-4 py-3 text-silver-dark italic text-xs">{t("Tidak ada transaksi")}</td></tr>
                     ) : ensureArray(items).map(acc => (
                         <tr key={acc.id} className="hover:bg-white/5">
                             <td className="px-4 py-2.5">
@@ -185,53 +187,53 @@ const BigProfitLoss = () => {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold gradient-text flex items-center gap-2">
-                        <TrendingUp className="w-8 h-8" /> Profit & Loss — Big
+                        <TrendingUp className="w-8 h-8" /> {t("Profit & Loss — Big")}
                     </h1>
-                    <p className="text-silver-dark mt-1">Laporan laba rugi Big module</p>
+                    <p className="text-silver-dark mt-1">{t("Laporan laba rugi Big module")}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button variant="secondary" icon={RefreshCw} onClick={fetchPL}>Refresh</Button>
+                    <Button variant="secondary" icon={RefreshCw} onClick={fetchPL}>{t("Refresh")}</Button>
                     <button onClick={handleExportExcel}
                         className="flex items-center gap-2 px-3 py-2 bg-dark-surface text-green-400 hover:bg-dark-card smooth-transition rounded-lg border border-dark-border text-xs">
-                        <FileSpreadsheet className="w-4 h-4" /> Excel
+                        <FileSpreadsheet className="w-4 h-4" /> {t("Excel")}
                     </button>
                     <select
                         value={printOrientation}
                         onChange={(e) => setPrintOrientation(e.target.value)}
                         className="px-2 py-2 bg-dark-surface border border-dark-border rounded-lg text-xs text-silver-light hover:bg-dark-card smooth-transition"
-                        title="Orientasi cetak"
+                        title={t("Orientasi cetak")}
                     >
-                        <option value="auto">Auto</option>
-                        <option value="portrait">Portrait</option>
-                        <option value="landscape">Landscape</option>
+                        <option value="auto">{t("Auto")}</option>
+                        <option value="portrait">{t("Portrait")}</option>
+                        <option value="landscape">{t("Landscape")}</option>
                     </select>
                     <select
                         value={printPageSize}
                         onChange={(e) => setPrintPageSize(e.target.value)}
                         className="px-2 py-2 bg-dark-surface border border-dark-border rounded-lg text-xs text-silver-light hover:bg-dark-card smooth-transition"
-                        title="Ukuran kertas"
+                        title={t("Ukuran kertas")}
                     >
                         <option value="A4">A4</option>
-                        <option value="Letter">Letter</option>
-                        <option value="Legal">Legal</option>
+                        <option value="Letter">{t("Letter")}</option>
+                        <option value="Legal">{t("Legal")}</option>
                     </select>
                     <button onClick={handleExportPDF}
                         className="flex items-center gap-2 px-3 py-2 bg-dark-surface text-red-400 hover:bg-dark-card smooth-transition rounded-lg border border-dark-border text-xs">
-                        <Printer className="w-4 h-4" /> Print PDF
+                        <Printer className="w-4 h-4" /> {t("Print PDF")}
                     </button>
                 </div>
             </div>
 
             <div className="glass-card p-4 rounded-xl flex items-center gap-4">
                 <div>
-                    <label className="block text-xs text-silver-dark uppercase mb-1">Mulai</label>
+                    <label className="block text-xs text-silver-dark uppercase mb-1">{t("Mulai")}</label>
                     <input type="date" value={dateRange.start}
                         onChange={e => setDateRange(p => ({ ...p, start: e.target.value }))}
                         className="bg-dark-surface border border-dark-border rounded px-2 py-1 text-silver-light text-sm" />
                 </div>
                 <div className="h-px w-4 bg-silver-dark" />
                 <div>
-                    <label className="block text-xs text-silver-dark uppercase mb-1">Sampai</label>
+                    <label className="block text-xs text-silver-dark uppercase mb-1">{t("Sampai")}</label>
                     <input type="date" value={dateRange.end}
                         onChange={e => setDateRange(p => ({ ...p, end: e.target.value }))}
                         className="bg-dark-surface border border-dark-border rounded px-2 py-1 text-silver-light text-sm" />
@@ -239,20 +241,20 @@ const BigProfitLoss = () => {
             </div>
 
             {loading ? (
-                <div className="glass-card p-12 text-center text-silver-dark rounded-xl">Memuat data...</div>
+                <div className="glass-card p-12 text-center text-silver-dark rounded-xl">{t("Memuat data...")}</div>
             ) : (
                 <div className="max-w-3xl">
-                    <Section title="Pendapatan (Revenue)" items={data.revenue} total={totalRevenue} totalLabel="Total Pendapatan" totalColor="text-green-400" />
-                    <Section title="Harga Pokok (COGS)" items={data.cogs} total={totalCogs} totalLabel="Total COGS" totalColor="text-orange-400" />
+                    <Section title={t("Pendapatan (Revenue)")} items={data.revenue} total={totalRevenue} totalLabel="Total Pendapatan" totalColor="text-green-400" />
+                    <Section title={t("Harga Pokok (COGS)")} items={data.cogs} total={totalCogs} totalLabel="Total COGS" totalColor="text-orange-400" />
 
                     <div className="glass-card rounded-xl mb-4 border border-blue-500/30">
                         <div className="flex justify-between items-center px-4 py-4">
-                            <span className="text-blue-400 font-bold text-base">Laba Kotor (Gross Profit)</span>
+                            <span className="text-blue-400 font-bold text-base">{t("Laba Kotor (Gross Profit)")}</span>
                             <span className={`text-2xl font-bold font-mono ${grossProfit >= 0 ? 'text-blue-400' : 'text-red-400'}`}>{fmtIDR(grossProfit)}</span>
                         </div>
                     </div>
 
-                    <Section title="Biaya Operasional (Expenses)" items={data.expenses} total={totalExpenses} totalLabel="Total Biaya" totalColor="text-red-400" />
+                    <Section title={t("Biaya Operasional (Expenses)")} items={data.expenses} total={totalExpenses} totalLabel="Total Biaya" totalColor="text-red-400" />
 
                     <div className={`glass-card rounded-xl border-2 ${netIncome >= 0 ? 'border-green-500' : 'border-red-500'}`}>
                         <div className="flex justify-between items-center px-4 py-5">

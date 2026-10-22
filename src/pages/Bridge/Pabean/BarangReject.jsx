@@ -4,8 +4,10 @@ import { useData } from '../../../context/DataContext';
 import Button from '../../../components/Common/Button';
 import { formatCurrency, getCurrencySymbol } from '../../../utils/currencyFormatter';
 import { exportToCSV } from '../../../utils/exportCSV';
+import { useLanguage } from '../../../i18n/LanguageContext';
 
 const BarangReject = () => {
+    const { t } = useLanguage();
     const { rejectTransactions = [] } = useData();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedItem, setSelectedItem] = useState(null);
@@ -43,8 +45,8 @@ const BarangReject = () => {
         <div className="p-6 space-y-6">
             {/* Header */}
             <div>
-                <h1 className="text-3xl font-bold gradient-text">Barang Reject/Scrap</h1>
-                <p className="text-silver-dark mt-1">Daftar Barang Reject, Rusak & Scrap</p>
+                <h1 className="text-3xl font-bold gradient-text">{t("Barang Reject/Scrap")}</h1>
+                <p className="text-silver-dark mt-1">{t("Daftar Barang Reject, Rusak & Scrap")}</p>
             </div>
 
             {/* Search & Stats */}
@@ -54,7 +56,7 @@ const BarangReject = () => {
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                         <input
                             type="text"
-                            placeholder="Cari berdasarkan nama barang, nomor BC, atau alasan reject..."
+                            placeholder={t("Cari berdasarkan nama barang, nomor BC, atau alasan reject...")}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
@@ -62,11 +64,11 @@ const BarangReject = () => {
                     </div>
                 </div>
                 <div className="glass-card p-4 rounded-lg border border-red-500">
-                    <p className="text-xs text-silver-dark">Total Reject</p>
+                    <p className="text-xs text-silver-dark">{t("Total Reject")}</p>
                     <p className="text-2xl font-bold text-red-500">{rejectTransactions.length}</p>
                 </div>
                 <div className="glass-card p-4 rounded-lg border border-accent-orange">
-                    <p className="text-xs text-silver-dark">Hari Ini</p>
+                    <p className="text-xs text-silver-dark">{t("Hari Ini")}</p>
                     <p className="text-2xl font-bold text-accent-orange">
                         {rejectTransactions.filter(t => t.date === new Date().toISOString().split('T')[0]).length}
                     </p>
@@ -78,15 +80,15 @@ const BarangReject = () => {
                 <div className="p-4 border-b border-dark-border">
                     <div className="flex items-center gap-2">
                         <AlertTriangle className="w-5 h-5 text-red-500" />
-                        <h2 className="text-lg font-semibold text-silver-light">Daftar Barang Reject</h2>
-                        <span className="ml-auto text-sm text-silver-dark">{filteredTransactions.length} entri</span>
+                        <h2 className="text-lg font-semibold text-silver-light">{t("Daftar Barang Reject")}</h2>
+                        <span className="ml-auto text-sm text-silver-dark">{filteredTransactions.length} {t("entri")}</span>
                         <Button
                             onClick={handleExportCSV}
                             variant="secondary"
                             icon={Download}
                             className="ml-2"
                         >
-                            Export CSV
+                            {t("Export CSV")}
                         </Button>
                     </div>
                 </div>
@@ -97,18 +99,18 @@ const BarangReject = () => {
                         <thead className="bg-red-500/10">
                             <tr>
                                 <th className="px-4 py-3 text-center text-xs font-semibold text-silver">No</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">Jenis Dokumen</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">No. Dokumen (Pabean)</th>
-                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver">Tanggal Dokumen</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">No. Bukti</th>
-                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver">Tanggal Reject</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">Alasan Reject</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">Kode</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">Nama Barang</th>
-                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver">Quantity</th>
-                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver">Satuan</th>
-                                <th className="px-4 py-3 text-right text-xs font-semibold text-silver">Nilai</th>
-                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver">Currency</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">{t("Jenis Dokumen")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">{t("No. Dokumen (Pabean)")}</th>
+                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver">{t("Tanggal Dokumen")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">{t("No. Bukti")}</th>
+                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver">{t("Tanggal Reject")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">{t("Alasan Reject")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">{t("Kode")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">{t("Nama Barang")}</th>
+                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver">{t("Quantity")}</th>
+                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver">{t("Satuan")}</th>
+                                <th className="px-4 py-3 text-right text-xs font-semibold text-silver">{t("Nilai")}</th>
+                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver">{t("Currency")}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -116,8 +118,8 @@ const BarangReject = () => {
                                 <tr>
                                     <td colSpan="13" className="px-4 py-12 text-center">
                                         <Package className="w-16 h-16 mx-auto mb-4 opacity-30 text-silver-dark" />
-                                        <p className="text-lg text-silver-dark">Belum ada data barang reject</p>
-                                        <p className="text-sm text-silver-dark mt-2">Data barang reject/scrap akan muncul di sini</p>
+                                        <p className="text-lg text-silver-dark">{t("Belum ada data barang reject")}</p>
+                                        <p className="text-sm text-silver-dark mt-2">{t("Data barang reject/scrap akan muncul di sini")}</p>
                                     </td>
                                 </tr>
                             ) : (
@@ -163,7 +165,7 @@ const BarangReject = () => {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
                     <div className="glass-card rounded-lg p-6 max-w-2xl w-full">
                         <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-xl font-bold gradient-text">Detail Barang Reject</h3>
+                            <h3 className="text-xl font-bold gradient-text">{t("Detail Barang Reject")}</h3>
                             <button onClick={() => setSelectedItem(null)} className="p-2 hover:bg-dark-border rounded">
                                 <span className="text-silver">✕</span>
                             </button>
@@ -183,15 +185,15 @@ const BarangReject = () => {
                             {/* Basic Info Grid */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="text-xs text-silver-dark">Kode Barang</label>
+                                    <label className="text-xs text-silver-dark">{t("Kode Barang")}</label>
                                     <p className="text-sm text-silver-light font-mono">{selectedItem.itemCode || selectedItem.hsCode || '-'}</p>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-silver-dark">Nama Barang</label>
+                                    <label className="text-xs text-silver-dark">{t("Nama Barang")}</label>
                                     <p className="text-sm text-silver-light font-medium">{selectedItem.assetName}</p>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-silver-dark">Tanggal Reject</label>
+                                    <label className="text-xs text-silver-dark">{t("Tanggal Reject")}</label>
                                     <p className="text-sm text-silver-light">{new Date(selectedItem.date).toLocaleDateString('id-ID')}</p>
                                 </div>
                                 <div>
@@ -199,32 +201,32 @@ const BarangReject = () => {
                                     <p className="text-sm text-silver-light">{selectedItem.pic || selectedItem.inspectedBy || 'Admin'}</p>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-silver-dark">Jenis BC</label>
+                                    <label className="text-xs text-silver-dark">{t("Jenis BC")}</label>
                                     <p className="text-sm text-silver-light">{selectedItem.customsDocType}</p>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-silver-dark">No. Dokumen</label>
+                                    <label className="text-xs text-silver-dark">{t("No. Dokumen")}</label>
                                     <p className="text-sm text-red-400">{selectedItem.customsDocNumber}</p>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-silver-dark">Alasan Reject</label>
+                                    <label className="text-xs text-silver-dark">{t("Alasan Reject")}</label>
                                     <p className="text-sm text-red-400 font-medium">{selectedItem.rejectReason || 'Rusak'}</p>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-silver-dark">No. Bukti</label>
+                                    <label className="text-xs text-silver-dark">{t("No. Bukti")}</label>
                                     <p className="text-sm text-silver-light">{selectedItem.receiptNumber || '-'}</p>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-silver-dark">Jumlah</label>
+                                    <label className="text-xs text-silver-dark">{t("Jumlah")}</label>
                                     <p className="text-lg font-bold text-red-500">{selectedItem.quantity} {selectedItem.unit}</p>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-silver-dark">Nilai</label>
+                                    <label className="text-xs text-silver-dark">{t("Nilai")}</label>
                                     <p className="text-lg font-bold text-accent-green">{getCurrencySymbol(selectedItem.currency || 'IDR')} {formatCurrency(selectedItem.value)}</p>
                                 </div>
                                 {selectedItem.notes && (
                                     <div className="col-span-2">
-                                        <label className="text-xs text-silver-dark">Catatan</label>
+                                        <label className="text-xs text-silver-dark">{t("Catatan")}</label>
                                         <p className="text-sm text-silver-light">{selectedItem.notes}</p>
                                     </div>
                                 )}
@@ -233,7 +235,7 @@ const BarangReject = () => {
                             {/* Supporting Documents */}
                             {selectedItem.documents && selectedItem.documents.length > 0 && (
                                 <div>
-                                    <label className="text-xs text-silver-dark block mb-2">Dokumen Pendukung</label>
+                                    <label className="text-xs text-silver-dark block mb-2">{t("Dokumen Pendukung")}</label>
                                     <div className="space-y-2">
                                         {selectedItem.documents.map((doc, idx) => (
                                             <div key={idx} className="flex items-center gap-2 p-2 bg-dark-surface rounded border border-dark-border">
@@ -245,7 +247,7 @@ const BarangReject = () => {
                                                         rel="noopener noreferrer"
                                                         className="text-red-400 text-xs hover:underline"
                                                     >
-                                                        Lihat
+                                                        {t("Lihat")}
                                                     </a>
                                                 )}
                                             </div>
@@ -255,7 +257,7 @@ const BarangReject = () => {
                             )}
                         </div>
                         <div className="mt-6 flex justify-end">
-                            <Button variant="secondary" onClick={() => setSelectedItem(null)}>Tutup</Button>
+                            <Button variant="secondary" onClick={() => setSelectedItem(null)}>{t("Tutup")}</Button>
                         </div>
                     </div>
                 </div>

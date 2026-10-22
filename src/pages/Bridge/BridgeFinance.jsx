@@ -5,8 +5,10 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import Button from '../../components/Common/Button';
 import { formatCurrency } from '../../utils/currencyFormatter';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const BridgeFinance = () => {
+    const { t } = useLanguage();
     const location = useLocation();
     const navigate = useNavigate();
     const { canCreate, canEdit, canDelete } = useAuth();
@@ -260,46 +262,46 @@ const BridgeFinance = () => {
         <div className="p-6 space-y-6">
             {/* Header */}
             <div>
-                <h1 className="text-3xl font-bold gradient-text">Bridge Finance</h1>
+                <h1 className="text-3xl font-bold gradient-text">{t("Bridge Finance")}</h1>
                 <p className="text-silver-dark mt-1">
-                    Invoice & Purchase Management untuk Bridge TPPB
+                    {t("Invoice & Purchase Management untuk Bridge TPPB")}
                 </p>
             </div>
 
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 <SummaryCard
-                    title="Total Invoice"
+                    title={t("Total Invoice")}
                     value={totalInvoices}
                     icon={FileText}
                     color="blue"
                 />
                 <SummaryCard
-                    title="Invoice Terbayar"
+                    title={t("Invoice Terbayar")}
                     value={paidInvoices}
                     icon={TrendingUp}
                     color="green"
                 />
                 <SummaryCard
-                    title="Invoice Belum Bayar"
+                    title={t("Invoice Belum Bayar")}
                     value={unpaidInvoices}
                     icon={TrendingDown}
                     color="orange"
                 />
                 <SummaryCard
-                    title="Total Pengeluaran"
+                    title={t("Total Pengeluaran")}
                     value={totalPurchases}
                     icon={DollarSign}
                     color="red"
                 />
                 <SummaryCard
-                    title="Pengeluaran Terbayar"
+                    title={t("Pengeluaran Terbayar")}
                     value={paidPurchases}
                     icon={TrendingUp}
                     color="green"
                 />
                 <SummaryCard
-                    title="Pengeluaran Belum Bayar"
+                    title={t("Pengeluaran Belum Bayar")}
                     value={unpaidPurchases}
                     icon={TrendingDown}
                     color="orange"
@@ -315,7 +317,7 @@ const BridgeFinance = () => {
                         : 'bg-dark-surface text-silver-dark hover:text-silver'
                         }`}
                 >
-                    Invoices ({invoices.length})
+                    {t("Invoices (")}{invoices.length})
                 </button>
                 <button
                     onClick={() => handleTabChange('purchases')}
@@ -324,7 +326,7 @@ const BridgeFinance = () => {
                         : 'bg-dark-surface text-silver-dark hover:text-silver'
                         }`}
                 >
-                    Purchases ({purchases.length})
+                    {t("Purchases (")}{purchases.length})
                 </button>
                 <button
                     onClick={() => handleTabChange('pos')}
@@ -333,22 +335,22 @@ const BridgeFinance = () => {
                         : 'bg-dark-surface text-silver-dark hover:text-silver'
                         }`}
                 >
-                    Purchase Orders ({purchaseOrders.length})
+                    {t("Purchase Orders (")}{purchaseOrders.length})
                 </button>
 
                 {hasCreate && activeTab === 'invoices' && (
                     <Button onClick={handleAddInvoice} icon={Plus} size="sm" className="ml-auto">
-                        Buat Invoice
+                        {t("Buat Invoice")}
                     </Button>
                 )}
                 {hasCreate && activeTab === 'purchases' && (
                     <Button onClick={handleAddPurchase} icon={Plus} size="sm" className="ml-auto">
-                        Buat Purchase
+                        {t("Buat Purchase")}
                     </Button>
                 )}
                 {hasCreate && activeTab === 'pos' && (
                     <Button onClick={() => setShowPOForm(true)} icon={Plus} size="sm" className="ml-auto">
-                        Buat PO
+                        {t("Buat PO")}
                     </Button>
                 )}
             </div>
@@ -358,21 +360,21 @@ const BridgeFinance = () => {
                 {activeTab === 'invoices' ? (
                     <>
                         <h3 className="text-xl font-semibold text-silver-light mb-4">
-                            Invoice
+                            {t("Invoice")}
                         </h3>
 
                         <div className="overflow-x-auto">
                             <table className="w-full">
                                 <thead className="bg-accent-blue">
                                     <tr>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-white">No. Invoice</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-white">Ref. Pengajuan</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-white">Customer</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-white">Tanggal</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-white">Judul</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-white">Nilai</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-white">Status</th>
-                                        <th className="px-4 py-3 text-center text-sm font-semibold text-white">Aksi</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-white">{t("No. Invoice")}</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-white">{t("Ref. Pengajuan")}</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-white">{t("Customer")}</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-white">{t("Tanggal")}</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-white">{t("Judul")}</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-white">{t("Nilai")}</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-white">{t("Status")}</th>
+                                        <th className="px-4 py-3 text-center text-sm font-semibold text-white">{t("Aksi")}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-dark-border">
@@ -380,7 +382,7 @@ const BridgeFinance = () => {
                                         <tr>
                                             <td colSpan="8" className="px-4 py-8 text-center text-silver-dark">
                                                 <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                                                <p>Belum ada invoice. Klik "Buat Invoice" untuk memulai.</p>
+                                                <p>{t("Belum ada invoice. Klik \"Buat Invoice\" untuk memulai.")}</p>
                                             </td>
                                         </tr>
                                     ) : (
@@ -426,7 +428,7 @@ const BridgeFinance = () => {
                                                             <button
                                                                 onClick={() => handleMarkAsPaid('invoice', invoice.id)}
                                                                 className="p-1 hover:bg-green-500 hover:bg-opacity-20 rounded smooth-transition"
-                                                                title="Tandai Terbayar"
+                                                                title={t("Tandai Terbayar")}
                                                             >
                                                                 <Check className="w-4 h-4 text-green-400" />
                                                             </button>
@@ -443,20 +445,20 @@ const BridgeFinance = () => {
                 ) : activeTab === 'purchases' ? (
                     <>
                         <h3 className="text-xl font-semibold text-silver-light mb-4">
-                            Pembayaran
+                            {t("Pembayaran")}
                         </h3>
 
                         <div className="overflow-x-auto">
                             <table className="w-full">
                                 <thead className="bg-accent-orange">
                                     <tr>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-white">No. Dokumen</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-white">Tanggal</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-white">Vendor</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-white">Judul</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-white">Jumlah</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-white">Status</th>
-                                        <th className="px-4 py-3 text-center text-sm font-semibold text-white">Aksi</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-white">{t("No. Dokumen")}</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-white">{t("Tanggal")}</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-white">{t("Vendor")}</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-white">{t("Judul")}</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-white">{t("Jumlah")}</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-white">{t("Status")}</th>
+                                        <th className="px-4 py-3 text-center text-sm font-semibold text-white">{t("Aksi")}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-dark-border">
@@ -464,7 +466,7 @@ const BridgeFinance = () => {
                                         <tr>
                                             <td colSpan="7" className="px-4 py-8 text-center text-silver-dark">
                                                 <DollarSign className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                                                <p>Belum ada purchase. Klik "Buat Purchase" untuk memulai.</p>
+                                                <p>{t("Belum ada purchase. Klik \"Buat Purchase\" untuk memulai.")}</p>
                                             </td>
                                         </tr>
                                     ) : (
@@ -503,7 +505,7 @@ const BridgeFinance = () => {
                                                             <button
                                                                 onClick={() => handleMarkAsPaid('purchase', purchase.id)}
                                                                 className="p-1 hover:bg-green-500 hover:bg-opacity-20 rounded smooth-transition"
-                                                                title="Tandai Terbayar"
+                                                                title={t("Tandai Terbayar")}
                                                             >
                                                                 <Check className="w-4 h-4 text-green-400" />
                                                             </button>
@@ -520,13 +522,13 @@ const BridgeFinance = () => {
                 ) : activeTab === 'pos' ? (
                     <>
                         <h3 className="text-xl font-semibold text-silver-light mb-4">
-                            Daftar Purchase Orders
+                            {t("Daftar Purchase Orders")}
                         </h3>
 
                         {purchaseOrders.length === 0 ? (
                             <div className="text-center py-8 text-silver-dark">
                                 <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                                <p>Belum ada Purchase Order. Klik "Buat PO" untuk memulai.</p>
+                                <p>{t("Belum ada Purchase Order. Klik \"Buat PO\" untuk memulai.")}</p>
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
@@ -535,11 +537,11 @@ const BridgeFinance = () => {
                                         <tr>
                                             <th className="px-4 py-3 text-center text-sm font-semibold text-white">No</th>
                                             <th className="px-4 py-3 text-left text-sm font-semibold text-white">No. PO</th>
-                                            <th className="px-4 py-3 text-left text-sm font-semibold text-white">Tanggal</th>
-                                            <th className="px-4 py-3 text-left text-sm font-semibold text-white">Vendor</th>
-                                            <th className="px-4 py-3 text-left text-sm font-semibold text-white">Judul</th>
-                                            <th className="px-4 py-3 text-right text-sm font-semibold text-white">Nilai PO</th>
-                                            <th className="px-4 py-3 text-left text-sm font-semibold text-white">Status</th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-white">{t("Tanggal")}</th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-white">{t("Vendor")}</th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-white">{t("Judul")}</th>
+                                            <th className="px-4 py-3 text-right text-sm font-semibold text-white">{t("Nilai PO")}</th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-white">{t("Status")}</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-dark-border">
@@ -621,35 +623,35 @@ const BridgeFinance = () => {
                 <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
                     <div className="glass-card rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
                         <div className="sticky top-0 bg-dark-card border-b border-dark-border p-6 z-10 flex items-center justify-between">
-                            <h2 className="text-2xl font-bold gradient-text">Detail Invoice</h2>
+                            <h2 className="text-2xl font-bold gradient-text">{t("Detail Invoice")}</h2>
                             <button onClick={() => setSelectedInvoice(null)} className="p-2 hover:bg-dark-surface rounded-lg">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
                         <div className="p-6 space-y-4">
                             <div className="grid grid-cols-2 gap-4">
-                                <div><span className="font-semibold">No. Invoice:</span> {selectedInvoice.invoiceNumber}</div>
-                                <div><span className="font-semibold">Tanggal:</span> {new Date(selectedInvoice.date).toLocaleDateString('id-ID')}</div>
-                                <div><span className="font-semibold">Customer:</span> {selectedInvoice.customerName || selectedInvoice.customer}</div>
-                                <div><span className="font-semibold">Status:</span>
+                                <div><span className="font-semibold">{t("No. Invoice:")}</span> {selectedInvoice.invoiceNumber}</div>
+                                <div><span className="font-semibold">{t("Tanggal:")}</span> {new Date(selectedInvoice.date).toLocaleDateString('id-ID')}</div>
+                                <div><span className="font-semibold">{t("Customer:")}</span> {selectedInvoice.customerName || selectedInvoice.customer}</div>
+                                <div><span className="font-semibold">{t("Status:")}</span>
                                     <span className={`ml-2 px-3 py-1 rounded-full text-xs ${selectedInvoice.status === 'paid' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
                                         {selectedInvoice.status}
                                     </span>
                                 </div>
                             </div>
-                            <div><span className="font-semibold">Judul:</span> {selectedInvoice.title}</div>
+                            <div><span className="font-semibold">{t("Judul:")}</span> {selectedInvoice.title}</div>
                             {selectedInvoice.pengajuanNumber && (
-                                <div><span className="font-semibold">Ref. Pengajuan:</span> <span className="text-accent-blue">{selectedInvoice.pengajuanNumber}</span></div>
+                                <div><span className="font-semibold">{t("Ref. Pengajuan:")}</span> <span className="text-accent-blue">{selectedInvoice.pengajuanNumber}</span></div>
                             )}
                             <div className="border-t border-dark-border pt-4">
-                                <p className="font-semibold text-xl">Total: <span className="text-accent-green">Rp {formatCurrency(selectedInvoice.grandTotal)}</span></p>
+                                <p className="font-semibold text-xl">{t("Total:")} <span className="text-accent-green">Rp {formatCurrency(selectedInvoice.grandTotal)}</span></p>
                             </div>
                             <div className="flex gap-3 pt-4">
                                 <Button onClick={() => handlePrint('invoice', selectedInvoice)} icon={FileText}>
-                                    Cetak Dokumen
+                                    {t("Cetak Dokumen")}
                                 </Button>
                                 <Button variant="secondary" onClick={() => setSelectedInvoice(null)}>
-                                    Tutup
+                                    {t("Tutup")}
                                 </Button>
                             </div>
                         </div>
@@ -662,32 +664,32 @@ const BridgeFinance = () => {
                 <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
                     <div className="glass-card rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
                         <div className="sticky top-0 bg-dark-card border-b border-dark-border p-6 z-10 flex items-center justify-between">
-                            <h2 className="text-2xl font-bold gradient-text">Detail Pembayaran</h2>
+                            <h2 className="text-2xl font-bold gradient-text">{t("Detail Pembayaran")}</h2>
                             <button onClick={() => setSelectedPurchase(null)} className="p-2 hover:bg-dark-surface rounded-lg">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
                         <div className="p-6 space-y-4">
                             <div className="grid grid-cols-2 gap-4">
-                                <div><span className="font-semibold">No. Dokumen:</span> {selectedPurchase.documentNumber}</div>
-                                <div><span className="font-semibold">Tanggal:</span> {new Date(selectedPurchase.date).toLocaleDateString('id-ID')}</div>
-                                <div><span className="font-semibold">Vendor:</span> {selectedPurchase.vendor}</div>
-                                <div><span className="font-semibold">Status:</span>
+                                <div><span className="font-semibold">{t("No. Dokumen:")}</span> {selectedPurchase.documentNumber}</div>
+                                <div><span className="font-semibold">{t("Tanggal:")}</span> {new Date(selectedPurchase.date).toLocaleDateString('id-ID')}</div>
+                                <div><span className="font-semibold">{t("Vendor:")}</span> {selectedPurchase.vendor}</div>
+                                <div><span className="font-semibold">{t("Status:")}</span>
                                     <span className={`ml-2 px-3 py-1 rounded-full text-xs ${selectedPurchase.status === 'paid' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
                                         {selectedPurchase.status}
                                     </span>
                                 </div>
                             </div>
-                            <div><span className="font-semibold">Judul:</span> {selectedPurchase.title}</div>
+                            <div><span className="font-semibold">{t("Judul:")}</span> {selectedPurchase.title}</div>
                             <div className="border-t border-dark-border pt-4">
-                                <p className="font-semibold text-xl">Total: <span className="text-accent-red">Rp {formatCurrency(selectedPurchase.grandTotal)}</span></p>
+                                <p className="font-semibold text-xl">{t("Total:")} <span className="text-accent-red">Rp {formatCurrency(selectedPurchase.grandTotal)}</span></p>
                             </div>
                             <div className="flex gap-3 pt-4">
                                 <Button onClick={() => handlePrint('purchase', selectedPurchase)} icon={FileText}>
-                                    Cetak Dokumen
+                                    {t("Cetak Dokumen")}
                                 </Button>
                                 <Button variant="secondary" onClick={() => setSelectedPurchase(null)}>
-                                    Tutup
+                                    {t("Tutup")}
                                 </Button>
                             </div>
                         </div>
@@ -729,6 +731,7 @@ const SummaryCard = ({ title, value, icon: Icon, color }) => {
 
 // Invoice Form Modal Component
 const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) => {
+    const { t } = useLanguage();
     const { quotations = [], invoices = [] } = useData();
 
     // Filter only approved quotations
@@ -833,7 +836,7 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
 
     const handleAddItem = () => {
         if (!itemForm.item || !itemForm.quantity || !itemForm.unitPrice) {
-            alert('Item, Jumlah, dan Harga Satuan wajib diisi');
+            alert(t("Item, Jumlah, dan Harga Satuan wajib diisi"));
             return;
         }
 
@@ -926,7 +929,7 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
         e.preventDefault();
 
         if (formData.items.length === 0) {
-            alert('Harap tambahkan minimal satu item');
+            alert(t("Harap tambahkan minimal satu item"));
             return;
         }
 
@@ -986,8 +989,8 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
             <div className="glass-card rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
                 <div className="sticky top-0 bg-dark-card border-b border-dark-border p-6 z-10 flex justify-between items-center">
                     <div>
-                        <h2 className="text-2xl font-bold gradient-text">Buat Invoice Baru</h2>
-                        <p className="text-silver-dark text-sm mt-1">Lengkapi form invoice di bawah ini</p>
+                        <h2 className="text-2xl font-bold gradient-text">{t("Buat Invoice Baru")}</h2>
+                        <p className="text-silver-dark text-sm mt-1">{t("Lengkapi form invoice di bawah ini")}</p>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-dark-surface rounded-full">
                         <X className="w-6 h-6 text-silver" />
@@ -999,7 +1002,7 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
                     <div className="glass-card p-6 rounded-lg border border-accent-blue/30 bg-gradient-to-br from-accent-blue/5 to-transparent">
                         <h3 className="text-lg font-semibold text-silver-light mb-4 flex items-center gap-2">
                             <FileText className="w-5 h-5 text-accent-blue" />
-                            Header Invoice
+                            {t("Header Invoice")}
                         </h3>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1007,7 +1010,7 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
                             <div>
                                 <div className="flex items-center justify-between mb-2">
                                     <label className="block text-sm font-medium text-silver">
-                                        No. Invoice *
+                                        {t("No. Invoice *")}
                                     </label>
                                     <label className="flex items-center gap-2 cursor-pointer">
                                         <input
@@ -1019,7 +1022,7 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
                                             }}
                                             className="w-4 h-4"
                                         />
-                                        <span className="text-xs text-silver-dark">Manual Input</span>
+                                        <span className="text-xs text-silver-dark">{t("Manual Input")}</span>
                                     </label>
                                 </div>
 
@@ -1029,7 +1032,7 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
                                         required
                                         value={customInvoiceNumber}
                                         onChange={(e) => setCustomInvoiceNumber(e.target.value)}
-                                        placeholder="BRG-INV-YYMMDD-XXXXXXXX"
+                                        placeholder={t("BRG-INV-YYMMDD-XXXXXXXX")}
                                         className="w-full px-4 py-3 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
                                     />
                                 ) : (
@@ -1037,7 +1040,7 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
                                         <p className="text-silver-light font-mono font-bold tracking-wide">
                                             {autoInvoiceNumber}
                                         </p>
-                                        <p className="text-xs text-silver-dark mt-1">Digenerate otomatis sistem</p>
+                                        <p className="text-xs text-silver-dark mt-1">{t("Digenerate otomatis sistem")}</p>
                                     </div>
                                 )}
                             </div>
@@ -1045,7 +1048,7 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
                             {/* Data Customer */}
                             <div>
                                 <label className="block text-sm font-medium text-silver mb-2">
-                                    Data Customer *
+                                    {t("Data Customer *")}
                                 </label>
                                 <div className="flex gap-2">
                                     <select
@@ -1053,7 +1056,7 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
                                         onChange={(e) => handleQuotationSelect(e.target.value)}
                                         className="w-1/3 px-3 py-3 bg-dark-surface border border-dark-border rounded-l-lg text-silver-light text-sm focus:border-accent-blue focus:outline-none"
                                     >
-                                        <option value="">Ref. Quotation</option>
+                                        <option value="">{t("Ref. Quotation")}</option>
                                         {approvedQuotations.map(q => (
                                             <option key={q.id} value={q.id}>{q.quotationNumber}</option>
                                         ))}
@@ -1064,7 +1067,7 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
                                         value={formData.customer}
                                         onChange={(e) => setFormData({ ...formData, customer: e.target.value })}
                                         className="flex-1 px-4 py-3 bg-dark-surface border border-dark-border rounded-r-lg text-silver-light focus:border-accent-blue focus:outline-none"
-                                        placeholder="Nama Customer"
+                                        placeholder={t("Nama Customer")}
                                     />
                                 </div>
                             </div>
@@ -1072,7 +1075,7 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
                             {/* Tanggal Inv */}
                             <div>
                                 <label className="block text-sm font-medium text-silver mb-2">
-                                    Tanggal Invoice *
+                                    {t("Tanggal Invoice *")}
                                 </label>
                                 <input
                                     type="date"
@@ -1086,14 +1089,14 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
                             {/* Judul */}
                             <div>
                                 <label className="block text-sm font-medium text-silver mb-2">
-                                    Judul / Keterangan
+                                    {t("Judul / Keterangan")}
                                 </label>
                                 <input
                                     type="text"
                                     value={formData.title}
                                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                                     className="w-full px-4 py-3 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
-                                    placeholder="Keterangan Invoice..."
+                                    placeholder={t("Keterangan Invoice...")}
                                 />
                             </div>
                         </div>
@@ -1101,33 +1104,33 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
 
                     {/* ITEMS TABLE SECTION */}
                     <div className="border-t border-dark-border pt-6">
-                        <h3 className="text-lg font-semibold text-silver-light mb-4">Detail Item Invoice</h3>
+                        <h3 className="text-lg font-semibold text-silver-light mb-4">{t("Detail Item Invoice")}</h3>
 
                         {/* Item Input Form */}
                         <div className="glass-card p-4 rounded-lg border border-dark-border mb-4">
                             <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
                                 <div className="md:col-span-3">
-                                    <label className="block text-xs font-medium text-silver mb-1">Item</label>
+                                    <label className="block text-xs font-medium text-silver mb-1">{t("Item")}</label>
                                     <input
                                         type="text"
                                         value={itemForm.item}
                                         onChange={(e) => setItemForm({ ...itemForm, item: e.target.value })}
-                                        placeholder="Nama Item"
+                                        placeholder={t("Nama Item")}
                                         className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-sm"
                                     />
                                 </div>
                                 <div className="md:col-span-3">
-                                    <label className="block text-xs font-medium text-silver mb-1">Deskripsi</label>
+                                    <label className="block text-xs font-medium text-silver mb-1">{t("Deskripsi")}</label>
                                     <input
                                         type="text"
                                         value={itemForm.description}
                                         onChange={(e) => setItemForm({ ...itemForm, description: e.target.value })}
-                                        placeholder="Deskripsi..."
+                                        placeholder={t("Deskripsi...")}
                                         className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-sm"
                                     />
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label className="block text-xs font-medium text-silver mb-1">Harga Satuan</label>
+                                    <label className="block text-xs font-medium text-silver mb-1">{t("Harga Satuan")}</label>
                                     <input
                                         type="number"
                                         value={itemForm.unitPrice}
@@ -1137,7 +1140,7 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
                                     />
                                 </div>
                                 <div className="md:col-span-1">
-                                    <label className="block text-xs font-medium text-silver mb-1">Jml</label>
+                                    <label className="block text-xs font-medium text-silver mb-1">{t("Jml")}</label>
                                     <input
                                         type="number"
                                         value={itemForm.quantity}
@@ -1147,7 +1150,7 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
                                     />
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label className="block text-xs font-medium text-silver mb-1">Satuan</label>
+                                    <label className="block text-xs font-medium text-silver mb-1">{t("Satuan")}</label>
                                     <select
                                         value={itemForm.unit}
                                         onChange={(e) => setItemForm({ ...itemForm, unit: e.target.value })}
@@ -1174,20 +1177,20 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
                                 <thead className="bg-accent-blue/10">
                                     <tr>
                                         <th className="px-4 py-3 text-center text-silver-light w-16">No</th>
-                                        <th className="px-4 py-3 text-left text-silver-light">Item</th>
-                                        <th className="px-4 py-3 text-left text-silver-light">Deskripsi</th>
-                                        <th className="px-4 py-3 text-right text-silver-light">Harga Satuan</th>
-                                        <th className="px-4 py-3 text-center text-silver-light">Jumlah</th>
-                                        <th className="px-4 py-3 text-center text-silver-light">Satuan</th>
-                                        <th className="px-4 py-3 text-right text-silver-light">Subtotal</th>
-                                        <th className="px-4 py-3 text-center text-silver-light w-16">Acc</th>
+                                        <th className="px-4 py-3 text-left text-silver-light">{t("Item")}</th>
+                                        <th className="px-4 py-3 text-left text-silver-light">{t("Deskripsi")}</th>
+                                        <th className="px-4 py-3 text-right text-silver-light">{t("Harga Satuan")}</th>
+                                        <th className="px-4 py-3 text-center text-silver-light">{t("Jumlah")}</th>
+                                        <th className="px-4 py-3 text-center text-silver-light">{t("Satuan")}</th>
+                                        <th className="px-4 py-3 text-right text-silver-light">{t("Subtotal")}</th>
+                                        <th className="px-4 py-3 text-center text-silver-light w-16">{t("Acc")}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-dark-border">
                                     {formData.items.length === 0 ? (
                                         <tr>
                                             <td colSpan="8" className="px-4 py-8 text-center text-silver-dark opacity-50">
-                                                Belum ada item ditambahkan
+                                                {t("Belum ada item ditambahkan")}
                                             </td>
                                         </tr>
                                     ) : (
@@ -1223,7 +1226,7 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
                         {/* COGS SECTION */}
                         <div className="border-t border-dark-border pt-6 mt-6">
                             <div className="flex justify-between items-center mb-4">
-                                <h3 className="text-lg font-semibold text-silver-light">COGS / Biaya Modal</h3>
+                                <h3 className="text-lg font-semibold text-silver-light">{t("COGS / Biaya Modal")}</h3>
                                 <div className="flex gap-2">
                                     <Button
                                         type="button"
@@ -1232,7 +1235,7 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
                                         onClick={handleSyncCogs}
                                         icon={FileText}
                                     >
-                                        Salin dari Invoice
+                                        {t("Salin dari Invoice")}
                                     </Button>
                                     <Button
                                         type="button"
@@ -1240,7 +1243,7 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
                                         onClick={handleAddCogsItem}
                                         icon={Plus}
                                     >
-                                        Tambah Item
+                                        {t("Tambah Item")}
                                     </Button>
                                 </div>
                             </div>
@@ -1249,11 +1252,11 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
                                 <table className="w-full text-sm">
                                     <thead className="bg-accent-orange/10">
                                         <tr>
-                                            <th className="px-4 py-3 text-left text-silver-light">Item</th>
-                                            <th className="px-4 py-3 text-left text-silver-light">Deskripsi</th>
-                                            <th className="px-4 py-3 text-right text-silver-light">Harga Beli</th>
-                                            <th className="px-4 py-3 text-center text-silver-light">Jml</th>
-                                            <th className="px-4 py-3 text-right text-silver-light">Total</th>
+                                            <th className="px-4 py-3 text-left text-silver-light">{t("Item")}</th>
+                                            <th className="px-4 py-3 text-left text-silver-light">{t("Deskripsi")}</th>
+                                            <th className="px-4 py-3 text-right text-silver-light">{t("Harga Beli")}</th>
+                                            <th className="px-4 py-3 text-center text-silver-light">{t("Jml")}</th>
+                                            <th className="px-4 py-3 text-right text-silver-light">{t("Total")}</th>
                                             <th className="px-4 py-3 text-center text-silver-light w-10"></th>
                                         </tr>
                                     </thead>
@@ -1261,7 +1264,7 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
                                         {formData.cogsItems.length === 0 ? (
                                             <tr>
                                                 <td colSpan="6" className="px-4 py-6 text-center text-silver-dark opacity-50">
-                                                    Belum ada item COGS. Klik "Salin dari Invoice" atau "Tambah Item".
+                                                    {t("Belum ada item COGS. Klik \"Salin dari Invoice\" atau \"Tambah Item\".")}
                                                 </td>
                                             </tr>
                                         ) : (
@@ -1273,7 +1276,7 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
                                                             value={item.item}
                                                             onChange={(e) => handleUpdateCogsItem(item.id, 'item', e.target.value)}
                                                             className="w-full bg-transparent border border-dark-border rounded px-2 py-1 text-silver-light"
-                                                            placeholder="Nama Item"
+                                                            placeholder={t("Nama Item")}
                                                         />
                                                     </td>
                                                     <td className="p-2">
@@ -1282,7 +1285,7 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
                                                             value={item.description}
                                                             onChange={(e) => handleUpdateCogsItem(item.id, 'description', e.target.value)}
                                                             className="w-full bg-transparent border border-dark-border rounded px-2 py-1 text-silver"
-                                                            placeholder="Deskripsi"
+                                                            placeholder={t("Deskripsi")}
                                                         />
                                                     </td>
                                                     <td className="p-2">
@@ -1322,12 +1325,12 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
                                     {formData.cogsItems.length > 0 && (
                                         <tfoot className="bg-dark-surface/30 font-semibold border-t border-dark-border">
                                             <tr>
-                                                <td colSpan="4" className="px-4 py-2 text-right text-silver">Total COGS:</td>
+                                                <td colSpan="4" className="px-4 py-2 text-right text-silver">{t("Total COGS:")}</td>
                                                 <td className="px-4 py-2 text-right text-accent-orange">Rp {formatCurrency(totalCogs)}</td>
                                                 <td></td>
                                             </tr>
                                             <tr>
-                                                <td colSpan="4" className="px-4 py-2 text-right text-silver">Estimasi Laba Kotor:</td>
+                                                <td colSpan="4" className="px-4 py-2 text-right text-silver">{t("Estimasi Laba Kotor:")}</td>
                                                 <td className={`px-4 py-2 text-right ${grossProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                                                     Rp {formatCurrency(grossProfit)}
                                                 </td>
@@ -1342,13 +1345,13 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
                         {/* SUMMARY & TOTALS */}
                         <div className="flex flex-col items-end space-y-3 pt-2 text-sm max-w-xs ml-auto">
                             <div className="flex justify-between w-full text-silver">
-                                <span>Subtotal</span>
+                                <span>{t("Subtotal")}</span>
                                 <span>Rp {formatCurrency(itemsSubtotal)}</span>
                             </div>
 
                             {/* Discount */}
                             <div className="flex justify-between items-center w-full text-silver">
-                                <span>Diskon</span>
+                                <span>{t("Diskon")}</span>
                                 <div className="flex gap-1">
                                     <input
                                         type="number"
@@ -1383,7 +1386,7 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
                             </div>
 
                             <div className="w-full border-t border-dark-border pt-2 flex justify-between items-center text-lg font-bold">
-                                <span className="text-silver-light">Grand Total</span>
+                                <span className="text-silver-light">{t("Grand Total")}</span>
                                 <span className="text-accent-green">Rp {formatCurrency(finalTotal)}</span>
                             </div>
                         </div>
@@ -1391,10 +1394,10 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
                         {/* ACTIONS */}
                         <div className="flex gap-3 justify-end mt-8 border-t border-dark-border pt-6">
                             <Button type="button" variant="secondary" onClick={onClose}>
-                                Batal
+                                {t("Batal")}
                             </Button>
                             <Button type="submit">
-                                Simpan Invoice
+                                {t("Simpan Invoice")}
                             </Button>
                         </div>
                     </div>
@@ -1406,6 +1409,7 @@ const InvoiceFormModal = ({ onClose, onSubmit, customers, customsDocuments }) =>
 
 // Purchase Form Modal Component
 const PurchaseFormModal = ({ onClose, onSubmit, vendors }) => {
+    const { t } = useLanguage();
     const [formData, setFormData] = useState({
         vendor: '',
         date: new Date().toISOString().split('T')[0],
@@ -1424,7 +1428,7 @@ const PurchaseFormModal = ({ onClose, onSubmit, vendors }) => {
 
     const handleAddCost = () => {
         if (!costForm.description || !costForm.quantity || !costForm.unitPrice) {
-            alert('Lengkapi semua field biaya');
+            alert(t("Lengkapi semua field biaya"));
             return;
         }
 
@@ -1468,23 +1472,23 @@ const PurchaseFormModal = ({ onClose, onSubmit, vendors }) => {
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
             <div className="glass-card p-6 rounded-lg max-w-3xl w-full my-8">
-                <h2 className="text-2xl font-bold text-silver-light mb-6">Buat Pembayaran/Purchase Baru</h2>
+                <h2 className="text-2xl font-bold text-silver-light mb-6">{t("Buat Pembayaran/Purchase Baru")}</h2>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-silver mb-2">Vendor *</label>
+                            <label className="block text-sm font-medium text-silver mb-2">{t("Vendor *")}</label>
                             <input
                                 type="text"
                                 required
                                 value={formData.vendor}
                                 onChange={(e) => setFormData({ ...formData, vendor: e.target.value })}
-                                placeholder="Nama Vendor"
+                                placeholder={t("Nama Vendor")}
                                 className="w-full"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-silver mb-2">Tanggal *</label>
+                            <label className="block text-sm font-medium text-silver mb-2">{t("Tanggal *")}</label>
                             <input
                                 type="date"
                                 required
@@ -1494,13 +1498,13 @@ const PurchaseFormModal = ({ onClose, onSubmit, vendors }) => {
                             />
                         </div>
                         <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-silver mb-2">Judul Pembayaran *</label>
+                            <label className="block text-sm font-medium text-silver mb-2">{t("Judul Pembayaran *")}</label>
                             <input
                                 type="text"
                                 required
                                 value={formData.title}
                                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                                placeholder="Pembayaran Jasa Transportasi"
+                                placeholder={t("Pembayaran Jasa Transportasi")}
                                 className="w-full"
                             />
                         </div>
@@ -1508,22 +1512,22 @@ const PurchaseFormModal = ({ onClose, onSubmit, vendors }) => {
 
                     {/* Cost Items */}
                     <div className="space-y-4">
-                        <h3 className="text-lg font-semibold text-silver-light">Breakdown Biaya</h3>
+                        <h3 className="text-lg font-semibold text-silver-light">{t("Breakdown Biaya")}</h3>
 
                         <div className="glass-card p-4 rounded-lg border border-dark-border">
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-silver mb-2">Deskripsi</label>
+                                    <label className="block text-sm font-medium text-silver mb-2">{t("Deskripsi")}</label>
                                     <input
                                         type="text"
                                         value={costForm.description}
                                         onChange={(e) => setCostForm({ ...costForm, description: e.target.value })}
-                                        placeholder="Biaya Transportasi"
+                                        placeholder={t("Biaya Transportasi")}
                                         className="w-full"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-silver mb-2">Qty</label>
+                                    <label className="block text-sm font-medium text-silver mb-2">{t("Qty")}</label>
                                     <input
                                         type="number"
                                         value={costForm.quantity}
@@ -1533,7 +1537,7 @@ const PurchaseFormModal = ({ onClose, onSubmit, vendors }) => {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-silver mb-2">Harga Satuan</label>
+                                    <label className="block text-sm font-medium text-silver mb-2">{t("Harga Satuan")}</label>
                                     <input
                                         type="number"
                                         value={costForm.unitPrice}
@@ -1544,7 +1548,7 @@ const PurchaseFormModal = ({ onClose, onSubmit, vendors }) => {
                                 </div>
                             </div>
                             <Button type="button" size="sm" onClick={handleAddCost} icon={Plus}>
-                                Tambah Biaya
+                                {t("Tambah Biaya")}
                             </Button>
                         </div>
 
@@ -1553,11 +1557,11 @@ const PurchaseFormModal = ({ onClose, onSubmit, vendors }) => {
                                 <table className="w-full">
                                     <thead className="bg-accent-orange">
                                         <tr>
-                                            <th className="px-4 py-3 text-left text-sm font-semibold text-white">Deskripsi</th>
-                                            <th className="px-4 py-3 text-left text-sm font-semibold text-white">Qty</th>
-                                            <th className="px-4 py-3 text-left text-sm font-semibold text-white">Harga</th>
-                                            <th className="px-4 py-3 text-left text-sm font-semibold text-white">Total</th>
-                                            <th className="px-4 py-3 text-center text-sm font-semibold text-white">Aksi</th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-white">{t("Deskripsi")}</th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-white">{t("Qty")}</th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-white">{t("Harga")}</th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-white">{t("Total")}</th>
+                                            <th className="px-4 py-3 text-center text-sm font-semibold text-white">{t("Aksi")}</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-dark-border">
@@ -1587,11 +1591,11 @@ const PurchaseFormModal = ({ onClose, onSubmit, vendors }) => {
                     {/* Summary */}
                     <div className="glass-card p-4 rounded-lg border border-dark-border space-y-2">
                         <div className="flex justify-between text-sm">
-                            <span className="text-silver-dark">Subtotal:</span>
+                            <span className="text-silver-dark">{t("Subtotal:")}</span>
                             <span className="text-silver-light font-semibold">Rp {formatCurrency(subtotal)}</span>
                         </div>
                         <div className="flex justify-between items-center text-sm">
-                            <span className="text-silver-dark">VAT:</span>
+                            <span className="text-silver-dark">{t("VAT:")}</span>
                             <div className="flex items-center gap-2">
                                 <input
                                     type="number"
@@ -1606,28 +1610,28 @@ const PurchaseFormModal = ({ onClose, onSubmit, vendors }) => {
                             </div>
                         </div>
                         <div className="flex justify-between text-lg pt-2 border-t border-dark-border">
-                            <span className="text-silver-light font-bold">TOTAL:</span>
+                            <span className="text-silver-light font-bold">{t("TOTAL:")}</span>
                             <span className="text-accent-green font-bold">Rp {formatCurrency(grandTotal)}</span>
                         </div>
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-silver mb-2">Catatan</label>
+                        <label className="block text-sm font-medium text-silver mb-2">{t("Catatan")}</label>
                         <textarea
                             value={formData.notes}
                             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                             rows={3}
                             className="w-full"
-                            placeholder="Catatan tambahan..."
+                            placeholder={t("Catatan tambahan...")}
                         />
                     </div>
 
                     <div className="flex gap-3 justify-end">
                         <Button type="button" variant="secondary" onClick={onClose}>
-                            Batal
+                            {t("Batal")}
                         </Button>
                         <Button type="submit">
-                            Simpan Purchase
+                            {t("Simpan Purchase")}
                         </Button>
                     </div>
                 </form>

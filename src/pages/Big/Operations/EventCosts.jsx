@@ -6,8 +6,10 @@ import {
 } from 'lucide-react';
 import Button from '../../../components/Common/Button';
 import Modal from '../../../components/Common/Modal';
+import { useLanguage } from '../../../i18n/LanguageContext';
 
 const BigCosts = () => {
+    const { t } = useLanguage();
     const [costs, setCosts] = useState([]);
     const [groupedCosts, setGroupedCosts] = useState([]);
     const [events, setEvents] = useState([]);
@@ -134,14 +136,14 @@ const BigCosts = () => {
             }
         } catch (error) {
             console.error(error);
-            alert('Error saving cost');
+            alert(t("Error saving cost"));
         }
     };
 
     const handleApprove = async () => {
         const cost = selectedCost;
         if (!cost) return;
-        if (!confirm('Approve this cost? Journal entry will be created.')) return;
+        if (!confirm(t("Approve this cost? Journal entry will be created."))) return;
         try {
             await supabase.from('big_costs').update({ status: 'approved' }).eq('id', cost.id);
             // Journal: DR Beban, CR Hutang
@@ -152,20 +154,20 @@ const BigCosts = () => {
                     { entry_date: cost.cost_date, coa_id: apCoa.id, debit: 0, credit: cost.amount, description: `Hutang Vendor: ${cost.description}`, reference_type: 'big_cost', reference_id: cost.id }
                 ]);
             }
-            alert('Cost approved and journal created.');
+            alert(t("Cost approved and journal created."));
             fetchData();
             setShowEditModal(false);
             if (selectedGroup) setShowDetailModal(false);
         } catch (error) {
             console.error(error);
-            alert('Error approving cost');
+            alert(t("Error approving cost"));
         }
     };
 
     const handleDelete = async () => {
         const id = selectedCost?.id;
         if (!id) return;
-        if (!confirm('Delete?')) return;
+        if (!confirm(t("Delete?"))) return;
         await supabase.from('big_costs').delete().eq('id', id);
         fetchData();
         setShowEditModal(false);
@@ -208,17 +210,17 @@ const BigCosts = () => {
                 <div>
                     <h1 className="text-2xl font-bold dark:text-white flex items-center gap-2">
                         <DollarSign className="w-6 h-6 text-red-500" />
-                        Event Costs (COGS)
+                        {t("Event Costs (COGS)")}
                     </h1>
-                    <p className="text-sm text-gray-500">Track event expenses (Grouped by Quotation)</p>
+                    <p className="text-sm text-gray-500">{t("Track event expenses (Grouped by Quotation)")}</p>
                 </div>
-                <Button onClick={() => { resetForm(); setShowEditModal(true); }} icon={Plus}>Add Manual Cost</Button>
+                <Button onClick={() => { resetForm(); setShowEditModal(true); }} icon={Plus}>{t("Add Manual Cost")}</Button>
             </div>
 
             <div className="flex gap-4">
                 <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input type="text" placeholder="Search Quotation or Event..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border rounded-lg text-sm dark:bg-dark-surface dark:border-dark-border" />
+                    <input type="text" placeholder={t("Search Quotation or Event...")} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border rounded-lg text-sm dark:bg-dark-surface dark:border-dark-border" />
                 </div>
                 <button onClick={fetchData} className="p-2 hover:bg-gray-100 dark:hover:bg-dark-surface rounded-lg">
                     <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
@@ -230,18 +232,18 @@ const BigCosts = () => {
                 <table className="w-full">
                     <thead className="bg-gray-50 dark:bg-dark-surface">
                         <tr>
-                            <th className="px-4 py-3 text-left text-xs uppercase">Quotation Ref / Group</th>
-                            <th className="px-4 py-3 text-left text-xs uppercase">Event</th>
-                            <th className="px-4 py-3 text-center text-xs uppercase">Items</th>
-                            <th className="px-4 py-3 text-right text-xs uppercase">Total Amount</th>
-                            <th className="px-4 py-3 text-center text-xs uppercase">Status</th>
+                            <th className="px-4 py-3 text-left text-xs uppercase">{t("Quotation Ref / Group")}</th>
+                            <th className="px-4 py-3 text-left text-xs uppercase">{t("Event")}</th>
+                            <th className="px-4 py-3 text-center text-xs uppercase">{t("Items")}</th>
+                            <th className="px-4 py-3 text-right text-xs uppercase">{t("Total Amount")}</th>
+                            <th className="px-4 py-3 text-center text-xs uppercase">{t("Status")}</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y">
                         {loading ? (
-                            <tr><td colSpan={5} className="py-8 text-center bg-transparent">Loading...</td></tr>
+                            <tr><td colSpan={5} className="py-8 text-center bg-transparent">{t("Loading...")}</td></tr>
                         ) : filteredGroups.length === 0 ? (
-                            <tr><td colSpan={5} className="py-8 text-center text-gray-500 bg-transparent">No costs found</td></tr>
+                            <tr><td colSpan={5} className="py-8 text-center text-gray-500 bg-transparent">{t("No costs found")}</td></tr>
                         ) : (
                             filteredGroups.map(g => (
                                 <tr
@@ -253,7 +255,7 @@ const BigCosts = () => {
                                     <td className="px-4 py-3 text-sm">{g.event_name}</td>
                                     <td className="px-4 py-3 text-center text-sm">
                                         <span className="bg-gray-100 dark:bg-dark-surface px-2 py-1 rounded-full text-xs">
-                                            {g.items.length} items
+                                            {g.items.length} {t("items")}
                                         </span>
                                     </td>
                                     <td className="px-4 py-3 text-sm text-right font-medium">{formatCurrency(g.total_amount)}</td>
@@ -271,11 +273,11 @@ const BigCosts = () => {
                     <div className="flex justify-between items-center mb-4">
                         <div>
                             <h3 className="text-lg font-bold">{selectedGroup?.event_name}</h3>
-                            <p className="text-sm text-gray-500">Total: {formatCurrency(selectedGroup?.total_amount)}</p>
+                            <p className="text-sm text-gray-500">{t("Total:")} {formatCurrency(selectedGroup?.total_amount)}</p>
                         </div>
                         {(!selectedGroup?.quotation_id) && (
                             <Button size="sm" onClick={() => { resetForm(); setFormData({ ...formData, event_id: selectedGroup?.event_id }); setShowEditModal(true); }} icon={Plus}>
-                                Add Item
+                                {t("Add Item")}
                             </Button>
                         )}
                     </div>
@@ -285,10 +287,10 @@ const BigCosts = () => {
                             <thead className="bg-gray-50 dark:bg-dark-surface">
                                 <tr>
                                     <th className="px-3 py-2 text-left">No.</th>
-                                    <th className="px-3 py-2 text-left">Description</th>
-                                    <th className="px-3 py-2 text-left">Vendor</th>
-                                    <th className="px-3 py-2 text-right">Amount</th>
-                                    <th className="px-3 py-2 text-center">Status</th>
+                                    <th className="px-3 py-2 text-left">{t("Description")}</th>
+                                    <th className="px-3 py-2 text-left">{t("Vendor")}</th>
+                                    <th className="px-3 py-2 text-right">{t("Amount")}</th>
+                                    <th className="px-3 py-2 text-center">{t("Status")}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y cursor-pointer">
@@ -316,29 +318,29 @@ const BigCosts = () => {
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium mb-1">Event</label>
+                            <label className="block text-sm font-medium mb-1">{t("Event")}</label>
                             <select value={formData.event_id} onChange={e => setFormData({ ...formData, event_id: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-dark-surface">
-                                <option value="">Select</option>
+                                <option value="">{t("Select")}</option>
                                 {events.map(e => <option key={e.id} value={e.id}>{e.event_name}</option>)}
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium mb-1">Vendor</label>
+                            <label className="block text-sm font-medium mb-1">{t("Vendor")}</label>
                             <select value={formData.vendor_id} onChange={e => setFormData({ ...formData, vendor_id: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-dark-surface">
-                                <option value="">Select</option>
+                                <option value="">{t("Select")}</option>
                                 {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
                             </select>
                         </div>
                         <div className="col-span-2">
-                            <label className="block text-sm font-medium mb-1">Description</label>
+                            <label className="block text-sm font-medium mb-1">{t("Description")}</label>
                             <input type="text" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-dark-surface" required />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium mb-1">Amount</label>
+                            <label className="block text-sm font-medium mb-1">{t("Amount")}</label>
                             <input type="text" value={formData.amount ? parseInt(formData.amount).toLocaleString('id-ID') : '0'} onChange={e => { const v = e.target.value.replace(/\./g, ''); if (v === '' || /^\d+$/.test(v)) setFormData({ ...formData, amount: v }); }} className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-dark-surface text-right" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium mb-1">Date</label>
+                            <label className="block text-sm font-medium mb-1">{t("Date")}</label>
                             <input type="date" value={formData.cost_date} onChange={e => setFormData({ ...formData, cost_date: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-dark-surface" />
                         </div>
                     </div>
@@ -348,19 +350,19 @@ const BigCosts = () => {
                             {selectedCost && (
                                 <>
                                     <Button type="button" variant="danger" onClick={handleDelete} className="flex items-center gap-1">
-                                        <Trash2 className="w-4 h-4" /> Delete
+                                        <Trash2 className="w-4 h-4" /> {t("Delete")}
                                     </Button>
                                     {selectedCost.status === 'pending' && (
                                         <Button type="button" variant="success" onClick={handleApprove} className="flex items-center gap-1">
-                                            <Check className="w-4 h-4" /> Approve
+                                            <Check className="w-4 h-4" /> {t("Approve")}
                                         </Button>
                                     )}
                                 </>
                             )}
                         </div>
                         <div className="flex gap-2">
-                            <Button type="button" variant="secondary" onClick={() => setShowEditModal(false)}>Cancel</Button>
-                            <Button type="submit">Save</Button>
+                            <Button type="button" variant="secondary" onClick={() => setShowEditModal(false)}>{t("Cancel")}</Button>
+                            <Button type="submit">{t("Save")}</Button>
                         </div>
                     </div>
                 </form>

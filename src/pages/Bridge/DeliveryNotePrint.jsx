@@ -2,8 +2,10 @@ import React, { useRef, useState } from 'react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { useData } from '../../context/DataContext';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const DeliveryNotePrint = ({ note, onClose }) => {
+    const { t } = useLanguage();
     const { bridgeSettings, companySettings } = useData();
     const printRef = useRef();
     const [isExporting, setIsExporting] = useState(false);
@@ -51,7 +53,7 @@ const DeliveryNotePrint = ({ note, onClose }) => {
             pdf.save(filename);
         } catch (error) {
             console.error('Error generating PDF:', error);
-            alert('Gagal membuat PDF. Silakan coba lagi.');
+            alert(t("Gagal membuat PDF. Silakan coba lagi."));
         } finally {
             setIsExporting(false);
         }
@@ -73,14 +75,14 @@ const DeliveryNotePrint = ({ note, onClose }) => {
     return (
         <div className="fixed inset-0 bg-white z-50 overflow-auto">
             <div className="no-print sticky top-0 bg-white border-b border-gray-300 p-4 flex items-center justify-between shadow-sm">
-                <h2 className="text-lg font-bold text-gray-900">Preview Surat Jalan</h2>
+                <h2 className="text-lg font-bold text-gray-900">{t("Preview Surat Jalan")}</h2>
                 <div className="flex gap-2">
                     <button
                         onClick={handlePrint}
                         className="btn-primary"
                         disabled={isExporting}
                     >
-                        🖨️ Print
+                        {t("🖨️ Print")}
                     </button>
                     <button
                         onClick={handleExportPDF}
@@ -94,7 +96,7 @@ const DeliveryNotePrint = ({ note, onClose }) => {
                         className="btn-secondary"
                         disabled={isExporting}
                     >
-                        ✕ Tutup
+                        {t("✕ Tutup")}
                     </button>
                 </div>
             </div>
@@ -123,7 +125,7 @@ const DeliveryNotePrint = ({ note, onClose }) => {
                                     {bridgeSettings?.company_address || companySettings?.company_address || 'JAKARTA - JALAN'}
                                 </p>
                                 <p className="text-xs text-gray-600 font-semibold mt-0.5">
-                                    NPWP: {bridgeSettings?.company_npwp || companySettings?.company_npwp || '-'}
+                                    {t("NPWP:")} {bridgeSettings?.company_npwp || companySettings?.company_npwp || '-'}
                                 </p>
                             </div>
                         </div>
@@ -134,7 +136,7 @@ const DeliveryNotePrint = ({ note, onClose }) => {
                                 {bridgeSettings?.company_name || companySettings?.company_name || 'BAKHTERA FREIGHT WORLDWIDE'}
                             </h2>
                             <div className="border-2 border-gray-900 px-4 py-1">
-                                <p className="text-sm font-semibold">SURAT JALAN</p>
+                                <p className="text-sm font-semibold">{t("SURAT JALAN")}</p>
                             </div>
                         </div>
                     </div>
@@ -159,7 +161,7 @@ const DeliveryNotePrint = ({ note, onClose }) => {
                             <table className="w-full text-sm">
                                 <tbody>
                                     <tr>
-                                        <td className="py-1 font-semibold w-32">Tanggal:</td>
+                                        <td className="py-1 font-semibold w-32">{t("Tanggal:")}</td>
                                         <td className="py-1">{formatDate(note.date)}</td>
                                     </tr>
                                 </tbody>
@@ -174,12 +176,12 @@ const DeliveryNotePrint = ({ note, onClose }) => {
                                 {/* Row 1: Consignee / Seal No */}
                                 <tr className="border-b border-gray-900">
                                     <td className="border-r border-gray-900 p-2 font-semibold w-1/6 align-top">
-                                        Consignee / Seal No. :
+                                        {t("Consignee / Seal No. :")}
                                     </td>
                                     <td className="p-2 align-top">
                                         <div>{note.consignee || '-'}</div>
                                         {note.seal_number && (
-                                            <div className="text-xs text-gray-600 mt-1">Seal: {note.seal_number}</div>
+                                            <div className="text-xs text-gray-600 mt-1">{t("Seal:")} {note.seal_number}</div>
                                         )}
                                     </td>
                                 </tr>
@@ -187,7 +189,7 @@ const DeliveryNotePrint = ({ note, onClose }) => {
                                 {/* Row 2: Truck No */}
                                 <tr className="border-b border-gray-900">
                                     <td className="border-r border-gray-900 p-2 font-semibold align-top">
-                                        Truck No. :
+                                        {t("Truck No. :")}
                                     </td>
                                     <td className="p-2 align-top">
                                         {note.truck_number || '-'}
@@ -197,7 +199,7 @@ const DeliveryNotePrint = ({ note, onClose }) => {
                                 {/* Row 3: Driver */}
                                 <tr className="border-b border-gray-900">
                                     <td className="border-r border-gray-900 p-2 font-semibold align-top">
-                                        Driver :
+                                        {t("Driver :")}
                                     </td>
                                     <td className="p-2 align-top">
                                         <div>{note.driver_name || '-'}</div>
@@ -210,7 +212,7 @@ const DeliveryNotePrint = ({ note, onClose }) => {
                                 {/* Row 4: Items Table */}
                                 <tr className="border-b border-gray-900">
                                     <td className="border-r border-gray-900 p-2 font-semibold align-top">
-                                        Barang-barang tersebut telah kami terima dengan lengkap baik :
+                                        {t("Barang-barang tersebut telah kami terima dengan lengkap baik :")}
                                     </td>
                                     <td className="p-0">
                                         {items.length > 0 ? (
@@ -218,11 +220,11 @@ const DeliveryNotePrint = ({ note, onClose }) => {
                                                 <thead>
                                                     <tr className="border-b border-gray-400">
                                                         <th className="p-2 text-left text-xs font-semibold w-12">No</th>
-                                                        <th className="p-2 text-left text-xs font-semibold border-l border-gray-400">Kode</th>
-                                                        <th className="p-2 text-left text-xs font-semibold border-l border-gray-400">Nama Barang</th>
-                                                        <th className="p-2 text-center text-xs font-semibold border-l border-gray-400 w-16">Qty</th>
-                                                        <th className="p-2 text-center text-xs font-semibold border-l border-gray-400 w-20">Satuan</th>
-                                                        <th className="p-2 text-left text-xs font-semibold border-l border-gray-400">Ket</th>
+                                                        <th className="p-2 text-left text-xs font-semibold border-l border-gray-400">{t("Kode")}</th>
+                                                        <th className="p-2 text-left text-xs font-semibold border-l border-gray-400">{t("Nama Barang")}</th>
+                                                        <th className="p-2 text-center text-xs font-semibold border-l border-gray-400 w-16">{t("Qty")}</th>
+                                                        <th className="p-2 text-center text-xs font-semibold border-l border-gray-400 w-20">{t("Satuan")}</th>
+                                                        <th className="p-2 text-left text-xs font-semibold border-l border-gray-400">{t("Ket")}</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -251,7 +253,7 @@ const DeliveryNotePrint = ({ note, onClose }) => {
                                             </table>
                                         ) : (
                                             <div className="p-4 text-center text-gray-500 text-xs">
-                                                Tidak ada barang
+                                                {t("Tidak ada barang")}
                                             </div>
                                         )}
                                     </td>
@@ -260,7 +262,7 @@ const DeliveryNotePrint = ({ note, onClose }) => {
                                 {/* Row 5: Keterangan */}
                                 <tr>
                                     <td className="border-r border-gray-900 p-2 font-semibold align-top">
-                                        Keterangan :
+                                        {t("Keterangan :")}
                                     </td>
                                     <td className="p-2 align-top min-h-[60px]">
                                         {note.remarks || '-'}
@@ -274,7 +276,7 @@ const DeliveryNotePrint = ({ note, onClose }) => {
                     <div className="grid grid-cols-2 gap-8 mt-8">
                         {/* Sender Signature */}
                         <div className="text-center">
-                            <p className="text-sm font-semibold mb-16">Hormat kami,</p>
+                            <p className="text-sm font-semibold mb-16">{t("Hormat kami,")}</p>
                             <div className="border-t border-gray-900 pt-1 inline-block min-w-[200px]">
                                 <p className="text-sm font-semibold">{note.sender_name || '( _____________ )'}</p>
                                 {note.sender_position && (
@@ -285,7 +287,7 @@ const DeliveryNotePrint = ({ note, onClose }) => {
 
                         {/* Receiver Signature */}
                         <div className="text-center">
-                            <p className="text-sm font-semibold mb-2">Nama Penerima dan Perusahaan</p>
+                            <p className="text-sm font-semibold mb-2">{t("Nama Penerima dan Perusahaan")}</p>
                             <div className="mb-12 min-h-[60px]">
                                 {note.receiver_name && (
                                     <>
@@ -297,7 +299,7 @@ const DeliveryNotePrint = ({ note, onClose }) => {
                                 )}
                             </div>
                             <div className="border-t border-gray-900 pt-1 inline-block min-w-[200px]">
-                                <p className="text-sm">Tanggal terima: {note.received_date ? formatDate(note.received_date) : '___/___/20___'}</p>
+                                <p className="text-sm">{t("Tanggal terima:")} {note.received_date ? formatDate(note.received_date) : '___/___/20___'}</p>
                             </div>
                         </div>
                     </div>
@@ -305,7 +307,7 @@ const DeliveryNotePrint = ({ note, onClose }) => {
                     {/* Footer Note */}
                     {note.bc_document_number && (
                         <div className="mt-6 text-xs text-gray-600 text-center">
-                            <p>BC Document: {note.bc_document_number}</p>
+                            <p>{t("BC Document:")} {note.bc_document_number}</p>
                         </div>
                     )}
                 </div>

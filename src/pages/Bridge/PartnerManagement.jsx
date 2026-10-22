@@ -8,8 +8,10 @@ import {
     Users, Plus, Search, Edit, Trash2, Building2, User,
     Phone, Mail, MapPin, CreditCard, Filter, X, Check, Download, Upload
 } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const BridgePartnerManagement = () => {
+    const { t } = useLanguage();
     const { canCreate, canEdit, canDelete } = useAuth();
     const hasCreate = canCreate('bridge_partners');
     const hasEdit = canEdit('bridge_partners');
@@ -95,7 +97,7 @@ const BridgePartnerManagement = () => {
                     .eq('id', editingPartner.id);
 
                 if (error) throw error;
-                alert('✅ Mitra berhasil diperbarui');
+                alert(t("✅ Mitra berhasil diperbarui"));
             } else {
                 // Create
                 const { error } = await supabase
@@ -103,7 +105,7 @@ const BridgePartnerManagement = () => {
                     .insert([formData]);
 
                 if (error) throw error;
-                alert('✅ Mitra baru berhasil ditambahkan');
+                alert(t("✅ Mitra baru berhasil ditambahkan"));
             }
 
             fetchPartners();
@@ -119,11 +121,11 @@ const BridgePartnerManagement = () => {
 
     const handleDelete = async (partnerId) => {
         if (!hasDelete) return;
-        if (!confirm('Yakin hapus mitra ini? Data transaksi terkait tidak akan terhapus.')) return;
+        if (!confirm(t("Yakin hapus mitra ini? Data transaksi terkait tidak akan terhapus."))) return;
         try {
             const success = await deleteBusinessPartner(partnerId, 'bridge_business_partners', 'bridge_partners');
             if (!success) return;
-            alert('✅ Mitra berhasil dihapus');
+            alert(t("✅ Mitra berhasil dihapus"));
             fetchPartners();
         } catch (error) {
             console.error('Error deleting partner:', error);
@@ -163,18 +165,18 @@ const BridgePartnerManagement = () => {
 
     const handleCleanseAll = async () => {
         if (!hasDelete) {
-            alert('Akses Ditolak: Anda tidak memiliki hak untuk cleansing data mitra.');
+            alert(t("Akses Ditolak: Anda tidak memiliki hak untuk cleansing data mitra."));
             return;
         }
         if (partners.length === 0) {
-            alert('Tidak ada data mitra untuk dihapus.');
+            alert(t("Tidak ada data mitra untuk dihapus."));
             return;
         }
 
         const firstConfirm = confirm(`Cleansing akan menghapus SEMUA data mitra Bridge (${partners.length} baris). Lanjutkan?`);
         if (!firstConfirm) return;
 
-        const secondConfirm = confirm('Konfirmasi terakhir: semua data mitra Bridge akan dihapus permanen. Yakin lanjut?');
+        const secondConfirm = confirm(t("Konfirmasi terakhir: semua data mitra Bridge akan dihapus permanen. Yakin lanjut?"));
         if (!secondConfirm) return;
 
         try {
@@ -184,7 +186,7 @@ const BridgePartnerManagement = () => {
                 onProgress: (message) => setCleanseProgress(message)
             });
             if (!success) return;
-            alert('✅ Cleansing selesai: semua data mitra Bridge berhasil dihapus.');
+            alert(t("✅ Cleansing selesai: semua data mitra Bridge berhasil dihapus."));
             setSelectedIds([]);
             fetchPartners();
         } catch (error) {
@@ -263,7 +265,7 @@ const BridgePartnerManagement = () => {
     // Export partners to CSV
     const handleExportCSV = () => {
         if (partners.length === 0) {
-            alert('Tidak ada data untuk diekspor');
+            alert(t("Tidak ada data untuk diekspor"));
             return;
         }
 
@@ -294,15 +296,15 @@ const BridgePartnerManagement = () => {
         alert(`✅ Diekspor ${partners.length} mitra ke CSV`);
     };
 
-    if (loading) return <div className="p-12 text-center text-silver-dark">Loading...</div>;
+    if (loading) return <div className="p-12 text-center text-silver-dark">{t("Loading...")}</div>;
 
     return (
         <div className="space-y-6">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text">Mitra Bisnis Bridge</h1>
-                    <p className="text-silver-dark mt-1">Kelola Customer, Vendor, Consignee, Shipper (TPB/Gudang Berikat)</p>
+                    <h1 className="text-3xl font-bold gradient-text">{t("Mitra Bisnis Bridge")}</h1>
+                    <p className="text-silver-dark mt-1">{t("Kelola Customer, Vendor, Consignee, Shipper (TPB/Gudang Berikat)")}</p>
                 </div>
                 <div className="flex gap-2">
                     {hasDelete && (
@@ -319,7 +321,7 @@ const BridgePartnerManagement = () => {
                         className="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-colors flex items-center gap-2 text-sm"
                     >
                         <Download className="w-4 h-4" />
-                        Export CSV
+                        {t("Export CSV")}
                     </button>
                     {hasDelete && (
                         <Button
@@ -327,12 +329,12 @@ const BridgePartnerManagement = () => {
                             disabled={selectedIds.length === 0}
                             className={`bg-red-500/20 text-red-400 hover:bg-red-500/30 ${selectedIds.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
-                            Hapus Terpilih ({selectedIds.length})
+                            {t("Hapus Terpilih (")}{selectedIds.length})
                         </Button>
                     )}
                     {hasCreate && (
                         <Button onClick={() => setShowModal(true)} icon={Plus}>
-                            Tambah Mitra Baru
+                            {t("Tambah Mitra Baru")}
                         </Button>
                     )}
                 </div>
@@ -340,42 +342,42 @@ const BridgePartnerManagement = () => {
 
             {isCleansing && (
                 <div className="glass-card px-4 py-2 rounded-lg border border-amber-500/30 bg-amber-500/10">
-                    <p className="text-xs text-amber-300">Progress Cleansing: {cleanseProgress || 'Sedang memproses...'}</p>
+                    <p className="text-xs text-amber-300">{t("Progress Cleansing:")} {cleanseProgress || 'Sedang memproses...'}</p>
                 </div>
             )}
 
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
                 <div className="glass-card p-4 rounded-lg">
-                    <p className="text-xs text-silver-dark">Total Mitra</p>
+                    <p className="text-xs text-silver-dark">{t("Total Mitra")}</p>
                     <p className="text-2xl font-bold text-silver-light mt-1">{partners.length}</p>
                 </div>
                 <div className="glass-card p-4 rounded-lg">
-                    <p className="text-xs text-silver-dark">Customer</p>
+                    <p className="text-xs text-silver-dark">{t("Customer")}</p>
                     <p className="text-2xl font-bold text-green-400 mt-1">
                         {partners.filter(p => p.is_customer).length}
                     </p>
                 </div>
                 <div className="glass-card p-4 rounded-lg">
-                    <p className="text-xs text-silver-dark">Vendor</p>
+                    <p className="text-xs text-silver-dark">{t("Vendor")}</p>
                     <p className="text-2xl font-bold text-blue-400 mt-1">
                         {partners.filter(p => p.is_vendor).length}
                     </p>
                 </div>
                 <div className="glass-card p-4 rounded-lg">
-                    <p className="text-xs text-silver-dark">Consignee</p>
+                    <p className="text-xs text-silver-dark">{t("Consignee")}</p>
                     <p className="text-2xl font-bold text-purple-400 mt-1">
                         {partners.filter(p => p.is_consignee).length}
                     </p>
                 </div>
                 <div className="glass-card p-4 rounded-lg">
-                    <p className="text-xs text-silver-dark">Shipper</p>
+                    <p className="text-xs text-silver-dark">{t("Shipper")}</p>
                     <p className="text-2xl font-bold text-yellow-400 mt-1">
                         {partners.filter(p => p.is_shipper).length}
                     </p>
                 </div>
                 <div className="glass-card p-4 rounded-lg">
-                    <p className="text-xs text-silver-dark">Transporter</p>
+                    <p className="text-xs text-silver-dark">{t("Transporter")}</p>
                     <p className="text-2xl font-bold text-orange-400 mt-1">
                         {partners.filter(p => p.is_transporter).length}
                     </p>
@@ -388,7 +390,7 @@ const BridgePartnerManagement = () => {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-silver-dark" />
                     <input
                         type="text"
-                        placeholder="Cari nama, kode, atau email..."
+                        placeholder={t("Cari nama, kode, atau email...")}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
@@ -399,19 +401,19 @@ const BridgePartnerManagement = () => {
                     onChange={(e) => setRoleFilter(e.target.value)}
                     className="px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
                 >
-                    <option value="all">Semua Role</option>
-                    <option value="customer">Customer</option>
-                    <option value="vendor">Vendor</option>
-                    <option value="consignee">Consignee</option>
-                    <option value="shipper">Shipper</option>
-                    <option value="transporter">Transporter</option>
+                    <option value="all">{t("Semua Role")}</option>
+                    <option value="customer">{t("Customer")}</option>
+                    <option value="vendor">{t("Vendor")}</option>
+                    <option value="consignee">{t("Consignee")}</option>
+                    <option value="shipper">{t("Shipper")}</option>
+                    <option value="transporter">{t("Transporter")}</option>
                 </select>
             </div>
 
             {/* Partners Table */}
             <div className="glass-card rounded-lg overflow-hidden">
                 <p className="text-xs text-silver-dark px-4 py-2 bg-dark-surface/50 border-b border-dark-border">
-                    💡 Klik baris untuk edit • Klik kanan untuk hapus
+                    {t("💡 Klik baris untuk edit • Klik kanan untuk hapus")}
                 </p>
                 <div className="overflow-x-auto">
                     <table className="w-full">
@@ -424,10 +426,10 @@ const BridgePartnerManagement = () => {
                                         onChange={handleSelectAll}
                                     />
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">Kode</th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">Nama Mitra</th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">Kontak</th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">Role</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">{t("Kode")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">{t("Nama Mitra")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">{t("Kontak")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">{t("Role")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
@@ -491,7 +493,7 @@ const BridgePartnerManagement = () => {
                                                 <button
                                                     className="ml-4 text-red-500 hover:text-red-700"
                                                     onClick={(e) => { e.stopPropagation(); handleDelete(partner.id); }}
-                                                    title="Hapus Mitra"
+                                                    title={t("Hapus Mitra")}
                                                 >
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>
@@ -516,10 +518,10 @@ const BridgePartnerManagement = () => {
                         <div className="space-y-6">
                             {/* Basic Info */}
                             <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
-                                <h3 className="text-sm font-bold text-blue-400 mb-3 uppercase">Informasi Dasar</h3>
+                                <h3 className="text-sm font-bold text-blue-400 mb-3 uppercase">{t("Informasi Dasar")}</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-xs text-silver-dark mb-1">Nama Mitra *</label>
+                                        <label className="block text-xs text-silver-dark mb-1">{t("Nama Mitra *")}</label>
                                         <input
                                             type="text"
                                             value={formData.partner_name}
@@ -529,18 +531,18 @@ const BridgePartnerManagement = () => {
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs text-silver-dark mb-1">Tipe</label>
+                                        <label className="block text-xs text-silver-dark mb-1">{t("Tipe")}</label>
                                         <select
                                             value={formData.partner_type}
                                             onChange={(e) => setFormData({ ...formData, partner_type: e.target.value })}
                                             className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
                                         >
-                                            <option value="company">Company</option>
-                                            <option value="individual">Individual</option>
+                                            <option value="company">{t("Company")}</option>
+                                            <option value="individual">{t("Individual")}</option>
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="block text-xs text-silver-dark mb-1">Contact Person</label>
+                                        <label className="block text-xs text-silver-dark mb-1">{t("Contact Person")}</label>
                                         <input
                                             type="text"
                                             value={formData.contact_person}
@@ -549,7 +551,7 @@ const BridgePartnerManagement = () => {
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs text-silver-dark mb-1">NPWP</label>
+                                        <label className="block text-xs text-silver-dark mb-1">{t("NPWP")}</label>
                                         <input
                                             type="text"
                                             value={formData.tax_id}
@@ -562,7 +564,7 @@ const BridgePartnerManagement = () => {
 
                             {/* Roles - Bridge specific */}
                             <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
-                                <h3 className="text-sm font-bold text-purple-400 mb-3 uppercase">Role Partner (bisa lebih dari 1)</h3>
+                                <h3 className="text-sm font-bold text-purple-400 mb-3 uppercase">{t("Role Partner (bisa lebih dari 1)")}</h3>
                                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                                     {[
                                         { key: 'is_customer', label: 'Customer', desc: 'Bisa ditagih' },
@@ -590,7 +592,7 @@ const BridgePartnerManagement = () => {
                             {/* Contact */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs text-silver-dark mb-1">Email</label>
+                                    <label className="block text-xs text-silver-dark mb-1">{t("Email")}</label>
                                     <input
                                         type="email"
                                         value={formData.email}
@@ -599,7 +601,7 @@ const BridgePartnerManagement = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs text-silver-dark mb-1">Phone</label>
+                                    <label className="block text-xs text-silver-dark mb-1">{t("Phone")}</label>
                                     <input
                                         type="text"
                                         value={formData.phone}
@@ -612,7 +614,7 @@ const BridgePartnerManagement = () => {
                             {/* Address */}
                             <div className="space-y-3">
                                 <div>
-                                    <label className="block text-xs text-silver-dark mb-1">Alamat</label>
+                                    <label className="block text-xs text-silver-dark mb-1">{t("Alamat")}</label>
                                     <textarea
                                         value={formData.address_line1}
                                         onChange={(e) => setFormData({ ...formData, address_line1: e.target.value })}
@@ -625,21 +627,21 @@ const BridgePartnerManagement = () => {
                                         type="text"
                                         value={formData.city}
                                         onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                                        placeholder="Kota"
+                                        placeholder={t("Kota")}
                                         className="px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
                                     />
                                     <input
                                         type="text"
                                         value={formData.postal_code}
                                         onChange={(e) => setFormData({ ...formData, postal_code: e.target.value })}
-                                        placeholder="Kode Pos"
+                                        placeholder={t("Kode Pos")}
                                         className="px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
                                     />
                                     <input
                                         type="text"
                                         value={formData.country}
                                         onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                                        placeholder="Negara"
+                                        placeholder={t("Negara")}
                                         className="px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
                                     />
                                 </div>
@@ -648,21 +650,21 @@ const BridgePartnerManagement = () => {
                             {/* Financial */}
                             <div className="grid grid-cols-3 gap-4">
                                 <div>
-                                    <label className="block text-xs text-silver-dark mb-1">Payment Terms</label>
+                                    <label className="block text-xs text-silver-dark mb-1">{t("Payment Terms")}</label>
                                     <select
                                         value={formData.payment_terms}
                                         onChange={(e) => setFormData({ ...formData, payment_terms: e.target.value })}
                                         className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
                                     >
-                                        <option value="NET 7">NET 7</option>
-                                        <option value="NET 14">NET 14</option>
-                                        <option value="NET 30">NET 30</option>
-                                        <option value="NET 60">NET 60</option>
+                                        <option value="NET 7">{t("NET 7")}</option>
+                                        <option value="NET 14">{t("NET 14")}</option>
+                                        <option value="NET 30">{t("NET 30")}</option>
+                                        <option value="NET 60">{t("NET 60")}</option>
                                         <option value="COD">COD</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-xs text-silver-dark mb-1">Currency</label>
+                                    <label className="block text-xs text-silver-dark mb-1">{t("Currency")}</label>
                                     <select
                                         value={formData.currency}
                                         onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
@@ -674,7 +676,7 @@ const BridgePartnerManagement = () => {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-xs text-silver-dark mb-1">Credit Limit</label>
+                                    <label className="block text-xs text-silver-dark mb-1">{t("Credit Limit")}</label>
                                     <input
                                         type="number"
                                         value={formData.credit_limit}
@@ -686,27 +688,27 @@ const BridgePartnerManagement = () => {
 
                             {/* Bank Info */}
                             <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
-                                <h3 className="text-sm font-bold text-green-400 mb-3 uppercase">Informasi Bank (opsional)</h3>
+                                <h3 className="text-sm font-bold text-green-400 mb-3 uppercase">{t("Informasi Bank (opsional)")}</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                     <input
                                         type="text"
                                         value={formData.bank_name}
                                         onChange={(e) => setFormData({ ...formData, bank_name: e.target.value })}
-                                        placeholder="Nama Bank"
+                                        placeholder={t("Nama Bank")}
                                         className="px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
                                     />
                                     <input
                                         type="text"
                                         value={formData.bank_account_number}
                                         onChange={(e) => setFormData({ ...formData, bank_account_number: e.target.value })}
-                                        placeholder="No Rekening"
+                                        placeholder={t("No Rekening")}
                                         className="px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
                                     />
                                     <input
                                         type="text"
                                         value={formData.bank_account_holder}
                                         onChange={(e) => setFormData({ ...formData, bank_account_holder: e.target.value })}
-                                        placeholder="Nama Pemilik Rekening"
+                                        placeholder={t("Nama Pemilik Rekening")}
                                         className="px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
                                     />
                                 </div>
@@ -714,7 +716,7 @@ const BridgePartnerManagement = () => {
 
                             {/* Notes */}
                             <div>
-                                <label className="block text-xs text-silver-dark mb-1">Catatan</label>
+                                <label className="block text-xs text-silver-dark mb-1">{t("Catatan")}</label>
                                 <textarea
                                     value={formData.notes}
                                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
@@ -727,7 +729,7 @@ const BridgePartnerManagement = () => {
                         {/* Actions */}
                         <div className="flex gap-3 justify-end mt-6 pt-6 border-t border-dark-border">
                             <Button type="button" variant="secondary" onClick={handleCloseModal}>
-                                Batal
+                                {t("Batal")}
                             </Button>
                             {(!editingPartner || hasEdit) && (
                                 <Button type="submit" icon={editingPartner ? Edit : Plus}>

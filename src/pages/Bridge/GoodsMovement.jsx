@@ -6,8 +6,10 @@ import { useAuth } from '../../context/AuthContext';
 import Button from '../../components/Common/Button';
 import { exportToCSV } from '../../utils/exportCSV';
 import { exportToXLS } from '../../utils/exportXLS';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const GoodsMovement = () => {
+    const { t } = useLanguage();
     const navigate = useNavigate();
     const { canCreate, canEdit, canDelete } = useAuth();
     const hasCreate = canCreate('bridge_movement');
@@ -73,7 +75,7 @@ const GoodsMovement = () => {
                 setSelectedIds(prev => prev.filter(x => x !== id));
             } catch (err) {
                 console.error(err);
-                alert("Gagal menghapus data mutasi");
+                alert(t("Gagal menghapus data mutasi"));
             }
         }
     };
@@ -90,7 +92,7 @@ const GoodsMovement = () => {
             setSelectedIds([]);
         } catch (err) {
             console.error(err);
-            alert('Gagal menghapus sebagian data mutasi terpilih');
+            alert(t("Gagal menghapus sebagian data mutasi terpilih"));
         }
     };
 
@@ -103,7 +105,7 @@ const GoodsMovement = () => {
             setSelectedIds([]);
         } catch (err) {
             console.error(err);
-            alert('Gagal menghapus semua data mutasi');
+            alert(t("Gagal menghapus semua data mutasi"));
         }
     };
 
@@ -133,7 +135,7 @@ const GoodsMovement = () => {
     // Generic Export XLS
     const handleExportXLS = (data, filename, title) => {
         if (data.length === 0) {
-            alert('Tidak ada data untuk diexport');
+            alert(t("Tidak ada data untuk diexport"));
             return;
         }
 
@@ -271,7 +273,7 @@ const GoodsMovement = () => {
                         {title}
                     </h2>
                     <span className="ml-auto text-sm text-silver-dark">
-                        {data.length} entri
+                        {data.length} {t("entri")}
                     </span>
                     <div className="flex gap-2 ml-2">
                         <Button
@@ -314,18 +316,18 @@ const GoodsMovement = () => {
                                         />
                                     </th>
                                 )}
-                                <th className="px-3 py-3 text-left text-xs text-silver">No. Pengajuan</th>
-                                <th className="px-3 py-3 text-left text-xs text-silver">Kode Barang</th>
-                                <th className="px-3 py-3 text-left text-xs text-silver">Nama Item</th>
-                                <th className="px-3 py-3 text-center text-xs text-silver">Masuk Gudang (Tgl & Jam)</th>
-                                <th className="px-3 py-3 text-center text-xs text-silver">Waktu Mutasi (Tgl & Jam)</th>
-                                <th className="px-3 py-3 text-left text-xs text-silver">PIC Mutasi</th>
-                                <th className="px-3 py-3 text-center text-xs text-accent-blue">Stok Awal</th>
-                                <th className="px-3 py-3 text-center text-xs text-accent-orange">Mutasi</th>
-                                <th className="px-3 py-3 text-center text-xs text-accent-purple">Sisa Gudang</th>
-                                <th className="px-3 py-3 text-left text-xs text-silver">Lokasi</th>
-                                <th className="px-3 py-3 text-center text-xs text-silver">Dokumen</th>
-                                <th className="px-3 py-3 text-center text-xs text-silver">Aksi</th>
+                                <th className="px-3 py-3 text-left text-xs text-silver">{t("No. Pengajuan")}</th>
+                                <th className="px-3 py-3 text-left text-xs text-silver">{t("Kode Barang")}</th>
+                                <th className="px-3 py-3 text-left text-xs text-silver">{t("Nama Item")}</th>
+                                <th className="px-3 py-3 text-center text-xs text-silver">{t("Masuk Gudang (Tgl & Jam)")}</th>
+                                <th className="px-3 py-3 text-center text-xs text-silver">{t("Waktu Mutasi (Tgl & Jam)")}</th>
+                                <th className="px-3 py-3 text-left text-xs text-silver">{t("PIC Mutasi")}</th>
+                                <th className="px-3 py-3 text-center text-xs text-accent-blue">{t("Stok Awal")}</th>
+                                <th className="px-3 py-3 text-center text-xs text-accent-orange">{t("Mutasi")}</th>
+                                <th className="px-3 py-3 text-center text-xs text-accent-purple">{t("Sisa Gudang")}</th>
+                                <th className="px-3 py-3 text-left text-xs text-silver">{t("Lokasi")}</th>
+                                <th className="px-3 py-3 text-center text-xs text-silver">{t("Dokumen")}</th>
+                                <th className="px-3 py-3 text-center text-xs text-silver">{t("Aksi")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
@@ -339,7 +341,7 @@ const GoodsMovement = () => {
                                         key={log.id}
                                         className="hover:bg-dark-surface/50 cursor-pointer"
                                         onClick={() => handleOpenLog(log)}
-                                        title="Klik untuk melihat rincian mutasi dan dokumen"
+                                        title={t("Klik untuk melihat rincian mutasi dan dokumen")}
                                     >
                                         {hasDelete && (
                                             <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
@@ -374,7 +376,7 @@ const GoodsMovement = () => {
                                         </td>
 
                                         <td className="px-3 py-3 text-center">
-                                            <span className="text-sm text-accent-purple" title="Sisa stok di gudang saat transaksi">
+                                            <span className="text-sm text-accent-purple" title={t("Sisa stok di gudang saat transaksi")}>
                                                 {(() => {
                                                     // Prefer runningBalancesMap (calculated from full mutation log history)
                                                     if (runningBalancesMap[log.id] !== undefined) return runningBalancesMap[log.id];
@@ -399,9 +401,9 @@ const GoodsMovement = () => {
                                                     handleOpenLog(log);
                                                 }}
                                                 className="inline-flex items-center gap-1 text-sky-600 hover:text-sky-700 text-xs font-semibold"
-                                                title="Lihat detail dan dokumen"
+                                                title={t("Lihat detail dan dokumen")}
                                             >
-                                                <FileText className="w-3 h-3" /> Lihat
+                                                <FileText className="w-3 h-3" /> {t("Lihat")}
                                             </button>
                                         </td>
                                         {hasDelete && (
@@ -409,7 +411,7 @@ const GoodsMovement = () => {
                                                 <button
                                                     onClick={(e) => handleDeleteRow(e, log.id)}
                                                     className="p-1.5 hover:bg-red-500/10 text-gray-500 hover:text-red-500 rounded-lg transition-colors"
-                                                    title="Hapus Data"
+                                                    title={t("Hapus Data")}
                                                 >
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>
@@ -431,29 +433,29 @@ const GoodsMovement = () => {
             {debugMode && (
                 <div style={{position:'fixed',right:12,top:80,zIndex:60,width:420,maxHeight: '60vh',overflow:'auto',background:'#ffffffcc',backdropFilter:'blur(4px)',border:'1px solid #ccc',padding:10,borderRadius:6,fontSize:12}}>
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-                        <strong>DEBUG: GoodsMovement</strong>
+                        <strong>{t("DEBUG: GoodsMovement")}</strong>
                         <span style={{fontSize:11,color:'#666'}}>{new Date().toLocaleTimeString()}</span>
                     </div>
-                    <div><b>mutationLogs.length:</b> {mutationLogs?.length || 0}</div>
-                    <div><b>runningBalances (sample):</b></div>
+                    <div><b>{t("mutationLogs.length:")}</b> {mutationLogs?.length || 0}</div>
+                    <div><b>{t("runningBalances (sample):")}</b></div>
                     <pre style={{whiteSpace:'pre-wrap',maxHeight:200,overflow:'auto',background:'#f7f7f7',padding:6}}>{JSON.stringify(Object.entries(runningBalancesMap).slice(0,10),null,2)}</pre>
-                    <div><b>First 8 mutationLogs:</b></div>
+                    <div><b>{t("First 8 mutationLogs:")}</b></div>
                     <pre style={{whiteSpace:'pre-wrap',maxHeight:220,overflow:'auto',background:'#f7f7f7',padding:6}}>{JSON.stringify((mutationLogs||[]).slice(0,8).map(m=>({id:m.id,date:m.date,totalStock:m.totalStock,mutatedQty:m.mutatedQty,origin:m.origin,destination:m.destination})),null,2)}</pre>
                 </div>
             )}
             {/* Header */}
             <div>
-                <h1 className="text-3xl font-bold gradient-text">Pergerakan Barang</h1>
-                <p className="text-silver-dark mt-1">Riwayat Mutasi & Pergerakan Inventaris Gudang</p>
+                <h1 className="text-3xl font-bold gradient-text">{t("Pergerakan Barang")}</h1>
+                <p className="text-silver-dark mt-1">{t("Riwayat Mutasi & Pergerakan Inventaris Gudang")}</p>
             </div>
 
             {hasDelete && (
                 <div className="flex gap-2">
                     <Button onClick={handleDeleteSelected} variant="danger" disabled={selectedIds.length === 0} icon={Trash2}>
-                        Hapus Terpilih ({selectedIds.length})
+                        {t("Hapus Terpilih (")}{selectedIds.length})
                     </Button>
                     <Button onClick={handleDeleteAll} variant="danger" disabled={mutationLogs.length === 0} icon={Trash2}>
-                        Bersihkan Semua Data
+                        {t("Bersihkan Semua Data")}
                     </Button>
                 </div>
             )}
@@ -464,7 +466,7 @@ const GoodsMovement = () => {
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                     <input
                         type="text"
-                        placeholder="Cari berdasarkan No. Pendaftaran, Item, atau PIC..."
+                        placeholder={t("Cari berdasarkan No. Pendaftaran, Item, atau PIC...")}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
@@ -503,7 +505,7 @@ const GoodsMovement = () => {
                             {/* Header */}
                             <div className="bg-sky-500 px-6 py-4 flex justify-between items-center rounded-t-lg">
                                 <div>
-                                    <h3 className="text-xl text-white font-bold">Mutasi Barang</h3>
+                                    <h3 className="text-xl text-white font-bold">{t("Mutasi Barang")}</h3>
                                     <p className="text-sm text-white/90">{selectedLog.pengajuanNumber}</p>
                                 </div>
                                 <div className="flex gap-2">
@@ -511,7 +513,7 @@ const GoodsMovement = () => {
                                         onClick={() => setSelectedLog(null)}
                                         className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm font-medium flex items-center gap-1"
                                     >
-                                        ✕ Tutup
+                                        {t("✕ Tutup")}
                                     </button>
                                 </div>
                             </div>
@@ -522,16 +524,16 @@ const GoodsMovement = () => {
                                     <table className="w-full text-sm border border-gray-300">
                                         <thead>
                                             <tr className="bg-sky-400 text-white">
-                                                <th className="px-3 py-2 text-left border-r border-sky-300 font-medium">NO. PENGAJUAN</th>
-                                                <th className="px-3 py-2 text-left border-r border-sky-300 font-medium">NO. PABEAN</th>
-                                                <th className="px-3 py-2 text-center border-r border-sky-300 font-medium">TGL MASUK</th>
-                                                <th className="px-3 py-2 text-center border-r border-sky-300 font-medium">JAM MASUK</th>
-                                                <th className="px-3 py-2 text-center border-r border-sky-300 font-medium">JML ITEM</th>
+                                                <th className="px-3 py-2 text-left border-r border-sky-300 font-medium">{t("NO. PENGAJUAN")}</th>
+                                                <th className="px-3 py-2 text-left border-r border-sky-300 font-medium">{t("NO. PABEAN")}</th>
+                                                <th className="px-3 py-2 text-center border-r border-sky-300 font-medium">{t("TGL MASUK")}</th>
+                                                <th className="px-3 py-2 text-center border-r border-sky-300 font-medium">{t("JAM MASUK")}</th>
+                                                <th className="px-3 py-2 text-center border-r border-sky-300 font-medium">{t("JML ITEM")}</th>
                                                 <th className="px-3 py-2 text-left border-r border-sky-300 font-medium">PIC</th>
-                                                <th className="px-3 py-2 text-center border-r border-sky-300 font-medium">TGL MUTASI</th>
-                                                <th className="px-3 py-2 text-center border-r border-sky-300 font-medium">JAM MUTASI</th>
-                                                <th className="px-3 py-2 text-left border-r border-sky-300 font-medium">PIC MUTASI</th>
-                                                <th className="px-3 py-2 text-left font-medium">LOKASI MUTASI</th>
+                                                <th className="px-3 py-2 text-center border-r border-sky-300 font-medium">{t("TGL MUTASI")}</th>
+                                                <th className="px-3 py-2 text-center border-r border-sky-300 font-medium">{t("JAM MUTASI")}</th>
+                                                <th className="px-3 py-2 text-left border-r border-sky-300 font-medium">{t("PIC MUTASI")}</th>
+                                                <th className="px-3 py-2 text-left font-medium">{t("LOKASI MUTASI")}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -559,22 +561,22 @@ const GoodsMovement = () => {
                                     </table>
                                 </div>
 
-                                <p className="text-sm text-gray-600 mb-2">Kode Packing: <span className="font-semibold">{selectedLog.packageNumber || 'Box-1'}</span></p>
+                                <p className="text-sm text-gray-600 mb-2">{t("Kode Packing:")} <span className="font-semibold">{selectedLog.packageNumber || 'Box-1'}</span></p>
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-sm border border-gray-300">
                                         <thead>
                                             <tr className="bg-sky-400 text-white">
                                                 <th className="px-2 py-2 text-center border-r border-sky-300 font-medium w-12">NO.</th>
-                                                <th className="px-2 py-2 text-left border-r border-sky-300 font-medium">KODE BARANG</th>
-                                                <th className="px-2 py-2 text-left border-r border-sky-300 font-medium">HS CODE</th>
-                                                <th className="px-2 py-2 text-left border-r border-sky-300 font-medium">ITEM</th>
-                                                <th className="px-2 py-2 text-center border-r border-sky-300 font-medium">JUMLAH</th>
-                                                <th className="px-2 py-2 text-left border-r border-sky-300 font-medium">SATUAN</th>
-                                                <th className="px-2 py-2 text-left border-r border-sky-300 font-medium">LOKASI ASAL</th>
-                                                <th className="px-2 py-2 text-left border-r border-sky-300 font-medium">KONDISI</th>
-                                                <th className="px-2 py-2 text-center border-r border-sky-300 font-medium text-orange-200">JML MUTASI</th>
-                                                <th className="px-2 py-2 text-center border-r border-sky-300 font-medium text-purple-200">SISA GUDANG</th>
-                                                <th className="px-2 py-2 text-left font-medium">KETERANGAN</th>
+                                                <th className="px-2 py-2 text-left border-r border-sky-300 font-medium">{t("KODE BARANG")}</th>
+                                                <th className="px-2 py-2 text-left border-r border-sky-300 font-medium">{t("HS CODE")}</th>
+                                                <th className="px-2 py-2 text-left border-r border-sky-300 font-medium">{t("ITEM")}</th>
+                                                <th className="px-2 py-2 text-center border-r border-sky-300 font-medium">{t("JUMLAH")}</th>
+                                                <th className="px-2 py-2 text-left border-r border-sky-300 font-medium">{t("SATUAN")}</th>
+                                                <th className="px-2 py-2 text-left border-r border-sky-300 font-medium">{t("LOKASI ASAL")}</th>
+                                                <th className="px-2 py-2 text-left border-r border-sky-300 font-medium">{t("KONDISI")}</th>
+                                                <th className="px-2 py-2 text-center border-r border-sky-300 font-medium text-orange-200">{t("JML MUTASI")}</th>
+                                                <th className="px-2 py-2 text-center border-r border-sky-300 font-medium text-purple-200">{t("SISA GUDANG")}</th>
+                                                <th className="px-2 py-2 text-left font-medium">{t("KETERANGAN")}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -603,13 +605,13 @@ const GoodsMovement = () => {
 
                                 {/* Documents Section */}
                                 <div className="mt-6 border border-gray-200 bg-white rounded-lg p-4">
-                                    <h4 className="font-semibold text-gray-800 mb-3">Dokumen Pendukung Mutasi</h4>
+                                    <h4 className="font-semibold text-gray-800 mb-3">{t("Dokumen Pendukung Mutasi")}</h4>
                                     {selectedLog.documentsLoading ? (
-                                        <p className="text-sm text-gray-500">Memuat dokumen...</p>
+                                        <p className="text-sm text-gray-500">{t("Memuat dokumen...")}</p>
                                     ) : selectedLog.documentsLoadError ? (
-                                        <p className="text-sm text-red-500">Dokumen gagal dimuat. Tutup lalu buka kembali detail mutasi.</p>
+                                        <p className="text-sm text-red-500">{t("Dokumen gagal dimuat. Tutup lalu buka kembali detail mutasi.")}</p>
                                     ) : (!selectedLog.documents || selectedLog.documents.length === 0) ? (
-                                        <p className="text-sm text-gray-500">Tidak ada dokumen pendukung untuk mutasi ini.</p>
+                                        <p className="text-sm text-gray-500">{t("Tidak ada dokumen pendukung untuk mutasi ini.")}</p>
                                     ) : (
                                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                                             {selectedLog.documents.map((doc, idx) => (
@@ -636,7 +638,7 @@ const GoodsMovement = () => {
                                                             <div className="w-12 h-12 text-gray-400 border-2 border-gray-300 rounded-lg flex items-center justify-center mb-1">
                                                                 <span className="text-xs font-bold uppercase">{doc.type ? doc.type.split('/')[1] : 'PDF'}</span>
                                                             </div>
-                                                            <span className="text-[10px] text-gray-500 text-center px-2 underline">Buka Dokumen</span>
+                                                            <span className="text-[10px] text-gray-500 text-center px-2 underline">{t("Buka Dokumen")}</span>
                                                         </div>
                                                     )}
                                                     <div className="text-sm font-medium text-gray-800 truncate" title={doc.title || doc.name}>{doc.title || doc.name || `Dokumen ${idx + 1}`}</div>
@@ -650,9 +652,9 @@ const GoodsMovement = () => {
                                 {/* Status Info */}
                                 <div className="mt-4 p-3 rounded-lg border bg-white">
                                     {isOutbound ? (
-                                        <p className="text-blue-600 text-sm">ℹ️ Item ini telah dimutasi keluar (Outbound/Pameran)</p>
+                                        <p className="text-blue-600 text-sm">{t("ℹ️ Item ini telah dimutasi keluar (Outbound/Pameran)")}</p>
                                     ) : (
-                                        <p className="text-gray-600 text-sm">✓ Item ini adalah remutasi (sudah kembali ke Gudang)</p>
+                                        <p className="text-gray-600 text-sm">{t("✓ Item ini adalah remutasi (sudah kembali ke Gudang)")}</p>
                                     )}
                                 </div>
                             </div>

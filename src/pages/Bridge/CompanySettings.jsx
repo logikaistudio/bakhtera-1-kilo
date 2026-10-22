@@ -6,8 +6,10 @@ import Button from '../../components/Common/Button';
 import { Plus, Building, MapPin, CreditCard, Upload, X, Image as ImageIcon, Trash2, Phone, Mail, FileText, Link2 } from 'lucide-react';
 import { validateAndConvertImage } from '../../utils/validateImage';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const BridgeCompanySettings = () => {
+    const { t } = useLanguage();
     const { canEdit, canCreate, canDelete } = useAuth();
     const {
         bridgeSettings,
@@ -89,7 +91,7 @@ const BridgeCompanySettings = () => {
     // Handle company info save
     const handleSaveCompanyInfo = async () => {
         if (!canEdit('bridge_settings')) {
-            alert('Anda tidak memiliki hak akses untuk mengubah pengaturan perusahaan.');
+            alert(t("Anda tidak memiliki hak akses untuk mengubah pengaturan perusahaan."));
             return;
         }
         setIsSaving(true);
@@ -109,7 +111,7 @@ const BridgeCompanySettings = () => {
             // Refresh data from database
             await fetchCompanySettings(MODULE);
 
-            alert('✅ Informasi perusahaan berhasil disimpan');
+            alert(t("✅ Informasi perusahaan berhasil disimpan"));
         } catch (error) {
             console.error('Error saving company info:', error);
             alert('❌ Gagal menyimpan: ' + error.message);
@@ -121,7 +123,7 @@ const BridgeCompanySettings = () => {
     // Handle logo upload
     const handleLogoUpload = async (e) => {
         if (!canEdit('bridge_settings')) {
-            alert('Anda tidak memiliki hak akses untuk mengubah logo perusahaan.');
+            alert(t("Anda tidak memiliki hak akses untuk mengubah logo perusahaan."));
             return;
         }
         const file = e.target.files[0];
@@ -150,11 +152,11 @@ const BridgeCompanySettings = () => {
     // Bank Account Handlers
     const handleAddBank = () => {
         if (!canCreate('bridge_settings')) {
-            alert('Anda tidak memiliki hak akses untuk menambah rekening bank.');
+            alert(t("Anda tidak memiliki hak akses untuk menambah rekening bank."));
             return;
         }
         if (!bridgeSettings?.id) {
-            alert('Simpan informasi perusahaan terlebih dahulu sebelum menambahkan rekening bank.');
+            alert(t("Simpan informasi perusahaan terlebih dahulu sebelum menambahkan rekening bank."));
             return;
         }
         setEditingBank(null);
@@ -174,7 +176,7 @@ const BridgeCompanySettings = () => {
 
     const handleEditBank = (bank) => {
         if (!canEdit('bridge_settings')) {
-            alert('Anda tidak memiliki hak akses untuk mengubah rekening bank.');
+            alert(t("Anda tidak memiliki hak akses untuk mengubah rekening bank."));
             return;
         }
         setEditingBank(bank);
@@ -194,15 +196,15 @@ const BridgeCompanySettings = () => {
 
     const handleDeleteBank = async (id) => {
         if (!canDelete('bridge_settings')) {
-            alert('Anda tidak memiliki hak akses untuk menghapus rekening bank.');
+            alert(t("Anda tidak memiliki hak akses untuk menghapus rekening bank."));
             return;
         }
         if (window.confirm('Hapus rekening ini?')) {
             try {
                 await deleteBankAccount(id, MODULE);
-                alert('Rekening dihapus');
+                alert(t("Rekening dihapus"));
             } catch (error) {
-                alert('Failed to delete rekening');
+                alert(t("Failed to delete rekening"));
             }
         }
     };
@@ -233,7 +235,7 @@ const BridgeCompanySettings = () => {
         <div className="p-6 max-w-7xl mx-auto">
             <h1 className="text-2xl font-bold mb-6 flex items-center gap-2">
                 <Building className="h-6 w-6 text-blue-600" />
-                Pengaturan Perusahaan (Bridge)
+                {t("Pengaturan Perusahaan (Bridge)")}
             </h1>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -243,36 +245,36 @@ const BridgeCompanySettings = () => {
                     <div className="bg-white rounded-lg shadow p-6 border border-gray-100">
                         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 border-b pb-2">
                             <FileText className="h-5 w-5 text-gray-500" />
-                            Informasi Umum
+                            {t("Informasi Umum")}
                         </h2>
 
                         <div className="grid grid-cols-1 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Nama Perusahaan</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">{t("Nama Perusahaan")}</label>
                                 <input
                                     type="text"
                                     value={companyName}
                                     onChange={(e) => setCompanyName(e.target.value)}
                                     className="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
-                                    placeholder="PT. Example Name"
+                                    placeholder={t("PT. Example Name")}
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Alamat Lengkap</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">{t("Alamat Lengkap")}</label>
                                 <textarea
                                     value={companyAddress}
                                     onChange={(e) => setCompanyAddress(e.target.value)}
                                     rows={3}
                                     className="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
-                                    placeholder="Jl. Alamat Perusahaan..."
+                                    placeholder={t("Jl. Alamat Perusahaan...")}
                                 />
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
-                                        <Phone className="h-3 w-3" /> Telepon
+                                        <Phone className="h-3 w-3" /> {t("Telepon")}
                                     </label>
                                     <input
                                         type="text"
@@ -286,7 +288,7 @@ const BridgeCompanySettings = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
-                                        <Mail className="h-3 w-3" /> Email
+                                        <Mail className="h-3 w-3" /> {t("Email")}
                                     </label>
                                     <input
                                         type="email"
@@ -296,7 +298,7 @@ const BridgeCompanySettings = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">NPWP</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">{t("NPWP")}</label>
                                     <input
                                         type="text"
                                         value={companyNpwp}
@@ -321,18 +323,18 @@ const BridgeCompanySettings = () => {
                         <div className="flex justify-between items-center mb-4 border-b pb-2">
                             <h2 className="text-lg font-semibold flex items-center gap-2">
                                 <CreditCard className="h-5 w-5 text-gray-500" />
-                                Rekening Bank
+                                {t("Rekening Bank")}
                             </h2>
                             {canCreate('bridge_settings') && (
                                 <Button size="sm" disabled={!bridgeSettings?.id} onClick={handleAddBank} Icon={Plus}>
-                                    Tambah Rekening
+                                    {t("Tambah Rekening")}
                                 </Button>
                             )}
                         </div>
 
                         <div className="space-y-3">
                             {bridgeBankAccounts.length === 0 ? (
-                                <p className="text-gray-500 text-center py-4">Belum ada rekening bank terdaftar.</p>
+                                <p className="text-gray-500 text-center py-4">{t("Belum ada rekening bank terdaftar.")}</p>
                             ) : (
                                 bridgeBankAccounts.map((bank) => (
                                     <div key={bank.id} className="flex justify-between items-center p-3 border rounded-md hover:bg-gray-50 transition-colors">
@@ -340,14 +342,14 @@ const BridgeCompanySettings = () => {
                                             <div className="font-bold text-gray-800">{bank.bank_name} ({bank.currency || 'IDR'})</div>
                                             <div className="text-blue-600 font-mono tracking-wide">{bank.account_number}</div>
                                             <div className="text-sm text-gray-600">a/n {bank.account_holder}</div>
-                                            {bank.branch_name && <div className="text-xs text-gray-500">Cabang: {bank.branch_name}</div>}
+                                            {bank.branch_name && <div className="text-xs text-gray-500">{t("Cabang:")} {bank.branch_name}</div>}
                                             {bank.coa_code ? (
                                                 <div className="text-xs text-green-600 mt-1 flex items-center gap-1">
                                                     <Link2 className="h-3 w-3" />
-                                                    COA: {bank.coa_code} — {bank.coa_name}
+                                                    {t("COA:")} {bank.coa_code} — {bank.coa_name}
                                                 </div>
                                             ) : (
-                                                <div className="text-xs text-orange-500 mt-1">⚠️ COA belum ditautkan — journal tidak akan akurat</div>
+                                                <div className="text-xs text-orange-500 mt-1">{t("⚠️ COA belum ditautkan — journal tidak akan akurat")}</div>
                                             )}
                                         </div>
                                         <div className="flex gap-2">
@@ -356,7 +358,7 @@ const BridgeCompanySettings = () => {
                                                     onClick={() => handleEditBank(bank)}
                                                     className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
                                                 >
-                                                    Edit
+                                                    {t("Edit")}
                                                 </button>
                                             )}
                                             {canDelete('bridge_settings') && (
@@ -380,7 +382,7 @@ const BridgeCompanySettings = () => {
                     <div className="bg-white rounded-lg shadow p-6 border border-gray-100">
                         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                             <ImageIcon className="h-5 w-5 text-gray-500" />
-                            Logo Perusahaan
+                            {t("Logo Perusahaan")}
                         </h2>
 
                         <div className="flex flex-col items-center">
@@ -394,13 +396,13 @@ const BridgeCompanySettings = () => {
                                 ) : (
                                     <div className="text-gray-400 text-center p-4">
                                         <Building className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                                        <span className="text-sm">No Logo</span>
+                                        <span className="text-sm">{t("No Logo")}</span>
                                     </div>
                                 )}
 
                                 {isUploading && (
                                     <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center text-white">
-                                        Uploading...
+                                        {t("Uploading...")}
                                     </div>
                                 )}
                             </div>
@@ -422,7 +424,7 @@ const BridgeCompanySettings = () => {
                                 onClick={(e) => {
                                     if (!canEdit('bridge_settings')) {
                                         e.preventDefault();
-                                        alert('Anda tidak memiliki hak akses untuk mengubah logo.');
+                                        alert(t("Anda tidak memiliki hak akses untuk mengubah logo."));
                                     }
                                 }}
                             >
@@ -430,8 +432,8 @@ const BridgeCompanySettings = () => {
                                 {logoUrl ? 'Ganti Logo' : 'Upload Logo'}
                             </label>
                             <p className="text-xs text-gray-500 mt-2 text-center">
-                                Format: PNG, JPG (Max 2MB)<br />
-                                Disarankan background transparan
+                                {t("Format: PNG, JPG (Max 2MB)")}<br />
+                                {t("Disarankan background transparan")}
                             </p>
                         </div>
                     </div>
@@ -446,18 +448,18 @@ const BridgeCompanySettings = () => {
             >
                 <form onSubmit={handleBankSubmit} className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium mb-1">Nama Bank</label>
+                        <label className="block text-sm font-medium mb-1">{t("Nama Bank")}</label>
                         <input
                             type="text"
                             value={bankFormData.bank_name}
                             onChange={(e) => setBankFormData({ ...bankFormData, bank_name: e.target.value })}
-                            placeholder="Contoh: BCA, Mandiri"
+                            placeholder={t("Contoh: BCA, Mandiri")}
                             className="w-full px-3 py-2 border rounded-md"
                             required
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium mb-1">Nomor Rekening</label>
+                        <label className="block text-sm font-medium mb-1">{t("Nomor Rekening")}</label>
                         <input
                             type="text"
                             value={bankFormData.account_number}
@@ -467,7 +469,7 @@ const BridgeCompanySettings = () => {
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium mb-1">Atas Nama (A/N)</label>
+                        <label className="block text-sm font-medium mb-1">{t("Atas Nama (A/N)")}</label>
                         <input
                             type="text"
                             value={bankFormData.account_holder}
@@ -478,7 +480,7 @@ const BridgeCompanySettings = () => {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium mb-1">Mata Uang</label>
+                            <label className="block text-sm font-medium mb-1">{t("Mata Uang")}</label>
                             <select
                                 value={bankFormData.currency}
                                 onChange={(e) => setBankFormData({ ...bankFormData, currency: e.target.value })}
@@ -491,23 +493,23 @@ const BridgeCompanySettings = () => {
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium mb-1">Cabang (Branch)</label>
+                            <label className="block text-sm font-medium mb-1">{t("Cabang (Branch)")}</label>
                             <input
                                 type="text"
                                 value={bankFormData.branch}
                                 onChange={(e) => setBankFormData({ ...bankFormData, branch: e.target.value })}
-                                placeholder="Contoh: KCU Jakarta"
+                                placeholder={t("Contoh: KCU Jakarta")}
                                 className="w-full px-3 py-2 border rounded-md"
                             />
                         </div>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium mb-1">SWIFT Code (Opsional)</label>
+                        <label className="block text-sm font-medium mb-1">{t("SWIFT Code (Opsional)")}</label>
                         <input
                             type="text"
                             value={bankFormData.swift_code}
                             onChange={(e) => setBankFormData({ ...bankFormData, swift_code: e.target.value })}
-                            placeholder="BMRIIDJA"
+                            placeholder={t("BMRIIDJA")}
                             className="w-full px-3 py-2 border rounded-md"
                         />
                     </div>
@@ -516,14 +518,13 @@ const BridgeCompanySettings = () => {
                     <div className="border border-orange-200 rounded-lg p-3 bg-orange-50">
                         <label className="block text-sm font-semibold mb-1 text-orange-800 flex items-center gap-1">
                             <Link2 className="h-4 w-4" />
-                            Akun Buku Besar (COA) <span className="text-red-500">*</span>
+                            {t("Akun Buku Besar (COA)")} <span className="text-red-500">*</span>
                         </label>
                         <p className="text-xs text-orange-600 mb-2">
-                            Pilih akun Kas/Bank yang sesuai di Chart of Accounts.
-                            Ini menentukan ke mana jurnal pembukuan akan dicatat saat terjadi transaksi AR/AP.
+                            {t("Pilih akun Kas/Bank yang sesuai di Chart of Accounts. Ini menentukan ke mana jurnal pembukuan akan dicatat saat terjadi transaksi AR/AP.")}
                         </p>
                         {loadingCOA ? (
-                            <div className="text-xs text-gray-500">Memuat daftar COA...</div>
+                            <div className="text-xs text-gray-500">{t("Memuat daftar COA...")}</div>
                         ) : (
                             <select
                                 value={bankFormData.coa_id}
@@ -538,7 +539,7 @@ const BridgeCompanySettings = () => {
                                 }}
                                 className="w-full px-3 py-2 border border-orange-300 rounded-md bg-white text-sm focus:ring-orange-400 focus:border-orange-400"
                             >
-                                <option value="">— Pilih Akun COA Kas/Bank —</option>
+                                <option value="">{t("— Pilih Akun COA Kas/Bank —")}</option>
                                 {coaAssetList.map(c => (
                                     <option key={c.id} value={c.id}>
                                         {c.code} — {c.name}
@@ -548,12 +549,12 @@ const BridgeCompanySettings = () => {
                         )}
                         {bankFormData.coa_id && (
                             <p className="text-xs text-green-600 mt-1 font-medium">
-                                ✅ Terhubung ke: {bankFormData.coa_code} — {bankFormData.coa_name}
+                                {t("✅ Terhubung ke:")} {bankFormData.coa_code} — {bankFormData.coa_name}
                             </p>
                         )}
                         {!bankFormData.coa_id && (
                             <p className="text-xs text-red-500 mt-1">
-                                ⚠️ Wajib diisi agar jurnal pembukuan akurat.
+                                {t("⚠️ Wajib diisi agar jurnal pembukuan akurat.")}
                             </p>
                         )}
                     </div>
@@ -564,7 +565,7 @@ const BridgeCompanySettings = () => {
                             variant="secondary"
                             onClick={() => setIsBankModalOpen(false)}
                         >
-                            Batal
+                            {t("Batal")}
                         </Button>
                         <Button type="submit">
                             {editingBank ? 'Update' : 'Simpan'}

@@ -5,6 +5,7 @@ import Modal from '../../../components/Common/Modal';
 import Button from '../../../components/Common/Button';
 import { Plus, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useLanguage } from '../../../i18n/LanguageContext';
 
 // Currency formatter for Indonesian format (xxx.xxx.xxx)
 const formatCurrency = (value) => {
@@ -13,6 +14,7 @@ const formatCurrency = (value) => {
 };
 
 const EventManagement = () => {
+    const { t } = useLanguage();
     const { events, addEvent, updateEvent, deleteEvent, customers } = useData();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingEvent, setEditingEvent] = useState(null);
@@ -129,11 +131,11 @@ const EventManagement = () => {
                     <ArrowLeft className="w-5 h-5" />
                 </button>
                 <div className="flex-1">
-                    <h1 className="text-4xl font-bold gradient-text mb-2">Event Management</h1>
-                    <p className="text-silver-dark">Manage events and scheduling</p>
+                    <h1 className="text-4xl font-bold gradient-text mb-2">{t("Event Management")}</h1>
+                    <p className="text-silver-dark">{t("Manage events and scheduling")}</p>
                 </div>
                 <Button onClick={() => handleOpenModal()} icon={Plus}>
-                    Add Event
+                    {t("Add Event")}
                 </Button>
             </div>
 
@@ -155,14 +157,14 @@ const EventManagement = () => {
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-silver-dark mb-2">
-                            Event Name *
+                            {t("Event Name *")}
                         </label>
                         <input
                             type="text"
                             required
                             value={formData.event_name}
                             onChange={(e) => setFormData({ ...formData, event_name: e.target.value })}
-                            placeholder="Enter event name"
+                            placeholder={t("Enter event name")}
                             className="w-full"
                         />
                     </div>
@@ -170,7 +172,7 @@ const EventManagement = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-silver-dark mb-2">
-                                Date
+                                {t("Date")}
                             </label>
                             <input
                                 type="date"
@@ -182,13 +184,13 @@ const EventManagement = () => {
 
                         <div>
                             <label className="block text-sm font-medium text-silver-dark mb-2">
-                                Venue
+                                {t("Venue")}
                             </label>
                             <input
                                 type="text"
                                 value={formData.venue}
                                 onChange={(e) => setFormData({ ...formData, venue: e.target.value })}
-                                placeholder="Event venue"
+                                placeholder={t("Event venue")}
                                 className="w-full"
                             />
                         </div>
@@ -196,14 +198,14 @@ const EventManagement = () => {
 
                     <div>
                         <label className="block text-sm font-medium text-silver-dark mb-2">
-                            Customer
+                            {t("Customer")}
                         </label>
                         <select
                             value={formData.client_id}
                             onChange={(e) => setFormData({ ...formData, client_id: e.target.value })}
                             className="w-full"
                         >
-                            <option value="">Select customer</option>
+                            <option value="">{t("Select customer")}</option>
                             {customers.map((customer) => (
                                 <option key={customer.id} value={customer.id}>
                                     {customer.name}
@@ -214,7 +216,7 @@ const EventManagement = () => {
 
                     <div>
                         <label className="block text-sm font-medium text-silver-dark mb-2">
-                            Status *
+                            {t("Status *")}
                         </label>
                         <select
                             required
@@ -232,12 +234,12 @@ const EventManagement = () => {
 
                     <div>
                         <label className="block text-sm font-medium text-silver-dark mb-2">
-                            Description
+                            {t("Description")}
                         </label>
                         <textarea
                             value={formData.description}
                             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                            placeholder="Event details and description"
+                            placeholder={t("Event details and description")}
                             rows={3}
                             className="w-full"
                         />
@@ -255,14 +257,14 @@ const EventManagement = () => {
                                     }
                                 }}
                             >
-                                Delete
+                                {t("Delete")}
                             </Button>
                         ) : <div />}
                         <div className="flex gap-3">
                             <Button type="button" variant="secondary" onClick={() => setIsModalOpen(false)}>
-                                Cancel
+                                {t("Cancel")}
                             </Button>
-                            <Button type="submit">{editingEvent ? 'Update' : 'Create'} Event</Button>
+                            <Button type="submit">{editingEvent ? 'Update' : 'Create'} {t("Event")}</Button>
                         </div>
                     </div>
                 </form>

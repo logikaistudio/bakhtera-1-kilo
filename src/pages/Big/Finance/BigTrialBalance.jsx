@@ -5,6 +5,7 @@ import Button from '../../../components/Common/Button';
 import { Scale, RefreshCw, FileSpreadsheet, Printer } from 'lucide-react';
 import { useData } from '../../../context/DataContext';
 import { printReport } from '../../../utils/printPDF';
+import { useLanguage } from '../../../i18n/LanguageContext';
 
 const fmtNum = (v) => {
     if (!v && v !== 0) return '-';
@@ -13,6 +14,7 @@ const fmtNum = (v) => {
 };
 
 const BigTrialBalance = () => {
+    const { t } = useLanguage();
     const { companySettings } = useData();
     const [balances, setBalances] = useState([]);
     const [totals, setTotals] = useState({ opening: 0, debit: 0, credit: 0, closing: 0 });
@@ -164,39 +166,39 @@ const BigTrialBalance = () => {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold gradient-text flex items-center gap-2">
-                        <Scale className="w-8 h-8" /> Trial Balance — Big
+                        <Scale className="w-8 h-8" /> {t("Trial Balance — Big")}
                     </h1>
-                    <p className="text-silver-dark mt-1">Saldo akun dan mutasi periode Big module</p>
+                    <p className="text-silver-dark mt-1">{t("Saldo akun dan mutasi periode Big module")}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button variant="secondary" icon={RefreshCw} onClick={fetchTB}>Refresh</Button>
+                    <Button variant="secondary" icon={RefreshCw} onClick={fetchTB}>{t("Refresh")}</Button>
                     <button onClick={handleExportExcel}
                         className="flex items-center gap-2 px-3 py-2 bg-dark-surface text-green-400 hover:bg-dark-card smooth-transition rounded-lg border border-dark-border text-xs">
-                        <FileSpreadsheet className="w-4 h-4" /> Excel
+                        <FileSpreadsheet className="w-4 h-4" /> {t("Excel")}
                     </button>
                     <select
                         value={printOrientation}
                         onChange={(e) => setPrintOrientation(e.target.value)}
                         className="px-2 py-2 bg-dark-surface border border-dark-border rounded-lg text-xs text-silver-light hover:bg-dark-card smooth-transition"
-                        title="Orientasi cetak"
+                        title={t("Orientasi cetak")}
                     >
-                        <option value="auto">Auto</option>
-                        <option value="portrait">Portrait</option>
-                        <option value="landscape">Landscape</option>
+                        <option value="auto">{t("Auto")}</option>
+                        <option value="portrait">{t("Portrait")}</option>
+                        <option value="landscape">{t("Landscape")}</option>
                     </select>
                     <select
                         value={printPageSize}
                         onChange={(e) => setPrintPageSize(e.target.value)}
                         className="px-2 py-2 bg-dark-surface border border-dark-border rounded-lg text-xs text-silver-light hover:bg-dark-card smooth-transition"
-                        title="Ukuran kertas"
+                        title={t("Ukuran kertas")}
                     >
                         <option value="A4">A4</option>
-                        <option value="Letter">Letter</option>
-                        <option value="Legal">Legal</option>
+                        <option value="Letter">{t("Letter")}</option>
+                        <option value="Legal">{t("Legal")}</option>
                     </select>
                     <button onClick={handleExportPDF}
                         className="flex items-center gap-2 px-3 py-2 bg-dark-surface text-red-400 hover:bg-dark-card smooth-transition rounded-lg border border-dark-border text-xs">
-                        <Printer className="w-4 h-4" /> Print PDF
+                        <Printer className="w-4 h-4" /> {t("Print PDF")}
                     </button>
                 </div>
             </div>
@@ -204,14 +206,14 @@ const BigTrialBalance = () => {
             <div className="flex flex-col md:flex-row gap-4">
                 <div className="glass-card p-4 rounded-xl flex items-center gap-4">
                     <div>
-                        <label className="block text-xs text-silver-dark uppercase mb-1">Start Date</label>
+                        <label className="block text-xs text-silver-dark uppercase mb-1">{t("Start Date")}</label>
                         <input type="date" value={dateRange.start}
                             onChange={e => setDateRange(p => ({ ...p, start: e.target.value }))}
                             className="bg-dark-surface border border-dark-border rounded px-2 py-1 text-silver-light text-sm" />
                     </div>
                     <div className="h-px w-4 bg-silver-dark" />
                     <div>
-                        <label className="block text-xs text-silver-dark uppercase mb-1">End Date</label>
+                        <label className="block text-xs text-silver-dark uppercase mb-1">{t("End Date")}</label>
                         <input type="date" value={dateRange.end}
                             onChange={e => setDateRange(p => ({ ...p, end: e.target.value }))}
                             className="bg-dark-surface border border-dark-border rounded px-2 py-1 text-silver-light text-sm" />
@@ -219,7 +221,7 @@ const BigTrialBalance = () => {
                 </div>
                 <div className={`glass-card p-4 rounded-xl flex items-center gap-4 border-l-4 ${isBalanced ? 'border-green-500' : 'border-red-500'}`}>
                     <div>
-                        <p className="text-xs text-silver-dark uppercase tracking-wider">Balance Status</p>
+                        <p className="text-xs text-silver-dark uppercase tracking-wider">{t("Balance Status")}</p>
                         <p className={`text-lg font-bold mt-1 ${isBalanced ? 'text-green-400' : 'text-red-400'}`}>
                             {isBalanced ? 'BALANCED ✓' : 'OUT OF BALANCE ✗'}
                         </p>
@@ -228,25 +230,25 @@ const BigTrialBalance = () => {
             </div>
 
             {loading ? (
-                <div className="glass-card p-12 text-center text-silver-dark rounded-xl">Memuat data...</div>
+                <div className="glass-card p-12 text-center text-silver-dark rounded-xl">{t("Memuat data...")}</div>
             ) : (
                 <div className="glass-card rounded-xl overflow-hidden shadow-lg border border-white/10">
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead className="bg-[#0070BB] text-white">
                                 <tr>
-                                    <th className="px-4 py-3 text-left">Kode COA</th>
-                                    <th className="px-4 py-3 text-left">Nama Akun</th>
-                                    <th className="px-4 py-3 text-center">Tipe</th>
-                                    <th className="px-4 py-3 text-right">Saldo Awal</th>
-                                    <th className="px-4 py-3 text-right">Debit</th>
-                                    <th className="px-4 py-3 text-right">Kredit</th>
-                                    <th className="px-4 py-3 text-right">Saldo Akhir</th>
+                                    <th className="px-4 py-3 text-left">{t("Kode COA")}</th>
+                                    <th className="px-4 py-3 text-left">{t("Nama Akun")}</th>
+                                    <th className="px-4 py-3 text-center">{t("Tipe")}</th>
+                                    <th className="px-4 py-3 text-right">{t("Saldo Awal")}</th>
+                                    <th className="px-4 py-3 text-right">{t("Debit")}</th>
+                                    <th className="px-4 py-3 text-right">{t("Kredit")}</th>
+                                    <th className="px-4 py-3 text-right">{t("Saldo Akhir")}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-dark-border/40">
                                 {balances.length === 0 ? (
-                                    <tr><td colSpan={7} className="text-center py-10 text-silver-dark italic">Tidak ada transaksi pada periode ini</td></tr>
+                                    <tr><td colSpan={7} className="text-center py-10 text-silver-dark italic">{t("Tidak ada transaksi pada periode ini")}</td></tr>
                                 ) : balances.map(acc => (
                                     <tr key={acc.id} className="hover:bg-white/5 smooth-transition">
                                         <td className="px-4 py-2 font-mono text-accent-orange text-xs">{acc.code}</td>
@@ -263,7 +265,7 @@ const BigTrialBalance = () => {
                             </tbody>
                             <tfoot className="bg-[#0070BB]/10 border-t-2 border-[#0070BB] font-bold">
                                 <tr>
-                                    <td colSpan={3} className="px-4 py-3 text-right uppercase tracking-wider text-silver-light">GRAND TOTAL</td>
+                                    <td colSpan={3} className="px-4 py-3 text-right uppercase tracking-wider text-silver-light">{t("GRAND TOTAL")}</td>
                                     <td className="px-4 py-3 text-right font-mono text-silver-light">{fmtNum(totals.opening)}</td>
                                     <td className="px-4 py-3 text-right font-mono text-blue-400">{fmtNum(totals.debit)}</td>
                                     <td className="px-4 py-3 text-right font-mono text-orange-400">{fmtNum(totals.credit)}</td>

@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { Search, Plus, Edit, Trash, Package, X } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const AssetInventory = () => {
+    const { t } = useLanguage();
     const { canCreate, canEdit, canDelete, user } = useAuth();
     const [assets, setAssets] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -66,7 +68,7 @@ const AssetInventory = () => {
 
     const handleEdit = (asset) => {
         if (!canEdit('bridge_asset_inventory')) {
-            alert('Anda tidak memiliki izin untuk mengedit aset ini.');
+            alert(t("Anda tidak memiliki izin untuk mengedit aset ini."));
             return;
         }
         setFormData(asset);
@@ -76,7 +78,7 @@ const AssetInventory = () => {
 
     const handleDelete = async (id) => {
         if (!canDelete('bridge_asset_inventory')) {
-            alert('Anda tidak memiliki izin untuk menghapus aset ini.');
+            alert(t("Anda tidak memiliki izin untuk menghapus aset ini."));
             return;
         }
 
@@ -118,7 +120,7 @@ const AssetInventory = () => {
     const handleDeleteAll = async () => {
         if (!canDelete('bridge_asset_inventory')) return;
         if (assets.length === 0) {
-            alert('Tidak ada data aset untuk dihapus.');
+            alert(t("Tidak ada data aset untuk dihapus."));
             return;
         }
 
@@ -217,8 +219,8 @@ const AssetInventory = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text">Asset Inventory</h1>
-                    <p className="text-silver-dark mt-1">Kelola data inventaris aset operasional harian.</p>
+                    <h1 className="text-3xl font-bold gradient-text">{t("Asset Inventory")}</h1>
+                    <p className="text-silver-dark mt-1">{t("Kelola data inventaris aset operasional harian.")}</p>
                 </div>
                 <div className="flex items-center gap-2">
                     {canDelete('bridge_asset_inventory') && (
@@ -229,7 +231,7 @@ const AssetInventory = () => {
                                 className={`flex items-center gap-2 px-4 py-2 rounded-lg smooth-transition ${selectedIds.length > 0 ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-dark-surface text-silver-dark cursor-not-allowed opacity-60'}`}
                             >
                                 <Trash className="w-4 h-4" />
-                                Hapus Terpilih ({selectedIds.length})
+                                {t("Hapus Terpilih (")}{selectedIds.length})
                             </button>
                             <button
                                 onClick={handleDeleteAll}
@@ -237,7 +239,7 @@ const AssetInventory = () => {
                                 className={`flex items-center gap-2 px-4 py-2 rounded-lg smooth-transition ${assets.length > 0 ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-dark-surface text-silver-dark cursor-not-allowed opacity-60'}`}
                             >
                                 <Trash className="w-4 h-4" />
-                                Bersihkan Semua Data
+                                {t("Bersihkan Semua Data")}
                             </button>
                         </>
                     )}
@@ -247,7 +249,7 @@ const AssetInventory = () => {
                             className="flex items-center gap-2 px-4 py-2 bg-accent-blue text-white rounded-lg hover:bg-accent-blue/90 smooth-transition"
                         >
                             <Plus className="w-5 h-5" />
-                            Tambah Aset
+                            {t("Tambah Aset")}
                         </button>
                     )}
                 </div>
@@ -258,7 +260,7 @@ const AssetInventory = () => {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                 <input
                     type="text"
-                    placeholder="Cari aset berdasarkan nama, merk, atau serial number..."
+                    placeholder={t("Cari aset berdasarkan nama, merk, atau serial number...")}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:outline-none focus:border-accent-blue smooth-transition"
@@ -280,15 +282,15 @@ const AssetInventory = () => {
                                     />
                                 </th>
                                 <th className="px-4 py-3 font-medium text-center">No</th>
-                                <th className="px-4 py-3 font-medium">Nama Aset</th>
-                                <th className="px-4 py-3 font-medium">Merk / Tipe</th>
-                                <th className="px-4 py-3 font-medium">Serial Number</th>
-                                <th className="px-4 py-3 font-medium text-center">Jumlah</th>
-                                <th className="px-4 py-3 font-medium">Kondisi</th>
-                                <th className="px-4 py-3 font-medium">Lokasi</th>
-                                <th className="px-4 py-3 font-medium">Tgl Operasional</th>
-                                <th className="px-4 py-3 font-medium">Keterangan</th>
-                                <th className="px-4 py-3 font-medium text-center">Aksi</th>
+                                <th className="px-4 py-3 font-medium">{t("Nama Aset")}</th>
+                                <th className="px-4 py-3 font-medium">{t("Merk / Tipe")}</th>
+                                <th className="px-4 py-3 font-medium">{t("Serial Number")}</th>
+                                <th className="px-4 py-3 font-medium text-center">{t("Jumlah")}</th>
+                                <th className="px-4 py-3 font-medium">{t("Kondisi")}</th>
+                                <th className="px-4 py-3 font-medium">{t("Lokasi")}</th>
+                                <th className="px-4 py-3 font-medium">{t("Tgl Operasional")}</th>
+                                <th className="px-4 py-3 font-medium">{t("Keterangan")}</th>
+                                <th className="px-4 py-3 font-medium text-center">{t("Aksi")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
@@ -297,7 +299,7 @@ const AssetInventory = () => {
                                     <td colSpan="11" className="px-4 py-8 text-center text-silver-dark">
                                         <div className="flex flex-col items-center justify-center">
                                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-blue mb-4"></div>
-                                            <p>Memuat data aset...</p>
+                                            <p>{t("Memuat data aset...")}</p>
                                         </div>
                                     </td>
                                 </tr>
@@ -305,9 +307,9 @@ const AssetInventory = () => {
                                 <tr>
                                     <td colSpan="11" className="px-4 py-12 text-center text-silver-dark">
                                         <Package className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                                        <p className="text-lg">Belum ada aset terdaftar.</p>
+                                        <p className="text-lg">{t("Belum ada aset terdaftar.")}</p>
                                         {canCreate('bridge_asset_inventory') && (
-                                            <p className="text-sm mt-1">Klik "Tambah Aset" untuk memulai memasukkan data inventaris.</p>
+                                            <p className="text-sm mt-1">{t("Klik \"Tambah Aset\" untuk memulai memasukkan data inventaris.")}</p>
                                         )}
                                     </td>
                                 </tr>
@@ -352,7 +354,7 @@ const AssetInventory = () => {
                                                     <button
                                                         onClick={() => handleEdit(asset)}
                                                         className="p-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 rounded-lg smooth-transition"
-                                                        title="Edit"
+                                                        title={t("Edit")}
                                                     >
                                                         <Edit className="w-4 h-4" />
                                                     </button>
@@ -361,7 +363,7 @@ const AssetInventory = () => {
                                                     <button
                                                         onClick={() => handleDelete(asset.id)}
                                                         className="p-1.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg smooth-transition"
-                                                        title="Hapus"
+                                                        title={t("Hapus")}
                                                     >
                                                         <Trash className="w-4 h-4" />
                                                     </button>
@@ -392,7 +394,7 @@ const AssetInventory = () => {
                         <form onSubmit={handleSubmit} className="p-6 space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-1">
-                                    <label className="text-sm font-medium text-gray-700">Nama Aset <span className="text-red-500">*</span></label>
+                                    <label className="text-sm font-medium text-gray-700">{t("Nama Aset")} <span className="text-red-500">*</span></label>
                                     <input
                                         type="text"
                                         name="name"
@@ -404,7 +406,7 @@ const AssetInventory = () => {
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label className="text-sm font-medium text-gray-700">Serial Number</label>
+                                    <label className="text-sm font-medium text-gray-700">{t("Serial Number")}</label>
                                     <input
                                         type="text"
                                         name="serial_number"
@@ -415,7 +417,7 @@ const AssetInventory = () => {
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label className="text-sm font-medium text-gray-700">Merk</label>
+                                    <label className="text-sm font-medium text-gray-700">{t("Merk")}</label>
                                     <input
                                         type="text"
                                         name="brand"
@@ -426,7 +428,7 @@ const AssetInventory = () => {
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label className="text-sm font-medium text-gray-700">Tipe</label>
+                                    <label className="text-sm font-medium text-gray-700">{t("Tipe")}</label>
                                     <input
                                         type="text"
                                         name="type"
@@ -437,7 +439,7 @@ const AssetInventory = () => {
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label className="text-sm font-medium text-gray-700">Jumlah <span className="text-red-500">*</span></label>
+                                    <label className="text-sm font-medium text-gray-700">{t("Jumlah")} <span className="text-red-500">*</span></label>
                                     <input
                                         type="number"
                                         name="quantity"
@@ -450,7 +452,7 @@ const AssetInventory = () => {
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label className="text-sm font-medium text-gray-700">Tanggal Operasional</label>
+                                    <label className="text-sm font-medium text-gray-700">{t("Tanggal Operasional")}</label>
                                     <input
                                         type="date"
                                         name="operational_date"
@@ -461,44 +463,44 @@ const AssetInventory = () => {
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label className="text-sm font-medium text-gray-700">Kondisi</label>
+                                    <label className="text-sm font-medium text-gray-700">{t("Kondisi")}</label>
                                     <select
                                         name="condition"
                                         value={formData.condition}
                                         onChange={handleInputChange}
                                         className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 focus:bg-white focus:outline-none focus:border-accent-blue focus:ring-1 focus:ring-accent-blue smooth-transition"
                                     >
-                                        <option value="Baik">Baik</option>
-                                        <option value="Rusak">Rusak</option>
-                                        <option value="Dalam Perbaikan">Dalam Perbaikan</option>
-                                        <option value="Hilang">Hilang</option>
+                                        <option value="Baik">{t("Baik")}</option>
+                                        <option value="Rusak">{t("Rusak")}</option>
+                                        <option value="Dalam Perbaikan">{t("Dalam Perbaikan")}</option>
+                                        <option value="Hilang">{t("Hilang")}</option>
                                     </select>
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label className="text-sm font-medium text-gray-700">Lokasi</label>
+                                    <label className="text-sm font-medium text-gray-700">{t("Lokasi")}</label>
                                     <select
                                         name="location"
                                         value={formData.location}
                                         onChange={handleInputChange}
                                         className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 focus:bg-white focus:outline-none focus:border-accent-blue focus:ring-1 focus:ring-accent-blue smooth-transition"
                                     >
-                                        <option value="Warehouse">Warehouse</option>
-                                        <option value="Event">Event</option>
-                                        <option value="Kantor">Kantor</option>
-                                        <option value="Outdoor">Outdoor</option>
+                                        <option value="Warehouse">{t("Warehouse")}</option>
+                                        <option value="Event">{t("Event")}</option>
+                                        <option value="Kantor">{t("Kantor")}</option>
+                                        <option value="Outdoor">{t("Outdoor")}</option>
                                     </select>
                                 </div>
 
                                 <div className="space-y-1 md:col-span-2">
-                                    <label className="text-sm font-medium text-gray-700">Keterangan</label>
+                                    <label className="text-sm font-medium text-gray-700">{t("Keterangan")}</label>
                                     <textarea
                                         name="notes"
                                         rows="3"
                                         value={formData.notes}
                                         onChange={handleInputChange}
                                         className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 focus:bg-white focus:outline-none focus:border-accent-blue focus:ring-1 focus:ring-accent-blue smooth-transition resize-none"
-                                        placeholder="Tambahkan catatan jika diperlukan..."
+                                        placeholder={t("Tambahkan catatan jika diperlukan...")}
                                     ></textarea>
                                 </div>
                             </div>
@@ -509,13 +511,13 @@ const AssetInventory = () => {
                                     onClick={() => setShowModal(false)}
                                     className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg smooth-transition"
                                 >
-                                    Batal
+                                    {t("Batal")}
                                 </button>
                                 <button
                                     type="submit"
                                     className="px-4 py-2 bg-accent-blue hover:bg-accent-blue/90 text-white font-medium rounded-lg smooth-transition"
                                 >
-                                    Simpan Aset
+                                    {t("Simpan Aset")}
                                 </button>
                             </div>
                         </form>

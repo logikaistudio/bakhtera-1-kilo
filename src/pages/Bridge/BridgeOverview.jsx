@@ -1,8 +1,10 @@
 import React from 'react';
 import { useData } from '../../context/DataContext';
 import { DEFAULT_LOCATION } from '../../constants/locationOptions';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const BridgeOverview = () => {
+    const { t } = useLanguage();
     const {
         quotations = [],
         warehouseInventory = [],
@@ -78,9 +80,9 @@ const BridgeOverview = () => {
         <div className="p-6 space-y-6">
             {/* Header */}
             <div className="mb-6">
-                <h1 className="text-4xl font-bold gradient-text mb-2">Bridge Overview</h1>
+                <h1 className="text-4xl font-bold gradient-text mb-2">{t("Bridge Overview")}</h1>
                 <p className="text-silver-dark">
-                    Ringkasan data pengajuan dan inventori barang TPPB
+                    {t("Ringkasan data pengajuan dan inventori barang TPPB")}
                 </p>
             </div>
 
@@ -106,27 +108,27 @@ const BridgeOverview = () => {
             {/* Quick Info */}
             <div className="glass-card p-6 rounded-lg mt-8">
                 <h3 className="text-lg font-semibold text-silver-light mb-4">
-                    📊 Informasi Tambahan
+                    {t("📊 Informasi Tambahan")}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="p-4 bg-dark-surface/50 rounded-lg">
-                        <p className="text-sm text-silver-dark mb-1">Net Movement</p>
+                        <p className="text-sm text-silver-dark mb-1">{t("Net Movement")}</p>
                         <p className="text-xl font-bold text-silver-light">
-                            {(totalInboundItems - totalOutboundItems).toLocaleString('id-ID')} items
+                            {(totalInboundItems - totalOutboundItems).toLocaleString('id-ID')} {t("items")}
                         </p>
                         <p className="text-xs text-silver-dark mt-1">
-                            Selisih barang masuk dan keluar
+                            {t("Selisih barang masuk dan keluar")}
                         </p>
                     </div>
                     <div className="p-4 bg-dark-surface/50 rounded-lg">
-                        <p className="text-sm text-silver-dark mb-1">Occupancy Rate</p>
+                        <p className="text-sm text-silver-dark mb-1">{t("Occupancy Rate")}</p>
                         <p className="text-xl font-bold text-silver-light">
                             {totalInboundItems > 0
                                 ? ((itemsInWarehouse / totalInboundItems) * 100).toFixed(1)
                                 : 0}%
                         </p>
                         <p className="text-xs text-silver-dark mt-1">
-                            Persentase barang di warehouse
+                            {t("Persentase barang di warehouse")}
                         </p>
                     </div>
                 </div>

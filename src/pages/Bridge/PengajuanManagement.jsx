@@ -10,8 +10,10 @@ import WarehouseItemSelectorModal from '../../components/Bridge/WarehouseItemSel
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { exportToCSV } from '../../utils/exportCSV';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const PengajuanManagement = () => {
+    const { t } = useLanguage();
     const { canCreate, canEdit, canDelete } = useAuth();
     const hasCreate = canCreate('bridge_pengajuan');
     const hasEdit = canEdit('bridge_pengajuan');
@@ -159,13 +161,13 @@ const PengajuanManagement = () => {
         console.log('🚀 handleSubmit called');
         
         if (formData.packages.length === 0) {
-            alert('❌ VALIDASI GAGAL:\nHarap tambahkan minimal satu package!');
+            alert(t("❌ VALIDASI GAGAL:\nHarap tambahkan minimal satu package!"));
             return;
         }
 
         const hasItems = formData.packages.some(pkg => pkg.items && pkg.items.length > 0);
         if (!hasItems) {
-            alert('❌ VALIDASI GAGAL:\nMinimal satu package harus berisi barang!');
+            alert(t("❌ VALIDASI GAGAL:\nMinimal satu package harus berisi barang!"));
             return;
         }
 
@@ -343,7 +345,7 @@ const PengajuanManagement = () => {
             }
 
             if (!src) {
-                alert('Tidak ada sumber dokumen untuk preview');
+                alert(t("Tidak ada sumber dokumen untuk preview"));
                 return;
             }
 
@@ -406,29 +408,29 @@ const PengajuanManagement = () => {
 
         // Validation
         if (editFormData.documentStatus === 'approved' && !editFormData.bcDocumentNumber.trim()) {
-            alert('❌ No. Dokumen Pabean wajib diisi untuk approval');
+            alert(t("❌ No. Dokumen Pabean wajib diisi untuk approval"));
             return;
         }
 
         // Outbound specific validation: require PIC (approver)
         if (isOutbound && editFormData.documentStatus === 'approved') {
             if (!editFormData.pic || !editFormData.pic.trim()) {
-                alert('❌ PIC/Approver wajib diisi untuk approval barang keluar');
+                alert(t("❌ PIC/Approver wajib diisi untuk approval barang keluar"));
                 return;
             }
             if (!editFormData.bcDocumentDate) {
-                alert('❌ Tanggal Dokumen Pabean wajib diisi untuk approval barang keluar');
+                alert(t("❌ Tanggal Dokumen Pabean wajib diisi untuk approval barang keluar"));
                 return;
             }
         }
 
         if (editFormData.documentStatus === 'rejected') {
             if (!editFormData.rejectionReason.trim()) {
-                alert('❌ Keterangan Penolakan wajib diisi untuk rejection');
+                alert(t("❌ Keterangan Penolakan wajib diisi untuk rejection"));
                 return;
             }
             if (!editFormData.rejectionDate) {
-                alert('❌ Tanggal Reject wajib diisi untuk rejection');
+                alert(t("❌ Tanggal Reject wajib diisi untuk rejection"));
                 return;
             }
         }
@@ -495,10 +497,10 @@ const PengajuanManagement = () => {
             }
 
             updateQuotation(editModal.pengajuan.id, updatedData);
-            alert('✅ Status pengajuan berhasil diupdate!');
+            alert(t("✅ Status pengajuan berhasil diupdate!"));
             setEditModal({ show: false, pengajuan: null });
         } else {
-            alert('❌ updateQuotation function not found');
+            alert(t("❌ updateQuotation function not found"));
         }
     };
 
@@ -545,7 +547,7 @@ const PengajuanManagement = () => {
                 console.log('✅ deleteQuotation result:', result);
 
                 if (result.success) {
-                    alert('✅ Pengajuan berhasil dihapus');
+                    alert(t("✅ Pengajuan berhasil dihapus"));
                     setEditModal({ show: false, pengajuan: null });
                 } else {
                     console.error('Delete failed:', result.error);
@@ -557,7 +559,7 @@ const PengajuanManagement = () => {
             }
         } else {
             console.error('❌ deleteQuotation function is not available in context');
-            alert('❌ Fungsi delete belum tersedia (function not found)');
+            alert(t("❌ Fungsi delete belum tersedia (function not found)"));
         }
     };
 
@@ -796,7 +798,7 @@ const PengajuanManagement = () => {
         }));
 
         if (packagesWithAvailable.length === 0) {
-            alert('❌ Tidak ada barang yang tersedia di gudang untuk pengajuan ini');
+            alert(t("❌ Tidak ada barang yang tersedia di gudang untuk pengajuan ini"));
             return;
         }
 
@@ -859,7 +861,7 @@ const PengajuanManagement = () => {
             .filter(pkg => pkg.items.length > 0);
 
         if (filteredPackages.length === 0) {
-            alert('⚠️ Tidak ada item yang dipilih. Pilih setidaknya 1 item untuk dikeluarkan.');
+            alert(t("⚠️ Tidak ada item yang dipilih. Pilih setidaknya 1 item untuk dikeluarkan."));
             return;
         }
 
@@ -986,8 +988,8 @@ const PengajuanManagement = () => {
         <div className="p-6 space-y-6" >
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text">Manajemen Pengajuan</h1>
-                    <p className="text-silver-dark mt-1">Pengajuan Layanan TPPB & Tracking Status Bea Cukai</p>
+                    <h1 className="text-3xl font-bold gradient-text">{t("Manajemen Pengajuan")}</h1>
+                    <p className="text-silver-dark mt-1">{t("Pengajuan Layanan TPPB & Tracking Status Bea Cukai")}</p>
                 </div>
                 {hasCreate && (
                     <Button 
@@ -1005,15 +1007,15 @@ const PengajuanManagement = () => {
             {/* Form */}
             {showForm && (
                 <form onSubmit={handleSubmit} className="glass-card p-6 rounded-lg space-y-6">
-                    <h3 className="text-lg font-semibold text-silver-light">Pengajuan Baru</h3>
+                    <h3 className="text-lg font-semibold text-silver-light">{t("Pengajuan Baru")}</h3>
 
                     {/* Submission Info */}
                     <div className="glass-card p-4 rounded-lg border-2 border-accent-blue bg-accent-blue/10">
-                        <h4 className="text-sm font-semibold text-silver-light mb-3">📋 Informasi Pengajuan</h4>
+                        <h4 className="text-sm font-semibold text-silver-light mb-3">{t("📋 Informasi Pengajuan")}</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-silver mb-2">
-                                    No. Pengajuan
+                                    {t("No. Pengajuan")}
                                 </label>
                                 <input
                                     type="text"
@@ -1024,7 +1026,7 @@ const PengajuanManagement = () => {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-silver mb-2">
-                                    Tanggal Pengajuan *
+                                    {t("Tanggal Pengajuan *")}
                                 </label>
                                 <input
                                     type="date"
@@ -1057,20 +1059,20 @@ const PengajuanManagement = () => {
 
                     {/* Tipe Pengajuan Section - NEW */}
                     <div className="glass-card p-4 rounded-lg border-2 border-accent-purple bg-accent-purple/10">
-                        <h4 className="text-sm font-semibold text-silver-light mb-3">📦 Tipe Pengajuan</h4>
+                        <h4 className="text-sm font-semibold text-silver-light mb-3">{t("📦 Tipe Pengajuan")}</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-silver mb-2">Tipe *</label>
+                                <label className="block text-sm font-medium text-silver mb-2">{t("Tipe *")}</label>
                                 <select
                                     value={formData.type}
                                     onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                                     className="w-full"
                                 >
-                                    <option value="inbound">Masuk (Inbound)</option>
-                                    <option value="outbound">Keluar (Outbound)</option>
+                                    <option value="inbound">{t("Masuk (Inbound)")}</option>
+                                    <option value="outbound">{t("Keluar (Outbound)")}</option>
                                 </select>
                                 <p className="text-xs text-silver-dark mt-1">
-                                    Pilih tipe pengajuan sesuai dengan alur barang (masuk atau keluar)
+                                    {t("Pilih tipe pengajuan sesuai dengan alur barang (masuk atau keluar)")}
                                 </p>
                             </div>
                         </div>
@@ -1078,17 +1080,17 @@ const PengajuanManagement = () => {
 
                     {/* BC Document, Owner & Shipper Section - NEW */}
                     <div className="glass-card p-4 rounded-lg border-2 border-accent-orange bg-accent-orange/10">
-                        <h4 className="text-sm font-semibold text-silver-light mb-3">📄 Dokumen BC & Pihak Terkait</h4>
+                        <h4 className="text-sm font-semibold text-silver-light mb-3">{t("📄 Dokumen BC & Pihak Terkait")}</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-silver mb-2">Jenis Dokumen BC *</label>
+                                <label className="block text-sm font-medium text-silver mb-2">{t("Jenis Dokumen BC *")}</label>
                                 <select
                                     required
                                     value={formData.bcDocType}
                                     onChange={(e) => setFormData({ ...formData, bcDocType: e.target.value })}
                                     className="w-full"
                                 >
-                                    <option value="">-- Pilih Jenis Dokumen BC --</option>
+                                    <option value="">{t("-- Pilih Jenis Dokumen BC --")}</option>
                                     {getFilteredBCCodes().map(bc => (
                                         <option key={bc.id} value={bc.code}>
                                             {bc.code} - {bc.name}
@@ -1096,7 +1098,7 @@ const PengajuanManagement = () => {
                                     ))}
                                 </select>
                                 <p className="text-xs text-silver-dark mt-1">
-                                    Pilih jenis dokumen Bea Cukai sesuai tipe pengajuan
+                                    {t("Pilih jenis dokumen Bea Cukai sesuai tipe pengajuan")}
                                 </p>
                             </div>
 
@@ -1106,7 +1108,7 @@ const PengajuanManagement = () => {
                                     {/* Source Pengajuan Dropdown */}
                                     <div className="md:col-span-2">
                                         <label className="block text-sm font-medium text-silver mb-2">
-                                            Pilih Pengajuan Masuk (Source) *
+                                            {t("Pilih Pengajuan Masuk (Source) *")}
                                         </label>
                                         <select
                                             required
@@ -1129,7 +1131,7 @@ const PengajuanManagement = () => {
                                             }}
                                             className="w-full"
                                         >
-                                            <option value="">-- Pilih Pengajuan Masuk yang Approved --</option>
+                                            <option value="">{t("-- Pilih Pengajuan Masuk yang Approved --")}</option>
                                             {getApprovedInboundPengajuan().map(p => (
                                                 <option key={p.id} value={p.id}>
                                                     {p.quotationNumber || p.quotation_number} - {getFullPartnerName(p.customer)} ({p.bcDocumentNumber || p.bc_document_number || 'No BC'})
@@ -1137,7 +1139,7 @@ const PengajuanManagement = () => {
                                             ))}
                                         </select>
                                         <p className="text-xs text-silver-dark mt-1">
-                                            Hanya pengajuan masuk yang sudah approved yang dapat dipilih
+                                            {t("Hanya pengajuan masuk yang sudah approved yang dapat dipilih")}
                                         </p>
                                     </div>
 
@@ -1146,7 +1148,7 @@ const PengajuanManagement = () => {
                                         <>
                                             <div>
                                                 <label className="block text-sm font-medium text-silver mb-2">
-                                                    No. Pengajuan Asal (Referensi)
+                                                    {t("No. Pengajuan Asal (Referensi)")}
                                                 </label>
                                                 <input
                                                     type="text"
@@ -1157,7 +1159,7 @@ const PengajuanManagement = () => {
                                             </div>
                                             <div>
                                                 <label className="block text-sm font-medium text-silver mb-2">
-                                                    No. Pabean Asal (Referensi)
+                                                    {t("No. Pabean Asal (Referensi)")}
                                                 </label>
                                                 <input
                                                     type="text"
@@ -1168,7 +1170,7 @@ const PengajuanManagement = () => {
                                             </div>
                                             <div>
                                                 <label className="block text-sm font-medium text-silver mb-2">
-                                                    Tanggal Pabean Asal
+                                                    {t("Tanggal Pabean Asal")}
                                                 </label>
                                                 <input
                                                     type="text"
@@ -1183,14 +1185,14 @@ const PengajuanManagement = () => {
                             )}
 
                             <div>
-                                <label className="block text-sm font-medium text-silver mb-2">Pemilik Barang *</label>
+                                <label className="block text-sm font-medium text-silver mb-2">{t("Pemilik Barang *")}</label>
                                 <select
                                     required
                                     value={formData.customer}
                                     onChange={(e) => setFormData({ ...formData, customer: e.target.value })}
                                     className="w-full"
                                 >
-                                    <option value="">-- Pilih Pelanggan --</option>
+                                    <option value="">{t("-- Pilih Pelanggan --")}</option>
                                     {ownerList.map(p => (
                                         <option key={p.id} value={p.partner_name}>
                                             {p.partner_name}
@@ -1198,19 +1200,19 @@ const PengajuanManagement = () => {
                                     ))}
                                 </select>
                                 <p className="text-xs text-silver-dark mt-1">
-                                    Pilih dari daftar customer yang sudah terdaftar
+                                    {t("Pilih dari daftar customer yang sudah terdaftar")}
                                 </p>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-silver mb-2">Shipper *</label>
+                                <label className="block text-sm font-medium text-silver mb-2">{t("Shipper *")}</label>
                                 <select
                                     required
                                     value={formData.shipper}
                                     onChange={(e) => setFormData({ ...formData, shipper: e.target.value })}
                                     className="w-full"
                                 >
-                                    <option value="">-- Pilih Shipper --</option>
+                                    <option value="">{t("-- Pilih Shipper --")}</option>
                                     {shipperList.map(p => (
                                         <option key={p.id} value={p.partner_name}>
                                             {p.partner_name}
@@ -1218,7 +1220,7 @@ const PengajuanManagement = () => {
                                     ))}
                                 </select>
                                 <p className="text-xs text-silver-dark mt-1">
-                                    Pengirim/vendor yang mengirimkan barang
+                                    {t("Pengirim/vendor yang mengirimkan barang")}
                                 </p>
                             </div>
                         </div>
@@ -1227,47 +1229,47 @@ const PengajuanManagement = () => {
                     {/* Origin, Destination & Receiver */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-silver mb-2">Asal</label>
+                            <label className="block text-sm font-medium text-silver mb-2">{t("Asal")}</label>
                             <input
                                 type="text"
                                 value={formData.origin}
                                 onChange={(e) => setFormData({ ...formData, origin: e.target.value })}
-                                placeholder="Negara/Kota asal"
+                                placeholder={t("Negara/Kota asal")}
                                 className="w-full"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-silver mb-2">Tujuan</label>
+                            <label className="block text-sm font-medium text-silver mb-2">{t("Tujuan")}</label>
                             <input
                                 type="text"
                                 value={formData.destination}
                                 onChange={(e) => setFormData({ ...formData, destination: e.target.value })}
-                                placeholder="Negara/Kota tujuan"
+                                placeholder={t("Negara/Kota tujuan")}
                                 className="w-full"
                             />
                         </div>
 
                         <div>
                             <label className="block text-sm font-medium text-silver mb-2">
-                                Penerima {formData.type === 'outbound' && <span className="text-accent-orange">*</span>}
+                                {t("Penerima")} {formData.type === 'outbound' && <span className="text-accent-orange">*</span>}
                             </label>
                             <input
                                 type="text"
                                 value={formData.receiver}
                                 onChange={(e) => setFormData({ ...formData, receiver: e.target.value })}
-                                placeholder="Nama penerima barang"
+                                placeholder={t("Nama penerima barang")}
                                 className="w-full"
                             />
                             {formData.type === 'outbound' && (
-                                <p className="text-xs text-silver-dark mt-1">Nama penerima untuk pengajuan barang keluar</p>
+                                <p className="text-xs text-silver-dark mt-1">{t("Nama penerima untuk pengajuan barang keluar")}</p>
                             )}
                         </div>
                     </div>
 
                     {/* BL & Invoice Information */}
                     <div className="glass-card p-4 rounded-lg border-2 border-accent-green bg-accent-green/10">
-                        <h4 className="text-sm font-semibold text-silver-light mb-3">📄 Informasi BL & Invoice</h4>
+                        <h4 className="text-sm font-semibold text-silver-light mb-3">{t("📄 Informasi BL & Invoice")}</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-silver mb-2">No. BL</label>
@@ -1275,13 +1277,13 @@ const PengajuanManagement = () => {
                                     type="text"
                                     value={formData.blNumber}
                                     onChange={(e) => setFormData({ ...formData, blNumber: e.target.value })}
-                                    placeholder="Bill of Lading Number"
+                                    placeholder={t("Bill of Lading Number")}
                                     className="w-full"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-silver mb-2">Tanggal BL</label>
+                                <label className="block text-sm font-medium text-silver mb-2">{t("Tanggal BL")}</label>
                                 <input
                                     type="date"
                                     value={formData.blDate}
@@ -1291,18 +1293,18 @@ const PengajuanManagement = () => {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-silver mb-2">No. Invoice</label>
+                                <label className="block text-sm font-medium text-silver mb-2">{t("No. Invoice")}</label>
                                 <input
                                     type="text"
                                     value={formData.invoiceNumber}
                                     onChange={(e) => setFormData({ ...formData, invoiceNumber: e.target.value })}
-                                    placeholder="Invoice Number"
+                                    placeholder={t("Invoice Number")}
                                     className="w-full"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-silver mb-2">Nilai Invoice</label>
+                                <label className="block text-sm font-medium text-silver mb-2">{t("Nilai Invoice")}</label>
                                 <input
                                     type="number"
                                     step="0.01"
@@ -1314,23 +1316,23 @@ const PengajuanManagement = () => {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-silver mb-2">Kurs</label>
+                                <label className="block text-sm font-medium text-silver mb-2">{t("Kurs")}</label>
                                 <select
                                     value={formData.invoiceCurrency}
                                     onChange={(e) => setFormData({ ...formData, invoiceCurrency: e.target.value })}
                                     className="w-full"
                                 >
-                                    <option value="IDR">IDR - Rupiah</option>
-                                    <option value="USD">USD - US Dollar</option>
-                                    <option value="EUR">EUR - Euro</option>
-                                    <option value="SGD">SGD - Singapore Dollar</option>
-                                    <option value="JPY">JPY - Japanese Yen</option>
-                                    <option value="CNY">CNY - Chinese Yuan</option>
+                                    <option value="IDR">{t("IDR - Rupiah")}</option>
+                                    <option value="USD">{t("USD - US Dollar")}</option>
+                                    <option value="EUR">{t("EUR - Euro")}</option>
+                                    <option value="SGD">{t("SGD - Singapore Dollar")}</option>
+                                    <option value="JPY">{t("JPY - Japanese Yen")}</option>
+                                    <option value="CNY">{t("CNY - Chinese Yuan")}</option>
                                 </select>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-silver mb-2">Rate Kurs</label>
+                                <label className="block text-sm font-medium text-silver mb-2">{t("Rate Kurs")}</label>
                                 <input
                                     type="number"
                                     step="0.0001"
@@ -1342,7 +1344,7 @@ const PengajuanManagement = () => {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-silver mb-2">Tanggal Rate Kurs</label>
+                                <label className="block text-sm font-medium text-silver mb-2">{t("Tanggal Rate Kurs")}</label>
                                 <input
                                     type="date"
                                     value={formData.exchangeRateDate}
@@ -1356,9 +1358,9 @@ const PengajuanManagement = () => {
                     {/* Warehouse Selector for Outbound */}
                     {formData.type === 'outbound' && (
                         <div className="glass-card p-4 rounded-lg border-2 border-accent-purple bg-accent-purple/10">
-                            <h4 className="text-sm font-semibold text-silver-light mb-3">📦 Pilih Barang dari Gudang</h4>
+                            <h4 className="text-sm font-semibold text-silver-light mb-3">{t("📦 Pilih Barang dari Gudang")}</h4>
                             <p className="text-xs text-silver-dark mb-3">
-                                Untuk pengajuan keluar, pilih barang yang sudah ada di gudang dari pengajuan inbound yang sudah approved.
+                                {t("Untuk pengajuan keluar, pilih barang yang sudah ada di gudang dari pengajuan inbound yang sudah approved.")}
                             </p>
 
                             {sourcePengajuanId ? (
@@ -1368,16 +1370,16 @@ const PengajuanManagement = () => {
                                             <div className="flex items-center gap-2">
                                                 <Package className="w-5 h-5 text-accent-green" />
                                                 <span className="text-sm text-silver">
-                                                    Sumber: <span className="font-medium text-accent-green">{formData.sourcePengajuanNumber}</span>
+                                                    {t("Sumber:")} <span className="font-medium text-accent-green">{formData.sourcePengajuanNumber}</span>
                                                 </span>
                                             </div>
                                             {formData.sourceBcDocumentNumber && (
                                                 <span className="text-xs text-silver ml-7">
-                                                    Ref BC Masuk: <span className="text-accent-blue">{formData.sourceBcDocumentNumber}</span> ({formData.sourceBcDocumentDate ? new Date(formData.sourceBcDocumentDate).toLocaleDateString('id-ID') : '-'})
+                                                    {t("Ref BC Masuk:")} <span className="text-accent-blue">{formData.sourceBcDocumentNumber}</span> ({formData.sourceBcDocumentDate ? new Date(formData.sourceBcDocumentDate).toLocaleDateString('id-ID') : '-'})
                                                 </span>
                                             )}
                                             <span className="text-xs text-silver-dark ml-7">
-                                                ({formData.packages?.length || 0} package, {formData.packages?.reduce((sum, pkg) => sum + (pkg.items?.length || 0), 0) || 0} item)
+                                                ({formData.packages?.length || 0} {t("package,")} {formData.packages?.reduce((sum, pkg) => sum + (pkg.items?.length || 0), 0) || 0} {t("item)")}
                                             </span>
                                         </div>
                                         <div className="flex gap-2">
@@ -1388,7 +1390,7 @@ const PengajuanManagement = () => {
                                                 icon={Edit2}
                                                 onClick={handleEditItemSelection}
                                             >
-                                                Edit Pilihan
+                                                {t("Edit Pilihan")}
                                             </Button>
                                             <Button
                                                 type="button"
@@ -1399,12 +1401,12 @@ const PengajuanManagement = () => {
                                                     setFormData(prev => ({ ...prev, packages: [], sourcePengajuanId: null, sourcePengajuanNumber: null }));
                                                 }}
                                             >
-                                                Ganti
+                                                {t("Ganti")}
                                             </Button>
                                         </div>
                                     </div>
                                     <p className="text-xs text-silver-dark italic">
-                                        💡 Klik "Edit Pilihan" untuk menyesuaikan item atau quantity yang akan dikeluarkan
+                                        {t("💡 Klik \"Edit Pilihan\" untuk menyesuaikan item atau quantity yang akan dikeluarkan")}
                                     </p>
                                 </div>
                             ) : (
@@ -1414,7 +1416,7 @@ const PengajuanManagement = () => {
                                     icon={Warehouse}
                                     onClick={() => setShowWarehouseSelector(true)}
                                 >
-                                    Pilih dari Gudang / Input Stok
+                                    {t("Pilih dari Gudang / Input Stok")}
                                 </Button>
                             )}
                         </div>
@@ -1434,7 +1436,7 @@ const PengajuanManagement = () => {
                     {formData.type === 'outbound' && !sourcePengajuanId && (
                         <div className="glass-card p-6 rounded-lg border-2 border-dashed border-dark-border text-center">
                             <Warehouse className="w-12 h-12 mx-auto mb-3 text-silver-dark opacity-50" />
-                            <p className="text-silver-dark">Klik "Pilih dari Gudang" di atas untuk memilih barang yang akan dikeluarkan</p>
+                            <p className="text-silver-dark">{t("Klik \"Pilih dari Gudang\" di atas untuk memilih barang yang akan dikeluarkan")}</p>
                         </div>
                     )}
 
@@ -1447,11 +1449,11 @@ const PengajuanManagement = () => {
 
                     {/* Notes */}
                     <div>
-                        <label className="block text-sm font-medium text-silver mb-2">Catatan</label>
+                        <label className="block text-sm font-medium text-silver mb-2">{t("Catatan")}</label>
                         <textarea
                             value={formData.notes}
                             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                            placeholder="Catatan tambahan..."
+                            placeholder={t("Catatan tambahan...")}
                             rows={3}
                             className="w-full"
                         />
@@ -1478,9 +1480,9 @@ const PengajuanManagement = () => {
                         <div className="flex items-center justify-between mb-4">
                             <div>
                                 <h3 className="text-xl font-semibold text-accent-blue flex items-center gap-2">
-                                    📥 Pengajuan Masuk (Inbound)
+                                    {t("📥 Pengajuan Masuk (Inbound)")}
                                 </h3>
-                                <p className="text-xs text-silver-dark mt-1">Pengajuan barang masuk ke TPPB</p>
+                                <p className="text-xs text-silver-dark mt-1">{t("Pengajuan barang masuk ke TPPB")}</p>
                             </div>
                             <Button
                                 onClick={handleExportCSV}
@@ -1488,28 +1490,28 @@ const PengajuanManagement = () => {
                                 icon={Download}
                                 size="sm"
                             >
-                                Export CSV
+                                {t("Export CSV")}
                             </Button>
                         </div>
 
                         {quotations.filter(q => q.type === 'inbound').length === 0 ? (
                             <div className="text-center py-8 text-silver-dark">
                                 <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                                <p>Belum ada pengajuan masuk</p>
+                                <p>{t("Belum ada pengajuan masuk")}</p>
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="w-full">
                                     <thead className="bg-accent-blue">
                                         <tr>
-                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">No. Pengajuan</th>
-                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Tanggal</th>
-                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap w-80">Pemilik Barang</th>
-                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Dokumen BC</th>
-                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Jumlah Barang</th>
-                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">No. Dokumen Pabean</th>
-                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Tgl Approval</th>
-                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Status Dokumen</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">{t("No. Pengajuan")}</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">{t("Tanggal")}</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap w-80">{t("Pemilik Barang")}</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">{t("Dokumen BC")}</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">{t("Jumlah Barang")}</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">{t("No. Dokumen Pabean")}</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">{t("Tgl Approval")}</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">{t("Status Dokumen")}</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-dark-border">
@@ -1574,9 +1576,9 @@ const PengajuanManagement = () => {
                         <div className="flex items-center justify-between mb-4">
                             <div>
                                 <h3 className="text-xl font-semibold text-accent-purple flex items-center gap-2">
-                                    📤 Pengajuan Keluar (Outbound)
+                                    {t("📤 Pengajuan Keluar (Outbound)")}
                                 </h3>
-                                <p className="text-xs text-silver-dark mt-1">Pengajuan barang keluar dari TPPB</p>
+                                <p className="text-xs text-silver-dark mt-1">{t("Pengajuan barang keluar dari TPPB")}</p>
                             </div>
                             <Button
                                 onClick={handleExportCSV}
@@ -1584,28 +1586,28 @@ const PengajuanManagement = () => {
                                 icon={Download}
                                 size="sm"
                             >
-                                Export CSV
+                                {t("Export CSV")}
                             </Button>
                         </div>
 
                         {quotations.filter(q => q.type === 'outbound').length === 0 ? (
                             <div className="text-center py-8 text-silver-dark">
                                 <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                                <p>Belum ada pengajuan keluar</p>
+                                <p>{t("Belum ada pengajuan keluar")}</p>
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="w-full">
                                     <thead className="bg-accent-purple">
                                         <tr>
-                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">No. Pengajuan</th>
-                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Tanggal</th>
-                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap w-80">Pemilik Barang</th>
-                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Dokumen BC</th>
-                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Jumlah Barang</th>
-                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">No. Dokumen Pabean</th>
-                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Tgl Approval</th>
-                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">Status Dokumen</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">{t("No. Pengajuan")}</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">{t("Tanggal")}</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap w-80">{t("Pemilik Barang")}</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">{t("Dokumen BC")}</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">{t("Jumlah Barang")}</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">{t("No. Dokumen Pabean")}</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">{t("Tgl Approval")}</th>
+                                            <th className="px-4 py-2 text-left text-sm font-bold text-white whitespace-nowrap">{t("Status Dokumen")}</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-dark-border">
@@ -1673,17 +1675,17 @@ const PengajuanManagement = () => {
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
                         <div className="glass-card p-6 rounded-lg max-w-md w-full mx-4">
                             <h3 className="text-lg font-semibold text-silver-light mb-4">
-                                Konfirmasi Pendaftaran
+                                {t("Konfirmasi Pendaftaran")}
                             </h3>
                             <p className="text-silver mb-6">
-                                Apakah Anda yakin ingin mengirim pengajuan ini ke Bea Cukai?
+                                {t("Apakah Anda yakin ingin mengirim pengajuan ini ke Bea Cukai?")}
                             </p>
                             <div className="flex gap-3 justify-end">
                                 <Button variant="secondary" onClick={handleCancelDialog}>
-                                    Batal
+                                    {t("Batal")}
                                 </Button>
                                 <Button onClick={handleConfirmAction} icon={CheckCircle}>
-                                    Ya, Kirim
+                                    {t("Ya, Kirim")}
                                 </Button>
                             </div>
                         </div>
@@ -1700,7 +1702,7 @@ const PengajuanManagement = () => {
                             <div>
                                 <h2 className="text-xl font-bold text-silver-light flex items-center gap-2">
                                     <FileText className="w-5 h-5" />
-                                    Detail Pengajuan
+                                    {t("Detail Pengajuan")}
                                 </h2>
                                 <p className="text-sm text-silver-dark mt-1">
                                     {selectedPengajuan.quotationNumber || selectedPengajuan.quotation_number}
@@ -1719,41 +1721,41 @@ const PengajuanManagement = () => {
                             {/* Info Grid */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="text-xs text-silver-dark font-medium">No. Pengajuan</label>
+                                    <label className="text-xs text-silver-dark font-medium">{t("No. Pengajuan")}</label>
                                     <p className="text-sm text-silver mt-1 font-semibold">
                                         {selectedPengajuan.quotationNumber || selectedPengajuan.quotation_number}
                                     </p>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-silver-dark font-medium">Tanggal Pengajuan</label>
+                                    <label className="text-xs text-silver-dark font-medium">{t("Tanggal Pengajuan")}</label>
                                     <p className="text-sm text-silver mt-1">
                                         {new Date(selectedPengajuan.submissionDate || selectedPengajuan.submission_date).toLocaleDateString('id-ID')}
                                     </p>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-silver-dark font-medium">Pemilik Barang</label>
+                                    <label className="text-xs text-silver-dark font-medium">{t("Pemilik Barang")}</label>
                                     <p className="text-sm text-silver mt-1">{getFullPartnerName(selectedPengajuan.customer)}</p>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-silver-dark font-medium">Shipper</label>
+                                    <label className="text-xs text-silver-dark font-medium">{t("Shipper")}</label>
                                     <p className="text-sm text-silver mt-1">{getFullPartnerName(selectedPengajuan.shipper)}</p>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-silver-dark font-medium">Jenis Dokumen BC</label>
+                                    <label className="text-xs text-silver-dark font-medium">{t("Jenis Dokumen BC")}</label>
                                     <p className="text-sm text-silver mt-1">{selectedPengajuan.bcDocType || selectedPengajuan.bc_document_type || '-'}</p>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-silver-dark font-medium">No. Dokumen Pabean</label>
+                                    <label className="text-xs text-silver-dark font-medium">{t("No. Dokumen Pabean")}</label>
                                     <p className="text-sm text-accent-purple mt-1 font-semibold">
                                         {selectedPengajuan.bcDocumentNumber || selectedPengajuan.bc_document_number || '-'}
                                     </p>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-silver-dark font-medium">Tujuan</label>
+                                    <label className="text-xs text-silver-dark font-medium">{t("Tujuan")}</label>
                                     <p className="text-sm text-silver mt-1">{selectedPengajuan.destination || '-'}</p>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-silver-dark font-medium">Status Dokumen</label>
+                                    <label className="text-xs text-silver-dark font-medium">{t("Status Dokumen")}</label>
                                     <p className="text-sm mt-1">
                                         <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
                                             (selectedPengajuan.documentStatus || selectedPengajuan.document_status) === 'approved'
@@ -1771,16 +1773,16 @@ const PengajuanManagement = () => {
 
                             {/* Dokumen Pendukung Section */}
                             <div>
-                                <h3 className="text-lg font-bold text-silver mb-3">📑 Dokumen Pendukung</h3>
+                                <h3 className="text-lg font-bold text-silver mb-3">{t("📑 Dokumen Pendukung")}</h3>
                                 {[...safeDocsArray(selectedPengajuan.documents), ...(selectedPengajuan.bcSupportingDocuments || [])].length === 0 ? (
-                                    <p className="text-silver-dark text-sm">Tidak ada dokumen.</p>
+                                    <p className="text-silver-dark text-sm">{t("Tidak ada dokumen.")}</p>
                                 ) : (
                                     <table className="w-full text-xs">
                                         <thead>
                                             <tr>
-                                                <th className="text-left">Nama</th>
-                                                <th className="text-left">Tanggal</th>
-                                                <th className="text-left">Aksi</th>
+                                                <th className="text-left">{t("Nama")}</th>
+                                                <th className="text-left">{t("Tanggal")}</th>
+                                                <th className="text-left">{t("Aksi")}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -1790,8 +1792,8 @@ const PengajuanManagement = () => {
                                                     <td className="text-left">{doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleDateString('id-ID') : '-'}</td>
                                                     <td className="text-left">
                                                         <div className="flex items-center gap-2">
-                                                            <Button size="xs" onClick={() => handlePreviewDocument(doc)}>Preview</Button>
-                                                            <Button size="xs" variant="secondary" onClick={() => handleDownloadDocument(doc)}>Download</Button>
+                                                            <Button size="xs" onClick={() => handlePreviewDocument(doc)}>{t("Preview")}</Button>
+                                                            <Button size="xs" variant="secondary" onClick={() => handleDownloadDocument(doc)}>{t("Download")}</Button>
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -1803,21 +1805,21 @@ const PengajuanManagement = () => {
 
                             {/* Packages Section */}
                             <div>
-                                <h3 className="text-lg font-bold text-silver mb-3">📦 Detail Barang</h3>
+                                <h3 className="text-lg font-bold text-silver mb-3">{t("📦 Detail Barang")}</h3>
                                 <div className="space-y-3">
                                     {(selectedPengajuan.packages || []).map((pkg, pkgIdx) => (
                                         <div key={pkgIdx} className="glass-card p-3 rounded-lg border border-dark-border">
                                             <div className="font-semibold text-silver mb-2 text-sm">
-                                                Package: {pkg.packageNumber}
+                                                {t("Package:")} {pkg.packageNumber}
                                             </div>
                                             <div className="overflow-x-auto">
                                                 <table className="w-full text-xs">
                                                     <thead className="bg-dark-surface">
                                                         <tr>
-                                                            <th className="px-2 py-1 text-left text-xs font-bold text-silver">Kode</th>
-                                                            <th className="px-2 py-1 text-left text-xs font-bold text-silver">Nama Item</th>
-                                                            <th className="px-2 py-1 text-center text-xs font-bold text-silver">Qty</th>
-                                                            <th className="px-2 py-1 text-center text-xs font-bold text-silver">Unit</th>
+                                                            <th className="px-2 py-1 text-left text-xs font-bold text-silver">{t("Kode")}</th>
+                                                            <th className="px-2 py-1 text-left text-xs font-bold text-silver">{t("Nama Item")}</th>
+                                                            <th className="px-2 py-1 text-center text-xs font-bold text-silver">{t("Qty")}</th>
+                                                            <th className="px-2 py-1 text-center text-xs font-bold text-silver">{t("Unit")}</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
@@ -1841,19 +1843,19 @@ const PengajuanManagement = () => {
                             <div className="glass-card p-4 bg-accent-purple/10 border-2 border-accent-purple rounded-lg">
                                 <div className="grid grid-cols-3 gap-4 text-sm">
                                     <div>
-                                        <p className="text-xs text-silver-dark">Total Package</p>
+                                        <p className="text-xs text-silver-dark">{t("Total Package")}</p>
                                         <p className="text-lg font-bold text-accent-purple">
                                             {selectedPengajuan.packages?.length || 0}
                                         </p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-silver-dark">Total Item</p>
+                                        <p className="text-xs text-silver-dark">{t("Total Item")}</p>
                                         <p className="text-lg font-bold text-accent-purple">
                                             {selectedPengajuan.packages?.reduce((sum, pkg) => sum + (pkg.items?.length || 0), 0) || 0}
                                         </p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-silver-dark">Total Quantity</p>
+                                        <p className="text-xs text-silver-dark">{t("Total Quantity")}</p>
                                         <p className="text-lg font-bold text-accent-purple">
                                             {selectedPengajuan.packages?.reduce((sum, pkg) => 
                                                 sum + pkg.items?.reduce((itemSum, item) => itemSum + (item.quantity || 0), 0), 0
@@ -1870,7 +1872,7 @@ const PengajuanManagement = () => {
                                 variant="secondary" 
                                 onClick={() => handleCloseDetailModal()}
                             >
-                                Tutup
+                                {t("Tutup")}
                             </Button>
                             <div className="flex gap-2">
                                 <Button
@@ -1881,7 +1883,7 @@ const PengajuanManagement = () => {
                                         handleCloseDetailModal();
                                     }}
                                 >
-                                    Edit Form
+                                    {t("Edit Form")}
                                 </Button>
                                 <Button
                                     variant="secondary"
@@ -1892,7 +1894,7 @@ const PengajuanManagement = () => {
                                     }}
                                     className="hover:bg-red-500/20 hover:text-red-400"
                                 >
-                                    Hapus
+                                    {t("Hapus")}
                                 </Button>
                                 <Button
                                     variant="primary"
@@ -1902,7 +1904,7 @@ const PengajuanManagement = () => {
                                         handleCloseDetailModal();
                                     }}
                                 >
-                                    Edit Status
+                                    {t("Edit Status")}
                                 </Button>
                             </div>
                         </div>
@@ -1916,7 +1918,7 @@ const PengajuanManagement = () => {
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
                         <div className="glass-card rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
                             <div className="sticky top-0 bg-dark-surface p-6 border-b border-dark-border z-10 flex justify-between items-center">
-                                <h2 className="text-xl font-bold gradient-text">Edit Status Pengajuan</h2>
+                                <h2 className="text-xl font-bold gradient-text">{t("Edit Status Pengajuan")}</h2>
                                 <button onClick={handleCancelEdit} className="text-silver-dark hover:text-white">
                                     <X className="w-6 h-6" />
                                 </button>
@@ -1925,32 +1927,32 @@ const PengajuanManagement = () => {
                             <div className="p-6 space-y-6">
                                 {/* Summary */}
                                 <div className="glass-card p-4 rounded-lg bg-accent-blue/10">
-                                    <h3 className="text-sm font-semibold text-silver-light mb-3">📋 Ringkasan Pengajuan</h3>
+                                    <h3 className="text-sm font-semibold text-silver-light mb-3">{t("📋 Ringkasan Pengajuan")}</h3>
                                     <div className="grid grid-cols-2 gap-3 text-sm">
                                         <div>
-                                            <p className="text-silver-dark">No. Pendaftaran</p>
+                                            <p className="text-silver-dark">{t("No. Pendaftaran")}</p>
                                             <p className="text-silver-light font-medium">{editModal.pengajuan.quotationNumber || editModal.pengajuan.id}</p>
                                         </div>
                                         <div>
-                                            <p className="text-silver-dark">Tanggal</p>
+                                            <p className="text-silver-dark">{t("Tanggal")}</p>
                                             <p className="text-silver-light">{new Date(editModal.pengajuan.submissionDate || editModal.pengajuan.date).toLocaleDateString('id-ID')}</p>
                                         </div>
                                         <div>
-                                            <p className="text-silver-dark">Customer</p>
+                                            <p className="text-silver-dark">{t("Customer")}</p>
                                             <p className="text-silver-light font-medium">{getFullPartnerName(editModal.pengajuan.customer)}</p>
                                         </div>
                                         <div>
-                                            <p className="text-silver-dark">BC Document</p>
+                                            <p className="text-silver-dark">{t("BC Document")}</p>
                                             <p className="text-silver-light">{editModal.pengajuan.bcDocType}</p>
                                         </div>
                                         <div>
-                                            <p className="text-silver-dark">Package</p>
-                                            <p className="text-silver-light">{editModal.pengajuan.packages?.length || 0} package</p>
+                                            <p className="text-silver-dark">{t("Package")}</p>
+                                            <p className="text-silver-light">{editModal.pengajuan.packages?.length || 0} {t("package")}</p>
                                         </div>
                                         <div>
-                                            <p className="text-silver-dark">Total Items</p>
+                                            <p className="text-silver-dark">{t("Total Items")}</p>
                                             <p className="text-silver-light">
-                                                {editModal.pengajuan.packages?.reduce((sum, pkg) => sum + (pkg.items?.length || 0), 0) || 0} item
+                                                {editModal.pengajuan.packages?.reduce((sum, pkg) => sum + (pkg.items?.length || 0), 0) || 0} {t("item")}
                                             </p>
                                         </div>
                                     </div>
@@ -1958,14 +1960,14 @@ const PengajuanManagement = () => {
                                     {/* Source Reference for Outbound */}
                                     {editModal.pengajuan.type === 'outbound' && editModal.pengajuan.sourcePengajuanNumber && (
                                         <div className="mt-3 pt-3 border-t border-dark-border">
-                                            <p className="text-xs text-accent-purple font-semibold mb-2">📥 Referensi Pengajuan Masuk:</p>
+                                            <p className="text-xs text-accent-purple font-semibold mb-2">{t("📥 Referensi Pengajuan Masuk:")}</p>
                                             <div className="grid grid-cols-2 gap-2 text-xs">
                                                 <div>
-                                                    <p className="text-silver-dark">No. Pengajuan Asal</p>
+                                                    <p className="text-silver-dark">{t("No. Pengajuan Asal")}</p>
                                                     <p className="text-silver-light">{editModal.pengajuan.sourcePengajuanNumber || '-'}</p>
                                                 </div>
                                                 <div>
-                                                    <p className="text-silver-dark">No. Pabean Asal</p>
+                                                    <p className="text-silver-dark">{t("No. Pabean Asal")}</p>
                                                     <p className="text-silver-light">{editModal.pengajuan.sourceBcDocumentNumber || '-'}</p>
                                                 </div>
                                             </div>
@@ -1975,11 +1977,11 @@ const PengajuanManagement = () => {
                                     <div className="mt-3 pt-3 border-t border-dark-border text-right">
                                         {(editModal.pengajuan.documentStatus || editModal.pengajuan.document_status) === 'approved' ? (
                                             <p className="text-xs text-amber-400 italic">
-                                                ⚠️ Dokumen approved tidak dapat diedit. Hanya bisa dihapus jika perlu.
+                                                {t("⚠️ Dokumen approved tidak dapat diedit. Hanya bisa dihapus jika perlu.")}
                                             </p>
                                         ) : (
                                             <Button size="sm" variant="secondary" onClick={() => handleFullEdit(editModal.pengajuan)} icon={Edit2}>
-                                                Edit Detail Data
+                                                {t("Edit Detail Data")}
                                             </Button>
                                         )}
                                     </div>
@@ -1999,7 +2001,7 @@ const PengajuanManagement = () => {
                                     />
                                     {editModal.pengajuan.type === 'outbound' && (
                                         <p className="text-xs text-accent-purple mt-1">
-                                            ⚠️ Ini adalah nomor BC baru untuk barang keluar, berbeda dari BC masuk
+                                            {t("⚠️ Ini adalah nomor BC baru untuk barang keluar, berbeda dari BC masuk")}
                                         </p>
                                     )}
                                 </div>
@@ -2007,7 +2009,7 @@ const PengajuanManagement = () => {
                                 {/* BC Document Date */}
                                 <div>
                                     <label className="block text-sm font-medium text-silver mb-2">
-                                        Tanggal Dokumen Pabean
+                                        {t("Tanggal Dokumen Pabean")}
                                     </label>
                                     <input
                                         type="date"
@@ -2028,16 +2030,16 @@ const PengajuanManagement = () => {
                                 {/* Status Selection */}
                                 <div>
                                     <label className="block text-sm font-medium text-silver mb-2">
-                                        Status Dokumen *
+                                        {t("Status Dokumen *")}
                                     </label>
                                     <select
                                         value={editFormData.documentStatus}
                                         onChange={(e) => setEditFormData({ ...editFormData, documentStatus: e.target.value })}
                                         className="w-full"
                                     >
-                                        <option value="pengajuan">Pendaftaran</option>
-                                        <option value="approved">Approved</option>
-                                        <option value="rejected">Rejected</option>
+                                        <option value="pengajuan">{t("Pendaftaran")}</option>
+                                        <option value="approved">{t("Approved")}</option>
+                                        <option value="rejected">{t("Rejected")}</option>
                                     </select>
                                 </div>
 
@@ -2045,7 +2047,7 @@ const PengajuanManagement = () => {
                                 {editFormData.documentStatus === 'approved' && (
                                     <div>
                                         <label className="block text-sm font-medium text-accent-green mb-2">
-                                            Tanggal Approval (Manual) *
+                                            {t("Tanggal Approval (Manual) *")}
                                         </label>
                                         <input
                                             type="date"
@@ -2055,20 +2057,20 @@ const PengajuanManagement = () => {
                                             className={`w-full border-accent-green focus:ring-accent-green ${(editModal.pengajuan.documentStatus || editModal.pengajuan.document_status) === 'approved' ? 'bg-dark-surface/50 cursor-not-allowed opacity-70' : ''}`}
                                             disabled={(editModal.pengajuan.documentStatus || editModal.pengajuan.document_status) === 'approved'}
                                         />
-                                        <p className="text-xs text-silver-dark mt-1">Tanggal ini akan digunakan sebagai tanggal masuk barang di sistem.</p>
+                                        <p className="text-xs text-silver-dark mt-1">{t("Tanggal ini akan digunakan sebagai tanggal masuk barang di sistem.")}</p>
                                     </div>
                                 )}
 
                                 {/* PIC Field */}
                                 <div>
                                     <label className="block text-sm font-medium text-silver mb-2">
-                                        PIC (Person In Charge)
+                                        {t("PIC (Person In Charge)")}
                                     </label>
                                     <input
                                         type="text"
                                         value={editFormData.pic}
                                         onChange={(e) => setEditFormData({ ...editFormData, pic: e.target.value })}
-                                        placeholder="Nama PIC yang menangani pendaftaran"
+                                        placeholder={t("Nama PIC yang menangani pendaftaran")}
                                         className="w-full"
                                     />
                                 </div>
@@ -2078,7 +2080,7 @@ const PengajuanManagement = () => {
                                     <>
                                         <div>
                                             <label className="block text-sm font-medium text-silver mb-2">
-                                                Tanggal Reject *
+                                                {t("Tanggal Reject *")}
                                             </label>
                                             <input
                                                 type="date"
@@ -2089,12 +2091,12 @@ const PengajuanManagement = () => {
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium text-silver mb-2">
-                                                Keterangan Penolakan *
+                                                {t("Keterangan Penolakan *")}
                                             </label>
                                             <textarea
                                                 value={editFormData.rejectionReason}
                                                 onChange={(e) => setEditFormData({ ...editFormData, rejectionReason: e.target.value })}
-                                                placeholder="Jelaskan alasan penolakan..."
+                                                placeholder={t("Jelaskan alasan penolakan...")}
                                                 rows={3}
                                                 className="w-full"
                                             />
@@ -2111,7 +2113,7 @@ const PengajuanManagement = () => {
                                             icon={Trash2}
                                             className="bg-red-500/10 text-red-400 hover:bg-red-500/20 border-red-500/20"
                                         >
-                                            Hapus
+                                            {t("Hapus")}
                                         </Button>
                                     )}
 
@@ -2126,7 +2128,7 @@ const PengajuanManagement = () => {
                                                 icon={ArrowRight}
                                                 className="bg-accent-purple hover:bg-accent-purple/80"
                                             >
-                                                Ajukan Barang Keluar
+                                                {t("Ajukan Barang Keluar")}
                                             </Button>
                                         )}
 
@@ -2139,7 +2141,7 @@ const PengajuanManagement = () => {
                                                     onClick={() => {
                                                         const status = (editModal.pengajuan.documentStatus || editModal.pengajuan.document_status);
                                                         if (status !== 'approved') {
-                                                            alert('Proses outbound hanya dapat dilakukan jika pengajuan berstatus APPROVED');
+                                                            alert(t("Proses outbound hanya dapat dilakukan jika pengajuan berstatus APPROVED"));
                                                             return;
                                                         }
                                                         // Navigate to OutboundInventory to confirm item exit
@@ -2149,17 +2151,17 @@ const PengajuanManagement = () => {
                                                     icon={Package}
                                                     className="bg-accent-orange hover:bg-accent-orange/80"
                                                 >
-                                                    Proses Barang Keluar
+                                                    {t("Proses Barang Keluar")}
                                                 </Button>
                                         )}
 
                                     <div className="flex gap-3 mt-4 sm:mt-0 sm:ml-auto">
                                         <Button variant="secondary" onClick={handleCancelEdit} className="w-full sm:w-auto">
-                                            Batal
+                                            {t("Batal")}
                                         </Button>
                                         {hasEdit && (
                                             <Button onClick={handleSaveEdit} icon={CheckCircle} className="w-full sm:w-auto text-sm whitespace-nowrap px-3 sm:px-4">
-                                                Simpan Perubahan
+                                                {t("Simpan Perubahan")}
                                             </Button>
                                         )}
                                     </div>
@@ -2175,18 +2177,18 @@ const PengajuanManagement = () => {
                 deleteConfirmModal.show && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 p-4">
                         <div className="glass-card rounded-lg max-w-md w-full p-6 border-2 border-red-500">
-                            <h2 className="text-2xl font-bold text-red-400 mb-4">⚠️ Konfirmasi Hapus</h2>
+                            <h2 className="text-2xl font-bold text-red-400 mb-4">{t("⚠️ Konfirmasi Hapus")}</h2>
                             <p className="text-silver-light mb-6">
-                                Apakah Anda yakin ingin menghapus pengajuan ini?
+                                {t("Apakah Anda yakin ingin menghapus pengajuan ini?")}
                                 <br />
-                                <span className="text-red-400 font-semibold">Data yang dihapus tidak dapat dikembalikan.</span>
+                                <span className="text-red-400 font-semibold">{t("Data yang dihapus tidak dapat dikembalikan.")}</span>
                             </p>
                             <div className="flex gap-3 justify-end">
                                 <Button variant="secondary" onClick={handleCancelDelete}>
-                                    TIDAK, Batal
+                                    {t("TIDAK, Batal")}
                                 </Button>
                                 <Button variant="danger" onClick={handleConfirmDelete} icon={Trash2}>
-                                    YA, Hapus
+                                    {t("YA, Hapus")}
                                 </Button>
                             </div>
                         </div>
@@ -2206,7 +2208,7 @@ const PengajuanManagement = () => {
                         <div className="flex justify-between items-center p-4 border-b border-dark-border">
                             <h2 className="text-xl font-bold text-silver-light">
                                 <Warehouse className="inline-block w-5 h-5 mr-2" />
-                                Pilih Barang dari Gudang
+                                {t("Pilih Barang dari Gudang")}
                             </h2>
                             <button
                                 onClick={() => setShowWarehouseSelector(false)}
@@ -2220,8 +2222,8 @@ const PengajuanManagement = () => {
                             {getApprovedInboundPengajuan().length === 0 ? (
                                 <div className="text-center py-8">
                                     <Package className="w-12 h-12 mx-auto mb-3 text-silver-dark opacity-50" />
-                                    <p className="text-silver-dark">Belum ada pengajuan inbound yang approved</p>
-                                    <p className="text-xs text-silver-dark mt-1">Buat dan approve pengajuan inbound terlebih dahulu</p>
+                                    <p className="text-silver-dark">{t("Belum ada pengajuan inbound yang approved")}</p>
+                                    <p className="text-xs text-silver-dark mt-1">{t("Buat dan approve pengajuan inbound terlebih dahulu")}</p>
                                 </div>
                             ) : (
                                 <div className="space-y-3">
@@ -2268,7 +2270,7 @@ const PengajuanManagement = () => {
                                                             }
                                                         </span>
                                                         <p className="text-xs text-silver-dark mt-1">
-                                                            {pengajuan.packages?.length || 0} package
+                                                            {pengajuan.packages?.length || 0} {t("package")}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -2278,12 +2280,12 @@ const PengajuanManagement = () => {
                                                     <div className="flex flex-wrap gap-2">
                                                         {packagesWithStock.slice(0, 3).map((pkg, idx) => (
                                                             <span key={idx} className="text-xs bg-dark-surface px-2 py-1 rounded">
-                                                                📦 {pkg.packageNumber}: {pkg.items.filter(i => i.availableQty > 0).length} item
+                                                                📦 {pkg.packageNumber}: {pkg.items.filter(i => i.availableQty > 0).length} {t("item")}
                                                             </span>
                                                         ))}
                                                         {packagesWithStock.length > 3 && (
                                                             <span className="text-xs text-silver-dark">
-                                                                +{packagesWithStock.length - 3} lainnya
+                                                                +{packagesWithStock.length - 3} {t("lainnya")}
                                                             </span>
                                                         )}
                                                     </div>
@@ -2297,7 +2299,7 @@ const PengajuanManagement = () => {
 
                         <div className="flex justify-end gap-3 p-4 border-t border-dark-border">
                             <Button variant="secondary" onClick={() => setShowWarehouseSelector(false)}>
-                                Batal
+                                {t("Batal")}
                             </Button>
                         </div>
                     </div>
@@ -2311,11 +2313,11 @@ const PengajuanManagement = () => {
                         {/* Modal Header */}
                         <div className="flex justify-between items-center p-4 border-b border-gray-200">
                             <div>
-                                <h2 className="text-xl font-bold text-gray-900">Detail Inventaris</h2>
+                                <h2 className="text-xl font-bold text-gray-900">{t("Detail Inventaris")}</h2>
                                 <p className="text-sm text-gray-500">{formData.sourcePengajuanNumber || '-'}</p>
                             </div>
                             <div className="flex items-center gap-2">
-                                <Button onClick={handleConfirmEditedItems} variant="primary" icon={Edit2} className="text-sm">Kelola</Button>
+                                <Button onClick={handleConfirmEditedItems} variant="primary" icon={Edit2} className="text-sm">{t("Kelola")}</Button>
                                 <button onClick={() => setShowItemEditor(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
                                     <X className="w-5 h-5 text-gray-500" />
                                 </button>
@@ -2324,7 +2326,7 @@ const PengajuanManagement = () => {
 
                         {/* Data Inventaris Section */}
                         <div className="px-4 pt-4 pb-2">
-                            <h3 className="text-base font-bold text-gray-800">📦 Data Inventaris</h3>
+                            <h3 className="text-base font-bold text-gray-800">{t("📦 Data Inventaris")}</h3>
                         </div>
 
                         {/* Header Info Table */}
@@ -2333,13 +2335,13 @@ const PengajuanManagement = () => {
                                 <table className="w-full">
                                     <thead className="bg-blue-600">
                                         <tr>
-                                            <th className="px-2 py-1 text-left text-xs font-semibold text-white">NO. PENGAJUAN</th>
-                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white">NO. PABEAN</th>
-                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white">TGL MASUK GUDANG</th>
-                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white">JAM MASUK</th>
-                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white">JML PACKAGE</th>
-                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white">JML ITEM</th>
-                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white">PIC PENERIMA</th>
+                                            <th className="px-2 py-1 text-left text-xs font-semibold text-white">{t("NO. PENGAJUAN")}</th>
+                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white">{t("NO. PABEAN")}</th>
+                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white">{t("TGL MASUK GUDANG")}</th>
+                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white">{t("JAM MASUK")}</th>
+                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white">{t("JML PACKAGE")}</th>
+                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white">{t("JML ITEM")}</th>
+                                            <th className="px-2 py-1 text-center text-xs font-semibold text-white">{t("PIC PENERIMA")}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -2381,7 +2383,7 @@ const PengajuanManagement = () => {
 
                         {/* Detail Item Section Title */}
                         <div className="px-4 pt-4 pb-3">
-                            <h3 className="text-base font-bold text-gray-800">📝 Detail Item</h3>
+                            <h3 className="text-base font-bold text-gray-800">{t("📝 Detail Item")}</h3>
                         </div>
 
                         {/* Detail Items - Scrollable */}
@@ -2403,7 +2405,7 @@ const PengajuanManagement = () => {
                                         <div className="bg-gray-100 px-3 py-2 border-b border-gray-200">
                                             <span className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                                                 <Package className="w-4 h-4 text-blue-600" />
-                                                Kode Packing: {pkg.packageNumber || `PKG-${pkgIndex + 1}`}
+                                                {t("Kode Packing:")} {pkg.packageNumber || `PKG-${pkgIndex + 1}`}
                                             </span>
                                         </div>
                                         <div className="overflow-x-auto">
@@ -2411,15 +2413,15 @@ const PengajuanManagement = () => {
                                                 <thead className="bg-blue-600">
                                                     <tr>
                                                         <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-8">NO.</th>
-                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-20">KODE BRG</th>
+                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-20">{t("KODE BRG")}</th>
                                                         <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-16">HS</th>
-                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white">ITEM</th>
-                                                        <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white w-12">AWAL</th>
+                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white">{t("ITEM")}</th>
+                                                        <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white w-12">{t("AWAL")}</th>
                                                         <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white w-12">SAT</th>
-                                                        <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white w-24">STATUS</th>
-                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-16">LOKASI</th>
-                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-14">KONDISI</th>
-                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-full">KETERANGAN</th>
+                                                        <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white w-24">{t("STATUS")}</th>
+                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-16">{t("LOKASI")}</th>
+                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-14">{t("KONDISI")}</th>
+                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-full">{t("KETERANGAN")}</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-gray-200">
@@ -2493,7 +2495,7 @@ const PengajuanManagement = () => {
                                                                         <div className="flex items-center gap-1 flex-wrap">
                                                                             <span className="inline-flex items-center gap-0.5 px-1 py-0 rounded text-[9px] font-medium bg-orange-100 text-orange-700 whitespace-nowrap">
                                                                                 <AlertCircle className="w-2.5 h-2.5" />
-                                                                                MUTASI
+                                                                                {t("MUTASI")}
                                                                             </span>
                                                                             <span className="text-[9px] text-orange-600 whitespace-nowrap">
                                                                                 {mutationInfo.totalMutated}u → {mutationInfo.destination}
@@ -2503,7 +2505,7 @@ const PengajuanManagement = () => {
                                                                                 className="inline-flex items-center gap-0.5 text-[9px] text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap"
                                                                             >
                                                                                 <ExternalLink className="w-2.5 h-2.5" />
-                                                                                Detail
+                                                                                {t("Detail")}
                                                                             </button>
                                                                         </div>
                                                                     ) : (item.notes || '-')}
@@ -2521,8 +2523,8 @@ const PengajuanManagement = () => {
 
                         {/* Footer with Batal dan Simpan */}
                         <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-white">
-                            <Button variant="secondary" onClick={() => setShowItemEditor(false)}>Batal</Button>
-                            <Button variant="primary" icon={Save} onClick={handleConfirmEditedItems}>Simpan</Button>
+                            <Button variant="secondary" onClick={() => setShowItemEditor(false)}>{t("Batal")}</Button>
+                            <Button variant="primary" icon={Save} onClick={handleConfirmEditedItems}>{t("Simpan")}</Button>
                         </div>
                     </div>
                 </div>

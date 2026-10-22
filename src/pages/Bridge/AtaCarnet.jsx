@@ -4,8 +4,10 @@ import * as XLSX from 'xlsx';
 import { useAuth } from '../../context/AuthContext';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const AtaCarnet = () => {
+    const { t } = useLanguage();
     const { canCreate, canEdit, canDelete } = useAuth();
     const hasCreate = canCreate('bridge_ata_carnet');
     const hasEdit = canEdit('bridge_ata_carnet');
@@ -197,7 +199,7 @@ const AtaCarnet = () => {
     };
 
     const handlePrint = () => {
-        alert("Fitur cetak akan segera tersedia (Coming Soon)");
+        alert(t("Fitur cetak akan segera tersedia (Coming Soon)"));
     };
 
     return (
@@ -205,30 +207,30 @@ const AtaCarnet = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-silver-light">ATA Carnet Management</h1>
-                    <p className="text-silver-dark text-sm mt-1">Manage temporary admission documents (ATA Carnet)</p>
+                    <h1 className="text-2xl font-bold text-silver-light">{t("ATA Carnet Management")}</h1>
+                    <p className="text-silver-dark text-sm mt-1">{t("Manage temporary admission documents (ATA Carnet)")}</p>
                 </div>
                 <div className="flex gap-2">
                     {hasDelete && (
                         <>
                             <Button onClick={handleDeleteSelected} variant="danger" disabled={selectedIds.length === 0}>
                                 <Trash2 className="w-4 h-4 mr-2" />
-                                Hapus Terpilih ({selectedIds.length})
+                                {t("Hapus Terpilih (")}{selectedIds.length})
                             </Button>
                             <Button onClick={handleDeleteAll} variant="danger" disabled={carnetList.length === 0}>
                                 <Trash2 className="w-4 h-4 mr-2" />
-                                Bersihkan Semua Data
+                                {t("Bersihkan Semua Data")}
                             </Button>
                         </>
                     )}
                     <Button onClick={handleExportExcel} variant="secondary">
                         <Download className="w-4 h-4 mr-2" />
-                        Export Excel
+                        {t("Export Excel")}
                     </Button>
                     {hasCreate && (
                         <Button onClick={handleOpenAdd} variant="primary">
                             <Plus className="w-4 h-4 mr-2" />
-                            New Carnet
+                            {t("New Carnet")}
                         </Button>
                     )}
                 </div>
@@ -240,7 +242,7 @@ const AtaCarnet = () => {
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-silver-dark w-4 h-4" />
                     <input
                         type="text"
-                        placeholder="Search by Carnet No, Holder, or Description..."
+                        placeholder={t("Search by Carnet No, Holder, or Description...")}
                         className="w-full pl-10 pr-4 py-2 bg-dark-bg border border-dark-border rounded-lg text-silver focus:outline-none focus:border-accent-blue transition-colors"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
@@ -262,15 +264,15 @@ const AtaCarnet = () => {
                                         className="w-4 h-4"
                                     />
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver uppercase tracking-wider min-w-[150px]">Carnet Number</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver uppercase tracking-wider min-w-[200px]">Holder / Origin</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver uppercase tracking-wider min-w-[100px]">Entry Date</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver uppercase tracking-wider min-w-[100px]">Expiry Date</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver uppercase tracking-wider min-w-[200px] w-1/4">Description / SN</th>
-                                <th className="px-4 py-3 text-right text-xs font-semibold text-silver uppercase tracking-wider min-w-[120px]">Qty / Value</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver uppercase tracking-wider min-w-[120px]">Destination</th>
-                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver uppercase tracking-wider min-w-[100px]">Status</th>
-                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver uppercase tracking-wider min-w-[80px]">Actions</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver uppercase tracking-wider min-w-[150px]">{t("Carnet Number")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver uppercase tracking-wider min-w-[200px]">{t("Holder / Origin")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver uppercase tracking-wider min-w-[100px]">{t("Entry Date")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver uppercase tracking-wider min-w-[100px]">{t("Expiry Date")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver uppercase tracking-wider min-w-[200px] w-1/4">{t("Description / SN")}</th>
+                                <th className="px-4 py-3 text-right text-xs font-semibold text-silver uppercase tracking-wider min-w-[120px]">{t("Qty / Value")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver uppercase tracking-wider min-w-[120px]">{t("Destination")}</th>
+                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver uppercase tracking-wider min-w-[100px]">{t("Status")}</th>
+                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver uppercase tracking-wider min-w-[80px]">{t("Actions")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border/50">
@@ -300,7 +302,7 @@ const AtaCarnet = () => {
                                             <div className="text-xs text-silver-dark mt-0.5 font-mono line-clamp-1">SN: {item.serialNumber}</div>
                                         </td>
                                         <td className="px-4 py-3 text-right">
-                                            <div className="text-xs text-silver-light font-bold">{item.quantity} Units</div>
+                                            <div className="text-xs text-silver-light font-bold">{item.quantity} {t("Units")}</div>
                                             <div className="text-xs text-silver-dark">{item.currency} {Number(item.value || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                                         </td>
                                         <td className="px-4 py-3 text-silver-light text-sm">{item.destination}</td>
@@ -317,7 +319,7 @@ const AtaCarnet = () => {
                                                 <button
                                                     onClick={() => handleRowClick(item)}
                                                     className="p-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 rounded transition-colors"
-                                                    title="Edit"
+                                                    title={t("Edit")}
                                                 >
                                                     <Edit className="w-4 h-4" />
                                                 </button>
@@ -329,7 +331,7 @@ const AtaCarnet = () => {
                                                             }
                                                         }}
                                                         className="p-1.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded transition-colors"
-                                                        title="Delete"
+                                                        title={t("Delete")}
                                                     >
                                                         <Trash2 className="w-4 h-4" />
                                                     </button>
@@ -341,7 +343,7 @@ const AtaCarnet = () => {
                             ) : (
                                 <tr>
                                     <td colSpan="10" className="px-6 py-8 text-center text-silver-dark">
-                                        No ATA Carnet documents found.
+                                        {t("No ATA Carnet documents found.")}
                                     </td>
                                 </tr>
                             )}
@@ -357,24 +359,24 @@ const AtaCarnet = () => {
                         {/* Section 1: Document Info */}
                         <div className="col-span-full space-y-4 pb-4 border-b border-dark-border">
                             <h3 className="text-sm font-semibold text-silver-dark uppercase tracking-wider mb-2 flex items-center gap-2">
-                                <FileText className="w-4 h-4" /> Document Details
+                                <FileText className="w-4 h-4" /> {t("Document Details")}
                             </h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs font-medium text-silver-dark mb-1">Carnet Number</label>
-                                    <input required name="carnetNumber" value={formData.carnetNumber} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed" placeholder="e.g. ATA-2024-XXX" />
+                                    <label className="block text-xs font-medium text-silver-dark mb-1">{t("Carnet Number")}</label>
+                                    <input required name="carnetNumber" value={formData.carnetNumber} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed" placeholder={t("e.g. ATA-2024-XXX")} />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-silver-dark mb-1">Holder Name</label>
-                                    <input required name="holder" value={formData.holder} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed" placeholder="Company or Individual Name" />
+                                    <label className="block text-xs font-medium text-silver-dark mb-1">{t("Holder Name")}</label>
+                                    <input required name="holder" value={formData.holder} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed" placeholder={t("Company or Individual Name")} />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-silver-dark mb-1">Origin Country</label>
-                                    <input required name="origin" value={formData.origin} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed" placeholder="e.g. Indonesia" />
+                                    <label className="block text-xs font-medium text-silver-dark mb-1">{t("Origin Country")}</label>
+                                    <input required name="origin" value={formData.origin} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed" placeholder={t("e.g. Indonesia")} />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-silver-dark mb-1">Destination</label>
-                                    <input required name="destination" value={formData.destination} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed" placeholder="e.g. Singapore" />
+                                    <label className="block text-xs font-medium text-silver-dark mb-1">{t("Destination")}</label>
+                                    <input required name="destination" value={formData.destination} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed" placeholder={t("e.g. Singapore")} />
                                 </div>
                             </div>
                         </div>
@@ -382,22 +384,22 @@ const AtaCarnet = () => {
                         {/* Section 2: Dates & Status */}
                         <div className="col-span-full space-y-4 pb-4 border-b border-dark-border">
                             <h3 className="text-sm font-semibold text-silver-dark uppercase tracking-wider mb-2 flex items-center gap-2">
-                                <Calendar className="w-4 h-4" /> Schedule & Status
+                                <Calendar className="w-4 h-4" /> {t("Schedule & Status")}
                             </h3>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
-                                    <label className="block text-xs font-medium text-silver-dark mb-1">Entry Date</label>
+                                    <label className="block text-xs font-medium text-silver-dark mb-1">{t("Entry Date")}</label>
                                     <input type="date" required name="entryDate" value={formData.entryDate} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed" />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-silver-dark mb-1">Expiry Date</label>
+                                    <label className="block text-xs font-medium text-silver-dark mb-1">{t("Expiry Date")}</label>
                                     <input type="date" required name="expiryDate" value={formData.expiryDate} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed" />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-silver-dark mb-1">Status</label>
+                                    <label className="block text-xs font-medium text-silver-dark mb-1">{t("Status")}</label>
                                     <select name="status" value={formData.status} onChange={handleChange} className="form-select w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed">
-                                        <option value="In">In (Import)</option>
-                                        <option value="Out">Out (Export)</option>
+                                        <option value="In">{t("In (Import)")}</option>
+                                        <option value="Out">{t("Out (Export)")}</option>
                                     </select>
                                 </div>
                             </div>
@@ -406,24 +408,24 @@ const AtaCarnet = () => {
                         {/* Section 3: Item Details */}
                         <div className="col-span-full space-y-4">
                             <h3 className="text-sm font-semibold text-silver-dark uppercase tracking-wider mb-2 flex items-center gap-2">
-                                <Box className="w-4 h-4" /> Item Details
+                                <Box className="w-4 h-4" /> {t("Item Details")}
                             </h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="md:col-span-2">
-                                    <label className="block text-xs font-medium text-silver-dark mb-1">Item Description</label>
-                                    <textarea required name="description" value={formData.description} onChange={handleChange} rows="2" className="form-textarea w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed" placeholder="Detailed description of goods..." />
+                                    <label className="block text-xs font-medium text-silver-dark mb-1">{t("Item Description")}</label>
+                                    <textarea required name="description" value={formData.description} onChange={handleChange} rows="2" className="form-textarea w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed" placeholder={t("Detailed description of goods...")} />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-silver-dark mb-1">Serial Number</label>
-                                    <input name="serialNumber" value={formData.serialNumber} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed" placeholder="Unique Serial No." />
+                                    <label className="block text-xs font-medium text-silver-dark mb-1">{t("Serial Number")}</label>
+                                    <input name="serialNumber" value={formData.serialNumber} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed" placeholder={t("Unique Serial No.")} />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-silver-dark mb-1">Quantity</label>
+                                    <label className="block text-xs font-medium text-silver-dark mb-1">{t("Quantity")}</label>
                                     <input type="number" required name="quantity" value={formData.quantity} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed" placeholder="0" />
                                 </div>
                                 <div className="grid grid-cols-3 gap-2 md:col-span-2">
                                     <div className="col-span-1">
-                                        <label className="block text-xs font-medium text-silver-dark mb-1">Currency</label>
+                                        <label className="block text-xs font-medium text-silver-dark mb-1">{t("Currency")}</label>
                                         <select name="currency" value={formData.currency} onChange={handleChange} className="form-select w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed">
                                             <option value="IDR">IDR</option>
                                             <option value="USD">USD</option>
@@ -432,8 +434,8 @@ const AtaCarnet = () => {
                                         </select>
                                     </div>
                                     <div className="col-span-2">
-                                        <label className="block text-xs font-medium text-silver-dark mb-1">Value</label>
-                                        <input type="number" required name="value" value={formData.value} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed" placeholder="Total Value" />
+                                        <label className="block text-xs font-medium text-silver-dark mb-1">{t("Value")}</label>
+                                        <input type="number" required name="value" value={formData.value} onChange={handleChange} className="form-input w-full bg-dark-bg border-dark-border rounded-lg text-silver px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed" placeholder={t("Total Value")} />
                                     </div>
                                 </div>
                             </div>
@@ -450,11 +452,11 @@ const AtaCarnet = () => {
                                             handleDelete(formData.id);
                                             setShowModal(false);
                                         }}>
-                                            <Trash2 className="w-4 h-4 mr-1" /> Delete
+                                            <Trash2 className="w-4 h-4 mr-1" /> {t("Delete")}
                                         </Button>
                                     )}
                                     <Button type="button" variant="secondary" onClick={handlePrint}>
-                                        <Printer className="w-4 h-4 mr-1" /> Print
+                                        <Printer className="w-4 h-4 mr-1" /> {t("Print")}
                                     </Button>
                                 </>
                             )}
@@ -466,10 +468,10 @@ const AtaCarnet = () => {
                                 {isEditing && !hasEdit ? 'Close' : 'Cancel'}
                             </Button>
                             {!isEditing && hasCreate && (
-                                <Button type="submit" variant="primary">Create Carnet</Button>
+                                <Button type="submit" variant="primary">{t("Create Carnet")}</Button>
                             )}
                             {isEditing && hasEdit && (
-                                <Button type="submit" variant="primary">Update Changes</Button>
+                                <Button type="submit" variant="primary">{t("Update Changes")}</Button>
                             )}
                         </div>
                     </div>

@@ -8,8 +8,10 @@ import { createProcessOutboundHandler } from './handlers/processOutbound';
 import { calculateDaysDifference, getAgingStatus } from '../../utils/agingCalculator';
 import { AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const OutboundInventory = () => {
+    const { t } = useLanguage();
     const { canEdit, user } = useAuth();
     const hasEdit = canEdit('bridge_outbound');
     const { quotations = [], addMutationLog, mutationLogs = [], updateQuotation, requestApproval, isExhibitionLocation, getExhibitionLocation } = useData();
@@ -255,7 +257,7 @@ const OutboundInventory = () => {
             XLSX.writeFile(wb, `Detail_Inventaris_${selectedItem.quotationNumber || 'Export'}.xlsx`);
         }).catch(err => {
             console.error("Failed to load xlsx-js-style", err);
-            alert("Gagal memuat modul export Excel. Menggunakan CSV sebagai alternatif.");
+            alert(t("Gagal memuat modul export Excel. Menggunakan CSV sebagai alternatif."));
             handleExportDetailCSV();
         });
     };
@@ -457,7 +459,7 @@ const OutboundInventory = () => {
 
                 if (statusError) {
                     console.error("Failed to update status:", statusError);
-                    alert("Data terkirim ke Pabean, tetapi gagal update status dokumen.");
+                    alert(t("Data terkirim ke Pabean, tetapi gagal update status dokumen."));
                 } else {
                     // Create approval request for monitoring
                     if (requestApproval) {
@@ -487,7 +489,7 @@ const OutboundInventory = () => {
                         }
                     }
 
-                    alert('Berhasil mengirim data ke Pabean - Barang Keluar! Status dokumen diperbarui.');
+                    alert(t("Berhasil mengirim data ke Pabean - Barang Keluar! Status dokumen diperbarui."));
                     setShowDetailModal(false);
                     // Force refresh or rely on realtime if available
                 }
@@ -509,14 +511,14 @@ const OutboundInventory = () => {
                 <div>
                     <h1 className="text-3xl font-bold gradient-text flex items-center gap-3">
                         <Package className="w-8 h-8" />
-                        Laporan Barang Keluar
+                        {t("Laporan Barang Keluar")}
                     </h1>
                     <p className="text-silver-dark mt-1">
-                        Proses Pengajuan Barang Keluar ke Pabean & Update Inventory
+                        {t("Proses Pengajuan Barang Keluar ke Pabean & Update Inventory")}
                     </p>
                 </div>
                 <Button onClick={handleExportCSV} variant="primary" icon={Download}>
-                    Export CSV
+                    {t("Export CSV")}
                 </Button>
             </div>
 
@@ -525,7 +527,7 @@ const OutboundInventory = () => {
                 <div className="glass-card p-4 border border-dark-border rounded-xl">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-xs text-silver-dark">Total Pengajuan</p>
+                            <p className="text-xs text-silver-dark">{t("Total Pengajuan")}</p>
                             <p className="text-2xl font-bold text-accent-purple mt-1">{stats.totalPengajuan}</p>
                         </div>
                         <FileText className="w-8 h-8 text-accent-purple opacity-50" />
@@ -535,7 +537,7 @@ const OutboundInventory = () => {
                 <div className="glass-card p-4 border border-dark-border rounded-xl">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-xs text-silver-dark">Total Packages</p>
+                            <p className="text-xs text-silver-dark">{t("Total Packages")}</p>
                             <p className="text-2xl font-bold text-accent-blue mt-1">{stats.totalPackages}</p>
                         </div>
                         <Package className="w-8 h-8 text-accent-blue opacity-50" />
@@ -545,7 +547,7 @@ const OutboundInventory = () => {
                 <div className="glass-card p-4 border border-dark-border rounded-xl">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-xs text-silver-dark">Total Items</p>
+                            <p className="text-xs text-silver-dark">{t("Total Items")}</p>
                             <p className="text-2xl font-bold text-accent-green mt-1">{stats.totalItems}</p>
                         </div>
                         <TrendingUp className="w-8 h-8 text-accent-green opacity-50" />
@@ -555,7 +557,7 @@ const OutboundInventory = () => {
                 <div className="glass-card p-4 border border-dark-border rounded-xl">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-xs text-silver-dark">Customers</p>
+                            <p className="text-xs text-silver-dark">{t("Customers")}</p>
                             <p className="text-2xl font-bold text-accent-orange mt-1">{stats.uniqueCustomers}</p>
                         </div>
                         <Calendar className="w-8 h-8 text-accent-orange opacity-50" />
@@ -569,7 +571,7 @@ const OutboundInventory = () => {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-silver-dark" />
                     <input
                         type="text"
-                        placeholder="Cari berdasarkan No. Pengajuan, No. Pabean, Customer, Tujuan, atau Status..."
+                        placeholder={t("Cari berdasarkan No. Pengajuan, No. Pabean, Customer, Tujuan, atau Status...")}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-12 pr-4 py-3 bg-dark-surface border border-dark-border rounded-lg text-silver placeholder:text-silver-dark focus:outline-none focus:border-accent-blue transition-colors"
@@ -583,15 +585,15 @@ const OutboundInventory = () => {
                     <table className="w-full">
                         <thead className="bg-accent-purple">
                             <tr>
-                                <th className="px-3 py-1.5 text-left text-[11px] font-bold text-white whitespace-nowrap">No. Pengajuan</th>
-                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-white whitespace-nowrap">No. Pabean</th>
-                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-white whitespace-nowrap">Tgl Keluar</th>
-                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-white whitespace-nowrap">Lama Keluar</th>
-                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-white whitespace-nowrap">Tujuan</th>
-                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-white whitespace-nowrap">Customer</th>
-                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-white whitespace-nowrap">Pkg</th>
-                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-white whitespace-nowrap">Items</th>
-                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-white whitespace-nowrap">Status</th>
+                                <th className="px-3 py-1.5 text-left text-[11px] font-bold text-white whitespace-nowrap">{t("No. Pengajuan")}</th>
+                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-white whitespace-nowrap">{t("No. Pabean")}</th>
+                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-white whitespace-nowrap">{t("Tgl Keluar")}</th>
+                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-white whitespace-nowrap">{t("Lama Keluar")}</th>
+                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-white whitespace-nowrap">{t("Tujuan")}</th>
+                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-white whitespace-nowrap">{t("Customer")}</th>
+                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-white whitespace-nowrap">{t("Pkg")}</th>
+                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-white whitespace-nowrap">{t("Items")}</th>
+                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-white whitespace-nowrap">{t("Status")}</th>
                                 {/* Removed Aksi Column Header */}
                             </tr>
                         </thead>
@@ -599,7 +601,7 @@ const OutboundInventory = () => {
                             {filteredData.length === 0 ? (
                                 <tr>
                                     <td colSpan="8" className="px-4 py-6 text-center text-silver-dark text-xs">
-                                        Belum ada pengajuan keluar yang disetujui
+                                        {t("Belum ada pengajuan keluar yang disetujui")}
                                     </td>
                                 </tr>
                             ) : (
@@ -610,7 +612,7 @@ const OutboundInventory = () => {
                                             key={pengajuan.id}
                                             className="hover:bg-dark-surface/50 transition-colors cursor-pointer"
                                             onClick={() => handleRowClick(pengajuan)}
-                                            title="Klik untuk melihat detail"
+                                            title={t("Klik untuk melihat detail")}
                                         >
                                             <td className="px-3 py-1.5 text-[11px] text-accent-purple font-semibold whitespace-nowrap">{pengajuan.quotationNumber || pengajuan.quotation_number || '-'}</td>
                                             <td className="px-3 py-1.5 text-[11px] text-silver text-center whitespace-nowrap">{pengajuan.bcDocumentNumber || pengajuan.bc_document_number || '-'}</td>
@@ -623,7 +625,7 @@ const OutboundInventory = () => {
                                                 return (
                                                     <td className={`px-3 py-1.5 text-[11px] text-center whitespace-nowrap font-medium ${status.color}`}>
                                                         {status.isAlert && <AlertCircle className="w-3 h-3 inline mr-1" />}
-                                                        {days} Hari
+                                                        {days} {t("Hari")}
                                                     </td>
                                                 );
                                             })()}
@@ -635,7 +637,7 @@ const OutboundInventory = () => {
                                                 {pengajuan.outbound_status === 'processed' ? (
                                                     <div className="flex flex-col gap-0.5">
                                                         <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 border border-green-500/30 text-[10px]">
-                                                            ✓ Barang Keluar dari Gudang
+                                                            {t("✓ Barang Keluar dari Gudang")}
                                                         </span>
                                                         <span className="text-[9px] text-gray-400">
                                                             {formatDate(pengajuan.outbound_date)} {formatTime(pengajuan.outbound_date)}
@@ -644,7 +646,7 @@ const OutboundInventory = () => {
                                                 ) : pengajuan.outbound_status === 'submitted' ? (
                                                     <div className="flex flex-col gap-0.5">
                                                         <span className="px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 text-[10px]">
-                                                            ⏳ Menunggu Proses Pabean
+                                                            {t("⏳ Menunggu Proses Pabean")}
                                                         </span>
                                                         <span className="text-[9px] text-gray-400">
                                                             {formatDate(pengajuan.outbound_date)}
@@ -652,7 +654,7 @@ const OutboundInventory = () => {
                                                     </div>
                                                 ) : (
                                                     <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 text-[10px]">
-                                                        📋 Document Approved
+                                                        {t("📋 Document Approved")}
                                                     </span>
                                                 )}
                                             </td>
@@ -673,14 +675,14 @@ const OutboundInventory = () => {
                         {/* Modal Header */}
                         <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
                             <div>
-                                <h2 className="text-xl font-bold text-gray-900">Detail Inventaris</h2>
+                                <h2 className="text-xl font-bold text-gray-900">{t("Detail Inventaris")}</h2>
                                 <p className="text-sm text-gray-500 mt-1">{selectedItem.quotationNumber || selectedItem.quotation_number || '-'}</p>
                             </div>
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={handleExportDetailCSV}
                                     className="px-3 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
-                                    title="Export Detail CSV"
+                                    title={t("Export Detail CSV")}
                                 >
                                     <Download className="w-4 h-4" />
                                     CSV
@@ -688,7 +690,7 @@ const OutboundInventory = () => {
                                 <button
                                     onClick={handleExportDetailXLS}
                                     className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-colors mr-2"
-                                    title="Export Detail Excel"
+                                    title={t("Export Detail Excel")}
                                 >
                                     <FileText className="w-4 h-4" /> {/* Approximate icon for XLS */}
                                     XLS
@@ -700,7 +702,7 @@ const OutboundInventory = () => {
                                         onClick={handleProcessOutbound}
                                         disabled={isSaving}
                                         className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-colors mr-2 disabled:opacity-50"
-                                        title="Proses ke Pabean - Barang Keluar"
+                                        title={t("Proses ke Pabean - Barang Keluar")}
                                     >
                                         <Send className="w-4 h-4" />
                                         {isSaving ? 'Memproses...' : 'Proses ke Pabean - Barang Keluar'}
@@ -710,12 +712,12 @@ const OutboundInventory = () => {
                                 {/* Show status indicator when already processed */}
                                 {selectedItem?.outbound_status === 'processed' && (
                                     <div className="flex items-center gap-2 px-4 py-2 bg-green-600/20 text-green-400 rounded-lg text-sm font-medium border border-green-500/30">
-                                        ✓ Barang Sudah Keluar dari Gudang
+                                        {t("✓ Barang Sudah Keluar dari Gudang")}
                                     </div>
                                 )}
                                 {selectedItem?.outbound_status === 'submitted' && (
                                     <div className="flex items-center gap-2 px-4 py-2 bg-yellow-600/20 text-yellow-400 rounded-lg text-sm font-medium border border-yellow-500/30">
-                                        ⏳ Menunggu Proses Pabean
+                                        {t("⏳ Menunggu Proses Pabean")}
                                     </div>
                                 )}
 
@@ -729,7 +731,7 @@ const OutboundInventory = () => {
                                                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-colors disabled:opacity-50"
                                             >
                                                 {isSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Edit className="w-4 h-4" />}
-                                                Simpan
+                                                {t("Simpan")}
                                             </button>
                                             <button
                                                 onClick={handleCancelEdit}
@@ -737,7 +739,7 @@ const OutboundInventory = () => {
                                                 className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
                                             >
                                                 <X className="w-4 h-4" />
-                                                Batal
+                                                {t("Batal")}
                                             </button>
                                         </>
                                     ) : (
@@ -747,7 +749,7 @@ const OutboundInventory = () => {
                                                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
                                             >
                                                 <Edit className="w-4 h-4" />
-                                                Edit
+                                                {t("Edit")}
                                             </button>
                                         )
                                     )
@@ -755,7 +757,7 @@ const OutboundInventory = () => {
                                     /* Read-only indicator when processed */
                                     <div className="px-3 py-1.5 bg-gray-200 text-gray-600 rounded-lg text-xs font-medium flex items-center gap-1">
                                         <Eye className="w-3 h-3" />
-                                        Read Only
+                                        {t("Read Only")}
                                     </div>
                                 )}
 
@@ -769,18 +771,18 @@ const OutboundInventory = () => {
                         <div className="p-6 overflow-y-auto max-h-[75vh] bg-gray-50 space-y-6">
                             {/* Data Inventaris */}
                             <div>
-                                <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">📦 Data Inventaris {isEditing && <span className="text-xs font-normal text-blue-600 ml-2">(Mode Edit Aktif)</span>}</h3>
+                                <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">{t("📦 Data Inventaris")} {isEditing && <span className="text-xs font-normal text-blue-600 ml-2">{t("(Mode Edit Aktif)")}</span>}</h3>
                                 <div className="bg-white rounded-xl shadow-sm overflow-hidden">
                                     <table className="w-full">
                                         <thead className="bg-blue-600">
                                             <tr>
-                                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">NO. PENGAJUAN</th>
-                                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">NO. PABEAN</th>
-                                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">TGL KELUAR GUDANG</th>
-                                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">JAM KELUAR</th>
-                                                <th className="px-4 py-3 text-center text-xs font-bold text-white uppercase">JML PACKAGE</th>
-                                                <th className="px-4 py-3 text-center text-xs font-bold text-white uppercase">JML ITEM</th>
-                                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">PIC PENGELUARAN</th>
+                                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">{t("NO. PENGAJUAN")}</th>
+                                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">{t("NO. PABEAN")}</th>
+                                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">{t("TGL KELUAR GUDANG")}</th>
+                                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">{t("JAM KELUAR")}</th>
+                                                <th className="px-4 py-3 text-center text-xs font-bold text-white uppercase">{t("JML PACKAGE")}</th>
+                                                <th className="px-4 py-3 text-center text-xs font-bold text-white uppercase">{t("JML ITEM")}</th>
+                                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase">{t("PIC PENGELUARAN")}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -834,28 +836,28 @@ const OutboundInventory = () => {
 
                             {/* Detail Items */}
                             <div>
-                                <h3 className="text-sm font-bold text-gray-700 mb-3">📝 Detail Item {isEditing && <span className="text-xs font-normal text-blue-600 ml-2">(Mode Edit Aktif)</span>}</h3>
+                                <h3 className="text-sm font-bold text-gray-700 mb-3">{t("📝 Detail Item")} {isEditing && <span className="text-xs font-normal text-blue-600 ml-2">{t("(Mode Edit Aktif)")}</span>}</h3>
                                 <div className="space-y-4">
                                     {((isEditing ? editedItem : selectedItem).packages || []).map((pkg, pkgIndex) => (
                                         <div key={pkgIndex}>
                                             <div className="bg-gray-100 px-4 py-2 rounded-t-lg">
-                                                <span className="text-sm font-semibold text-gray-700">Kode Packing: {pkg.packageNumber || `Paket_${pkgIndex + 1}`}</span>
+                                                <span className="text-sm font-semibold text-gray-700">{t("Kode Packing:")} {pkg.packageNumber || `Paket_${pkgIndex + 1}`}</span>
                                             </div>
                                             <div className="bg-white rounded-b-xl shadow-sm overflow-hidden">
                                                 <table className="w-full">
                                                     <thead className="bg-blue-600">
                                                         <tr>
-                                                            <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase w-16">NO. URUT</th>
-                                                            <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase">KODE BARANG</th>
-                                                            <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase w-20">HS CODE</th>
-                                                            <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase">ITEM</th>
-                                                            <th className="px-3 py-3 text-center text-xs font-bold text-white uppercase w-20">STOK AWAL</th>
-                                                            <th className="px-3 py-3 text-center text-xs font-bold text-white uppercase w-20 bg-orange-500">STOK {DEFAULT_LOCATION.toUpperCase()}</th>
-                                                            <th className="px-3 py-3 text-center text-xs font-bold text-white uppercase w-20">SATUAN</th>
-                                                            <th className="px-3 py-3 text-center text-xs font-bold text-white uppercase w-24 bg-red-600">JML KELUAR</th>
-                                                            <th className="px-3 py-3 text-center text-xs font-bold text-white uppercase w-24 bg-green-600">SISA STOK</th>
-                                                            <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase w-20">KONDISI</th>
-                                                            <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase">KETERANGAN</th>
+                                                            <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase w-16">{t("NO. URUT")}</th>
+                                                            <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase">{t("KODE BARANG")}</th>
+                                                            <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase w-20">{t("HS CODE")}</th>
+                                                            <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase">{t("ITEM")}</th>
+                                                            <th className="px-3 py-3 text-center text-xs font-bold text-white uppercase w-20">{t("STOK AWAL")}</th>
+                                                            <th className="px-3 py-3 text-center text-xs font-bold text-white uppercase w-20 bg-orange-500">{t("STOK")} {DEFAULT_LOCATION.toUpperCase()}</th>
+                                                            <th className="px-3 py-3 text-center text-xs font-bold text-white uppercase w-20">{t("SATUAN")}</th>
+                                                            <th className="px-3 py-3 text-center text-xs font-bold text-white uppercase w-24 bg-red-600">{t("JML KELUAR")}</th>
+                                                            <th className="px-3 py-3 text-center text-xs font-bold text-white uppercase w-24 bg-green-600">{t("SISA STOK")}</th>
+                                                            <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase w-20">{t("KONDISI")}</th>
+                                                            <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase">{t("KETERANGAN")}</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-gray-200">
@@ -959,9 +961,9 @@ const OutboundInventory = () => {
                                                                                 onChange={(e) => handleUpdateItem(pkgIndex, itemIdx, 'condition', e.target.value)}
                                                                                 className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
                                                                             >
-                                                                                <option value="Baik">Baik</option>
-                                                                                <option value="Rusak">Rusak</option>
-                                                                                <option value="Perbaikan">Perbaikan</option>
+                                                                                <option value="Baik">{t("Baik")}</option>
+                                                                                <option value="Rusak">{t("Rusak")}</option>
+                                                                                <option value="Perbaikan">{t("Perbaikan")}</option>
                                                                             </select>
                                                                         ) : (item.condition || 'Baik')}
                                                                     </td>

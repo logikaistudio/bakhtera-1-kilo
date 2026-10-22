@@ -4,8 +4,10 @@ import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import Button from '../../components/Common/Button';
 import { exportToCSV } from '../../utils/exportCSV';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const ItemMaster = () => {
+    const { t } = useLanguage();
     const { canCreate, canEdit, canDelete } = useAuth();
     const hasCreate = canCreate('bridge_item_master');
     const hasEdit = canEdit('bridge_item_master');
@@ -94,26 +96,26 @@ const ItemMaster = () => {
             {/* Header */}
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text">Master Kode Barang</h1>
-                    <p className="text-silver-dark mt-1">Manajemen Kode & Tipe Barang</p>
+                    <h1 className="text-3xl font-bold gradient-text">{t("Master Kode Barang")}</h1>
+                    <p className="text-silver-dark mt-1">{t("Manajemen Kode & Tipe Barang")}</p>
                 </div>
                 <div className="flex items-center gap-2">
                     {hasDelete && (
                         <>
                             <Button onClick={handleDeleteSelected} variant="danger" disabled={selectedIds.length === 0}>
                                 <Trash2 className="w-4 h-4 mr-2" />
-                                Hapus Terpilih ({selectedIds.length})
+                                {t("Hapus Terpilih (")}{selectedIds.length})
                             </Button>
                             <Button onClick={handleDeleteAll} variant="danger" disabled={itemMaster.length === 0}>
                                 <Trash2 className="w-4 h-4 mr-2" />
-                                Bersihkan Semua Data
+                                {t("Bersihkan Semua Data")}
                             </Button>
                         </>
                     )}
                     {hasCreate && (
                         <Button onClick={() => setShowModal(true)}>
                             <Plus className="w-4 h-4 mr-2" />
-                            Tambah Kode Barang
+                            {t("Tambah Kode Barang")}
                         </Button>
                     )}
                 </div>
@@ -126,7 +128,7 @@ const ItemMaster = () => {
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                         <input
                             type="text"
-                            placeholder="Cari kode atau tipe barang..."
+                            placeholder={t("Cari kode atau tipe barang...")}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
@@ -134,7 +136,7 @@ const ItemMaster = () => {
                     </div>
                 </div>
                 <div className="glass-card p-4 rounded-lg border border-accent-blue">
-                    <p className="text-xs text-silver-dark">Total Kode Barang</p>
+                    <p className="text-xs text-silver-dark">{t("Total Kode Barang")}</p>
                     <p className="text-2xl font-bold text-accent-blue">{itemMaster.length}</p>
                 </div>
             </div>
@@ -144,15 +146,15 @@ const ItemMaster = () => {
                 <div className="p-4 border-b border-dark-border">
                     <div className="flex items-center gap-2">
                         <Package className="w-5 h-5 text-accent-blue" />
-                        <h2 className="text-lg font-semibold text-silver-light">Kode Barang</h2>
-                        <span className="ml-auto text-sm text-silver-dark">{filteredItems.length} entri</span>
+                        <h2 className="text-lg font-semibold text-silver-light">{t("Kode Barang")}</h2>
+                        <span className="ml-auto text-sm text-silver-dark">{filteredItems.length} {t("entri")}</span>
                         <Button
                             onClick={handleExportCSV}
                             variant="secondary"
                             icon={Download}
                             className="ml-2"
                         >
-                            Export CSV
+                            {t("Export CSV")}
                         </Button>
                     </div>
                 </div>
@@ -170,8 +172,8 @@ const ItemMaster = () => {
                                     />
                                 </th>
                                 <th className="px-4 py-3 text-center text-xs font-semibold text-silver">No</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">Kode Barang</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">Tipe Barang</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">{t("Kode Barang")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">{t("Tipe Barang")}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -179,8 +181,8 @@ const ItemMaster = () => {
                                 <tr>
                                     <td colSpan="4" className="px-4 py-12 text-center">
                                         <Package className="w-16 h-16 mx-auto mb-4 opacity-30 text-silver-dark" />
-                                        <p className="text-lg text-silver-dark">Belum ada kode barang</p>
-                                        <p className="text-sm text-silver-dark mt-2">Tambahkan kode barang untuk memulai</p>
+                                        <p className="text-lg text-silver-dark">{t("Belum ada kode barang")}</p>
+                                        <p className="text-sm text-silver-dark mt-2">{t("Tambahkan kode barang untuk memulai")}</p>
                                     </td>
                                 </tr>
                             ) : (
@@ -218,24 +220,24 @@ const ItemMaster = () => {
                         </h3>
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
-                                <label className="block text-sm text-silver-light mb-2">Kode Barang *</label>
+                                <label className="block text-sm text-silver-light mb-2">{t("Kode Barang *")}</label>
                                 <input
                                     type="text"
                                     value={formData.itemCode}
                                     onChange={(e) => setFormData({ ...formData, itemCode: e.target.value })}
                                     className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
-                                    placeholder="Contoh: 8471.30.00"
+                                    placeholder={t("Contoh: 8471.30.00")}
                                     required
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm text-silver-light mb-2">Tipe Barang *</label>
+                                <label className="block text-sm text-silver-light mb-2">{t("Tipe Barang *")}</label>
                                 <input
                                     type="text"
                                     value={formData.itemType}
                                     onChange={(e) => setFormData({ ...formData, itemType: e.target.value })}
                                     className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
-                                    placeholder="Contoh: Elektronik"
+                                    placeholder={t("Contoh: Elektronik")}
                                     required
                                 />
                             </div>
@@ -251,7 +253,7 @@ const ItemMaster = () => {
                                         }}
                                     >
                                         <Trash2 className="w-4 h-4 mr-2" />
-                                        Hapus
+                                        {t("Hapus")}
                                     </Button>
                                 )}
                                 <div className="flex gap-2 ml-auto">
@@ -264,7 +266,7 @@ const ItemMaster = () => {
                                             setEditingItem(null);
                                         }}
                                     >
-                                        Batal
+                                        {t("Batal")}
                                     </Button>
                                     {(!editingItem || hasEdit) && (
                                         <Button type="submit">

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { CheckCircle, XCircle, Clock, Search, FileText, Edit, Trash2, Eye, X, User, Calendar, ArrowRightLeft, Package } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 /**
  * ✅ BRIDGE APPROVAL MANAGER
@@ -19,6 +20,7 @@ import { useAuth } from '../../context/AuthContext';
  */
 
 const ApprovalManager = () => {
+    const { t } = useLanguage();
     const { pendingApprovals = [], approveRequest, rejectRequest } = useData();
     const { canEdit, canApprove, user } = useAuth();
     const hasApprove = canApprove('bridge_approval') || canEdit('bridge_approval');
@@ -116,7 +118,7 @@ const ApprovalManager = () => {
     // Render changes detail
     const renderChangesDetail = (changes) => {
         if (!changes || typeof changes !== 'object' || Object.keys(changes).length === 0) {
-            return <p className="text-sm text-silver-dark italic">Tidak ada detail perubahan</p>;
+            return <p className="text-sm text-silver-dark italic">{t("Tidak ada detail perubahan")}</p>;
         }
 
         return (
@@ -137,8 +139,8 @@ const ApprovalManager = () => {
         <div className="p-6 space-y-6">
             {/* Header */}
             <div>
-                <h1 className="text-3xl font-bold gradient-text">Approval Manager</h1>
-                <p className="text-silver-dark mt-1">Persetujuan untuk masuk & keluar barang dari warehouse</p>
+                <h1 className="text-3xl font-bold gradient-text">{t("Approval Manager")}</h1>
+                <p className="text-silver-dark mt-1">{t("Persetujuan untuk masuk & keluar barang dari warehouse")}</p>
             </div>
 
             {/* Stats Cards */}
@@ -152,7 +154,7 @@ const ApprovalManager = () => {
                             <Clock className="w-8 h-8 text-yellow-400" />
                         </div>
                         <div>
-                            <p className="text-xs text-silver-dark">Menunggu Persetujuan</p>
+                            <p className="text-xs text-silver-dark">{t("Menunggu Persetujuan")}</p>
                             <p className="text-2xl font-bold text-yellow-400">{pendingCount}</p>
                         </div>
                     </div>
@@ -166,7 +168,7 @@ const ApprovalManager = () => {
                             <CheckCircle className="w-8 h-8 text-accent-green" />
                         </div>
                         <div>
-                            <p className="text-xs text-silver-dark">Disetujui</p>
+                            <p className="text-xs text-silver-dark">{t("Disetujui")}</p>
                             <p className="text-2xl font-bold text-accent-green">{approvedCount}</p>
                         </div>
                     </div>
@@ -180,7 +182,7 @@ const ApprovalManager = () => {
                             <XCircle className="w-8 h-8 text-red-400" />
                         </div>
                         <div>
-                            <p className="text-xs text-silver-dark">Ditolak</p>
+                            <p className="text-xs text-silver-dark">{t("Ditolak")}</p>
                             <p className="text-2xl font-bold text-red-400">{rejectedCount}</p>
                         </div>
                     </div>
@@ -195,7 +197,7 @@ const ApprovalManager = () => {
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                         <input
                             type="text"
-                            placeholder="Cari berdasarkan nama, submitter, modul..."
+                            placeholder={t("Cari berdasarkan nama, submitter, modul...")}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
@@ -210,10 +212,10 @@ const ApprovalManager = () => {
                         onChange={(e) => setFilterStatus(e.target.value)}
                         className="w-full px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
                     >
-                        <option value="pending">⏳ Pending</option>
-                        <option value="approved">✅ Approved</option>
-                        <option value="rejected">❌ Rejected</option>
-                        <option value="all">📋 Semua Status</option>
+                        <option value="pending">{t("⏳ Pending")}</option>
+                        <option value="approved">{t("✅ Approved")}</option>
+                        <option value="rejected">{t("❌ Rejected")}</option>
+                        <option value="all">{t("📋 Semua Status")}</option>
                     </select>
                 </div>
             </div>
@@ -223,8 +225,8 @@ const ApprovalManager = () => {
                 <div className="p-4 border-b border-dark-border">
                     <div className="flex items-center gap-2">
                         <FileText className="w-5 h-5 text-accent-purple" />
-                        <h2 className="text-lg font-semibold text-silver-light">Daftar Approval</h2>
-                        <span className="ml-auto text-sm text-silver-dark">{filteredApprovals.length} request</span>
+                        <h2 className="text-lg font-semibold text-silver-light">{t("Daftar Approval")}</h2>
+                        <span className="ml-auto text-sm text-silver-dark">{filteredApprovals.length} {t("request")}</span>
                     </div>
                 </div>
 
@@ -233,14 +235,14 @@ const ApprovalManager = () => {
                         <thead className="bg-accent-purple/10">
                             <tr>
                                 <th className="px-4 py-3 text-center text-xs font-semibold text-silver uppercase">No</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver uppercase">Tgl Submit</th>
-                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver uppercase">Tipe</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver uppercase">Modul</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver uppercase">Entity</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver uppercase">Submitter</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver uppercase">Tgl Approve</th>
-                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver uppercase">Status</th>
-                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver uppercase">Aksi</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver uppercase">{t("Tgl Submit")}</th>
+                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver uppercase">{t("Tipe")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver uppercase">{t("Modul")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver uppercase">{t("Entity")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver uppercase">{t("Submitter")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver uppercase">{t("Tgl Approve")}</th>
+                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver uppercase">{t("Status")}</th>
+                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver uppercase">{t("Aksi")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
@@ -248,7 +250,7 @@ const ApprovalManager = () => {
                                 <tr>
                                     <td colSpan="9" className="px-4 py-12 text-center">
                                         <FileText className="w-16 h-16 mx-auto mb-4 opacity-30 text-silver-dark" />
-                                        <p className="text-lg text-silver-dark">Tidak ada approval request</p>
+                                        <p className="text-lg text-silver-dark">{t("Tidak ada approval request")}</p>
                                         <p className="text-sm text-silver-dark/50 mt-1">
                                             {filterStatus === 'pending' ? 'Tidak ada permintaan yang menunggu persetujuan' : `Tidak ada request dengan status "${filterStatus}"`}
                                         </p>
@@ -308,7 +310,7 @@ const ApprovalManager = () => {
                                                         <span className="text-xs text-silver-dark">{rejectTs.time}</span>
                                                     </div>
                                                 ) : (
-                                                    <span className="text-silver-dark italic text-xs">Belum diproses</span>
+                                                    <span className="text-silver-dark italic text-xs">{t("Belum diproses")}</span>
                                                 )}
                                             </td>
                                             <td className="px-4 py-3 text-center">
@@ -322,7 +324,7 @@ const ApprovalManager = () => {
                                                     <button
                                                         onClick={() => handleViewDetail(req)}
                                                         className="p-1.5 hover:bg-accent-blue/10 text-accent-blue rounded-lg transition-colors"
-                                                        title="Lihat Detail"
+                                                        title={t("Lihat Detail")}
                                                     >
                                                         <Eye className="w-4 h-4" />
                                                     </button>
@@ -331,7 +333,7 @@ const ApprovalManager = () => {
                                                             <button
                                                                 onClick={() => handleApprove(req.id)}
                                                                 className="p-1.5 hover:bg-accent-green/10 text-accent-green rounded-lg transition-colors"
-                                                                title="Approve"
+                                                                title={t("Approve")}
                                                             >
                                                                 <CheckCircle className="w-4 h-4" />
                                                             </button>
@@ -341,7 +343,7 @@ const ApprovalManager = () => {
                                                                     setShowRejectModal(true);
                                                                 }}
                                                                 className="p-1.5 hover:bg-red-500/10 text-red-400 rounded-lg transition-colors"
-                                                                title="Reject"
+                                                                title={t("Reject")}
                                                             >
                                                                 <XCircle className="w-4 h-4" />
                                                             </button>
@@ -365,7 +367,7 @@ const ApprovalManager = () => {
                         {/* Modal Header */}
                         <div className="flex-shrink-0 flex justify-between items-start p-5 border-b border-dark-border">
                             <div>
-                                <h3 className="text-xl font-bold text-white">Detail Approval Request</h3>
+                                <h3 className="text-xl font-bold text-white">{t("Detail Approval Request")}</h3>
                                 <p className="text-sm text-silver-dark mt-1">{selectedRequest.entityName}</p>
                             </div>
                             <button onClick={() => setShowDetailModal(false)} className="p-2 hover:bg-dark-surface rounded-lg transition-colors">
@@ -401,15 +403,15 @@ const ApprovalManager = () => {
                                 {/* Submitter Info */}
                                 <div className="bg-dark-surface/60 rounded-lg p-4 space-y-3">
                                     <h4 className="text-sm font-bold text-silver-light flex items-center gap-2">
-                                        <User className="w-4 h-4 text-accent-blue" /> Informasi Submitter
+                                        <User className="w-4 h-4 text-accent-blue" /> {t("Informasi Submitter")}
                                     </h4>
                                     <div className="space-y-2">
                                         <div className="flex justify-between">
-                                            <span className="text-xs text-silver-dark">Nama</span>
+                                            <span className="text-xs text-silver-dark">{t("Nama")}</span>
                                             <span className="text-xs text-silver-light font-medium">{selectedRequest.requestedBy || '-'}</span>
                                         </div>
                                         <div className="flex justify-between">
-                                            <span className="text-xs text-silver-dark">Tanggal Submit</span>
+                                            <span className="text-xs text-silver-dark">{t("Tanggal Submit")}</span>
                                             <span className="text-xs text-silver-light">
                                                 {(() => {
                                                     const ts = formatTimestamp(selectedRequest.requestDate);
@@ -423,15 +425,15 @@ const ApprovalManager = () => {
                                 {/* Approval Info */}
                                 <div className="bg-dark-surface/60 rounded-lg p-4 space-y-3">
                                     <h4 className="text-sm font-bold text-silver-light flex items-center gap-2">
-                                        <Calendar className="w-4 h-4 text-accent-green" /> Informasi Approval
+                                        <Calendar className="w-4 h-4 text-accent-green" /> {t("Informasi Approval")}
                                     </h4>
                                     <div className="space-y-2">
                                         <div className="flex justify-between">
-                                            <span className="text-xs text-silver-dark">Approver</span>
+                                            <span className="text-xs text-silver-dark">{t("Approver")}</span>
                                             <span className="text-xs text-silver-light font-medium">{selectedRequest.approvedBy || '-'}</span>
                                         </div>
                                         <div className="flex justify-between">
-                                            <span className="text-xs text-silver-dark">Tanggal Approve</span>
+                                            <span className="text-xs text-silver-dark">{t("Tanggal Approve")}</span>
                                             <span className="text-xs text-silver-light">
                                                 {selectedRequest.approvalDate
                                                     ? (() => {
@@ -443,7 +445,7 @@ const ApprovalManager = () => {
                                         </div>
                                         {selectedRequest.rejectionDate && (
                                             <div className="flex justify-between">
-                                                <span className="text-xs text-silver-dark">Tanggal Reject</span>
+                                                <span className="text-xs text-silver-dark">{t("Tanggal Reject")}</span>
                                                 <span className="text-xs text-red-400">
                                                     {(() => {
                                                         const ts = formatTimestamp(selectedRequest.rejectionDate);
@@ -459,11 +461,11 @@ const ApprovalManager = () => {
                             {/* Request Details */}
                             <div className="bg-dark-surface/60 rounded-lg p-4 space-y-3">
                                 <h4 className="text-sm font-bold text-silver-light flex items-center gap-2">
-                                    <FileText className="w-4 h-4 text-accent-purple" /> Detail Permintaan
+                                    <FileText className="w-4 h-4 text-accent-purple" /> {t("Detail Permintaan")}
                                 </h4>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="flex flex-col gap-1">
-                                        <span className="text-xs text-silver-dark">Tipe</span>
+                                        <span className="text-xs text-silver-dark">{t("Tipe")}</span>
                                         {(() => {
                                             const tc = getTypeConfig(selectedRequest.type);
                                             const TI = tc.icon;
@@ -475,21 +477,21 @@ const ApprovalManager = () => {
                                         })()}
                                     </div>
                                     <div className="flex flex-col gap-1">
-                                        <span className="text-xs text-silver-dark">Modul</span>
+                                        <span className="text-xs text-silver-dark">{t("Modul")}</span>
                                         <span className="text-xs text-accent-purple font-medium">{selectedRequest.module}</span>
                                     </div>
                                     <div className="flex flex-col gap-1">
-                                        <span className="text-xs text-silver-dark">Entity</span>
+                                        <span className="text-xs text-silver-dark">{t("Entity")}</span>
                                         <span className="text-xs text-silver-light font-medium">{selectedRequest.entityName}</span>
                                     </div>
                                     <div className="flex flex-col gap-1">
-                                        <span className="text-xs text-silver-dark">Entity Type</span>
+                                        <span className="text-xs text-silver-dark">{t("Entity Type")}</span>
                                         <span className="text-xs text-silver-light font-mono">{selectedRequest.entityType}</span>
                                     </div>
                                 </div>
                                 {selectedRequest.details && (
                                     <div className="mt-3 pt-3 border-t border-dark-border">
-                                        <span className="text-xs text-silver-dark block mb-1">Keterangan</span>
+                                        <span className="text-xs text-silver-dark block mb-1">{t("Keterangan")}</span>
                                         <p className="text-sm text-silver-light">{selectedRequest.details}</p>
                                     </div>
                                 )}
@@ -498,7 +500,7 @@ const ApprovalManager = () => {
                             {/* Changes Detail */}
                             <div className="bg-dark-surface/60 rounded-lg p-4 space-y-3">
                                 <h4 className="text-sm font-bold text-silver-light flex items-center gap-2">
-                                    <Edit className="w-4 h-4 text-accent-blue" /> Data Perubahan
+                                    <Edit className="w-4 h-4 text-accent-blue" /> {t("Data Perubahan")}
                                 </h4>
                                 {renderChangesDetail(selectedRequest.changes)}
                             </div>
@@ -507,7 +509,7 @@ const ApprovalManager = () => {
                             {selectedRequest.rejectionReason && (
                                 <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
                                     <h4 className="text-sm font-bold text-red-400 mb-2 flex items-center gap-2">
-                                        <XCircle className="w-4 h-4" /> Alasan Penolakan
+                                        <XCircle className="w-4 h-4" /> {t("Alasan Penolakan")}
                                     </h4>
                                     <p className="text-sm text-silver-light">{selectedRequest.rejectionReason}</p>
                                 </div>
@@ -524,13 +526,13 @@ const ApprovalManager = () => {
                                         }}
                                         className="px-5 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors text-sm font-medium border border-red-500/30"
                                     >
-                                        Tolak
+                                        {t("Tolak")}
                                     </button>
                                     <button
                                         onClick={() => handleApprove(selectedRequest.id)}
                                         className="px-5 py-2 bg-accent-green text-white rounded-lg hover:bg-accent-green/80 transition-colors text-sm font-medium"
                                     >
-                                        Setujui
+                                        {t("Setujui")}
                                     </button>
                                 </>
                             )}
@@ -538,7 +540,7 @@ const ApprovalManager = () => {
                                 onClick={() => setShowDetailModal(false)}
                                 className="px-5 py-2 bg-dark-surface text-silver-light rounded-lg hover:bg-dark-card transition-colors text-sm font-medium"
                             >
-                                Tutup
+                                {t("Tutup")}
                             </button>
                         </div>
                     </div>
@@ -551,19 +553,19 @@ const ApprovalManager = () => {
                     <div className="glass-card p-6 rounded-lg max-w-md w-full mx-4 border border-dark-border" onClick={(e) => e.stopPropagation()}>
                         <h3 className="text-xl font-bold text-silver-light mb-4 flex items-center gap-2">
                             <XCircle className="w-5 h-5 text-red-400" />
-                            Tolak Request
+                            {t("Tolak Request")}
                         </h3>
                         <p className="text-silver-dark mb-4">
-                            Tolak request untuk {selectedRequest.type} <span className="text-accent-blue font-medium">{selectedRequest.entityName}</span>?
+                            {t("Tolak request untuk")} {selectedRequest.type} <span className="text-accent-blue font-medium">{selectedRequest.entityName}</span>?
                         </p>
                         <div className="mb-4">
                             <label className="block text-silver-light text-sm font-medium mb-2">
-                                Alasan Penolakan <span className="text-red-400">*</span>
+                                {t("Alasan Penolakan")} <span className="text-red-400">*</span>
                             </label>
                             <textarea
                                 value={rejectReason}
                                 onChange={(e) => setRejectReason(e.target.value)}
-                                placeholder="Masukkan alasan penolakan..."
+                                placeholder={t("Masukkan alasan penolakan...")}
                                 className="w-full px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
                                 rows={3}
                             />
@@ -576,14 +578,14 @@ const ApprovalManager = () => {
                                 }}
                                 className="px-4 py-2 bg-dark-surface text-silver-light rounded-lg hover:bg-dark-card transition-colors"
                             >
-                                Batal
+                                {t("Batal")}
                             </button>
                             <button
                                 onClick={handleReject}
                                 disabled={!rejectReason.trim()}
                                 className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                Tolak
+                                {t("Tolak")}
                             </button>
                         </div>
                     </div>

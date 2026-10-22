@@ -5,8 +5,10 @@ import { useAuth } from '../../../context/AuthContext';
 import {
     Plus, Search, Edit2, Trash2, ChevronDown, ChevronRight, Save, X, FileSpreadsheet
 } from 'lucide-react';
+import { useLanguage } from '../../../i18n/LanguageContext';
 
 const BigCodeOfAccount = () => {
+    const { t } = useLanguage();
     const { canCreate, canEdit, canDelete } = useAuth();
     const hasCreate = canCreate('big_coa');
     const hasEdit   = canEdit('big_coa');
@@ -79,7 +81,7 @@ const BigCodeOfAccount = () => {
                     })
                     .eq('id', editingAccount.id);
                 if (error) throw error;
-                alert('✅ Akun berhasil diperbarui');
+                alert(t("✅ Akun berhasil diperbarui"));
             } else {
                 const { error } = await supabase
                     .from('big_coa')
@@ -90,7 +92,7 @@ const BigCodeOfAccount = () => {
                         is_active: true,
                     }]);
                 if (error) throw error;
-                alert('✅ Akun berhasil ditambahkan');
+                alert(t("✅ Akun berhasil ditambahkan"));
             }
             setShowModal(false);
             setEditingAccount(null);
@@ -131,7 +133,7 @@ const BigCodeOfAccount = () => {
                 .update({ is_active: false })
                 .eq('id', account.id);
             if (error) throw error;
-            alert('✅ Akun dinonaktifkan');
+            alert(t("✅ Akun dinonaktifkan"));
             fetchAccounts();
         } catch (err) {
             console.error('Error deleting Big COA:', err);
@@ -143,7 +145,7 @@ const BigCodeOfAccount = () => {
         if (!hasDelete || accounts.length === 0) return;
         if (!confirm(`⚠️ Hapus SELURUH ${accounts.length} akun COA Big? Tindakan ini tidak dapat dibatalkan.`)) return;
         if (prompt('Ketik "HAPUS" untuk konfirmasi:') !== 'HAPUS') {
-            alert('Konfirmasi tidak sesuai. Dibatalkan.');
+            alert(t("Konfirmasi tidak sesuai. Dibatalkan."));
             return;
         }
         try {
@@ -153,7 +155,7 @@ const BigCodeOfAccount = () => {
                 .update({ is_active: false })
                 .eq('is_active', true);
             if (error) throw error;
-            alert('✅ Seluruh COA Big dinonaktifkan');
+            alert(t("✅ Seluruh COA Big dinonaktifkan"));
             fetchAccounts();
         } catch (err) {
             alert('❌ Error: ' + err.message);
@@ -203,13 +205,13 @@ const BigCodeOfAccount = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text">COA Master — BIG</h1>
-                    <p className="text-silver-dark mt-1">Master data kode akun keuangan BIG (Event Organizer)</p>
+                    <h1 className="text-3xl font-bold gradient-text">{t("COA Master — BIG")}</h1>
+                    <p className="text-silver-dark mt-1">{t("Master data kode akun keuangan BIG (Event Organizer)")}</p>
                 </div>
                 <div className="flex gap-2">
                     {hasDelete && accounts.length > 0 && (
                         <Button variant="danger" icon={Trash2} onClick={handleDeleteAll}>
-                            Hapus Semua
+                            {t("Hapus Semua")}
                         </Button>
                     )}
                     {hasCreate && (
@@ -221,7 +223,7 @@ const BigCodeOfAccount = () => {
                                 setShowModal(true);
                             }}
                         >
-                            Tambah Akun
+                            {t("Tambah Akun")}
                         </Button>
                     )}
                 </div>
@@ -252,7 +254,7 @@ const BigCodeOfAccount = () => {
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                     <input
                         type="text"
-                        placeholder="Cari kode atau nama akun..."
+                        placeholder={t("Cari kode atau nama akun...")}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-orange-400 outline-none"
@@ -260,7 +262,7 @@ const BigCodeOfAccount = () => {
                 </div>
                 {filterGroup !== 'all' && (
                     <Button variant="secondary" onClick={() => setFilterGroup('all')}>
-                        <X className="w-4 h-4 mr-1" /> Clear
+                        <X className="w-4 h-4 mr-1" /> {t("Clear")}
                     </Button>
                 )}
             </div>
@@ -271,18 +273,18 @@ const BigCodeOfAccount = () => {
                     <table className="w-full">
                         <thead className="bg-dark-surface">
                             <tr>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-silver-dark uppercase">Kode</th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-silver-dark uppercase">Nama Akun</th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-silver-dark uppercase">Master Code</th>
-                                <th className="px-4 py-3 text-center text-xs font-bold text-silver-dark uppercase">Grup</th>
-                                <th className="px-4 py-3 text-center text-xs font-bold text-silver-dark uppercase">Lvl</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-silver-dark uppercase">{t("Kode")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-silver-dark uppercase">{t("Nama Akun")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-silver-dark uppercase">{t("Master Code")}</th>
+                                <th className="px-4 py-3 text-center text-xs font-bold text-silver-dark uppercase">{t("Grup")}</th>
+                                <th className="px-4 py-3 text-center text-xs font-bold text-silver-dark uppercase">{t("Lvl")}</th>
                                 <th className="px-4 py-3 text-center text-xs font-bold text-silver-dark uppercase">TB</th>
                                 <th className="px-4 py-3 text-center text-xs font-bold text-silver-dark uppercase">P&L</th>
                                 <th className="px-4 py-3 text-center text-xs font-bold text-silver-dark uppercase">BS</th>
                                 <th className="px-4 py-3 text-center text-xs font-bold text-silver-dark uppercase">AR</th>
                                 <th className="px-4 py-3 text-center text-xs font-bold text-silver-dark uppercase">AP</th>
                                 <th className="px-4 py-3 text-center text-xs font-bold text-silver-dark uppercase">CF</th>
-                                <th className="px-4 py-3 text-center text-xs font-bold text-silver-dark uppercase">Aksi</th>
+                                <th className="px-4 py-3 text-center text-xs font-bold text-silver-dark uppercase">{t("Aksi")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
@@ -300,7 +302,7 @@ const BigCodeOfAccount = () => {
                                                         ? <ChevronDown className="w-4 h-4" />
                                                         : <ChevronRight className="w-4 h-4" />
                                                     }
-                                                    {group} ({accts.length} akun)
+                                                    {group} ({accts.length} {t("akun)")}
                                                 </div>
                                             </td>
                                         </tr>
@@ -330,7 +332,7 @@ const BigCodeOfAccount = () => {
                                                             <button
                                                                 onClick={() => handleEdit(acc)}
                                                                 className="p-1.5 rounded hover:bg-blue-500/20 text-blue-400"
-                                                                title="Edit"
+                                                                title={t("Edit")}
                                                             >
                                                                 <Edit2 className="w-4 h-4" />
                                                             </button>
@@ -339,7 +341,7 @@ const BigCodeOfAccount = () => {
                                                             <button
                                                                 onClick={() => handleDelete(acc)}
                                                                 className="p-1.5 rounded hover:bg-red-500/20 text-red-400"
-                                                                title="Hapus"
+                                                                title={t("Hapus")}
                                                             >
                                                                 <Trash2 className="w-4 h-4" />
                                                             </button>
@@ -355,7 +357,7 @@ const BigCodeOfAccount = () => {
                                 <tr>
                                     <td colSpan="12" className="px-4 py-8 text-center text-silver-dark">
                                         <FileSpreadsheet className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                                        <p>Tidak ada akun ditemukan</p>
+                                        <p>{t("Tidak ada akun ditemukan")}</p>
                                     </td>
                                 </tr>
                             )}
@@ -384,23 +386,23 @@ const BigCodeOfAccount = () => {
                             {/* Code & Name */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-silver-dark mb-1">Kode Akun *</label>
+                                    <label className="block text-sm font-medium text-silver-dark mb-1">{t("Kode Akun *")}</label>
                                     <input
                                         type="text"
                                         value={form.code}
                                         onChange={(e) => setForm({ ...form, code: e.target.value })}
-                                        placeholder="mis. 1-1100"
+                                        placeholder={t("mis. 1-1100")}
                                         className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light font-mono focus:border-orange-400 outline-none"
                                         required
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-silver-dark mb-1">Nama Akun *</label>
+                                    <label className="block text-sm font-medium text-silver-dark mb-1">{t("Nama Akun *")}</label>
                                     <input
                                         type="text"
                                         value={form.name}
                                         onChange={(e) => setForm({ ...form, name: e.target.value })}
-                                        placeholder="Nama akun"
+                                        placeholder={t("Nama akun")}
                                         className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-orange-400 outline-none"
                                         required
                                     />
@@ -410,13 +412,13 @@ const BigCodeOfAccount = () => {
                             {/* Master Code, Type, Level */}
                             <div className="grid grid-cols-3 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-silver-dark mb-1">Master Code</label>
+                                    <label className="block text-sm font-medium text-silver-dark mb-1">{t("Master Code")}</label>
                                     <select
                                         value={form.parent_code}
                                         onChange={(e) => setForm({ ...form, parent_code: e.target.value })}
                                         className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-orange-400 outline-none"
                                     >
-                                        <option value="">-- Tidak ada (top level) --</option>
+                                        <option value="">{t("-- Tidak ada (top level) --")}</option>
                                         {accounts
                                             .filter(a => a.code !== form.code)
                                             .map(a => (
@@ -427,7 +429,7 @@ const BigCodeOfAccount = () => {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-silver-dark mb-1">Grup / Tipe *</label>
+                                    <label className="block text-sm font-medium text-silver-dark mb-1">{t("Grup / Tipe *")}</label>
                                     <select
                                         value={form.type}
                                         onChange={(e) => setForm({ ...form, type: e.target.value })}
@@ -440,7 +442,7 @@ const BigCodeOfAccount = () => {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-silver-dark mb-1">Level</label>
+                                    <label className="block text-sm font-medium text-silver-dark mb-1">{t("Level")}</label>
                                     <input
                                         type="number"
                                         min="1"
@@ -454,7 +456,7 @@ const BigCodeOfAccount = () => {
 
                             {/* Report Classification */}
                             <div>
-                                <label className="block text-sm font-medium text-silver-dark mb-2">Klasifikasi Laporan</label>
+                                <label className="block text-sm font-medium text-silver-dark mb-2">{t("Klasifikasi Laporan")}</label>
                                 <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
                                     {[
                                         { key: 'is_trial_balance', label: 'Trial Balance' },
@@ -488,11 +490,11 @@ const BigCodeOfAccount = () => {
 
                             {/* Description */}
                             <div>
-                                <label className="block text-sm font-medium text-silver-dark mb-1">Deskripsi</label>
+                                <label className="block text-sm font-medium text-silver-dark mb-1">{t("Deskripsi")}</label>
                                 <textarea
                                     value={form.description}
                                     onChange={(e) => setForm({ ...form, description: e.target.value })}
-                                    placeholder="Opsional..."
+                                    placeholder={t("Opsional...")}
                                     rows={2}
                                     className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-orange-400 outline-none"
                                 />
@@ -501,7 +503,7 @@ const BigCodeOfAccount = () => {
                             {/* Actions */}
                             <div className="flex justify-end gap-3 pt-4 border-t border-dark-border">
                                 <Button type="button" variant="secondary" onClick={() => setShowModal(false)}>
-                                    Batal
+                                    {t("Batal")}
                                 </Button>
                                 {(!editingAccount || hasEdit) && (
                                     <Button type="submit" icon={Save}>

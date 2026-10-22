@@ -6,8 +6,10 @@ import Button from '../../../components/Common/Button';
 import { DEFAULT_LOCATION } from '../../../constants/locationOptions';
 import { exportToCSV } from '../../../utils/exportCSV';
 import { exportToXLS } from '../../../utils/exportXLS';
+import { useLanguage } from '../../../i18n/LanguageContext';
 
 const PergerakanBarang = () => {
+    const { t } = useLanguage();
     const [searchParams] = useSearchParams();
     const { inboundTransactions = [], outboundTransactions = [], quotations = [], mutationLogs = [], companySettings, updateInboundItem } = useData();
 
@@ -250,7 +252,7 @@ const PergerakanBarang = () => {
         if (res.success) {
             setEditingRow(null);
         } else {
-            alert('Gagal menyimpan perubahan');
+            alert(t("Gagal menyimpan perubahan"));
         }
     };
 
@@ -346,8 +348,8 @@ const PergerakanBarang = () => {
         <div className="p-6 space-y-6">
             {/* Header */}
             <div>
-                <h1 className="text-3xl font-bold gradient-text">Pabean - Mutasi Barang</h1>
-                <p className="text-silver-dark mt-1">Laporan Penghitungan Posisi Barang (Masuk - Keluar)</p>
+                <h1 className="text-3xl font-bold gradient-text">{t("Pabean - Mutasi Barang")}</h1>
+                <p className="text-silver-dark mt-1">{t("Laporan Penghitungan Posisi Barang (Masuk - Keluar)")}</p>
             </div>
 
             {/* Search & Stats */}
@@ -357,7 +359,7 @@ const PergerakanBarang = () => {
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                         <input
                             type="text"
-                            placeholder="Cari berdasarkan nama barang, nomor Aju, atau kode barang..."
+                            placeholder={t("Cari berdasarkan nama barang, nomor Aju, atau kode barang...")}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
@@ -370,7 +372,7 @@ const PergerakanBarang = () => {
                                 value={startDate}
                                 onChange={(e) => setStartDate(e.target.value)}
                                 className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none text-sm"
-                                placeholder="Dari Tanggal"
+                                placeholder={t("Dari Tanggal")}
                             />
                         </div>
                         <div className="flex-1">
@@ -379,7 +381,7 @@ const PergerakanBarang = () => {
                                 value={endDate}
                                 onChange={(e) => setEndDate(e.target.value)}
                                 className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none text-sm"
-                                placeholder="Sampai Tanggal"
+                                placeholder={t("Sampai Tanggal")}
                             />
                         </div>
                     </div>
@@ -387,7 +389,7 @@ const PergerakanBarang = () => {
 
                 {/* Total Masuk */}
                 <div className="glass-card p-4 rounded-lg border border-accent-blue">
-                    <p className="text-xs text-silver-dark">Barang Masuk</p>
+                    <p className="text-xs text-silver-dark">{t("Barang Masuk")}</p>
                     <p className="text-2xl font-bold text-accent-blue">
                         {filteredData.reduce((sum, i) => sum + (Number(i.qtyMasuk) || 0), 0)}
                     </p>
@@ -395,7 +397,7 @@ const PergerakanBarang = () => {
 
                 {/* Total Keluar */}
                 <div className="glass-card p-4 rounded-lg border border-red-500">
-                    <p className="text-xs text-silver-dark">Barang Keluar</p>
+                    <p className="text-xs text-silver-dark">{t("Barang Keluar")}</p>
                     <p className="text-2xl font-bold text-red-500">
                         {filteredData.reduce((sum, i) => sum + (Number(i.qtyKeluar) || 0), 0)}
                     </p>
@@ -403,7 +405,7 @@ const PergerakanBarang = () => {
 
                 {/* Total Saldo Akhir */}
                 <div className="glass-card p-4 rounded-lg border border-green-500">
-                    <p className="text-xs text-silver-dark">Saldo</p>
+                    <p className="text-xs text-silver-dark">{t("Saldo")}</p>
                     <p className="text-2xl font-bold text-green-500">
                         {filteredData.reduce((sum, i) => sum + (Number(i.qtySisa) || 0), 0)}
                     </p>
@@ -415,8 +417,8 @@ const PergerakanBarang = () => {
                 <div className="p-4 border-b border-dark-border">
                     <div className="flex items-center gap-2">
                         <Activity className="w-5 h-5 text-accent-blue" />
-                        <h2 className="text-lg font-semibold text-silver-light">Rekonsiliasi Mutasi</h2>
-                        <span className="ml-auto text-sm text-silver-dark">{filteredData.length} entri</span>
+                        <h2 className="text-lg font-semibold text-silver-light">{t("Rekonsiliasi Mutasi")}</h2>
+                        <span className="ml-auto text-sm text-silver-dark">{filteredData.length} {t("entri")}</span>
                         <div className="flex gap-2 ml-2">
                             <Button
                                 onClick={handleExportXLS}
@@ -443,20 +445,20 @@ const PergerakanBarang = () => {
                         <thead className="bg-accent-blue/10">
                             <tr>
                                 <th className="px-3 py-1.5 text-center text-[11px] font-bold text-silver whitespace-nowrap">No</th>
-                                <th className="px-3 py-1.5 text-left text-[11px] font-bold text-silver whitespace-nowrap">No. Pengajuan</th>
-                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-accent-cyan whitespace-nowrap">Kode BC Masuk</th>
-                                <th className="px-3 py-1.5 text-left text-[11px] font-bold text-silver whitespace-nowrap">No. Pabean</th>
-                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-silver whitespace-nowrap">Tgl. Keluar</th>
-                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-silver whitespace-nowrap">No. Urut Item</th>
-                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-silver whitespace-nowrap">Kode Barang</th>
-                                <th className="px-3 py-1.5 text-left text-[11px] font-bold text-silver whitespace-nowrap">Nama Barang</th>
-                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-silver whitespace-nowrap">Satuan</th>
-                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-silver whitespace-nowrap">Jml Masuk</th>
-                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-orange-400 whitespace-nowrap">Jml Keluar</th>
-                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-yellow-400 whitespace-nowrap">Penyesuaian</th>
-                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-green-400 whitespace-nowrap">Saldo Akhir</th>
-                                <th className="px-3 py-1.5 text-left text-[11px] font-bold text-silver whitespace-nowrap">Keterangan</th>
-                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-silver whitespace-nowrap">Aksi</th>
+                                <th className="px-3 py-1.5 text-left text-[11px] font-bold text-silver whitespace-nowrap">{t("No. Pengajuan")}</th>
+                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-accent-cyan whitespace-nowrap">{t("Kode BC Masuk")}</th>
+                                <th className="px-3 py-1.5 text-left text-[11px] font-bold text-silver whitespace-nowrap">{t("No. Pabean")}</th>
+                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-silver whitespace-nowrap">{t("Tgl. Keluar")}</th>
+                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-silver whitespace-nowrap">{t("No. Urut Item")}</th>
+                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-silver whitespace-nowrap">{t("Kode Barang")}</th>
+                                <th className="px-3 py-1.5 text-left text-[11px] font-bold text-silver whitespace-nowrap">{t("Nama Barang")}</th>
+                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-silver whitespace-nowrap">{t("Satuan")}</th>
+                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-silver whitespace-nowrap">{t("Jml Masuk")}</th>
+                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-orange-400 whitespace-nowrap">{t("Jml Keluar")}</th>
+                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-yellow-400 whitespace-nowrap">{t("Penyesuaian")}</th>
+                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-green-400 whitespace-nowrap">{t("Saldo Akhir")}</th>
+                                <th className="px-3 py-1.5 text-left text-[11px] font-bold text-silver whitespace-nowrap">{t("Keterangan")}</th>
+                                <th className="px-3 py-1.5 text-center text-[11px] font-bold text-silver whitespace-nowrap">{t("Aksi")}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -464,7 +466,7 @@ const PergerakanBarang = () => {
                                 <tr>
                                     <td colSpan="15" className="px-4 py-12 text-center">
                                         <Package className="w-16 h-16 mx-auto mb-4 opacity-30 text-silver-dark" />
-                                        <p className="text-lg text-silver-dark">Belum ada data</p>
+                                        <p className="text-lg text-silver-dark">{t("Belum ada data")}</p>
                                     </td>
                                 </tr>
                             ) : (
@@ -505,7 +507,7 @@ const PergerakanBarang = () => {
                                                     value={editForm.notes}
                                                     onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
                                                     className="w-full px-2 py-0.5 bg-dark-bg border border-accent-blue rounded text-xs"
-                                                    placeholder="Catatan..."
+                                                    placeholder={t("Catatan...")}
                                                  />
                                             ) : (
                                                 <div className="truncate max-w-[150px]" title={item.keterangan}>
@@ -519,14 +521,14 @@ const PergerakanBarang = () => {
                                                     <button
                                                         onClick={() => handleSave(item)}
                                                         className="p-1 text-accent-green hover:bg-accent-green/10 rounded-md transition-colors"
-                                                        title="Simpan"
+                                                        title={t("Simpan")}
                                                     >
                                                         <Save className="w-3.5 h-3.5" />
                                                     </button>
                                                     <button
                                                         onClick={handleCancel}
                                                         className="p-1 text-red-400 hover:bg-red-400/10 rounded-md transition-colors"
-                                                        title="Batal"
+                                                        title={t("Batal")}
                                                     >
                                                         <XCircle className="w-3.5 h-3.5" />
                                                     </button>
@@ -535,7 +537,7 @@ const PergerakanBarang = () => {
                                                 <button
                                                     onClick={() => handleEdit(item)}
                                                     className="p-1 text-accent-blue hover:bg-accent-blue/10 rounded-md transition-colors"
-                                                    title="Edit Mutasi"
+                                                    title={t("Edit Mutasi")}
                                                 >
                                                     <Edit2 className="w-3.5 h-3.5" />
                                                 </button>

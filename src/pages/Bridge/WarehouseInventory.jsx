@@ -8,8 +8,10 @@ import { LOCATION_OPTIONS, DEFAULT_LOCATION } from '../../constants/locationOpti
 import Button from '../../components/Common/Button';
 import { exportToCSV } from '../../utils/exportCSV';
 import { calculateDaysDifference, getAgingStatus } from '../../utils/agingCalculator';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const WarehouseInventory = () => {
+    const { t } = useLanguage();
     const { canEdit, canDelete, user } = useAuth();
     const hasEdit = canEdit('bridge_inventory');
     const hasDelete = canDelete('bridge_inventory');
@@ -323,7 +325,7 @@ const WarehouseInventory = () => {
                     }
                 }
             } else {
-                alert('Data berhasil disimpan!');
+                alert(t("Data berhasil disimpan!"));
             }
 
             // Update selectedPengajuan dengan data baru (approvedDate sudah update)
@@ -782,7 +784,7 @@ const WarehouseInventory = () => {
                 );
                 
                 if (!outboundApproved) {
-                    alert('❌ Tidak bisa melakukan outbound. Pengajuan Barang Keluar belum disetujui.\n\nSilakan buat dan setujui pengajuan barang keluar terlebih dahulu.');
+                    alert(t("❌ Tidak bisa melakukan outbound. Pengajuan Barang Keluar belum disetujui.\n\nSilakan buat dan setujui pengajuan barang keluar terlebih dahulu."));
                     return;
                 }
             }
@@ -830,7 +832,7 @@ const WarehouseInventory = () => {
             }
 
             if (!qId) {
-                alert("Gagal: ID Pengajuan tidak ditemukan. Silakan refresh halaman dan coba lagi.");
+                alert(t("Gagal: ID Pengajuan tidak ditemukan. Silakan refresh halaman dan coba lagi."));
                 console.error("❌ Critical Error: Quotation ID missing even after lookup.");
                 return;
             }
@@ -1243,11 +1245,11 @@ const WarehouseInventory = () => {
     // Handle delete all mutations for an item
     const handleDeleteMutations = async (itemCode, packageNumber) => {
         if (!hasDelete) {
-            alert('Anda tidak memiliki izin untuk menghapus mutasi');
+            alert(t("Anda tidak memiliki izin untuk menghapus mutasi"));
             return;
         }
         if (!deleteMutationLog) {
-            alert('Fungsi hapus tidak tersedia');
+            alert(t("Fungsi hapus tidak tersedia"));
             return;
         }
 
@@ -1291,11 +1293,11 @@ const WarehouseInventory = () => {
     // Handle delete ALL mutations for entire pengajuan
     const handleDeleteAllMutations = async () => {
         if (!hasDelete) {
-            alert('Anda tidak memiliki izin untuk menghapus mutasi');
+            alert(t("Anda tidak memiliki izin untuk menghapus mutasi"));
             return;
         }
         if (!deleteMutationLog) {
-            alert('Fungsi hapus tidak tersedia');
+            alert(t("Fungsi hapus tidak tersedia"));
             return;
         }
 
@@ -1307,7 +1309,7 @@ const WarehouseInventory = () => {
         );
 
         if (allMutations.length === 0) {
-            alert('Tidak ada data mutasi untuk dihapus');
+            alert(t("Tidak ada data mutasi untuk dihapus"));
             return;
         }
 
@@ -1356,7 +1358,7 @@ const WarehouseInventory = () => {
                 setEditData(JSON.parse(JSON.stringify(updatedPengajuan)));
             }
 
-            alert('Semua data mutasi berhasil dihapus');
+            alert(t("Semua data mutasi berhasil dihapus"));
         } catch (error) {
             console.error('❌ Error deleting mutations:', error);
             alert('Gagal menghapus data mutasi: ' + error.message);
@@ -1375,16 +1377,16 @@ const WarehouseInventory = () => {
             {/* Focus Mode Overlay: Hides main content when direct-linking to mutation modal */}
             {showMutationModal && searchParams.get('action') === 'openMutation' && (
                 <div className="fixed inset-0 z-40 bg-gray-50 dark:bg-dark-bg animate-fade-in flex items-center justify-center">
-                    <div className="text-silver-dark animate-pulse">Memuat Editor Mutasi...</div>
+                    <div className="text-silver-dark animate-pulse">{t("Memuat Editor Mutasi...")}</div>
                 </div>
             )}
             {/* Header */}
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text">Inventaris Gudang</h1>
-                    <p className="text-silver-dark mt-1">Data Barang Masuk dari Pengajuan yang Disetujui</p>
+                    <h1 className="text-3xl font-bold gradient-text">{t("Inventaris Gudang")}</h1>
+                    <p className="text-silver-dark mt-1">{t("Data Barang Masuk dari Pengajuan yang Disetujui")}</p>
                 </div>
-                <Button onClick={handleExportCSV} variant="secondary" icon={Download}>Export CSV</Button>
+                <Button onClick={handleExportCSV} variant="secondary" icon={Download}>{t("Export CSV")}</Button>
             </div>
 
             {/* Search */}
@@ -1393,7 +1395,7 @@ const WarehouseInventory = () => {
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-silver-dark w-5 h-5" />
                     <input
                         type="text"
-                        placeholder="Cari berdasarkan no. pengajuan, no. dokumen pabean, atau customer..."
+                        placeholder={t("Cari berdasarkan no. pengajuan, no. dokumen pabean, atau customer...")}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
@@ -1407,14 +1409,14 @@ const WarehouseInventory = () => {
                     <table className="w-full">
                         <thead className="bg-accent-blue">
                             <tr>
-                                <th className="px-2 py-1 text-left text-xs font-semibold text-white whitespace-nowrap">No. Pengajuan</th>
-                                <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">No. Pabean</th>
-                                <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">Tgl Masuk Gudang</th>
-                                <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">Jam Masuk</th>
-                                <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">Durasi</th>
-                                <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">Jml Package</th>
-                                <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">Jml Item</th>
-                                <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">PIC Penerima</th>
+                                <th className="px-2 py-1 text-left text-xs font-semibold text-white whitespace-nowrap">{t("No. Pengajuan")}</th>
+                                <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">{t("No. Pabean")}</th>
+                                <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">{t("Tgl Masuk Gudang")}</th>
+                                <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">{t("Jam Masuk")}</th>
+                                <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">{t("Durasi")}</th>
+                                <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">{t("Jml Package")}</th>
+                                <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">{t("Jml Item")}</th>
+                                <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">{t("PIC Penerima")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
@@ -1432,7 +1434,7 @@ const WarehouseInventory = () => {
                                             return (
                                                 <td className={`px-2 py-0.5 text-xs text-center whitespace-nowrap font-medium ${status.color}`}>
                                                     {status.isAlert && <AlertCircle className="w-3 h-3 inline mr-1" />}
-                                                    {days} Hari
+                                                    {days} {t("Hari")}
                                                 </td>
                                             );
                                         })()}
@@ -1448,7 +1450,7 @@ const WarehouseInventory = () => {
                 {filteredInboundPengajuan.length === 0 && (
                     <div className="text-center py-12">
                         <Warehouse className="w-16 h-16 text-silver-dark mx-auto mb-4" />
-                        <p className="text-silver-dark">Belum ada pengajuan yang disetujui</p>
+                        <p className="text-silver-dark">{t("Belum ada pengajuan yang disetujui")}</p>
                     </div>
                 )}
             </div>
@@ -1461,7 +1463,7 @@ const WarehouseInventory = () => {
                         <div className="bg-white dark:bg-dark-card rounded-xl w-full max-w-6xl max-h-[90vh] overflow-hidden shadow-xl flex flex-col">
                             <div className="flex-shrink-0 flex justify-between items-center p-4 border-b border-gray-200 dark:border-dark-border">
                                 <div>
-                                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">Detail Inventaris</h2>
+                                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">{t("Detail Inventaris")}</h2>
                                     <p className="text-sm text-gray-500 dark:text-silver-dark">{selectedPengajuan.quotationNumber || selectedPengajuan.quotation_number}</p>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -1471,21 +1473,21 @@ const WarehouseInventory = () => {
                                             {selectedPengajuan.type !== 'outbound' && (
                                                 <>
                                                     {hasDelete && (
-                                                        <Button onClick={handleDeleteAllMutations} variant="secondary" icon={Trash2} className="text-sm text-red-600 hover:text-red-800">Hapus Mutasi</Button>
+                                                        <Button onClick={handleDeleteAllMutations} variant="secondary" icon={Trash2} className="text-sm text-red-600 hover:text-red-800">{t("Hapus Mutasi")}</Button>
                                                     )}
                                                     {hasEdit && (
-                                                        <Button onClick={() => handleStartMutation(selectedPengajuan)} variant="primary" icon={ArrowRightLeft} className="text-sm">Mutasi</Button>
+                                                        <Button onClick={() => handleStartMutation(selectedPengajuan)} variant="primary" icon={ArrowRightLeft} className="text-sm">{t("Mutasi")}</Button>
                                                     )}
                                                 </>
                                             )}
                                             {hasEdit && (
-                                                <Button onClick={handleStartEdit} variant="secondary" icon={Edit2} className="text-sm">Kelola</Button>
+                                                <Button onClick={handleStartEdit} variant="secondary" icon={Edit2} className="text-sm">{t("Kelola")}</Button>
                                             )}
                                         </>
                                     ) : (
                                         <>
-                                            <Button onClick={handleCancelEdit} variant="secondary" icon={XCircle} className="text-sm">Batal</Button>
-                                            <Button onClick={handleSaveEdit} variant="primary" icon={Save} className="text-sm">Simpan</Button>
+                                            <Button onClick={handleCancelEdit} variant="secondary" icon={XCircle} className="text-sm">{t("Batal")}</Button>
+                                            <Button onClick={handleSaveEdit} variant="primary" icon={Save} className="text-sm">{t("Simpan")}</Button>
                                         </>
                                     )}
                                     <button onClick={handleCloseDetail} className="p-2 hover:bg-gray-100 dark:hover:bg-dark-surface rounded-lg"><X className="w-5 h-5 text-gray-500" /></button>
@@ -1494,7 +1496,7 @@ const WarehouseInventory = () => {
 
                             {/* Data Inventaris Section Title */}
                             <div className="flex-shrink-0 px-4 pt-4 pb-2">
-                                <h3 className="text-base font-bold text-gray-800 dark:text-silver-light">📦 Data Inventaris</h3>
+                                <h3 className="text-base font-bold text-gray-800 dark:text-silver-light">{t("📦 Data Inventaris")}</h3>
                             </div>
 
                             {/* Header Table */}
@@ -1503,16 +1505,16 @@ const WarehouseInventory = () => {
                                     <table className="w-full">
                                         <thead className={selectedPengajuan.type === 'outbound' ? 'bg-accent-purple' : 'bg-accent-blue'}>
                                             <tr>
-                                                <th className="px-2 py-1 text-left text-xs font-semibold text-white">No. Pengajuan</th>
-                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">No. Pabean</th>
+                                                <th className="px-2 py-1 text-left text-xs font-semibold text-white">{t("No. Pengajuan")}</th>
+                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">{t("No. Pabean")}</th>
                                                 <th className="px-2 py-1 text-center text-xs font-semibold text-white">
                                                     {selectedPengajuan.type === 'outbound' ? 'Tgl Keluar Gudang' : 'Tgl Masuk Gudang'}
                                                 </th>
                                                 <th className="px-2 py-1 text-center text-xs font-semibold text-white">
                                                     {selectedPengajuan.type === 'outbound' ? 'Jam Keluar' : 'Jam Masuk'}
                                                 </th>
-                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">Jml Package</th>
-                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">Jml Item</th>
+                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">{t("Jml Package")}</th>
+                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">{t("Jml Item")}</th>
                                                 <th className="px-2 py-1 text-center text-xs font-semibold text-white">
                                                     {selectedPengajuan.type === 'outbound' ? 'PIC yang Mengeluarkan' : 'PIC Penerima'}
                                                 </th>
@@ -1548,7 +1550,7 @@ const WarehouseInventory = () => {
 
                             {/* Monitoring Durasi & Timeline Section */}
                             <div className="flex-shrink-0 px-4 pt-4 pb-4 border-b border-gray-200 dark:border-dark-border">
-                                <h3 className="text-base font-bold text-gray-800 dark:text-silver-light mb-3">⏱️ Monitoring Durasi & Timeline</h3>
+                                <h3 className="text-base font-bold text-gray-800 dark:text-silver-light mb-3">{t("⏱️ Monitoring Durasi & Timeline")}</h3>
 
                                 {(() => {
                                     const entryDate = displayData.submissionDate || displayData.submission_date || displayData.date;
@@ -1569,35 +1571,35 @@ const WarehouseInventory = () => {
                                             {/* Aging Status Card */}
                                             <div className="glass-card p-4 rounded-lg border-l-4" style={{ borderLeftColor: status.color.replace('text-', '#') }}>
                                                 <div className="flex items-center justify-between mb-2">
-                                                    <h4 className="text-sm font-semibold text-gray-700 dark:text-silver-light">Status Aging</h4>
+                                                    <h4 className="text-sm font-semibold text-gray-700 dark:text-silver-light">{t("Status Aging")}</h4>
                                                     {status.isAlert && <AlertCircle className={`w-5 h-5 ${status.color}`} />}
                                                 </div>
                                                 <div className="space-y-2">
                                                     <div className="flex justify-between items-center">
-                                                        <span className="text-xs text-gray-600 dark:text-silver-dark">Tanggal Masuk:</span>
+                                                        <span className="text-xs text-gray-600 dark:text-silver-dark">{t("Tanggal Masuk:")}</span>
                                                         <span className="text-xs font-semibold text-gray-900 dark:text-silver-light">{formatDate(entryDate)}</span>
                                                     </div>
                                                     <div className="flex justify-between items-center">
-                                                        <span className="text-xs text-gray-600 dark:text-silver-dark">Jam Masuk:</span>
+                                                        <span className="text-xs text-gray-600 dark:text-silver-dark">{t("Jam Masuk:")}</span>
                                                         <span className="text-xs font-semibold text-gray-900 dark:text-silver-light">{formatTime(displayData.approvedDate || displayData.approved_date)}</span>
                                                     </div>
                                                     <div className="flex justify-between items-center pt-2 border-t border-gray-200 dark:border-dark-border">
-                                                        <span className="text-xs text-gray-600 dark:text-silver-dark">Durasi di Gudang:</span>
-                                                        <span className={`text-lg font-bold ${status.color}`}>{days} Hari</span>
+                                                        <span className="text-xs text-gray-600 dark:text-silver-dark">{t("Durasi di Gudang:")}</span>
+                                                        <span className={`text-lg font-bold ${status.color}`}>{days} {t("Hari")}</span>
                                                     </div>
                                                 </div>
                                             </div>
 
                                             {/* Location Breakdown Card */}
                                             <div className="glass-card p-4 rounded-lg">
-                                                <h4 className="text-sm font-semibold text-gray-700 dark:text-silver-light mb-2">Distribusi Lokasi</h4>
+                                                <h4 className="text-sm font-semibold text-gray-700 dark:text-silver-light mb-2">{t("Distribusi Lokasi")}</h4>
                                                 <div className="space-y-2">
                                                     <div className="flex justify-between items-center">
-                                                        <span className="text-xs text-gray-600 dark:text-silver-dark">Total Item:</span>
+                                                        <span className="text-xs text-gray-600 dark:text-silver-dark">{t("Total Item:")}</span>
                                                         <span className="text-xs font-bold text-accent-blue">{locationInfo.totalItems}</span>
                                                     </div>
                                                     <div className="flex justify-between items-center">
-                                                        <span className="text-xs text-green-600 dark:text-green-400">📦 Di Gudang:</span>
+                                                        <span className="text-xs text-green-600 dark:text-green-400">{t("📦 Di Gudang:")}</span>
                                                         <span className="text-xs font-bold text-green-700 dark:text-green-400">{locationInfo.itemsInWarehouse}</span>
                                                     </div>
                                                     {locationInfo.itemsAtPameran > 0 && (
@@ -1608,7 +1610,7 @@ const WarehouseInventory = () => {
                                                     )}
                                                     {(locationInfo.totalItems - locationInfo.itemsInWarehouse - locationInfo.itemsAtPameran) > 0 && (
                                                         <div className="flex justify-between items-center">
-                                                            <span className="text-xs text-purple-600 dark:text-purple-400">📤 Keluar:</span>
+                                                            <span className="text-xs text-purple-600 dark:text-purple-400">{t("📤 Keluar:")}</span>
                                                             <span className="text-xs font-bold text-purple-700 dark:text-purple-400">
                                                                 {locationInfo.totalItems - locationInfo.itemsInWarehouse - locationInfo.itemsAtPameran}
                                                             </span>
@@ -1619,7 +1621,7 @@ const WarehouseInventory = () => {
 
                                             {/* Activity Timeline Card */}
                                             <div className="glass-card p-4 rounded-lg">
-                                                <h4 className="text-sm font-semibold text-gray-700 dark:text-silver-light mb-2">Aktivitas & Frekuensi</h4>
+                                                <h4 className="text-sm font-semibold text-gray-700 dark:text-silver-light mb-2">{t("Aktivitas & Frekuensi")}</h4>
                                                 {allMutations.length > 0 ? (
                                                     <div className="space-y-3">
                                                         {/* Mutation Statistics */}
@@ -1646,12 +1648,12 @@ const WarehouseInventory = () => {
                                                                     </div>
                                                                     {/* Gudang Counter */}
                                                                     <div className="text-center">
-                                                                        <div className="text-[10px] text-green-600 dark:text-green-400 font-medium">Kembali</div>
+                                                                        <div className="text-[10px] text-green-600 dark:text-green-400 font-medium">{t("Kembali")}</div>
                                                                         <div className="text-lg font-bold text-green-700 dark:text-green-300">{toGudang.length}x</div>
                                                                     </div>
                                                                     {/* Other Counter */}
                                                                     <div className="text-center">
-                                                                        <div className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">Lainnya</div>
+                                                                        <div className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">{t("Lainnya")}</div>
                                                                         <div className="text-lg font-bold text-purple-700 dark:text-purple-300">{toOther.length}x</div>
                                                                     </div>
                                                                 </div>
@@ -1688,7 +1690,7 @@ const WarehouseInventory = () => {
                                                             {allMutations.length > 3 && (
                                                                 <div className="text-center pt-1">
                                                                     <span className="text-[10px] text-accent-blue cursor-pointer hover:underline">
-                                                                        +{allMutations.length - 3} aktivitas lainnya
+                                                                        +{allMutations.length - 3} {t("aktivitas lainnya")}
                                                                     </span>
                                                                 </div>
                                                             )}
@@ -1696,7 +1698,7 @@ const WarehouseInventory = () => {
                                                     </div>
                                                 ) : (
                                                     <div className="text-center py-2">
-                                                        <p className="text-xs text-gray-500 dark:text-silver-dark">Belum ada aktivitas mutasi</p>
+                                                        <p className="text-xs text-gray-500 dark:text-silver-dark">{t("Belum ada aktivitas mutasi")}</p>
                                                     </div>
                                                 )}
                                             </div>
@@ -1707,7 +1709,7 @@ const WarehouseInventory = () => {
 
                             {/* Detail Item Section Title */}
                             <div className="flex-shrink-0 px-4 pt-4 pb-3">
-                                <h3 className="text-base font-bold text-gray-800 dark:text-silver-light">📝 Detail Item</h3>
+                                <h3 className="text-base font-bold text-gray-800 dark:text-silver-light">{t("📝 Detail Item")}</h3>
                             </div>
 
                             {/* Detail Items */}
@@ -1715,41 +1717,41 @@ const WarehouseInventory = () => {
                                 {(displayData.packages || []).map((pkg, pkgIndex) => (
                                     <div key={pkgIndex} className="border border-gray-200 dark:border-dark-border rounded-lg overflow-hidden">
                                         <div className="bg-gray-100 dark:bg-dark-surface px-3 py-2 border-b border-gray-200 dark:border-dark-border">
-                                            <span className="text-sm font-semibold text-gray-700 dark:text-silver-light">Kode Packing: {pkg.packageNumber || `PKG-${pkgIndex + 1}`}</span>
+                                            <span className="text-sm font-semibold text-gray-700 dark:text-silver-light">{t("Kode Packing:")} {pkg.packageNumber || `PKG-${pkgIndex + 1}`}</span>
                                         </div>
                                         <div className="overflow-x-auto">
                                             <table className="w-full">
                                                 <thead className={selectedPengajuan.type === 'outbound' ? 'bg-accent-purple' : 'bg-accent-blue'}>
                                                     <tr>
                                                         <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-8" style={{ fontWeight: 'bold' }}>No.</th>
-                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-20" style={{ fontWeight: 'bold' }}>Kode Brg</th>
+                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-20" style={{ fontWeight: 'bold' }}>{t("Kode Brg")}</th>
                                                         <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-16" style={{ fontWeight: 'bold' }}>HS</th>
-                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white" style={{ fontWeight: 'bold' }}>Item</th>
-                                                        <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white w-12" style={{ fontWeight: 'bold' }}>Awal</th>
-                                                        <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white w-12" style={{ fontWeight: 'bold' }}>Sat</th>
+                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white" style={{ fontWeight: 'bold' }}>{t("Item")}</th>
+                                                        <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white w-12" style={{ fontWeight: 'bold' }}>{t("Awal")}</th>
+                                                        <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white w-12" style={{ fontWeight: 'bold' }}>{t("Sat")}</th>
                                                         {isEditing && selectedPengajuan.type !== 'outbound' && (
-                                                            <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white bg-green-700 w-16" style={{ fontWeight: 'bold' }}>Stok</th>
+                                                            <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white bg-green-700 w-16" style={{ fontWeight: 'bold' }}>{t("Stok")}</th>
                                                         )}
-                                                        <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white w-28" style={{ fontWeight: 'bold' }}>Status</th>
+                                                        <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white w-28" style={{ fontWeight: 'bold' }}>{t("Status")}</th>
                                                         { /* Lokasi removed from here */}
-                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-14" style={{ fontWeight: 'bold' }}>Kondisi</th>
+                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-14" style={{ fontWeight: 'bold' }}>{t("Kondisi")}</th>
                                                         {/* Mutation columns - only in edit mode for inbound */}
                                                         {isEditing && selectedPengajuan.type !== 'outbound' && (
                                                             <>
-                                                                <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white bg-red-700 w-16" style={{ fontWeight: 'bold' }}>Keluar</th>
+                                                                <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white bg-red-700 w-16" style={{ fontWeight: 'bold' }}>{t("Keluar")}</th>
                                                                 {/* New Outbound Details */}
-                                                                <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white bg-red-800 w-24">Tgl Keluar</th>
-                                                                <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white bg-red-800 w-16">Jam</th>
+                                                                <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white bg-red-800 w-24">{t("Tgl Keluar")}</th>
+                                                                <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white bg-red-800 w-16">{t("Jam")}</th>
                                                                 <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white bg-red-800 w-20">PIC</th>
 
-                                                                <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white bg-blue-700 w-16" style={{ fontWeight: 'bold' }}>Kembali</th>
+                                                                <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white bg-blue-700 w-16" style={{ fontWeight: 'bold' }}>{t("Kembali")}</th>
                                                                 {/* New Inbound Details */}
-                                                                <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white bg-blue-800 w-24">Tgl Kembali</th>
-                                                                <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white bg-blue-800 w-16">Jam</th>
+                                                                <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white bg-blue-800 w-24">{t("Tgl Kembali")}</th>
+                                                                <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white bg-blue-800 w-16">{t("Jam")}</th>
                                                                 <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white bg-blue-800 w-20">PIC</th>
                                                             </>
                                                         )}
-                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-full" style={{ fontWeight: 'bold' }}>Keterangan</th>
+                                                        <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-full" style={{ fontWeight: 'bold' }}>{t("Keterangan")}</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-gray-200 dark:divide-dark-border">
@@ -1796,7 +1798,7 @@ const WarehouseInventory = () => {
                                                                     <div className="flex flex-col gap-1 items-start">
                                                                         {/* Warehouse */}
                                                                         <div className="flex items-center justify-between w-full min-w-[70px] bg-green-50 dark:bg-green-900/20 px-1.5 py-0.5 rounded border border-green-100 dark:border-green-800/50">
-                                                                            <span className="text-[10px] text-green-700 dark:text-green-400 font-medium">Gudang</span>
+                                                                            <span className="text-[10px] text-green-700 dark:text-green-400 font-medium">{t("Gudang")}</span>
                                                                             <span className="text-[10px] font-bold text-green-800 dark:text-green-300">{inWarehouse}</span>
                                                                         </div>
 
@@ -1811,14 +1813,14 @@ const WarehouseInventory = () => {
                                                                         {/* Keluar */}
                                                                         {itemStatus.totalOfficialOut > 0 && (
                                                                             <div className="flex items-center justify-between w-full min-w-[70px] bg-purple-50 dark:bg-purple-900/20 px-1.5 py-0.5 rounded border border-purple-100 dark:border-purple-800/50">
-                                                                                <span className="text-[10px] text-purple-700 dark:text-purple-400 font-medium">Keluar</span>
+                                                                                <span className="text-[10px] text-purple-700 dark:text-purple-400 font-medium">{t("Keluar")}</span>
                                                                                 <span className="text-[10px] font-bold text-purple-800 dark:text-purple-300">{itemStatus.totalOfficialOut}</span>
                                                                             </div>
                                                                         )}
                                                                     </div>
                                                                 </td>
                                                                 {/* <td ... Lokasi removed from here ... ></td> */}
-                                                                <td className="px-1 py-0 text-xs text-gray-700 dark:text-silver">{isEditing ? <select value={item.condition || 'Baik'} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'condition', e.target.value)} className="px-1 py-0 text-xs border rounded"><option value="Baik">Baik</option><option value="Rusak">Rusak</option><option value="Cacat">Cacat</option></select> : (item.condition || 'Baik')}</td>
+                                                                <td className="px-1 py-0 text-xs text-gray-700 dark:text-silver">{isEditing ? <select value={item.condition || 'Baik'} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'condition', e.target.value)} className="px-1 py-0 text-xs border rounded"><option value="Baik">{t("Baik")}</option><option value="Rusak">{t("Rusak")}</option><option value="Cacat">{t("Cacat")}</option></select> : (item.condition || 'Baik')}</td>
                                                                 {/* Mutation columns - only in edit mode for inbound */}
                                                                 {isEditing && selectedPengajuan.type !== 'outbound' && (
                                                                     <>
@@ -1905,7 +1907,7 @@ const WarehouseInventory = () => {
                                                                 <td className={`px-1 py-0 text-xs ${isCheckedOut ? 'text-amber-800 dark:text-amber-400' : 'text-gray-700 dark:text-silver'}`}>
                                                                     {isEditing ? (
                                                                         <div className="flex items-center gap-1">
-                                                                            <input type="text" value={item.notes || ''} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'notes', e.target.value)} className="w-24 px-1 py-0 text-xs border rounded" placeholder="Catatan..." />
+                                                                            <input type="text" value={item.notes || ''} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'notes', e.target.value)} className="w-24 px-1 py-0 text-xs border rounded" placeholder={t("Catatan...")} />
                                                                             {item.checkedOut && (
                                                                                 <input
                                                                                     type="text"
@@ -1920,7 +1922,7 @@ const WarehouseInventory = () => {
                                                                         <div className="flex items-center gap-1 flex-wrap">
                                                                             <span className="inline-flex items-center gap-0.5 px-1 py-0 rounded text-[9px] font-medium bg-amber-200 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 whitespace-nowrap">
                                                                                 <CheckCircle className="w-2.5 h-2.5" />
-                                                                                KELUAR
+                                                                                {t("KELUAR")}
                                                                             </span>
                                                                             {checkoutBcNumber && (
                                                                                 <span className="text-[9px] text-amber-700 dark:text-amber-400 whitespace-nowrap">
@@ -1933,7 +1935,7 @@ const WarehouseInventory = () => {
                                                                         <div className="flex items-center gap-1 flex-wrap">
                                                                             <span className="inline-flex items-center gap-0.5 px-1 py-0 rounded text-[9px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 whitespace-nowrap">
                                                                                 <AlertCircle className="w-2.5 h-2.5" />
-                                                                                MUTASI
+                                                                                {t("MUTASI")}
                                                                             </span>
                                                                             <span className="text-[9px] text-orange-600 dark:text-orange-400 whitespace-nowrap">
                                                                                 {mutationInfo.totalMutated}u → {mutationInfo.destination}
@@ -1943,7 +1945,7 @@ const WarehouseInventory = () => {
                                                                                 className="inline-flex items-center gap-0.5 text-[9px] text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap"
                                                                             >
                                                                                 <ExternalLink className="w-2.5 h-2.5" />
-                                                                                Detail
+                                                                                {t("Detail")}
                                                                             </button>
                                                                         </div>
                                                                     ) : (item.notes || '-')}
@@ -1970,12 +1972,12 @@ const WarehouseInventory = () => {
                             {/* Modal Header */}
                             <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-dark-border bg-red-50 dark:bg-red-900/20">
                                 <div>
-                                    <h2 className="text-xl font-bold text-red-700 dark:text-red-400">Mutasi Barang</h2>
+                                    <h2 className="text-xl font-bold text-red-700 dark:text-red-400">{t("Mutasi Barang")}</h2>
                                     <p className="text-sm text-red-600 dark:text-red-500">{selectedPengajuan.quotationNumber || selectedPengajuan.quotation_number}</p>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <Button onClick={handleCloseMutation} variant="secondary" icon={XCircle} className="text-sm">Batal</Button>
-                                    <Button onClick={handleSaveMutation} variant="danger" icon={Save} className="text-sm">Simpan Mutasi</Button>
+                                    <Button onClick={handleCloseMutation} variant="secondary" icon={XCircle} className="text-sm">{t("Batal")}</Button>
+                                    <Button onClick={handleSaveMutation} variant="danger" icon={Save} className="text-sm">{t("Simpan Mutasi")}</Button>
                                     <button onClick={handleCloseMutation} className="p-2 hover:bg-red-100 rounded-lg"><X className="w-5 h-5 text-red-500" /></button>
                                 </div>
                             </div>
@@ -1986,12 +1988,12 @@ const WarehouseInventory = () => {
                                     <table className="w-full">
                                         <thead className="bg-red-600">
                                             <tr>
-                                                <th className="px-2 py-1 text-left text-xs font-semibold text-white">No. Pengajuan</th>
-                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">No. Pabean</th>
-                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">Tgl Masuk</th>
-                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">Jam Masuk</th>
-                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">Jml Pkg</th>
-                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">Jml Item</th>
+                                                <th className="px-2 py-1 text-left text-xs font-semibold text-white">{t("No. Pengajuan")}</th>
+                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">{t("No. Pabean")}</th>
+                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">{t("Tgl Masuk")}</th>
+                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">{t("Jam Masuk")}</th>
+                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">{t("Jml Pkg")}</th>
+                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">{t("Jml Item")}</th>
                                                 <th className="px-2 py-1 text-center text-xs font-semibold text-white">PIC</th>
                                             </tr>
                                         </thead>
@@ -2016,26 +2018,26 @@ const WarehouseInventory = () => {
                                 {(mutationData.packages || []).map((pkg, pkgIndex) => (
                                     <div key={pkgIndex} className="border border-gray-200 dark:border-dark-border rounded-lg overflow-hidden">
                                         <div className="bg-gray-100 dark:bg-dark-surface px-3 py-2 border-b border-gray-200 dark:border-dark-border">
-                                            <span className="text-sm font-semibold">Kode Packing: {pkg.packageNumber || `PKG-${pkgIndex + 1}`}</span>
+                                            <span className="text-sm font-semibold">{t("Kode Packing:")} {pkg.packageNumber || `PKG-${pkgIndex + 1}`}</span>
                                         </div>
                                         <div className="overflow-x-auto">
                                             <table className="w-full">
                                                 <thead className="bg-accent-blue">
                                                     <tr>
                                                         <th className="px-2 py-1 text-left text-xs font-semibold text-white w-8">No.</th>
-                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-20">Kode Brg</th>
-                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white">Item</th>
-                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white w-14">Stok</th>
-                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-32">Tujuan/Lokasi</th>
+                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-20">{t("Kode Brg")}</th>
+                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white">{t("Item")}</th>
+                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white w-14">{t("Stok")}</th>
+                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-32">{t("Tujuan/Lokasi")}</th>
                                                         {/* Mutation columns */}
-                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-20">Mutasi</th>
-                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-16">Sisa</th>
-                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-24">Tgl</th>
-                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-20">Jam</th>
+                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-20">{t("Mutasi")}</th>
+                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-16">{t("Sisa")}</th>
+                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-24">{t("Tgl")}</th>
+                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-20">{t("Jam")}</th>
                                                         <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-24">PIC</th>
-                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-24">Dokumen</th>
-                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-32">Keterangan</th>
-                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white w-14">Aksi</th>
+                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-24">{t("Dokumen")}</th>
+                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-32">{t("Keterangan")}</th>
+                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white w-14">{t("Aksi")}</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-gray-200 dark:divide-dark-border">
@@ -2107,7 +2109,7 @@ const WarehouseInventory = () => {
                                                                         {LOCATION_OPTIONS.filter(opt => isWarehouseRow ? opt.value.toLowerCase() !== 'gudang' : opt.value.toLowerCase() === 'gudang').map(opt => (
                                                                             <option key={opt.value} value={opt.value}>{opt.label}</option>
                                                                         ))}
-                                                                        {isWarehouseRow && <option value="Outbound">Outbound</option>}
+                                                                        {isWarehouseRow && <option value="Outbound">{t("Outbound")}</option>}
                                                                     </select>
                                                                 </td>
 
@@ -2133,7 +2135,7 @@ const WarehouseInventory = () => {
                                                                             className={`w-16 px-1 py-0.5 text-xs text-center border rounded focus:ring-1 ${maxMutasi > 0 ? 'border-red-300 focus:ring-red-500 bg-white' : 'border-gray-300 bg-gray-200 cursor-not-allowed'}`}
                                                                             disabled={maxMutasi === 0}
                                                                         />
-                                                                        <span className={`text-[9px] mt-0.5 text-red-500`}>Max: {maxMutasi}</span>
+                                                                        <span className={`text-[9px] mt-0.5 text-red-500`}>{t("Max:")} {maxMutasi}</span>
                                                                     </div>
                                                                 </td>
 
@@ -2175,7 +2177,7 @@ const WarehouseInventory = () => {
                                                                         value={item.notes || ''}
                                                                         onChange={(e) => handleMutationItemChange(pkgIndex, itemIdx, 'notes', e.target.value)}
                                                                         className="w-full px-1 py-0.5 text-xs border border-red-300 rounded"
-                                                                        placeholder="Ket..."
+                                                                        placeholder={t("Ket...")}
                                                                     />
                                                                 </td>
                                                                 
@@ -2188,7 +2190,7 @@ const WarehouseInventory = () => {
                                                                                     onClick={() => handleAddMultiMutation(pkgIndex, itemIdx)}
                                                                                     variant="primary"
                                                                                     className="!p-1"
-                                                                                    title="Tambah Lokasi Mutasi"
+                                                                                    title={t("Tambah Lokasi Mutasi")}
                                                                                 >
                                                                                     <Plus className="w-3 h-3" />
                                                                                 </Button>
@@ -2197,7 +2199,7 @@ const WarehouseInventory = () => {
                                                                                     onClick={() => handleRemoveMultiMutation(pkgIndex, itemIdx)}
                                                                                     variant="danger"
                                                                                     className="!p-1"
-                                                                                    title="Hapus Baris"
+                                                                                    title={t("Hapus Baris")}
                                                                                 >
                                                                                     <Trash2 className="w-3 h-3" />
                                                                                 </Button>
@@ -2220,15 +2222,15 @@ const WarehouseInventory = () => {
                                         <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-gray-300 dark:border-dark-border">
                                             <div className="bg-gray-100 dark:bg-dark-surface px-4 py-3 border-b border-gray-200 dark:border-dark-border flex justify-between items-center">
                                                 <div>
-                                                    <span className="text-base font-semibold text-gray-800 dark:text-silver-light">Dokumen Pendukung Mutasi</span>
+                                                    <span className="text-base font-semibold text-gray-800 dark:text-silver-light">{t("Dokumen Pendukung Mutasi")}</span>
                                                     <p className="text-xs text-gray-500">
-                                                        Item: {mutationData?.packages[activeDocumentRow.pkgIndex]?.items[activeDocumentRow.itemIdx]?.itemName || mutationData?.packages[activeDocumentRow.pkgIndex]?.items[activeDocumentRow.itemIdx]?.name}
+                                                        {t("Item:")} {mutationData?.packages[activeDocumentRow.pkgIndex]?.items[activeDocumentRow.itemIdx]?.itemName || mutationData?.packages[activeDocumentRow.pkgIndex]?.items[activeDocumentRow.itemIdx]?.name}
                                                     </p>
                                                 </div>
                                                 <div className="flex gap-2">
                                                     <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".jpg,.jpeg,.png,.pdf" multiple className="hidden" />
                                                     <Button onClick={() => fileInputRef.current?.click()} variant="secondary" icon={Upload} className="text-xs" disabled={(mutationData?.packages[activeDocumentRow.pkgIndex]?.items[activeDocumentRow.itemIdx]?.mutationDocuments || []).length >= 5}>
-                                                        Upload ({((mutationData?.packages[activeDocumentRow.pkgIndex]?.items[activeDocumentRow.itemIdx]?.mutationDocuments || [])).length}/5)
+                                                        {t("Upload (")}{((mutationData?.packages[activeDocumentRow.pkgIndex]?.items[activeDocumentRow.itemIdx]?.mutationDocuments || [])).length}/5)
                                                     </Button>
                                                     <button onClick={() => setActiveDocumentRow(null)} className="p-1 hover:bg-gray-200 rounded text-gray-600">
                                                         <X className="w-5 h-5" />
@@ -2237,17 +2239,17 @@ const WarehouseInventory = () => {
                                             </div>
                                             <div className="p-4 overflow-y-auto">
                                                 {!(mutationData?.packages[activeDocumentRow.pkgIndex]?.items[activeDocumentRow.itemIdx]?.mutationDocuments || []).length ? (
-                                                    <p className="text-sm text-gray-500 text-center py-8">Belum ada dokumen pendukung. Klik Upload untuk menambahkan (JPG, PNG, PDF - Max 3MB).</p>
+                                                    <p className="text-sm text-gray-500 text-center py-8">{t("Belum ada dokumen pendukung. Klik Upload untuk menambahkan (JPG, PNG, PDF - Max 3MB).")}</p>
                                                 ) : (
                                                     <table className="w-full">
                                                         <thead className="bg-gray-50 dark:bg-dark-surface">
                                                             <tr>
                                                                 <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600 w-8">No</th>
-                                                                <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">Judul Dokumen</th>
-                                                                <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">Nama File</th>
-                                                                <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Tipe</th>
-                                                                <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Ukuran</th>
-                                                                <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600 w-12">Aksi</th>
+                                                                <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">{t("Judul Dokumen")}</th>
+                                                                <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">{t("Nama File")}</th>
+                                                                <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">{t("Tipe")}</th>
+                                                                <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">{t("Ukuran")}</th>
+                                                                <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600 w-12">{t("Aksi")}</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody className="divide-y divide-gray-200 dark:divide-dark-border">
@@ -2263,7 +2265,7 @@ const WarehouseInventory = () => {
                                                                                 newDocs[idx] = { ...newDocs[idx], title: e.target.value };
                                                                                 handleMutationItemChange(activeDocumentRow.pkgIndex, activeDocumentRow.itemIdx, 'mutationDocuments', newDocs);
                                                                             }} 
-                                                                            placeholder="Masukkan judul..." 
+                                                                            placeholder={t("Masukkan judul...")} 
                                                                             className="w-full px-2 py-1 text-xs border border-gray-300 rounded" 
                                                                         />
                                                                     </td>

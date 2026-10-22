@@ -4,8 +4,10 @@ import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import Button from '../../components/Common/Button';
 import { exportToCSV } from '../../utils/exportCSV';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const HSMaster = () => {
+    const { t } = useLanguage();
     const { canCreate, canEdit, canDelete } = useAuth();
     const hasCreate = canCreate('bridge_hs_master');
     const hasEdit = canEdit('bridge_hs_master');
@@ -94,26 +96,26 @@ const HSMaster = () => {
             {/* Header */}
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text">Master Kode HS</h1>
-                    <p className="text-silver-dark mt-1">Manajemen Kode HS</p>
+                    <h1 className="text-3xl font-bold gradient-text">{t("Master Kode HS")}</h1>
+                    <p className="text-silver-dark mt-1">{t("Manajemen Kode HS")}</p>
                 </div>
                 <div className="flex items-center gap-2">
                     {hasDelete && (
                         <>
                             <Button onClick={handleDeleteSelected} variant="danger" disabled={selectedIds.length === 0}>
                                 <Trash2 className="w-4 h-4 mr-2" />
-                                Hapus Terpilih ({selectedIds.length})
+                                {t("Hapus Terpilih (")}{selectedIds.length})
                             </Button>
                             <Button onClick={handleDeleteAll} variant="danger" disabled={hsCodes.length === 0}>
                                 <Trash2 className="w-4 h-4 mr-2" />
-                                Bersihkan Semua Data
+                                {t("Bersihkan Semua Data")}
                             </Button>
                         </>
                     )}
                     {hasCreate && (
                         <Button onClick={() => setShowModal(true)}>
                             <Plus className="w-4 h-4 mr-2" />
-                            Tambah Kode HS
+                            {t("Tambah Kode HS")}
                         </Button>
                     )}
                 </div>
@@ -126,7 +128,7 @@ const HSMaster = () => {
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                         <input
                             type="text"
-                            placeholder="Cari Kode HS atau deskripsi..."
+                            placeholder={t("Cari Kode HS atau deskripsi...")}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
@@ -134,7 +136,7 @@ const HSMaster = () => {
                     </div>
                 </div>
                 <div className="glass-card p-4 rounded-lg border border-accent-blue">
-                    <p className="text-xs text-silver-dark">Total Kode HS</p>
+                    <p className="text-xs text-silver-dark">{t("Total Kode HS")}</p>
                     <p className="text-2xl font-bold text-accent-blue">{hsCodes.length}</p>
                 </div>
             </div>
@@ -144,15 +146,15 @@ const HSMaster = () => {
                 <div className="p-4 border-b border-dark-border">
                     <div className="flex items-center gap-2">
                         <FileText className="w-5 h-5 text-accent-blue" />
-                        <h2 className="text-lg font-semibold text-silver-light">Daftar Kode HS</h2>
-                        <span className="ml-auto text-sm text-silver-dark">{filteredItems.length} entri</span>
+                        <h2 className="text-lg font-semibold text-silver-light">{t("Daftar Kode HS")}</h2>
+                        <span className="ml-auto text-sm text-silver-dark">{filteredItems.length} {t("entri")}</span>
                         <Button
                             onClick={handleExportCSV}
                             variant="secondary"
                             icon={Download}
                             className="ml-2"
                         >
-                            Export CSV
+                            {t("Export CSV")}
                         </Button>
                     </div>
                 </div>
@@ -170,8 +172,8 @@ const HSMaster = () => {
                                     />
                                 </th>
                                 <th className="px-4 py-3 text-center text-xs font-semibold text-silver">No</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">Kode HS</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">Deskripsi</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">{t("Kode HS")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">{t("Deskripsi")}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -179,8 +181,8 @@ const HSMaster = () => {
                                 <tr>
                                     <td colSpan="4" className="px-4 py-12 text-center">
                                         <FileText className="w-16 h-16 mx-auto mb-4 opacity-30 text-silver-dark" />
-                                        <p className="text-lg text-silver-dark">Belum ada Kode HS</p>
-                                        <p className="text-sm text-silver-dark mt-2">Tambahkan Kode HS untuk memulai</p>
+                                        <p className="text-lg text-silver-dark">{t("Belum ada Kode HS")}</p>
+                                        <p className="text-sm text-silver-dark mt-2">{t("Tambahkan Kode HS untuk memulai")}</p>
                                     </td>
                                 </tr>
                             ) : (
@@ -218,24 +220,24 @@ const HSMaster = () => {
                         </h3>
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
-                                <label className="block text-sm text-silver-light mb-2">Kode HS *</label>
+                                <label className="block text-sm text-silver-light mb-2">{t("Kode HS *")}</label>
                                 <input
                                     type="text"
                                     value={formData.hsCode}
                                     onChange={(e) => setFormData({ ...formData, hsCode: e.target.value })}
                                     className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
-                                    placeholder="Contoh: 8517.12.00"
+                                    placeholder={t("Contoh: 8517.12.00")}
                                     required
                                />
                             </div>
                             <div>
-                                <label className="block text-sm text-silver-light mb-2">Deskripsi</label>
+                                <label className="block text-sm text-silver-light mb-2">{t("Deskripsi")}</label>
                                 <input
                                     type="text"
                                     value={formData.description}
                                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                                     className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
-                                    placeholder="Contoh: Telepon Seluler"
+                                    placeholder={t("Contoh: Telepon Seluler")}
                                 />
                             </div>
                             <div className="flex gap-2 justify-between mt-6">
@@ -250,7 +252,7 @@ const HSMaster = () => {
                                         }}
                                     >
                                         <Trash2 className="w-4 h-4 mr-2" />
-                                        Hapus
+                                        {t("Hapus")}
                                     </Button>
                                 )}
                                 <div className="flex gap-2 ml-auto">
@@ -263,11 +265,11 @@ const HSMaster = () => {
                                             setEditingItem(null);
                                         }}
                                     >
-                                        Batal
+                                        {t("Batal")}
                                     </Button>
                                     {(!editingItem || hasEdit) && (
                                         <Button type="submit">
-                                            Simpan
+                                            {t("Simpan")}
                                         </Button>
                                     )}
                                 </div>

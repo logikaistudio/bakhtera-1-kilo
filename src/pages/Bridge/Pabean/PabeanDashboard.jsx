@@ -1,7 +1,9 @@
 import React from 'react';
 import { useData } from '../../../context/DataContext';
+import { useLanguage } from '../../../i18n/LanguageContext';
 
 const PabeanDashboard = () => {
+    const { t } = useLanguage();
     const { inboundTransactions = [], outboundTransactions = [], quotations = [] } = useData();
 
     // 1. Calculate Totals (Detail Quantity)
@@ -46,58 +48,58 @@ const PabeanDashboard = () => {
         <div className="p-6 space-y-6">
             {/* Header */}
             <div>
-                <h1 className="text-3xl font-bold gradient-text">Dashboard Pabean</h1>
-                <p className="text-silver-dark mt-1">Ringkasan Aktivitas Kepabeanan</p>
+                <h1 className="text-3xl font-bold gradient-text">{t("Dashboard Pabean")}</h1>
+                <p className="text-silver-dark mt-1">{t("Ringkasan Aktivitas Kepabeanan")}</p>
             </div>
 
             {/* Compact Summary Boxes (No Icons) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Barang Masuk */}
                 <div className="glass-card p-4 rounded-lg border-l-4 border-accent-blue bg-dark-bg/40">
-                    <p className="text-xs font-semibold text-silver-dark uppercase tracking-wider mb-1">Total Barang Masuk</p>
+                    <p className="text-xs font-semibold text-silver-dark uppercase tracking-wider mb-1">{t("Total Barang Masuk")}</p>
                     <p className="text-2xl font-bold text-silver-light">{totalInbound.toLocaleString('id-ID')}</p>
-                    <p className="text-[10px] text-silver-dark mt-1">Total Quantity Detail</p>
+                    <p className="text-[10px] text-silver-dark mt-1">{t("Total Quantity Detail")}</p>
                 </div>
 
                 {/* Barang Keluar */}
                 <div className="glass-card p-4 rounded-lg border-l-4 border-accent-orange bg-dark-bg/40">
-                    <p className="text-xs font-semibold text-silver-dark uppercase tracking-wider mb-1">Total Barang Keluar</p>
+                    <p className="text-xs font-semibold text-silver-dark uppercase tracking-wider mb-1">{t("Total Barang Keluar")}</p>
                     <p className="text-2xl font-bold text-silver-light">{totalOutbound.toLocaleString('id-ID')}</p>
-                    <p className="text-[10px] text-silver-dark mt-1">Total Quantity Detail</p>
+                    <p className="text-[10px] text-silver-dark mt-1">{t("Total Quantity Detail")}</p>
                 </div>
 
                 {/* Stok */}
                 <div className="glass-card p-4 rounded-lg border-l-4 border-accent-green bg-dark-bg/40">
-                    <p className="text-xs font-semibold text-silver-dark uppercase tracking-wider mb-1">Barang di TPPB</p>
+                    <p className="text-xs font-semibold text-silver-dark uppercase tracking-wider mb-1">{t("Barang di TPPB")}</p>
                     <p className={`text-2xl font-bold ${stock < 0 ? 'text-red-400' : 'text-accent-green'}`}>
                         {stock.toLocaleString('id-ID')}
                     </p>
-                    <p className="text-[10px] text-silver-dark mt-1">Masuk - Keluar</p>
+                    <p className="text-[10px] text-silver-dark mt-1">{t("Masuk - Keluar")}</p>
                 </div>
             </div>
 
             {/* Table Summary */}
             <div className="glass-card rounded-lg overflow-hidden border border-dark-border">
                 <div className="px-6 py-4 border-b border-dark-border">
-                    <h3 className="text-lg font-semibold text-silver-light">Ringkasan Status Pengajuan</h3>
+                    <h3 className="text-lg font-semibold text-silver-light">{t("Ringkasan Status Pengajuan")}</h3>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead className="bg-dark-surface/50 border-b border-dark-border">
                             <tr>
-                                <th className="px-3 py-2 text-left text-[11px] font-bold text-silver uppercase tracking-wider whitespace-nowrap">No. Pengajuan</th>
+                                <th className="px-3 py-2 text-left text-[11px] font-bold text-silver uppercase tracking-wider whitespace-nowrap">{t("No. Pengajuan")}</th>
                                 <th className="px-3 py-2 text-left text-[11px] font-bold text-silver uppercase tracking-wider whitespace-nowrap">No. BC</th>
-                                <th className="px-3 py-2 text-center text-[11px] font-bold text-silver uppercase tracking-wider whitespace-nowrap">Tanggal Pengajuan</th>
-                                <th className="px-3 py-2 text-center text-[11px] font-bold text-silver uppercase tracking-wider whitespace-nowrap">Tanggal Approval</th>
-                                <th className="px-3 py-2 text-center text-[11px] font-bold text-silver uppercase tracking-wider whitespace-nowrap">Jenis Pengajuan</th>
-                                <th className="px-3 py-2 text-center text-[11px] font-bold text-silver uppercase tracking-wider whitespace-nowrap">Status</th>
+                                <th className="px-3 py-2 text-center text-[11px] font-bold text-silver uppercase tracking-wider whitespace-nowrap">{t("Tanggal Pengajuan")}</th>
+                                <th className="px-3 py-2 text-center text-[11px] font-bold text-silver uppercase tracking-wider whitespace-nowrap">{t("Tanggal Approval")}</th>
+                                <th className="px-3 py-2 text-center text-[11px] font-bold text-silver uppercase tracking-wider whitespace-nowrap">{t("Jenis Pengajuan")}</th>
+                                <th className="px-3 py-2 text-center text-[11px] font-bold text-silver uppercase tracking-wider whitespace-nowrap">{t("Status")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
                             {sortedQuotations.length === 0 ? (
                                 <tr>
                                     <td colSpan="5" className="px-6 py-8 text-center text-silver-dark text-sm">
-                                        Belum ada data pengajuan
+                                        {t("Belum ada data pengajuan")}
                                     </td>
                                 </tr>
                             ) : (

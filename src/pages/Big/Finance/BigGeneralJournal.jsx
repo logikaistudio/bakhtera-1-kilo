@@ -4,11 +4,13 @@ import { useAuth } from '../../../context/AuthContext';
 import Button from '../../../components/Common/Button';
 import Modal from '../../../components/Common/Modal';
 import { BookOpen, Plus, Trash, RefreshCw, CheckCircle, X } from 'lucide-react';
+import { useLanguage } from '../../../i18n/LanguageContext';
 
 const today = () => new Date().toISOString().split('T')[0];
 const fmtIDR = (v) => v != null ? 'Rp ' + Number(v).toLocaleString('id-ID') : 'Rp 0';
 
 const EntryFormModal = ({ coaList, onClose, onSave }) => {
+    const { t } = useLanguage();
     const [form, setForm] = useState({
         entry_date: today(),
         description: '',
@@ -34,9 +36,9 @@ const EntryFormModal = ({ coaList, onClose, onSave }) => {
     const removeLine = (idx) => { if (form.lines.length > 2) setForm(p => ({ ...p, lines: p.lines.filter((_, i) => i !== idx) })); };
 
     const handleSave = async () => {
-        if (!form.description.trim()) return alert('Deskripsi wajib diisi');
-        if (!isBalanced) return alert('Jumlah Debit dan Kredit harus seimbang!');
-        if (form.lines.some(l => !l.coa_id)) return alert('Semua baris harus memiliki COA');
+        if (!form.description.trim()) return alert(t("Deskripsi wajib diisi"));
+        if (!isBalanced) return alert(t("Jumlah Debit dan Kredit harus seimbang!"));
+        if (form.lines.some(l => !l.coa_id)) return alert(t("Semua baris harus memiliki COA"));
         setSaving(true);
         try {
             const { data: entry, error: entryErr } = await supabase
@@ -72,39 +74,39 @@ const EntryFormModal = ({ coaList, onClose, onSave }) => {
     return (
         <Modal isOpen onClose={onClose} maxWidth="max-w-4xl">
             <div className="p-6 space-y-5">
-                <h2 className="text-2xl font-bold gradient-text">Tambah Jurnal Manual</h2>
+                <h2 className="text-2xl font-bold gradient-text">{t("Tambah Jurnal Manual")}</h2>
                 <div className="grid grid-cols-3 gap-4">
                     <div>
-                        <label className="block text-xs text-silver-dark mb-1">Tanggal *</label>
+                        <label className="block text-xs text-silver-dark mb-1">{t("Tanggal *")}</label>
                         <input type="date" value={form.entry_date} onChange={e => setForm(p => ({ ...p, entry_date: e.target.value }))}
                             className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-silver-light text-sm" />
                     </div>
                     <div className="col-span-2">
-                        <label className="block text-xs text-silver-dark mb-1">Deskripsi *</label>
+                        <label className="block text-xs text-silver-dark mb-1">{t("Deskripsi *")}</label>
                         <input value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
-                            className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-silver-light text-sm" placeholder="Keterangan jurnal" />
+                            className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-silver-light text-sm" placeholder={t("Keterangan jurnal")} />
                     </div>
                 </div>
                 <div>
-                    <label className="block text-xs text-silver-dark mb-1">No. Referensi</label>
+                    <label className="block text-xs text-silver-dark mb-1">{t("No. Referensi")}</label>
                     <input value={form.reference_number} onChange={e => setForm(p => ({ ...p, reference_number: e.target.value }))}
-                        className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-silver-light text-sm" placeholder="Opsional" />
+                        className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-silver-light text-sm" placeholder={t("Opsional")} />
                 </div>
 
                 <div className="glass-card rounded-xl overflow-hidden">
                     <div className="flex items-center justify-between px-4 py-3 bg-[#0070BB]">
-                        <span className="text-white font-semibold text-sm">Baris Jurnal</span>
+                        <span className="text-white font-semibold text-sm">{t("Baris Jurnal")}</span>
                         <button onClick={addLine} className="text-white text-xs flex items-center gap-1 hover:text-yellow-300">
-                            <Plus className="w-4 h-4" /> Tambah Baris
+                            <Plus className="w-4 h-4" /> {t("Tambah Baris")}
                         </button>
                     </div>
                     <table className="w-full text-sm">
                         <thead className="bg-dark-surface/60 text-silver-dark text-xs uppercase">
                             <tr>
-                                <th className="px-3 py-2 text-left">COA Big *</th>
-                                <th className="px-3 py-2 text-left">Keterangan</th>
-                                <th className="px-3 py-2 text-right w-36">Debit</th>
-                                <th className="px-3 py-2 text-right w-36">Kredit</th>
+                                <th className="px-3 py-2 text-left">{t("COA Big *")}</th>
+                                <th className="px-3 py-2 text-left">{t("Keterangan")}</th>
+                                <th className="px-3 py-2 text-right w-36">{t("Debit")}</th>
+                                <th className="px-3 py-2 text-right w-36">{t("Kredit")}</th>
                                 <th className="px-3 py-2 w-10"></th>
                             </tr>
                         </thead>
@@ -114,7 +116,7 @@ const EntryFormModal = ({ coaList, onClose, onSave }) => {
                                     <td className="px-3 py-2">
                                         <select value={line.coa_id} onChange={e => updateLine(idx, 'coa_id', e.target.value)}
                                             className="w-full bg-dark-surface border border-dark-border rounded px-2 py-1.5 text-silver-light text-xs">
-                                            <option value="">— Pilih COA —</option>
+                                            <option value="">{t("— Pilih COA —")}</option>
                                             {coaList.map(c => <option key={c.id} value={c.id}>{c.code} - {c.name}</option>)}
                                         </select>
                                     </td>
@@ -142,7 +144,7 @@ const EntryFormModal = ({ coaList, onClose, onSave }) => {
                         </tbody>
                         <tfoot className={`text-sm font-bold ${isBalanced ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
                             <tr>
-                                <td colSpan={2} className="px-3 py-3 text-right text-silver-light">TOTAL</td>
+                                <td colSpan={2} className="px-3 py-3 text-right text-silver-light">{t("TOTAL")}</td>
                                 <td className="px-3 py-3 text-right text-blue-400 font-mono">{fmtIDR(totalDebit)}</td>
                                 <td className="px-3 py-3 text-right text-orange-400 font-mono">{fmtIDR(totalCredit)}</td>
                                 <td className="px-3 py-3 text-center">
@@ -154,11 +156,11 @@ const EntryFormModal = ({ coaList, onClose, onSave }) => {
                 </div>
 
                 {!isBalanced && (
-                    <p className="text-red-400 text-sm text-center">⚠️ Selisih: {fmtIDR(Math.abs(totalDebit - totalCredit))} — Jurnal harus seimbang</p>
+                    <p className="text-red-400 text-sm text-center">{t("⚠️ Selisih:")} {fmtIDR(Math.abs(totalDebit - totalCredit))} {t("— Jurnal harus seimbang")}</p>
                 )}
 
                 <div className="flex gap-3 justify-end pt-4 border-t border-dark-border">
-                    <Button variant="secondary" onClick={onClose}>Batal</Button>
+                    <Button variant="secondary" onClick={onClose}>{t("Batal")}</Button>
                     <Button onClick={handleSave} disabled={saving || !isBalanced} icon={CheckCircle}>
                         {saving ? 'Menyimpan...' : 'Posting Jurnal'}
                     </Button>
@@ -169,6 +171,7 @@ const EntryFormModal = ({ coaList, onClose, onSave }) => {
 };
 
 const BigGeneralJournal = () => {
+    const { t } = useLanguage();
     const { canCreate, canDelete } = useAuth();
     const [entries, setEntries] = useState([]);
     const [coaList, setCoaList] = useState([]);
@@ -192,8 +195,8 @@ const BigGeneralJournal = () => {
     };
 
     const handleDelete = async (id) => {
-        if (!canDelete('big_finance')) return alert('Tidak ada akses.');
-        if (!confirm('Hapus jurnal ini? Tindakan tidak dapat dibatalkan.')) return;
+        if (!canDelete('big_finance')) return alert(t("Tidak ada akses."));
+        if (!confirm(t("Hapus jurnal ini? Tindakan tidak dapat dibatalkan."))) return;
         await supabase.from('big_journal_line_items').delete().eq('journal_entry_id', id);
         await supabase.from('big_journal_entries').delete().eq('id', id);
         fetchAll();
@@ -204,36 +207,36 @@ const BigGeneralJournal = () => {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold gradient-text flex items-center gap-2">
-                        <BookOpen className="w-8 h-8" /> General Journal — Big
+                        <BookOpen className="w-8 h-8" /> {t("General Journal — Big")}
                     </h1>
-                    <p className="text-silver-dark mt-1">Jurnal manual Big module</p>
+                    <p className="text-silver-dark mt-1">{t("Jurnal manual Big module")}</p>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="secondary" icon={RefreshCw} onClick={fetchAll}>Refresh</Button>
+                    <Button variant="secondary" icon={RefreshCw} onClick={fetchAll}>{t("Refresh")}</Button>
                     {canCreate('big_finance') && (
-                        <Button icon={Plus} onClick={() => setShowForm(true)}>Tambah Jurnal</Button>
+                        <Button icon={Plus} onClick={() => setShowForm(true)}>{t("Tambah Jurnal")}</Button>
                     )}
                 </div>
             </div>
 
             <div className="glass-card rounded-xl overflow-hidden">
                 {loading ? (
-                    <div className="text-center py-16 text-silver-dark">Memuat jurnal...</div>
+                    <div className="text-center py-16 text-silver-dark">{t("Memuat jurnal...")}</div>
                 ) : (
                     <table className="w-full text-sm">
                         <thead className="bg-[#0070BB] text-white">
                             <tr>
-                                <th className="px-4 py-3 text-left">Tanggal</th>
-                                <th className="px-4 py-3 text-left">Deskripsi</th>
-                                <th className="px-4 py-3 text-left">Referensi</th>
-                                <th className="px-4 py-3 text-right">Total Debit</th>
-                                <th className="px-4 py-3 text-right">Total Kredit</th>
-                                <th className="px-4 py-3 text-center">Aksi</th>
+                                <th className="px-4 py-3 text-left">{t("Tanggal")}</th>
+                                <th className="px-4 py-3 text-left">{t("Deskripsi")}</th>
+                                <th className="px-4 py-3 text-left">{t("Referensi")}</th>
+                                <th className="px-4 py-3 text-right">{t("Total Debit")}</th>
+                                <th className="px-4 py-3 text-right">{t("Total Kredit")}</th>
+                                <th className="px-4 py-3 text-center">{t("Aksi")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border/40">
                             {entries.length === 0 ? (
-                                <tr><td colSpan={6} className="text-center py-10 text-silver-dark italic">Belum ada jurnal</td></tr>
+                                <tr><td colSpan={6} className="text-center py-10 text-silver-dark italic">{t("Belum ada jurnal")}</td></tr>
                             ) : entries.map(ent => (
                                 <React.Fragment key={ent.id}>
                                     <tr className="hover:bg-white/5 smooth-transition cursor-pointer" onClick={() => setExpanded(expanded === ent.id ? null : ent.id)}>
@@ -258,9 +261,9 @@ const BigGeneralJournal = () => {
                                                     <thead>
                                                         <tr className="border-b border-dark-border text-silver-dark">
                                                             <th className="py-1 text-left">COA</th>
-                                                            <th className="py-1 text-left">Keterangan</th>
-                                                            <th className="py-1 text-right">Debit</th>
-                                                            <th className="py-1 text-right">Kredit</th>
+                                                            <th className="py-1 text-left">{t("Keterangan")}</th>
+                                                            <th className="py-1 text-right">{t("Debit")}</th>
+                                                            <th className="py-1 text-right">{t("Kredit")}</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>

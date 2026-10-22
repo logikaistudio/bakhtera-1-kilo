@@ -15,8 +15,10 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const CodeOfAccount = () => {
+    const { t } = useLanguage();
     const { canCreate, canEdit, canDelete } = useAuth();
     const hasCreate = canCreate('bridge_coa');
     const hasEdit = canEdit('bridge_coa');
@@ -93,7 +95,7 @@ const CodeOfAccount = () => {
                     .eq('id', editingAccount.id);
 
                 if (error) throw error;
-                alert('✅ Account updated successfully');
+                alert(t("✅ Account updated successfully"));
             } else {
                 const { error } = await supabase
                     .from('code_of_accounts')
@@ -103,7 +105,7 @@ const CodeOfAccount = () => {
                     }]);
 
                 if (error) throw error;
-                alert('✅ Account created successfully');
+                alert(t("✅ Account created successfully"));
             }
 
             setShowModal(false);
@@ -143,7 +145,7 @@ const CodeOfAccount = () => {
         try {
             const success = await deleteBridgeCOA(account.id);
             if (!success) return;
-            alert('✅ Account deleted');
+            alert(t("✅ Account deleted"));
             fetchAccounts();
         } catch (error) {
             console.error('Error deleting account:', error);
@@ -155,10 +157,10 @@ const CodeOfAccount = () => {
         if (!hasDelete) return;
         if (accounts.length === 0) return;
 
-        const confirm1 = confirm("⚠️ PERINGATAN: Anda yakin ingin menghapus SELURUH data COA?\n\nSemua akun yang aktif saat ini akan dinonaktifkan.");
+        const confirm1 = confirm(t("⚠️ PERINGATAN: Anda yakin ingin menghapus SELURUH data COA?\n\nSemua akun yang aktif saat ini akan dinonaktifkan."));
         if (!confirm1) return;
 
-        const confirm2 = confirm("KONFIRMASI TERAKHIR: Tindakan ini tidak dapat dibatalkan melalui aplikasi. Lanjutkan?");
+        const confirm2 = confirm(t("KONFIRMASI TERAKHIR: Tindakan ini tidak dapat dibatalkan melalui aplikasi. Lanjutkan?"));
         if (!confirm2) return;
 
         try {
@@ -170,7 +172,7 @@ const CodeOfAccount = () => {
 
             if (error) throw error;
 
-            alert('✅ Seluruh data COA berhasil dinonaktifkan.');
+            alert(t("✅ Seluruh data COA berhasil dinonaktifkan."));
             fetchAccounts();
         } catch (error) {
             console.error('Error deleting all accounts:', error);
@@ -285,8 +287,8 @@ const CodeOfAccount = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text">Code of Account</h1>
-                    <p className="text-silver-dark mt-1">Master data kode akun untuk klasifikasi anggaran</p>
+                    <h1 className="text-3xl font-bold gradient-text">{t("Code of Account")}</h1>
+                    <p className="text-silver-dark mt-1">{t("Master data kode akun untuk klasifikasi anggaran")}</p>
                 </div>
                 <div className="flex gap-2">
                     {hasDelete && (
@@ -296,7 +298,7 @@ const CodeOfAccount = () => {
                             onClick={handleDeleteSelected}
                             disabled={selectedIds.length === 0}
                         >
-                            Delete Selected ({selectedIds.length})
+                            {t("Delete Selected (")}{selectedIds.length})
                         </Button>
                     )}
                     {hasDelete && accounts.length > 0 && (
@@ -305,7 +307,7 @@ const CodeOfAccount = () => {
                             icon={Trash2}
                             onClick={handleDeleteAll}
                         >
-                            Delete All
+                            {t("Delete All")}
                         </Button>
                     )}
                     {hasCreate && (
@@ -317,7 +319,7 @@ const CodeOfAccount = () => {
                                 setShowModal(true);
                             }}
                         >
-                            Add Account
+                            {t("Add Account")}
                         </Button>
                     )}
                 </div>
@@ -345,7 +347,7 @@ const CodeOfAccount = () => {
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                     <input
                         type="text"
-                        placeholder="Search by code or name..."
+                        placeholder={t("Search by code or name...")}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-10 pr-4 py-2 bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded-lg text-gray-900 dark:text-silver-light"
@@ -353,7 +355,7 @@ const CodeOfAccount = () => {
                 </div>
                 {filterGroup !== 'all' && (
                     <Button variant="outline" onClick={() => setFilterGroup('all')}>
-                        <X className="w-4 h-4 mr-1" /> Clear Filter
+                        <X className="w-4 h-4 mr-1" /> {t("Clear Filter")}
                     </Button>
                 )}
             </div>
@@ -372,18 +374,18 @@ const CodeOfAccount = () => {
                                         className="w-4 h-4"
                                     />
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-silver-dark uppercase">Code</th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-silver-dark uppercase">Name</th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-silver-dark uppercase">Master Code #</th>
-                                <th className="px-4 py-3 text-center text-xs font-bold text-silver-dark uppercase">Group</th>
-                                <th className="px-4 py-3 text-center text-xs font-bold text-silver-dark uppercase">Level</th>
-                                <th className="px-4 py-3 text-center text-xs font-bold text-silver-dark uppercase">Trial Balance</th>
-                                <th className="px-4 py-3 text-center text-xs font-bold text-silver-dark uppercase">Profit & Loss</th>
-                                <th className="px-4 py-3 text-center text-xs font-bold text-silver-dark uppercase">Balance Sheet</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-silver-dark uppercase">{t("Code")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-silver-dark uppercase">{t("Name")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-silver-dark uppercase">{t("Master Code #")}</th>
+                                <th className="px-4 py-3 text-center text-xs font-bold text-silver-dark uppercase">{t("Group")}</th>
+                                <th className="px-4 py-3 text-center text-xs font-bold text-silver-dark uppercase">{t("Level")}</th>
+                                <th className="px-4 py-3 text-center text-xs font-bold text-silver-dark uppercase">{t("Trial Balance")}</th>
+                                <th className="px-4 py-3 text-center text-xs font-bold text-silver-dark uppercase">{t("Profit & Loss")}</th>
+                                <th className="px-4 py-3 text-center text-xs font-bold text-silver-dark uppercase">{t("Balance Sheet")}</th>
                                 <th className="px-4 py-3 text-center text-xs font-bold text-silver-dark uppercase">AR</th>
                                 <th className="px-4 py-3 text-center text-xs font-bold text-silver-dark uppercase">AP</th>
-                                <th className="px-4 py-3 text-center text-xs font-bold text-silver-dark uppercase">Cashflow</th>
-                                <th className="px-4 py-3 text-center text-xs font-bold text-silver-dark uppercase">Actions</th>
+                                <th className="px-4 py-3 text-center text-xs font-bold text-silver-dark uppercase">{t("Cashflow")}</th>
+                                <th className="px-4 py-3 text-center text-xs font-bold text-silver-dark uppercase">{t("Actions")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
@@ -401,7 +403,7 @@ const CodeOfAccount = () => {
                                                 ) : (
                                                     <ChevronRight className="w-4 h-4" />
                                                 )}
-                                                {group} ({accts.length} accounts)
+                                                {group} ({accts.length} {t("accounts)")}
                                             </div>
                                         </td>
                                     </tr>
@@ -464,7 +466,7 @@ const CodeOfAccount = () => {
                                                         <button
                                                             onClick={() => handleEdit(account)}
                                                             className="p-1.5 rounded hover:bg-blue-500/20 text-blue-400"
-                                                            title="Edit"
+                                                            title={t("Edit")}
                                                         >
                                                             <Edit2 className="w-4 h-4" />
                                                         </button>
@@ -473,7 +475,7 @@ const CodeOfAccount = () => {
                                                         <button
                                                             onClick={() => handleDelete(account)}
                                                             className="p-1.5 rounded hover:bg-red-500/20 text-red-400"
-                                                            title="Delete"
+                                                            title={t("Delete")}
                                                         >
                                                             <Trash2 className="w-4 h-4" />
                                                         </button>
@@ -488,7 +490,7 @@ const CodeOfAccount = () => {
                                 <tr>
                                     <td colSpan="13" className="px-4 py-8 text-center text-silver-dark">
                                         <FileSpreadsheet className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                                        <p>No accounts found</p>
+                                        <p>{t("No accounts found")}</p>
                                     </td>
                                 </tr>
                             )}
@@ -518,7 +520,7 @@ const CodeOfAccount = () => {
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-silver-dark mb-1">
-                                        Code *
+                                        {t("Code *")}
                                     </label>
                                     <input
                                         type="text"
@@ -531,13 +533,13 @@ const CodeOfAccount = () => {
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-silver-dark mb-1">
-                                        Name *
+                                        {t("Name *")}
                                     </label>
                                     <input
                                         type="text"
                                         value={form.name}
                                         onChange={(e) => setForm({ ...form, name: e.target.value })}
-                                        placeholder="Account name"
+                                        placeholder={t("Account name")}
                                         className="w-full px-3 py-2 bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded-lg text-gray-900 dark:text-silver-light"
                                         required
                                     />
@@ -548,14 +550,14 @@ const CodeOfAccount = () => {
                             <div className="grid grid-cols-3 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-silver-dark mb-1">
-                                        Master Code #
+                                        {t("Master Code #")}
                                     </label>
                                     <select
                                         value={form.master_code}
                                         onChange={(e) => setForm({ ...form, master_code: e.target.value })}
                                         className="w-full px-3 py-2 bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded-lg text-gray-900 dark:text-silver-light"
                                     >
-                                        <option value="">-- None (Top Level) --</option>
+                                        <option value="">{t("-- None (Top Level) --")}</option>
                                         {accounts
                                             .filter(a => a.code !== form.code)
                                             .map(a => (
@@ -568,7 +570,7 @@ const CodeOfAccount = () => {
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-silver-dark mb-1">
-                                        Group *
+                                        {t("Group *")}
                                     </label>
                                     <select
                                         value={form.account_group}
@@ -576,16 +578,16 @@ const CodeOfAccount = () => {
                                         className="w-full px-3 py-2 bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded-lg text-gray-900 dark:text-silver-light"
                                         required
                                     >
-                                        <option value="Asset">Asset</option>
-                                        <option value="Liability">Liability</option>
-                                        <option value="Equity">Equity</option>
-                                        <option value="Revenue">Revenue</option>
-                                        <option value="Expense">Expense</option>
+                                        <option value="Asset">{t("Asset")}</option>
+                                        <option value="Liability">{t("Liability")}</option>
+                                        <option value="Equity">{t("Equity")}</option>
+                                        <option value="Revenue">{t("Revenue")}</option>
+                                        <option value="Expense">{t("Expense")}</option>
                                     </select>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-silver-dark mb-1">
-                                        Level
+                                        {t("Level")}
                                     </label>
                                     <input
                                         type="number"
@@ -601,7 +603,7 @@ const CodeOfAccount = () => {
                             {/* Report Classification */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-silver-dark mb-2">
-                                    Report Classification
+                                    {t("Report Classification")}
                                 </label>
                                 <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
                                     {[
@@ -636,12 +638,12 @@ const CodeOfAccount = () => {
                             {/* Description */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-silver-dark mb-1">
-                                    Description
+                                    {t("Description")}
                                 </label>
                                 <textarea
                                     value={form.description}
                                     onChange={(e) => setForm({ ...form, description: e.target.value })}
-                                    placeholder="Optional description..."
+                                    placeholder={t("Optional description...")}
                                     rows={2}
                                     className="w-full px-3 py-2 bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded-lg text-gray-900 dark:text-silver-light"
                                 />
@@ -654,7 +656,7 @@ const CodeOfAccount = () => {
                                     variant="secondary"
                                     onClick={() => setShowModal(false)}
                                 >
-                                    Cancel
+                                    {t("Cancel")}
                                 </Button>
                                 {(!editingAccount || hasEdit) && (
                                     <Button type="submit" icon={Save}>

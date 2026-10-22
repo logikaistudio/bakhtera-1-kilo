@@ -10,8 +10,10 @@ import {
     TrendingUp,
     Plus
 } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const BigDashboard = () => {
+    const { t } = useLanguage();
     const { events } = useData();
     const navigate = useNavigate();
 
@@ -38,10 +40,10 @@ const BigDashboard = () => {
                         <Calendar className="w-10 h-10 text-green-400" />
                         <h1 className="text-4xl font-bold gradient-text">BIG</h1>
                     </div>
-                    <p className="text-silver-dark">Event Organizer</p>
+                    <p className="text-silver-dark">{t("Event Organizer")}</p>
                 </div>
                 <Button onClick={() => navigate('/big/events')} icon={Plus}>
-                    New Event
+                    {t("New Event")}
                 </Button>
             </div>
 
@@ -75,13 +77,13 @@ const BigDashboard = () => {
 
             {/* Recent Events */}
             <div className="glass-card p-6 rounded-lg">
-                <h2 className="text-2xl font-bold text-silver-light mb-4">Recent Events</h2>
+                <h2 className="text-2xl font-bold text-silver-light mb-4">{t("Recent Events")}</h2>
                 {recentEvents.length === 0 ? (
                     <div className="text-center py-12">
                         <Calendar className="w-16 h-16 text-silver-dark mx-auto mb-4" />
-                        <p className="text-silver-dark">No events yet. Create your first event!</p>
+                        <p className="text-silver-dark">{t("No events yet. Create your first event!")}</p>
                         <Button onClick={() => navigate('/big/events')} className="mt-4">
-                            Create Event
+                            {t("Create Event")}
                         </Button>
                     </div>
                 ) : (
@@ -115,28 +117,28 @@ const BigDashboard = () => {
                     variant="secondary"
                     className="w-full py-4"
                 >
-                    Manage Events
+                    {t("Manage Events")}
                 </Button>
                 <Button
                     onClick={() => navigate('/big/quotations')}
                     variant="secondary"
                     className="w-full py-4"
                 >
-                    Quotations
+                    {t("Quotations")}
                 </Button>
                 <Button
                     onClick={() => navigate('/big/invoices')}
                     variant="secondary"
                     className="w-full py-4"
                 >
-                    Invoices
+                    {t("Invoices")}
                 </Button>
                 <Button
                     onClick={() => navigate('/customers')}
                     variant="secondary"
                     className="w-full py-4"
                 >
-                    Customers
+                    {t("Customers")}
                 </Button>
             </div>
         </div>

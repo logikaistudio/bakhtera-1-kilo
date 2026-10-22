@@ -4,8 +4,10 @@ import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import Button from '../../components/Common/Button';
 import { exportToCSV } from '../../utils/exportCSV';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const BCMaster = () => {
+    const { t } = useLanguage();
     const { canCreate, canEdit, canDelete } = useAuth();
     const hasCreate = canCreate('bridge_bc_master');
     const hasEdit = canEdit('bridge_bc_master');
@@ -117,17 +119,17 @@ const BCMaster = () => {
         <div className="p-6 space-y-6">
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text">Master Kode BC</h1>
-                    <p className="text-silver-dark mt-1">CEISA 4.0 - Jenis Dokumen Pabean</p>
+                    <h1 className="text-3xl font-bold gradient-text">{t("Master Kode BC")}</h1>
+                    <p className="text-silver-dark mt-1">{t("CEISA 4.0 - Jenis Dokumen Pabean")}</p>
                 </div>
                 <div className="flex items-center gap-2">
                     {hasDelete && (
                         <>
                             <Button onClick={handleDeleteSelected} variant="danger" disabled={selectedIds.length === 0}>
-                                <Trash2 className="w-4 h-4 mr-1" /> Hapus Terpilih ({selectedIds.length})
+                                <Trash2 className="w-4 h-4 mr-1" /> {t("Hapus Terpilih (")}{selectedIds.length})
                             </Button>
                             <Button onClick={handleDeleteAll} variant="danger" disabled={bcCodes.length === 0}>
-                                <Trash2 className="w-4 h-4 mr-1" /> Bersihkan Semua Data
+                                <Trash2 className="w-4 h-4 mr-1" /> {t("Bersihkan Semua Data")}
                             </Button>
                         </>
                     )}
@@ -142,7 +144,7 @@ const BCMaster = () => {
             {/* Info */}
             <div className="bg-blue-500/10 border border-blue-500/30 p-4 rounded-lg">
                 <p className="text-sm text-blue-400">
-                    <strong>CEISA 4.0:</strong> Sistem customs Indonesia. BC Code digunakan untuk dokumen pabean TPPB.
+                    <strong>{t("CEISA 4.0:")}</strong> {t("Sistem customs Indonesia. BC Code digunakan untuk dokumen pabean TPPB.")}
                 </p>
             </div>
 
@@ -155,48 +157,48 @@ const BCMaster = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-silver mb-2">Kode BC *</label>
+                            <label className="block text-sm font-medium text-silver mb-2">{t("Kode BC *")}</label>
                             <input
                                 type="text"
                                 required
                                 value={formData.code}
                                 onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                                placeholder="contoh: BC 2.3"
+                                placeholder={t("contoh: BC 2.3")}
                                 className="w-full"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-silver mb-2">Kategori *</label>
+                            <label className="block text-sm font-medium text-silver mb-2">{t("Kategori *")}</label>
                             <select
                                 value={formData.category}
                                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                                 className="w-full"
                             >
-                                <option value="inbound">Masuk</option>
-                                <option value="outbound">Keluar</option>
-                                <option value="monitoring">Monitoring/Laporan</option>
+                                <option value="inbound">{t("Masuk")}</option>
+                                <option value="outbound">{t("Keluar")}</option>
+                                <option value="monitoring">{t("Monitoring/Laporan")}</option>
                             </select>
                         </div>
 
                         <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-silver mb-2">Nama Dokumen *</label>
+                            <label className="block text-sm font-medium text-silver mb-2">{t("Nama Dokumen *")}</label>
                             <input
                                 type="text"
                                 required
                                 value={formData.name}
                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                placeholder="contoh: Pemberitahuan Pabean Masuk Barang"
+                                placeholder={t("contoh: Pemberitahuan Pabean Masuk Barang")}
                                 className="w-full"
                             />
                         </div>
 
                         <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-silver mb-2">Deskripsi</label>
+                            <label className="block text-sm font-medium text-silver mb-2">{t("Deskripsi")}</label>
                             <textarea
                                 value={formData.description}
                                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                placeholder="Tujuan dan penggunaan jenis dokumen BC ini"
+                                placeholder={t("Tujuan dan penggunaan jenis dokumen BC ini")}
                                 rows={2}
                                 className="w-full"
                             />
@@ -209,7 +211,7 @@ const BCMaster = () => {
                                 onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
                                 className="w-4 h-4"
                             />
-                            <label className="text-sm text-silver">Aktif</label>
+                            <label className="text-sm text-silver">{t("Aktif")}</label>
                         </div>
                     </div>
 
@@ -221,7 +223,7 @@ const BCMaster = () => {
                                     setShowForm(false);
                                     setEditingCode(null);
                                 }}>
-                                    <Trash2 className="w-4 h-4 mr-1" /> Hapus
+                                    <Trash2 className="w-4 h-4 mr-1" /> {t("Hapus")}
                                 </Button>
                             )}
                         </div>
@@ -237,11 +239,11 @@ const BCMaster = () => {
                                     isActive: true
                                 });
                             }}>
-                                Batal
+                                {t("Batal")}
                             </Button>
                             {(!editingCode || hasEdit) && (
                                 <Button type="submit" icon={editingCode ? Edit2 : Plus}>
-                                    {editingCode ? 'Perbarui' : 'Tambah'} Kode BC
+                                    {editingCode ? 'Perbarui' : 'Tambah'} {t("Kode BC")}
                                 </Button>
                             )}
                         </div>
@@ -254,14 +256,14 @@ const BCMaster = () => {
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-xl font-semibold text-silver-light flex items-center gap-2">
                         <BookOpen className="w-5 h-5 text-accent-blue" />
-                        Daftar BC Code ({bcCodes.length})
+                        {t("Daftar BC Code (")}{bcCodes.length})
                     </h3>
                     <Button
                         onClick={handleExportCSV}
                         variant="secondary"
                         icon={Download}
                     >
-                        Export CSV
+                        {t("Export CSV")}
                     </Button>
                 </div>
 
@@ -277,11 +279,11 @@ const BCMaster = () => {
                                         className="w-4 h-4"
                                     />
                                 </th>
-                                <th className="px-4 py-3 text-left text-sm font-semibold text-white">Kode BC</th>
-                                <th className="px-4 py-3 text-left text-sm font-semibold text-white">Nama Dokumen</th>
-                                <th className="px-4 py-3 text-left text-sm font-semibold text-white">Kategori</th>
-                                <th className="px-4 py-3 text-left text-sm font-semibold text-white">Deskripsi</th>
-                                <th className="px-4 py-3 text-center text-sm font-semibold text-white">Status</th>
+                                <th className="px-4 py-3 text-left text-sm font-semibold text-white">{t("Kode BC")}</th>
+                                <th className="px-4 py-3 text-left text-sm font-semibold text-white">{t("Nama Dokumen")}</th>
+                                <th className="px-4 py-3 text-left text-sm font-semibold text-white">{t("Kategori")}</th>
+                                <th className="px-4 py-3 text-left text-sm font-semibold text-white">{t("Deskripsi")}</th>
+                                <th className="px-4 py-3 text-center text-sm font-semibold text-white">{t("Status")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
@@ -322,16 +324,16 @@ const BCMaster = () => {
 
             {/* Usage Guide */}
             <div className="glass-card p-6 rounded-lg">
-                <h3 className="text-lg font-semibold text-silver-light mb-3">Panduan BC Code untuk TPPB</h3>
+                <h3 className="text-lg font-semibold text-silver-light mb-3">{t("Panduan BC Code untuk TPPB")}</h3>
                 <div className="space-y-2 text-sm text-silver-dark">
-                    <p><strong className="text-accent-blue">BC 2.3:</strong> Pemasukan Barang Impor ke TPPB (dari luar negeri)</p>
-                    <p><strong className="text-accent-blue">BC 2.7:</strong> Pemindahan Antar TPB (inbound/outbound)</p>
-                    <p><strong className="text-accent-blue">BC 2.5:</strong> Pengeluaran ke Dalam Negeri (TLDDP)</p>
-                    <p><strong className="text-accent-blue">BC 4.0:</strong> Pemasukan Barang Lokal ke TPPB (dari dalam negeri)</p>
-                    <p><strong className="text-accent-blue">BC 4.1:</strong> Pengeluaran Barang Lokal dari TPPB</p>
-                    <p><strong className="text-accent-green">BC 2.6.1:</strong> Pengeluaran Sementara (demo/uji coba)</p>
-                    <p><strong className="text-accent-green">BC 2.6.2:</strong> Pemasukan Kembali (setelah keluar sementara)</p>
-                    <p><strong className="text-accent-blue">BC 2.8:</strong> Re-ekspor ke Luar Negeri</p>
+                    <p><strong className="text-accent-blue">BC 2.3:</strong> {t("Pemasukan Barang Impor ke TPPB (dari luar negeri)")}</p>
+                    <p><strong className="text-accent-blue">BC 2.7:</strong> {t("Pemindahan Antar TPB (inbound/outbound)")}</p>
+                    <p><strong className="text-accent-blue">BC 2.5:</strong> {t("Pengeluaran ke Dalam Negeri (TLDDP)")}</p>
+                    <p><strong className="text-accent-blue">BC 4.0:</strong> {t("Pemasukan Barang Lokal ke TPPB (dari dalam negeri)")}</p>
+                    <p><strong className="text-accent-blue">BC 4.1:</strong> {t("Pengeluaran Barang Lokal dari TPPB")}</p>
+                    <p><strong className="text-accent-green">BC 2.6.1:</strong> {t("Pengeluaran Sementara (demo/uji coba)")}</p>
+                    <p><strong className="text-accent-green">BC 2.6.2:</strong> {t("Pemasukan Kembali (setelah keluar sementara)")}</p>
+                    <p><strong className="text-accent-blue">BC 2.8:</strong> {t("Re-ekspor ke Luar Negeri")}</p>
                 </div>
             </div>
         </div>

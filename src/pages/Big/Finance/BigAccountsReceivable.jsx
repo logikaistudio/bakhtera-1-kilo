@@ -7,6 +7,7 @@ import {
     DollarSign, TrendingUp, AlertTriangle, Clock, Search,
     Download, CheckCircle, AlertCircle, CreditCard, History, X
 } from 'lucide-react';
+import { useLanguage } from '../../../i18n/LanguageContext';
 
 const fmtIDR = (v, cur = 'IDR') => {
     if (v == null) return '-';
@@ -37,6 +38,7 @@ const STATUS_STYLE = {
 
 // ─── Payment Modal ────────────────────────────────────────────────────────────
 const PaymentModal = ({ ar, onClose, onSuccess }) => {
+    const { t } = useLanguage();
     const [form, setForm] = useState({
         payment_date: new Date().toISOString().split('T')[0],
         amount: ar.outstanding_amount || 0,
@@ -67,8 +69,8 @@ const PaymentModal = ({ ar, onClose, onSuccess }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (form.amount <= 0) return alert('Jumlah pembayaran harus lebih dari 0');
-        if (form.amount > ar.outstanding_amount) return alert('Melebihi saldo outstanding');
+        if (form.amount <= 0) return alert(t("Jumlah pembayaran harus lebih dari 0"));
+        if (form.amount > ar.outstanding_amount) return alert(t("Melebihi saldo outstanding"));
         setLoading(true);
         try {
             const payNum = `BRG-AR-PAY-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
@@ -118,24 +120,24 @@ const PaymentModal = ({ ar, onClose, onSuccess }) => {
                 <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-green-500/20 flex items-center justify-center animate-pulse">
                     <CheckCircle className="w-12 h-12 text-green-500" />
                 </div>
-                <h2 className="text-2xl font-bold text-green-500 mb-2">Pembayaran Berhasil!</h2>
+                <h2 className="text-2xl font-bold text-green-500 mb-2">{t("Pembayaran Berhasil!")}</h2>
                 <div className="glass-card p-4 rounded-lg mb-6 text-left space-y-3 bg-green-500/5 border border-green-500/20">
                     <div className="flex justify-between text-sm">
-                        <span className="text-silver-dark">No. Pembayaran:</span>
+                        <span className="text-silver-dark">{t("No. Pembayaran:")}</span>
                         <span className="text-silver-light font-mono">{success.payNum}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                        <span className="text-silver-dark">Jumlah:</span>
+                        <span className="text-silver-dark">{t("Jumlah:")}</span>
                         <span className="text-green-400 font-bold">{fmtIDR(success.amount, success.currency)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                        <span className="text-silver-dark">Sisa Tagihan:</span>
+                        <span className="text-silver-dark">{t("Sisa Tagihan:")}</span>
                         <span className={`font-bold ${success.newOut <= 0 ? 'text-green-400' : 'text-yellow-400'}`}>
                             {fmtIDR(Math.max(0, success.newOut), success.currency)}
                         </span>
                     </div>
                 </div>
-                <Button onClick={() => onSuccess()} className="w-full">Tutup</Button>
+                <Button onClick={() => onSuccess()} className="w-full">{t("Tutup")}</Button>
             </div>
         </Modal>
     );
@@ -143,63 +145,63 @@ const PaymentModal = ({ ar, onClose, onSuccess }) => {
     return (
         <Modal isOpen onClose={onClose} maxWidth="max-w-2xl">
             <div className="p-6">
-                <h2 className="text-2xl font-bold gradient-text mb-6">Catat Pembayaran AR</h2>
+                <h2 className="text-2xl font-bold gradient-text mb-6">{t("Catat Pembayaran AR")}</h2>
                 <div className="glass-card p-4 rounded-lg mb-6 bg-green-500/5 border border-green-500/20">
                     <div className="grid grid-cols-2 gap-3 text-sm">
-                        <div><span className="text-silver-dark">AR Number:</span><span className="text-silver-light ml-2 font-medium">{ar.ar_number}</span></div>
-                        <div><span className="text-silver-dark">Customer:</span><span className="text-silver-light ml-2 font-medium">{ar.customer_name}</span></div>
-                        <div><span className="text-silver-dark">Total:</span><span className="text-silver-light ml-2">{fmtIDR(ar.original_amount, ar.currency)}</span></div>
-                        <div><span className="text-silver-dark">Outstanding:</span><span className="text-green-400 ml-2 font-bold">{fmtIDR(ar.outstanding_amount, ar.currency)}</span></div>
+                        <div><span className="text-silver-dark">{t("AR Number:")}</span><span className="text-silver-light ml-2 font-medium">{ar.ar_number}</span></div>
+                        <div><span className="text-silver-dark">{t("Customer:")}</span><span className="text-silver-light ml-2 font-medium">{ar.customer_name}</span></div>
+                        <div><span className="text-silver-dark">{t("Total:")}</span><span className="text-silver-light ml-2">{fmtIDR(ar.original_amount, ar.currency)}</span></div>
+                        <div><span className="text-silver-dark">{t("Outstanding:")}</span><span className="text-green-400 ml-2 font-bold">{fmtIDR(ar.outstanding_amount, ar.currency)}</span></div>
                     </div>
                 </div>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-silver-dark mb-2">Tanggal Bayar *</label>
+                            <label className="block text-sm font-medium text-silver-dark mb-2">{t("Tanggal Bayar *")}</label>
                             <input type="date" required value={form.payment_date}
                                 onChange={e => setForm(p => ({ ...p, payment_date: e.target.value }))} className="w-full" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-silver-dark mb-2">Jumlah *</label>
+                            <label className="block text-sm font-medium text-silver-dark mb-2">{t("Jumlah *")}</label>
                             <input type="number" required min="0" max={ar.outstanding_amount} step="0.01"
                                 value={form.amount} onChange={e => setForm(p => ({ ...p, amount: parseFloat(e.target.value) || 0 }))}
                                 className="w-full" />
-                            <p className="text-xs text-silver-dark mt-1">Max: {fmtIDR(ar.outstanding_amount, ar.currency)}</p>
+                            <p className="text-xs text-silver-dark mt-1">{t("Max:")} {fmtIDR(ar.outstanding_amount, ar.currency)}</p>
                         </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-silver-dark mb-2">Metode Bayar *</label>
+                            <label className="block text-sm font-medium text-silver-dark mb-2">{t("Metode Bayar *")}</label>
                             <select required value={form.payment_method}
                                 onChange={e => setForm(p => ({ ...p, payment_method: e.target.value }))} className="w-full">
-                                <option value="bank_transfer">Bank Transfer</option>
-                                <option value="cash">Cash</option>
-                                <option value="check">Cek / Giro</option>
+                                <option value="bank_transfer">{t("Bank Transfer")}</option>
+                                <option value="cash">{t("Cash")}</option>
+                                <option value="check">{t("Cek / Giro")}</option>
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-silver-dark mb-2">No. Referensi</label>
+                            <label className="block text-sm font-medium text-silver-dark mb-2">{t("No. Referensi")}</label>
                             <input type="text" value={form.reference_number}
                                 onChange={e => setForm(p => ({ ...p, reference_number: e.target.value }))}
-                                placeholder="Ref transfer / no. cek" className="w-full" />
+                                placeholder={t("Ref transfer / no. cek")} className="w-full" />
                         </div>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-silver-dark mb-2">
-                            <CreditCard className="w-4 h-4 inline mr-1" />Akun Diterima (COA Big)
+                            <CreditCard className="w-4 h-4 inline mr-1" />{t("Akun Diterima (COA Big)")}
                         </label>
                         <select value={form.ar_coa_id} onChange={e => setForm(p => ({ ...p, ar_coa_id: e.target.value }))} className="w-full">
-                            <option value="">— Pilih COA Piutang —</option>
+                            <option value="">{t("— Pilih COA Piutang —")}</option>
                             {arAccounts.map(c => <option key={c.id} value={c.id}>{c.code} - {c.name}</option>)}
                         </select>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-silver-dark mb-2">Catatan</label>
+                        <label className="block text-sm font-medium text-silver-dark mb-2">{t("Catatan")}</label>
                         <textarea rows={2} value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
-                            className="w-full" placeholder="Catatan opsional..." />
+                            className="w-full" placeholder={t("Catatan opsional...")} />
                     </div>
                     <div className="flex gap-3 justify-end pt-4 border-t border-dark-border">
-                        <Button type="button" variant="secondary" onClick={onClose}>Batal</Button>
+                        <Button type="button" variant="secondary" onClick={onClose}>{t("Batal")}</Button>
                         <Button type="submit" disabled={loading} icon={DollarSign}>
                             {loading ? 'Memproses...' : 'Catat Pembayaran'}
                         </Button>
@@ -212,6 +214,7 @@ const PaymentModal = ({ ar, onClose, onSuccess }) => {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 const BigAccountsReceivable = () => {
+    const { t } = useLanguage();
     const { canEdit } = useAuth();
     const [arList, setArList] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -320,11 +323,11 @@ const BigAccountsReceivable = () => {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold gradient-text flex items-center gap-2">
-                        <TrendingUp className="w-8 h-8" /> Accounts Receivable — Big
+                        <TrendingUp className="w-8 h-8" /> {t("Accounts Receivable — Big")}
                     </h1>
-                    <p className="text-silver-dark mt-1">Monitoring piutang Big module</p>
+                    <p className="text-silver-dark mt-1">{t("Monitoring piutang Big module")}</p>
                 </div>
-                <Button variant="secondary" icon={Download} onClick={handleExport}>Export XLS</Button>
+                <Button variant="secondary" icon={Download} onClick={handleExport}>{t("Export XLS")}</Button>
             </div>
 
             {/* Summary Cards */}
@@ -344,11 +347,11 @@ const BigAccountsReceivable = () => {
 
             {/* Aging Analysis */}
             <div className="glass-card p-5 rounded-xl">
-                <h3 className="text-sm font-semibold text-silver-light uppercase tracking-wider mb-4">Aging Analysis (Outstanding)</h3>
+                <h3 className="text-sm font-semibold text-silver-light uppercase tracking-wider mb-4">{t("Aging Analysis (Outstanding)")}</h3>
                 <div className="grid grid-cols-4 gap-4">
                     {Object.entries(aging).map(([bucket, val]) => (
                         <div key={bucket} className="text-center">
-                            <p className="text-xs text-silver-dark mb-1">{bucket} days</p>
+                            <p className="text-xs text-silver-dark mb-1">{bucket} {t("days")}</p>
                             <p className="text-lg font-bold text-silver-light">{fmtIDR(val)}</p>
                             <div className="w-full bg-dark-border rounded-full h-1.5 mt-2">
                                 <div className="bg-accent-orange h-1.5 rounded-full"
@@ -364,7 +367,7 @@ const BigAccountsReceivable = () => {
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-silver-dark" />
                     <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                        placeholder="Cari AR Number, Invoice, Customer..."
+                        placeholder={t("Cari AR Number, Invoice, Customer...")}
                         className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm" />
                 </div>
             </div>
@@ -372,28 +375,28 @@ const BigAccountsReceivable = () => {
             {/* Table */}
             <div className="glass-card rounded-xl overflow-hidden">
                 {loading ? (
-                    <div className="text-center py-16 text-silver-dark">Memuat data AR...</div>
+                    <div className="text-center py-16 text-silver-dark">{t("Memuat data AR...")}</div>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead className="bg-[#0070BB] text-white">
                                 <tr>
-                                    <th className="px-4 py-3 text-left">AR Number</th>
-                                    <th className="px-4 py-3 text-left">Invoice #</th>
-                                    <th className="px-4 py-3 text-left">Customer</th>
-                                    <th className="px-4 py-3 text-left">Tgl Transaksi</th>
-                                    <th className="px-4 py-3 text-left">Jatuh Tempo</th>
-                                    <th className="px-4 py-3 text-right">Total</th>
-                                    <th className="px-4 py-3 text-right">Terbayar</th>
-                                    <th className="px-4 py-3 text-right">Outstanding</th>
-                                    <th className="px-4 py-3 text-center">Aging</th>
-                                    <th className="px-4 py-3 text-center">Status</th>
-                                    <th className="px-4 py-3 text-center">Aksi</th>
+                                    <th className="px-4 py-3 text-left">{t("AR Number")}</th>
+                                    <th className="px-4 py-3 text-left">{t("Invoice #")}</th>
+                                    <th className="px-4 py-3 text-left">{t("Customer")}</th>
+                                    <th className="px-4 py-3 text-left">{t("Tgl Transaksi")}</th>
+                                    <th className="px-4 py-3 text-left">{t("Jatuh Tempo")}</th>
+                                    <th className="px-4 py-3 text-right">{t("Total")}</th>
+                                    <th className="px-4 py-3 text-right">{t("Terbayar")}</th>
+                                    <th className="px-4 py-3 text-right">{t("Outstanding")}</th>
+                                    <th className="px-4 py-3 text-center">{t("Aging")}</th>
+                                    <th className="px-4 py-3 text-center">{t("Status")}</th>
+                                    <th className="px-4 py-3 text-center">{t("Aksi")}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-dark-border/40">
                                 {filtered.length === 0 ? (
-                                    <tr><td colSpan={11} className="text-center py-10 text-silver-dark italic">Tidak ada data AR</td></tr>
+                                    <tr><td colSpan={11} className="text-center py-10 text-silver-dark italic">{t("Tidak ada data AR")}</td></tr>
                                 ) : filtered.map(ar => (
                                     <tr key={ar.id} className="hover:bg-white/5 smooth-transition">
                                         <td className="px-4 py-3 font-mono text-accent-orange text-xs">{ar.ar_number}</td>
@@ -423,7 +426,7 @@ const BigAccountsReceivable = () => {
                                             {ar.outstanding_amount > 0 && canEdit('big_finance') && (
                                                 <Button size="sm" variant="ghost" icon={DollarSign}
                                                     onClick={() => { setSelectedAR(ar); setShowPayment(true); }}>
-                                                    Bayar
+                                                    {t("Bayar")}
                                                 </Button>
                                             )}
                                         </td>

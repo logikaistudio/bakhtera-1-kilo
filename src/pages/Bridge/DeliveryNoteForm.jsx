@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useData } from '../../context/DataContext';
 import { supabase } from '../../lib/supabase';
 import { X, Plus, Trash2, Save, Send, Package, Truck, User, MapPin, FileText, Calendar } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const DeliveryNoteForm = ({ note, onClose, onSave, mode = 'create' }) => {
+    const { t } = useLanguage();
     const { quotations, mutationLogs } = useData();
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
@@ -179,12 +181,12 @@ const DeliveryNoteForm = ({ note, onClose, onSave, mode = 'create' }) => {
                     <div className="glass-card p-4">
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-silver-light mb-4 flex items-center gap-2">
                             <Calendar className="w-5 h-5 text-accent-blue" />
-                            Header Dokumen
+                            {t("Header Dokumen")}
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-silver-light mb-1">
-                                    No. Surat Jalan <span className="text-red-500">*</span>
+                                    {t("No. Surat Jalan")} <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="text"
@@ -196,7 +198,7 @@ const DeliveryNoteForm = ({ note, onClose, onSave, mode = 'create' }) => {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-silver-light mb-1">
-                                    Tanggal <span className="text-red-500">*</span>
+                                    {t("Tanggal")} <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="date"
@@ -207,14 +209,14 @@ const DeliveryNoteForm = ({ note, onClose, onSave, mode = 'create' }) => {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-silver-light mb-1">
-                                    TO (Tujuan) <span className="text-red-500">*</span>
+                                    {t("TO (Tujuan)")} <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="text"
                                     value={formData.destination}
                                     onChange={(e) => handleChange('destination', e.target.value)}
                                     className="input-field"
-                                    placeholder="Alamat/lokasi tujuan"
+                                    placeholder={t("Alamat/lokasi tujuan")}
                                 />
                             </div>
                         </div>
@@ -224,36 +226,36 @@ const DeliveryNoteForm = ({ note, onClose, onSave, mode = 'create' }) => {
                     <div className="glass-card p-4">
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-silver-light mb-4 flex items-center gap-2">
                             <Truck className="w-5 h-5 text-accent-blue" />
-                            Informasi Pengiriman
+                            {t("Informasi Pengiriman")}
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-silver-light mb-1">
-                                    Consignee <span className="text-red-500">*</span>
+                                    {t("Consignee")} <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="text"
                                     value={formData.consignee}
                                     onChange={(e) => handleChange('consignee', e.target.value)}
                                     className="input-field"
-                                    placeholder="Nama penerima barang"
+                                    placeholder={t("Nama penerima barang")}
                                 />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-silver-light mb-1">
-                                    Seal No.
+                                    {t("Seal No.")}
                                 </label>
                                 <input
                                     type="text"
                                     value={formData.seal_number}
                                     onChange={(e) => handleChange('seal_number', e.target.value)}
                                     className="input-field"
-                                    placeholder="Nomor segel"
+                                    placeholder={t("Nomor segel")}
                                 />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-silver-light mb-1">
-                                    Truck No. <span className="text-red-500">*</span>
+                                    {t("Truck No.")} <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="text"
@@ -265,26 +267,26 @@ const DeliveryNoteForm = ({ note, onClose, onSave, mode = 'create' }) => {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-silver-light mb-1">
-                                    Driver <span className="text-red-500">*</span>
+                                    {t("Driver")} <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="text"
                                     value={formData.driver_name}
                                     onChange={(e) => handleChange('driver_name', e.target.value)}
                                     className="input-field"
-                                    placeholder="Nama pengemudi"
+                                    placeholder={t("Nama pengemudi")}
                                 />
                             </div>
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-medium text-gray-700 dark:text-silver-light mb-1">
-                                    No. HP Driver
+                                    {t("No. HP Driver")}
                                 </label>
                                 <input
                                     type="text"
                                     value={formData.driver_phone}
                                     onChange={(e) => handleChange('driver_phone', e.target.value)}
                                     className="input-field"
-                                    placeholder="08xx xxxx xxxx"
+                                    placeholder={t("08xx xxxx xxxx")}
                                 />
                             </div>
                         </div>
@@ -293,12 +295,12 @@ const DeliveryNoteForm = ({ note, onClose, onSave, mode = 'create' }) => {
                     {/* Section 3: Load from Source (Optional) */}
                     <div className="glass-card p-4 bg-blue-50 dark:bg-blue-900/10">
                         <h3 className="text-sm font-semibold text-gray-900 dark:text-silver-light mb-3">
-                            📋 Load Data dari Sumber (Opsional)
+                            {t("📋 Load Data dari Sumber (Opsional)")}
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-silver-light mb-1">
-                                    Dari Pengajuan
+                                    {t("Dari Pengajuan")}
                                 </label>
                                 <select
                                     value={formData.pengajuan_id}
@@ -308,7 +310,7 @@ const DeliveryNoteForm = ({ note, onClose, onSave, mode = 'create' }) => {
                                     }}
                                     className="input-field"
                                 >
-                                    <option value="">-- Pilih Pengajuan --</option>
+                                    <option value="">{t("-- Pilih Pengajuan --")}</option>
                                     {quotations.filter(q => q.type === 'outbound' || q.status === 'approved').map(q => (
                                         <option key={q.id} value={q.id}>
                                             {q.quotationNumber || q.quotation_number} - {q.customer}
@@ -318,14 +320,14 @@ const DeliveryNoteForm = ({ note, onClose, onSave, mode = 'create' }) => {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-silver-light mb-1">
-                                    No. BC Dokumen
+                                    {t("No. BC Dokumen")}
                                 </label>
                                 <input
                                     type="text"
                                     value={formData.bc_document_number}
                                     onChange={(e) => handleChange('bc_document_number', e.target.value)}
                                     className="input-field"
-                                    placeholder="Nomor dokumen BC"
+                                    placeholder={t("Nomor dokumen BC")}
                                 />
                             </div>
                         </div>
@@ -336,20 +338,20 @@ const DeliveryNoteForm = ({ note, onClose, onSave, mode = 'create' }) => {
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-lg font-semibold text-gray-900 dark:text-silver-light flex items-center gap-2">
                                 <Package className="w-5 h-5 text-accent-blue" />
-                                Detail Barang
+                                {t("Detail Barang")}
                             </h3>
                             <button
                                 onClick={addItem}
                                 className="btn-secondary flex items-center gap-2 text-sm"
                             >
                                 <Plus className="w-4 h-4" />
-                                Tambah Item
+                                {t("Tambah Item")}
                             </button>
                         </div>
 
                         {formData.items.length === 0 ? (
                             <div className="text-center py-8 text-gray-500">
-                                Belum ada item. Klik "Tambah Item" or load dari pengajuan.
+                                {t("Belum ada item. Klik \"Tambah Item\" or load dari pengajuan.")}
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
@@ -357,12 +359,12 @@ const DeliveryNoteForm = ({ note, onClose, onSave, mode = 'create' }) => {
                                     <thead className="bg-gray-100 dark:bg-dark-surface">
                                         <tr>
                                             <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-silver-light">No</th>
-                                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-silver-light">Kode Barang</th>
-                                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-silver-light">Nama Barang</th>
-                                            <th className="px-3 py-2 text-center text-xs font-semibold text-gray-700 dark:text-silver-light">Qty</th>
-                                            <th className="px-3 py-2 text-center text-xs font-semibold text-gray-700 dark:text-silver-light">Satuan</th>
-                                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-silver-light">Keterangan</th>
-                                            <th className="px-3 py-2 text-center text-xs font-semibold text-gray-700 dark:text-silver-light">Aksi</th>
+                                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-silver-light">{t("Kode Barang")}</th>
+                                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-silver-light">{t("Nama Barang")}</th>
+                                            <th className="px-3 py-2 text-center text-xs font-semibold text-gray-700 dark:text-silver-light">{t("Qty")}</th>
+                                            <th className="px-3 py-2 text-center text-xs font-semibold text-gray-700 dark:text-silver-light">{t("Satuan")}</th>
+                                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-silver-light">{t("Keterangan")}</th>
+                                            <th className="px-3 py-2 text-center text-xs font-semibold text-gray-700 dark:text-silver-light">{t("Aksi")}</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-200 dark:divide-dark-border">
@@ -375,7 +377,7 @@ const DeliveryNoteForm = ({ note, onClose, onSave, mode = 'create' }) => {
                                                         value={item.item_code}
                                                         onChange={(e) => handleItemChange(index, 'item_code', e.target.value)}
                                                         className="input-field text-sm"
-                                                        placeholder="ABC-001"
+                                                        placeholder={t("ABC-001")}
                                                     />
                                                 </td>
                                                 <td className="px-3 py-2">
@@ -384,7 +386,7 @@ const DeliveryNoteForm = ({ note, onClose, onSave, mode = 'create' }) => {
                                                         value={item.item_name}
                                                         onChange={(e) => handleItemChange(index, 'item_name', e.target.value)}
                                                         className="input-field text-sm"
-                                                        placeholder="Nama barang"
+                                                        placeholder={t("Nama barang")}
                                                     />
                                                 </td>
                                                 <td className="px-3 py-2">
@@ -402,11 +404,11 @@ const DeliveryNoteForm = ({ note, onClose, onSave, mode = 'create' }) => {
                                                         onChange={(e) => handleItemChange(index, 'unit', e.target.value)}
                                                         className="input-field text-sm w-24"
                                                     >
-                                                        <option value="pcs">pcs</option>
-                                                        <option value="unit">unit</option>
-                                                        <option value="box">box</option>
+                                                        <option value="pcs">{t("pcs")}</option>
+                                                        <option value="unit">{t("unit")}</option>
+                                                        <option value="box">{t("box")}</option>
                                                         <option value="kg">kg</option>
-                                                        <option value="set">set</option>
+                                                        <option value="set">{t("set")}</option>
                                                     </select>
                                                 </td>
                                                 <td className="px-3 py-2">
@@ -415,7 +417,7 @@ const DeliveryNoteForm = ({ note, onClose, onSave, mode = 'create' }) => {
                                                         value={item.remarks}
                                                         onChange={(e) => handleItemChange(index, 'remarks', e.target.value)}
                                                         className="input-field text-sm"
-                                                        placeholder="Kondisi/catatan"
+                                                        placeholder={t("Kondisi/catatan")}
                                                     />
                                                 </td>
                                                 <td className="px-3 py-2 text-center">
@@ -438,45 +440,45 @@ const DeliveryNoteForm = ({ note, onClose, onSave, mode = 'create' }) => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="glass-card p-4">
                             <h3 className="text-lg font-semibold text-gray-900 dark:text-silver-light mb-4">
-                                Keterangan
+                                {t("Keterangan")}
                             </h3>
                             <textarea
                                 value={formData.remarks}
                                 onChange={(e) => handleChange('remarks', e.target.value)}
                                 className="input-field"
                                 rows="4"
-                                placeholder="Catatan umum tentang pengiriman..."
+                                placeholder={t("Catatan umum tentang pengiriman...")}
                             />
                         </div>
 
                         <div className="glass-card p-4">
                             <h3 className="text-lg font-semibold text-gray-900 dark:text-silver-light mb-4 flex items-center gap-2">
                                 <User className="w-5 h-5 text-accent-blue" />
-                                Pengirim
+                                {t("Pengirim")}
                             </h3>
                             <div className="space-y-3">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-silver-light mb-1">
-                                        Hormat kami <span className="text-red-500">*</span>
+                                        {t("Hormat kami")} <span className="text-red-500">*</span>
                                     </label>
                                     <input
                                         type="text"
                                         value={formData.sender_name}
                                         onChange={(e) => handleChange('sender_name', e.target.value)}
                                         className="input-field"
-                                        placeholder="Nama pengirim"
+                                        placeholder={t("Nama pengirim")}
                                     />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-silver-light mb-1">
-                                        Jabatan
+                                        {t("Jabatan")}
                                     </label>
                                     <input
                                         type="text"
                                         value={formData.sender_position}
                                         onChange={(e) => handleChange('sender_position', e.target.value)}
                                         className="input-field"
-                                        placeholder="Jabatan pengirim"
+                                        placeholder={t("Jabatan pengirim")}
                                     />
                                 </div>
                             </div>
@@ -491,7 +493,7 @@ const DeliveryNoteForm = ({ note, onClose, onSave, mode = 'create' }) => {
                         className="btn-secondary"
                         disabled={loading}
                     >
-                        Batal
+                        {t("Batal")}
                     </button>
                     {formData.status === 'draft' && (
                         <button

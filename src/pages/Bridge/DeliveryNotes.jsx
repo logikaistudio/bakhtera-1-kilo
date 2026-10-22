@@ -5,8 +5,10 @@ import { supabase } from '../../lib/supabase';
 import { FileText, Plus, Eye, Printer, Edit, Trash2, Search, Filter, Calendar, Truck, Package, CheckCircle, Clock, Send, Download } from 'lucide-react';
 import DeliveryNoteForm from './DeliveryNoteForm';
 import DeliveryNotePrint from './DeliveryNotePrint';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const DeliveryNotes = () => {
+    const { t } = useLanguage();
     const { canCreate, canEdit, canDelete } = useAuth();
     const hasCreate = canCreate('bridge_delivery');
     const hasEdit = canEdit('bridge_delivery');
@@ -130,7 +132,7 @@ const DeliveryNotes = () => {
             await loadDeliveryNotes();
         } catch (error) {
             console.error('Error deleting delivery note:', error);
-            alert('Gagal menghapus surat jalan');
+            alert(t("Gagal menghapus surat jalan"));
         }
     };
 
@@ -149,14 +151,14 @@ const DeliveryNotes = () => {
             await loadDeliveryNotes();
         } catch (error) {
             console.error('Error deleting selected delivery notes:', error);
-            alert('Gagal menghapus surat jalan terpilih');
+            alert(t("Gagal menghapus surat jalan terpilih"));
         }
     };
 
     const handleDeleteAll = async () => {
         if (!hasDelete) return;
         if (deliveryNotes.length === 0) {
-            alert('Tidak ada data surat jalan untuk dihapus.');
+            alert(t("Tidak ada data surat jalan untuk dihapus."));
             return;
         }
         if (!window.confirm(`Hapus seluruh data surat jalan (${deliveryNotes.length} baris)?`)) return;
@@ -173,7 +175,7 @@ const DeliveryNotes = () => {
             await loadDeliveryNotes();
         } catch (error) {
             console.error('Error deleting all delivery notes:', error);
-            alert('Gagal menghapus seluruh surat jalan');
+            alert(t("Gagal menghapus seluruh surat jalan"));
         }
     };
 
@@ -191,10 +193,10 @@ const DeliveryNotes = () => {
                     <div>
                         <h1 className="text-2xl font-bold text-gray-900 dark:text-silver-light flex items-center gap-2">
                             <FileText className="w-7 h-7 text-accent-blue" />
-                            Surat Jalan
+                            {t("Surat Jalan")}
                         </h1>
                         <p className="text-sm text-gray-600 dark:text-silver-dark mt-1">
-                            Kelola surat jalan pengiriman barang
+                            {t("Kelola surat jalan pengiriman barang")}
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -206,7 +208,7 @@ const DeliveryNotes = () => {
                                     className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${selectedIds.length > 0 ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-dark-surface text-silver-dark cursor-not-allowed opacity-60'}`}
                                 >
                                     <Trash2 className="w-4 h-4" />
-                                    Hapus Terpilih ({selectedIds.length})
+                                    {t("Hapus Terpilih (")}{selectedIds.length})
                                 </button>
                                 <button
                                     onClick={handleDeleteAll}
@@ -214,7 +216,7 @@ const DeliveryNotes = () => {
                                     className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${deliveryNotes.length > 0 ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-dark-surface text-silver-dark cursor-not-allowed opacity-60'}`}
                                 >
                                     <Trash2 className="w-4 h-4" />
-                                    Bersihkan Semua Data
+                                    {t("Bersihkan Semua Data")}
                                 </button>
                             </>
                         )}
@@ -227,7 +229,7 @@ const DeliveryNotes = () => {
                                 className="btn-primary flex items-center gap-2"
                             >
                                 <Plus className="w-4 h-4" />
-                                Buat Surat Jalan
+                                {t("Buat Surat Jalan")}
                             </button>
                         )}
                     </div>
@@ -241,7 +243,7 @@ const DeliveryNotes = () => {
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                             <input
                                 type="text"
-                                placeholder="Cari No. SJ, Penerima, Driver..."
+                                placeholder={t("Cari No. SJ, Penerima, Driver...")}
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 className="input-field pl-10 w-full"
@@ -256,10 +258,10 @@ const DeliveryNotes = () => {
                                 onChange={(e) => setStatusFilter(e.target.value)}
                                 className="input-field pl-10 w-full"
                             >
-                                <option value="all">Semua Status</option>
-                                <option value="draft">Draft</option>
-                                <option value="sent">Terkirim</option>
-                                <option value="received">Diterima</option>
+                                <option value="all">{t("Semua Status")}</option>
+                                <option value="draft">{t("Draft")}</option>
+                                <option value="sent">{t("Terkirim")}</option>
+                                <option value="received">{t("Diterima")}</option>
                             </select>
                         </div>
 
@@ -271,7 +273,7 @@ const DeliveryNotes = () => {
                                 value={dateFrom}
                                 onChange={(e) => setDateFrom(e.target.value)}
                                 className="input-field pl-10 w-full"
-                                placeholder="Dari Tanggal"
+                                placeholder={t("Dari Tanggal")}
                             />
                         </div>
 
@@ -283,7 +285,7 @@ const DeliveryNotes = () => {
                                 value={dateTo}
                                 onChange={(e) => setDateTo(e.target.value)}
                                 className="input-field pl-10 w-full"
-                                placeholder="Sampai Tanggal"
+                                placeholder={t("Sampai Tanggal")}
                             />
                         </div>
                     </div>
@@ -295,7 +297,7 @@ const DeliveryNotes = () => {
                 <div className="glass-card p-4">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm text-gray-600 dark:text-silver-dark">Total Surat Jalan</p>
+                            <p className="text-sm text-gray-600 dark:text-silver-dark">{t("Total Surat Jalan")}</p>
                             <p className="text-2xl font-bold text-gray-900 dark:text-silver-light">{deliveryNotes.length}</p>
                         </div>
                         <FileText className="w-10 h-10 text-accent-blue opacity-20" />
@@ -305,7 +307,7 @@ const DeliveryNotes = () => {
                 <div className="glass-card p-4">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm text-gray-600 dark:text-silver-dark">Draft</p>
+                            <p className="text-sm text-gray-600 dark:text-silver-dark">{t("Draft")}</p>
                             <p className="text-2xl font-bold text-gray-700 dark:text-gray-300">
                                 {deliveryNotes.filter(n => n.status === 'draft').length}
                             </p>
@@ -317,7 +319,7 @@ const DeliveryNotes = () => {
                 <div className="glass-card p-4">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm text-gray-600 dark:text-silver-dark">Terkirim</p>
+                            <p className="text-sm text-gray-600 dark:text-silver-dark">{t("Terkirim")}</p>
                             <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
                                 {deliveryNotes.filter(n => n.status === 'sent').length}
                             </p>
@@ -329,7 +331,7 @@ const DeliveryNotes = () => {
                 <div className="glass-card p-4">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm text-gray-600 dark:text-silver-dark">Diterima</p>
+                            <p className="text-sm text-gray-600 dark:text-silver-dark">{t("Diterima")}</p>
                             <p className="text-2xl font-bold text-green-700 dark:text-green-300">
                                 {deliveryNotes.filter(n => n.status === 'received').length}
                             </p>
@@ -353,27 +355,27 @@ const DeliveryNotes = () => {
                                         className="w-4 h-4"
                                     />
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-white">No. Surat Jalan</th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-white">Tanggal</th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-white">Tujuan</th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-white">Penerima</th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-white">Driver</th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-white">Truck No.</th>
-                                <th className="px-4 py-3 text-center text-xs font-bold text-white">Status</th>
-                                <th className="px-4 py-3 text-center text-xs font-bold text-white">Aksi</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-white">{t("No. Surat Jalan")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-white">{t("Tanggal")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-white">{t("Tujuan")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-white">{t("Penerima")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-white">{t("Driver")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-white">{t("Truck No.")}</th>
+                                <th className="px-4 py-3 text-center text-xs font-bold text-white">{t("Status")}</th>
+                                <th className="px-4 py-3 text-center text-xs font-bold text-white">{t("Aksi")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200 dark:divide-dark-border">
                             {loading ? (
                                 <tr>
                                     <td colSpan="9" className="px-4 py-8 text-center text-gray-500">
-                                        Loading...
+                                        {t("Loading...")}
                                     </td>
                                 </tr>
                             ) : filteredNotes.length === 0 ? (
                                 <tr>
                                     <td colSpan="9" className="px-4 py-8 text-center text-gray-500">
-                                        Tidak ada data surat jalan
+                                        {t("Tidak ada data surat jalan")}
                                     </td>
                                 </tr>
                             ) : (
@@ -416,14 +418,14 @@ const DeliveryNotes = () => {
                                                         setViewMode('view');
                                                     }}
                                                     className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
-                                                    title="Lihat Detail"
+                                                    title={t("Lihat Detail")}
                                                 >
                                                     <Eye className="w-4 h-4" />
                                                 </button>
                                                 <button
                                                     onClick={() => handlePrint(note)}
                                                     className="p-1.5 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded transition-colors"
-                                                    title="Print"
+                                                    title={t("Print")}
                                                 >
                                                     <Printer className="w-4 h-4" />
                                                 </button>
@@ -436,7 +438,7 @@ const DeliveryNotes = () => {
                                                                     setViewMode('edit');
                                                                 }}
                                                                 className="p-1.5 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded transition-colors"
-                                                                title="Edit"
+                                                                title={t("Edit")}
                                                             >
                                                                 <Edit className="w-4 h-4" />
                                                             </button>
@@ -445,7 +447,7 @@ const DeliveryNotes = () => {
                                                             <button
                                                                 onClick={() => handleDelete(note.id)}
                                                                 className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
-                                                                title="Hapus"
+                                                                title={t("Hapus")}
                                                             >
                                                                 <Trash2 className="w-4 h-4" />
                                                             </button>

@@ -9,9 +9,11 @@ import {
     Building, CreditCard, Banknote, History
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 // AP Payment Record Modal Component
 const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
+    const { t } = useLanguage();
     const [formData, setFormData] = useState({
         payment_date: new Date().toISOString().split('T')[0],
         amount: ap.outstanding_amount || 0,
@@ -71,7 +73,7 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
         e.preventDefault();
 
         if (formData.amount <= 0) {
-            alert('Payment amount must be greater than 0');
+            alert(t("Payment amount must be greater than 0"));
             return;
         }
 
@@ -266,28 +268,28 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
                         <CheckCircle className="w-12 h-12 text-green-500" />
                     </div>
 
-                    <h2 className="text-2xl font-bold text-green-500 mb-2">Payment Successful!</h2>
-                    <p className="text-silver-dark mb-6">Payment has been recorded in the system</p>
+                    <h2 className="text-2xl font-bold text-green-500 mb-2">{t("Payment Successful!")}</h2>
+                    <p className="text-silver-dark mb-6">{t("Payment has been recorded in the system")}</p>
 
                     {/* Payment Details */}
                     <div className="glass-card p-4 rounded-lg mb-6 text-left bg-green-500/5 border border-green-500/20">
                         <div className="space-y-3">
                             <div className="flex justify-between">
-                                <span className="text-silver-dark">Payment Number:</span>
+                                <span className="text-silver-dark">{t("Payment Number:")}</span>
                                 <span className="text-silver-light font-mono font-medium">{successData.paymentNumber}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-silver-dark">Amount Paid:</span>
+                                <span className="text-silver-dark">{t("Amount Paid:")}</span>
                                 <span className="text-green-400 font-bold">{formatCurrency(successData.amountPaid, successData.currency)}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-silver-dark">Outstanding Balance:</span>
+                                <span className="text-silver-dark">{t("Outstanding Balance:")}</span>
                                 <span className={`font-bold ${successData.newOutstanding <= 0 ? 'text-green-400' : 'text-yellow-400'}`}>
                                     {formatCurrency(Math.max(0, successData.newOutstanding), successData.currency)}
                                 </span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-silver-dark">New Status:</span>
+                                <span className="text-silver-dark">{t("New Status:")}</span>
                                 <span className={`px-3 py-1 rounded-full text-xs font-semibold ${successData.newStatus === 'paid' ? 'bg-green-500/20 text-green-400' :
                                     successData.newStatus === 'partial' ? 'bg-yellow-500/20 text-yellow-400' :
                                         'bg-blue-500/20 text-blue-400'
@@ -300,7 +302,7 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
                     </div>
 
                     <Button onClick={() => { onSuccess(); }} className="w-full">
-                        Close
+                        {t("Close")}
                     </Button>
                 </div>
             </Modal>
@@ -310,33 +312,33 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
     return (
         <Modal isOpen={true} onClose={onClose} maxWidth="max-w-2xl">
             <div className="p-6">
-                <h2 className="text-2xl font-bold gradient-text mb-6">Record AP Payment</h2>
+                <h2 className="text-2xl font-bold gradient-text mb-6">{t("Record AP Payment")}</h2>
 
                 {/* AP Info Summary */}
                 <div className="glass-card p-4 rounded-lg mb-6 bg-gradient-to-br from-red-500/10 to-transparent border border-red-500/30">
                     <div className="grid grid-cols-2 gap-3 text-sm">
                         <div>
-                            <span className="text-silver-dark">AP Number:</span>
+                            <span className="text-silver-dark">{t("AP Number:")}</span>
                             <span className="text-silver-light font-medium ml-2">{ap.ap_number}</span>
                         </div>
                         <div>
-                            <span className="text-silver-dark">Vendor:</span>
+                            <span className="text-silver-dark">{t("Vendor:")}</span>
                             <span className="text-silver-light font-medium ml-2">{ap.vendor_name}</span>
                         </div>
                         <div>
-                            <span className="text-silver-dark">PO Number:</span>
+                            <span className="text-silver-dark">{t("PO Number:")}</span>
                             <span className="text-silver-light font-medium ml-2">{ap.po_number || '-'}</span>
                         </div>
                         <div>
-                            <span className="text-silver-dark">Due Date:</span>
+                            <span className="text-silver-dark">{t("Due Date:")}</span>
                             <span className="text-silver-light font-medium ml-2">{ap.due_date}</span>
                         </div>
                         <div>
-                            <span className="text-silver-dark">Total Amount:</span>
+                            <span className="text-silver-dark">{t("Total Amount:")}</span>
                             <span className="text-silver-light font-medium ml-2">{formatCurrency(ap.original_amount, ap.currency)}</span>
                         </div>
                         <div>
-                            <span className="text-silver-dark">Outstanding:</span>
+                            <span className="text-silver-dark">{t("Outstanding:")}</span>
                             <span className="text-red-400 font-bold ml-2">{formatCurrency(ap.outstanding_amount, ap.currency)}</span>
                         </div>
                     </div>
@@ -347,7 +349,7 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-silver-dark mb-2">
-                                Payment Date *
+                                {t("Payment Date *")}
                             </label>
                             <input
                                 type="date"
@@ -359,7 +361,7 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-silver-dark mb-2">
-                                Payment Amount *
+                                {t("Payment Amount *")}
                             </label>
                             <input
                                 type="number"
@@ -372,13 +374,13 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
                                 className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg"
                             />
                             <p className="text-xs text-silver-dark mt-1">
-                                Max: {formatCurrency(ap.outstanding_amount, ap.currency)}
+                                {t("Max:")} {formatCurrency(ap.outstanding_amount, ap.currency)}
                             </p>
                         </div>
                         {ap.currency !== 'IDR' && (
                             <div>
                                 <label className="block text-sm font-medium text-silver-dark mb-2">
-                                    Kurs Pembayaran *
+                                    {t("Kurs Pembayaran *")}
                                 </label>
                                 <input
                                     type="number"
@@ -390,7 +392,7 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
                                     required
                                 />
                                 <p className="text-xs text-amber-500 mt-1">
-                                    Kurs Hutang Awal: Rp {(ap.exchange_rate || 1).toLocaleString('id-ID')}
+                                    {t("Kurs Hutang Awal: Rp")} {(ap.exchange_rate || 1).toLocaleString('id-ID')}
                                 </p>
                             </div>
                         )}
@@ -399,7 +401,7 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-silver-dark mb-2">
-                                Payment Method *
+                                {t("Payment Method *")}
                             </label>
                             <select
                                 required
@@ -407,22 +409,22 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
                                 onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
                                 className="w-full"
                             >
-                                <option value="bank_transfer">Bank Transfer</option>
-                                <option value="cash">Cash</option>
-                                <option value="check">Check / Giro</option>
-                                <option value="credit_card">Credit Card</option>
-                                <option value="other">Other</option>
+                                <option value="bank_transfer">{t("Bank Transfer")}</option>
+                                <option value="cash">{t("Cash")}</option>
+                                <option value="check">{t("Check / Giro")}</option>
+                                <option value="credit_card">{t("Credit Card")}</option>
+                                <option value="other">{t("Other")}</option>
                             </select>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-silver-dark mb-2">
-                                Reference Number
+                                {t("Reference Number")}
                             </label>
                             <input
                                 type="text"
                                 value={formData.reference_number}
                                 onChange={(e) => setFormData({ ...formData, reference_number: e.target.value })}
-                                placeholder="e.g., Transfer ref, Check #"
+                                placeholder={t("e.g., Transfer ref, Check #")}
                                 className="w-full"
                             />
                         </div>
@@ -432,7 +434,7 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
                     <div>
                         <label className="block text-sm font-medium text-silver-dark mb-2">
                             <CreditCard className="w-4 h-4 inline mr-1" />
-                            Paid From Account
+                            {t("Paid From Account")}
                         </label>
                         {bankAccounts.length > 0 ? (
                             <select
@@ -440,7 +442,7 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
                                 onChange={(e) => setFormData({ ...formData, paid_from_account: e.target.value })}
                                 className="w-full"
                             >
-                                <option value="">-- Select Bank Account --</option>
+                                <option value="">{t("-- Select Bank Account --")}</option>
                                 {bankAccounts.map(bank => (
                                     <option key={bank.id} value={bank.id}>
                                         {bank.bank_name} - {bank.account_number} ({bank.account_holder})
@@ -449,7 +451,7 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
                             </select>
                         ) : (
                             <p className="text-sm text-silver-dark italic">
-                                No bank accounts configured. Go to Company Settings to add accounts.
+                                {t("No bank accounts configured. Go to Company Settings to add accounts.")}
                             </p>
                         )}
                     </div>
@@ -457,31 +459,31 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
                     {/* Hutang Account Override */}
                     <div>
                         <label className="block text-sm font-medium text-silver-dark mb-2">
-                            Akun Hutang (AP Account)
+                            {t("Akun Hutang (AP Account)")}
                         </label>
                         <select
                             value={formData.ap_coa_id}
                             onChange={(e) => setFormData({ ...formData, ap_coa_id: e.target.value })}
                             className="w-full"
                         >
-                            <option value="">-- Pilih Akun Hutang --</option>
+                            <option value="">{t("-- Pilih Akun Hutang --")}</option>
                             {apAccountsList.map(c => (
                                 <option key={c.id} value={c.id}>
                                     {c.code} - {c.name}
                                 </option>
                             ))}
                         </select>
-                        <p className="text-xs text-silver-dark mt-1">Dicatat di General Ledger sebagai pengurang hutang.</p>
+                        <p className="text-xs text-silver-dark mt-1">{t("Dicatat di General Ledger sebagai pengurang hutang.")}</p>
                     </div>
 
                     <div>
                         <label className="block text-sm font-medium text-silver-dark mb-2">
-                            Notes
+                            {t("Notes")}
                         </label>
                         <textarea
                             value={formData.notes}
                             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                            placeholder="Optional payment notes..."
+                            placeholder={t("Optional payment notes...")}
                             rows={2}
                             className="w-full"
                         />
@@ -489,7 +491,7 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
 
                     <div className="flex gap-3 justify-end pt-4 border-t border-dark-border">
                         <Button type="button" variant="secondary" onClick={onClose}>
-                            Cancel
+                            {t("Cancel")}
                         </Button>
                         <Button type="submit" disabled={loading} icon={DollarSign}>
                             {loading ? 'Processing...' : 'Record Payment'}
@@ -503,6 +505,7 @@ const APPaymentRecordModal = ({ ap, formatCurrency, onClose, onSuccess }) => {
 
 // AP Detail Modal Component
 const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment, canEditAP }) => {
+    const { t } = useLanguage();
     const [paymentHistory, setPaymentHistory] = useState([]);
     const [loadingHistory, setLoadingHistory] = useState(true);
     const [accounts, setAccounts] = useState([]); // COA list
@@ -586,7 +589,7 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment, canEditAP
 
     const handleItemCoaChange = async (index, newCoaId) => {
         if (!canEditAP) {
-            alert('Anda tidak memiliki hak akses untuk mengubah akun beban.');
+            alert(t("Anda tidak memiliki hak akses untuk mengubah akun beban."));
             return;
         }
         const updatedItems = [...poItems];
@@ -623,7 +626,7 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment, canEditAP
 
             if (error) throw error;
 
-            alert('Account allocation saved successfully!');
+            alert(t("Account allocation saved successfully!"));
         } catch (error) {
             console.error('Error updating items:', error);
             alert('Failed to save changes: ' + error.message);
@@ -636,7 +639,7 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment, canEditAP
         <Modal isOpen={true} onClose={onClose} maxWidth="max-w-6xl">
             <div className="p-6">
                 <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-2xl font-bold gradient-text">AP Detail</h2>
+                    <h2 className="text-2xl font-bold gradient-text">{t("AP Detail")}</h2>
                     <span className={`px-3 py-1 rounded-full text-sm font-semibold ${ap.status === 'paid' ? 'bg-green-500/20 text-green-400' :
                         ap.status === 'partial' ? 'bg-yellow-500/20 text-yellow-400' :
                             ap.status === 'overdue' ? 'bg-red-500/20 text-red-400' :
@@ -653,15 +656,15 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment, canEditAP
                 {/* AP Info */}
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
                     <div className="glass-card p-4 rounded-lg">
-                        <p className="text-xs text-silver-dark mb-1">AP Number</p>
+                        <p className="text-xs text-silver-dark mb-1">{t("AP Number")}</p>
                         <p className="font-bold text-accent-orange">{ap.ap_number}</p>
                     </div>
                     <div className="glass-card p-4 rounded-lg">
-                        <p className="text-xs text-silver-dark mb-1">PO Number</p>
+                        <p className="text-xs text-silver-dark mb-1">{t("PO Number")}</p>
                         <p className="font-bold text-silver-light">{ap.po_number || '-'}</p>
                     </div>
                     <div className="glass-card p-4 rounded-lg">
-                        <p className="text-xs text-silver-dark mb-1">Vendor</p>
+                        <p className="text-xs text-silver-dark mb-1">{t("Vendor")}</p>
                         <p className="font-bold text-silver-light">{ap.vendor_name}</p>
                     </div>
                 </div>
@@ -670,22 +673,22 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment, canEditAP
                 <div className="glass-card p-4 rounded-lg mb-6 bg-blue-500/5 border border-blue-500/20">
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="font-semibold text-white flex items-center gap-2">
-                            <Building className="w-4 h-4" /> Item Allocation (Finance)
+                            <Building className="w-4 h-4" /> {t("Item Allocation (Finance)")}
                         </h3>
                     </div>
 
                     {loadingItems ? (
-                        <div className="text-center py-4 text-silver-dark text-sm animate-pulse">Loading item details...</div>
+                        <div className="text-center py-4 text-silver-dark text-sm animate-pulse">{t("Loading item details...")}</div>
                     ) : poItems.length > 0 ? (
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead className="bg-[#0070bc]">
                                     <tr className="text-left">
-                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase rounded-tl-lg whitespace-nowrap">Item</th>
-                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase">Description</th>
-                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right whitespace-nowrap">Qty</th>
-                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right whitespace-nowrap">Unit Price</th>
-                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right rounded-tr-lg whitespace-nowrap">Amount</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase rounded-tl-lg whitespace-nowrap">{t("Item")}</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase">{t("Description")}</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right whitespace-nowrap">{t("Qty")}</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right whitespace-nowrap">{t("Unit Price")}</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right rounded-tr-lg whitespace-nowrap">{t("Amount")}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-dark-border/50">
@@ -713,7 +716,7 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment, canEditAP
                         </div>
                     ) : (
                         <div className="text-center py-4 text-silver-dark text-sm italic">
-                            No item details found for this PO.
+                            {t("No item details found for this PO.")}
                         </div>
                     )}
                 </div>
@@ -722,29 +725,29 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment, canEditAP
                 <div className="glass-card p-4 rounded-lg mb-6">
                     <div className="flex items-center gap-2 mb-3">
                         <Banknote className="w-5 h-5 text-accent-green" />
-                        <h3 className="font-semibold text-silver-light">Financial Summary</h3>
+                        <h3 className="font-semibold text-silver-light">{t("Financial Summary")}</h3>
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div>
-                            <p className="text-xs text-silver-dark mb-1">Bill Date</p>
+                            <p className="text-xs text-silver-dark mb-1">{t("Bill Date")}</p>
                             <p className="font-medium text-silver-light">{ap.bill_date}</p>
                         </div>
                         <div>
-                            <p className="text-xs text-silver-dark mb-1">Due Date</p>
+                            <p className="text-xs text-silver-dark mb-1">{t("Due Date")}</p>
                             <p className="font-medium text-silver-light">{ap.due_date}</p>
                         </div>
                         <div>
-                            <p className="text-xs text-silver-dark mb-1">Original Amount</p>
+                            <p className="text-xs text-silver-dark mb-1">{t("Original Amount")}</p>
                             <p className="font-bold text-silver-light">{formatCurrency(ap.original_amount, ap.currency)}</p>
                         </div>
                         <div>
-                            <p className="text-xs text-silver-dark mb-1">Paid Amount</p>
+                            <p className="text-xs text-silver-dark mb-1">{t("Paid Amount")}</p>
                             <p className="font-bold text-green-400">{formatCurrency(ap.paid_amount || 0, ap.currency)}</p>
                         </div>
                     </div>
                     <div className="mt-4 pt-4 border-t border-dark-border">
                         <div className="flex justify-between items-center">
-                            <span className="text-lg font-semibold text-silver-light">Outstanding Balance</span>
+                            <span className="text-lg font-semibold text-silver-light">{t("Outstanding Balance")}</span>
                             <span className={`text-2xl font-bold ${ap.outstanding_amount <= 0 ? 'text-green-400' : 'text-red-400'}`}>
                                 {formatCurrency(ap.outstanding_amount, ap.currency)}
                             </span>
@@ -757,16 +760,16 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment, canEditAP
                     <div className="glass-card p-4 rounded-lg mb-6">
                         <div className="flex items-center gap-2 mb-3">
                             <History className="w-5 h-5 text-accent-blue" />
-                            <h3 className="font-semibold text-silver-light">Payment History</h3>
+                            <h3 className="font-semibold text-silver-light">{t("Payment History")}</h3>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b border-dark-border">
-                                        <th className="text-left py-2 text-silver-dark font-medium">Date</th>
-                                        <th className="text-left py-2 text-silver-dark font-medium">Payment Number</th>
-                                        <th className="text-left py-2 text-silver-dark font-medium">Method</th>
-                                        <th className="text-right py-2 text-silver-dark font-medium">Amount</th>
+                                        <th className="text-left py-2 text-silver-dark font-medium">{t("Date")}</th>
+                                        <th className="text-left py-2 text-silver-dark font-medium">{t("Payment Number")}</th>
+                                        <th className="text-left py-2 text-silver-dark font-medium">{t("Method")}</th>
+                                        <th className="text-right py-2 text-silver-dark font-medium">{t("Amount")}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -793,32 +796,32 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment, canEditAP
                 {loadingHistory && (
                     <div className="glass-card p-4 rounded-lg mb-6 text-center">
                         <div className="animate-spin w-6 h-6 border-2 border-accent-orange border-t-transparent rounded-full mx-auto"></div>
-                        <p className="text-silver-dark text-sm mt-2">Loading payment history...</p>
+                        <p className="text-silver-dark text-sm mt-2">{t("Loading payment history...")}</p>
                     </div>
                 )}
 
                 {/* Notes */}
                 {ap.notes && (
                     <div className="glass-card p-4 rounded-lg mb-6">
-                        <p className="text-xs text-silver-dark mb-1">Notes</p>
+                        <p className="text-xs text-silver-dark mb-1">{t("Notes")}</p>
                         <p className="text-silver-light text-sm">{ap.notes}</p>
                     </div>
                 )}
 
                 {ap.source === 'po_fallback' && (
                     <div className="glass-card p-4 rounded-lg mb-6 bg-yellow-100 border border-yellow-300 text-sm text-black font-medium">
-                        This AP record is derived from purchase order fallback data. A proper AP transaction is required before payments can be recorded.
+                        {t("This AP record is derived from purchase order fallback data. A proper AP transaction is required before payments can be recorded.")}
                     </div>
                 )}
 
                 {/* Actions */}
                 <div className="flex gap-3 justify-end pt-4 border-t border-dark-border">
                     <Button variant="secondary" onClick={onClose}>
-                        Close
+                        {t("Close")}
                     </Button>
                     {ap.outstanding_amount > 0 && canEditAP && (
                         <Button icon={DollarSign} onClick={onRecordPayment}>
-                            Record Payment
+                            {t("Record Payment")}
                         </Button>
                     )}
                 </div>
@@ -828,6 +831,7 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment, canEditAP
 };
 
 const BridgeAccountsPayable = () => {
+    const { t } = useLanguage();
     const { canEdit, canCreate, canDelete } = useAuth();
     const [apTransactions, setAPTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -1042,44 +1046,44 @@ const BridgeAccountsPayable = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text">Accounts Payable (AP)</h1>
-                    <p className="text-silver-dark mt-1">Manage vendor payables</p>
+                    <h1 className="text-3xl font-bold gradient-text">{t("Accounts Payable (AP)")}</h1>
+                    <p className="text-silver-dark mt-1">{t("Manage vendor payables")}</p>
                 </div>
-                <Button onClick={handleExportXLS} icon={Download}>Export to Excel</Button>
+                <Button onClick={handleExportXLS} icon={Download}>{t("Export to Excel")}</Button>
             </div>
 
             {/* Summary Cards - Compact */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="glass-card p-4 rounded-lg">
                     <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark">Total AP Amount</p>
+                        <p className="text-xs text-silver-dark">{t("Total AP Amount")}</p>
                         <DollarSign className="w-4 h-4 text-blue-400" />
                     </div>
                     <p className="text-xl font-bold text-blue-400">{formatCurrency(totalAPAmount)}</p>
-                    <p className="text-xs text-silver-dark">{apTransactions.length} transactions</p>
+                    <p className="text-xs text-silver-dark">{apTransactions.length} {t("transactions")}</p>
                 </div>
 
                 <div className="glass-card p-4 rounded-lg">
                     <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark">Total Paid</p>
+                        <p className="text-xs text-silver-dark">{t("Total Paid")}</p>
                         <CheckCircle className="w-4 h-4 text-green-400" />
                     </div>
                     <p className="text-xl font-bold text-green-400">{formatCurrency(totalPaidAmount)}</p>
-                    <p className="text-xs text-silver-dark">{apTransactions.filter(ap => ap.status === 'paid').length} paid</p>
+                    <p className="text-xs text-silver-dark">{apTransactions.filter(ap => ap.status === 'paid').length} {t("paid")}</p>
                 </div>
 
                 <div className="glass-card p-4 rounded-lg">
                     <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark">Outstanding Balance</p>
+                        <p className="text-xs text-silver-dark">{t("Outstanding Balance")}</p>
                         <AlertCircle className="w-4 h-4 text-red-400" />
                     </div>
                     <p className="text-xl font-bold text-red-400">{formatCurrency(totalOutstanding)}</p>
-                    <p className="text-xs text-silver-dark">{apTransactions.filter(ap => ap.outstanding_amount > 0).length} unpaid</p>
+                    <p className="text-xs text-silver-dark">{apTransactions.filter(ap => ap.outstanding_amount > 0).length} {t("unpaid")}</p>
                 </div>
 
                 <div className="glass-card p-4 rounded-lg">
                     <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark">Overdue</p>
+                        <p className="text-xs text-silver-dark">{t("Overdue")}</p>
                         <Clock className="w-4 h-4 text-orange-400" />
                     </div>
                     <p className="text-xl font-bold text-orange-400">{overdueCount}</p>
@@ -1089,11 +1093,11 @@ const BridgeAccountsPayable = () => {
 
             {/* Aging Analysis - Compact */}
             <div className="glass-card p-4 rounded-lg">
-                <h2 className="text-sm font-bold text-silver-light mb-3">Aging Analysis</h2>
+                <h2 className="text-sm font-bold text-silver-light mb-3">{t("Aging Analysis")}</h2>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {Object.entries(agingSummary).map(([bucket, amount]) => (
                         <div key={bucket} className="bg-dark-surface p-3 rounded-lg">
-                            <p className="text-xs text-silver-dark">{bucket} Days</p>
+                            <p className="text-xs text-silver-dark">{bucket} {t("Days")}</p>
                             <p className="text-lg font-bold text-silver-light">{formatCurrency(amount)}</p>
                             <div className="mt-1 h-1.5 bg-dark-card rounded-full overflow-hidden">
                                 <div
@@ -1115,7 +1119,7 @@ const BridgeAccountsPayable = () => {
                     <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                     <input
                         type="text"
-                        placeholder="Search AP number, PO, or vendor..."
+                        placeholder={t("Search AP number, PO, or vendor...")}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-12 pr-4 py-3 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-base"
@@ -1129,15 +1133,15 @@ const BridgeAccountsPayable = () => {
                     <table className="w-full text-sm">
                         <thead className="bg-accent-orange">
                             <tr>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">AP Number</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">{t("AP Number")}</th>
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">PO #</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Vendor</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Bill Date</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Due Date</th>
-                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">Original</th>
-                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">Paid</th>
-                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">Outstanding</th>
-                                <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap">Status</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">{t("Vendor")}</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">{t("Bill Date")}</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">{t("Due Date")}</th>
+                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">{t("Original")}</th>
+                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">{t("Paid")}</th>
+                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">{t("Outstanding")}</th>
+                                <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap">{t("Status")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
@@ -1145,14 +1149,14 @@ const BridgeAccountsPayable = () => {
                                 <tr>
                                     <td colSpan="9" className="px-3 py-8 text-center">
                                         <div className="animate-spin w-6 h-6 border-2 border-accent-orange border-t-transparent rounded-full mx-auto"></div>
-                                        <p className="text-silver-dark mt-2 text-sm">Loading...</p>
+                                        <p className="text-silver-dark mt-2 text-sm">{t("Loading...")}</p>
                                     </td>
                                 </tr>
                             ) : filteredAP.length === 0 ? (
                                 <tr>
                                     <td colSpan="9" className="px-3 py-8 text-center">
                                         <FileText className="w-10 h-10 text-silver-dark mx-auto mb-2" />
-                                        <p className="text-silver-dark text-sm">No AP transactions yet.</p>
+                                        <p className="text-silver-dark text-sm">{t("No AP transactions yet.")}</p>
                                     </td>
                                 </tr>
                             ) : (

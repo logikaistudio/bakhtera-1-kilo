@@ -11,6 +11,7 @@ import {
 import { printReport, fmtDatePrint } from '../../../utils/printPDF';
 import { journalEntriesHasColumn } from '../../../utils/journalHelper';
 import { useData } from '../../../context/DataContext';
+import { useLanguage } from '../../../i18n/LanguageContext';
 
 // ─── COA Type Config ─────────────────────────────────────────────────────────
 const COA_TYPE_CONFIG = {
@@ -98,6 +99,7 @@ const Sparkline = ({ data, color = '#f97316', width = 80, height = 24 }) => {
 };
 
 const BigGeneralLedger = () => {
+    const { t } = useLanguage();
     const navigate = useNavigate();
     const location = useLocation();
     const { user } = useData();
@@ -338,10 +340,10 @@ const BigGeneralLedger = () => {
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                         <BookOpen className="h-6 w-6 text-blue-500" />
-                        Big General Ledger
+                        {t("Big General Ledger")}
                     </h1>
                     <p className="text-gray-600 dark:text-gray-400 mt-1">
-                        Chart of Accounts and transaction details for Big module
+                        {t("Chart of Accounts and transaction details for Big module")}
                     </p>
                 </div>
                 <Button
@@ -350,7 +352,7 @@ const BigGeneralLedger = () => {
                     className="flex items-center gap-2"
                 >
                     <RefreshCw className="h-4 w-4" />
-                    Refresh
+                    {t("Refresh")}
                 </Button>
             </div>
 
@@ -359,7 +361,7 @@ const BigGeneralLedger = () => {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Start Date
+                            {t("Start Date")}
                         </label>
                         <input
                             type="date"
@@ -370,7 +372,7 @@ const BigGeneralLedger = () => {
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            End Date
+                            {t("End Date")}
                         </label>
                         <input
                             type="date"
@@ -381,29 +383,29 @@ const BigGeneralLedger = () => {
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Account Type
+                            {t("Account Type")}
                         </label>
                         <select
                             value={filterType}
                             onChange={(e) => setFilterType(e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                         >
-                            <option value="ALL">All Types</option>
-                            <option value="ASSET">Assets</option>
-                            <option value="LIABILITY">Liabilities</option>
-                            <option value="EQUITY">Equity</option>
-                            <option value="REVENUE">Revenue</option>
-                            <option value="EXPENSE">Expenses</option>
-                            <option value="COGS">COGS</option>
+                            <option value="ALL">{t("All Types")}</option>
+                            <option value="ASSET">{t("Assets")}</option>
+                            <option value="LIABILITY">{t("Liabilities")}</option>
+                            <option value="EQUITY">{t("Equity")}</option>
+                            <option value="REVENUE">{t("Revenue")}</option>
+                            <option value="EXPENSE">{t("Expenses")}</option>
+                            <option value="COGS">{t("COGS")}</option>
                         </select>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Search
+                            {t("Search")}
                         </label>
                         <input
                             type="text"
-                            placeholder="Search accounts..."
+                            placeholder={t("Search accounts...")}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
@@ -419,22 +421,22 @@ const BigGeneralLedger = () => {
                         <thead className="bg-gray-50 dark:bg-gray-700">
                             <tr>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Account
+                                    {t("Account")}
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Type
+                                    {t("Type")}
                                 </th>
                                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Debit
+                                    {t("Debit")}
                                 </th>
                                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Credit
+                                    {t("Credit")}
                                 </th>
                                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Balance
+                                    {t("Balance")}
                                 </th>
                                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Actions
+                                    {t("Actions")}
                                 </th>
                             </tr>
                         </thead>
@@ -475,7 +477,7 @@ const BigGeneralLedger = () => {
                                                 className="flex items-center gap-1"
                                             >
                                                 <ExternalLink className="h-3 w-3" />
-                                                View
+                                                {t("View")}
                                             </Button>
                                         </td>
                                     </tr>
@@ -492,7 +494,7 @@ const BigGeneralLedger = () => {
                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-6xl w-full mx-4 max-h-[90vh] overflow-hidden">
                         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
                             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                                Transaction Details - {drillDownData.account.name}
+                                {t("Transaction Details -")} {drillDownData.account.name}
                             </h2>
                             <button
                                 onClick={() => setShowDrillDown(false)}
@@ -508,19 +510,19 @@ const BigGeneralLedger = () => {
                                     <thead className="bg-gray-50 dark:bg-gray-700">
                                         <tr>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                                Date
+                                                {t("Date")}
                                             </th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                                Description
+                                                {t("Description")}
                                             </th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                                Reference
+                                                {t("Reference")}
                                             </th>
                                             <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                                Debit
+                                                {t("Debit")}
                                             </th>
                                             <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                                Credit
+                                                {t("Credit")}
                                             </th>
                                         </tr>
                                     </thead>
@@ -556,10 +558,10 @@ const BigGeneralLedger = () => {
                                 className="flex items-center gap-2"
                             >
                                 <Download className="h-4 w-4" />
-                                Export PDF
+                                {t("Export PDF")}
                             </Button>
                             <Button onClick={() => setShowDrillDown(false)}>
-                                Close
+                                {t("Close")}
                             </Button>
                         </div>
                     </div>

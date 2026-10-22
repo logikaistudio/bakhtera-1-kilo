@@ -6,8 +6,10 @@ import { formatCurrency } from '../../../utils/currencyFormatter';
 import { exportToCSV } from '../../../utils/exportCSV';
 import { exportToXLS } from '../../../utils/exportXLS';
 import { useNavigate } from 'react-router-dom';
+import { useLanguage } from '../../../i18n/LanguageContext';
 
 const BarangKeluar = () => {
+    const { t } = useLanguage();
     const { outboundTransactions = [], quotations = [], bridgeBusinessPartners = [], companySettings, bridgeSettings } = useData();
     const [searchTerm, setSearchTerm] = useState('');
     const [startDate, setStartDate] = useState('');
@@ -228,8 +230,8 @@ const BarangKeluar = () => {
         <div className="p-6 space-y-6">
             {/* Header */}
             <div>
-                <h1 className="text-3xl font-bold gradient-text">Barang Keluar</h1>
-                <p className="text-silver-dark mt-1">Laporan Pengajuan Barang Keluar (Per Item)</p>
+                <h1 className="text-3xl font-bold gradient-text">{t("Barang Keluar")}</h1>
+                <p className="text-silver-dark mt-1">{t("Laporan Pengajuan Barang Keluar (Per Item)")}</p>
             </div>
 
             {/* Search & Stats */}
@@ -239,7 +241,7 @@ const BarangKeluar = () => {
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                         <input
                             type="text"
-                            placeholder="Cari No Pengajuan, No BC, atau Pemilik..."
+                            placeholder={t("Cari No Pengajuan, No BC, atau Pemilik...")}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-orange focus:outline-none"
@@ -265,17 +267,17 @@ const BarangKeluar = () => {
                     </div>
                 </div>
                 <div className="glass-card p-4 rounded-lg border border-accent-orange">
-                    <p className="text-xs text-silver-dark">Total Pengajuan</p>
+                    <p className="text-xs text-silver-dark">{t("Total Pengajuan")}</p>
                     <p className="text-2xl font-bold text-accent-orange">{filteredTransactions.length}</p>
                 </div>
                 <div className="glass-card p-4 rounded-lg border border-red-500">
-                    <p className="text-xs text-silver-dark">Barang Keluar</p>
+                    <p className="text-xs text-silver-dark">{t("Barang Keluar")}</p>
                     <p className="text-2xl font-bold text-red-500">
                         {flatRows.reduce((sum, r) => sum + (r.jumlahBarang || 0), 0).toLocaleString('id-ID')}
                     </p>
                 </div>
                 <div className="glass-card p-4 rounded-lg border border-accent-green">
-                    <p className="text-xs text-silver-dark">Jumlah Total</p>
+                    <p className="text-xs text-silver-dark">{t("Jumlah Total")}</p>
                     <p className="text-xl font-bold text-accent-green">
                         {formatCurrency(flatRows.reduce((sum, r) => sum + (r.nilaiBarang || 0), 0))}
                     </p>
@@ -287,7 +289,7 @@ const BarangKeluar = () => {
                 <div className="p-4 border-b border-dark-border flex justify-between items-center">
                     <div className="flex items-center gap-2">
                         <ArrowUpCircle className="w-5 h-5 text-accent-orange" />
-                        <h2 className="text-lg font-semibold text-silver-light">Daftar Dokumen Barang Keluar</h2>
+                        <h2 className="text-lg font-semibold text-silver-light">{t("Daftar Dokumen Barang Keluar")}</h2>
                     </div>
                     <div className="flex gap-2">
                         <Button onClick={handleExportXLS} variant="success" icon={FileSpreadsheet} className="!py-1.5 !px-3 !text-xs">XLS</Button>
@@ -300,31 +302,31 @@ const BarangKeluar = () => {
                         <thead className="bg-accent-orange/10 sticky top-0 z-10">
                             <tr>
                                 <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-8">No</th>
-                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-32">No. Bukti Pengeluaran</th>
-                                <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-24">Tgl Bukti</th>
-                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider" style={{ minWidth: '384px' }}>Nama Pemilik</th>
-                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-28">No. Pengajuan</th>
-                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-16">Jenis Dok</th>
-                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-24">No. Pabean</th>
-                                <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-22">Tgl Pabean</th>
-                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider" style={{ minWidth: '384px' }}>Penerima</th>
-                                <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-8">No Urut Item</th>
-                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-24">Kode Barang</th>
-                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-24">Kode HS</th>
-                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-36">Nama Barang</th>
-                                <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-14">Satuan</th>
-                                <th className="px-2 py-2 text-right text-xs font-semibold text-silver uppercase tracking-wider w-20">Jml Barang</th>
-                                <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-14">Kurs</th>
-                                <th className="px-2 py-2 text-right text-xs font-semibold text-silver uppercase tracking-wider w-24">Nominal</th>
-                                <th className="px-2 py-2 text-right text-xs font-semibold text-silver uppercase tracking-wider w-24">Nilai Barang</th>
-                                <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-20">Aksi</th>
+                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-32">{t("No. Bukti Pengeluaran")}</th>
+                                <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-24">{t("Tgl Bukti")}</th>
+                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider" style={{ minWidth: '384px' }}>{t("Nama Pemilik")}</th>
+                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-28">{t("No. Pengajuan")}</th>
+                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-16">{t("Jenis Dok")}</th>
+                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-24">{t("No. Pabean")}</th>
+                                <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-22">{t("Tgl Pabean")}</th>
+                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider" style={{ minWidth: '384px' }}>{t("Penerima")}</th>
+                                <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-8">{t("No Urut Item")}</th>
+                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-24">{t("Kode Barang")}</th>
+                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-24">{t("Kode HS")}</th>
+                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-36">{t("Nama Barang")}</th>
+                                <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-14">{t("Satuan")}</th>
+                                <th className="px-2 py-2 text-right text-xs font-semibold text-silver uppercase tracking-wider w-20">{t("Jml Barang")}</th>
+                                <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-14">{t("Kurs")}</th>
+                                <th className="px-2 py-2 text-right text-xs font-semibold text-silver uppercase tracking-wider w-24">{t("Nominal")}</th>
+                                <th className="px-2 py-2 text-right text-xs font-semibold text-silver uppercase tracking-wider w-24">{t("Nilai Barang")}</th>
+                                <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-20">{t("Aksi")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
                             {flatRows.length === 0 ? (
                                 <tr>
                                     <td colSpan="15" className="px-4 py-12 text-center text-silver-dark">
-                                        Tidak ada data yang ditemukan
+                                        {t("Tidak ada data yang ditemukan")}
                                     </td>
                                 </tr>
                             ) : (
@@ -368,10 +370,10 @@ const BarangKeluar = () => {
                                             <button
                                                 onClick={() => navigate(`/bridge/pengajuan?detail=${encodeURIComponent(row.pengajuanNumber)}`)}
                                                 className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-accent-orange/10 hover:bg-accent-orange/20 text-accent-orange transition-colors text-xs font-medium whitespace-nowrap"
-                                                title="Lihat Detail Pengajuan"
+                                                title={t("Lihat Detail Pengajuan")}
                                             >
                                                 <Eye className="w-3 h-3" />
-                                                <span>Detail</span>
+                                                <span>{t("Detail")}</span>
                                             </button>
                                         </td>
                                     </tr>

@@ -7,8 +7,10 @@ import { exportToCSV } from '../../../utils/exportCSV';
 import { exportToXLS } from '../../../utils/exportXLS';
 import DocumentPreviewModal from '../../../components/Common/DocumentPreviewModal';
 import { useNavigate } from 'react-router-dom';
+import { useLanguage } from '../../../i18n/LanguageContext';
 
 const BarangMasuk = () => {
+    const { t } = useLanguage();
     const { inboundTransactions = [], quotations = [], bridgeBusinessPartners = [], companySettings, bridgeSettings } = useData();
     const [searchTerm, setSearchTerm] = useState('');
     const [startDate, setStartDate] = useState('');
@@ -340,8 +342,8 @@ const BarangMasuk = () => {
         <div className="p-6 space-y-6">
             {/* Header */}
             <div>
-                <h1 className="text-3xl font-bold gradient-text">Barang Masuk</h1>
-                <p className="text-silver-dark mt-1">Daftar Pengajuan Barang Masuk (Per Dokumen)</p>
+                <h1 className="text-3xl font-bold gradient-text">{t("Barang Masuk")}</h1>
+                <p className="text-silver-dark mt-1">{t("Daftar Pengajuan Barang Masuk (Per Dokumen)")}</p>
             </div>
 
             {/* Search & Stats */}
@@ -351,7 +353,7 @@ const BarangMasuk = () => {
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                         <input
                             type="text"
-                            placeholder="Cari No Pengajuan, No BC, atau Pengirim..."
+                            placeholder={t("Cari No Pengajuan, No BC, atau Pengirim...")}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
@@ -377,17 +379,17 @@ const BarangMasuk = () => {
                     </div>
                 </div>
                 <div className="glass-card p-4 rounded-lg border border-accent-blue">
-                    <p className="text-xs text-silver-dark">Total Pengajuan</p>
+                    <p className="text-xs text-silver-dark">{t("Total Pengajuan")}</p>
                     <p className="text-2xl font-bold text-accent-blue">{filteredTransactions.length}</p>
                 </div>
                 <div className="glass-card p-4 rounded-lg border border-orange-500">
-                    <p className="text-xs text-silver-dark">Barang Masuk</p>
+                    <p className="text-xs text-silver-dark">{t("Barang Masuk")}</p>
                     <p className="text-2xl font-bold text-orange-500">
                         {flatRows.reduce((sum, r) => sum + (r.jumlahBarang || 0), 0).toLocaleString('id-ID')}
                     </p>
                 </div>
                 <div className="glass-card p-4 rounded-lg border border-accent-green">
-                    <p className="text-xs text-silver-dark">Jumlah Total</p>
+                    <p className="text-xs text-silver-dark">{t("Jumlah Total")}</p>
                     <p className="text-xl font-bold text-accent-green">
                         {formatCurrency(flatRows.reduce((sum, r) => sum + (r.nilaiBarang || 0), 0))}
                     </p>
@@ -399,7 +401,7 @@ const BarangMasuk = () => {
                 <div className="p-4 border-b border-dark-border flex justify-between items-center">
                     <div className="flex items-center gap-2">
                         <ArrowDownCircle className="w-5 h-5 text-accent-blue" />
-                        <h2 className="text-lg font-semibold text-silver-light">Daftar Dokumen Masuk</h2>
+                        <h2 className="text-lg font-semibold text-silver-light">{t("Daftar Dokumen Masuk")}</h2>
                     </div>
                     <div className="flex gap-2">
                         <Button onClick={handleExportXLS} variant="success" icon={FileSpreadsheet} className="!py-1.5 !px-3 !text-xs">XLS</Button>
@@ -412,31 +414,31 @@ const BarangMasuk = () => {
                         <thead className="bg-accent-blue/10 sticky top-0 z-10">
                             <tr>
                                 <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-8">No</th>
-                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-32">No. Bukti Penerimaan</th>
-                                <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-24">Tgl Bukti</th>
-                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider" style={{ minWidth: '384px' }}>Nama Pemilik</th>
-                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-28">No. Pengajuan</th>
-                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-16">Jenis Dok</th>
-                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-24">No. Pabean</th>
-                                <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-22">Tgl Pabean</th>
-                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider" style={{ minWidth: '384px' }}>Pengirim</th>
-                                <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-8">No Urut Item</th>
-                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-24">Kode Barang</th>
-                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-24">Kode HS</th>
-                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-36">Nama Barang</th>
-                                <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-14">Satuan</th>
-                                <th className="px-2 py-2 text-right text-xs font-semibold text-silver uppercase tracking-wider w-20">Jml Barang</th>
-                                <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-14">Kurs</th>
-                                <th className="px-2 py-2 text-right text-xs font-semibold text-silver uppercase tracking-wider w-24">Nominal</th>
-                                <th className="px-2 py-2 text-right text-xs font-semibold text-silver uppercase tracking-wider w-24">Nilai Barang</th>
-                                <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-20">Aksi</th>
+                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-32">{t("No. Bukti Penerimaan")}</th>
+                                <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-24">{t("Tgl Bukti")}</th>
+                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider" style={{ minWidth: '384px' }}>{t("Nama Pemilik")}</th>
+                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-28">{t("No. Pengajuan")}</th>
+                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-16">{t("Jenis Dok")}</th>
+                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-24">{t("No. Pabean")}</th>
+                                <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-22">{t("Tgl Pabean")}</th>
+                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider" style={{ minWidth: '384px' }}>{t("Pengirim")}</th>
+                                <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-8">{t("No Urut Item")}</th>
+                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-24">{t("Kode Barang")}</th>
+                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-24">{t("Kode HS")}</th>
+                                <th className="px-2 py-2 text-left text-xs font-semibold text-silver uppercase tracking-wider w-36">{t("Nama Barang")}</th>
+                                <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-14">{t("Satuan")}</th>
+                                <th className="px-2 py-2 text-right text-xs font-semibold text-silver uppercase tracking-wider w-20">{t("Jml Barang")}</th>
+                                <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-14">{t("Kurs")}</th>
+                                <th className="px-2 py-2 text-right text-xs font-semibold text-silver uppercase tracking-wider w-24">{t("Nominal")}</th>
+                                <th className="px-2 py-2 text-right text-xs font-semibold text-silver uppercase tracking-wider w-24">{t("Nilai Barang")}</th>
+                                <th className="px-2 py-2 text-center text-xs font-semibold text-silver uppercase tracking-wider w-20">{t("Aksi")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
                             {flatRows.length === 0 ? (
                                 <tr>
                                     <td colSpan="15" className="px-4 py-12 text-center text-silver-dark">
-                                        Tidak ada data yang ditemukan
+                                        {t("Tidak ada data yang ditemukan")}
                                     </td>
                                 </tr>
                             ) : (
@@ -480,10 +482,10 @@ const BarangMasuk = () => {
                                             <button
                                                 onClick={() => navigate(`/bridge/pengajuan?detail=${encodeURIComponent(row.pengajuanNumber)}`)}
                                                 className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-accent-blue/10 hover:bg-accent-blue/20 text-accent-blue transition-colors text-xs font-medium whitespace-nowrap"
-                                                title="Lihat Detail Pengajuan"
+                                                title={t("Lihat Detail Pengajuan")}
                                             >
                                                 <Eye className="w-3 h-3" />
-                                                <span>Detail</span>
+                                                <span>{t("Detail")}</span>
                                             </button>
                                         </td>
                                     </tr>
@@ -502,7 +504,7 @@ const BarangMasuk = () => {
                         {/* Modal Header */}
                         <div className="p-5 border-b border-gray-100 dark:border-dark-border flex justify-between items-start bg-white dark:bg-dark-card">
                             <div>
-                                <h3 className="text-2xl font-bold text-gray-800 dark:text-white">Detail Inventaris</h3>
+                                <h3 className="text-2xl font-bold text-gray-800 dark:text-white">{t("Detail Inventaris")}</h3>
                                 <p className="text-sm text-gray-500 dark:text-silver-dark mt-1">{selectedTransaction.pengajuanNumber}</p>
                             </div>
                             <div className="flex items-center gap-2">
@@ -517,15 +519,15 @@ const BarangMasuk = () => {
                         {/* Data Info Card */}
                         <div className="p-5 pb-0">
                             <h4 className="flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-silver-light mb-3">
-                                <Package className="w-4 h-4" /> Data Inventaris
+                                <Package className="w-4 h-4" /> {t("Data Inventaris")}
                             </h4>
                             <div className="bg-accent-blue text-white rounded-t-lg px-4 py-3 grid grid-cols-7 gap-4 text-xs font-semibold">
-                                <span className="col-span-2">NO. PENGAJUAN</span>
-                                <span>NO. PABEAN</span>
-                                <span>TGL DOKUMEN</span>
-                                <span>TGL DITERIMA</span>
-                                <span className="text-center">JML ITEM</span>
-                                <span>PENGIRIM</span>
+                                <span className="col-span-2">{t("NO. PENGAJUAN")}</span>
+                                <span>{t("NO. PABEAN")}</span>
+                                <span>{t("TGL DOKUMEN")}</span>
+                                <span>{t("TGL DITERIMA")}</span>
+                                <span className="text-center">{t("JML ITEM")}</span>
+                                <span>{t("PENGIRIM")}</span>
                             </div>
                             <div className="bg-white dark:bg-dark-surface border border-t-0 border-gray-200 dark:border-dark-border rounded-b-lg px-4 py-3 grid grid-cols-7 gap-4 text-xs items-center text-gray-600 dark:text-silver">
                                 <span className="col-span-2 font-medium text-accent-blue">{selectedTransaction.pengajuanNumber}</span>
@@ -540,19 +542,19 @@ const BarangMasuk = () => {
                         {/* Detail Items Table */}
                         <div className="flex-1 overflow-y-auto p-5">
                             <h4 className="flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-silver-light mb-3">
-                                📝 Detail Item
+                                {t("📝 Detail Item")}
                             </h4>
                             <div className="border border-gray-200 dark:border-dark-border rounded-lg overflow-hidden">
                                 <table className="w-full">
                                     <thead className="bg-accent-blue text-white">
                                         <tr>
                                             <th className="px-4 py-2 text-left text-xs font-semibold">HS</th>
-                                            <th className="px-4 py-2 text-left text-xs font-semibold">ITEM</th>
+                                            <th className="px-4 py-2 text-left text-xs font-semibold">{t("ITEM")}</th>
                                             <th className="px-4 py-2 text-center text-xs font-semibold">JML</th>
                                             <th className="px-4 py-2 text-center text-xs font-semibold">SAT</th>
-                                            <th className="px-4 py-2 text-right text-xs font-semibold">NOMINAL</th>
-                                            <th className="px-4 py-2 text-right text-xs font-semibold">TOTAL</th>
-                                            <th className="px-4 py-2 text-center text-xs font-semibold">KURS</th>
+                                            <th className="px-4 py-2 text-right text-xs font-semibold">{t("NOMINAL")}</th>
+                                            <th className="px-4 py-2 text-right text-xs font-semibold">{t("TOTAL")}</th>
+                                            <th className="px-4 py-2 text-center text-xs font-semibold">{t("KURS")}</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100 dark:divide-dark-border bg-white dark:bg-dark-surface">
@@ -577,7 +579,7 @@ const BarangMasuk = () => {
                                     </tbody>
                                     <tfoot className="bg-gray-50 dark:bg-white/5 border-t border-gray-200 dark:border-dark-border">
                                         <tr>
-                                            <td colSpan="5" className="px-4 py-2 text-right text-xs font-bold text-gray-700 dark:text-silver">GRAND TOTAL:</td>
+                                            <td colSpan="5" className="px-4 py-2 text-right text-xs font-bold text-gray-700 dark:text-silver">{t("GRAND TOTAL:")}</td>
                                             <td className="px-4 py-2 text-right text-xs font-bold text-accent-green">
                                                 {formatCurrency(getTransactionTotal(selectedTransaction))}
                                             </td>
@@ -591,10 +593,10 @@ const BarangMasuk = () => {
                         {/* Documents Section */}
                         <div className="p-5 border-t border-gray-100 dark:border-dark-border">
                             <h4 className="flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-silver-light mb-3">
-                                📑 Dokumen Pendukung
+                                {t("📑 Dokumen Pendukung")}
                             </h4>
                             {[...(selectedTransaction.documents || []), ...(selectedTransaction.bcSupportingDocuments || [])].length === 0 ? (
-                                <p className="text-sm text-gray-500 dark:text-silver-dark">Tidak ada dokumen pendukung.</p>
+                                <p className="text-sm text-gray-500 dark:text-silver-dark">{t("Tidak ada dokumen pendukung.")}</p>
                             ) : (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                                     {[...(selectedTransaction.documents || []), ...(selectedTransaction.bcSupportingDocuments || [])].map((doc, idx) => (
@@ -621,11 +623,11 @@ const BarangMasuk = () => {
                                                     <div className="w-10 h-10 text-gray-400 dark:text-silver-dark border-2 border-gray-200 dark:border-dark-border rounded-lg flex items-center justify-center mb-1 bg-gray-50 dark:bg-dark-surface">
                                                         <span className="text-[10px] font-bold uppercase">{doc.type ? doc.type.split('/')[1] : 'PDF'}</span>
                                                     </div>
-                                                    <span className="text-[10px] text-accent-blue text-center px-2 underline">Buka Dokumen</span>
+                                                    <span className="text-[10px] text-accent-blue text-center px-2 underline">{t("Buka Dokumen")}</span>
                                                 </div>
                                             )}
                                             <div className="text-sm font-medium text-gray-800 dark:text-silver-light truncate" title={doc.title || doc.name || doc.fileName}>{doc.title || doc.name || doc.fileName || `Dokumen ${idx + 1}`}</div>
-                                            <div className="text-xs text-gray-500 dark:text-silver-dark truncate">Tgl: {doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleDateString('id-ID') : '-'}</div>
+                                            <div className="text-xs text-gray-500 dark:text-silver-dark truncate">{t("Tgl:")} {doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleDateString('id-ID') : '-'}</div>
                                         </div>
                                     ))}
                                 </div>
@@ -634,7 +636,7 @@ const BarangMasuk = () => {
 
                         {/* Footer */}
                         <div className="p-4 border-t border-gray-100 dark:border-dark-border bg-gray-50 dark:bg-dark-surface/50 flex justify-end">
-                            <Button variant="secondary" onClick={() => setSelectedTransaction(null)}>Tutup</Button>
+                            <Button variant="secondary" onClick={() => setSelectedTransaction(null)}>{t("Tutup")}</Button>
                         </div>
                     </div>
                 </div>
@@ -650,7 +652,7 @@ const BarangMasuk = () => {
                                 <FileText className="w-5 h-5 text-accent-blue" />
                                 <h3 className="font-semibold text-silver-light text-sm">{docModal.title}</h3>
                                 <span className="text-xs bg-accent-blue/20 text-accent-blue px-2 py-0.5 rounded-full font-medium">
-                                    {docModal.docs.length} dokumen
+                                    {docModal.docs.length} {t("dokumen")}
                                 </span>
                             </div>
                             <button
@@ -666,7 +668,7 @@ const BarangMasuk = () => {
                             {docModal.docs.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center h-40 gap-3 text-silver-dark">
                                     <FileText className="w-10 h-10 opacity-30" />
-                                    <p className="text-sm">Tidak ada dokumen pendukung</p>
+                                    <p className="text-sm">{t("Tidak ada dokumen pendukung")}</p>
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
@@ -722,7 +724,7 @@ const BarangMasuk = () => {
 
                         {/* Footer */}
                         <div className="p-3 border-t border-dark-border bg-dark-surface/50 flex justify-end">
-                            <Button variant="secondary" onClick={() => setDocModal(null)}>Tutup</Button>
+                            <Button variant="secondary" onClick={() => setDocModal(null)}>{t("Tutup")}</Button>
                         </div>
                     </div>
                 </div>

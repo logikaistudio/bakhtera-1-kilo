@@ -9,8 +9,10 @@ import { useNavigate } from 'react-router-dom';
 import XLSX from 'xlsx-js-style';
 import { printReport, fmtPrint, fmtDatePrint } from '../../utils/printPDF';
 import { useData } from '../../context/DataContext';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const BridgeTrialBalance = () => {
+    const { t } = useLanguage();
     const navigate = useNavigate();
     const { companySettings } = useData();
     const [loading, setLoading] = useState(true);
@@ -412,20 +414,20 @@ const BridgeTrialBalance = () => {
                 <div>
                     <h1 className="text-3xl font-bold gradient-text flex items-center gap-2">
                         <Scale className="w-8 h-8" />
-                        Trial Balance
+                        {t("Trial Balance")}
                     </h1>
-                    <p className="text-silver-dark mt-1">Account balances and period movements</p>
+                    <p className="text-silver-dark mt-1">{t("Account balances and period movements")}</p>
                 </div>
 
                 <div className="flex items-center gap-2">
                     <Button variant="secondary" icon={RefreshCw} onClick={fetchTrialBalance}>
-                        Refresh
+                        {t("Refresh")}
                     </Button>
                     <button
                         onClick={exportToExcel}
                         className="flex items-center gap-2 px-3 py-2 bg-dark-surface text-green-400 hover:bg-dark-card smooth-transition rounded-lg border border-dark-border text-xs"
                     >
-                        <FileSpreadsheet className="w-4 h-4" /> Excel
+                        <FileSpreadsheet className="w-4 h-4" /> {t("Excel")}
                     </button>
                     <button
                         onClick={exportToCSV}
@@ -437,28 +439,28 @@ const BridgeTrialBalance = () => {
                         value={printOrientation}
                         onChange={(e) => setPrintOrientation(e.target.value)}
                         className="px-2 py-2 bg-dark-surface border border-dark-border rounded-lg text-xs text-silver-light hover:bg-dark-card smooth-transition"
-                        title="Orientasi cetak"
+                        title={t("Orientasi cetak")}
                     >
-                        <option value="auto">Auto</option>
-                        <option value="portrait">Portrait</option>
-                        <option value="landscape">Landscape</option>
+                        <option value="auto">{t("Auto")}</option>
+                        <option value="portrait">{t("Portrait")}</option>
+                        <option value="landscape">{t("Landscape")}</option>
                     </select>
                     <select
                         value={printPageSize}
                         onChange={(e) => setPrintPageSize(e.target.value)}
                         className="px-2 py-2 bg-dark-surface border border-dark-border rounded-lg text-xs text-silver-light hover:bg-dark-card smooth-transition"
-                        title="Ukuran kertas"
+                        title={t("Ukuran kertas")}
                     >
                         <option value="A4">A4</option>
-                        <option value="Letter">Letter</option>
-                        <option value="Legal">Legal</option>
+                        <option value="Letter">{t("Letter")}</option>
+                        <option value="Legal">{t("Legal")}</option>
                     </select>
                     <button
                         onClick={exportToPDF}
                         disabled={loading || balances.length === 0}
                         className="flex items-center gap-2 px-3 py-2 bg-dark-surface text-red-400 hover:bg-dark-card smooth-transition rounded-lg border border-dark-border text-xs disabled:opacity-40"
                     >
-                        <Printer className="w-4 h-4" /> Print PDF
+                        <Printer className="w-4 h-4" /> {t("Print PDF")}
                     </button>
                 </div>
             </div>
@@ -467,7 +469,7 @@ const BridgeTrialBalance = () => {
             <div className="flex flex-col md:flex-row gap-4">
                 <div className="glass-card p-4 rounded-lg flex items-center gap-4 flex-1">
                     <div>
-                        <label className="block text-xs text-silver-dark uppercase mb-1">Start Date</label>
+                        <label className="block text-xs text-silver-dark uppercase mb-1">{t("Start Date")}</label>
                         <input
                             type="date"
                             value={dateRange.start}
@@ -477,7 +479,7 @@ const BridgeTrialBalance = () => {
                     </div>
                     <div className="h-px w-4 bg-silver-dark"></div>
                     <div>
-                        <label className="block text-xs text-silver-dark uppercase mb-1">End Date</label>
+                        <label className="block text-xs text-silver-dark uppercase mb-1">{t("End Date")}</label>
                         <input
                             type="date"
                             value={dateRange.end}
@@ -489,23 +491,23 @@ const BridgeTrialBalance = () => {
 
                 <div className={`glass-card p-4 rounded-lg flex items-center justify-between gap-6 border-l-4 ${isBalanced ? 'border-green-500' : 'border-red-500'} min-w-[300px]`}>
                     <div>
-                        <p className="text-xs text-silver-dark uppercase tracking-wider">Balance Status</p>
+                        <p className="text-xs text-silver-dark uppercase tracking-wider">{t("Balance Status")}</p>
                         <div className="flex items-center gap-2 mt-1">
                             {isBalanced ? (
                                 <>
                                     <CheckCircle className="w-5 h-5 text-green-400" />
-                                    <span className="text-lg font-bold text-green-400">BALANCED</span>
+                                    <span className="text-lg font-bold text-green-400">{t("BALANCED")}</span>
                                 </>
                             ) : (
                                 <>
                                     <AlertCircle className="w-5 h-5 text-red-500" />
-                                    <span className="text-lg font-bold text-red-500">OUT OF BALANCE</span>
+                                    <span className="text-lg font-bold text-red-500">{t("OUT OF BALANCE")}</span>
                                 </>
                             )}
                         </div>
                     </div>
                     <div className="text-right">
-                        <p className="text-xs text-silver-dark">Difference</p>
+                        <p className="text-xs text-silver-dark">{t("Difference")}</p>
                         <p className={`font-mono font-bold ${isBalanced ? 'text-silver-light' : 'text-red-400'}`}>
                             {formatCurrency(totals.closing)}
                         </p>
@@ -515,7 +517,7 @@ const BridgeTrialBalance = () => {
 
             {unclassifiedAccounts.length > 0 && (
                 <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 mb-4 rounded">
-                    <strong>Warning:</strong> Ada akun <b>Unclassified/Unmapped</b> yang terisi. Mohon cek mapping COA dan jurnal!
+                    <strong>{t("Warning:")}</strong> {t("Ada akun")} <b>{t("Unclassified/Unmapped")}</b> {t("yang terisi. Mohon cek mapping COA dan jurnal!")}
                     <ul className="mt-2 text-xs">
                         {unclassifiedAccounts.map(acc => (
                             <li key={acc.id}>{acc.code} - {acc.name}</li>
@@ -525,12 +527,12 @@ const BridgeTrialBalance = () => {
             )}
             {duplicateEntries.length > 0 && (
                 <div className="bg-red-100 border-l-4 border-red-500 text-red-800 p-4 mb-4 rounded">
-                    <strong>Warning:</strong> Ditemukan potensi <b>duplikasi jurnal</b> berdasarkan akun, nilai, dan tanggal yang sama. Mohon audit data jurnal!
+                    <strong>{t("Warning:")}</strong> {t("Ditemukan potensi")} <b>{t("duplikasi jurnal")}</b> {t("berdasarkan akun, nilai, dan tanggal yang sama. Mohon audit data jurnal!")}
                     <ul className="mt-2 text-xs">
                         {duplicateEntries.slice(0, 10).map((dup, idx) => (
-                            <li key={idx}>ID {dup.id1} & {dup.id2} | Akun: {dup.account_code || '-'} | Debit: {dup.debit} | Kredit: {dup.credit} | Tanggal: {dup.entry_date}</li>
+                            <li key={idx}>ID {dup.id1} & {dup.id2} {t("| Akun:")} {dup.account_code || '-'} {t("| Debit:")} {dup.debit} {t("| Kredit:")} {dup.credit} {t("| Tanggal:")} {dup.entry_date}</li>
                         ))}
-                        {duplicateEntries.length > 10 && <li>Dan {duplicateEntries.length - 10} duplikasi lainnya...</li>}
+                        {duplicateEntries.length > 10 && <li>{t("Dan")} {duplicateEntries.length - 10} {t("duplikasi lainnya...")}</li>}
                     </ul>
                 </div>
             )}
@@ -538,7 +540,7 @@ const BridgeTrialBalance = () => {
             {Object.keys(typeSummaries || {}).length > 0 && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div className="glass-card p-3 rounded">
-                        <div className="text-xs text-silver-dark font-semibold">Type Summary</div>
+                        <div className="text-xs text-silver-dark font-semibold">{t("Type Summary")}</div>
                         <div className="text-sm mt-2">
                             {Object.entries(typeSummaries).map(([t, v]) => (
                                 <div key={t} className="flex justify-between text-xs py-1">
@@ -549,17 +551,17 @@ const BridgeTrialBalance = () => {
                         </div>
                     </div>
                     <div className="glass-card p-3 rounded">
-                        <div className="text-xs text-silver-dark font-semibold">Accounts Receivable (AR)</div>
+                        <div className="text-xs text-silver-dark font-semibold">{t("Accounts Receivable (AR)")}</div>
                         <div className="text-sm mt-2">
-                            <div className="flex justify-between text-xs py-1"><span>Count</span><span className="font-mono">{arSummary.count}</span></div>
-                            <div className="flex justify-between text-xs py-1"><span>Closing</span><span className="font-mono">{(arSummary.closing || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                            <div className="flex justify-between text-xs py-1"><span>{t("Count")}</span><span className="font-mono">{arSummary.count}</span></div>
+                            <div className="flex justify-between text-xs py-1"><span>{t("Closing")}</span><span className="font-mono">{(arSummary.closing || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                         </div>
                     </div>
                     <div className="glass-card p-3 rounded">
-                        <div className="text-xs text-silver-dark font-semibold">Accounts Payable (AP)</div>
+                        <div className="text-xs text-silver-dark font-semibold">{t("Accounts Payable (AP)")}</div>
                         <div className="text-sm mt-2">
-                            <div className="flex justify-between text-xs py-1"><span>Count</span><span className="font-mono">{apSummary.count}</span></div>
-                            <div className="flex justify-between text-xs py-1"><span>Closing</span><span className="font-mono">{(apSummary.closing || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                            <div className="flex justify-between text-xs py-1"><span>{t("Count")}</span><span className="font-mono">{apSummary.count}</span></div>
+                            <div className="flex justify-between text-xs py-1"><span>{t("Closing")}</span><span className="font-mono">{(apSummary.closing || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                         </div>
                     </div>
                 </div>
@@ -567,35 +569,35 @@ const BridgeTrialBalance = () => {
 
             {suspiciousAccounts.length > 0 && (
                 <div className="bg-indigo-50 border-l-4 border-indigo-400 text-indigo-800 p-4 mb-4 rounded">
-                    <strong>Notice:</strong> Ditemukan akun dengan nama terkait discount/air yang tidak diklasifikasikan sebagai COGS.
+                    <strong>{t("Notice:")}</strong> {t("Ditemukan akun dengan nama terkait discount/air yang tidak diklasifikasikan sebagai COGS.")}
                     <ul className="mt-2 text-xs">
                         {suspiciousAccounts.map(acc => (
-                            <li key={acc.id}>{acc.code} - {acc.name} — type: {acc.type} — balance: {(acc.closing || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</li>
+                            <li key={acc.id}>{acc.code} - {acc.name} {t("— type:")} {acc.type} {t("— balance:")} {(acc.closing || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</li>
                         ))}
                     </ul>
                 </div>
             )}
             {loading ? (
-                <div className="p-12 text-center text-silver-dark border border-dark-border rounded-lg bg-dark-surface/30">Loading financial data...</div>
+                <div className="p-12 text-center text-silver-dark border border-dark-border rounded-lg bg-dark-surface/30">{t("Loading financial data...")}</div>
             ) : (
                 <div className="glass-card rounded-xl overflow-hidden shadow-lg border border-white/10">
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead className="bg-[#0070BB] text-white">
                                 <tr>
-                                    <th className="px-4 py-3 text-left font-semibold uppercase tracking-wider">COA Code</th>
-                                    <th className="px-4 py-3 text-left font-semibold uppercase tracking-wider">Account Name</th>
-                                    <th className="px-4 py-3 text-center font-semibold uppercase tracking-wider">Level</th>
-                                    <th className="px-4 py-3 text-right font-semibold uppercase tracking-wider">Prev Balance</th>
-                                    <th className="px-4 py-3 text-right font-semibold uppercase tracking-wider">Debit</th>
-                                    <th className="px-4 py-3 text-right font-semibold uppercase tracking-wider">Credit</th>
-                                    <th className="px-4 py-3 text-right font-semibold uppercase tracking-wider">Balance</th>
+                                    <th className="px-4 py-3 text-left font-semibold uppercase tracking-wider">{t("COA Code")}</th>
+                                    <th className="px-4 py-3 text-left font-semibold uppercase tracking-wider">{t("Account Name")}</th>
+                                    <th className="px-4 py-3 text-center font-semibold uppercase tracking-wider">{t("Level")}</th>
+                                    <th className="px-4 py-3 text-right font-semibold uppercase tracking-wider">{t("Prev Balance")}</th>
+                                    <th className="px-4 py-3 text-right font-semibold uppercase tracking-wider">{t("Debit")}</th>
+                                    <th className="px-4 py-3 text-right font-semibold uppercase tracking-wider">{t("Credit")}</th>
+                                    <th className="px-4 py-3 text-right font-semibold uppercase tracking-wider">{t("Balance")}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-dark-border/40">
                                 {balances.length === 0 ? (
                                     <tr>
-                                        <td colSpan="7" className="px-4 py-8 text-center text-silver-dark">No transaction data found.</td>
+                                        <td colSpan="7" className="px-4 py-8 text-center text-silver-dark">{t("No transaction data found.")}</td>
                                     </tr>
                                 ) : (
                                     balances.map(acc => {
@@ -637,7 +639,7 @@ const BridgeTrialBalance = () => {
                             </tbody>
                             <tfoot className="bg-[#0070BB]/10 border-t-2 border-[#0070BB] font-bold">
                                 <tr>
-                                    <td colSpan="3" className="px-4 py-3 text-right uppercase tracking-wider text-silver-light">GRAND TOTAL</td>
+                                    <td colSpan="3" className="px-4 py-3 text-right uppercase tracking-wider text-silver-light">{t("GRAND TOTAL")}</td>
                                     <td className="px-4 py-3 text-right font-mono text-silver-light">{formatBalance(totals.opening)}</td>
                                     <td className="px-4 py-3 text-right font-mono text-blue-400">{formatCurrency(totals.debit)}</td>
                                     <td className="px-4 py-3 text-right font-mono text-orange-400">{formatCurrency(totals.credit)}</td>
@@ -651,7 +653,7 @@ const BridgeTrialBalance = () => {
                 </div>
             )}
             <div className="text-center text-xs text-silver-dark mt-6 italic bg-dark-surface/30 p-4 rounded border border-white/5">
-                Note: Values in parentheses ( ) represent Credit-normal balances (Liabilities / Equity / Revenue). Total Debit and Credit movements must always be balanced.
+                {t("Note: Values in parentheses ( ) represent Credit-normal balances (Liabilities / Equity / Revenue). Total Debit and Credit movements must always be balanced.")}
             </div>
         </div>
     );

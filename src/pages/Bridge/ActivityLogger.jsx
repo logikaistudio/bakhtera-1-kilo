@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { FileText, Search, Plus, Minus, Edit, Trash2, Activity } from 'lucide-react';
 import { useData } from '../../context/DataContext';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const ActivityLogger = () => {
+    const { t } = useLanguage();
     const { activityLogs = [] } = useData();
     const [searchTerm, setSearchTerm] = useState('');
     const [filterAction, setFilterAction] = useState('all');
@@ -63,8 +65,8 @@ const ActivityLogger = () => {
         <div className="p-6 space-y-6">
             {/* Header */}
             <div>
-                <h1 className="text-3xl font-bold gradient-text">Activity Logger</h1>
-                <p className="text-silver-dark mt-1">Audit log untuk semua perubahan data di Bridge</p>
+                <h1 className="text-3xl font-bold gradient-text">{t("Activity Logger")}</h1>
+                <p className="text-silver-dark mt-1">{t("Audit log untuk semua perubahan data di Bridge")}</p>
             </div>
 
             {/* Stats */}
@@ -73,7 +75,7 @@ const ActivityLogger = () => {
                     <div className="flex items-center gap-3">
                         <Activity className="w-10 h-10 text-accent-purple" />
                         <div>
-                            <p className="text-xs text-silver-dark">Total Activities</p>
+                            <p className="text-xs text-silver-dark">{t("Total Activities")}</p>
                             <p className="text-2xl font-bold text-accent-purple">{activityLogs.length}</p>
                         </div>
                     </div>
@@ -82,7 +84,7 @@ const ActivityLogger = () => {
                     <div className="flex items-center gap-3">
                         <Plus className="w-10 h-10 text-accent-green" />
                         <div>
-                            <p className="text-xs text-silver-dark">Added</p>
+                            <p className="text-xs text-silver-dark">{t("Added")}</p>
                             <p className="text-2xl font-bold text-accent-green">
                                 {activityLogs.filter(log => log.action === 'add').length}
                             </p>
@@ -93,7 +95,7 @@ const ActivityLogger = () => {
                     <div className="flex items-center gap-3">
                         <Edit className="w-10 h-10 text-accent-blue" />
                         <div>
-                            <p className="text-xs text-silver-dark">Edited</p>
+                            <p className="text-xs text-silver-dark">{t("Edited")}</p>
                             <p className="text-2xl font-bold text-accent-blue">
                                 {activityLogs.filter(log => log.action === 'edit').length}
                             </p>
@@ -104,7 +106,7 @@ const ActivityLogger = () => {
                     <div className="flex items-center gap-3">
                         <Trash2 className="w-10 h-10 text-red-400" />
                         <div>
-                            <p className="text-xs text-silver-dark">Deleted</p>
+                            <p className="text-xs text-silver-dark">{t("Deleted")}</p>
                             <p className="text-2xl font-bold text-red-400">
                                 {activityLogs.filter(log => log.action === 'delete').length}
                             </p>
@@ -121,7 +123,7 @@ const ActivityLogger = () => {
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                         <input
                             type="text"
-                            placeholder="Cari aktivitas, user, atau detail..."
+                            placeholder={t("Cari aktivitas, user, atau detail...")}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
@@ -136,10 +138,10 @@ const ActivityLogger = () => {
                         onChange={(e) => setFilterAction(e.target.value)}
                         className="w-full px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
                     >
-                        <option value="all">Semua Aksi</option>
-                        <option value="add">Add</option>
-                        <option value="edit">Edit</option>
-                        <option value="delete">Delete</option>
+                        <option value="all">{t("Semua Aksi")}</option>
+                        <option value="add">{t("Add")}</option>
+                        <option value="edit">{t("Edit")}</option>
+                        <option value="delete">{t("Delete")}</option>
                     </select>
                 </div>
 
@@ -150,7 +152,7 @@ const ActivityLogger = () => {
                         onChange={(e) => setFilterModule(e.target.value)}
                         className="w-full px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
                     >
-                        <option value="all">Semua Module</option>
+                        <option value="all">{t("Semua Module")}</option>
                         {uniqueModules.map(module => (
                             <option key={module} value={module}>{module}</option>
                         ))}
@@ -163,8 +165,8 @@ const ActivityLogger = () => {
                 <div className="p-4 border-b border-dark-border">
                     <div className="flex items-center gap-2">
                         <FileText className="w-5 h-5 text-accent-purple" />
-                        <h2 className="text-lg font-semibold text-silver-light">Activity Logs</h2>
-                        <span className="ml-auto text-sm text-silver-dark">{filteredLogs.length} entries</span>
+                        <h2 className="text-lg font-semibold text-silver-light">{t("Activity Logs")}</h2>
+                        <span className="ml-auto text-sm text-silver-dark">{filteredLogs.length} {t("entries")}</span>
                     </div>
                 </div>
 
@@ -173,14 +175,14 @@ const ActivityLogger = () => {
                         <thead className="bg-accent-purple/10">
                             <tr>
                                 <th className="px-4 py-3 text-center text-xs font-semibold text-silver">No</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">Timestamp</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">Module</th>
-                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver">Action</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">Entity Type</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">Entity ID</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">Entity Name</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">User</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">Details</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">{t("Timestamp")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">{t("Module")}</th>
+                                <th className="px-4 py-3 text-center text-xs font-semibold text-silver">{t("Action")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">{t("Entity Type")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">{t("Entity ID")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">{t("Entity Name")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">{t("User")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-silver">{t("Details")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
@@ -188,8 +190,8 @@ const ActivityLogger = () => {
                                 <tr>
                                     <td colSpan="9" className="px-4 py-12 text-center">
                                         <Activity className="w-16 h-16 mx-auto mb-4 opacity-30 text-silver-dark" />
-                                        <p className="text-lg text-silver-dark">Tidak ada activity log</p>
-                                        <p className="text-sm text-silver-dark mt-2">Activity akan muncul di sini</p>
+                                        <p className="text-lg text-silver-dark">{t("Tidak ada activity log")}</p>
+                                        <p className="text-sm text-silver-dark mt-2">{t("Activity akan muncul di sini")}</p>
                                     </td>
                                 </tr>
                             ) : (
