@@ -16,6 +16,7 @@ import {
     Plus, Check, Filter, Download, Search, Trash, Circle
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const formatInputAmount = (value, currency) => {
     if (value === null || value === undefined || value === '') return '';
@@ -49,6 +50,7 @@ const normalizeServiceType = (value) => {
 };
 
 const QuotationManagement = () => {
+    const { t } = useLanguage();
     const { user, canCreate, canEdit, canDelete, canView, canApprove, isAdmin, isSuperAdmin } = useAuth();
     const navigate = useNavigate();
     const { deleteBlinkQuotationCascade, customers, companySettings } = useData();
@@ -180,7 +182,7 @@ const QuotationManagement = () => {
             setQuotations(mapped);
         } catch (error) {
             console.error('Error fetching quotations:', error);
-            alert('Failed to load quotations from database');
+            alert(t("Failed to load quotations from database"));
         } finally {
             setLoading(false);
         }
@@ -212,7 +214,7 @@ const QuotationManagement = () => {
     const handleSubmit = async (e, status = 'draft') => {
         e.preventDefault();
         if (!canCreate('blink_quotations')) {
-            alert('You do not have permission to create Quotation.');
+            alert(t("You do not have permission to create Quotation."));
             return;
         }
 
@@ -309,7 +311,7 @@ const QuotationManagement = () => {
 
     const handleManagerReject = async (quotationId, reason) => {
         if (!canApprove('blink_quotations')) {
-            alert('You do not have permission to reject Quotation.');
+            alert(t("You do not have permission to reject Quotation."));
             return;
         }
         const rejectionReason = prompt('Reject reason (optional):');
@@ -325,7 +327,7 @@ const QuotationManagement = () => {
             if (error) throw error;
 
             await fetchQuotations();
-            alert('❌ Quotation rejected. Sales needs revision.');
+            alert(t("❌ Quotation rejected. Sales needs revision."));
             setShowViewModal(false);
         } catch (error) {
             console.error('Error rejecting quotation:', error);
@@ -336,7 +338,7 @@ const QuotationManagement = () => {
     // Handle edit quotation
     const handleEditQuotation = () => {
         if (!canEdit('blink_quotations')) {
-            alert('You do not have permission to edit Quotation.');
+            alert(t("You do not have permission to edit Quotation."));
             return;
         }
         setEditedQuotation({ ...viewingQuotation });
@@ -398,7 +400,7 @@ const QuotationManagement = () => {
             await fetchQuotations();
             setViewingQuotation(editedQuotation);
             setIsEditingQuotation(false);
-            alert('✅ Quotation updated successfully!');
+            alert(t("✅ Quotation updated successfully!"));
         } catch (error) {
             console.error('Error updating quotation:', error);
             alert('Failed to update: ' + error.message);
@@ -450,7 +452,7 @@ const QuotationManagement = () => {
     // Delete quotation (Cascading delete to all financial records)
     const handleForceCascadeDelete = async (quotationIds) => {
         if (!(isAdmin() || canDelete('blink_quotations'))) {
-            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus pengajuan ini.');
+            alert(t("Akses Ditolak: Anda tidak memiliki hak untuk menghapus pengajuan ini."));
             return;
         }
 
@@ -534,7 +536,7 @@ const QuotationManagement = () => {
             });
             if (!success) throw new Error('Delete failed');
 
-            alert('✅ Sukses! Data Pengajuan dan SEMUA transaksi terkait berhasil dihapus.');
+            alert(t("✅ Sukses! Data Pengajuan dan SEMUA transaksi terkait berhasil dihapus."));
             setSelectedIds([]);
             setShowViewModal(false);
             await fetchQuotations();
@@ -548,18 +550,18 @@ const QuotationManagement = () => {
 
     const handleCleanseAllQuotations = async () => {
         if (!canRunSuperAdminBatch) {
-            alert('Akses Ditolak: Hanya Super Admin yang dapat cleansing quotation.');
+            alert(t("Akses Ditolak: Hanya Super Admin yang dapat cleansing quotation."));
             return;
         }
         if (quotations.length === 0) {
-            alert('Tidak ada data quotation untuk dihapus.');
+            alert(t("Tidak ada data quotation untuk dihapus."));
             return;
         }
 
         const confirm1 = confirm(`Cleansing akan menghapus SEMUA quotation (${quotations.length} baris) beserta transaksi turunannya. Lanjutkan?`);
         if (!confirm1) return;
 
-        const confirm2 = confirm('Konfirmasi terakhir: semua data quotation terkait akan dihapus permanen. Yakin lanjut?');
+        const confirm2 = confirm(t("Konfirmasi terakhir: semua data quotation terkait akan dihapus permanen. Yakin lanjut?"));
         if (!confirm2) return;
 
         try {
@@ -574,12 +576,12 @@ const QuotationManagement = () => {
     // Request revision from customer
     const handleRequestRevision = async (quotationId) => {
         if (!canEdit('blink_quotations')) {
-            alert('Anda tidak memiliki hak akses untuk meminta revisi.');
+            alert(t("Anda tidak memiliki hak akses untuk meminta revisi."));
             return;
         }
         const reason = prompt('Revision reason from customer:');
         if (!reason || reason.trim() === '') {
-            alert('Revision reason is required');
+            alert(t("Revision reason is required"));
             return;
         }
 
@@ -595,7 +597,7 @@ const QuotationManagement = () => {
             if (error) throw error;
 
             await fetchQuotations();
-            alert('✅ Revision request created. Sales can now create a revised quotation.');
+            alert(t("✅ Revision request created. Sales can now create a revised quotation."));
             setShowViewModal(false);
         } catch (error) {
             console.error('Error requesting revision:', error);
@@ -606,13 +608,13 @@ const QuotationManagement = () => {
     // Create revision (new version) of quotation
     const handleCreateRevision = async (quotationId) => {
         if (!canCreate('blink_quotations')) {
-            alert('You do not have permission to create Quotation revision.');
+            alert(t("You do not have permission to create Quotation revision."));
             return;
         }
         try {
             const parentQuotation = quotations.find(q => q.id === quotationId);
             if (!parentQuotation) {
-                alert('Quotation not found');
+                alert(t("Quotation not found"));
                 return;
             }
 
@@ -679,7 +681,7 @@ const QuotationManagement = () => {
     // Update quotation status
     const handleUpdateStatus = async (quotationId, newStatus) => {
         if (!canApprove('blink_quotations')) {
-            alert('You do not have permission to change Quotation status (Approve).');
+            alert(t("You do not have permission to change Quotation status (Approve)."));
             return;
         }
         try {
@@ -695,7 +697,7 @@ const QuotationManagement = () => {
             setShowViewModal(false);
         } catch (error) {
             console.error('Error updating status:', error);
-            alert('Failed to update status');
+            alert(t("Failed to update status"));
         }
     };
 
@@ -705,7 +707,7 @@ const QuotationManagement = () => {
             const printWindow = window.open('', '_blank');
 
             if (!printWindow) {
-                alert('Pop-up blocked! Please allow pop-ups for this site.');
+                alert(t("Pop-up blocked! Please allow pop-ups for this site."));
                 return;
             }
 
@@ -851,14 +853,14 @@ const QuotationManagement = () => {
             printWindow.document.close();
         } catch (error) {
             console.error('Print error:', error);
-            alert('Failed to print');
+            alert(t("Failed to print"));
         }
     };
 
     // Create SO from approved quotation
     const handleCreateSO = async (quotation) => { // Added async
         if (!canCreate('blink_shipments') || !canEdit('blink_quotations')) {
-            alert('You do not have permission (Create Shipment / Edit Quotation) to convert to Sales Order.');
+            alert(t("You do not have permission (Create Shipment / Edit Quotation) to convert to Sales Order."));
             return;
         }
         console.log('🔵 Create SO clicked for quotation:', quotation.id);
@@ -1044,8 +1046,8 @@ const QuotationManagement = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text">Operations Quotation</h1>
-                    <p className="text-silver-dark mt-1">Manage operational quotations</p>
+                    <h1 className="text-3xl font-bold gradient-text">{t("Operations Quotation")}</h1>
+                    <p className="text-silver-dark mt-1">{t("Manage operational quotations")}</p>
                 </div>
                 <div className="flex items-center gap-3">
                     {canCleanseQuotations && (
@@ -1055,15 +1057,15 @@ const QuotationManagement = () => {
                     )}
                     {canRunSuperAdminBatch && selectedIds.length > 0 && (
                         <Button variant="danger" icon={Trash} onClick={() => handleForceCascadeDelete(selectedIds)}>
-                            Delete Selected ({selectedIds.length})
+                            {t("Delete Selected (")}{selectedIds.length})
                         </Button>
                     )}
                     <Button onClick={handleExportXLS} variant="secondary" icon={Download}>
-                        Export XLS
+                        {t("Export XLS")}
                     </Button>
                     {canCreate('blink_quotations') && (
                         <Button onClick={() => setShowModal(true)} icon={Plus}>
-                            New Quotation
+                            {t("New Quotation")}
                         </Button>
                     )}
                 </div>
@@ -1071,7 +1073,7 @@ const QuotationManagement = () => {
 
             {isCleansing && (
                 <div className="glass-card px-4 py-2 rounded-lg border border-amber-500/30 bg-amber-500/10">
-                    <p className="text-xs text-amber-300">Progress Cleansing: {cleanseProgress || 'Sedang memproses...'}</p>
+                    <p className="text-xs text-amber-300">{t("Progress Cleansing:")} {cleanseProgress || 'Sedang memproses...'}</p>
                 </div>
             )}
 
@@ -1080,7 +1082,7 @@ const QuotationManagement = () => {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                 <input
                     type="text"
-                    placeholder="Search Job Number, Customer, or Route..."
+                    placeholder={t("Search Job Number, Customer, or Route...")}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:outline-none focus:border-accent-orange smooth-transition"
@@ -1092,7 +1094,7 @@ const QuotationManagement = () => {
                 <div className="glass-card p-4 rounded-lg">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-xs text-silver-dark">Total Quotations</p>
+                            <p className="text-xs text-silver-dark">{t("Total Quotations")}</p>
                             <p className="text-2xl font-bold text-silver-light mt-1">{quotations.length}</p>
                         </div>
                         <FileText className="w-8 h-8 text-blue-400" />
@@ -1101,7 +1103,7 @@ const QuotationManagement = () => {
                 <div className="glass-card p-4 rounded-lg">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-xs text-silver-dark">Manager Approval</p>
+                            <p className="text-xs text-silver-dark">{t("Manager Approval")}</p>
                             <p className="text-2xl font-bold text-yellow-400 mt-1">
                                 {quotations.filter(q => q.status === 'manager_approval').length}
                             </p>
@@ -1113,7 +1115,7 @@ const QuotationManagement = () => {
                 <div className="glass-card p-4 rounded-lg">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-xs text-silver-dark">Converted to SO</p>
+                            <p className="text-xs text-silver-dark">{t("Converted to SO")}</p>
                             <p className="text-2xl font-bold text-emerald-400 mt-1">
                                 {quotations.filter(q => q.status === 'converted').length}
                             </p>
@@ -1142,13 +1144,13 @@ const QuotationManagement = () => {
                                         />
                                     </th>
                                 )}
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">Job Number</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">Customer</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">Route</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">Service</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">Amount</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">Valid Until</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">Status</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">{t("Job Number")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">{t("Customer")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">{t("Route")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">{t("Service")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">{t("Amount")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">{t("Valid Until")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">{t("Status")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
@@ -1192,12 +1194,12 @@ const QuotationManagement = () => {
                                                     <span className="font-medium text-accent-orange">{quote.jobNumber}</span>
                                                     {quote.revision_number > 1 && (
                                                         <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded">
-                                                            Rev {quote.revision_number}
+                                                            {t("Rev")} {quote.revision_number}
                                                         </span>
                                                     )}
                                                     {quote.is_superseded && (
                                                         <span className="px-2 py-0.5 bg-gray-500/20 text-gray-400 text-xs rounded">
-                                                            Superseded
+                                                            {t("Superseded")}
                                                         </span>
                                                     )}
                                                 </div>
@@ -1282,7 +1284,7 @@ const QuotationManagement = () => {
                     setShowModal(false);
                     resetForm();
                 }}
-                title="New Quotation"
+                title={t("New Quotation")}
                 size="large"
             >
                 <form onSubmit={(e) => handleSubmit(e, 'draft')} className="space-y-6">
@@ -1291,14 +1293,14 @@ const QuotationManagement = () => {
                     {/* Customer Selection - using PartnerPicker */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Customer <span className="text-red-400">*</span>
+                            {t("Customer")} <span className="text-red-400">*</span>
                         </label>
                         <PartnerPicker
                             value={formData.partnerId}
                             onChange={handlePartnerChange}
                             onPartnerLoad={handlePartnerLoad}
                             roleFilter="customer"
-                            placeholder="Select Customer..."
+                            placeholder={t("Select Customer...")}
                             required={true}
                             theme="light"
                         />
@@ -1312,7 +1314,7 @@ const QuotationManagement = () => {
                     {/* Person in Charge Dropdown */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Person in Charge <span className="text-red-400">*</span>
+                            {t("Person in Charge")} <span className="text-red-400">*</span>
                         </label>
                         <div className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-600 font-medium cursor-not-allowed">
                             {formData.salesPerson || user?.full_name || user?.username || 'Account Executive'}
@@ -1323,7 +1325,7 @@ const QuotationManagement = () => {
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Quotation Type <span className="text-red-400">*</span>
+                                {t("Quotation Type")} <span className="text-red-400">*</span>
                             </label>
                             <select
                                 required
@@ -1331,17 +1333,17 @@ const QuotationManagement = () => {
                                 onChange={(e) => setFormData({ ...formData, quotationType: e.target.value })}
                                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                             >
-                                <option value="RG">Regular (RG)</option>
-                                <option value="PJ">Project (PJ)</option>
-                                <option value="EV_ENT">Event Entertaint & Concert</option>
-                                <option value="EV_AUTO">Event Automotive</option>
-                                <option value="EV_KEK">Event KEK</option>
-                                <option value="EV_FAIR">Event Fair & Excebition</option>
+                                <option value="RG">{t("Regular (RG)")}</option>
+                                <option value="PJ">{t("Project (PJ)")}</option>
+                                <option value="EV_ENT">{t("Event Entertaint & Concert")}</option>
+                                <option value="EV_AUTO">{t("Event Automotive")}</option>
+                                <option value="EV_KEK">{t("Event KEK")}</option>
+                                <option value="EV_FAIR">{t("Event Fair & Excebition")}</option>
                             </select>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Quotation Date <span className="text-red-400">*</span>
+                                {t("Quotation Date")} <span className="text-red-400">*</span>
                             </label>
                             <input
                                 type="date"
@@ -1357,27 +1359,27 @@ const QuotationManagement = () => {
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Origin <span className="text-red-400">*</span>
+                                {t("Origin")} <span className="text-red-400">*</span>
                             </label>
                             <input
                                 type="text"
                                 required
                                 value={formData.origin}
                                 onChange={(e) => setFormData({ ...formData, origin: e.target.value })}
-                                placeholder="e.g., Jakarta"
+                                placeholder={t("e.g., Jakarta")}
                                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                             />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Destination <span className="text-red-400">*</span>
+                                {t("Destination")} <span className="text-red-400">*</span>
                             </label>
                             <input
                                 type="text"
                                 required
                                 value={formData.destination}
                                 onChange={(e) => setFormData({ ...formData, destination: e.target.value })}
-                                placeholder="e.g., Singapore"
+                                placeholder={t("e.g., Singapore")}
                                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                             />
                         </div>
@@ -1387,7 +1389,7 @@ const QuotationManagement = () => {
                     <div className="grid grid-cols-3 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Service Type <span className="text-red-400">*</span>
+                                {t("Service Type")} <span className="text-red-400">*</span>
                             </label>
                             <select
                                 required
@@ -1395,36 +1397,36 @@ const QuotationManagement = () => {
                                 onChange={(e) => setFormData({ ...formData, serviceType: e.target.value })}
                                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                             >
-                                <option value="sea">Sea Freight</option>
-                                <option value="air">Air Freight</option>
-                                <option value="land">Land Transport</option>
+                                <option value="sea">{t("Sea Freight")}</option>
+                                <option value="air">{t("Air Freight")}</option>
+                                <option value="land">{t("Land Transport")}</option>
                             </select>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Cargo Type
+                                {t("Cargo Type")}
                             </label>
                             <select
                                 value={formData.cargoType}
                                 onChange={(e) => setFormData({ ...formData, cargoType: e.target.value })}
                                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                             >
-                                <option value="">Select...</option>
-                                <option value="FCL">FCL (Full Container)</option>
-                                <option value="LCL">LCL (Less Container)</option>
-                                <option value="General">General Cargo</option>
-                                <option value="Dangerous">Dangerous Goods</option>
+                                <option value="">{t("Select...")}</option>
+                                <option value="FCL">{t("FCL (Full Container)")}</option>
+                                <option value="LCL">{t("LCL (Less Container)")}</option>
+                                <option value="General">{t("General Cargo")}</option>
+                                <option value="Dangerous">{t("Dangerous Goods")}</option>
                             </select>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Commodity
+                                {t("Commodity")}
                             </label>
                             <input
                                 type="text"
                                 value={formData.commodity}
                                 onChange={(e) => setFormData({ ...formData, commodity: e.target.value })}
-                                placeholder="e.g., Electronic"
+                                placeholder={t("e.g., Electronic")}
                                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                             />
                         </div>
@@ -1433,7 +1435,7 @@ const QuotationManagement = () => {
                     {/* Volume (Standalone) */}
                     <div className="mb-4">
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Volume (CBM)
+                            {t("Volume (CBM)")}
                         </label>
                         <input
                             type="number"
@@ -1450,7 +1452,7 @@ const QuotationManagement = () => {
                     <div className="grid grid-cols-3 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Gross Weight (kgs)
+                                {t("Gross Weight (kgs)")}
                             </label>
                             <input
                                 type="number"
@@ -1464,7 +1466,7 @@ const QuotationManagement = () => {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Net Weight (kgs)
+                                {t("Net Weight (kgs)")}
                             </label>
                             <input
                                 type="number"
@@ -1478,7 +1480,7 @@ const QuotationManagement = () => {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Measure (M³)
+                                {t("Measure (M³)")}
                             </label>
                             <input
                                 type="number"
@@ -1495,37 +1497,37 @@ const QuotationManagement = () => {
                     {/* Additional Shipment Details (Incoterm, Package, etc) */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 p-4 bg-white rounded-lg border border-gray-300">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Incoterm</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">{t("Incoterm")}</label>
                             <input
                                 type="text"
                                 value={formData.incoterm}
                                 onChange={(e) => setFormData({ ...formData, incoterm: e.target.value })}
-                                placeholder="e.g. FOB"
+                                placeholder={t("e.g. FOB")}
                                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black text-sm"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Payment Terms</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">{t("Payment Terms")}</label>
                             <input
                                 type="text"
                                 value={formData.paymentTerms}
                                 onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })}
-                                placeholder="Net 30 Days"
+                                placeholder={t("Net 30 Days")}
                                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black text-sm"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Package Type</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">{t("Package Type")}</label>
                             <input
                                 type="text"
                                 value={formData.packageType}
                                 onChange={(e) => setFormData({ ...formData, packageType: e.target.value })}
-                                placeholder="e.g. Cartons"
+                                placeholder={t("e.g. Cartons")}
                                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black text-sm"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">{t("Quantity")}</label>
                             <input
                                 type="number"
                                 value={formData.quantity}
@@ -1538,7 +1540,7 @@ const QuotationManagement = () => {
                         {/* Customer Contact Details Override */}
                         <div className="col-span-2 md:col-span-4 grid grid-cols-3 gap-4 pt-2 border-t border-gray-300 mt-2">
                             <div>
-                                <label className="block text-xs text-gray-500 mb-1">Contact Person (Attn)</label>
+                                <label className="block text-xs text-gray-500 mb-1">{t("Contact Person (Attn)")}</label>
                                 <input
                                     type="text"
                                     value={formData.customerContact}
@@ -1547,7 +1549,7 @@ const QuotationManagement = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs text-gray-500 mb-1">Contact Email</label>
+                                <label className="block text-xs text-gray-500 mb-1">{t("Contact Email")}</label>
                                 <input
                                     type="email"
                                     value={formData.customerEmail}
@@ -1556,7 +1558,7 @@ const QuotationManagement = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs text-gray-500 mb-1">Contact Phone</label>
+                                <label className="block text-xs text-gray-500 mb-1">{t("Contact Phone")}</label>
                                 <input
                                     type="text"
                                     value={formData.customerPhone}
@@ -1571,7 +1573,7 @@ const QuotationManagement = () => {
                     <div className="grid grid-cols-4 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Currency
+                                {t("Currency")}
                             </label>
                             <select
                                 value={formData.currency}
@@ -1591,7 +1593,7 @@ const QuotationManagement = () => {
                         </div>
                         <div>
                             <label className="block text-[11px] font-semibold text-gray-700 mb-1">
-                                Kurs Rate (USD to IDR)
+                                {t("Kurs Rate (USD to IDR)")}
                             </label>
                             <input
                                 type="number"
@@ -1606,7 +1608,7 @@ const QuotationManagement = () => {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Total Amount
+                                {t("Total Amount")}
                             </label>
                             <input
                                 type="text"
@@ -1622,7 +1624,7 @@ const QuotationManagement = () => {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Valid for (days)
+                                {t("Valid for (days)")}
                             </label>
                             <input
                                 type="number"
@@ -1672,13 +1674,13 @@ const QuotationManagement = () => {
                     {/* Notes */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Notes / Remarks
+                            {t("Notes / Remarks")}
                         </label>
                         <textarea
                             rows={3}
                             value={formData.notes}
                             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                            placeholder="Additional information..."
+                            placeholder={t("Additional information...")}
                             className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                         />
                     </div>
@@ -1686,13 +1688,13 @@ const QuotationManagement = () => {
                     {/* Terms & Conditions */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Terms & Conditions
+                            {t("Terms & Conditions")}
                         </label>
                         <textarea
                             rows={5}
                             value={formData.termsConditions}
                             onChange={(e) => setFormData({ ...formData, termsConditions: e.target.value })}
-                            placeholder="Enter terms and conditions..."
+                            placeholder={t("Enter terms and conditions...")}
                             className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black font-mono text-xs"
                         />
                     </div>
@@ -1707,32 +1709,32 @@ const QuotationManagement = () => {
                                 resetForm();
                             }}
                         >
-                            Cancel
+                            {t("Cancel")}
                         </Button>
                         {/* formNoValidate: allows saving as draft even if required fields are empty */}
                         <Button type="submit" formNoValidate>
-                            Save as Draft
+                            {t("Save as Draft")}
                         </Button>
                         <Button
                             type="button"
                             onClick={(e) => {
                                 // Validate required fields before submitting for approval
                                 if (!formData.partnerId && !formData.customerName) {
-                                    alert('⚠️ Harap pilih Customer terlebih dahulu.');
+                                    alert(t("⚠️ Harap pilih Customer terlebih dahulu."));
                                     return;
                                 }
                                 if (!formData.origin || !formData.destination) {
-                                    alert('⚠️ Harap isi Origin dan Destination.');
+                                    alert(t("⚠️ Harap isi Origin dan Destination."));
                                     return;
                                 }
                                 if (!formData.serviceType) {
-                                    alert('⚠️ Harap pilih Service Type.');
+                                    alert(t("⚠️ Harap pilih Service Type."));
                                     return;
                                 }
                                 handleSubmit(e, 'manager_approval');
                             }}
                         >
-                            Submit for Manager Approval
+                            {t("Submit for Manager Approval")}
                         </Button>
                     </div>
                 </form>
@@ -1749,9 +1751,9 @@ const QuotationManagement = () => {
                     <div className="pb-4 border-b border-gray-200">
                         <div className="flex items-center justify-between mb-4">
                             <div>
-                                <h2 className="text-2xl font-bold text-gray-900">Quotation Details</h2>
+                                <h2 className="text-2xl font-bold text-gray-900">{t("Quotation Details")}</h2>
                                 <p className="text-sm text-gray-500 mt-1">
-                                    {viewingQuotation.jobNumber} | Created: {viewingQuotation.createdAt} | Valid: {viewingQuotation.validUntil}
+                                    {viewingQuotation.jobNumber} {t("| Created:")} {viewingQuotation.createdAt} {t("| Valid:")} {viewingQuotation.validUntil}
                                 </p>
                             </div>
                             <div className="flex gap-2 items-center">
@@ -1762,7 +1764,7 @@ const QuotationManagement = () => {
                                     icon={Eye}
                                     onClick={() => setShowPrintPreview(true)}
                                 >
-                                    Preview
+                                    {t("Preview")}
                                 </Button>
                                 <Button
                                     size="sm"
@@ -1770,14 +1772,14 @@ const QuotationManagement = () => {
                                     icon={FileText}
                                     onClick={() => handlePrintQuotation(isEditingQuotation ? editedQuotation : viewingQuotation)}
                                 >
-                                    Print
+                                    {t("Print")}
                                 </Button>
 
                                 {!isEditingQuotation && (
                                     <>
                                         {canEdit('blink_quotations') && (
                                             <Button size="sm" variant="secondary" icon={Edit} onClick={handleEditQuotation}>
-                                                Edit
+                                                {t("Edit")}
                                             </Button>
                                         )}
                                         {(isAdmin() || canDelete('blink_quotations')) && (
@@ -1787,15 +1789,15 @@ const QuotationManagement = () => {
                                                 icon={Trash}
                                                 onClick={() => handleForceCascadeDelete([viewingQuotation.id])}
                                             >
-                                                Force Delete
+                                                {t("Force Delete")}
                                             </Button>
                                         )}
                                     </>
                                 )}
                                 {isEditingQuotation && (
                                     <>
-                                        <Button size="sm" variant="secondary" onClick={handleCancelEdit}>Cancel</Button>
-                                        <Button size="sm" onClick={handleSaveEditedQuotation}>Save</Button>
+                                        <Button size="sm" variant="secondary" onClick={handleCancelEdit}>{t("Cancel")}</Button>
+                                        <Button size="sm" onClick={handleSaveEditedQuotation}>{t("Save")}</Button>
                                     </>
                                 )}
                                 <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusConfig[viewingQuotation.status]?.color}`}>
@@ -1808,7 +1810,7 @@ const QuotationManagement = () => {
                         {/* Customer & Route & Quotation Info */}
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
                             <div>
-                                <p className="text-xs text-gray-500 font-medium mb-1">Customer</p>
+                                <p className="text-xs text-gray-500 font-medium mb-1">{t("Customer")}</p>
                                 {isEditingQuotation ? (
                                     <PartnerPicker
                                         value={editedQuotation?.partnerId || editedQuotation?.customerId}
@@ -1830,7 +1832,7 @@ const QuotationManagement = () => {
                                             }
                                         }}
                                         roleFilter="customer"
-                                        placeholder="Select Customer..."
+                                        placeholder={t("Select Customer...")}
                                     />
                                 ) : (
                                     <input
@@ -1842,7 +1844,7 @@ const QuotationManagement = () => {
                                 )}
                             </div>
                             <div>
-                                <p className="text-xs text-gray-500 font-medium mb-1">Customer Address</p>
+                                <p className="text-xs text-gray-500 font-medium mb-1">{t("Customer Address")}</p>
                                 <input
                                     type="text"
                                     value={isEditingQuotation ? (editedQuotation?.customerAddress || '') : (viewingQuotation.customerAddress || viewingQuotation.customer_address || '')}
@@ -1852,13 +1854,13 @@ const QuotationManagement = () => {
                                 />
                             </div>
                             <div>
-                                <p className="text-xs text-gray-500 font-medium mb-1">Person in Charge</p>
+                                <p className="text-xs text-gray-500 font-medium mb-1">{t("Person in Charge")}</p>
                                 <div className="w-full px-2 py-1 bg-gray-100 border border-gray-300 rounded text-gray-700 text-sm cursor-not-allowed min-h-[28px]">
                                     {isEditingQuotation ? (editedQuotation?.salesPerson || '') : (viewingQuotation.salesPerson || '')}
                                 </div>
                             </div>
                             <div>
-                                <p className="text-xs text-gray-500 font-medium mb-1">Quotation Type</p>
+                                <p className="text-xs text-gray-500 font-medium mb-1">{t("Quotation Type")}</p>
                                 <p className="text-gray-900 font-medium">
                                     {viewingQuotation.quotationType === 'RG' && 'Regular'}
                                     {viewingQuotation.quotationType === 'PJ' && 'Project'}
@@ -1868,14 +1870,14 @@ const QuotationManagement = () => {
                                 </p>
                             </div>
                             <div>
-                                <p className="text-xs text-gray-500 font-medium mb-1">Quotation Date</p>
+                                <p className="text-xs text-gray-500 font-medium mb-1">{t("Quotation Date")}</p>
                                 <p className="text-gray-900 font-medium">{viewingQuotation.quotationDate || viewingQuotation.createdAt}</p>
                             </div>
                             {/* New Fields Edit Section */}
                             {isEditingQuotation && (
                                 <div className="col-span-2 md:col-span-5 grid grid-cols-2 md:grid-cols-4 gap-4 mt-2 p-3 bg-white border border-gray-300 rounded-lg">
                                     <div>
-                                        <p className="text-xs text-gray-500 mb-1">Incoterm</p>
+                                        <p className="text-xs text-gray-500 mb-1">{t("Incoterm")}</p>
                                         <input
                                             type="text"
                                             value={editedQuotation.incoterm || ''}
@@ -1885,27 +1887,27 @@ const QuotationManagement = () => {
                                         />
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-500 mb-1">Payment Terms</p>
+                                        <p className="text-xs text-gray-500 mb-1">{t("Payment Terms")}</p>
                                         <input
                                             type="text"
                                             value={editedQuotation.paymentTerms || ''}
                                             onChange={(e) => setEditedQuotation({ ...editedQuotation, paymentTerms: e.target.value })}
-                                            placeholder="Net 30 Days"
+                                            placeholder={t("Net 30 Days")}
                                             className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-black text-sm"
                                         />
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-500 mb-1">Package Type</p>
+                                        <p className="text-xs text-gray-500 mb-1">{t("Package Type")}</p>
                                         <input
                                             type="text"
                                             value={editedQuotation.packageType || ''}
                                             onChange={(e) => setEditedQuotation({ ...editedQuotation, packageType: e.target.value })}
-                                            placeholder="Cartons"
+                                            placeholder={t("Cartons")}
                                             className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-black text-sm"
                                         />
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-500 mb-1">Quantity</p>
+                                        <p className="text-xs text-gray-500 mb-1">{t("Quantity")}</p>
                                         <input
                                             type="number"
                                             value={editedQuotation.quantity || ''}
@@ -1916,7 +1918,7 @@ const QuotationManagement = () => {
                                     </div>
                                     {/* Additional Customer Details */}
                                     <div>
-                                        <p className="text-xs text-gray-500 mb-1">Cust. Contact (Attn)</p>
+                                        <p className="text-xs text-gray-500 mb-1">{t("Cust. Contact (Attn)")}</p>
                                         <input
                                             type="text"
                                             value={editedQuotation.customerContact || ''}
@@ -1925,7 +1927,7 @@ const QuotationManagement = () => {
                                         />
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-500 mb-1">Cust. Email</p>
+                                        <p className="text-xs text-gray-500 mb-1">{t("Cust. Email")}</p>
                                         <input
                                             type="text"
                                             value={editedQuotation.customerEmail || ''}
@@ -1934,7 +1936,7 @@ const QuotationManagement = () => {
                                         />
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-500 mb-1">Cust. Phone</p>
+                                        <p className="text-xs text-gray-500 mb-1">{t("Cust. Phone")}</p>
                                         <input
                                             type="text"
                                             value={editedQuotation.customerPhone || ''}
@@ -1945,14 +1947,14 @@ const QuotationManagement = () => {
                                 </div>
                             )}
                             <div>
-                                <p className="text-xs text-gray-500 mb-1">Route</p>
+                                <p className="text-xs text-gray-500 mb-1">{t("Route")}</p>
                                 <div className="flex gap-2 items-center">
                                     <input
                                         type="text"
                                         value={isEditingQuotation ? (editedQuotation?.origin || '') : (viewingQuotation.origin || '')}
                                         onChange={(e) => setEditedQuotation({ ...editedQuotation, origin: e.target.value })}
                                         disabled={!isEditingQuotation}
-                                        placeholder="Origin"
+                                        placeholder={t("Origin")}
                                         className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm disabled:bg-gray-100/50"
                                     />
                                     <span className="text-gray-400">→</span>
@@ -1961,7 +1963,7 @@ const QuotationManagement = () => {
                                         value={isEditingQuotation ? (editedQuotation?.destination || '') : (viewingQuotation.destination || '')}
                                         onChange={(e) => setEditedQuotation({ ...editedQuotation, destination: e.target.value })}
                                         disabled={!isEditingQuotation}
-                                        placeholder="Destination"
+                                        placeholder={t("Destination")}
                                         className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm disabled:bg-gray-100/50"
                                     />
                                 </div>
@@ -1969,53 +1971,53 @@ const QuotationManagement = () => {
                         </div>
 
                         <div>
-                            <p className="text-xs text-gray-500 mb-1">Service Type</p>
+                            <p className="text-xs text-gray-500 mb-1">{t("Service Type")}</p>
                             <select
                                 value={isEditingQuotation ? (editedQuotation?.serviceType || '') : (viewingQuotation.serviceType || '')}
                                 onChange={(e) => setEditedQuotation({ ...editedQuotation, serviceType: e.target.value })}
                                 disabled={!isEditingQuotation}
                                 className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm disabled:bg-gray-100/50"
                             >
-                                <option value="sea">Sea Freight</option>
-                                <option value="air">Air Freight</option>
-                                <option value="land">Land Transport</option>
+                                <option value="sea">{t("Sea Freight")}</option>
+                                <option value="air">{t("Air Freight")}</option>
+                                <option value="land">{t("Land Transport")}</option>
                             </select>
                         </div>
 
                         <div>
-                            <p className="text-xs text-gray-500 mb-1">Cargo Type</p>
+                            <p className="text-xs text-gray-500 mb-1">{t("Cargo Type")}</p>
                             <select
                                 value={isEditingQuotation ? (editedQuotation?.cargoType || '') : (viewingQuotation.cargoType || '')}
                                 onChange={(e) => setEditedQuotation({ ...editedQuotation, cargoType: e.target.value })}
                                 disabled={!isEditingQuotation}
                                 className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm disabled:bg-gray-100/50"
                             >
-                                <option value="">Select...</option>
-                                <option value="FCL">FCL (Full Container)</option>
-                                <option value="LCL">LCL (Less Container)</option>
-                                <option value="General">General Cargo</option>
-                                <option value="Dangerous">Dangerous Goods</option>
+                                <option value="">{t("Select...")}</option>
+                                <option value="FCL">{t("FCL (Full Container)")}</option>
+                                <option value="LCL">{t("LCL (Less Container)")}</option>
+                                <option value="General">{t("General Cargo")}</option>
+                                <option value="Dangerous">{t("Dangerous Goods")}</option>
                             </select>
                         </div>
 
                         <div>
-                            <p className="text-xs text-gray-500 mb-1">Commodity</p>
+                            <p className="text-xs text-gray-500 mb-1">{t("Commodity")}</p>
                             <input
                                 type="text"
                                 value={isEditingQuotation ? (editedQuotation?.commodity || '') : (viewingQuotation.commodity || '')}
                                 onChange={(e) => setEditedQuotation({ ...editedQuotation, commodity: e.target.value })}
                                 disabled={!isEditingQuotation}
-                                placeholder="e.g., Electronics"
+                                placeholder={t("e.g., Electronics")}
                                 className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm disabled:bg-gray-100/50"
                             />
                         </div>
 
                         {/* Cargo Details */}
                         <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                            <h5 className="text-xs font-semibold text-gray-400 mb-3 uppercase tracking-wider">Cargo Details</h5>
+                            <h5 className="text-xs font-semibold text-gray-400 mb-3 uppercase tracking-wider">{t("Cargo Details")}</h5>
 
                             <div className="mb-3">
-                                <p className="text-xs text-gray-500 mb-1">Volume (CBM)</p>
+                                <p className="text-xs text-gray-500 mb-1">{t("Volume (CBM)")}</p>
                                 <input
                                     type="number"
                                     value={isEditingQuotation ? (editedQuotation?.volume || '') : (viewingQuotation.volume || '')}
@@ -2027,7 +2029,7 @@ const QuotationManagement = () => {
                             </div>
                             <div className="grid grid-cols-3 gap-3">
                                 <div>
-                                    <p className="text-xs text-gray-500 mb-1">Gross (kg)</p>
+                                    <p className="text-xs text-gray-500 mb-1">{t("Gross (kg)")}</p>
                                     <input
                                         type="number"
                                         value={isEditingQuotation ? (editedQuotation?.grossWeight || '') : (viewingQuotation.grossWeight || '')}
@@ -2038,7 +2040,7 @@ const QuotationManagement = () => {
                                     />
                                 </div>
                                 <div>
-                                    <p className="text-xs text-gray-500 mb-1">Net (kg)</p>
+                                    <p className="text-xs text-gray-500 mb-1">{t("Net (kg)")}</p>
                                     <input
                                         type="number"
                                         value={isEditingQuotation ? (editedQuotation?.netWeight || '') : (viewingQuotation.netWeight || '')}
@@ -2049,7 +2051,7 @@ const QuotationManagement = () => {
                                     />
                                 </div>
                                 <div>
-                                    <p className="text-xs text-gray-500 mb-1">Measure (M³)</p>
+                                    <p className="text-xs text-gray-500 mb-1">{t("Measure (M³)")}</p>
                                     <input
                                         type="number"
                                         value={isEditingQuotation ? (editedQuotation?.measure || '') : (viewingQuotation.measure || '')}
@@ -2065,7 +2067,7 @@ const QuotationManagement = () => {
                         <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
                             <div className="flex justify-between items-start">
                                 <div className="flex-1">
-                                    <p className="text-sm font-semibold text-gray-500 mb-3">Estimated Amount</p>
+                                    <p className="text-sm font-semibold text-gray-500 mb-3">{t("Estimated Amount")}</p>
                                     {(() => {
                                         const data = isEditingQuotation ? editedQuotation : viewingQuotation;
                                         const rate = parseFloat(data?.exchange_rate || data?.exchangeRate) || 16000;
@@ -2097,7 +2099,7 @@ const QuotationManagement = () => {
                                                     <p className="text-2xl font-bold text-orange-600 break-words">Rp {formatInputAmount(isIDR ? data?.totalAmount : totalIDR, 'IDR')}</p>
                                                 </div>
                                                 <div className="flex-1 max-w-[320px] p-3 bg-white/80 rounded-lg border border-orange-200 text-right">
-                                                    <p className="text-[10px] text-gray-400 mb-0.5">USD (@ Rp {Number(rate).toLocaleString('id-ID')})</p>
+                                                    <p className="text-[10px] text-gray-400 mb-0.5">{t("USD (@ Rp")} {Number(rate).toLocaleString('id-ID')})</p>
                                                     <p className="text-2xl font-bold text-blue-600 break-words">{rate > 1 ? `$ ${formatInputAmount(isIDR ? totalUSD : data?.totalAmount, 'USD')}` : '-'}</p>
                                                 </div>
                                             </div>
@@ -2108,7 +2110,7 @@ const QuotationManagement = () => {
                                     {isEditingQuotation ? (
                                         <div className="flex flex-col gap-2 items-end">
                                             <div className="flex items-center gap-2">
-                                                <label className="text-xs text-gray-500 font-medium">Currency</label>
+                                                <label className="text-xs text-gray-500 font-medium">{t("Currency")}</label>
                                                 <select
                                                     value={editedQuotation?.currency || 'IDR'}
                                                     onChange={(e) => {
@@ -2127,7 +2129,7 @@ const QuotationManagement = () => {
                                             </div>
                                             {editedQuotation?.currency === 'USD' && (
                                                 <div className="flex items-center gap-2">
-                                                    <label className="text-xs text-gray-500 font-medium whitespace-nowrap">Kurs Rate</label>
+                                                    <label className="text-xs text-gray-500 font-medium whitespace-nowrap">{t("Kurs Rate")}</label>
                                                     <input
                                                         type="number"
                                                         value={editedQuotation?.exchange_rate || ''}
@@ -2140,9 +2142,9 @@ const QuotationManagement = () => {
                                         </div>
                                     ) : (
                                         <div className="text-sm text-gray-600 bg-white/50 px-3 py-2 rounded-lg border border-orange-100/50 inline-block text-left">
-                                            <p className="flex justify-between gap-4"><span>Currency:</span> <span className="font-semibold text-gray-900">{viewingQuotation.currency || 'IDR'}</span></p>
+                                            <p className="flex justify-between gap-4"><span>{t("Currency:")}</span> <span className="font-semibold text-gray-900">{viewingQuotation.currency || 'IDR'}</span></p>
                                             {(viewingQuotation.currency === 'USD' || viewingQuotation.exchange_rate > 1) && (
-                                                <p className="flex justify-between gap-4 mt-1"><span>Rate:</span> <span className="font-semibold text-gray-900">Rp {(viewingQuotation.exchange_rate || viewingQuotation.exchangeRate || 16000).toLocaleString('id-ID')}</span></p>
+                                                <p className="flex justify-between gap-4 mt-1"><span>{t("Rate:")}</span> <span className="font-semibold text-gray-900">Rp {(viewingQuotation.exchange_rate || viewingQuotation.exchangeRate || 16000).toLocaleString('id-ID')}</span></p>
                                             )}
                                         </div>
                                     )}
@@ -2174,7 +2176,7 @@ const QuotationManagement = () => {
                         {/* Terms & Conditions (View/Edit) */}
                         {/* Terms & Conditions (View/Edit) */}
                         <div className="p-4 bg-white rounded-lg border border-gray-200">
-                            <h5 className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Terms & Conditions</h5>
+                            <h5 className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">{t("Terms & Conditions")}</h5>
                             {isEditingQuotation ? (
                                 <textarea
                                     rows={5}
@@ -2198,10 +2200,10 @@ const QuotationManagement = () => {
                                         {canEdit('blink_quotations') && (
                                             <>
                                                 <Button onClick={() => handleUpdateStatus(viewingQuotation.id, 'manager_approval')}>
-                                                    Submit for Manager Approval
+                                                    {t("Submit for Manager Approval")}
                                                 </Button>
                                                 <Button variant="secondary" onClick={handleEditQuotation} icon={Edit}>
-                                                    Edit
+                                                    {t("Edit")}
                                                 </Button>
                                             </>
                                         )}
@@ -2211,10 +2213,10 @@ const QuotationManagement = () => {
                                 {isEditingQuotation && (
                                     <>
                                         <Button onClick={handleSaveEditedQuotation} className="bg-green-600 hover:bg-green-700 text-white">
-                                            Save Changes
+                                            {t("Save Changes")}
                                         </Button>
                                         <Button variant="secondary" onClick={handleCancelEdit}>
-                                            Cancel
+                                            {t("Cancel")}
                                         </Button>
                                     </>
                                 )}
@@ -2224,17 +2226,17 @@ const QuotationManagement = () => {
                                     <>
                                         <Button
                                             onClick={() => {
-                                                if (confirm('Approve and directly create Sales Order (SO)?\n\nThis will:\n1. Change status to Converted\n2. Auto-generate SO number\n3. Create new Shipment in Operations')) {
+                                                if (confirm(t("Approve and directly create Sales Order (SO)?\n\nThis will:\n1. Change status to Converted\n2. Auto-generate SO number\n3. Create new Shipment in Operations"))) {
                                                     handleCreateSO(viewingQuotation);
                                                 }
                                             }}
                                             className="bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 font-bold border border-blue-500/40"
                                         >
-                                            ⚡ Approve & Create SO
+                                            {t("⚡ Approve & Create SO")}
                                         </Button>
 
                                         <Button variant="secondary" onClick={() => handleManagerReject(viewingQuotation.id)} className="bg-red-500/20 hover:bg-red-500/30 text-red-400">
-                                            ✗ Reject
+                                            {t("✗ Reject")}
                                         </Button>
                                     </>
                                 )}
@@ -2247,18 +2249,18 @@ const QuotationManagement = () => {
                                 {/* Create Revision (for revision_requested status) */}
                                 {viewingQuotation.status === 'revision_requested' && canCreate('blink_quotations') && (
                                     <Button onClick={() => handleCreateRevision(viewingQuotation.id)} className="bg-blue-500/20 hover:bg-blue-500/30 text-blue-400">
-                                        📝 Create Revision
+                                        {t("📝 Create Revision")}
                                     </Button>
                                 )}
 
                                 {/* Warning for superseded quotations */}
                                 {viewingQuotation.is_superseded && (
                                     <div className="text-orange-400 text-sm flex items-center gap-2">
-                                        <span>⚠️ Cannot create SO - quotation has been superseded by newer revision</span>
+                                        <span>{t("⚠️ Cannot create SO - quotation has been superseded by newer revision")}</span>
                                     </div>
                                 )}
                             </div>
-                            <Button variant="secondary" onClick={() => setShowViewModal(false)}>Close</Button>
+                            <Button variant="secondary" onClick={() => setShowViewModal(false)}>{t("Close")}</Button>
                         </div>
                     </div>
                 </Modal>
@@ -2276,6 +2278,7 @@ const QuotationManagement = () => {
 };
 
 const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettings }) => {
+    const { t } = useLanguage();
     const handlePrint = () => {
         window.print();
     };
@@ -2294,20 +2297,20 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
         <Modal isOpen={true} onClose={onClose} maxWidth="max-w-5xl">
             <div className="p-0 overflow-hidden rounded-lg">
                 <div className="flex items-center justify-between p-6 border-b border-dark-border bg-dark-card">
-                    <h2 className="text-xl font-bold text-silver-light">Quotation Preview</h2>
+                    <h2 className="text-xl font-bold text-silver-light">{t("Quotation Preview")}</h2>
                     <div className="flex gap-2 print:hidden">
                         <button
                             onClick={() => onPrint(quotation)}
                             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium text-sm"
                         >
                             <Download className="w-4 h-4" />
-                            Print / Save PDF
+                            {t("Print / Save PDF")}
                         </button>
                         <button
                             onClick={onClose}
                             className="px-4 py-2 border border-dark-border text-silver-light rounded-lg hover:bg-dark-surface transition-colors text-sm"
                         >
-                            Close
+                            {t("Close")}
                         </button>
                     </div>
                 </div>
@@ -2321,20 +2324,20 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                             {companySettings?.logo_url ? (
                                 <img src={companySettings.logo_url} alt="Logo" className="h-10 object-contain mb-4" />
                             ) : (
-                                <h1 className="text-2xl font-bold tracking-tight text-slate-900 mb-2">PT. Bakhtera Freight Worldwide</h1>
+                                <h1 className="text-2xl font-bold tracking-tight text-slate-900 mb-2">{t("PT. Bakhtera Freight Worldwide")}</h1>
                             )}
                             <div className="text-sm text-slate-500 leading-relaxed max-w-xs">
                                 <p>{companySettings?.company_address}</p>
                                 <div className="mt-2 flex gap-4 text-xs">
-                                    <span>Phone: {companySettings?.company_phone}</span>
-                                    <span>Email: {companySettings?.company_email}</span>
+                                    <span>{t("Phone:")} {companySettings?.company_phone}</span>
+                                    <span>{t("Email:")} {companySettings?.company_email}</span>
                                 </div>
                             </div>
                         </div>
                         <div className="text-right">
-                            <h2 className="text-4xl font-light tracking-tight text-slate-900 mb-2">Quotation</h2>
+                            <h2 className="text-4xl font-light tracking-tight text-slate-900 mb-2">{t("Quotation")}</h2>
                             <p className="text-accent-blue font-mono font-medium text-lg">{quotation.quotationNumber || quotation.quotation_number}</p>
-                            <p className="text-sm text-slate-400 mt-1">Issued Date: {new Date(quotation.quotationDate || quotation.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                            <p className="text-sm text-slate-400 mt-1">{t("Issued Date:")} {new Date(quotation.quotationDate || quotation.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
                         </div>
                     </header>
 
@@ -2342,7 +2345,7 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                     <div className="grid grid-cols-12 gap-12 mb-12">
                         {/* Client Info */}
                         <div className="col-span-5">
-                            <h3 className="text-xs uppercase tracking-widest text-slate-400 font-semibold mb-4">Bill To</h3>
+                            <h3 className="text-xs uppercase tracking-widest text-slate-400 font-semibold mb-4">{t("Bill To")}</h3>
                             <div className="text-sm leading-relaxed">
                                 <p className="font-bold text-slate-900 text-lg mb-1">{quotation.customerName || quotation.customer_name}</p>
                                 <p className="text-slate-600 mb-2">{quotation.customerCompany || quotation.customer_company}</p>
@@ -2350,13 +2353,13 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
 
                                 <dl className="space-y-1 text-slate-600 text-xs border-l-2 border-slate-100 pl-3">
                                     {(quotation.customerContact || quotation.customer_contact_name) && (
-                                        <div className="flex gap-2"><dt className="font-medium text-slate-900 w-12">Attn:</dt> <dd>{quotation.customerContact || quotation.customer_contact_name}</dd></div>
+                                        <div className="flex gap-2"><dt className="font-medium text-slate-900 w-12">{t("Attn:")}</dt> <dd>{quotation.customerContact || quotation.customer_contact_name}</dd></div>
                                     )}
                                     {(quotation.customerEmail || quotation.customer_email) && (
-                                        <div className="flex gap-2"><dt className="font-medium text-slate-900 w-12">Email:</dt> <dd>{quotation.customerEmail || quotation.customer_email}</dd></div>
+                                        <div className="flex gap-2"><dt className="font-medium text-slate-900 w-12">{t("Email:")}</dt> <dd>{quotation.customerEmail || quotation.customer_email}</dd></div>
                                     )}
                                     {(quotation.customerPhone || quotation.customer_phone) && (
-                                        <div className="flex gap-2"><dt className="font-medium text-slate-900 w-12">Phone:</dt> <dd>{quotation.customerPhone || quotation.customer_phone}</dd></div>
+                                        <div className="flex gap-2"><dt className="font-medium text-slate-900 w-12">{t("Phone:")}</dt> <dd>{quotation.customerPhone || quotation.customer_phone}</dd></div>
                                     )}
                                 </dl>
                             </div>
@@ -2364,50 +2367,50 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
 
                         {/* Shipment Details */}
                         <div className="col-span-7">
-                            <h3 className="text-xs uppercase tracking-widest text-slate-400 font-semibold mb-4">Shipment Details</h3>
+                            <h3 className="text-xs uppercase tracking-widest text-slate-400 font-semibold mb-4">{t("Shipment Details")}</h3>
                             <div className="grid grid-cols-3 gap-y-6 gap-x-8 text-sm">
                                 <div>
-                                    <span className="block text-xs text-slate-400 mb-1">Origin (POL)</span>
+                                    <span className="block text-xs text-slate-400 mb-1">{t("Origin (POL)")}</span>
                                     <span className="font-semibold text-slate-800">{quotation.origin || '—'}</span>
                                 </div>
                                 <div>
-                                    <span className="block text-xs text-slate-400 mb-1">Destination (POD)</span>
+                                    <span className="block text-xs text-slate-400 mb-1">{t("Destination (POD)")}</span>
                                     <span className="font-semibold text-slate-800">{quotation.destination || '—'}</span>
                                 </div>
                                 <div>
-                                    <span className="block text-xs text-slate-400 mb-1">Service Mode</span>
+                                    <span className="block text-xs text-slate-400 mb-1">{t("Service Mode")}</span>
                                     <span className="font-semibold text-slate-800 capitalize">{quotation.serviceType || '—'}</span>
                                 </div>
 
                                 <div>
-                                    <span className="block text-xs text-slate-400 mb-1">Commodity</span>
+                                    <span className="block text-xs text-slate-400 mb-1">{t("Commodity")}</span>
                                     <span className="font-semibold text-slate-800">{quotation.commodity || '—'}</span>
                                 </div>
                                 <div>
-                                    <span className="block text-xs text-slate-400 mb-1">Quantity/Package</span>
+                                    <span className="block text-xs text-slate-400 mb-1">{t("Quantity/Package")}</span>
                                     <span className="font-semibold text-slate-800">
                                         {quotation.quantity || '-'} {quotation.packageType || quotation.package_type || ''}
                                     </span>
                                 </div>
                                 <div>
-                                    <span className="block text-xs text-slate-400 mb-1">Incoterm</span>
+                                    <span className="block text-xs text-slate-400 mb-1">{t("Incoterm")}</span>
                                     <span className="font-semibold text-slate-800 uppercase">{quotation.incoterm || '—'}</span>
                                 </div>
 
                                 <div>
-                                    <span className="block text-xs text-slate-400 mb-1">Weight / Volume</span>
+                                    <span className="block text-xs text-slate-400 mb-1">{t("Weight / Volume")}</span>
                                     <span className="font-semibold text-slate-800">
                                         NW: {parseFloat(quotation.netWeight || 0).toLocaleString('id-ID')} / GW: {parseFloat(quotation.grossWeight || quotation.weight || 0).toLocaleString('id-ID')} KGS <br />
                                         {parseFloat(quotation.volume || quotation.measure || 0).toLocaleString('id-ID')} CBM
                                     </span>
                                 </div>
                                 <div>
-                                    <span className="block text-xs text-slate-400 mb-1">Payment Term</span>
+                                    <span className="block text-xs text-slate-400 mb-1">{t("Payment Term")}</span>
                                     <span className="font-semibold text-slate-800">{quotation.paymentTerms || quotation.payment_terms || 'Net 30 Days'}</span>
                                 </div>
                                 <div>
-                                    <span className="block text-xs text-slate-400 mb-1">Validity</span>
-                                    <span className="font-semibold text-slate-800">{quotation.validityDays || 30} Days</span>
+                                    <span className="block text-xs text-slate-400 mb-1">{t("Validity")}</span>
+                                    <span className="font-semibold text-slate-800">{quotation.validityDays || 30} {t("Days")}</span>
                                 </div>
                             </div>
                         </div>
@@ -2419,10 +2422,10 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                             <thead>
                                 <tr className="border-b border-slate-200">
                                     <th className="text-left font-semibold text-slate-900 py-1 uppercase text-[10px] tracking-wider w-[5%] bg-slate-50 pl-4 rounded-l-md">No</th>
-                                    <th className="text-left font-semibold text-slate-900 py-1 uppercase text-[10px] tracking-wider w-[40%] bg-slate-50">Description</th>
-                                    <th className="text-right font-semibold text-slate-900 py-1 uppercase text-[10px] tracking-wider w-[10%] bg-slate-50">Qty</th>
-                                    <th className="text-right font-semibold text-slate-900 py-1 uppercase text-[10px] tracking-wider w-[15%] bg-slate-50">Unit Price</th>
-                                    <th className="text-right font-semibold text-slate-900 py-1 uppercase text-[10px] tracking-wider w-[15%] bg-slate-50 pr-4 rounded-r-md">Total ({quotation.currency})</th>
+                                    <th className="text-left font-semibold text-slate-900 py-1 uppercase text-[10px] tracking-wider w-[40%] bg-slate-50">{t("Description")}</th>
+                                    <th className="text-right font-semibold text-slate-900 py-1 uppercase text-[10px] tracking-wider w-[10%] bg-slate-50">{t("Qty")}</th>
+                                    <th className="text-right font-semibold text-slate-900 py-1 uppercase text-[10px] tracking-wider w-[15%] bg-slate-50">{t("Unit Price")}</th>
+                                    <th className="text-right font-semibold text-slate-900 py-1 uppercase text-[10px] tracking-wider w-[15%] bg-slate-50 pr-4 rounded-r-md">{t("Total (")}{quotation.currency})</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -2452,7 +2455,7 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                         <div className="flex justify-end mt-4">
                             <div className="w-64 bg-slate-50 p-6 rounded-lg">
                                 <div className="flex justify-between items-center mb-2">
-                                    <span className="text-slate-500 text-sm">Subtotal</span>
+                                    <span className="text-slate-500 text-sm">{t("Subtotal")}</span>
                                     {(() => {
                                         const rate = quotation.exchange_rate || quotation.exchangeRate || 16000;
                                         const idr = quotation.total_idr ?? (quotation.totalAmount ? ((quotation.currency === 'IDR') ? quotation.totalAmount : quotation.totalAmount * rate) : (quotation.total_amount ? (quotation.currency === 'IDR' ? quotation.total_amount : quotation.total_amount * rate) : 0));
@@ -2461,11 +2464,11 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                                     })()}
                                 </div>
                                 <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-200">
-                                    <span className="text-slate-500 text-sm">VAT (0%)</span>
+                                    <span className="text-slate-500 text-sm">{t("VAT (0%)")}</span>
                                     <span className="font-mono text-slate-700">-</span>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                    <span className="font-bold text-slate-900">Total</span>
+                                    <span className="font-bold text-slate-900">{t("Total")}</span>
                                             <span className="font-bold text-xl text-blue-600">{(() => {
                                                 const rate = quotation.exchange_rate || quotation.exchangeRate || 16000;
                                                 const idr = quotation.total_idr ?? (quotation.totalAmount ? ((quotation.currency === 'IDR') ? quotation.totalAmount : quotation.totalAmount * rate) : (quotation.total_amount ? (quotation.currency === 'IDR' ? quotation.total_amount : quotation.total_amount * rate) : 0));
@@ -2480,7 +2483,7 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                     {/* Terms & Footer */}
                     <div className="grid grid-cols-2 gap-12 mt-auto">
                         <div className="text-xs text-slate-500">
-                            <h4 className="font-bold text-slate-900 uppercase mb-2">Terms & Conditions</h4>
+                            <h4 className="font-bold text-slate-900 uppercase mb-2">{t("Terms & Conditions")}</h4>
                             <div className="whitespace-pre-line leading-relaxed">
                                 {quotation.termsConditions || 'Standard trading conditions apply.'}
                             </div>
@@ -2489,13 +2492,13 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                             <div className="flex justify-between items-end gap-8 text-center pt-8">
                                 <div className="flex-1">
                                     <div className="h-20 border-b border-slate-300 mb-2"></div>
-                                    <p className="font-semibold text-slate-900 text-sm">Prepared By</p>
+                                    <p className="font-semibold text-slate-900 text-sm">{t("Prepared By")}</p>
                                     <p className="text-xs text-slate-500">{preparedByName || '___________________'}</p>
                                 </div>
                                 <div className="flex-1">
                                     <div className="h-20 border-b border-slate-300 mb-2"></div>
-                                    <p className="font-semibold text-slate-900 text-sm">Approved By</p>
-                                    <p className="text-xs text-slate-500">Management</p>
+                                    <p className="font-semibold text-slate-900 text-sm">{t("Approved By")}</p>
+                                    <p className="text-xs text-slate-500">{t("Management")}</p>
                                 </div>
                             </div>
                         </div>

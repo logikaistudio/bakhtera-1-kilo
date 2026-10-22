@@ -11,8 +11,10 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { getCurrencySummary, getAgingByCurrency, formatCurrencySummary } from '../../utils/multiCurrencyHelper';
 import { getActiveDivision } from '../../utils/divisionContext';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const AccountsReceivable = () => {
+    const { t } = useLanguage();
     const { canEdit, canCreate, canDelete } = useAuth();
     const activeDivision = getActiveDivision();
     const [arTransactions, setARTransactions] = useState([]);
@@ -225,12 +227,12 @@ const AccountsReceivable = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text">Accounts Receivable (AR)</h1>
-                    <p className="text-silver-dark mt-1">Manage customer receivables</p>
+                    <h1 className="text-3xl font-bold gradient-text">{t("Accounts Receivable (AR)")}</h1>
+                    <p className="text-silver-dark mt-1">{t("Manage customer receivables")}</p>
                 </div>
-                <Button onClick={handleExportXLS} icon={Download}>Export to Excel</Button>
+                <Button onClick={handleExportXLS} icon={Download}>{t("Export to Excel")}</Button>
             </div>
-                    <p className="text-xs text-blue-300 mt-1">Data ditampilkan sesuai divisi aktif: {activeDivision?.toUpperCase()}</p>
+                    <p className="text-xs text-blue-300 mt-1">{t("Data ditampilkan sesuai divisi aktif:")} {activeDivision?.toUpperCase()}</p>
 
 
             {/* Summary Cards - Currency Breakdown */}
@@ -238,91 +240,91 @@ const AccountsReceivable = () => {
                 {/* Total AR Receivables */}
                 <div className="glass-card p-4 rounded-lg">
                     <div className="flex items-center justify-between mb-3">
-                        <p className="text-xs text-silver-dark font-semibold">Total AR Receivables</p>
+                        <p className="text-xs text-silver-dark font-semibold">{t("Total AR Receivables")}</p>
                         <DollarSign className="w-4 h-4 text-blue-400" />
                     </div>
                     <div className="space-y-2">
                         <div className="flex justify-between items-center">
-                            <span className="text-sm text-silver-light">IDR:</span>
+                            <span className="text-sm text-silver-light">{t("IDR:")}</span>
                             <p className="text-lg font-bold text-blue-400">{arFormatted.IDR}</p>
                         </div>
                         <div className="flex justify-between items-center">
-                            <span className="text-sm text-silver-light">USD:</span>
+                            <span className="text-sm text-silver-light">{t("USD:")}</span>
                             <p className="text-lg font-bold text-yellow-400">{arFormatted.USD}</p>
                         </div>
                     </div>
-                    <p className="text-xs text-silver-dark mt-2">{arTransactions.length} transactions</p>
+                    <p className="text-xs text-silver-dark mt-2">{arTransactions.length} {t("transactions")}</p>
                 </div>
 
                 {/* Total Received */}
                 <div className="glass-card p-4 rounded-lg">
                     <div className="flex items-center justify-between mb-3">
-                        <p className="text-xs text-silver-dark font-semibold">Total Received</p>
+                        <p className="text-xs text-silver-dark font-semibold">{t("Total Received")}</p>
                         <CheckCircle className="w-4 h-4 text-green-400" />
                     </div>
                     <div className="space-y-2">
                         <div className="flex justify-between items-center">
-                            <span className="text-sm text-silver-light">IDR:</span>
+                            <span className="text-sm text-silver-light">{t("IDR:")}</span>
                             <p className="text-lg font-bold text-green-400">{paidFormatted.IDR}</p>
                         </div>
                         <div className="flex justify-between items-center">
-                            <span className="text-sm text-silver-light">USD:</span>
+                            <span className="text-sm text-silver-light">{t("USD:")}</span>
                             <p className="text-lg font-bold text-green-300">{paidFormatted.USD}</p>
                         </div>
                     </div>
-                    <p className="text-xs text-silver-dark mt-2">{paidCount} paid</p>
+                    <p className="text-xs text-silver-dark mt-2">{paidCount} {t("paid")}</p>
                 </div>
 
                 {/* Outstanding Receivables */}
                 <div className="glass-card p-4 rounded-lg">
                     <div className="flex items-center justify-between mb-3">
-                        <p className="text-xs text-silver-dark font-semibold">Outstanding Receivables</p>
+                        <p className="text-xs text-silver-dark font-semibold">{t("Outstanding Receivables")}</p>
                         <AlertCircle className="w-4 h-4 text-red-400" />
                     </div>
                     <div className="space-y-2">
                         <div className="flex justify-between items-center">
-                            <span className="text-sm text-silver-light">IDR:</span>
+                            <span className="text-sm text-silver-light">{t("IDR:")}</span>
                             <p className="text-lg font-bold text-red-400">{receivablesFormatted.IDR}</p>
                         </div>
                         <div className="flex justify-between items-center">
-                            <span className="text-sm text-silver-light">USD:</span>
+                            <span className="text-sm text-silver-light">{t("USD:")}</span>
                             <p className="text-lg font-bold text-red-300">{receivablesFormatted.USD}</p>
                         </div>
                     </div>
-                    <p className="text-xs text-silver-dark mt-2">{outstandingCount} outstanding</p>
+                    <p className="text-xs text-silver-dark mt-2">{outstandingCount} {t("outstanding")}</p>
                 </div>
 
                 {/* Overdue */}
                 <div className="glass-card p-4 rounded-lg">
                     <div className="flex items-center justify-between mb-3">
-                        <p className="text-xs text-silver-dark font-semibold">Overdue</p>
+                        <p className="text-xs text-silver-dark font-semibold">{t("Overdue")}</p>
                         <Clock className="w-4 h-4 text-orange-400" />
                     </div>
                     <div className="space-y-2">
                         <div className="flex justify-between items-center">
-                            <span className="text-sm text-silver-light">IDR:</span>
+                            <span className="text-sm text-silver-light">{t("IDR:")}</span>
                             <p className="text-lg font-bold text-orange-400">{overdueFormatted.IDR}</p>
                         </div>
                         <div className="flex justify-between items-center">
-                            <span className="text-sm text-silver-light">USD:</span>
+                            <span className="text-sm text-silver-light">{t("USD:")}</span>
                             <p className="text-lg font-bold text-orange-300">{overdueFormatted.USD}</p>
                         </div>
                     </div>
-                    <p className="text-xs text-silver-dark mt-2">{overdueCount} transactions</p>
+                    <p className="text-xs text-silver-dark mt-2">{overdueCount} {t("transactions")}</p>
                 </div>
             </div>
 
             {/* Aging Analysis - By Currency */}
             <div className="glass-card p-4 rounded-lg">
-                <h2 className="text-sm font-bold text-silver-light mb-3">Aging Analysis (Outstanding by Currency)</h2>
+                <h2 className="text-sm font-bold text-silver-light mb-3">{t("Aging Analysis (Outstanding by Currency)")}</h2>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {/* IDR Aging */}
                     <div className="space-y-3">
-                        <p className="text-xs font-semibold text-blue-400">IDR Outstanding</p>
+                        <p className="text-xs font-semibold text-blue-400">{t("IDR Outstanding")}</p>
                         {Object.entries(agingByCurrency).map(([bucket, data]) => (
                             <div key={`idr-${bucket}`}>
                                 <div className="flex justify-between mb-1">
-                                    <span className="text-xs text-silver-dark">{bucket} Days</span>
+                                    <span className="text-xs text-silver-dark">{bucket} {t("Days")}</span>
                                     <span className="text-sm font-semibold text-blue-300">Rp {formatCurrency(data.IDR)}</span>
                                 </div>
                                 <div className="h-1.5 bg-dark-card rounded-full overflow-hidden">
@@ -341,11 +343,11 @@ const AccountsReceivable = () => {
 
                     {/* USD Aging */}
                     <div className="space-y-3">
-                        <p className="text-xs font-semibold text-yellow-400">USD Outstanding</p>
+                        <p className="text-xs font-semibold text-yellow-400">{t("USD Outstanding")}</p>
                         {Object.entries(agingByCurrency).map(([bucket, data]) => (
                             <div key={`usd-${bucket}`}>
                                 <div className="flex justify-between mb-1">
-                                    <span className="text-xs text-silver-dark">{bucket} Days</span>
+                                    <span className="text-xs text-silver-dark">{bucket} {t("Days")}</span>
                                     <span className="text-sm font-semibold text-yellow-300">$ {formatCurrency(data.USD)}</span>
                                 </div>
                                 <div className="h-1.5 bg-dark-card rounded-full overflow-hidden">
@@ -370,7 +372,7 @@ const AccountsReceivable = () => {
                     <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                     <input
                         type="text"
-                        placeholder="Search AR number, invoice, atau customer..."
+                        placeholder={t("Search AR number, invoice, atau customer...")}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-12 pr-4 py-3 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-base"
@@ -382,14 +384,14 @@ const AccountsReceivable = () => {
                         className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${viewMode === 'flat' ? 'bg-accent-orange text-white' : 'bg-dark-surface border border-dark-border text-silver-light hover:bg-dark-card'}`}
                     >
                         <FileText className="w-4 h-4" />
-                        Per Transaksi
+                        {t("Per Transaksi")}
                     </button>
                     <button
                         onClick={() => setViewMode('grouped')}
                         className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${viewMode === 'grouped' ? 'bg-accent-orange text-white' : 'bg-dark-surface border border-dark-border text-silver-light hover:bg-dark-card'}`}
                     >
                         <Users className="w-4 h-4" />
-                        Per Customer
+                        {t("Per Customer")}
                     </button>
                 </div>
             </div>
@@ -465,21 +467,21 @@ const AccountsReceivable = () => {
                         <div className={`px-5 py-3 flex items-center justify-between border-b border-dark-border ${currency === 'IDR' ? 'bg-blue-900/30' : 'bg-yellow-900/20'}`}>
                             <div className="flex items-center gap-3">
                                 <span className={`text-base font-bold ${currency === 'IDR' ? 'text-blue-300' : 'text-yellow-300'}`}>
-                                    Tabel AR — {currency}
+                                    {t("Tabel AR —")} {currency}
                                 </span>
-                                <span className="text-xs text-silver-dark">{currRows.length} transaksi</span>
+                                <span className="text-xs text-silver-dark">{currRows.length} {t("transaksi")}</span>
                             </div>
                             <div className="flex gap-6 text-sm">
                                 <div className="text-right">
-                                    <p className="text-xs text-silver-dark">Total Piutang</p>
+                                    <p className="text-xs text-silver-dark">{t("Total Piutang")}</p>
                                     <p className={`font-bold ${currency === 'IDR' ? 'text-blue-300' : 'text-yellow-300'}`}>{fmtAmt(totOrig)}</p>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-xs text-silver-dark">Sudah Bayar</p>
+                                    <p className="text-xs text-silver-dark">{t("Sudah Bayar")}</p>
                                     <p className="font-bold text-green-400">{fmtAmt(totPaid)}</p>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-xs text-silver-dark">Outstanding</p>
+                                    <p className="text-xs text-silver-dark">{t("Outstanding")}</p>
                                     <p className="font-bold text-red-400">{fmtAmt(totOut)}</p>
                                 </div>
                             </div>
@@ -488,21 +490,21 @@ const AccountsReceivable = () => {
                             <table className="w-full text-sm">
                                 <thead className="bg-accent-orange">
                                     <tr>
-                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">AR Number</th>
-                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Invoice #</th>
-                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Customer</th>
-                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Tgl Transaksi</th>
-                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Jatuh Tempo</th>
-                                        <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">Original</th>
-                                        <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">Dibayar</th>
-                                        <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">Outstanding</th>
-                                        <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap">Aging</th>
-                                        <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap">Status</th>
+                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">{t("AR Number")}</th>
+                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">{t("Invoice #")}</th>
+                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">{t("Customer")}</th>
+                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">{t("Tgl Transaksi")}</th>
+                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">{t("Jatuh Tempo")}</th>
+                                        <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">{t("Original")}</th>
+                                        <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">{t("Dibayar")}</th>
+                                        <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">{t("Outstanding")}</th>
+                                        <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap">{t("Aging")}</th>
+                                        <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap">{t("Status")}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-dark-border">
                                     {currRows.length === 0 ? (
-                                        <tr><td colSpan={COL_COUNT} className="px-3 py-8 text-center text-silver-dark">Tidak ada data {currency}</td></tr>
+                                        <tr><td colSpan={COL_COUNT} className="px-3 py-8 text-center text-silver-dark">{t("Tidak ada data")} {currency}</td></tr>
                                     ) : viewMode === 'flat' ? (
                                         currRows.map(renderRow)
                                     ) : (
@@ -514,13 +516,13 @@ const AccountsReceivable = () => {
                                                         <div className="flex items-center gap-2">
                                                             <Users className="w-3.5 h-3.5 text-accent-orange" />
                                                             <span className="font-semibold text-silver-light text-sm">{group.name}</span>
-                                                            <span className="text-xs text-silver-dark">({group.items.length} transaksi)</span>
+                                                            <span className="text-xs text-silver-dark">({group.items.length} {t("transaksi)")}</span>
                                                         </div>
                                                     </td>
                                                     <td className="px-3 py-2 text-right text-sm font-semibold text-silver-light">{fmtAmt(group.subOrig)}</td>
                                                     <td className="px-3 py-2 text-right text-sm font-semibold text-green-400">{fmtAmt(group.subPaid)}</td>
                                                     <td className="px-3 py-2 text-right text-sm font-semibold text-yellow-400">{fmtAmt(group.subOut)}</td>
-                                                    <td colSpan={2} className="px-3 py-2 text-center text-xs text-silver-dark">Sub Total</td>
+                                                    <td colSpan={2} className="px-3 py-2 text-center text-xs text-silver-dark">{t("Sub Total")}</td>
                                                 </tr>
                                                 {group.items.map(renderRow)}
                                             </React.Fragment>
@@ -529,7 +531,7 @@ const AccountsReceivable = () => {
                                     {/* Grand Total Row */}
                                     <tr className="bg-dark-surface font-bold border-t-2 border-accent-orange/50">
                                         <td colSpan={5} className="px-3 py-3 text-sm text-silver-light">
-                                            GRAND TOTAL {currency} ({currRows.length} transaksi)
+                                            {t("GRAND TOTAL")} {currency} ({currRows.length} {t("transaksi)")}
                                         </td>
                                         <td className="px-3 py-3 text-right text-sm text-silver-light">{fmtAmt(totOrig)}</td>
                                         <td className="px-3 py-3 text-right text-sm text-green-400">{fmtAmt(totPaid)}</td>
@@ -572,6 +574,7 @@ const AccountsReceivable = () => {
 
 // AR Detail Modal Component — mirrors AP Detail Modal format
 const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency, canEditAR }) => {
+    const { t } = useLanguage();
     const [accounts, setAccounts] = useState([]);
     const [invoiceItems, setInvoiceItems] = useState([]);
     const [invoiceFull, setInvoiceFull] = useState(null);
@@ -656,7 +659,7 @@ const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency, canEditAR
 
     const handleItemCoaChange = async (index, newCoaId) => {
         if (!canEditAR) {
-            alert('Anda tidak memiliki hak akses untuk mengubah akun pendapatan.');
+            alert(t("Anda tidak memiliki hak akses untuk mengubah akun pendapatan."));
             return;
         }
         const updatedItems = [...invoiceItems];
@@ -683,7 +686,7 @@ const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency, canEditAR
                 .eq('id', ar.id)
                 .eq('division', ar.division || getActiveDivision());
             if (error) throw error;
-            alert('Revenue account allocation saved successfully!');
+            alert(t("Revenue account allocation saved successfully!"));
         } catch (error) {
             console.error('Error updating invoice items:', error);
             alert('Failed to save changes: ' + error.message);
@@ -707,7 +710,7 @@ const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency, canEditAR
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h2 className="text-2xl font-bold gradient-text">AR Detail</h2>
+                        <h2 className="text-2xl font-bold gradient-text">{t("AR Detail")}</h2>
                         <p className="text-silver-dark text-sm mt-0.5">{ar.ar_number} • {ar.transaction_date}</p>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-sm font-semibold ${sc.cls}`}>{sc.label}</span>
@@ -716,26 +719,26 @@ const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency, canEditAR
                 {/* Info Grid */}
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
                     <div className="glass-card p-4 rounded-lg">
-                        <p className="text-xs text-silver-dark mb-1">AR / Invoice Number</p>
+                        <p className="text-xs text-silver-dark mb-1">{t("AR / Invoice Number")}</p>
                         <p className="font-bold text-accent-orange">{ar.ar_number}</p>
                     </div>
                     <div className="glass-card p-4 rounded-lg">
-                        <p className="text-xs text-silver-dark mb-1">Invoice Ref</p>
+                        <p className="text-xs text-silver-dark mb-1">{t("Invoice Ref")}</p>
                         <p className="font-bold text-silver-light">{ar.invoice_number || '-'}</p>
                     </div>
                     <div className="glass-card p-4 rounded-lg">
-                        <p className="text-xs text-silver-dark mb-1">Customer</p>
+                        <p className="text-xs text-silver-dark mb-1">{t("Customer")}</p>
                         <p className="font-bold text-silver-light">{ar.customer_name}</p>
                     </div>
                     {invoiceFull?.job_number && (
                         <div className="glass-card p-4 rounded-lg">
-                            <p className="text-xs text-silver-dark mb-1">Job Number</p>
+                            <p className="text-xs text-silver-dark mb-1">{t("Job Number")}</p>
                             <p className="font-bold text-silver-light">{invoiceFull.job_number}</p>
                         </div>
                     )}
                     {(invoiceFull?.origin || invoiceFull?.destination) && (
                         <div className="glass-card p-4 rounded-lg">
-                            <p className="text-xs text-silver-dark mb-1">Route</p>
+                            <p className="text-xs text-silver-dark mb-1">{t("Route")}</p>
                             <p className="font-bold text-silver-light text-xs">
                                 {invoiceFull.origin || '-'} → {invoiceFull.destination || '-'}
                             </p>
@@ -743,7 +746,7 @@ const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency, canEditAR
                     )}
                     {invoiceFull?.payment_terms && (
                         <div className="glass-card p-4 rounded-lg">
-                            <p className="text-xs text-silver-dark mb-1">Payment Terms</p>
+                            <p className="text-xs text-silver-dark mb-1">{t("Payment Terms")}</p>
                             <p className="font-bold text-silver-light">{invoiceFull.payment_terms}</p>
                         </div>
                     )}
@@ -753,22 +756,22 @@ const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency, canEditAR
                 <div className="glass-card p-4 rounded-lg mb-6 bg-blue-500/5 border border-blue-500/20">
                     <div className="flex items-center mb-4">
                         <h3 className="font-semibold text-white flex items-center gap-2">
-                            <Building className="w-4 h-4" /> Item Allocation (Finance)
+                            <Building className="w-4 h-4" /> {t("Item Allocation (Finance)")}
                         </h3>
                     </div>
 
                     {loadingItems ? (
-                        <div className="text-center py-4 text-silver-dark text-sm animate-pulse">Loading item details...</div>
+                        <div className="text-center py-4 text-silver-dark text-sm animate-pulse">{t("Loading item details...")}</div>
                     ) : invoiceItems.length > 0 ? (
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead className="bg-[#0070bc]">
                                     <tr className="text-left">
-                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase rounded-tl-lg whitespace-nowrap">Item</th>
-                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase">Description</th>
-                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right whitespace-nowrap">Qty</th>
-                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right whitespace-nowrap">Unit Price</th>
-                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right rounded-tr-lg whitespace-nowrap">Amount</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase rounded-tl-lg whitespace-nowrap">{t("Item")}</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase">{t("Description")}</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right whitespace-nowrap">{t("Qty")}</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right whitespace-nowrap">{t("Unit Price")}</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right rounded-tr-lg whitespace-nowrap">{t("Amount")}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-dark-border/50">
@@ -796,7 +799,7 @@ const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency, canEditAR
                         </div>
                     ) : (
                         <div className="text-center py-4 text-silver-dark text-sm italic">
-                            No item details found for this invoice.
+                            {t("No item details found for this invoice.")}
                         </div>
                     )}
                 </div>
@@ -805,31 +808,31 @@ const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency, canEditAR
                 <div className="glass-card p-4 rounded-lg mb-6">
                     <div className="flex items-center gap-2 mb-3">
                         <Banknote className="w-5 h-5 text-accent-orange" />
-                        <h3 className="font-semibold text-silver-light">Financial Summary</h3>
+                        <h3 className="font-semibold text-silver-light">{t("Financial Summary")}</h3>
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div>
-                            <p className="text-xs text-silver-dark mb-1">Invoice Date</p>
+                            <p className="text-xs text-silver-dark mb-1">{t("Invoice Date")}</p>
                             <p className="font-medium text-silver-light">{ar.transaction_date}</p>
                         </div>
                         <div>
-                            <p className="text-xs text-silver-dark mb-1">Due Date</p>
+                            <p className="text-xs text-silver-dark mb-1">{t("Due Date")}</p>
                             <p className={`font-medium ${ar.status === 'overdue' ? 'text-red-400' : 'text-silver-light'}`}>
                                 {ar.due_date}
                             </p>
                         </div>
                         <div>
-                            <p className="text-xs text-silver-dark mb-1">Original Amount</p>
+                            <p className="text-xs text-silver-dark mb-1">{t("Original Amount")}</p>
                             <p className="font-bold text-silver-light">{formatCurrency(ar.original_amount, ar.currency)}</p>
                         </div>
                         <div>
-                            <p className="text-xs text-silver-dark mb-1">Paid Amount</p>
+                            <p className="text-xs text-silver-dark mb-1">{t("Paid Amount")}</p>
                             <p className="font-bold text-green-400">{formatCurrency(ar.paid_amount || 0, ar.currency)}</p>
                         </div>
                     </div>
                     <div className="mt-4 pt-4 border-t border-dark-border">
                         <div className="flex justify-between items-center">
-                            <span className="text-lg font-semibold text-silver-light">Outstanding Balance</span>
+                            <span className="text-lg font-semibold text-silver-light">{t("Outstanding Balance")}</span>
                             <span className={`text-2xl font-bold ${ar.outstanding_amount <= 0 ? 'text-green-400' : 'text-yellow-400'}`}>
                                 {formatCurrency(ar.outstanding_amount, ar.currency)}
                             </span>
@@ -842,16 +845,16 @@ const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency, canEditAR
                     <div className="glass-card p-4 rounded-lg mb-6">
                         <div className="flex items-center gap-2 mb-3">
                             <History className="w-5 h-5 text-blue-400" />
-                            <h3 className="font-semibold text-silver-light">Payment History</h3>
+                            <h3 className="font-semibold text-silver-light">{t("Payment History")}</h3>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b border-dark-border">
-                                        <th className="text-left py-2 text-silver-dark font-medium">Date</th>
-                                        <th className="text-left py-2 text-silver-dark font-medium">Payment Number</th>
-                                        <th className="text-left py-2 text-silver-dark font-medium">Method</th>
-                                        <th className="text-right py-2 text-silver-dark font-medium">Amount</th>
+                                        <th className="text-left py-2 text-silver-dark font-medium">{t("Date")}</th>
+                                        <th className="text-left py-2 text-silver-dark font-medium">{t("Payment Number")}</th>
+                                        <th className="text-left py-2 text-silver-dark font-medium">{t("Method")}</th>
+                                        <th className="text-right py-2 text-silver-dark font-medium">{t("Amount")}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -878,14 +881,14 @@ const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency, canEditAR
                 {loadingHistory && (
                     <div className="glass-card p-4 rounded-lg mb-6 text-center">
                         <div className="animate-spin w-6 h-6 border-2 border-accent-orange border-t-transparent rounded-full mx-auto"></div>
-                        <p className="text-silver-dark text-sm mt-2">Loading payment history...</p>
+                        <p className="text-silver-dark text-sm mt-2">{t("Loading payment history...")}</p>
                     </div>
                 )}
 
                 {/* Notes */}
                 {invoiceFull?.notes && (
                     <div className="glass-card p-4 rounded-lg mb-6">
-                        <p className="text-xs text-silver-dark mb-1">Notes</p>
+                        <p className="text-xs text-silver-dark mb-1">{t("Notes")}</p>
                         <p className="text-silver-light text-sm">{invoiceFull.notes}</p>
                     </div>
                 )}
@@ -893,11 +896,11 @@ const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency, canEditAR
                 {/* Actions */}
                 <div className="flex justify-end gap-3 pt-4 border-t border-dark-border">
                     <Button variant="secondary" onClick={onClose}>
-                        Close
+                        {t("Close")}
                     </Button>
                     {ar.outstanding_amount > 0 && canEditAR && (
                         <Button icon={DollarSign} onClick={onRecordPayment}>
-                            Record Payment
+                            {t("Record Payment")}
                         </Button>
                     )}
                 </div>
@@ -908,6 +911,7 @@ const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency, canEditAR
 
 // Payment Record Modal Component — AR version (mirrors APPaymentRecordModal)
 const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
+    const { t } = useLanguage();
     const [formData, setFormData] = useState({
         payment_date: new Date().toISOString().split('T')[0],
         amount: ar.outstanding_amount || 0,
@@ -976,7 +980,7 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
         e.preventDefault();
 
         if (formData.amount <= 0) {
-            alert('Payment amount must be greater than 0');
+            alert(t("Payment amount must be greater than 0"));
             return;
         }
 
@@ -1159,26 +1163,26 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
                     <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-green-500/20 flex items-center justify-center animate-pulse">
                         <CheckCircle className="w-12 h-12 text-green-500" />
                     </div>
-                    <h2 className="text-2xl font-bold text-green-500 mb-2">Payment Received!</h2>
-                    <p className="text-silver-dark mb-6">Payment has been recorded in the system</p>
+                    <h2 className="text-2xl font-bold text-green-500 mb-2">{t("Payment Received!")}</h2>
+                    <p className="text-silver-dark mb-6">{t("Payment has been recorded in the system")}</p>
                     <div className="glass-card p-4 rounded-lg mb-6 text-left bg-green-500/5 border border-green-500/20">
                         <div className="space-y-3">
                             <div className="flex justify-between">
-                                <span className="text-silver-dark">Payment Number:</span>
+                                <span className="text-silver-dark">{t("Payment Number:")}</span>
                                 <span className="text-silver-light font-mono font-medium">{successData.paymentNumber}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-silver-dark">Amount Received:</span>
+                                <span className="text-silver-dark">{t("Amount Received:")}</span>
                                 <span className="text-green-400 font-bold">{formatCurrency(successData.amountPaid, successData.currency)}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-silver-dark">Outstanding Balance:</span>
+                                <span className="text-silver-dark">{t("Outstanding Balance:")}</span>
                                 <span className={`font-bold ${successData.newOutstanding <= 0 ? 'text-green-400' : 'text-yellow-400'}`}>
                                     {formatCurrency(Math.max(0, successData.newOutstanding), successData.currency)}
                                 </span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-silver-dark">New Status:</span>
+                                <span className="text-silver-dark">{t("New Status:")}</span>
                                 <span className={`px-3 py-1 rounded-full text-xs font-semibold ${successData.newStatus === 'paid' ? 'bg-green-500/20 text-green-400' :
                                     successData.newStatus === 'partially_paid' ? 'bg-yellow-500/20 text-yellow-400' :
                                         'bg-blue-500/20 text-blue-400'
@@ -1189,7 +1193,7 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
                             </div>
                         </div>
                     </div>
-                    <Button onClick={() => { onSuccess(); }} className="w-full">Close</Button>
+                    <Button onClick={() => { onSuccess(); }} className="w-full">{t("Close")}</Button>
                 </div>
             </Modal>
         );
@@ -1198,25 +1202,25 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
     return (
         <Modal isOpen={true} onClose={onClose} maxWidth="max-w-2xl">
             <div className="p-6">
-                <h2 className="text-2xl font-bold gradient-text mb-6">Record AR Payment</h2>
+                <h2 className="text-2xl font-bold gradient-text mb-6">{t("Record AR Payment")}</h2>
 
                 {/* Invoice Info Summary */}
                 <div className="glass-card p-4 rounded-lg mb-6 bg-gradient-to-br from-accent-orange/10 to-transparent border border-accent-orange/30">
                     <div className="grid grid-cols-2 gap-3 text-sm">
                         <div>
-                            <span className="text-silver-dark">Invoice:</span>
+                            <span className="text-silver-dark">{t("Invoice:")}</span>
                             <span className="text-silver-light font-medium ml-2">{ar.invoice_number}</span>
                         </div>
                         <div>
-                            <span className="text-silver-dark">Customer:</span>
+                            <span className="text-silver-dark">{t("Customer:")}</span>
                             <span className="text-silver-light font-medium ml-2">{ar.customer_name}</span>
                         </div>
                         <div>
-                            <span className="text-silver-dark">Total Amount:</span>
+                            <span className="text-silver-dark">{t("Total Amount:")}</span>
                             <span className="text-silver-light font-medium ml-2">{formatCurrency(ar.total_amount, ar.currency)}</span>
                         </div>
                         <div>
-                            <span className="text-silver-dark">Outstanding:</span>
+                            <span className="text-silver-dark">{t("Outstanding:")}</span>
                             <span className="text-yellow-400 font-bold ml-2">{formatCurrency(ar.outstanding_amount, ar.currency)}</span>
                         </div>
                     </div>
@@ -1227,9 +1231,9 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
                     <div className="flex items-start gap-2 px-3 py-2 mb-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                         <CreditCard className="w-4 h-4 text-blue-400 mt-0.5 shrink-0" />
                         <div className="text-xs">
-                            <p className="text-blue-300 font-semibold mb-0.5">Rekening yang tercetak di Invoice:</p>
+                            <p className="text-blue-300 font-semibold mb-0.5">{t("Rekening yang tercetak di Invoice:")}</p>
                             <p className="text-blue-200 font-mono">{ar.payment_bank_account}</p>
-                            <p className="text-blue-400 mt-0.5">Pastikan pembayaran diterima di rekening ini.</p>
+                            <p className="text-blue-400 mt-0.5">{t("Pastikan pembayaran diterima di rekening ini.")}</p>
                         </div>
                     </div>
                 )}
@@ -1238,7 +1242,7 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-silver-dark mb-2">
-                                Payment Date *
+                                {t("Payment Date *")}
                             </label>
                             <input
                                 type="date"
@@ -1250,7 +1254,7 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-silver-dark mb-2">
-                                Amount ({ar.currency}) *
+                                {t("Amount (")}{ar.currency}) *
                             </label>
                             <input
                                 type="number"
@@ -1263,13 +1267,13 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
                                 required
                             />
                             <p className="text-xs text-silver-dark mt-1">
-                                Max: {formatCurrency(ar.outstanding_amount, ar.currency)}
+                                {t("Max:")} {formatCurrency(ar.outstanding_amount, ar.currency)}
                             </p>
                         </div>
                         {ar.currency !== 'IDR' && (
                             <div>
                                 <label className="block text-sm font-medium text-silver-dark mb-2">
-                                    Kurs Pencairan *
+                                    {t("Kurs Pencairan *")}
                                 </label>
                                 <input
                                     type="number"
@@ -1281,7 +1285,7 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
                                     required
                                 />
                                 <p className="text-xs text-amber-500 mt-1">
-                                    Kurs Invoice Awal: Rp {(ar.exchange_rate || 1).toLocaleString('id-ID')}
+                                    {t("Kurs Invoice Awal: Rp")} {(ar.exchange_rate || 1).toLocaleString('id-ID')}
                                 </p>
                             </div>
                         )}
@@ -1290,7 +1294,7 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-silver-dark mb-2">
-                                Payment Method *
+                                {t("Payment Method *")}
                             </label>
                             <select
                                 value={formData.payment_method}
@@ -1298,22 +1302,22 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
                                 className="w-full"
                                 required
                             >
-                                <option value="bank_transfer">Bank Transfer</option>
-                                <option value="cash">Cash</option>
-                                <option value="check">Check / Giro</option>
-                                <option value="credit_card">Credit Card</option>
-                                <option value="other">Other</option>
+                                <option value="bank_transfer">{t("Bank Transfer")}</option>
+                                <option value="cash">{t("Cash")}</option>
+                                <option value="check">{t("Check / Giro")}</option>
+                                <option value="credit_card">{t("Credit Card")}</option>
+                                <option value="other">{t("Other")}</option>
                             </select>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-silver-dark mb-2">
-                                Reference Number
+                                {t("Reference Number")}
                             </label>
                             <input
                                 type="text"
                                 value={formData.reference_number}
                                 onChange={(e) => setFormData(prev => ({ ...prev, reference_number: e.target.value }))}
-                                placeholder="e.g., Transfer ref, Check #"
+                                placeholder={t("e.g., Transfer ref, Check #")}
                                 className="w-full"
                             />
                         </div>
@@ -1323,7 +1327,7 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
                     <div>
                         <label className="block text-sm font-medium text-silver-dark mb-2">
                             <CreditCard className="w-4 h-4 inline mr-1" />
-                            No. Rekening Penerimaan <span className="text-red-400">*</span>
+                            {t("No. Rekening Penerimaan")} <span className="text-red-400">*</span>
                         </label>
                         {bankAccounts.length > 0 ? (
                             <>
@@ -1333,7 +1337,7 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
                                     className="w-full"
                                     required
                                 >
-                                    <option value="">-- Select Bank Account --</option>
+                                    <option value="">{t("-- Select Bank Account --")}</option>
                                     {bankAccounts.map(account => (
                                         <option key={account.id} value={account.id}>
                                             {account.bank_name} — {account.account_number} ({account.account_holder || account.currency})
@@ -1347,7 +1351,7 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
                                     const mismatch = invoiceBankId && sel && sel.id !== invoiceBankId;
                                     return sel ? (
                                         <div className={`mt-1.5 px-3 py-2 rounded-lg text-xs border ${mismatch ? 'bg-yellow-500/10 border-yellow-500/40 text-yellow-300' : 'bg-green-500/10 border-green-500/30 text-green-300'}`}>
-                                            {mismatch && <p className="font-semibold mb-0.5">⚠️ Berbeda dari rekening di Invoice!</p>}
+                                            {mismatch && <p className="font-semibold mb-0.5">{t("⚠️ Berbeda dari rekening di Invoice!")}</p>}
                                             <p>🏦 {sel.bank_name} | <span className="font-mono">{sel.account_number}</span></p>
                                             {sel.account_holder && <p>a/n {sel.account_holder}</p>}
                                         </div>
@@ -1356,7 +1360,7 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
                             </>
                         ) : (
                             <p className="text-sm text-silver-dark italic">
-                                No bank accounts configured. Go to Company Settings to add accounts.
+                                {t("No bank accounts configured. Go to Company Settings to add accounts.")}
                             </p>
                         )}
                     </div>
@@ -1364,31 +1368,31 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
                     {/* Piutang Account Override */}
                     <div>
                         <label className="block text-sm font-medium text-silver-dark mb-2">
-                            Akun Piutang (AR Account)
+                            {t("Akun Piutang (AR Account)")}
                         </label>
                         <select
                             value={formData.ar_coa_id}
                             onChange={(e) => setFormData(prev => ({ ...prev, ar_coa_id: e.target.value }))}
                             className="w-full"
                         >
-                            <option value="">-- Pilih Akun Piutang --</option>
+                            <option value="">{t("-- Pilih Akun Piutang --")}</option>
                             {arAccountsList.map(c => (
                                 <option key={c.id} value={c.id}>
                                     {c.code} - {c.name}
                                 </option>
                             ))}
                         </select>
-                        <p className="text-xs text-silver-dark mt-1">Dicatat di General Ledger sebagai pengurang piutang.</p>
+                        <p className="text-xs text-silver-dark mt-1">{t("Dicatat di General Ledger sebagai pengurang piutang.")}</p>
                     </div>
 
                     <div>
                         <label className="block text-sm font-medium text-silver-dark mb-2">
-                            Notes
+                            {t("Notes")}
                         </label>
                         <textarea
                             value={formData.notes}
                             onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                            placeholder="Optional payment notes..."
+                            placeholder={t("Optional payment notes...")}
                             rows={2}
                             className="w-full"
                         />
@@ -1396,7 +1400,7 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
 
                     <div className="flex gap-3 justify-end pt-4 border-t border-dark-border">
                         <Button type="button" variant="secondary" onClick={onClose} disabled={loading}>
-                            Cancel
+                            {t("Cancel")}
                         </Button>
                         <Button type="submit" disabled={loading} icon={DollarSign}>
                             {loading ? 'Processing...' : 'Record Payment'}

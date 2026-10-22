@@ -2,6 +2,7 @@ import { commonPairs, loginPairs, sidebarPairs } from './dictionaries/common';
 import { dashboardPairs } from './dictionaries/dashboard';
 import { financeDocPairs } from './dictionaries/financeDocs';
 import { financeDocsSweepPairs } from './dictionaries/financeDocsSweep';
+import { quotationArApPairs } from './dictionaries/quotationArAp';
 
 const allPairs = [
     ...commonPairs,
@@ -10,6 +11,7 @@ const allPairs = [
     ...dashboardPairs,
     ...financeDocPairs,
     ...financeDocsSweepPairs,
+    ...quotationArApPairs,
 ];
 
 const en = {};

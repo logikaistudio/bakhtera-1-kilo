@@ -16,6 +16,7 @@ import {
     Plus, Check, Filter, Download, Search, Trash, Circle, Copy
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const formatInputAmount = (value, currency) => {
     if (value === null || value === undefined || value === '') return '';
@@ -206,6 +207,7 @@ const resolveQuotationRenderData = (quotation = {}) => {
 };
 
 const RichTextEditor = ({ value, onChange, rows = 4, placeholder = '' }) => {
+    const { t } = useLanguage();
     const editorRef = React.useRef(null);
     const [textColor, setTextColor] = React.useState('#111827');
     const [highlightColor, setHighlightColor] = React.useState('#fef08a');
@@ -239,12 +241,12 @@ const RichTextEditor = ({ value, onChange, rows = 4, placeholder = '' }) => {
     return (
         <div className="border border-gray-300 rounded-lg overflow-hidden bg-white">
             <div className="flex flex-wrap items-center gap-2 p-2 border-b border-gray-200 bg-gray-50">
-                <button type="button" onClick={() => exec('removeFormat')} className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-white">Regular</button>
+                <button type="button" onClick={() => exec('removeFormat')} className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-white">{t("Regular")}</button>
                 <button type="button" onClick={() => exec('bold')} className="px-2 py-1 text-xs font-bold border border-gray-300 rounded hover:bg-white">B</button>
                 <button type="button" onClick={() => exec('italic')} className="px-2 py-1 text-xs italic border border-gray-300 rounded hover:bg-white">I</button>
                 <button type="button" onClick={() => exec('underline')} className="px-2 py-1 text-xs underline border border-gray-300 rounded hover:bg-white">U</button>
                 <label className="flex items-center gap-1 text-xs text-gray-600">
-                    Text
+                    {t("Text")}
                     <input
                         type="color"
                         value={textColor}
@@ -285,6 +287,7 @@ const RichTextEditor = ({ value, onChange, rows = 4, placeholder = '' }) => {
 };
 
 const SalesQuotation = () => {
+    const { t } = useLanguage();
     const { user, canCreate, canEdit, canDelete, canApprove, isSuperAdmin } = useAuth();
     const navigate = useNavigate();
     const { customers, companySettings, deleteBlinkQuotationCascade } = useData();
@@ -524,7 +527,7 @@ const SalesQuotation = () => {
             }
         } catch (error) {
             console.error('Error fetching quotations:', error);
-            alert('Failed to load quotations from database');
+            alert(t("Failed to load quotations from database"));
         } finally {
             setLoading(false);
         }
@@ -557,11 +560,11 @@ const SalesQuotation = () => {
         e.preventDefault();
         if (editingDraftId) {
             if (!canManageQuotation('edit')) {
-                alert('Anda tidak memiliki hak akses untuk mengubah draft quotation.');
+                alert(t("Anda tidak memiliki hak akses untuk mengubah draft quotation."));
                 return;
             }
         } else if (!canManageQuotation('create')) {
-            alert('Anda tidak memiliki hak akses untuk membuat quotation.');
+            alert(t("Anda tidak memiliki hak akses untuk membuat quotation."));
             return;
         }
 
@@ -659,7 +662,7 @@ const SalesQuotation = () => {
 
     const handleManagerReject = async (quotationId, reason) => {
         if (!canManageQuotation('approve')) {
-            alert('Anda tidak memiliki hak akses untuk me-reject quotation.');
+            alert(t("Anda tidak memiliki hak akses untuk me-reject quotation."));
             return;
         }
         const rejectionReason = prompt('Reject reason (optional):');
@@ -675,7 +678,7 @@ const SalesQuotation = () => {
             if (error) throw error;
 
             await fetchQuotations();
-            alert('❌ Quotation rejected. Sales needs revision.');
+            alert(t("❌ Quotation rejected. Sales needs revision."));
             setShowViewModal(false);
         } catch (error) {
             console.error('Error rejecting quotation:', error);
@@ -691,7 +694,7 @@ const SalesQuotation = () => {
 
     const handleSaveEditedQuotation = async () => {
         if (!canManageQuotation('edit')) {
-            alert('Anda tidak memiliki hak akses untuk menyimpan perubahan quotation.');
+            alert(t("Anda tidak memiliki hak akses untuk menyimpan perubahan quotation."));
             return;
         }
         try {
@@ -763,7 +766,7 @@ const SalesQuotation = () => {
             await fetchQuotations();
             setViewingQuotation(editedQuotation);
             setIsEditingQuotation(false);
-            alert('✅ Quotation updated successfully!');
+            alert(t("✅ Quotation updated successfully!"));
         } catch (error) {
             console.error('Error updating quotation:', error);
             alert('Failed to update: ' + error.message);
@@ -823,7 +826,7 @@ const SalesQuotation = () => {
 
     const handleRepeatOrder = (sourceQuotation) => {
         if (!canManageQuotation('create')) {
-            alert('Anda tidak memiliki hak akses untuk membuat quotation baru dari repeat order.');
+            alert(t("Anda tidak memiliki hak akses untuk membuat quotation baru dari repeat order."));
             return;
         }
 
@@ -991,7 +994,7 @@ const SalesQuotation = () => {
             await supabase.from('blink_invoices').update({ status: 'cancelled' }).eq('quotation_id', quotationId);
             await supabase.from('blink_purchase_orders').update({ status: 'cancelled' }).eq('quotation_id', quotationId);
 
-            alert('Quotation dan seluruh alur terkait berhasil dibatalkan.');
+            alert(t("Quotation dan seluruh alur terkait berhasil dibatalkan."));
             fetchQuotations();
         } catch (error) {
             console.error('Error cancelling quotation:', error);
@@ -1003,7 +1006,7 @@ const SalesQuotation = () => {
 
     const handleDeleteQuotation = async (quotationId) => {
         if (!canRunSuperAdminBatch) {
-            alert('Akses Ditolak: Hanya Super Admin yang dapat menghapus quotation terpilih.');
+            alert(t("Akses Ditolak: Hanya Super Admin yang dapat menghapus quotation terpilih."));
             return;
         }
         try {
@@ -1019,7 +1022,7 @@ const SalesQuotation = () => {
 
             // Extra confirmation for converted quotations
             if (quotation?.status === 'converted') {
-                if (!confirm('This Quotation is already converted to SO with active shipment/invoice. Are you sure you want to continue?')) {
+                if (!confirm(t("This Quotation is already converted to SO with active shipment/invoice. Are you sure you want to continue?"))) {
                     return;
                 }
             }
@@ -1032,7 +1035,7 @@ const SalesQuotation = () => {
             // Refresh quotations list
             await fetchQuotations();
 
-            alert('✅ Sukses! Data Pengajuan dan SEMUA transaksi terkait (Shipments, Invoices, PO, AR, AP, Payments, Jurnal) berhasil dihapus bersih.');
+            alert(t("✅ Sukses! Data Pengajuan dan SEMUA transaksi terkait (Shipments, Invoices, PO, AR, AP, Payments, Jurnal) berhasil dihapus bersih."));
             setShowViewModal(false);
         } catch (error) {
             console.error('❌ Error deleting quotation:', error);
@@ -1044,7 +1047,7 @@ const SalesQuotation = () => {
     const handleRequestRevision = async (quotationId) => {
         const reason = prompt('Revision reason from customer:');
         if (!reason || reason.trim() === '') {
-            alert('Revision reason is required');
+            alert(t("Revision reason is required"));
             return;
         }
 
@@ -1060,7 +1063,7 @@ const SalesQuotation = () => {
             if (error) throw error;
 
             await fetchQuotations();
-            alert('✅ Revision request created. Sales can now create a revised quotation.');
+            alert(t("✅ Revision request created. Sales can now create a revised quotation."));
             setShowViewModal(false);
         } catch (error) {
             console.error('Error requesting revision:', error);
@@ -1073,7 +1076,7 @@ const SalesQuotation = () => {
         try {
             const parentQuotation = quotations.find(q => q.id === quotationId);
             if (!parentQuotation) {
-                alert('Quotation not found');
+                alert(t("Quotation not found"));
                 return;
             }
 
@@ -1154,7 +1157,7 @@ const SalesQuotation = () => {
             setShowViewModal(false);
         } catch (error) {
             console.error('Error updating status:', error);
-            alert('Failed to update status');
+            alert(t("Failed to update status"));
         }
     };
 
@@ -1164,7 +1167,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
             const printWindow = window.open('', '_blank');
 
             if (!printWindow) {
-                alert('Pop-up blocked! Please allow pop-ups for this site.');
+                alert(t("Pop-up blocked! Please allow pop-ups for this site."));
                 return;
             }
 
@@ -1461,14 +1464,14 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
             printWindow.document.close();
         } catch (error) {
             console.error('Print error:', error);
-            alert('Failed to print');
+            alert(t("Failed to print"));
         }
     };
 
     // Create SO from approved quotation
     const handleCreateSO = async (quotation) => { // Added async
         if (!canManageQuotation('approve')) {
-            alert('Anda tidak memiliki hak akses untuk Approve & Create SO.');
+            alert(t("Anda tidak memiliki hak akses untuk Approve & Create SO."));
             return;
         }
         console.log('🔵 Create SO clicked for quotation:', quotation.id);
@@ -1683,17 +1686,17 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
 
     const handleDeleteSelectedQuotations = async () => {
         if (!canRunSuperAdminBatch) {
-            alert('Akses Ditolak: Hanya Super Admin yang dapat cleansing quotation.');
+            alert(t("Akses Ditolak: Hanya Super Admin yang dapat cleansing quotation."));
             return;
         }
         if (selectedQuotationIds.length === 0) {
-            alert('Pilih minimal 1 quotation untuk dihapus.');
+            alert(t("Pilih minimal 1 quotation untuk dihapus."));
             return;
         }
 
         const confirm1 = confirm(`Hapus ${selectedQuotationIds.length} quotation terpilih beserta seluruh data terkait?`);
         if (!confirm1) return;
-        const confirm2 = confirm('Konfirmasi terakhir: data terpilih akan dihapus permanen. Lanjutkan?');
+        const confirm2 = confirm(t("Konfirmasi terakhir: data terpilih akan dihapus permanen. Lanjutkan?"));
         if (!confirm2) return;
 
         try {
@@ -1708,7 +1711,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
             if (!success) return;
             await fetchQuotations();
             setSelectedQuotationIds([]);
-            alert('✅ Quotation terpilih berhasil dihapus.');
+            alert(t("✅ Quotation terpilih berhasil dihapus."));
         } catch (error) {
             console.error('Error deleting selected sales quotations:', error);
             alert('❌ Gagal hapus quotation terpilih: ' + (error.message || error));
@@ -1719,17 +1722,17 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
 
     const handleCleanseAllSalesQuotations = async () => {
         if (!canManageQuotation('delete')) {
-            alert('Anda tidak memiliki hak akses untuk menghapus quotation.');
+            alert(t("Anda tidak memiliki hak akses untuk menghapus quotation."));
             return;
         }
         if (quotations.length === 0) {
-            alert('Tidak ada data quotation untuk dihapus.');
+            alert(t("Tidak ada data quotation untuk dihapus."));
             return;
         }
 
         const confirm1 = confirm(`Cleansing akan menghapus SEMUA Sales Quotation (${quotations.length} baris) beserta alur transaksi terkait. Lanjutkan?`);
         if (!confirm1) return;
-        const confirm2 = confirm('Konfirmasi terakhir: semua data Sales Quotation akan dihapus permanen. Yakin lanjut?');
+        const confirm2 = confirm(t("Konfirmasi terakhir: semua data Sales Quotation akan dihapus permanen. Yakin lanjut?"));
         if (!confirm2) return;
 
         try {
@@ -1744,7 +1747,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
             if (!success) return;
             await fetchQuotations();
             setSelectedQuotationIds([]);
-            alert('✅ Cleansing sales quotation selesai.');
+            alert(t("✅ Cleansing sales quotation selesai."));
         } catch (error) {
             console.error('Error cleansing sales quotations:', error);
             alert('❌ Gagal cleansing sales quotation: ' + (error.message || error));
@@ -1768,7 +1771,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
         }
 
         if (!repeatSourceQuotation) {
-            alert('Pilih quotation dari tabel terlebih dahulu untuk Repeat Order.');
+            alert(t("Pilih quotation dari tabel terlebih dahulu untuk Repeat Order."));
             return;
         }
 
@@ -1780,8 +1783,8 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text">Sales Quotation</h1>
-                    <p className="text-silver-dark mt-1">Manage quotations untuk customer</p>
+                    <h1 className="text-3xl font-bold gradient-text">{t("Sales Quotation")}</h1>
+                    <p className="text-silver-dark mt-1">{t("Manage quotations untuk customer")}</p>
                 </div>
                 <div className="flex items-center gap-2">
                     {canRunSuperAdminBatch && (
@@ -1792,7 +1795,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                 variant="danger"
                                 disabled={selectedQuotationIds.length === 0 || isCleansing}
                             >
-                                Hapus Terpilih ({selectedQuotationIds.length})
+                                {t("Hapus Terpilih (")}{selectedQuotationIds.length})
                             </Button>
                             <Button
                                 onClick={handleCleanseAllSalesQuotations}
@@ -1818,7 +1821,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                             setRepeatSelectionMode(false);
                             setShowModal(true);
                         }} icon={Plus}>
-                            New Quotation
+                            {t("New Quotation")}
                         </Button>
                     </>
                 )}
@@ -1827,13 +1830,13 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
 
             {isCleansing && (
                 <div className="glass-card px-4 py-2 rounded-lg border border-amber-500/30 bg-amber-500/10">
-                    <p className="text-xs text-amber-300">Progress Cleansing: {cleanseProgress || 'Sedang memproses...'}</p>
+                    <p className="text-xs text-amber-300">{t("Progress Cleansing:")} {cleanseProgress || 'Sedang memproses...'}</p>
                 </div>
             )}
 
             {repeatSelectionMode && (
                 <div className="px-4 py-2 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 text-sm">
-                    Mode Repeat Order aktif: klik baris quotation untuk memilih sumber copy (baris terpilih akan berwarna), lalu klik tombol "Gunakan Quotation Terpilih".
+                    {t("Mode Repeat Order aktif: klik baris quotation untuk memilih sumber copy (baris terpilih akan berwarna), lalu klik tombol \"Gunakan Quotation Terpilih\".")}
                 </div>
             )}
 
@@ -1842,7 +1845,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                 <input
                     type="text"
-                    placeholder="Search Job Number, Customer, atau Route..."
+                    placeholder={t("Search Job Number, Customer, atau Route...")}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:outline-none focus:border-accent-orange smooth-transition"
@@ -1854,7 +1857,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                 <div className="glass-card p-4 rounded-lg">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-xs text-silver-dark">Total Quotations</p>
+                            <p className="text-xs text-silver-dark">{t("Total Quotations")}</p>
                             <p className="text-2xl font-bold text-silver-light mt-1">{quotations.length}</p>
                         </div>
                         <FileText className="w-8 h-8 text-blue-400" />
@@ -1863,7 +1866,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                 <div className="glass-card p-4 rounded-lg">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-xs text-silver-dark">Manager Approval</p>
+                            <p className="text-xs text-silver-dark">{t("Manager Approval")}</p>
                             <p className="text-2xl font-bold text-yellow-400 mt-1">
                                 {quotations.filter(q => q.status === 'manager_approval').length}
                             </p>
@@ -1875,7 +1878,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                 <div className="glass-card p-4 rounded-lg">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-xs text-silver-dark">Converted to SO</p>
+                            <p className="text-xs text-silver-dark">{t("Converted to SO")}</p>
                             <p className="text-2xl font-bold text-emerald-400 mt-1">
                                 {quotations.filter(q => q.status === 'converted').length}
                             </p>
@@ -1900,14 +1903,14 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                         className="w-4 h-4"
                                     />
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">Job Number</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">Customer</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">Route</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">Service</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">Type</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">Amount</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">Valid Until</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">Status</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">{t("Job Number")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">{t("Customer")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">{t("Route")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">{t("Service")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">{t("Type")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">{t("Amount")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">{t("Valid Until")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">{t("Status")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
@@ -1951,16 +1954,16 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                                 <div className="flex items-center gap-2">
                                                     <span className="font-medium text-accent-orange">{quote.jobNumber}</span>
                                                     {repeatSelectionMode && repeatSourceQuotation?.id === quote.id && (
-                                                        <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-xs rounded">Selected</span>
+                                                        <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-xs rounded">{t("Selected")}</span>
                                                     )}
                                                     {quote.revision_number > 1 && (
                                                         <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded">
-                                                            Rev {quote.revision_number}
+                                                            {t("Rev")} {quote.revision_number}
                                                         </span>
                                                     )}
                                                     {quote.is_superseded && (
                                                         <span className="px-2 py-0.5 bg-gray-500/20 text-gray-400 text-xs rounded">
-                                                            Superseded
+                                                            {t("Superseded")}
                                                         </span>
                                                     )}
                                                 </div>
@@ -2059,14 +2062,14 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                     {/* Customer Selection - using PartnerPicker */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Customer <span className="text-red-400">*</span>
+                            {t("Customer")} <span className="text-red-400">*</span>
                         </label>
                         <PartnerPicker
                             value={formData.partnerId}
                             onChange={handlePartnerChange}
                             onPartnerLoad={handlePartnerLoad}
                             roleFilter="customer"
-                            placeholder="Select Customer..."
+                            placeholder={t("Select Customer...")}
                             required={true}
                             theme="light"
                         />
@@ -2080,7 +2083,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                     {/* Person in Charge */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Person in Charge <span className="text-red-400">*</span>
+                            {t("Person in Charge")} <span className="text-red-400">*</span>
                         </label>
                         <div className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-600 font-medium cursor-not-allowed">
                             {formData.salesPerson || user?.full_name || user?.username || 'Account Executive'}
@@ -2090,13 +2093,13 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                     {/* Nama Pembuat */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Nama Pembuat <span className="text-gray-400 font-normal text-xs">(akan tampil di dokumen cetak)</span>
+                            {t("Nama Pembuat")} <span className="text-gray-400 font-normal text-xs">{t("(akan tampil di dokumen cetak)")}</span>
                         </label>
                         <input
                             type="text"
                             value={formData.preparedBy}
                             onChange={(e) => setFormData({ ...formData, preparedBy: e.target.value })}
-                            placeholder="Ketik nama lengkap pembuat quotation..."
+                            placeholder={t("Ketik nama lengkap pembuat quotation...")}
                             className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400"
                         />
                     </div>
@@ -2105,7 +2108,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Kategori Quotation (Internal) <span className="text-red-400">*</span>
+                                {t("Kategori Quotation (Internal)")} <span className="text-red-400">*</span>
                             </label>
                             <select
                                 required
@@ -2113,18 +2116,18 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                 onChange={(e) => setFormData({ ...formData, quotationType: e.target.value })}
                                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                             >
-                                <option value="RG">Regular (RG)</option>
-                                <option value="PJ">Project (PJ)</option>
-                                <option value="EV_ENT">Event Entertaint & Concert</option>
-                                <option value="EV_AUTO">Event Automotive</option>
-                                <option value="EV_KEK">Event KEK</option>
-                                <option value="EV_FAIR">Event Fair & Excebition</option>
+                                <option value="RG">{t("Regular (RG)")}</option>
+                                <option value="PJ">{t("Project (PJ)")}</option>
+                                <option value="EV_ENT">{t("Event Entertaint & Concert")}</option>
+                                <option value="EV_AUTO">{t("Event Automotive")}</option>
+                                <option value="EV_KEK">{t("Event KEK")}</option>
+                                <option value="EV_FAIR">{t("Event Fair & Excebition")}</option>
                             </select>
-                            <p className="text-xs text-gray-500 mt-1">Untuk klasifikasi internal dokumen quotation.</p>
+                            <p className="text-xs text-gray-500 mt-1">{t("Untuk klasifikasi internal dokumen quotation.")}</p>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Quotation Date <span className="text-red-400">*</span>
+                                {t("Quotation Date")} <span className="text-red-400">*</span>
                             </label>
                             <input
                                 type="date"
@@ -2138,14 +2141,14 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
 
                     <div className="mb-4">
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Jenis Penawaran (Business Type)
+                            {t("Jenis Penawaran (Business Type)")}
                         </label>
                         <input
                             type="text"
                             list="blink-quotation-offer-types"
                             value={formData.offerType}
                             onChange={(e) => setFormData({ ...formData, offerType: e.target.value })}
-                            placeholder="Pilih atau ketik manual..."
+                            placeholder={t("Pilih atau ketik manual...")}
                             className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                         />
                         <datalist id="blink-quotation-offer-types">
@@ -2155,7 +2158,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                             ))}
                         </datalist>
                         <p className="text-xs text-gray-500 mt-1">
-                            Pilih salah satu opsi bisnis/layanan atau ketik manual.
+                            {t("Pilih salah satu opsi bisnis/layanan atau ketik manual.")}
                         </p>
                     </div>
 
@@ -2163,27 +2166,27 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Origin <span className="text-red-400">*</span>
+                                {t("Origin")} <span className="text-red-400">*</span>
                             </label>
                             <input
                                 type="text"
                                 required
                                 value={formData.origin}
                                 onChange={(e) => setFormData({ ...formData, origin: e.target.value })}
-                                placeholder="e.g., Jakarta"
+                                placeholder={t("e.g., Jakarta")}
                                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                             />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Destination <span className="text-red-400">*</span>
+                                {t("Destination")} <span className="text-red-400">*</span>
                             </label>
                             <input
                                 type="text"
                                 required
                                 value={formData.destination}
                                 onChange={(e) => setFormData({ ...formData, destination: e.target.value })}
-                                placeholder="e.g., Singapore"
+                                placeholder={t("e.g., Singapore")}
                                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                             />
                         </div>
@@ -2193,7 +2196,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                     <div className="grid grid-cols-3 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Service Type <span className="text-red-400">*</span>
+                                {t("Service Type")} <span className="text-red-400">*</span>
                             </label>
                             <select
                                 required
@@ -2201,36 +2204,36 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                 onChange={(e) => setFormData({ ...formData, serviceType: e.target.value })}
                                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                             >
-                                <option value="sea">Sea Freight</option>
-                                <option value="air">Air Freight</option>
-                                <option value="land">Land Transport</option>
+                                <option value="sea">{t("Sea Freight")}</option>
+                                <option value="air">{t("Air Freight")}</option>
+                                <option value="land">{t("Land Transport")}</option>
                             </select>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Cargo Type
+                                {t("Cargo Type")}
                             </label>
                             <select
                                 value={formData.cargoType}
                                 onChange={(e) => setFormData({ ...formData, cargoType: e.target.value })}
                                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                             >
-                                <option value="">Select...</option>
-                                <option value="FCL">FCL (Full Container)</option>
-                                <option value="LCL">LCL (Less Container)</option>
-                                <option value="General">General Cargo</option>
-                                <option value="Dangerous">Dangerous Goods</option>
+                                <option value="">{t("Select...")}</option>
+                                <option value="FCL">{t("FCL (Full Container)")}</option>
+                                <option value="LCL">{t("LCL (Less Container)")}</option>
+                                <option value="General">{t("General Cargo")}</option>
+                                <option value="Dangerous">{t("Dangerous Goods")}</option>
                             </select>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Commodity
+                                {t("Commodity")}
                             </label>
                             <input
                                 type="text"
                                 value={formData.commodity}
                                 onChange={(e) => setFormData({ ...formData, commodity: e.target.value })}
-                                placeholder="e.g., Electronic"
+                                placeholder={t("e.g., Electronic")}
                                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                             />
                         </div>
@@ -2240,7 +2243,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                     <div className="grid grid-cols-3 gap-4 mb-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Volume (CBM)
+                                {t("Volume (CBM)")}
                             </label>
                             <input
                                 type="number"
@@ -2254,25 +2257,25 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Container Size
+                                {t("Container Size")}
                             </label>
                             <select
                                 value={formData.containerSize}
                                 onChange={(e) => setFormData({ ...formData, containerSize: e.target.value })}
                                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                             >
-                                <option value="">Select...</option>
+                                <option value="">{t("Select...")}</option>
                                 <option value="20ft">20ft</option>
                                 <option value="40ft">40ft</option>
                                 <option value="40HC">40HC</option>
                                 <option value="45HC">45HC</option>
                                 <option value="LCL">LCL</option>
-                                <option value="Other">Other</option>
+                                <option value="Other">{t("Other")}</option>
                             </select>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Container Count
+                                {t("Container Count")}
                             </label>
                             <input
                                 type="number"
@@ -2289,7 +2292,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                     <div className="grid grid-cols-4 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Gross Weight (kgs)
+                                {t("Gross Weight (kgs)")}
                             </label>
                             <input
                                 type="number"
@@ -2303,7 +2306,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Net Weight (kgs)
+                                {t("Net Weight (kgs)")}
                             </label>
                             <input
                                 type="number"
@@ -2317,7 +2320,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Chargeable Weight (kgs)
+                                {t("Chargeable Weight (kgs)")}
                             </label>
                             <input
                                 type="number"
@@ -2331,7 +2334,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Measure (M³)
+                                {t("Measure (M³)")}
                             </label>
                             <input
                                 type="number"
@@ -2348,7 +2351,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                     {/* Cargo Detail (Multi Container) */}
                     <div className="p-4 bg-white rounded-lg border border-gray-300 space-y-3">
                         <div className="flex items-center justify-between">
-                            <label className="block text-sm font-semibold text-gray-700">Cargo Detail (Multiple Container)</label>
+                            <label className="block text-sm font-semibold text-gray-700">{t("Cargo Detail (Multiple Container)")}</label>
                             <button
                                 type="button"
                                 onClick={() => setFormData(prev => {
@@ -2357,14 +2360,14 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                 })}
                                 className="px-3 py-1 text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100"
                             >
-                                + Add Container
+                                {t("+ Add Container")}
                             </button>
                         </div>
 
                         {(formData.cargoDetails || []).map((cargo, idx) => (
                             <div key={cargo.id || idx} className="p-3 border border-gray-200 rounded-lg bg-gray-50">
                                 <div className="flex items-center justify-between mb-2">
-                                    <p className="text-xs font-semibold text-gray-600 uppercase">Container #{idx + 1}</p>
+                                    <p className="text-xs font-semibold text-gray-600 uppercase">{t("Container #")}{idx + 1}</p>
                                     {(formData.cargoDetails || []).length > 1 && (
                                         <button
                                             type="button"
@@ -2374,7 +2377,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                             })}
                                             className="text-xs text-red-600 hover:text-red-700"
                                         >
-                                            Remove
+                                            {t("Remove")}
                                         </button>
                                     )}
                                 </div>
@@ -2386,7 +2389,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                             ...prev,
                                             cargoDetails: (prev.cargoDetails || []).map((c, i) => i === idx ? { ...c, containerNumber: e.target.value } : c)
                                         }))}
-                                        placeholder="Container No"
+                                        placeholder={t("Container No")}
                                         className="px-2 py-1 bg-white border border-gray-300 rounded text-black text-sm"
                                     />
                                     <input
@@ -2397,7 +2400,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                             containerSize: idx === 0 ? e.target.value : prev.containerSize,
                                             cargoDetails: (prev.cargoDetails || []).map((c, i) => i === idx ? { ...c, containerSize: e.target.value } : c)
                                         }))}
-                                        placeholder="Size (20ft / 40HC)"
+                                        placeholder={t("Size (20ft / 40HC)")}
                                         className="px-2 py-1 bg-white border border-gray-300 rounded text-black text-sm"
                                     />
                                     <input
@@ -2407,7 +2410,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                             ...prev,
                                             cargoDetails: (prev.cargoDetails || []).map((c, i) => i === idx ? { ...c, packageType: e.target.value } : c)
                                         }))}
-                                        placeholder="Package Type"
+                                        placeholder={t("Package Type")}
                                         className="px-2 py-1 bg-white border border-gray-300 rounded text-black text-sm"
                                     />
                                     <input
@@ -2418,7 +2421,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                             ...prev,
                                             cargoDetails: (prev.cargoDetails || []).map((c, i) => i === idx ? { ...c, quantity: e.target.value } : c)
                                         }))}
-                                        placeholder="Qty"
+                                        placeholder={t("Qty")}
                                         className="px-2 py-1 bg-white border border-gray-300 rounded text-black text-sm"
                                     />
                                     <input
@@ -2430,7 +2433,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                             ...prev,
                                             cargoDetails: (prev.cargoDetails || []).map((c, i) => i === idx ? { ...c, grossWeight: e.target.value } : c)
                                         }))}
-                                        placeholder="Gross Weight"
+                                        placeholder={t("Gross Weight")}
                                         className="px-2 py-1 bg-white border border-gray-300 rounded text-black text-sm"
                                     />
                                     <input
@@ -2442,7 +2445,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                             ...prev,
                                             cargoDetails: (prev.cargoDetails || []).map((c, i) => i === idx ? { ...c, chargeableWeight: e.target.value } : c)
                                         }))}
-                                        placeholder="Chargeable Weight"
+                                        placeholder={t("Chargeable Weight")}
                                         className="px-2 py-1 bg-white border border-gray-300 rounded text-black text-sm"
                                     />
                                     <input
@@ -2454,7 +2457,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                             ...prev,
                                             cargoDetails: (prev.cargoDetails || []).map((c, i) => i === idx ? { ...c, volume: e.target.value } : c)
                                         }))}
-                                        placeholder="Volume (CBM)"
+                                        placeholder={t("Volume (CBM)")}
                                         className="px-2 py-1 bg-white border border-gray-300 rounded text-black text-sm"
                                     />
                                     <input
@@ -2464,7 +2467,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                             ...prev,
                                             cargoDetails: (prev.cargoDetails || []).map((c, i) => i === idx ? { ...c, description: e.target.value } : c)
                                         }))}
-                                        placeholder="Description"
+                                        placeholder={t("Description")}
                                         className="px-2 py-1 bg-white border border-gray-300 rounded text-black text-sm"
                                     />
                                 </div>
@@ -2475,37 +2478,37 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                     {/* Additional Shipment Details (Incoterm, Package, etc) */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 p-4 bg-white rounded-lg border border-gray-300">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Incoterm</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">{t("Incoterm")}</label>
                             <input
                                 type="text"
                                 value={formData.incoterm}
                                 onChange={(e) => setFormData({ ...formData, incoterm: e.target.value })}
-                                placeholder="e.g. FOB"
+                                placeholder={t("e.g. FOB")}
                                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black text-sm"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Term of Payment</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">{t("Term of Payment")}</label>
                             <input
                                 type="text"
                                 value={formData.termOfPayment || formData.paymentTerms}
                                 onChange={(e) => setFormData({ ...formData, termOfPayment: e.target.value, paymentTerms: e.target.value })}
-                                placeholder="Net 30 Days"
+                                placeholder={t("Net 30 Days")}
                                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black text-sm"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Package Type</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">{t("Package Type")}</label>
                             <input
                                 type="text"
                                 value={formData.packageType}
                                 onChange={(e) => setFormData({ ...formData, packageType: e.target.value })}
-                                placeholder="e.g. Cartons"
+                                placeholder={t("e.g. Cartons")}
                                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black text-sm"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">{t("Quantity")}</label>
                             <input
                                 type="number"
                                 value={formData.quantity}
@@ -2518,7 +2521,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                         {/* Customer Contact Details Override */}
                         <div className="col-span-2 md:col-span-4 grid grid-cols-3 gap-4 pt-2 border-t border-gray-300 mt-2">
                             <div>
-                                <label className="block text-xs text-gray-500 mb-1">Contact Person (Attn)</label>
+                                <label className="block text-xs text-gray-500 mb-1">{t("Contact Person (Attn)")}</label>
                                 <input
                                     type="text"
                                     value={formData.customerContact}
@@ -2527,7 +2530,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs text-gray-500 mb-1">Contact Email</label>
+                                <label className="block text-xs text-gray-500 mb-1">{t("Contact Email")}</label>
                                 <input
                                     type="email"
                                     value={formData.customerEmail}
@@ -2536,7 +2539,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs text-gray-500 mb-1">Contact Phone</label>
+                                <label className="block text-xs text-gray-500 mb-1">{t("Contact Phone")}</label>
                                 <input
                                     type="text"
                                     value={formData.customerPhone}
@@ -2551,7 +2554,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                     <div className="grid grid-cols-3 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Currency
+                                {t("Currency")}
                             </label>
                             <select
                                 value={formData.currency}
@@ -2574,7 +2577,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                         </div>
                         <div>
                             <label className="block text-[11px] font-semibold text-gray-700 mb-1">
-                                Kurs Rate (to IDR)
+                                {t("Kurs Rate (to IDR)")}
                             </label>
                             <input
                                 type="number"
@@ -2589,7 +2592,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Valid for (days)
+                                {t("Valid for (days)")}
                             </label>
                             <input
                                 type="number"
@@ -2610,7 +2613,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                         const totalUSD = isIDR ? (rate > 1 ? totalNum / rate : 0) : totalNum;
                         return (
                             <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                                <p className="text-xs font-semibold text-gray-500 mb-2">Estimated Total (auto dari item)</p>
+                                <p className="text-xs font-semibold text-gray-500 mb-2">{t("Estimated Total (auto dari item)")}</p>
                                 <div className="flex gap-6">
                                     <div>
                                         <p className="text-[10px] text-gray-400 mb-0.5">IDR</p>
@@ -2618,7 +2621,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                     </div>
                                     {rate > 1 && (
                                         <div className="border-l border-orange-200 pl-6">
-                                            <p className="text-[10px] text-gray-400 mb-0.5">USD (@ Rp {rate.toLocaleString('id-ID')})</p>
+                                            <p className="text-[10px] text-gray-400 mb-0.5">{t("USD (@ Rp")} {rate.toLocaleString('id-ID')})</p>
                                             <p className="text-lg font-bold text-blue-600 break-words">$ {formatInputAmount(isIDR ? totalUSD : formData.totalAmount, 'USD')}</p>
                                         </div>
                                     )}
@@ -2628,7 +2631,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                     })()}
 
                     <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-gray-700">Selling Price / Service Items <span className="text-gray-400 font-normal">(Opsional — dapat diisi kemudian)</span></span>
+                        <span className="text-sm font-medium text-gray-700">{t("Selling Price / Service Items")} <span className="text-gray-400 font-normal">{t("(Opsional — dapat diisi kemudian)")}</span></span>
                     </div>
                     <GroupedServiceItemManager
                         items={formData.serviceItems}
@@ -2685,12 +2688,12 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                     {/* Cost Breakdown */}
                     <div className="mt-8 border-t border-gray-200 pt-8">
                         <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium text-gray-700">Cost Breakdown <span className="text-gray-400 font-normal">(Opsional — dapat diisi kemudian)</span></span>
+                            <span className="text-sm font-medium text-gray-700">{t("Cost Breakdown")} <span className="text-gray-400 font-normal">{t("(Opsional — dapat diisi kemudian)")}</span></span>
                             {formData.serviceItems && formData.serviceItems.length > 0 && (
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        if (confirm('Salin semua item penjualan ke estimasi cost breakdown? Ini akan menimpa cost breakdown saat ini.')) {
+                                        if (confirm(t("Salin semua item penjualan ke estimasi cost breakdown? Ini akan menimpa cost breakdown saat ini."))) {
                                             setFormData(prev => ({
                                                 ...prev,
                                                 costItems: duplicateAsCostItems(prev.serviceItems)
@@ -2699,7 +2702,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                     }}
                                     className="text-xs text-blue-600 hover:text-blue-700 font-medium"
                                 >
-                                    📋 Salin dari Selling Items
+                                    {t("📋 Salin dari Selling Items")}
                                 </button>
                             )}
                         </div>
@@ -2716,26 +2719,26 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                     {/* Notes */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Notes / Remarks
+                            {t("Notes / Remarks")}
                         </label>
                         <RichTextEditor
                             rows={5}
                             value={formData.notes}
                             onChange={(html) => setFormData({ ...formData, notes: html })}
-                            placeholder="Tulis notes/review dan atur style per kata..."
+                            placeholder={t("Tulis notes/review dan atur style per kata...")}
                         />
                     </div>
 
                     {/* Terms & Conditions */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Terms & Conditions
+                            {t("Terms & Conditions")}
                         </label>
                         <textarea
                             rows={5}
                             value={formData.termsConditions}
                             onChange={(e) => setFormData({ ...formData, termsConditions: e.target.value })}
-                            placeholder="Enter terms and conditions..."
+                            placeholder={t("Enter terms and conditions...")}
                             className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black font-mono text-xs"
                         />
                     </div>
@@ -2750,32 +2753,32 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                 resetForm();
                             }}
                         >
-                            Cancel
+                            {t("Cancel")}
                         </Button>
                         {/* formNoValidate: allows saving as draft even if required fields are empty */}
                         <Button type="submit" formNoValidate>
-                            Save as Draft
+                            {t("Save as Draft")}
                         </Button>
                         <Button
                             type="button"
                             onClick={(e) => {
                                 // Validate required fields before submitting for approval
                                 if (!formData.partnerId && !formData.customerName) {
-                                    alert('⚠️ Harap pilih Customer terlebih dahulu.');
+                                    alert(t("⚠️ Harap pilih Customer terlebih dahulu."));
                                     return;
                                 }
                                 if (!formData.origin || !formData.destination) {
-                                    alert('⚠️ Harap isi Origin dan Destination.');
+                                    alert(t("⚠️ Harap isi Origin dan Destination."));
                                     return;
                                 }
                                 if (!formData.serviceType) {
-                                    alert('⚠️ Harap pilih Service Type.');
+                                    alert(t("⚠️ Harap pilih Service Type."));
                                     return;
                                 }
                                 handleSubmit(e, 'manager_approval');
                             }}
                         >
-                            Submit for Manager Approval
+                            {t("Submit for Manager Approval")}
                         </Button>
                     </div>
                 </form>
@@ -2792,9 +2795,9 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                     <div className="pb-4 border-b border-gray-200">
                         <div className="flex items-center justify-between mb-4">
                             <div>
-                                <h2 className="text-2xl font-bold text-gray-900">Quotation Details</h2>
+                                <h2 className="text-2xl font-bold text-gray-900">{t("Quotation Details")}</h2>
                                 <p className="text-sm text-gray-500 mt-1">
-                                    {viewingQuotation.jobNumber} | Created: {viewingQuotation.createdAt} | Valid: {viewingQuotation.validUntil}
+                                    {viewingQuotation.jobNumber} {t("| Created:")} {viewingQuotation.createdAt} {t("| Valid:")} {viewingQuotation.validUntil}
                                 </p>
                             </div>
                             <div className="flex gap-2 items-center">
@@ -2805,7 +2808,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                     icon={Eye}
                                     onClick={() => setShowPrintPreview(true)}
                                 >
-                                    Preview
+                                    {t("Preview")}
                                 </Button>
                                 <Button
                                     size="sm"
@@ -2813,7 +2816,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                     icon={FileText}
                                     onClick={() => setShowPrintPreview(true)}
                                 >
-                                    Preview & Print
+                                    {t("Preview & Print")}
                                 </Button>
 
                                 {!isEditingQuotation && (
@@ -2830,16 +2833,16 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                                 handleEditQuotation();
                                             }}
                                         >
-                                            Edit
+                                            {t("Edit")}
                                         </Button>
                                         <Button
                                             size="sm"
                                             variant="danger"
                                             icon={XCircle}
                                             onClick={() => handleCancelQuotation(viewingQuotation.id)}
-                                            title="Batalkan quotation dan seluruh alur shipment/invoice terkait"
+                                            title={t("Batalkan quotation dan seluruh alur shipment/invoice terkait")}
                                         >
-                                            Batal
+                                            {t("Batal")}
                                         </Button>
                                         <Button
                                             size="sm"
@@ -2847,14 +2850,14 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                             icon={Trash}
                                             onClick={() => handleDeleteQuotation(viewingQuotation.id)}
                                         >
-                                            Delete
+                                            {t("Delete")}
                                         </Button>
                                     </>
                                 )}
                                 {isEditingQuotation && (
                                     <>
-                                        <Button size="sm" variant="secondary" onClick={handleCancelEdit}>Cancel</Button>
-                                        <Button size="sm" onClick={handleSaveEditedQuotation}>Save</Button>
+                                        <Button size="sm" variant="secondary" onClick={handleCancelEdit}>{t("Cancel")}</Button>
+                                        <Button size="sm" onClick={handleSaveEditedQuotation}>{t("Save")}</Button>
                                     </>
                                 )}
                                 <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusConfig[viewingQuotation.status]?.color}`}>
@@ -2867,7 +2870,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                         {/* Customer & Route & Quotation Info */}
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
                             <div>
-                                <p className="text-xs text-gray-500 font-medium mb-1">Customer</p>
+                                <p className="text-xs text-gray-500 font-medium mb-1">{t("Customer")}</p>
                                 {isEditingQuotation ? (
                                     <PartnerPicker
                                         value={editedQuotation?.partnerId || editedQuotation?.customerId}
@@ -2890,7 +2893,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                             }
                                         }}
                                         roleFilter="customer"
-                                        placeholder="Select Customer..."
+                                        placeholder={t("Select Customer...")}
                                     />
                                 ) : (
                                     <input
@@ -2902,7 +2905,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                 )}
                             </div>
                             <div>
-                                <p className="text-xs text-gray-500 font-medium mb-1">Customer Address</p>
+                                <p className="text-xs text-gray-500 font-medium mb-1">{t("Customer Address")}</p>
                                 <input
                                     type="text"
                                     value={isEditingQuotation ? (editedQuotation?.customerAddress || '') : (viewingQuotation.customerAddress || viewingQuotation.customer_address || '')}
@@ -2912,21 +2915,21 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                 />
                             </div>
                             <div>
-                                <p className="text-xs text-gray-500 font-medium mb-1">Person in Charge</p>
+                                <p className="text-xs text-gray-500 font-medium mb-1">{t("Person in Charge")}</p>
                                 <div className="w-full px-2 py-1 bg-gray-100 border border-gray-300 rounded text-gray-700 text-sm cursor-not-allowed min-h-[28px]">
                                     {isEditingQuotation ? (editedQuotation?.salesPerson || '') : (viewingQuotation.salesPerson || '')}
                                 </div>
                             </div>
                             <div>
                                 <p className="text-xs text-gray-500 font-medium mb-1">
-                                    Nama Pembuat <span className="text-gray-400 font-normal">(Prepared By)</span>
+                                    {t("Nama Pembuat")} <span className="text-gray-400 font-normal">{t("(Prepared By)")}</span>
                                 </p>
                                 {isEditingQuotation ? (
                                     <input
                                         type="text"
                                         value={editedQuotation?.preparedBy || ''}
                                         onChange={(e) => setEditedQuotation({ ...editedQuotation, preparedBy: e.target.value })}
-                                        placeholder="Nama pembuat quotation..."
+                                        placeholder={t("Nama pembuat quotation...")}
                                         className="w-full px-2 py-1 bg-white border border-blue-300 rounded text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
                                     />
                                 ) : (
@@ -2936,16 +2939,16 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                 )}
                             </div>
                             <div>
-                                <p className="text-xs text-gray-500 font-medium mb-1">Kategori Quotation (Internal)</p>
+                                <p className="text-xs text-gray-500 font-medium mb-1">{t("Kategori Quotation (Internal)")}</p>
                                 {isEditingQuotation ? (
                                     <select
                                         value={editedQuotation?.quotationType || 'RG'}
                                         onChange={(e) => setEditedQuotation({ ...editedQuotation, quotationType: e.target.value })}
                                         className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm"
                                     >
-                                        <option value="RG">Regular</option>
-                                        <option value="PJ">Project</option>
-                                        <option value="EV">Event</option>
+                                        <option value="RG">{t("Regular")}</option>
+                                        <option value="PJ">{t("Project")}</option>
+                                        <option value="EV">{t("Event")}</option>
                                     </select>
                                 ) : (
                                     <p className="text-gray-900 font-medium">
@@ -2958,7 +2961,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                 )}
                             </div>
                             <div>
-                                <p className="text-xs text-gray-500 font-medium mb-1">Jenis Penawaran (Business Type)</p>
+                                <p className="text-xs text-gray-500 font-medium mb-1">{t("Jenis Penawaran (Business Type)")}</p>
                                 {isEditingQuotation ? (
                                     <>
                                         <input
@@ -2966,7 +2969,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                             list="blink-quotation-offer-types-edit"
                                             value={editedQuotation?.offerType || ''}
                                             onChange={(e) => setEditedQuotation({ ...editedQuotation, offerType: e.target.value })}
-                                            placeholder="Pilih atau ketik manual..."
+                                            placeholder={t("Pilih atau ketik manual...")}
                                             className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm"
                                         />
                                         <datalist id="blink-quotation-offer-types-edit">
@@ -2982,14 +2985,14 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                 )}
                             </div>
                             <div>
-                                <p className="text-xs text-gray-500 font-medium mb-1">Quotation Date</p>
+                                <p className="text-xs text-gray-500 font-medium mb-1">{t("Quotation Date")}</p>
                                 <p className="text-gray-900 font-medium">{viewingQuotation.quotationDate || viewingQuotation.createdAt}</p>
                             </div>
                             {/* New Fields Edit Section */}
                             {isEditingQuotation && (
                                 <div className="col-span-2 md:col-span-5 grid grid-cols-2 md:grid-cols-4 gap-4 mt-2 p-3 bg-white border border-gray-300 rounded-lg">
                                     <div>
-                                        <p className="text-xs text-gray-500 mb-1">Incoterm</p>
+                                        <p className="text-xs text-gray-500 mb-1">{t("Incoterm")}</p>
                                         <input
                                             type="text"
                                             value={editedQuotation.incoterm || ''}
@@ -2999,27 +3002,27 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                         />
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-500 mb-1">Term of Payment</p>
+                                        <p className="text-xs text-gray-500 mb-1">{t("Term of Payment")}</p>
                                         <input
                                             type="text"
                                             value={editedQuotation.termOfPayment || editedQuotation.paymentTerms || ''}
                                             onChange={(e) => setEditedQuotation({ ...editedQuotation, termOfPayment: e.target.value, paymentTerms: e.target.value })}
-                                            placeholder="Net 30 Days"
+                                            placeholder={t("Net 30 Days")}
                                             className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-black text-sm"
                                         />
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-500 mb-1">Package Type</p>
+                                        <p className="text-xs text-gray-500 mb-1">{t("Package Type")}</p>
                                         <input
                                             type="text"
                                             value={editedQuotation.packageType || ''}
                                             onChange={(e) => setEditedQuotation({ ...editedQuotation, packageType: e.target.value })}
-                                            placeholder="Cartons"
+                                            placeholder={t("Cartons")}
                                             className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-black text-sm"
                                         />
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-500 mb-1">Quantity</p>
+                                        <p className="text-xs text-gray-500 mb-1">{t("Quantity")}</p>
                                         <input
                                             type="number"
                                             value={editedQuotation.quantity || ''}
@@ -3030,7 +3033,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                     </div>
                                     {/* Additional Customer Details */}
                                     <div>
-                                        <p className="text-xs text-gray-500 mb-1">Cust. Contact (Attn)</p>
+                                        <p className="text-xs text-gray-500 mb-1">{t("Cust. Contact (Attn)")}</p>
                                         <input
                                             type="text"
                                             value={editedQuotation.customerContact || ''}
@@ -3039,7 +3042,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                         />
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-500 mb-1">Cust. Email</p>
+                                        <p className="text-xs text-gray-500 mb-1">{t("Cust. Email")}</p>
                                         <input
                                             type="text"
                                             value={editedQuotation.customerEmail || ''}
@@ -3048,7 +3051,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                         />
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-500 mb-1">Cust. Phone</p>
+                                        <p className="text-xs text-gray-500 mb-1">{t("Cust. Phone")}</p>
                                         <input
                                             type="text"
                                             value={editedQuotation.customerPhone || ''}
@@ -3059,14 +3062,14 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                 </div>
                             )}
                             <div>
-                                <p className="text-xs text-gray-500 mb-1">Route</p>
+                                <p className="text-xs text-gray-500 mb-1">{t("Route")}</p>
                                 <div className="flex gap-2 items-center">
                                     <input
                                         type="text"
                                         value={isEditingQuotation ? (editedQuotation?.origin || '') : (viewingQuotation.origin || '')}
                                         onChange={(e) => setEditedQuotation({ ...editedQuotation, origin: e.target.value })}
                                         disabled={!isEditingQuotation}
-                                        placeholder="Origin"
+                                        placeholder={t("Origin")}
                                         className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm disabled:bg-gray-100/50"
                                     />
                                     <span className="text-gray-400">→</span>
@@ -3075,7 +3078,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                         value={isEditingQuotation ? (editedQuotation?.destination || '') : (viewingQuotation.destination || '')}
                                         onChange={(e) => setEditedQuotation({ ...editedQuotation, destination: e.target.value })}
                                         disabled={!isEditingQuotation}
-                                        placeholder="Destination"
+                                        placeholder={t("Destination")}
                                         className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm disabled:bg-gray-100/50"
                                     />
                                 </div>
@@ -3083,54 +3086,54 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                         </div>
 
                         <div>
-                            <p className="text-xs text-gray-500 mb-1">Service Type</p>
+                            <p className="text-xs text-gray-500 mb-1">{t("Service Type")}</p>
                             <select
                                 value={isEditingQuotation ? (editedQuotation?.serviceType || '') : (viewingQuotation.serviceType || '')}
                                 onChange={(e) => setEditedQuotation({ ...editedQuotation, serviceType: e.target.value })}
                                 disabled={!isEditingQuotation}
                                 className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm disabled:bg-gray-100/50"
                             >
-                                <option value="sea">Sea Freight</option>
-                                <option value="air">Air Freight</option>
-                                <option value="land">Land Transport</option>
+                                <option value="sea">{t("Sea Freight")}</option>
+                                <option value="air">{t("Air Freight")}</option>
+                                <option value="land">{t("Land Transport")}</option>
                             </select>
                         </div>
 
                         <div>
-                            <p className="text-xs text-gray-500 mb-1">Cargo Type</p>
+                            <p className="text-xs text-gray-500 mb-1">{t("Cargo Type")}</p>
                             <select
                                 value={isEditingQuotation ? (editedQuotation?.cargoType || '') : (viewingQuotation.cargoType || '')}
                                 onChange={(e) => setEditedQuotation({ ...editedQuotation, cargoType: e.target.value })}
                                 disabled={!isEditingQuotation}
                                 className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm disabled:bg-gray-100/50"
                             >
-                                <option value="">Select...</option>
-                                <option value="FCL">FCL (Full Container)</option>
-                                <option value="LCL">LCL (Less Container)</option>
-                                <option value="General">General Cargo</option>
-                                <option value="Dangerous">Dangerous Goods</option>
+                                <option value="">{t("Select...")}</option>
+                                <option value="FCL">{t("FCL (Full Container)")}</option>
+                                <option value="LCL">{t("LCL (Less Container)")}</option>
+                                <option value="General">{t("General Cargo")}</option>
+                                <option value="Dangerous">{t("Dangerous Goods")}</option>
                             </select>
                         </div>
 
                         <div>
-                            <p className="text-xs text-gray-500 mb-1">Commodity</p>
+                            <p className="text-xs text-gray-500 mb-1">{t("Commodity")}</p>
                             <input
                                 type="text"
                                 value={isEditingQuotation ? (editedQuotation?.commodity || '') : (viewingQuotation.commodity || '')}
                                 onChange={(e) => setEditedQuotation({ ...editedQuotation, commodity: e.target.value })}
                                 disabled={!isEditingQuotation}
-                                placeholder="e.g., Electronics"
+                                placeholder={t("e.g., Electronics")}
                                 className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm disabled:bg-gray-100/50"
                             />
                         </div>
 
                         {/* Cargo Details */}
                         <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                            <h5 className="text-xs font-semibold text-gray-400 mb-3 uppercase tracking-wider">Cargo Details</h5>
+                            <h5 className="text-xs font-semibold text-gray-400 mb-3 uppercase tracking-wider">{t("Cargo Details")}</h5>
 
                             <div className="grid grid-cols-3 gap-3 mb-3">
                                 <div>
-                                    <p className="text-xs text-gray-500 mb-1">Volume (CBM)</p>
+                                    <p className="text-xs text-gray-500 mb-1">{t("Volume (CBM)")}</p>
                                     <input
                                         type="number"
                                         value={isEditingQuotation ? (editedQuotation?.volume || '') : (viewingQuotation.volume || '')}
@@ -3141,24 +3144,24 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                     />
                                 </div>
                                 <div>
-                                    <p className="text-xs text-gray-500 mb-1">Container Size</p>
+                                    <p className="text-xs text-gray-500 mb-1">{t("Container Size")}</p>
                                     <select
                                         value={isEditingQuotation ? (editedQuotation?.containerSize || '') : (viewingQuotation.containerSize || '')}
                                         onChange={(e) => setEditedQuotation({ ...editedQuotation, containerSize: e.target.value })}
                                         disabled={!isEditingQuotation}
                                         className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm disabled:bg-gray-100/50"
                                     >
-                                        <option value="">Select...</option>
+                                        <option value="">{t("Select...")}</option>
                                         <option value="20ft">20ft</option>
                                         <option value="40ft">40ft</option>
                                         <option value="40HC">40HC</option>
                                         <option value="45HC">45HC</option>
                                         <option value="LCL">LCL</option>
-                                        <option value="Other">Other</option>
+                                        <option value="Other">{t("Other")}</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <p className="text-xs text-gray-500 mb-1">Container Count</p>
+                                    <p className="text-xs text-gray-500 mb-1">{t("Container Count")}</p>
                                     <input
                                         type="number"
                                         min="0"
@@ -3172,7 +3175,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                             </div>
                             <div className="grid grid-cols-4 gap-3">
                                 <div>
-                                    <p className="text-xs text-gray-500 mb-1">Gross (kg)</p>
+                                    <p className="text-xs text-gray-500 mb-1">{t("Gross (kg)")}</p>
                                     <input
                                         type="number"
                                         value={isEditingQuotation ? (editedQuotation?.grossWeight || '') : (viewingQuotation.grossWeight || '')}
@@ -3183,7 +3186,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                     />
                                 </div>
                                 <div>
-                                    <p className="text-xs text-gray-500 mb-1">Net (kg)</p>
+                                    <p className="text-xs text-gray-500 mb-1">{t("Net (kg)")}</p>
                                     <input
                                         type="number"
                                         value={isEditingQuotation ? (editedQuotation?.netWeight || '') : (viewingQuotation.netWeight || '')}
@@ -3194,7 +3197,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                     />
                                 </div>
                                 <div>
-                                    <p className="text-xs text-gray-500 mb-1">Chargeable (kg)</p>
+                                    <p className="text-xs text-gray-500 mb-1">{t("Chargeable (kg)")}</p>
                                     <input
                                         type="number"
                                         value={isEditingQuotation ? (editedQuotation?.chargeableWeight || '') : (viewingQuotation.chargeableWeight || '')}
@@ -3205,7 +3208,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                     />
                                 </div>
                                 <div>
-                                    <p className="text-xs text-gray-500 mb-1">Measure (M³)</p>
+                                    <p className="text-xs text-gray-500 mb-1">{t("Measure (M³)")}</p>
                                     <input
                                         type="number"
                                         value={isEditingQuotation ? (editedQuotation?.measure || '') : (viewingQuotation.measure || '')}
@@ -3219,7 +3222,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
 
                             <div className="mt-4 space-y-2">
                                 <div className="flex items-center justify-between">
-                                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Container Breakdown</p>
+                                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{t("Container Breakdown")}</p>
                                     {isEditingQuotation && (
                                         <button
                                             type="button"
@@ -3229,7 +3232,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                             })}
                                             className="text-xs px-2 py-1 border border-blue-200 text-blue-600 rounded hover:bg-blue-50"
                                         >
-                                            + Add
+                                            {t("+ Add")}
                                         </button>
                                     )}
                                 </div>
@@ -3250,7 +3253,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                                 }));
                                             }}
                                             disabled={!isEditingQuotation}
-                                            placeholder="Container No"
+                                            placeholder={t("Container No")}
                                             className="px-2 py-1 border border-gray-300 rounded text-xs disabled:bg-gray-100"
                                         />
                                         <input
@@ -3264,7 +3267,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                                 }));
                                             }}
                                             disabled={!isEditingQuotation}
-                                            placeholder="Size"
+                                            placeholder={t("Size")}
                                             className="px-2 py-1 border border-gray-300 rounded text-xs disabled:bg-gray-100"
                                         />
                                         <input
@@ -3278,7 +3281,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                                 }));
                                             }}
                                             disabled={!isEditingQuotation}
-                                            placeholder="Qty"
+                                            placeholder={t("Qty")}
                                             className="px-2 py-1 border border-gray-300 rounded text-xs disabled:bg-gray-100"
                                         />
                                         <input
@@ -3292,7 +3295,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                                 }));
                                             }}
                                             disabled={!isEditingQuotation}
-                                            placeholder="Gross"
+                                            placeholder={t("Gross")}
                                             className="px-2 py-1 border border-gray-300 rounded text-xs disabled:bg-gray-100"
                                         />
                                         <input
@@ -3306,7 +3309,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                                 }));
                                             }}
                                             disabled={!isEditingQuotation}
-                                            placeholder="Chargeable"
+                                            placeholder={t("Chargeable")}
                                             className="px-2 py-1 border border-gray-300 rounded text-xs disabled:bg-gray-100"
                                         />
                                     </div>
@@ -3318,7 +3321,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                         <div className="space-y-6">
                             {/* Left Column: Selling Items (Revenue) */}
                             <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 flex flex-col">
-                                <h4 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wider">Selling Items (Revenue)</h4>
+                                <h4 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wider">{t("Selling Items (Revenue)")}</h4>
                                 <div className="flex-1">
                                     <GroupedServiceItemManager
                                         items={isEditingQuotation ? (editedQuotation?.serviceItems || []) : viewingQuotation.serviceItems}
@@ -3380,12 +3383,12 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                             {/* Cost Breakdown (Buying/COGS) */}
                             <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 flex flex-col">
                                 <div className="flex items-center justify-between mb-3">
-                                    <h4 className="text-sm font-semibold text-gray-700 mb-0 uppercase tracking-wider">Cost Breakdown (Estimated Buying)</h4>
+                                    <h4 className="text-sm font-semibold text-gray-700 mb-0 uppercase tracking-wider">{t("Cost Breakdown (Estimated Buying)")}</h4>
                                     {isEditingQuotation && editedQuotation?.serviceItems && editedQuotation.serviceItems.length > 0 && (
                                         <button
                                             type="button"
                                             onClick={() => {
-                                                if (confirm('Salin semua item penjualan ke estimasi cost breakdown? Ini akan menimpa cost breakdown saat ini.')) {
+                                                if (confirm(t("Salin semua item penjualan ke estimasi cost breakdown? Ini akan menimpa cost breakdown saat ini."))) {
                                                     setEditedQuotation(prev => ({
                                                         ...prev,
                                                         costItems: duplicateAsCostItems(prev.serviceItems)
@@ -3394,7 +3397,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                             }}
                                             className="text-xs text-blue-600 hover:text-blue-700 font-medium"
                                         >
-                                            📋 Salin dari Selling Items
+                                            {t("📋 Salin dari Selling Items")}
                                         </button>
                                     )}
                                 </div>
@@ -3411,7 +3414,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                             <>
                                                 {isFallback && (
                                                     <div className="mb-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-700">
-                                                        ℹ️ Data lama — menampilkan selling items sebagai referensi estimasi biaya. Edit quotation untuk mengatur cost breakdown.
+                                                        {t("ℹ️ Data lama — menampilkan selling items sebagai referensi estimasi biaya. Edit quotation untuk mengatur cost breakdown.")}
                                                     </div>
                                                 )}
                                                 <GroupedServiceItemManager
@@ -3493,7 +3496,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
                                         {/* Selling Total */}
                                         <div className="p-4 bg-white/70 backdrop-blur-sm rounded-lg border border-orange-200/40">
-                                            <p className="text-[10px] font-bold text-orange-600 uppercase tracking-wider mb-1">Total Selling (Revenue)</p>
+                                            <p className="text-[10px] font-bold text-orange-600 uppercase tracking-wider mb-1">{t("Total Selling (Revenue)")}</p>
                                             <p className="text-xl font-bold text-orange-700">Rp {Number(selling.totalIdr || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                                             <p className="text-xs text-gray-500 font-semibold mt-1">
                                                 {rate > 1 ? `$ ${Number(selling.totalUsd || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
@@ -3502,7 +3505,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
 
                                         {/* Buying Total */}
                                         <div className="p-4 bg-white/70 backdrop-blur-sm rounded-lg border border-blue-200/40">
-                                            <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-1">Total Buying (COGS)</p>
+                                            <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-1">{t("Total Buying (COGS)")}</p>
                                             <p className="text-xl font-bold text-blue-700">Rp {Number(buying.totalIdr || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                                             <p className="text-xs text-gray-500 font-semibold mt-1">
                                                 {rate > 1 ? `$ ${Number(buying.totalUsd || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
@@ -3511,7 +3514,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
 
                                         {/* Profit Margin */}
                                         <div className="p-4 bg-white/80 backdrop-blur-sm rounded-lg border border-emerald-200">
-                                            <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1">Est. Profit Margin ({marginPct.toFixed(1)}%)</p>
+                                            <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1">{t("Est. Profit Margin (")}{marginPct.toFixed(1)}%)</p>
                                             <p className="text-xl font-bold text-emerald-700">
                                                 {marginIdr >= 0 ? '+' : ''} Rp {Number(marginIdr || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </p>
@@ -3526,13 +3529,13 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
 
                         {/* Notes / Review (View/Edit) */}
                         <div className="p-4 bg-white rounded-lg border border-gray-200">
-                            <h5 className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Notes / Review</h5>
+                            <h5 className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">{t("Notes / Review")}</h5>
                             {isEditingQuotation ? (
                                 <RichTextEditor
                                     rows={5}
                                     value={editedQuotation?.notes || ''}
                                     onChange={(html) => setEditedQuotation({ ...editedQuotation, notes: html })}
-                                    placeholder="Tambahkan notes dan format sesuai kebutuhan..."
+                                    placeholder={t("Tambahkan notes dan format sesuai kebutuhan...")}
                                 />
                             ) : (
                                 <div
@@ -3544,7 +3547,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
 
                         {/* Terms & Conditions (View/Edit) */}
                         <div className="p-4 bg-white rounded-lg border border-gray-200">
-                            <h5 className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Terms & Conditions</h5>
+                            <h5 className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">{t("Terms & Conditions")}</h5>
                             {isEditingQuotation ? (
                                 <textarea
                                     rows={5}
@@ -3566,10 +3569,10 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                 {viewingQuotation.status === 'draft' && !isEditingQuotation && (
                                     <>
                                         <Button onClick={() => handleUpdateStatus(viewingQuotation.id, 'manager_approval')}>
-                                            Submit for Manager Approval
+                                            {t("Submit for Manager Approval")}
                                         </Button>
                                         <Button variant="secondary" onClick={() => handleEditDraftInForm(viewingQuotation)} icon={Edit}>
-                                            Edit
+                                            {t("Edit")}
                                         </Button>
                                     </>
                                 )}
@@ -3577,10 +3580,10 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                 {isEditingQuotation && (
                                     <>
                                         <Button onClick={handleSaveEditedQuotation} className="bg-green-600 hover:bg-green-700 text-white">
-                                            Save Changes
+                                            {t("Save Changes")}
                                         </Button>
                                         <Button variant="secondary" onClick={handleCancelEdit}>
-                                            Cancel
+                                            {t("Cancel")}
                                         </Button>
                                     </>
                                 )}
@@ -3590,17 +3593,17 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                     <>
                                         <Button
                                             onClick={() => {
-                                                if (confirm('Approve and directly create Sales Order (SO)?\n\nThis will:\n1. Change status to Converted\n2. Auto-generate SO number\n3. Create new Shipment in Operations')) {
+                                                if (confirm(t("Approve and directly create Sales Order (SO)?\n\nThis will:\n1. Change status to Converted\n2. Auto-generate SO number\n3. Create new Shipment in Operations"))) {
                                                     handleCreateSO(viewingQuotation);
                                                 }
                                             }}
                                             className="bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 font-bold border border-blue-500/40"
                                         >
-                                            ⚡ Approve & Create SO
+                                            {t("⚡ Approve & Create SO")}
                                         </Button>
 
                                         <Button variant="secondary" onClick={() => handleManagerReject(viewingQuotation.id)} className="bg-red-500/20 hover:bg-red-500/30 text-red-400">
-                                            ✗ Reject
+                                            {t("✗ Reject")}
                                         </Button>
                                     </>
                                 )}
@@ -3613,18 +3616,18 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
                                 {/* Create Revision (for revision_requested status) */}
                                 {viewingQuotation.status === 'revision_requested' && (
                                     <Button onClick={() => handleCreateRevision(viewingQuotation.id)} className="bg-blue-500/20 hover:bg-blue-500/30 text-blue-400">
-                                        📝 Create Revision
+                                        {t("📝 Create Revision")}
                                     </Button>
                                 )}
 
                                 {/* Warning for superseded quotations */}
                                 {viewingQuotation.is_superseded && (
                                     <div className="text-orange-400 text-sm flex items-center gap-2">
-                                        <span>⚠️ Cannot create SO - quotation has been superseded by newer revision</span>
+                                        <span>{t("⚠️ Cannot create SO - quotation has been superseded by newer revision")}</span>
                                     </div>
                                 )}
                             </div>
-                            <Button variant="secondary" onClick={() => setShowViewModal(false)}>Close</Button>
+                            <Button variant="secondary" onClick={() => setShowViewModal(false)}>{t("Close")}</Button>
                         </div>
                     </div>
                 </Modal>
@@ -3642,6 +3645,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
 };
 
 const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettings }) => {
+    const { t } = useLanguage();
     const [creatorName, setCreatorName] = React.useState(quotation?.preparedBy || quotation?.prepared_by || '');
     const [approverName, setApproverName] = React.useState(quotation?.approvedBy || quotation?.approved_by || '');
     const [showGrandTotal, setShowGrandTotal] = React.useState(true);
@@ -3701,20 +3705,20 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
         <Modal isOpen={true} onClose={onClose} maxWidth="max-w-5xl">
             <div className="p-0 overflow-hidden rounded-lg">
                 <div className="flex items-center justify-between p-6 border-b border-dark-border bg-dark-card">
-                    <h2 className="text-xl font-bold text-silver-light">Quotation Preview</h2>
+                    <h2 className="text-xl font-bold text-silver-light">{t("Quotation Preview")}</h2>
                     <div className="flex gap-2 print:hidden">
                         <button
                             onClick={handlePrint}
                             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium text-sm"
                         >
                             <Download className="w-4 h-4" />
-                            Print / Save PDF
+                            {t("Print / Save PDF")}
                         </button>
                         <button
                             onClick={onClose}
                             className="px-4 py-2 border border-dark-border text-silver-light rounded-lg hover:bg-dark-surface transition-colors text-sm"
                         >
-                            Close
+                            {t("Close")}
                         </button>
                     </div>
                 </div>
@@ -3728,21 +3732,21 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                             {companySettings?.logo_url ? (
                                 <img src={companySettings.logo_url} alt="Logo" className="h-16 w-auto object-contain mb-4" />
                             ) : (
-                                <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 mb-2">PT. Bakhtera Freight Worldwide</h1>
+                                <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 mb-2">{t("PT. Bakhtera Freight Worldwide")}</h1>
                             )}
                             <div className="text-sm text-slate-500 leading-relaxed max-w-xs">
                                 <p>{companySettings?.company_address}</p>
                                 <div className="mt-2 flex gap-4 text-xs">
-                                    <span>Phone: {companySettings?.company_phone}</span>
-                                    <span>Email: {companySettings?.company_email}</span>
+                                    <span>{t("Phone:")} {companySettings?.company_phone}</span>
+                                    <span>{t("Email:")} {companySettings?.company_email}</span>
                                 </div>
                             </div>
                         </div>
                         <div className="text-right">
                             <h2 className="text-4xl font-light tracking-tight text-slate-900 mb-2">{offerTypeTitle ? `${offerTypeTitle.toUpperCase()} CHARGE COST` : 'Quotation'}</h2>
                             <p className="text-accent-blue font-mono font-medium text-lg">{quotation.quotationNumber || quotation.quotation_number}</p>
-                            <p className="text-xs text-slate-600 mt-2"><span className="font-semibold">Term of Payment:</span> {termOfPayment}</p>
-                            <p className="text-sm text-slate-400 mt-1">Issued Date: {new Date(quotation.quotationDate || quotation.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                            <p className="text-xs text-slate-600 mt-2"><span className="font-semibold">{t("Term of Payment:")}</span> {termOfPayment}</p>
+                            <p className="text-sm text-slate-400 mt-1">{t("Issued Date:")} {new Date(quotation.quotationDate || quotation.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
                         </div>
                     </header>
 
@@ -3750,7 +3754,7 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                     <div className="grid grid-cols-12 gap-12 mb-12">
                         {/* Client Info */}
                         <div className="col-span-5">
-                            <h3 className="text-xs uppercase tracking-widest text-slate-400 font-semibold mb-4">Bill To</h3>
+                            <h3 className="text-xs uppercase tracking-widest text-slate-400 font-semibold mb-4">{t("Bill To")}</h3>
                             <div className="text-sm leading-relaxed">
                                 {/* Company name — primary identity */}
                                 <p className="font-bold text-slate-900 text-base mb-0.5">
@@ -3762,39 +3766,39 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
 
                                 <dl className="space-y-1 text-slate-600 text-xs border-l-2 border-slate-100 pl-3">
                                     {(quotation.customerContact || quotation.customer_contact_name || quotation.customerName || quotation.customer_name) && (
-                                        <div className="flex gap-2"><dt className="font-medium text-slate-900 w-12">Attn:</dt> <dd>{quotation.customerContact || quotation.customer_contact_name || quotation.customerName || quotation.customer_name}</dd></div>
+                                        <div className="flex gap-2"><dt className="font-medium text-slate-900 w-12">{t("Attn:")}</dt> <dd>{quotation.customerContact || quotation.customer_contact_name || quotation.customerName || quotation.customer_name}</dd></div>
                                     )}
                                     {(quotation.customerEmail || quotation.customer_email) && (
-                                        <div className="flex gap-2"><dt className="font-medium text-slate-900 w-12">Email:</dt> <dd>{quotation.customerEmail || quotation.customer_email}</dd></div>
+                                        <div className="flex gap-2"><dt className="font-medium text-slate-900 w-12">{t("Email:")}</dt> <dd>{quotation.customerEmail || quotation.customer_email}</dd></div>
                                     )}
                                     {(quotation.customerPhone || quotation.customer_phone) && (
-                                        <div className="flex gap-2"><dt className="font-medium text-slate-900 w-12">Phone:</dt> <dd>{quotation.customerPhone || quotation.customer_phone}</dd></div>
+                                        <div className="flex gap-2"><dt className="font-medium text-slate-900 w-12">{t("Phone:")}</dt> <dd>{quotation.customerPhone || quotation.customer_phone}</dd></div>
                                     )}
                                 </dl>
 
                                 {/* Nama Pembuat — manual input */}
                                 <div className="mt-5 pt-4 border-t border-slate-100 print:hidden space-y-4">
                                     <div>
-                                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Nama Pembuat</label>
+                                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">{t("Nama Pembuat")}</label>
                                         <input
                                             type="text"
                                             value={creatorName}
                                             onChange={e => setCreatorName(e.target.value)}
-                                            placeholder="Ketik nama pembuat quotation..."
+                                            placeholder={t("Ketik nama pembuat quotation...")}
                                             className="w-full text-sm px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-800 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
                                         />
-                                        <p className="text-xs text-slate-400 mt-1">Nama akan muncul di kolom Prepared By saat dicetak.</p>
+                                        <p className="text-xs text-slate-400 mt-1">{t("Nama akan muncul di kolom Prepared By saat dicetak.")}</p>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Nama Disetujui</label>
+                                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">{t("Nama Disetujui")}</label>
                                         <input
                                             type="text"
                                             value={approverName}
                                             onChange={e => setApproverName(e.target.value)}
-                                            placeholder="Ketik nama yang menyetujui atau kosongkan..."
+                                            placeholder={t("Ketik nama yang menyetujui atau kosongkan...")}
                                             className="w-full text-sm px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-800 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
                                         />
-                                        <p className="text-xs text-slate-400 mt-1">Kosongkan jika ingin mencetak tanda tangan kosong.</p>
+                                        <p className="text-xs text-slate-400 mt-1">{t("Kosongkan jika ingin mencetak tanda tangan kosong.")}</p>
                                     </div>
                                 </div>
                             </div>
@@ -3802,54 +3806,54 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
 
                         {/* Shipment Details */}
                         <div className="col-span-7">
-                            <h3 className="text-xs uppercase tracking-widest text-slate-400 font-semibold mb-4">Shipment Details</h3>
+                            <h3 className="text-xs uppercase tracking-widest text-slate-400 font-semibold mb-4">{t("Shipment Details")}</h3>
                             <div className="grid grid-cols-3 gap-y-6 gap-x-8 text-sm">
                                 <div>
-                                    <span className="block text-xs text-slate-400 mb-1">Origin (POL)</span>
+                                    <span className="block text-xs text-slate-400 mb-1">{t("Origin (POL)")}</span>
                                     <span className="font-semibold text-slate-800">{quotation.origin || '—'}</span>
                                 </div>
                                 <div>
-                                    <span className="block text-xs text-slate-400 mb-1">Destination (POD)</span>
+                                    <span className="block text-xs text-slate-400 mb-1">{t("Destination (POD)")}</span>
                                     <span className="font-semibold text-slate-800">{quotation.destination || '—'}</span>
                                 </div>
                                 <div>
-                                    <span className="block text-xs text-slate-400 mb-1">Service Mode</span>
+                                    <span className="block text-xs text-slate-400 mb-1">{t("Service Mode")}</span>
                                     <span className="font-semibold text-slate-800 capitalize">{quotation.serviceType || '—'}</span>
                                 </div>
 
                                 <div>
-                                    <span className="block text-xs text-slate-400 mb-1">Commodity</span>
+                                    <span className="block text-xs text-slate-400 mb-1">{t("Commodity")}</span>
                                     <span className="font-semibold text-slate-800">{quotation.commodity || '—'}</span>
                                 </div>
                                 <div>
-                                    <span className="block text-xs text-slate-400 mb-1">Quantity/Package</span>
+                                    <span className="block text-xs text-slate-400 mb-1">{t("Quantity/Package")}</span>
                                     <span className="font-semibold text-slate-800">
                                         {quotation.quantity || '-'} {quotation.packageType || quotation.package_type || ''}
                                     </span>
                                 </div>
                                 <div>
-                                    <span className="block text-xs text-slate-400 mb-1">Container Count</span>
+                                    <span className="block text-xs text-slate-400 mb-1">{t("Container Count")}</span>
                                     <span className="font-semibold text-slate-800">{quotation.containerCount || quotation.container_count || '—'}</span>
                                 </div>
                                 <div>
-                                    <span className="block text-xs text-slate-400 mb-1">Incoterm</span>
+                                    <span className="block text-xs text-slate-400 mb-1">{t("Incoterm")}</span>
                                     <span className="font-semibold text-slate-800 uppercase">{quotation.incoterm || '—'}</span>
                                 </div>
 
                                 <div>
-                                    <span className="block text-xs text-slate-400 mb-1">Weight / Volume</span>
+                                    <span className="block text-xs text-slate-400 mb-1">{t("Weight / Volume")}</span>
                                     <span className="font-semibold text-slate-800">
                                         NW: {parseFloat(quotation.netWeight || 0).toLocaleString('id-ID')} / GW: {parseFloat(quotation.grossWeight || quotation.weight || 0).toLocaleString('id-ID')} KGS <br />
                                         {parseFloat(quotation.volume || quotation.measure || 0).toLocaleString('id-ID')} CBM
                                     </span>
                                 </div>
                                 <div>
-                                    <span className="block text-xs text-slate-400 mb-1">Payment Term</span>
+                                    <span className="block text-xs text-slate-400 mb-1">{t("Payment Term")}</span>
                                     <span className="font-semibold text-slate-800">{termOfPayment}</span>
                                 </div>
                                 <div>
-                                    <span className="block text-xs text-slate-400 mb-1">Validity</span>
-                                    <span className="font-semibold text-slate-800">{quotation.validityDays || 30} Days</span>
+                                    <span className="block text-xs text-slate-400 mb-1">{t("Validity")}</span>
+                                    <span className="font-semibold text-slate-800">{quotation.validityDays || 30} {t("Days")}</span>
                                 </div>
                             </div>
                         </div>
@@ -3864,7 +3868,7 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                                 onChange={(e) => setShowGrandTotal(e.target.checked)}
                                 className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                             />
-                            Show Grand Total
+                            {t("Show Grand Total")}
                         </label>
                         <label className="inline-flex items-center gap-2 text-sm text-slate-700">
                             <input
@@ -3873,7 +3877,7 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                                 onChange={(e) => setShowEstimatedTotal(e.target.checked)}
                                 className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                             />
-                            Show Estimated Total
+                            {t("Show Estimated Total")}
                         </label>
                     </div>
                     <div className="mb-6">
@@ -3881,11 +3885,11 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                             <thead>
                                 <tr className="border-b border-slate-200">
                                     <th className="text-center font-semibold text-slate-900 py-1.5 uppercase text-[9px] tracking-wider w-[5%] bg-slate-50 pl-4 rounded-l-md">No</th>
-                                    <th className="text-left font-semibold text-slate-900 py-1.5 uppercase text-[9px] tracking-wider w-[45%] bg-slate-50">Description</th>
-                                    <th className="text-right font-semibold text-slate-900 py-1.5 uppercase text-[9px] tracking-wider w-[17%] bg-slate-50">Rate</th>
-                                    <th className="text-right font-semibold text-slate-900 py-1.5 uppercase text-[9px] tracking-wider w-[17%] bg-slate-50">Value (IDR)</th>
-                                    <th className="text-right font-semibold text-slate-900 py-1.5 uppercase text-[9px] tracking-wider w-[17%] bg-slate-50">Total (USD)</th>
-                                    <th className="text-center font-semibold text-slate-900 py-1.5 uppercase text-[9px] tracking-wider w-[10%] bg-slate-50 pr-4 rounded-r-md">Remarks</th>
+                                    <th className="text-left font-semibold text-slate-900 py-1.5 uppercase text-[9px] tracking-wider w-[45%] bg-slate-50">{t("Description")}</th>
+                                    <th className="text-right font-semibold text-slate-900 py-1.5 uppercase text-[9px] tracking-wider w-[17%] bg-slate-50">{t("Rate")}</th>
+                                    <th className="text-right font-semibold text-slate-900 py-1.5 uppercase text-[9px] tracking-wider w-[17%] bg-slate-50">{t("Value (IDR)")}</th>
+                                    <th className="text-right font-semibold text-slate-900 py-1.5 uppercase text-[9px] tracking-wider w-[17%] bg-slate-50">{t("Total (USD)")}</th>
+                                    <th className="text-center font-semibold text-slate-900 py-1.5 uppercase text-[9px] tracking-wider w-[10%] bg-slate-50 pr-4 rounded-r-md">{t("Remarks")}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -3899,7 +3903,7 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                                         <React.Fragment key={groupIndex}>
                                             <tr className="bg-slate-50/70">
                                                 <td colSpan={6} className="py-2 pl-4 font-bold text-slate-800 text-[10px] uppercase">
-                                                    {groupName} (Rate: Rp {formatNumberByCurrency(currentGroupRate, 'IDR')})
+                                                    {groupName} {t("(Rate: Rp")} {formatNumberByCurrency(currentGroupRate, 'IDR')})
                                                 </td>
                                             </tr>
                                             {subItems.map((item, itemIndex) => {
@@ -3954,14 +3958,14 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                                 {showGrandTotal && (
                                     <>
                                         <div className="flex justify-between items-center mb-2">
-                                            <span className="text-slate-400 text-xs">GRAND TOTAL (IDR):</span>
+                                            <span className="text-slate-400 text-xs">{t("GRAND TOTAL (IDR):")}</span>
                                             <span className="font-mono font-bold text-sm min-w-[170px] inline-flex items-center justify-between gap-2">
                                                 <span className="text-slate-300">IDR</span>
                                                 <span className="text-right">{formatNumberByCurrency(computedGrandTotalIDR, 'IDR')}</span>
                                             </span>
                                         </div>
                                         <div className="flex justify-between items-center mb-3">
-                                            <span className="text-slate-400 text-xs">GRAND TOTAL (USD):</span>
+                                            <span className="text-slate-400 text-xs">{t("GRAND TOTAL (USD):")}</span>
                                             <span className="font-mono font-bold text-sm min-w-[170px] inline-flex items-center justify-between gap-2">
                                                 <span className="text-slate-300">USD</span>
                                                 <span className="text-right">{formatNumberByCurrency(computedGrandTotalUSD, 'USD')}</span>
@@ -3971,7 +3975,7 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                                 )}
                                 {showEstimatedTotal && (
                                     <div className="flex justify-between items-center pt-3 border-t border-dashed border-slate-700">
-                                        <span className="font-bold text-slate-200 text-xs">ESTIMASI TOTAL ({quotation.currency}):</span>
+                                        <span className="font-bold text-slate-200 text-xs">{t("ESTIMASI TOTAL (")}{quotation.currency}):</span>
                                         <span className="font-bold text-base text-emerald-400 font-mono min-w-[170px] inline-flex items-center justify-between gap-2">
                                             <span>{quotation.currency === 'IDR' ? 'IDR' : 'USD'}</span>
                                             <span className="text-right">
@@ -3989,7 +3993,7 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                     {/* Notes / Terms & Footer */}
                     <div className="grid grid-cols-1 gap-8 mt-auto">
                         <div className="text-xs text-slate-500">
-                            <h4 className="font-bold text-slate-900 uppercase mb-2">Notes / Review</h4>
+                            <h4 className="font-bold text-slate-900 uppercase mb-2">{t("Notes / Review")}</h4>
                             <div
                                 className="leading-relaxed border border-slate-200 rounded-md p-3 min-h-[64px]"
                                 dangerouslySetInnerHTML={{ __html: notesHtml || '<span style="color:#94a3b8;font-style:italic;">No notes</span>' }}
@@ -3999,7 +4003,7 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
 
                     <div className="grid grid-cols-2 gap-12 mt-8">
                         <div className="text-xs text-slate-500">
-                            <h4 className="font-bold text-slate-900 uppercase mb-2">Terms & Conditions</h4>
+                            <h4 className="font-bold text-slate-900 uppercase mb-2">{t("Terms & Conditions")}</h4>
                             <div className="whitespace-pre-line leading-relaxed">
                                 {quotation.termsConditions || 'Standard trading conditions apply.'}
                             </div>
@@ -4008,12 +4012,12 @@ const QuotationPrintPreviewModal = ({ quotation, onClose, onPrint, companySettin
                             <div className="flex justify-between items-end gap-8 text-center pt-8">
                                 <div className="flex-1">
                                     <div className="h-20 border-b border-slate-300 mb-2"></div>
-                                    <p className="font-semibold text-slate-900 text-sm">Prepared By</p>
+                                    <p className="font-semibold text-slate-900 text-sm">{t("Prepared By")}</p>
                                     <p className="text-xs text-slate-700 font-medium mt-0.5">{creatorName || '___________________'}</p>
                                 </div>
                                 <div className="flex-1">
                                     <div className="h-20 border-b border-slate-300 mb-2"></div>
-                                    <p className="font-semibold text-slate-900 text-sm">Approved By</p>
+                                    <p className="font-semibold text-slate-900 text-sm">{t("Approved By")}</p>
                                     <p className="text-xs text-slate-700 font-medium mt-0.5">{approverName || '___________________'}</p>
                                 </div>
                             </div>
