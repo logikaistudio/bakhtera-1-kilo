@@ -818,7 +818,14 @@ export async function createARPaymentJournal({
 
     const batchId = generateUUID();
     const jeNum = await generateJENumber('PAY-IN');
-    const exRate = invoice.currency !== 'IDR' ? (invoice.exchange_rate || 1) : 1;
+    let invoiceRate = Number(invoice.exchange_rate) || 1;
+    if (invoice.currency !== 'IDR' && invoiceRate <= 1) {
+        // Data AR kadang tanpa kurs; ambil kurs asli dari invoice
+        const { data: invRow } = await supabase
+            .from('blink_invoices').select('exchange_rate').eq('id', invoice.id).maybeSingle();
+        if (Number(invRow?.exchange_rate) > 1) invoiceRate = Number(invRow.exchange_rate);
+    }
+    const exRate = invoice.currency !== 'IDR' ? invoiceRate : 1;
     const payRate = invoice.currency !== 'IDR' ? (paymentExchangeRate || exRate) : 1;
     const note = invoice.currency !== 'IDR' ? ` (Rate: ${payRate.toLocaleString('id-ID')})` : '';
     const bankLabel = selectedBank
