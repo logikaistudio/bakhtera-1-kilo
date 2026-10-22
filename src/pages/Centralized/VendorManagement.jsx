@@ -6,8 +6,10 @@ import Button from '../../components/Common/Button';
 import { Plus, Users, Download } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { exportToCSV } from '../../utils/exportCSV';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const VendorManagement = () => {
+    const { t } = useLanguage();
     const { businessPartners, addBusinessPartner, updateBusinessPartner, deleteBusinessPartner } = useData();
     const { isAdmin, canDelete } = useAuth();
 
@@ -84,7 +86,7 @@ const VendorManagement = () => {
 
     const handleRemove = (vendor) => {
         if (!(isAdmin() || canDelete('central_vendors'))) {
-            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus partner.');
+            alert(t("Akses Ditolak: Anda tidak memiliki hak untuk menghapus partner."));
             return;
         }
         if (window.confirm(`Are you sure you want to delete ${vendor.partner_name}?`)) {
@@ -103,10 +105,10 @@ const VendorManagement = () => {
             key: 'roles',
             render: (row) => (
                 <div className="flex gap-1 flex-wrap">
-                    {row.is_vendor && <span className="px-2 py-0.5 rounded text-xs bg-blue-500/20 text-blue-400">Vendor</span>}
-                    {row.is_customer && <span className="px-2 py-0.5 rounded text-xs bg-green-500/20 text-green-400">Customer</span>}
-                    {row.is_agent && <span className="px-2 py-0.5 rounded text-xs bg-purple-500/20 text-purple-400">Agent</span>}
-                    {row.is_transporter && <span className="px-2 py-0.5 rounded text-xs bg-orange-500/20 text-orange-400">Transporter</span>}
+                    {row.is_vendor && <span className="px-2 py-0.5 rounded text-xs bg-blue-500/20 text-blue-400">{t("Vendor")}</span>}
+                    {row.is_customer && <span className="px-2 py-0.5 rounded text-xs bg-green-500/20 text-green-400">{t("Customer")}</span>}
+                    {row.is_agent && <span className="px-2 py-0.5 rounded text-xs bg-purple-500/20 text-purple-400">{t("Agent")}</span>}
+                    {row.is_transporter && <span className="px-2 py-0.5 rounded text-xs bg-orange-500/20 text-orange-400">{t("Transporter")}</span>}
                 </div>
             ),
         },
@@ -146,15 +148,15 @@ const VendorManagement = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-4xl font-bold gradient-text mb-2">Vendor Management</h1>
-                    <p className="text-silver-dark">Centralized vendor database for all modules</p>
+                    <h1 className="text-4xl font-bold gradient-text mb-2">{t("Vendor Management")}</h1>
+                    <p className="text-silver-dark">{t("Centralized vendor database for all modules")}</p>
                 </div>
                 <div className="flex gap-3">
                     <Button onClick={handleExportCSV} variant="secondary" icon={Download}>
-                        Export CSV
+                        {t("Export CSV")}
                     </Button>
                     <Button onClick={() => handleOpenModal()} icon={Plus}>
-                        Add Vendor
+                        {t("Add Vendor")}
                     </Button>
                 </div>
             </div>
@@ -165,7 +167,7 @@ const VendorManagement = () => {
                     <div className="flex items-center gap-3">
                         <Users className="w-8 h-8 text-silver" />
                         <div>
-                            <p className="text-silver-dark text-sm">Total Vendors</p>
+                            <p className="text-silver-dark text-sm">{t("Total Vendors")}</p>
                             <p className="text-3xl font-bold text-silver-light">{vendors.length}</p>
                         </div>
                     </div>
@@ -174,7 +176,7 @@ const VendorManagement = () => {
                     <div className="flex items-center gap-3">
                         <div className="w-3 h-3 rounded-full bg-green-500" />
                         <div>
-                            <p className="text-silver-dark text-sm">Active</p>
+                            <p className="text-silver-dark text-sm">{t("Active")}</p>
                             <p className="text-3xl font-bold text-silver-light">
                                 {vendors.filter((v) => v.status === 'active').length}
                             </p>
@@ -185,7 +187,7 @@ const VendorManagement = () => {
                     <div className="flex items-center gap-3">
                         <div className="w-3 h-3 rounded-full bg-red-500" />
                         <div>
-                            <p className="text-silver-dark text-sm">Inactive</p>
+                            <p className="text-silver-dark text-sm">{t("Inactive")}</p>
                             <p className="text-3xl font-bold text-silver-light">
                                 {vendors.filter((v) => v.status === 'inactive').length}
                             </p>
@@ -212,14 +214,14 @@ const VendorManagement = () => {
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-silver-dark mb-2">
-                            Partner Name *
+                            {t("Partner Name *")}
                         </label>
                         <input
                             type="text"
                             required
                             value={formData.partner_name}
                             onChange={(e) => setFormData({ ...formData, partner_name: e.target.value })}
-                            placeholder="Enter partner name"
+                            placeholder={t("Enter partner name")}
                             className="w-full"
                         />
                     </div>
@@ -227,7 +229,7 @@ const VendorManagement = () => {
                     {/* Partner Roles */}
                     <div>
                         <label className="block text-sm font-medium text-silver-dark mb-2">
-                            Partner Roles *
+                            {t("Partner Roles *")}
                         </label>
                         <div className="grid grid-cols-2 gap-3">
                             <label className="flex items-center gap-2 cursor-pointer">
@@ -237,7 +239,7 @@ const VendorManagement = () => {
                                     onChange={(e) => setFormData({ ...formData, is_customer: e.target.checked })}
                                     className="w-4 h-4"
                                 />
-                                <span className="text-sm text-silver-light">Customer</span>
+                                <span className="text-sm text-silver-light">{t("Customer")}</span>
                             </label>
                             <label className="flex items-center gap-2 cursor-pointer">
                                 <input
@@ -246,7 +248,7 @@ const VendorManagement = () => {
                                     onChange={(e) => setFormData({ ...formData, is_vendor: e.target.checked })}
                                     className="w-4 h-4"
                                 />
-                                <span className="text-sm text-silver-light">Vendor</span>
+                                <span className="text-sm text-silver-light">{t("Vendor")}</span>
                             </label>
                             <label className="flex items-center gap-2 cursor-pointer">
                                 <input
@@ -255,7 +257,7 @@ const VendorManagement = () => {
                                     onChange={(e) => setFormData({ ...formData, is_agent: e.target.checked })}
                                     className="w-4 h-4"
                                 />
-                                <span className="text-sm text-silver-light">Agent</span>
+                                <span className="text-sm text-silver-light">{t("Agent")}</span>
                             </label>
                             <label className="flex items-center gap-2 cursor-pointer">
                                 <input
@@ -264,20 +266,20 @@ const VendorManagement = () => {
                                     onChange={(e) => setFormData({ ...formData, is_transporter: e.target.checked })}
                                     className="w-4 h-4"
                                 />
-                                <span className="text-sm text-silver-light">Transporter</span>
+                                <span className="text-sm text-silver-light">{t("Transporter")}</span>
                             </label>
                         </div>
                     </div>
 
                     <div>
                         <label className="block text-sm font-medium text-silver-dark mb-2">
-                            Contact Person
+                            {t("Contact Person")}
                         </label>
                         <input
                             type="text"
                             value={formData.contact_person}
                             onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
-                            placeholder="Enter contact person name"
+                            placeholder={t("Enter contact person name")}
                             className="w-full"
                         />
                     </div>
@@ -285,26 +287,26 @@ const VendorManagement = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-silver-dark mb-2">
-                                Email
+                                {t("Email")}
                             </label>
                             <input
                                 type="email"
                                 value={formData.email}
                                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                placeholder="partner@example.com"
+                                placeholder={t("partner@example.com")}
                                 className="w-full"
                             />
                         </div>
 
                         <div>
                             <label className="block text-sm font-medium text-silver-dark mb-2">
-                                Phone
+                                {t("Phone")}
                             </label>
                             <input
                                 type="tel"
                                 value={formData.phone}
                                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                placeholder="+62 xxx xxxx xxxx"
+                                placeholder={t("+62 xxx xxxx xxxx")}
                                 className="w-full"
                             />
                         </div>
@@ -312,7 +314,7 @@ const VendorManagement = () => {
 
                     <div>
                         <label className="block text-sm font-medium text-silver-dark mb-2">
-                            NPWP
+                            {t("NPWP")}
                         </label>
                         <input
                             type="text"
@@ -322,20 +324,20 @@ const VendorManagement = () => {
                             className="w-full"
                             maxLength="20"
                         />
-                        <p className="text-xs text-silver-dark mt-1">Format: 00.000.000.0-000.000</p>
+                        <p className="text-xs text-silver-dark mt-1">{t("Format: 00.000.000.0-000.000")}</p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-silver-dark mb-2">
-                                Category
+                                {t("Category")}
                             </label>
                             <select
                                 value={formData.category}
                                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                                 className="w-full"
                             >
-                                <option value="">Select category</option>
+                                <option value="">{t("Select category")}</option>
                                 {categories.map((cat) => (
                                     <option key={cat} value={cat}>
                                         {cat}
@@ -346,7 +348,7 @@ const VendorManagement = () => {
 
                         <div>
                             <label className="block text-sm font-medium text-silver-dark mb-2">
-                                Status
+                                {t("Status")}
                             </label>
                             <select
                                 value={formData.status}
@@ -370,14 +372,14 @@ const VendorManagement = () => {
                                 onClick={() => handleRemove(editingVendor)}
                                 className="bg-red-500/20 hover:bg-red-500/30 text-red-400"
                             >
-                                Delete
+                                {t("Delete")}
                             </Button>
                         )}
                         <div className="flex gap-3 ml-auto">
                             <Button type="button" variant="secondary" onClick={() => setIsModalOpen(false)}>
-                                Cancel
+                                {t("Cancel")}
                             </Button>
-                            <Button type="submit">{editingVendor ? 'Update' : 'Create'} Vendor</Button>
+                            <Button type="submit">{editingVendor ? 'Update' : 'Create'} {t("Vendor")}</Button>
                         </div>
                     </div>
                 </form>

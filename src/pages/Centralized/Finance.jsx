@@ -4,8 +4,10 @@ import DataTable from '../../components/Common/DataTable';
 import Modal from '../../components/Common/Modal';
 import Button from '../../components/Common/Button';
 import { Plus, Wallet, TrendingUp, TrendingDown } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const Finance = () => {
+    const { t } = useLanguage();
     const { finance, addFinanceTransaction, updateFinanceTransaction, deleteFinanceTransaction } = useData();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingTransaction, setEditingTransaction] = useState(null);
@@ -114,11 +116,11 @@ const Finance = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-4xl font-bold gradient-text mb-2">Finance Management</h1>
-                    <p className="text-silver-dark">Centralized financial transactions for all modules</p>
+                    <h1 className="text-4xl font-bold gradient-text mb-2">{t("Finance Management")}</h1>
+                    <p className="text-silver-dark">{t("Centralized financial transactions for all modules")}</p>
                 </div>
                 <Button onClick={() => handleOpenModal()} icon={Plus}>
-                    Add Transaction
+                    {t("Add Transaction")}
                 </Button>
             </div>
 
@@ -128,7 +130,7 @@ const Finance = () => {
                     <div className="flex items-center gap-3">
                         <TrendingUp className="w-8 h-8 text-green-400" />
                         <div>
-                            <p className="text-silver-dark text-sm">Total Income</p>
+                            <p className="text-silver-dark text-sm">{t("Total Income")}</p>
                             <p className="text-2xl font-bold text-green-400">
                                 Rp {totalIncome.toLocaleString('id-ID')}
                             </p>
@@ -139,7 +141,7 @@ const Finance = () => {
                     <div className="flex items-center gap-3">
                         <TrendingDown className="w-8 h-8 text-red-400" />
                         <div>
-                            <p className="text-silver-dark text-sm">Total Expense</p>
+                            <p className="text-silver-dark text-sm">{t("Total Expense")}</p>
                             <p className="text-2xl font-bold text-red-400">
                                 Rp {totalExpense.toLocaleString('id-ID')}
                             </p>
@@ -150,7 +152,7 @@ const Finance = () => {
                     <div className="flex items-center gap-3">
                         <Wallet className="w-8 h-8 text-silver" />
                         <div>
-                            <p className="text-silver-dark text-sm">Balance</p>
+                            <p className="text-silver-dark text-sm">{t("Balance")}</p>
                             <p className={`text-2xl font-bold ${balance >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                                 Rp {balance.toLocaleString('id-ID')}
                             </p>
@@ -179,7 +181,7 @@ const Finance = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-silver-dark mb-2">
-                                Type *
+                                {t("Type *")}
                             </label>
                             <select
                                 required
@@ -197,7 +199,7 @@ const Finance = () => {
 
                         <div>
                             <label className="block text-sm font-medium text-silver-dark mb-2">
-                                Category *
+                                {t("Category *")}
                             </label>
                             <select
                                 required
@@ -205,7 +207,7 @@ const Finance = () => {
                                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                                 className="w-full"
                             >
-                                <option value="">Select category</option>
+                                <option value="">{t("Select category")}</option>
                                 {categories.map((cat) => (
                                     <option key={cat} value={cat}>
                                         {cat}
@@ -218,7 +220,7 @@ const Finance = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-silver-dark mb-2">
-                                Quantity *
+                                {t("Quantity *")}
                             </label>
                             <input
                                 type="number"
@@ -234,7 +236,7 @@ const Finance = () => {
 
                         <div>
                             <label className="block text-sm font-medium text-silver-dark mb-2">
-                                Date *
+                                {t("Date *")}
                             </label>
                             <input
                                 type="date"
@@ -248,7 +250,7 @@ const Finance = () => {
 
                     <div>
                         <label className="block text-sm font-medium text-silver-dark mb-2">
-                            Module
+                            {t("Module")}
                         </label>
                         <select
                             value={formData.module}
@@ -265,12 +267,12 @@ const Finance = () => {
 
                     <div>
                         <label className="block text-sm font-medium text-silver-dark mb-2">
-                            Description
+                            {t("Description")}
                         </label>
                         <textarea
                             value={formData.description}
                             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                            placeholder="Enter transaction description"
+                            placeholder={t("Enter transaction description")}
                             rows={3}
                             className="w-full"
                         />
@@ -278,10 +280,10 @@ const Finance = () => {
 
                     <div className="flex justify-end gap-3 mt-6">
                         <Button type="button" variant="secondary" onClick={() => setIsModalOpen(false)}>
-                            Cancel
+                            {t("Cancel")}
                         </Button>
                         <Button type="submit">
-                            {editingTransaction ? 'Update' : 'Create'} Transaction
+                            {editingTransaction ? 'Update' : 'Create'} {t("Transaction")}
                         </Button>
                     </div>
                 </form>

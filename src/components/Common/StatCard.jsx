@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const StatCard = ({
     icon: Icon,

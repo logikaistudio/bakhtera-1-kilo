@@ -8,10 +8,12 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const { read, utils } = XLSX;
 
     const COAMaster = () => {
+    const { t } = useLanguage();
     const { isAdmin, canDelete } = useAuth();
     const { deleteCOA } = useData();
     const [accounts, setAccounts] = useState([]);
@@ -137,7 +139,7 @@ const { read, utils } = XLSX;
                 console.log('[COA Import] Sample Row 2:', data[1]);
 
                 if (data.length === 0) {
-                    alert('Excel file is empty or format is incorrect.');
+                    alert(t("Excel file is empty or format is incorrect."));
                     return;
                 }
 
@@ -364,7 +366,7 @@ const { read, utils } = XLSX;
     const executeImport = async () => {
         try {
             if (importMode === 'REPLACE') {
-                if (!confirm('WARNING: This will DELETE ALL existing accounts and replace with new data. Continue?')) return;
+                if (!confirm(t("WARNING: This will DELETE ALL existing accounts and replace with new data. Continue?"))) return;
 
                 setLoading(true);
                 const { error: deleteError } = await supabase
@@ -374,7 +376,7 @@ const { read, utils } = XLSX;
 
                 if (deleteError) {
                     if (deleteError.code === '23503' || deleteError.message?.includes('foreign key')) {
-                        alert('Failed: Some accounts are linked to transactions. Use APPEND mode instead.');
+                        alert(t("Failed: Some accounts are linked to transactions. Use APPEND mode instead."));
                         setLoading(false);
                         return;
                     }
@@ -408,7 +410,7 @@ const { read, utils } = XLSX;
                 )].map(p => `${p}-`);
 
                 if (prefixes.length === 0) {
-                    alert('Tidak dapat mendeteksi prefix kode dari data Excel. Pastikan kode diawali dengan angka (misal 5-xxx).');
+                    alert(t("Tidak dapat mendeteksi prefix kode dari data Excel. Pastikan kode diawali dengan angka (misal 5-xxx)."));
                     return;
                 }
 
@@ -555,7 +557,7 @@ const { read, utils } = XLSX;
 
     const handleExportExcel = () => {
         if (accounts.length === 0) {
-            alert('No data to export.');
+            alert(t("No data to export."));
             return;
         }
 
@@ -622,10 +624,10 @@ const { read, utils } = XLSX;
 
     const handleDelete = async (id) => {
         if (!(isAdmin() || canDelete('central_coa'))) {
-            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus COA.');
+            alert(t("Akses Ditolak: Anda tidak memiliki hak untuk menghapus COA."));
             return;
         }
-        if (!confirm('Are you sure you want to delete this account?')) return;
+        if (!confirm(t("Are you sure you want to delete this account?"))) return;
         try {
             const success = await deleteCOA(id);
             if (!success) return;
@@ -638,11 +640,11 @@ const { read, utils } = XLSX;
 
     const handleDeleteAll = async () => {
         if (!(isAdmin() || canDelete('central_coa'))) {
-            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus seluruh COA.');
+            alert(t("Akses Ditolak: Anda tidak memiliki hak untuk menghapus seluruh COA."));
             return;
         }
         if (accounts.length === 0) {
-            alert('Tidak ada data COA untuk dihapus.');
+            alert(t("Tidak ada data COA untuk dihapus."));
             return;
         }
 
@@ -651,7 +653,7 @@ const { read, utils } = XLSX;
 
         const userInput = prompt('Ketik "HAPUS SEMUA" (huruf kapital) untuk konfirmasi:');
         if (userInput !== 'HAPUS SEMUA') {
-            alert('Konfirmasi tidak sesuai. Operasi dibatalkan.');
+            alert(t("Konfirmasi tidak sesuai. Operasi dibatalkan."));
             return;
         }
 
@@ -664,13 +666,13 @@ const { read, utils } = XLSX;
 
             if (error) {
                 if (error.code === '23503' || error.message?.includes('foreign key')) {
-                    alert('❌ Gagal: Sebagian akun sudah terhubung ke transaksi dan tidak dapat dihapus.');
+                    alert(t("❌ Gagal: Sebagian akun sudah terhubung ke transaksi dan tidak dapat dihapus."));
                     return;
                 }
                 throw error;
             }
 
-            alert('✅ Seluruh data COA berhasil dihapus.');
+            alert(t("✅ Seluruh data COA berhasil dihapus."));
             fetchAccounts();
         } catch (error) {
             console.error('Error deleting all accounts:', error);
@@ -682,7 +684,7 @@ const { read, utils } = XLSX;
 
     const handleDeleteSelected = async () => {
         if (!(isAdmin() || canDelete('central_coa'))) {
-            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus COA.');
+            alert(t("Akses Ditolak: Anda tidak memiliki hak untuk menghapus COA."));
             return;
         }
         if (selectedIds.length === 0) return;
@@ -698,7 +700,7 @@ const { read, utils } = XLSX;
 
             if (error) {
                 if (error.code === '23503' || error.message?.includes('foreign key')) {
-                    alert('❌ Gagal: Sebagian akun sudah terhubung ke transaksi.');
+                    alert(t("❌ Gagal: Sebagian akun sudah terhubung ke transaksi."));
                     return;
                 }
                 throw error;
@@ -767,8 +769,8 @@ const { read, utils } = XLSX;
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text">Chart of Accounts</h1>
-                    <p className="text-silver-dark mt-1">Master Data Kode Akuntansi Keuangan</p>
+                    <h1 className="text-3xl font-bold gradient-text">{t("Chart of Accounts")}</h1>
+                    <p className="text-silver-dark mt-1">{t("Master Data Kode Akuntansi Keuangan")}</p>
                 </div>
                 <div className="flex gap-2 items-center">
                     <input
@@ -784,7 +786,7 @@ const { read, utils } = XLSX;
                             className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-red-500/20 text-red-400 border border-red-500/30 rounded-md hover:bg-red-500/30 transition-colors"
                         >
                             <Trash2 className="w-3 h-3" />
-                            Hapus {selectedIds.length} Dipilih
+                            {t("Hapus")} {selectedIds.length} {t("Dipilih")}
                         </button>
                     )}
                     <button
@@ -792,35 +794,35 @@ const { read, utils } = XLSX;
                         className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20 rounded-md hover:bg-green-500/20 transition-colors"
                     >
                         <FileText className="w-3 h-3" />
-                        Export
+                        {t("Export")}
                     </button>
                     <button
                         onClick={handleDownloadTemplate}
                         className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-md hover:bg-blue-500/20 transition-colors"
                     >
                         <FileText className="w-3 h-3" />
-                        Template
+                        {t("Template")}
                     </button>
                     <button
                         onClick={() => fileInputRef.current.click()}
                         className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-dark-surface text-silver-light border border-dark-border rounded-md hover:border-accent-blue transition-colors"
                     >
                         <Upload className="w-3 h-3" />
-                        Import
+                        {t("Import")}
                     </button>
                     <button
                         onClick={handleDeleteAll}
                         className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-red-600/80 text-white rounded-md hover:bg-red-700 transition-colors"
                     >
                         <Trash2 className="w-3 h-3" />
-                        Delete All
+                        {t("Delete All")}
                     </button>
                     <button
                         onClick={() => { resetForm(); setShowModal(true); }}
                         className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-accent-blue text-white rounded-md hover:bg-accent-cyan transition-colors"
                     >
                         <Plus className="w-3 h-3" />
-                        Add Account
+                        {t("Add Account")}
                     </button>
                 </div>
             </div>
@@ -831,7 +833,7 @@ const { read, utils } = XLSX;
                     <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 text-silver-dark" />
                     <input
                         type="text"
-                        placeholder="Search code or account name..."
+                        placeholder={t("Search code or account name...")}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-10 pr-4 py-2.5 bg-dark-surface border border-dark-border rounded-lg text-sm text-silver-light focus:border-accent-blue outline-none transition-colors"
@@ -842,7 +844,7 @@ const { read, utils } = XLSX;
                     onChange={(e) => setFilterType(e.target.value)}
                     className="px-4 py-2.5 bg-dark-surface border border-dark-border rounded-lg text-sm text-silver-light min-w-[180px] focus:border-accent-blue outline-none transition-colors"
                 >
-                    <option value="ALL">All Groups</option>
+                    <option value="ALL">{t("All Groups")}</option>
                     {accountGroups.map(type => (
                         <option key={type} value={type}>{type}</option>
                     ))}
@@ -861,28 +863,28 @@ const { read, utils } = XLSX;
                                         checked={filteredAccounts.length > 0 && selectedIds.length === filteredAccounts.length}
                                         onChange={toggleSelectAll}
                                         className="w-3 h-3 accent-accent-blue cursor-pointer"
-                                        title="Pilih semua"
+                                        title={t("Pilih semua")}
                                     />
                                 </th>
-                                <th className="px-2 py-1 text-left text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">Code</th>
-                                <th className="px-2 py-1 text-left text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">Name</th>
-                                <th className="px-2 py-1 text-left text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">Group</th>
-                                <th className="px-2 py-1 text-center text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">No. Master Code</th>
-                                <th className="px-2 py-1 text-center text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">Lvl</th>
+                                <th className="px-2 py-1 text-left text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">{t("Code")}</th>
+                                <th className="px-2 py-1 text-left text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">{t("Name")}</th>
+                                <th className="px-2 py-1 text-left text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">{t("Group")}</th>
+                                <th className="px-2 py-1 text-center text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">{t("No. Master Code")}</th>
+                                <th className="px-2 py-1 text-center text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">{t("Lvl")}</th>
                                 <th className="px-2 py-1 text-center text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">TB</th>
                                 <th className="px-2 py-1 text-center text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">P&L</th>
                                 <th className="px-2 py-1 text-center text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">BS</th>
                                 <th className="px-2 py-1 text-center text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">AR</th>
                                 <th className="px-2 py-1 text-center text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">AP</th>
                                 <th className="px-2 py-1 text-center text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">CF</th>
-                                <th className="px-2 py-1 text-right text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">Updated</th>
+                                <th className="px-2 py-1 text-right text-[11px] font-bold text-silver-light uppercase whitespace-nowrap">{t("Updated")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border/10">
                             {loading ? (
-                                <tr><td colSpan="13" className="text-center py-4 text-silver-dark text-xs">Loading accounts...</td></tr>
+                                <tr><td colSpan="13" className="text-center py-4 text-silver-dark text-xs">{t("Loading accounts...")}</td></tr>
                             ) : filteredAccounts.length === 0 ? (
-                                <tr><td colSpan="13" className="text-center py-4 text-silver-dark text-xs">No accounts found.</td></tr>
+                                <tr><td colSpan="13" className="text-center py-4 text-silver-dark text-xs">{t("No accounts found.")}</td></tr>
                             ) : (
                                 filteredAccounts.map((acc) => (
                                     <tr
@@ -934,18 +936,17 @@ const { read, utils } = XLSX;
 
             {/* Import Confirmation Modal */}
             {showImportModal && (
-                <Modal isOpen={true} onClose={() => setShowImportModal(false)} title="Import Options">
+                <Modal isOpen={true} onClose={() => setShowImportModal(false)} title={t("Import Options")}>
                     <div className="p-5 space-y-4">
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-blue-500/10 rounded-full border border-blue-500/20">
                                 <Upload className="w-5 h-5 text-blue-400" />
                             </div>
                             <div>
-                                <h3 className="text-base font-bold text-silver-light">Confirm Import</h3>
+                                <h3 className="text-base font-bold text-silver-light">{t("Confirm Import")}</h3>
                                 <p className="text-silver-dark text-xs">
-                                    📊 Data dibaca: <strong>{importStats.totalRows}</strong> baris
-                                    | Valid: <strong className="text-green-400">{importStats.validRows}</strong>
-                                    | Dilewati: <strong className="text-orange-400">{importStats.skippedRows}</strong>
+                                    {t("📊 Data dibaca:")} <strong>{importStats.totalRows}</strong> {t("baris | Valid:")} <strong className="text-green-400">{importStats.validRows}</strong>
+                                    {t("| Dilewati:")} <strong className="text-orange-400">{importStats.skippedRows}</strong>
                                 </p>
                             </div>
                         </div>
@@ -953,7 +954,7 @@ const { read, utils } = XLSX;
                         <div className="space-y-2">
                             {/* Type Distribution */}
                             <div className="bg-dark-surface/50 rounded-lg p-3 border border-dark-border">
-                                <p className="text-xs font-semibold text-silver-light mb-2">📊 Distribusi Type (5 Kategori Utama):</p>
+                                <p className="text-xs font-semibold text-silver-light mb-2">{t("📊 Distribusi Type (5 Kategori Utama):")}</p>
                                 <div className="flex flex-wrap gap-2">
                                     {Object.entries(importStats.typeCounts || {}).map(([type, count]) => (
                                         <span key={type} className={`px-2 py-1 rounded text-[11px] font-semibold border
@@ -970,7 +971,7 @@ const { read, utils } = XLSX;
 
                             {/* Group Distribution */}
                             <div className="bg-dark-surface/50 rounded-lg p-3 border border-dark-border">
-                                <p className="text-xs font-semibold text-silver-light mb-2">📁 Distribusi Group (Sub-Kategori dari Excel):</p>
+                                <p className="text-xs font-semibold text-silver-light mb-2">{t("📁 Distribusi Group (Sub-Kategori dari Excel):")}</p>
                                 <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
                                     {Object.entries(importStats.groupCounts || {}).sort((a, b) => b[1] - a[1]).map(([group, count]) => (
                                         <span key={group} className="px-2 py-0.5 rounded text-[10px] bg-dark-surface border border-dark-border text-silver-light">
@@ -993,8 +994,8 @@ const { read, utils } = XLSX;
                                     className="mt-0.5 mr-3"
                                 />
                                 <div>
-                                    <span className="block text-sm font-semibold text-silver-light">Append / Update (Recommended)</span>
-                                    <span className="block text-[11px] text-silver-dark mt-0.5">Adds new accounts & updates existing ones. Safe.</span>
+                                    <span className="block text-sm font-semibold text-silver-light">{t("Append / Update (Recommended)")}</span>
+                                    <span className="block text-[11px] text-silver-dark mt-0.5">{t("Adds new accounts & updates existing ones. Safe.")}</span>
                                 </div>
                             </label>
 
@@ -1008,8 +1009,8 @@ const { read, utils } = XLSX;
                                     className="mt-0.5 mr-3"
                                 />
                                 <div>
-                                    <span className="block text-sm font-semibold text-yellow-400">⚡ Smart Replace by Prefix (Recommended)</span>
-                                    <span className="block text-[11px] text-silver-dark mt-0.5">Hapus data lama berdasarkan awalan kode (misal <strong>5-</strong>), lalu masukkan data baru. Akun yang terintegrasi dilewati otomatis.</span>
+                                    <span className="block text-sm font-semibold text-yellow-400">{t("⚡ Smart Replace by Prefix (Recommended)")}</span>
+                                    <span className="block text-[11px] text-silver-dark mt-0.5">{t("Hapus data lama berdasarkan awalan kode (misal")} <strong>5-</strong>{t("), lalu masukkan data baru. Akun yang terintegrasi dilewati otomatis.")}</span>
                                 </div>
                             </label>
 
@@ -1023,8 +1024,8 @@ const { read, utils } = XLSX;
                                     className="mt-0.5 mr-3"
                                 />
                                 <div>
-                                    <span className="block text-sm font-semibold text-red-400">Replace All (Destructive)</span>
-                                    <span className="block text-[11px] text-silver-dark mt-0.5">Deletes ALL current accounts first. <strong>Fails if data is in use.</strong></span>
+                                    <span className="block text-sm font-semibold text-red-400">{t("Replace All (Destructive)")}</span>
+                                    <span className="block text-[11px] text-silver-dark mt-0.5">{t("Deletes ALL current accounts first.")} <strong>{t("Fails if data is in use.")}</strong></span>
                                 </div>
                             </label>
                         </div>
@@ -1034,7 +1035,7 @@ const { read, utils } = XLSX;
                                 onClick={() => setShowImportModal(false)}
                                 className="px-3 py-1.5 text-xs font-medium text-silver-dark hover:bg-dark-surface rounded-lg transition-colors"
                             >
-                                Cancel
+                                {t("Cancel")}
                             </button>
                             <Button onClick={executeImport} className={`py-1.5 text-xs ${importMode === 'REPLACE' ? 'bg-red-500 hover:bg-red-600' : importMode === 'SMART_REPLACE' ? 'bg-yellow-500 hover:bg-yellow-600 text-black' : ''}`}>
                                 {importMode === 'REPLACE' ? 'Replace & Import' : importMode === 'SMART_REPLACE' ? '⚡ Smart Replace & Import' : 'Import Data'}
@@ -1054,21 +1055,21 @@ const { read, utils } = XLSX;
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        if (confirm('Are you sure you want to delete this account?')) {
+                                        if (confirm(t("Are you sure you want to delete this account?"))) {
                                             handleDelete(formData.id);
                                             setShowModal(false);
                                         }
                                     }}
                                     className="text-red-400 hover:text-red-300 flex items-center gap-1 text-xs bg-red-500/10 px-2 py-1 rounded border border-red-500/20"
                                 >
-                                    <Trash2 className="w-3.5 h-3.5" /> Delete
+                                    <Trash2 className="w-3.5 h-3.5" /> {t("Delete")}
                                 </button>
                             )}
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label className="block text-xs font-medium text-silver-dark mb-1">Account Code</label>
+                                <label className="block text-xs font-medium text-silver-dark mb-1">{t("Account Code")}</label>
                                 <input
                                     type="text"
                                     value={formData.code}
@@ -1079,32 +1080,32 @@ const { read, utils } = XLSX;
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-silver-dark mb-1">Master Code</label>
+                                <label className="block text-xs font-medium text-silver-dark mb-1">{t("Master Code")}</label>
                                 <input
                                     type="text"
                                     value={formData.parent_code}
                                     onChange={(e) => setFormData({ ...formData, parent_code: e.target.value })}
                                     className="w-full px-3 py-1.5 text-sm bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue outline-none"
-                                    placeholder="Parent Code"
+                                    placeholder={t("Parent Code")}
                                 />
                             </div>
                         </div>
 
                         <div>
-                            <label className="block text-xs font-medium text-silver-dark mb-1">Account Name</label>
+                            <label className="block text-xs font-medium text-silver-dark mb-1">{t("Account Name")}</label>
                             <input
                                 type="text"
                                 value={formData.name}
                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                 className="w-full px-3 py-1.5 text-sm bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue outline-none"
                                 required
-                                placeholder="e.g. Kas Besar"
+                                placeholder={t("e.g. Kas Besar")}
                             />
                         </div>
 
                         <div className="grid grid-cols-3 gap-3">
                             <div>
-                                <label className="block text-xs font-medium text-silver-dark mb-1">Group (Type)</label>
+                                <label className="block text-xs font-medium text-silver-dark mb-1">{t("Group (Type)")}</label>
                                 <select
                                     value={formData.type}
                                     onChange={(e) => setFormData({ ...formData, type: e.target.value })}
@@ -1118,14 +1119,14 @@ const { read, utils } = XLSX;
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-silver-dark mb-1">Job Type</label>
+                                <label className="block text-xs font-medium text-silver-dark mb-1">{t("Job Type")}</label>
                                 <input
                                     type="text"
                                     list="job-types-list"
                                     value={formData.job_type || ''}
                                     onChange={(e) => setFormData({ ...formData, job_type: e.target.value.toUpperCase() })}
                                     className="w-full px-3 py-1.5 text-sm bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue outline-none uppercase"
-                                    placeholder="e.g. FREIGHT or AIR EXPORT"
+                                    placeholder={t("e.g. FREIGHT or AIR EXPORT")}
                                 />
                                 <datalist id="job-types-list">
                                     <option value="FREIGHT" />
@@ -1139,7 +1140,7 @@ const { read, utils } = XLSX;
                                 </datalist>
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-silver-dark mb-1">Level</label>
+                                <label className="block text-xs font-medium text-silver-dark mb-1">{t("Level")}</label>
                                 <input
                                     type="number"
                                     value={formData.level}
@@ -1151,43 +1152,43 @@ const { read, utils } = XLSX;
                         </div>
 
                         <div>
-                            <label className="block text-xs font-medium text-silver-dark mb-1">Description</label>
+                            <label className="block text-xs font-medium text-silver-dark mb-1">{t("Description")}</label>
                             <textarea
                                 value={formData.description}
                                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                                 className="w-full px-3 py-1.5 text-sm bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue outline-none"
                                 rows="2"
-                                placeholder="Optional description"
+                                placeholder={t("Optional description")}
                             />
                         </div>
 
                         {/* Report Flags */}
                         <div className="space-y-2 pt-2 border-t border-dark-border">
-                            <p className="text-xs font-semibold text-silver-light">Report Settings</p>
+                            <p className="text-xs font-semibold text-silver-light">{t("Report Settings")}</p>
                             <div className="grid grid-cols-2 gap-x-2 gap-y-1">
                                 <label className="flex items-center space-x-2 text-xs text-silver-dark cursor-pointer hover:text-white transition-colors">
                                     <input type="checkbox" checked={formData.is_trial_balance} onChange={(e) => setFormData({ ...formData, is_trial_balance: e.target.checked })} className="rounded bg-dark-surface border-gray-600 w-3.5 h-3.5 accent-accent-blue" />
-                                    <span>Trial Balance</span>
+                                    <span>{t("Trial Balance")}</span>
                                 </label>
                                 <label className="flex items-center space-x-2 text-xs text-silver-dark cursor-pointer hover:text-white transition-colors">
                                     <input type="checkbox" checked={formData.is_profit_loss} onChange={(e) => setFormData({ ...formData, is_profit_loss: e.target.checked })} className="rounded bg-dark-surface border-gray-600 w-3.5 h-3.5 accent-accent-blue" />
-                                    <span>Profit & Loss</span>
+                                    <span>{t("Profit & Loss")}</span>
                                 </label>
                                 <label className="flex items-center space-x-2 text-xs text-silver-dark cursor-pointer hover:text-white transition-colors">
                                     <input type="checkbox" checked={formData.is_balance_sheet} onChange={(e) => setFormData({ ...formData, is_balance_sheet: e.target.checked })} className="rounded bg-dark-surface border-gray-600 w-3.5 h-3.5 accent-accent-blue" />
-                                    <span>Balance Sheet</span>
+                                    <span>{t("Balance Sheet")}</span>
                                 </label>
                                 <label className="flex items-center space-x-2 text-xs text-silver-dark cursor-pointer hover:text-white transition-colors">
                                     <input type="checkbox" checked={formData.is_ar} onChange={(e) => setFormData({ ...formData, is_ar: e.target.checked })} className="rounded bg-dark-surface border-gray-600 w-3.5 h-3.5 accent-accent-blue" />
-                                    <span>Accounts Receivable (AR)</span>
+                                    <span>{t("Accounts Receivable (AR)")}</span>
                                 </label>
                                 <label className="flex items-center space-x-2 text-xs text-silver-dark cursor-pointer hover:text-white transition-colors">
                                     <input type="checkbox" checked={formData.is_ap} onChange={(e) => setFormData({ ...formData, is_ap: e.target.checked })} className="rounded bg-dark-surface border-gray-600 w-3.5 h-3.5 accent-accent-blue" />
-                                    <span>Accounts Payable (AP)</span>
+                                    <span>{t("Accounts Payable (AP)")}</span>
                                 </label>
                                 <label className="flex items-center space-x-2 text-xs text-silver-dark cursor-pointer hover:text-white transition-colors">
                                     <input type="checkbox" checked={formData.is_cashflow} onChange={(e) => setFormData({ ...formData, is_cashflow: e.target.checked })} className="rounded bg-dark-surface border-gray-600 w-3.5 h-3.5 accent-accent-blue" />
-                                    <span>Cashflow</span>
+                                    <span>{t("Cashflow")}</span>
                                 </label>
                             </div>
                         </div>
@@ -1198,7 +1199,7 @@ const { read, utils } = XLSX;
                                 onClick={() => setShowModal(false)}
                                 className="px-3 py-1.5 text-xs text-silver-dark hover:bg-dark-surface rounded-lg transition-colors"
                             >
-                                Cancel
+                                {t("Cancel")}
                             </button>
                             <Button type="submit" className="py-1.5 px-4 text-xs">
                                 {isEditing ? 'Update Account' : 'Create Account'}

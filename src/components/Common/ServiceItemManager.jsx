@@ -3,11 +3,13 @@ import { Plus, Trash2, ChevronDown, Search } from 'lucide-react';
 import Button from './Button';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency as formatLocalizedNumber, getCurrencySymbol, parseCurrency } from '../../utils/currencyFormatter';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 // ─── Custom Item Picker ───────────────────────────────────────────────────────
 // Dropdown list shows "code – name" for easy identification
 // Selected field shows only "name"  (no code)
 const ItemPicker = ({ value, onChange, accounts }) => {
+    const { t } = useLanguage();
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState('');
     const ref = useRef(null);
@@ -38,7 +40,7 @@ const ItemPicker = ({ value, onChange, accounts }) => {
                 className="w-full flex items-center justify-between gap-1 px-2 py-1.5 text-sm border border-dark-border rounded bg-dark-surface text-silver-light text-left"
             >
                 <span className="truncate">
-                    {selected ? selected.name : <span className="text-silver-dark">Select Item...</span>}
+                    {selected ? selected.name : <span className="text-silver-dark">{t("Select Item...")}</span>}
                 </span>
                 <ChevronDown className={`w-3 h-3 text-silver-dark flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
             </button>
@@ -55,7 +57,7 @@ const ItemPicker = ({ value, onChange, accounts }) => {
                             <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
                             <input
                                 type="text"
-                                placeholder="Search kode atau nama..."
+                                placeholder={t("Search kode atau nama...")}
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 autoFocus
@@ -76,11 +78,11 @@ const ItemPicker = ({ value, onChange, accounts }) => {
                             onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f3f4f6'; }}
                             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#ffffff'; }}
                         >
-                            — Clear selection —
+                            {t("— Clear selection —")}
                         </button>
 
                         {filtered.length === 0 ? (
-                            <div className="p-4 text-center text-xs text-gray-400">Tidak ditemukan</div>
+                            <div className="p-4 text-center text-xs text-gray-400">{t("Tidak ditemukan")}</div>
                         ) : (
                             filtered.map(acc => (
                                 <button
@@ -111,6 +113,7 @@ const ItemPicker = ({ value, onChange, accounts }) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ServiceItemManager = ({ items = [], onChange, currency = 'USD', readOnly = false }) => {
+    const { t } = useLanguage();
     const [serviceItems, setServiceItems] = useState(items);
     const [revenueAccounts, setRevenueAccounts] = useState([]);
 
@@ -199,7 +202,7 @@ const ServiceItemManager = ({ items = [], onChange, currency = 'USD', readOnly =
         <div className="space-y-4">
             <div className="flex items-center justify-between">
                 <label className="block text-sm font-medium text-silver">
-                    Cost Breakdown / Service Items
+                    {t("Cost Breakdown / Service Items")}
                 </label>
                 {!readOnly && (
                     <Button
@@ -209,7 +212,7 @@ const ServiceItemManager = ({ items = [], onChange, currency = 'USD', readOnly =
                         variant="secondary"
                         className="text-xs"
                     >
-                        Add Item
+                        {t("Add Item")}
                     </Button>
                 )}
             </div>
@@ -220,12 +223,12 @@ const ServiceItemManager = ({ items = [], onChange, currency = 'USD', readOnly =
                     <table className="w-full">
                         <thead className="bg-accent-blue/10">
                             <tr className="border-b border-dark-border">
-                                <th className="text-left text-xs font-bold text-white px-2 py-2 min-w-48">Kode</th>
-                                <th className="text-left text-xs font-bold text-white px-2 py-2 min-w-[250px]">Item</th>
-                                <th className="text-left text-xs font-bold text-white px-2 py-2 min-w-[350px]">Service / Description</th>
-                                <th className="text-right text-xs font-bold text-white px-2 py-2 min-w-[104px]">Qty</th>
-                                <th className="text-right text-xs font-bold text-white px-2 py-2 min-w-[166px]">Unit Price</th>
-                                <th className="text-right text-xs font-bold text-white px-2 py-2 min-w-32">Amount</th>
+                                <th className="text-left text-xs font-bold text-white px-2 py-2 min-w-48">{t("Kode")}</th>
+                                <th className="text-left text-xs font-bold text-white px-2 py-2 min-w-[250px]">{t("Item")}</th>
+                                <th className="text-left text-xs font-bold text-white px-2 py-2 min-w-[350px]">{t("Service / Description")}</th>
+                                <th className="text-right text-xs font-bold text-white px-2 py-2 min-w-[104px]">{t("Qty")}</th>
+                                <th className="text-right text-xs font-bold text-white px-2 py-2 min-w-[166px]">{t("Unit Price")}</th>
+                                <th className="text-right text-xs font-bold text-white px-2 py-2 min-w-32">{t("Amount")}</th>
                                 {!readOnly && <th className="min-w-[48px] px-2 py-2"></th>}
                             </tr>
                         </thead>
@@ -254,7 +257,7 @@ const ServiceItemManager = ({ items = [], onChange, currency = 'USD', readOnly =
                                         <textarea
                                             value={item.description}
                                             onChange={(e) => updateItem(item.id, 'description', e.target.value)}
-                                            placeholder="e.g., Ocean Freight, THC, Documentation"
+                                            placeholder={t("e.g., Ocean Freight, THC, Documentation")}
                                             className="w-full px-2 py-1.5 text-sm bg-dark-surface border border-dark-border rounded text-silver-light resize-y min-h-[40px] max-h-[150px]"
                                             readOnly={readOnly}
                                             rows={2}
@@ -297,7 +300,7 @@ const ServiceItemManager = ({ items = [], onChange, currency = 'USD', readOnly =
                                                 type="button"
                                                 onClick={() => deleteItem(item.id)}
                                                 className="p-1.5 text-red-400 hover:bg-red-500/10 rounded smooth-transition"
-                                                title="Delete item"
+                                                title={t("Delete item")}
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
@@ -312,7 +315,7 @@ const ServiceItemManager = ({ items = [], onChange, currency = 'USD', readOnly =
                     <div className="mt-4 pt-4 border-t border-dark-border flex justify-end">
                         <div className="space-y-2">
                             <div className="flex items-center justify-between gap-8">
-                                <span className="text-sm font-medium text-silver">Total:</span>
+                                <span className="text-sm font-medium text-silver">{t("Total:")}</span>
                                 <span className="text-lg font-bold text-accent-orange">
                                     {getCurrencySymbol(currency)} {formatNumber(total)}
                                 </span>
@@ -325,14 +328,14 @@ const ServiceItemManager = ({ items = [], onChange, currency = 'USD', readOnly =
             {/* Empty State */}
             {serviceItems.length === 0 && !readOnly && (
                 <div className="text-center py-8 border-2 border-dashed border-dark-border rounded-lg">
-                    <p className="text-sm text-silver-dark">No service items added yet</p>
-                    <p className="text-xs text-silver-dark mt-1">Click "Add Item" to add cost breakdown</p>
+                    <p className="text-sm text-silver-dark">{t("No service items added yet")}</p>
+                    <p className="text-xs text-silver-dark mt-1">{t("Click \"Add Item\" to add cost breakdown")}</p>
                 </div>
             )}
 
             {serviceItems.length === 0 && readOnly && (
                 <div className="text-center py-4">
-                    <p className="text-sm text-silver-dark">No cost breakdown provided</p>
+                    <p className="text-sm text-silver-dark">{t("No cost breakdown provided")}</p>
                 </div>
             )}
         </div>

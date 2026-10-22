@@ -10,6 +10,7 @@ import { getAllUsers, createUser, updateUser, resetPassword, toggleUserActive, d
 import { generatePassword } from '../../services/passwordService';
 import { Users, Plus, Edit, Key, Ban, CheckCircle, Shield, RefreshCw, Trash2, Download, Eye, EyeOff } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 /**
  * User Management Page (Super Admin Only)
@@ -40,6 +41,7 @@ const pickDefaultRoleId = (roles = []) => {
     const LEGACY_PASSWORD_NOTICE = 'Password lama masih aman (hash) dan tidak bisa ditampilkan ulang';
 
 const UserManagement = () => {
+    const { t } = useLanguage();
     const { user } = useAuth();
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -187,7 +189,7 @@ const UserManagement = () => {
 
     const handleDeleteUser = async (userToDelete) => {
         if (userToDelete.id === user.id) {
-            alert('Tidak bisa menghapus akun Anda sendiri.');
+            alert(t("Tidak bisa menghapus akun Anda sendiri."));
             return;
         }
         if (!confirm(`⚠️ HAPUS user "${userToDelete.username}" (${userToDelete.full_name})?\n\nTindakan ini PERMANEN dan tidak bisa dibatalkan.\nSemua sesi dan izin user ini akan ikut dihapus.`)) return;
@@ -251,7 +253,7 @@ const UserManagement = () => {
     };
 
     const handleBulkResetLegacy = async () => {
-        if (!confirm('Reset massal password untuk semua user legacy yang belum punya Password Aktif? Password baru akan digenerate dan user wajib ganti saat login.')) {
+        if (!confirm(t("Reset massal password untuk semua user legacy yang belum punya Password Aktif? Password baru akan digenerate dan user wajib ganti saat login."))) {
             return;
         }
 
@@ -320,9 +322,9 @@ const UserManagement = () => {
                 <div>
                     <h1 style={{ fontSize: 22, fontWeight: 700, color: '#111827', display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
                         <Shield style={{ width: 26, height: 26, color: '#2563eb' }} />
-                        Manajemen User
+                        {t("Manajemen User")}
                     </h1>
-                    <p style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>Kelola user, role, dan password</p>
+                    <p style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>{t("Kelola user, role, dan password")}</p>
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
                     <button
@@ -330,7 +332,7 @@ const UserManagement = () => {
                         style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: '#f9fafb', color: '#374151', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}
                     >
                         <RefreshCw style={{ width: 14, height: 14 }} />
-                        Refresh
+                        {t("Refresh")}
                     </button>
                     {user?.user_level === 'super_admin' && (
                         <button
@@ -348,7 +350,7 @@ const UserManagement = () => {
                             style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 500 }}
                         >
                             <Download style={{ width: 14, height: 14 }} />
-                            Export Excel
+                            {t("Export Excel")}
                         </button>
                     )}
                     <button
@@ -356,7 +358,7 @@ const UserManagement = () => {
                         style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}
                     >
                         <Plus style={{ width: 16, height: 16 }} />
-                        Tambah User
+                        {t("Tambah User")}
                     </button>
                 </div>
             </div>
@@ -419,11 +421,11 @@ const UserManagement = () => {
                                     <td style={{ padding: '12px 20px', whiteSpace: 'nowrap' }}>
                                         {u.is_active ? (
                                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#16a34a', fontSize: 13, fontWeight: 500 }}>
-                                                <CheckCircle style={{ width: 15, height: 15 }} /> Aktif
+                                                <CheckCircle style={{ width: 15, height: 15 }} /> {t("Aktif")}
                                             </span>
                                         ) : (
                                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#dc2626', fontSize: 13, fontWeight: 500 }}>
-                                                <Ban style={{ width: 15, height: 15 }} /> Nonaktif
+                                                <Ban style={{ width: 15, height: 15 }} /> {t("Nonaktif")}
                                             </span>
                                         )}
                                     </td>
@@ -432,17 +434,17 @@ const UserManagement = () => {
                                     </td>
                                     <td style={{ padding: '12px 20px', whiteSpace: 'nowrap', textAlign: 'right' }}>
                                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                                            <button onClick={() => handleEditUser(u)} title="Edit User"
+                                            <button onClick={() => handleEditUser(u)} title={t("Edit User")}
                                                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2563eb', padding: 4, borderRadius: 6 }}
                                             ><Edit style={{ width: 18, height: 18 }} /></button>
-                                            <button onClick={() => handleResetPassword(u)} title="Reset Password"
+                                            <button onClick={() => handleResetPassword(u)} title={t("Reset Password")}
                                                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#16a34a', padding: 4, borderRadius: 6 }}
                                             ><Key style={{ width: 18, height: 18 }} /></button>
                                             <button onClick={() => handleToggleActive(u)} title={u.is_active ? 'Nonaktifkan' : 'Aktifkan'}
                                                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: u.is_active ? '#f59e0b' : '#16a34a', padding: 4, borderRadius: 6 }}
                                             >{u.is_active ? <Ban style={{ width: 18, height: 18 }} /> : <CheckCircle style={{ width: 18, height: 18 }} />}</button>
                                             {u.id !== user.id && (
-                                                <button onClick={() => handleDeleteUser(u)} title="Hapus User"
+                                                <button onClick={() => handleDeleteUser(u)} title={t("Hapus User")}
                                                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', padding: 4, borderRadius: 6 }}
                                                 ><Trash2 style={{ width: 18, height: 18 }} /></button>
                                             )}
@@ -491,6 +493,7 @@ const UserManagement = () => {
  * CREATE USER MODAL — dropdown role dinamis
  * ============================================================================= */
 const CreateUserModal = ({ roles, onClose, onSuccess, createdBy }) => {
+    const { t } = useLanguage();
     const defaultRoleId = pickDefaultRoleId(roles);
     const [formData, setFormData] = useState({
         username: '',
@@ -537,7 +540,7 @@ const CreateUserModal = ({ roles, onClose, onSuccess, createdBy }) => {
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">Buat User Baru</h2>
+                <h2 className="text-xl font-bold text-gray-900 mb-4">{t("Buat User Baru")}</h2>
 
                 {error && (
                     <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-800 rounded-lg text-sm">
@@ -547,7 +550,7 @@ const CreateUserModal = ({ roles, onClose, onSuccess, createdBy }) => {
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Username *</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">{t("Username *")}</label>
                         <input
                             type="text"
                             value={formData.username}
@@ -558,7 +561,7 @@ const CreateUserModal = ({ roles, onClose, onSuccess, createdBy }) => {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Nama Lengkap *</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">{t("Nama Lengkap *")}</label>
                         <input
                             type="text"
                             value={formData.full_name}
@@ -569,7 +572,7 @@ const CreateUserModal = ({ roles, onClose, onSuccess, createdBy }) => {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Email (Opsional)</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">{t("Email (Opsional)")}</label>
                         <input
                             type="email"
                             value={formData.email}
@@ -579,7 +582,7 @@ const CreateUserModal = ({ roles, onClose, onSuccess, createdBy }) => {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Role / Level *</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">{t("Role / Level *")}</label>
                         <select
                             value={formData.user_level}
                             onChange={(e) => setFormData({ ...formData, user_level: e.target.value })}
@@ -590,18 +593,18 @@ const CreateUserModal = ({ roles, onClose, onSuccess, createdBy }) => {
                                 <option key={r.id} value={r.id}>{r.label}</option>
                             ))}
                         </select>
-                        <p className="text-xs text-gray-500 mt-1">Role dapat ditambah di halaman Manajemen Role & Akses</p>
+                        <p className="text-xs text-gray-500 mt-1">{t("Role dapat ditambah di halaman Manajemen Role & Akses")}</p>
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">{t("Password *")}</label>
                         <div className="flex gap-2">
                             <input
                                 type="text"
                                 value={formData.password}
                                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="Min 8 karakter, huruf & angka"
+                                placeholder={t("Min 8 karakter, huruf & angka")}
                                 required
                             />
                             <button
@@ -609,7 +612,7 @@ const CreateUserModal = ({ roles, onClose, onSuccess, createdBy }) => {
                                 onClick={handleGeneratePassword}
                                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                             >
-                                Generate
+                                {t("Generate")}
                             </button>
                         </div>
                     </div>
@@ -622,7 +625,7 @@ const CreateUserModal = ({ roles, onClose, onSuccess, createdBy }) => {
                                 onChange={(e) => setFormData({ ...formData, portal_access: e.target.checked })}
                                 className="rounded border-gray-300"
                             />
-                            <span className="text-sm text-gray-700">Portal Access</span>
+                            <span className="text-sm text-gray-700">{t("Portal Access")}</span>
                         </label>
                         <label className="flex items-center gap-2">
                             <input
@@ -631,7 +634,7 @@ const CreateUserModal = ({ roles, onClose, onSuccess, createdBy }) => {
                                 onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
                                 className="rounded border-gray-300"
                             />
-                            <span className="text-sm text-gray-700">Aktif</span>
+                            <span className="text-sm text-gray-700">{t("Aktif")}</span>
                         </label>
                         <label className="flex items-center gap-2 w-full mt-1">
                             <input
@@ -640,7 +643,7 @@ const CreateUserModal = ({ roles, onClose, onSuccess, createdBy }) => {
                                 onChange={(e) => setFormData({ ...formData, requires_password_change: e.target.checked })}
                                 className="rounded border-gray-300"
                             />
-                            <span className="text-sm text-gray-700 font-medium text-red-600">Wajib ganti password saat login berikutnya</span>
+                            <span className="text-sm text-gray-700 font-medium text-red-600">{t("Wajib ganti password saat login berikutnya")}</span>
                         </label>
                     </div>
 
@@ -650,7 +653,7 @@ const CreateUserModal = ({ roles, onClose, onSuccess, createdBy }) => {
                             onClick={onClose}
                             className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
                         >
-                            Batal
+                            {t("Batal")}
                         </button>
                         <button
                             type="submit"
@@ -670,6 +673,7 @@ const CreateUserModal = ({ roles, onClose, onSuccess, createdBy }) => {
  * EDIT USER MODAL — dropdown role dinamis
  * ============================================================================= */
 const EditUserModal = ({ user: selectedUser, roles, onClose, onSuccess, updatedBy }) => {
+    const { t } = useLanguage();
     const [formData, setFormData] = useState({
         username: selectedUser.username,
         full_name: selectedUser.full_name,
@@ -716,7 +720,7 @@ const EditUserModal = ({ user: selectedUser, roles, onClose, onSuccess, updatedB
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">Edit User: {selectedUser.username}</h2>
+                <h2 className="text-xl font-bold text-gray-900 mb-4">{t("Edit User:")} {selectedUser.username}</h2>
 
                 {error && (
                     <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-800 rounded-lg text-sm">
@@ -726,7 +730,7 @@ const EditUserModal = ({ user: selectedUser, roles, onClose, onSuccess, updatedB
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">{t("Username")}</label>
                         <input
                             type="text"
                             value={formData.username}
@@ -737,7 +741,7 @@ const EditUserModal = ({ user: selectedUser, roles, onClose, onSuccess, updatedB
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Nama Lengkap *</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">{t("Nama Lengkap *")}</label>
                         <input
                             type="text"
                             value={formData.full_name}
@@ -748,7 +752,7 @@ const EditUserModal = ({ user: selectedUser, roles, onClose, onSuccess, updatedB
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Email (Opsional)</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">{t("Email (Opsional)")}</label>
                         <input
                             type="email"
                             value={formData.email}
@@ -758,7 +762,7 @@ const EditUserModal = ({ user: selectedUser, roles, onClose, onSuccess, updatedB
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Role / Level *</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">{t("Role / Level *")}</label>
                         <select
                             value={formData.user_level}
                             onChange={(e) => setFormData({ ...formData, user_level: e.target.value })}
@@ -769,7 +773,7 @@ const EditUserModal = ({ user: selectedUser, roles, onClose, onSuccess, updatedB
                                 <option key={r.id} value={r.id}>{r.label}</option>
                             ))}
                         </select>
-                        <p className="text-xs text-gray-500 mt-1">Role dari Manajemen Role & Akses</p>
+                        <p className="text-xs text-gray-500 mt-1">{t("Role dari Manajemen Role & Akses")}</p>
                     </div>
 
                     <div className="flex gap-4">
@@ -780,7 +784,7 @@ const EditUserModal = ({ user: selectedUser, roles, onClose, onSuccess, updatedB
                                 onChange={(e) => setFormData({ ...formData, portal_access: e.target.checked })}
                                 className="rounded border-gray-300"
                             />
-                            <span className="text-sm text-gray-700">Portal Access</span>
+                            <span className="text-sm text-gray-700">{t("Portal Access")}</span>
                         </label>
                         <label className="flex items-center gap-2">
                             <input
@@ -789,7 +793,7 @@ const EditUserModal = ({ user: selectedUser, roles, onClose, onSuccess, updatedB
                                 onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
                                 className="rounded border-gray-300"
                             />
-                            <span className="text-sm text-gray-700">Aktif</span>
+                            <span className="text-sm text-gray-700">{t("Aktif")}</span>
                         </label>
                     </div>
 
@@ -799,7 +803,7 @@ const EditUserModal = ({ user: selectedUser, roles, onClose, onSuccess, updatedB
                             onClick={onClose}
                             className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
                         >
-                            Batal
+                            {t("Batal")}
                         </button>
                         <button
                             type="submit"
@@ -819,6 +823,7 @@ const EditUserModal = ({ user: selectedUser, roles, onClose, onSuccess, updatedB
  * RESET PASSWORD MODAL
  * ============================================================================= */
 const ResetPasswordModal = ({ user: selectedUser, onClose, onSuccess, resetBy }) => {
+    const { t } = useLanguage();
     const [password, setPassword] = useState('');
     const [requireChange, setRequireChange] = useState(true);
     const [loading, setLoading] = useState(false);
@@ -855,7 +860,7 @@ const ResetPasswordModal = ({ user: selectedUser, onClose, onSuccess, resetBy })
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">Reset Password: {selectedUser.username}</h2>
+                <h2 className="text-xl font-bold text-gray-900 mb-4">{t("Reset Password:")} {selectedUser.username}</h2>
 
                 {error && (
                     <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-800 rounded-lg text-sm">
@@ -865,14 +870,14 @@ const ResetPasswordModal = ({ user: selectedUser, onClose, onSuccess, resetBy })
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Password Baru *</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">{t("Password Baru *")}</label>
                         <div className="flex gap-2">
                             <input
                                 type="text"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="Min 8 karakter, huruf & angka"
+                                placeholder={t("Min 8 karakter, huruf & angka")}
                                 required
                             />
                             <button
@@ -880,7 +885,7 @@ const ResetPasswordModal = ({ user: selectedUser, onClose, onSuccess, resetBy })
                                 onClick={handleGeneratePassword}
                                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                             >
-                                Generate
+                                {t("Generate")}
                             </button>
                         </div>
                     </div>
@@ -893,7 +898,7 @@ const ResetPasswordModal = ({ user: selectedUser, onClose, onSuccess, resetBy })
                                 onChange={(e) => setRequireChange(e.target.checked)}
                                 className="rounded border-gray-300"
                             />
-                            <span className="text-sm text-gray-700">Wajib ganti password saat login berikutnya</span>
+                            <span className="text-sm text-gray-700">{t("Wajib ganti password saat login berikutnya")}</span>
                         </label>
                     </div>
 
@@ -903,7 +908,7 @@ const ResetPasswordModal = ({ user: selectedUser, onClose, onSuccess, resetBy })
                             onClick={onClose}
                             className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
                         >
-                            Batal
+                            {t("Batal")}
                         </button>
                         <button
                             type="submit"

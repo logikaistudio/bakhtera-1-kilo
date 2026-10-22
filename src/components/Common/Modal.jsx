@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import Button from './Button';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const Modal = ({ isOpen, onClose, title, children, size = 'medium', maxWidth }) => {
     // Map size to Tailwind classes

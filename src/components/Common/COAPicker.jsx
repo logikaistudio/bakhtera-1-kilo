@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { ChevronDown, Search, X, FolderOpen } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 /**
  * COAPicker - Reusable Chart of Accounts dropdown with smart filtering
@@ -26,6 +27,7 @@ const COAPicker = ({
     showCode = true,
     size = 'sm'
 }) => {
+    const { t } = useLanguage();
     const [accounts, setAccounts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isOpen, setIsOpen] = useState(false);
@@ -294,7 +296,7 @@ const COAPicker = ({
                                 type="text"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                placeholder="Search kode atau nama akun..."
+                                placeholder={t("Search kode atau nama akun...")}
                                 className="w-full pl-9 pr-4 py-3 bg-white border border-gray-300 rounded-lg 
                                     text-sm text-gray-800 placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
                             />

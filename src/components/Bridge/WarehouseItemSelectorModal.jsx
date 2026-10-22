@@ -3,6 +3,7 @@ import { X, Package, Check, AlertCircle } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { DEFAULT_LOCATION } from '../../constants/locationOptions';
 import Button from '../Common/Button';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 /**
  * WarehouseItemSelectorModal - Simple table-based modal for selecting items from warehouse
@@ -24,6 +25,7 @@ const WarehouseItemSelectorModal = ({
     onApply,
     sourcePengajuanNumber = ''
 }) => {
+    const { t } = useLanguage();
     const { mutationLogs = [], isExhibitionLocation, getExhibitionLocation } = useData();
 
     // Local state for items with outbound quantity
@@ -137,7 +139,7 @@ const WarehouseItemSelectorModal = ({
         const packages = Object.values(packagesMap);
 
         if (packages.length === 0) {
-            alert('⚠️ Pilih minimal 1 item dengan qty > 0');
+            alert(t("⚠️ Pilih minimal 1 item dengan qty > 0"));
             return;
         }
 
@@ -159,8 +161,8 @@ const WarehouseItemSelectorModal = ({
                     <div className="flex items-center gap-3">
                         <Package className="w-6 h-6 text-white" />
                         <div>
-                            <h2 className="text-lg font-bold text-white">Edit Pilihan Barang Keluar</h2>
-                            <p className="text-xs text-white/70">Sumber: {sourcePengajuanNumber}</p>
+                            <h2 className="text-lg font-bold text-white">{t("Edit Pilihan Barang Keluar")}</h2>
+                            <p className="text-xs text-white/70">{t("Sumber:")} {sourcePengajuanNumber}</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
@@ -172,8 +174,7 @@ const WarehouseItemSelectorModal = ({
                 <div className="px-6 py-3 bg-blue-500/10 border-b border-blue-500/20 flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 text-blue-400" />
                     <span className="text-xs text-blue-300">
-                        Masukkan jumlah barang yang akan dikeluarkan pada kolom "Qty Keluar".
-                        Maksimum = Stok Tersedia (Stok Awal - Stok {DEFAULT_LOCATION})
+                        {t("Masukkan jumlah barang yang akan dikeluarkan pada kolom \"Qty Keluar\". Maksimum = Stok Tersedia (Stok Awal - Stok")} {DEFAULT_LOCATION})
                     </span>
                 </div>
 
@@ -182,14 +183,14 @@ const WarehouseItemSelectorModal = ({
                     <table className="w-full text-sm">
                         <thead className="sticky top-0 z-10">
                             <tr className="bg-dark-surface border-b-2 border-accent-purple">
-                                <th className="px-3 py-3 text-left text-xs font-bold text-silver-light uppercase">Package</th>
-                                <th className="px-3 py-3 text-left text-xs font-bold text-silver-light uppercase">Jenis Item</th>
-                                <th className="px-3 py-3 text-center text-xs font-bold text-silver-light uppercase bg-gray-700/50">Stok Awal</th>
-                                <th className="px-3 py-3 text-center text-xs font-bold text-orange-400 uppercase bg-orange-500/10">Stok {getExhibitionLocation ? getExhibitionLocation() : 'Pameran'}</th>
-                                <th className="px-3 py-3 text-center text-xs font-bold text-green-400 uppercase bg-green-500/10">Stok Tersedia</th>
-                                <th className="px-3 py-3 text-center text-xs font-bold text-accent-purple uppercase bg-accent-purple/10" style={{ minWidth: '100px' }}>Qty Keluar</th>
-                                <th className="px-3 py-3 text-center text-xs font-bold text-blue-400 uppercase bg-blue-500/10">Sisa Stok</th>
-                                <th className="px-3 py-3 text-left text-xs font-bold text-silver-light uppercase" style={{ minWidth: '150px' }}>Keterangan</th>
+                                <th className="px-3 py-3 text-left text-xs font-bold text-silver-light uppercase">{t("Package")}</th>
+                                <th className="px-3 py-3 text-left text-xs font-bold text-silver-light uppercase">{t("Jenis Item")}</th>
+                                <th className="px-3 py-3 text-center text-xs font-bold text-silver-light uppercase bg-gray-700/50">{t("Stok Awal")}</th>
+                                <th className="px-3 py-3 text-center text-xs font-bold text-orange-400 uppercase bg-orange-500/10">{t("Stok")} {getExhibitionLocation ? getExhibitionLocation() : 'Pameran'}</th>
+                                <th className="px-3 py-3 text-center text-xs font-bold text-green-400 uppercase bg-green-500/10">{t("Stok Tersedia")}</th>
+                                <th className="px-3 py-3 text-center text-xs font-bold text-accent-purple uppercase bg-accent-purple/10" style={{ minWidth: '100px' }}>{t("Qty Keluar")}</th>
+                                <th className="px-3 py-3 text-center text-xs font-bold text-blue-400 uppercase bg-blue-500/10">{t("Sisa Stok")}</th>
+                                <th className="px-3 py-3 text-left text-xs font-bold text-silver-light uppercase" style={{ minWidth: '150px' }}>{t("Keterangan")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
@@ -197,7 +198,7 @@ const WarehouseItemSelectorModal = ({
                                 <tr>
                                     <td colSpan="8" className="px-4 py-8 text-center text-silver-dark">
                                         <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                                        <p>Tidak ada item tersedia</p>
+                                        <p>{t("Tidak ada item tersedia")}</p>
                                     </td>
                                 </tr>
                             ) : (
@@ -275,7 +276,7 @@ const WarehouseItemSelectorModal = ({
                                                     type="text"
                                                     value={item.notes || ''}
                                                     onChange={(e) => updateNotes(item.id, e.target.value)}
-                                                    placeholder="Keterangan..."
+                                                    placeholder={t("Keterangan...")}
                                                     className="w-full px-2 py-1 bg-dark-bg border border-dark-border rounded text-xs text-silver focus:outline-none focus:border-accent-blue"
                                                 />
                                             </td>
@@ -291,16 +292,16 @@ const WarehouseItemSelectorModal = ({
                 <div className="px-6 py-4 border-t border-dark-border bg-dark-surface/50 flex items-center justify-between">
                     <div className="flex gap-6 text-sm">
                         <span className="text-silver-dark">
-                            Total Item Keluar: <span className="text-accent-purple font-bold">{summary.totalItems}</span>
+                            {t("Total Item Keluar:")} <span className="text-accent-purple font-bold">{summary.totalItems}</span>
                         </span>
                         <span className="text-silver-dark">
-                            Total Qty Keluar: <span className="text-accent-green font-bold">{summary.totalQty}</span>
+                            {t("Total Qty Keluar:")} <span className="text-accent-green font-bold">{summary.totalQty}</span>
                         </span>
                     </div>
 
                     <div className="flex gap-3">
                         <Button variant="secondary" onClick={onClose}>
-                            Batal
+                            {t("Batal")}
                         </Button>
                         <Button
                             variant="primary"
@@ -308,7 +309,7 @@ const WarehouseItemSelectorModal = ({
                             disabled={summary.totalItems === 0}
                             icon={Check}
                         >
-                            Terapkan Pilihan
+                            {t("Terapkan Pilihan")}
                         </Button>
                     </div>
                 </div>

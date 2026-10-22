@@ -2,8 +2,10 @@ import React, { useMemo, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Building2, PlusCircle, ShieldCheck, XCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const CabangManagement = () => {
+    const { t } = useLanguage();
     const { user, isAdmin, isSuperAdmin } = useAuth();
     const [branches, setBranches] = useState([]);
     const [form, setForm] = useState({ code: '', name: '', city: '', mode: 'standalone' });
@@ -58,7 +60,7 @@ const CabangManagement = () => {
 
             setForm({ code: '', name: '', city: '', mode: 'standalone' });
             await fetchBranches();
-            alert('Cabang berhasil dibuat.');
+            alert(t("Cabang berhasil dibuat."));
         } catch (error) {
             console.error('Create branch failed:', error);
             alert(`Gagal membuat cabang: ${error.message}`);
@@ -70,9 +72,9 @@ const CabangManagement = () => {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-3xl font-bold text-silver-light">Manajemen Cabang</h1>
+                <h1 className="text-3xl font-bold text-silver-light">{t("Manajemen Cabang")}</h1>
                 <p className="text-sm text-silver-dark mt-1">
-                    Pembuatan cabang hanya untuk Admin HQ. Cabang memiliki modul Sales dan Finance setara BXPO, BLINK, dan BIG.
+                    {t("Pembuatan cabang hanya untuk Admin HQ. Cabang memiliki modul Sales dan Finance setara BXPO, BLINK, dan BIG.")}
                 </p>
             </div>
 
@@ -81,16 +83,16 @@ const CabangManagement = () => {
                     <>
                         <ShieldCheck className="w-5 h-5 text-emerald-300 mt-0.5" />
                         <div>
-                            <p className="text-sm text-emerald-300 font-medium">Akses Admin HQ terdeteksi</p>
-                            <p className="text-xs text-silver-dark mt-1">Anda dapat membuat cabang baru dan menentukan mode standalone/shared.</p>
+                            <p className="text-sm text-emerald-300 font-medium">{t("Akses Admin HQ terdeteksi")}</p>
+                            <p className="text-xs text-silver-dark mt-1">{t("Anda dapat membuat cabang baru dan menentukan mode standalone/shared.")}</p>
                         </div>
                     </>
                 ) : (
                     <>
                         <XCircle className="w-5 h-5 text-red-300 mt-0.5" />
                         <div>
-                            <p className="text-sm text-red-300 font-medium">Akses dibatasi</p>
-                            <p className="text-xs text-silver-dark mt-1">Hanya Admin HQ yang boleh membuat cabang baru.</p>
+                            <p className="text-sm text-red-300 font-medium">{t("Akses dibatasi")}</p>
+                            <p className="text-xs text-silver-dark mt-1">{t("Hanya Admin HQ yang boleh membuat cabang baru.")}</p>
                         </div>
                     </>
                 )}
@@ -99,13 +101,13 @@ const CabangManagement = () => {
             <form onSubmit={handleCreate} className="glass-card rounded-xl border border-dark-border p-4 space-y-4">
                 <div className="flex items-center gap-2 mb-1">
                     <PlusCircle className="w-4 h-4 text-accent-blue" />
-                    <h2 className="text-base font-semibold text-silver-light">Create Cabang</h2>
+                    <h2 className="text-base font-semibold text-silver-light">{t("Create Cabang")}</h2>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <input
                         type="text"
-                        placeholder="Kode cabang (contoh: CBG-BDG)"
+                        placeholder={t("Kode cabang (contoh: CBG-BDG)")}
                         value={form.code}
                         onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value }))}
                         className="w-full px-3 py-2.5 rounded-lg bg-dark-surface border border-dark-border text-silver-light text-sm focus:outline-none focus:ring-2 focus:ring-accent-blue/40"
@@ -113,7 +115,7 @@ const CabangManagement = () => {
                     />
                     <input
                         type="text"
-                        placeholder="Nama cabang"
+                        placeholder={t("Nama cabang")}
                         value={form.name}
                         onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
                         className="w-full px-3 py-2.5 rounded-lg bg-dark-surface border border-dark-border text-silver-light text-sm focus:outline-none focus:ring-2 focus:ring-accent-blue/40"
@@ -121,7 +123,7 @@ const CabangManagement = () => {
                     />
                     <input
                         type="text"
-                        placeholder="Kota"
+                        placeholder={t("Kota")}
                         value={form.city}
                         onChange={(e) => setForm((prev) => ({ ...prev, city: e.target.value }))}
                         className="w-full px-3 py-2.5 rounded-lg bg-dark-surface border border-dark-border text-silver-light text-sm focus:outline-none focus:ring-2 focus:ring-accent-blue/40"
@@ -133,8 +135,8 @@ const CabangManagement = () => {
                         className="w-full px-3 py-2.5 rounded-lg bg-dark-surface border border-dark-border text-silver-light text-sm focus:outline-none focus:ring-2 focus:ring-accent-blue/40"
                         disabled={!isAdminHq}
                     >
-                        <option value="standalone">Standalone</option>
-                        <option value="shared">Shared HQ Finance</option>
+                        <option value="standalone">{t("Standalone")}</option>
+                        <option value="shared">{t("Shared HQ Finance")}</option>
                     </select>
                 </div>
 
@@ -150,28 +152,28 @@ const CabangManagement = () => {
 
             <div className="glass-card rounded-xl border border-dark-border overflow-hidden">
                 <div className="px-5 py-4 border-b border-dark-border">
-                    <h2 className="text-base font-semibold text-silver-light">Daftar Cabang</h2>
+                    <h2 className="text-base font-semibold text-silver-light">{t("Daftar Cabang")}</h2>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="bg-dark-surface/40 border-b border-dark-border/80">
-                                <th className="text-left px-5 py-3 text-silver-dark">Kode</th>
-                                <th className="text-left px-5 py-3 text-silver-dark">Nama</th>
-                                <th className="text-left px-5 py-3 text-silver-dark">Kota</th>
-                                <th className="text-left px-5 py-3 text-silver-dark">Mode</th>
-                                <th className="text-left px-5 py-3 text-silver-dark">Status</th>
+                                <th className="text-left px-5 py-3 text-silver-dark">{t("Kode")}</th>
+                                <th className="text-left px-5 py-3 text-silver-dark">{t("Nama")}</th>
+                                <th className="text-left px-5 py-3 text-silver-dark">{t("Kota")}</th>
+                                <th className="text-left px-5 py-3 text-silver-dark">{t("Mode")}</th>
+                                <th className="text-left px-5 py-3 text-silver-dark">{t("Status")}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {!loading && branches.length === 0 && (
                                 <tr>
-                                    <td colSpan={5} className="px-5 py-8 text-center text-silver-dark">Belum ada data cabang.</td>
+                                    <td colSpan={5} className="px-5 py-8 text-center text-silver-dark">{t("Belum ada data cabang.")}</td>
                                 </tr>
                             )}
                             {loading && (
                                 <tr>
-                                    <td colSpan={5} className="px-5 py-8 text-center text-silver-dark">Memuat data cabang...</td>
+                                    <td colSpan={5} className="px-5 py-8 text-center text-silver-dark">{t("Memuat data cabang...")}</td>
                                 </tr>
                             )}
                             {branches.map((item) => (

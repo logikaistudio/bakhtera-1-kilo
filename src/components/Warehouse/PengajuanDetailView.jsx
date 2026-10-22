@@ -3,8 +3,10 @@ import { X, Package, Edit2, ArrowRightLeft, FileText, Calendar, Clock, User } fr
 import Button from '../Common/Button';
 import DocumentUploadManager from '../Common/DocumentUploadManager';
 import { LOCATION_OPTIONS, DEFAULT_LOCATION } from '../../constants/locationOptions';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const PengajuanDetailView = ({ pengajuan, onClose, onSubmitMutations, onUpdatePengajuan }) => {
+    const { t } = useLanguage();
     const [mode, setMode] = useState('view'); // 'view' or 'mutasi'
     const [mutations, setMutations] = useState({});
     const [showEditModal, setShowEditModal] = useState(false);
@@ -63,14 +65,14 @@ const PengajuanDetailView = ({ pengajuan, onClose, onSubmitMutations, onUpdatePe
             });
 
         if (activeMutations.length === 0) {
-            alert('⚠️ Tidak ada mutasi yang dipilih');
+            alert(t("⚠️ Tidak ada mutasi yang dipilih"));
             return;
         }
 
         // Validate
         for (const mut of activeMutations) {
             if (!mut.pic.trim()) {
-                alert('❌ PIC wajib diisi untuk semua mutasi');
+                alert(t("❌ PIC wajib diisi untuk semua mutasi"));
                 return;
             }
         }
@@ -106,10 +108,10 @@ const PengajuanDetailView = ({ pengajuan, onClose, onSubmitMutations, onUpdatePe
                 location: editForm.location,
                 remarks: editForm.remarks
             });
-            alert('✅ Perubahan berhasil disimpan!');
+            alert(t("✅ Perubahan berhasil disimpan!"));
             setShowEditModal(false);
         } else {
-            alert('⚠️ Fungsi update belum terhubung');
+            alert(t("⚠️ Fungsi update belum terhubung"));
         }
     };
 
@@ -133,31 +135,31 @@ const PengajuanDetailView = ({ pengajuan, onClose, onSubmitMutations, onUpdatePe
                 <div className="sticky top-0 bg-dark-surface p-6 border-b border-dark-border z-10">
                     <div className="flex justify-between items-start">
                         <div className="flex-1">
-                            <h2 className="text-2xl font-bold gradient-text mb-2">Detail Pengajuan</h2>
+                            <h2 className="text-2xl font-bold gradient-text mb-2">{t("Detail Pengajuan")}</h2>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
                                 <div>
-                                    <p className="text-xs text-silver-dark">No. Pengajuan</p>
+                                    <p className="text-xs text-silver-dark">{t("No. Pengajuan")}</p>
                                     <p className="text-sm font-semibold text-silver-light">{pengajuan.quotationNumber}</p>
                                 </div>
                                 <div>
-                                    <p className="text-xs text-silver-dark">Tanggal Pengajuan</p>
+                                    <p className="text-xs text-silver-dark">{t("Tanggal Pengajuan")}</p>
                                     <p className="text-sm font-semibold text-silver-light">
                                         {new Date(pengajuan.submissionDate || pengajuan.date).toLocaleDateString('id-ID')}
                                     </p>
                                 </div>
                                 <div>
-                                    <p className="text-xs text-silver-dark">No. Dokumen Pabean</p>
+                                    <p className="text-xs text-silver-dark">{t("No. Dokumen Pabean")}</p>
                                     <p className="text-sm font-semibold text-accent-blue">{pengajuan.bcDocumentNumber || '-'}</p>
                                 </div>
                                 <div>
-                                    <p className="text-xs text-silver-dark">Tanggal Dokumen</p>
+                                    <p className="text-xs text-silver-dark">{t("Tanggal Dokumen")}</p>
                                     <p className="text-sm font-semibold text-silver-light">
                                         {pengajuan.bcDocumentDate ? new Date(pengajuan.bcDocumentDate).toLocaleDateString('id-ID') : '-'}
                                     </p>
                                 </div>
                             </div>
                             <div className="mt-3">
-                                <p className="text-xs text-silver-dark">Judul</p>
+                                <p className="text-xs text-silver-dark">{t("Judul")}</p>
                                 <p className="text-base font-semibold text-silver-light">{pengajuan.title || pengajuan.customer}</p>
                             </div>
                         </div>
@@ -173,7 +175,7 @@ const PengajuanDetailView = ({ pengajuan, onClose, onSubmitMutations, onUpdatePe
                             onClick={() => setMode('view')}
                             size="sm"
                         >
-                            View Mode
+                            {t("View Mode")}
                         </Button>
                         <Button
                             variant={mode === 'mutasi' ? 'primary' : 'secondary'}
@@ -181,7 +183,7 @@ const PengajuanDetailView = ({ pengajuan, onClose, onSubmitMutations, onUpdatePe
                             icon={ArrowRightLeft}
                             size="sm"
                         >
-                            Mutasi Mode
+                            {t("Mutasi Mode")}
                         </Button>
                         {mode === 'view' && (
                             <Button
@@ -190,7 +192,7 @@ const PengajuanDetailView = ({ pengajuan, onClose, onSubmitMutations, onUpdatePe
                                 size="sm"
                                 onClick={handleOpenEditModal}
                             >
-                                Edit
+                                {t("Edit")}
                             </Button>
                         )}
                         {mode === 'mutasi' && (
@@ -198,7 +200,7 @@ const PengajuanDetailView = ({ pengajuan, onClose, onSubmitMutations, onUpdatePe
                                 onClick={handleSubmitMutations}
                                 size="sm"
                             >
-                                Submit Mutasi
+                                {t("Submit Mutasi")}
                             </Button>
                         )}
                     </div>
@@ -207,19 +209,19 @@ const PengajuanDetailView = ({ pengajuan, onClose, onSubmitMutations, onUpdatePe
                     {mode === 'mutasi' && (
                         <div className="grid grid-cols-3 gap-4 mt-6">
                             <div className="glass-card p-4 rounded-lg border border-accent-blue">
-                                <p className="text-xs text-silver-dark">Total Barang</p>
+                                <p className="text-xs text-silver-dark">{t("Total Barang")}</p>
                                 <p className="text-2xl font-bold text-accent-blue">{totalStock}</p>
-                                <p className="text-xs text-silver-dark mt-1">unit</p>
+                                <p className="text-xs text-silver-dark mt-1">{t("unit")}</p>
                             </div>
                             <div className="glass-card p-4 rounded-lg border border-accent-orange">
-                                <p className="text-xs text-silver-dark">Mutasi Barang</p>
+                                <p className="text-xs text-silver-dark">{t("Mutasi Barang")}</p>
                                 <p className="text-2xl font-bold text-accent-orange">{mutatedStock}</p>
-                                <p className="text-xs text-silver-dark mt-1">unit akan dimutasi</p>
+                                <p className="text-xs text-silver-dark mt-1">{t("unit akan dimutasi")}</p>
                             </div>
                             <div className="glass-card p-4 rounded-lg border border-accent-green">
-                                <p className="text-xs text-silver-dark">Sisa Barang</p>
+                                <p className="text-xs text-silver-dark">{t("Sisa Barang")}</p>
                                 <p className="text-2xl font-bold text-accent-green">{remainingStock}</p>
-                                <p className="text-xs text-silver-dark mt-1">unit tetap di gudang</p>
+                                <p className="text-xs text-silver-dark mt-1">{t("unit tetap di gudang")}</p>
                             </div>
                         </div>
                     )}
@@ -242,20 +244,20 @@ const PengajuanDetailView = ({ pengajuan, onClose, onSubmitMutations, onUpdatePe
                                 <table className="w-full">
                                     <thead className="bg-dark-surface">
                                         <tr>
-                                            <th className="px-3 py-2 text-left text-xs font-semibold text-silver">Nama Item</th>
-                                            <th className="px-3 py-2 text-left text-xs font-semibold text-silver">Serial Number</th>
-                                            <th className="px-3 py-2 text-center text-xs font-semibold text-silver">Kondisi</th>
+                                            <th className="px-3 py-2 text-left text-xs font-semibold text-silver">{t("Nama Item")}</th>
+                                            <th className="px-3 py-2 text-left text-xs font-semibold text-silver">{t("Serial Number")}</th>
+                                            <th className="px-3 py-2 text-center text-xs font-semibold text-silver">{t("Kondisi")}</th>
                                             {mode === 'mutasi' && (
                                                 <>
-                                                    <th className="px-3 py-2 text-center text-xs font-semibold text-accent-blue">Total</th>
-                                                    <th className="px-3 py-2 text-center text-xs font-semibold text-accent-orange">Mutasi</th>
-                                                    <th className="px-3 py-2 text-center text-xs font-semibold text-accent-green">Sisa</th>
-                                                    <th className="px-3 py-2 text-left text-xs font-semibold text-silver">Status</th>
-                                                    <th className="px-3 py-2 text-left text-xs font-semibold text-silver">Aksi</th>
+                                                    <th className="px-3 py-2 text-center text-xs font-semibold text-accent-blue">{t("Total")}</th>
+                                                    <th className="px-3 py-2 text-center text-xs font-semibold text-accent-orange">{t("Mutasi")}</th>
+                                                    <th className="px-3 py-2 text-center text-xs font-semibold text-accent-green">{t("Sisa")}</th>
+                                                    <th className="px-3 py-2 text-left text-xs font-semibold text-silver">{t("Status")}</th>
+                                                    <th className="px-3 py-2 text-left text-xs font-semibold text-silver">{t("Aksi")}</th>
                                                 </>
                                             )}
                                             {mode === 'view' && (
-                                                <th className="px-3 py-2 text-center text-xs font-semibold text-silver">Jumlah</th>
+                                                <th className="px-3 py-2 text-center text-xs font-semibold text-silver">{t("Jumlah")}</th>
                                             )}
                                         </tr>
                                     </thead>
@@ -320,8 +322,8 @@ const PengajuanDetailView = ({ pengajuan, onClose, onSubmitMutations, onUpdatePe
                                                                         onChange={(e) => updateMutation(itemId, 'status', e.target.value)}
                                                                         className="px-2 py-1 bg-dark-surface border border-dark-border rounded text-sm text-silver-light"
                                                                     >
-                                                                        <option value="tetap">Tetap</option>
-                                                                        <option value="mutasi">Mutasi</option>
+                                                                        <option value="tetap">{t("Tetap")}</option>
+                                                                        <option value="mutasi">{t("Mutasi")}</option>
                                                                     </select>
                                                                 </td>
 
@@ -352,11 +354,11 @@ const PengajuanDetailView = ({ pengajuan, onClose, onSubmitMutations, onUpdatePe
                                                         <tr>
                                                             <td colSpan="6" className="px-3 py-4 bg-dark-bg">
                                                                 <div className="p-4 bg-dark-surface rounded-lg space-y-4">
-                                                                    <h4 className="text-sm font-semibold text-silver-light mb-3">Form Mutasi - {item.itemName}</h4>
+                                                                    <h4 className="text-sm font-semibold text-silver-light mb-3">{t("Form Mutasi -")} {item.itemName}</h4>
 
                                                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                                                         <div>
-                                                                            <label className="block text-xs text-silver-dark mb-1">Asal *</label>
+                                                                            <label className="block text-xs text-silver-dark mb-1">{t("Asal *")}</label>
                                                                             <select
                                                                                 value={mutationData.origin || 'Gudang'}
                                                                                 onChange={(e) => updateMutation(itemId, 'origin', e.target.value)}
@@ -368,7 +370,7 @@ const PengajuanDetailView = ({ pengajuan, onClose, onSubmitMutations, onUpdatePe
                                                                             </select>
                                                                         </div>
                                                                         <div>
-                                                                            <label className="block text-xs text-silver-dark mb-1">Tujuan *</label>
+                                                                            <label className="block text-xs text-silver-dark mb-1">{t("Tujuan *")}</label>
                                                                             <select
                                                                                 value={mutationData.destination || DEFAULT_LOCATION}
                                                                                 onChange={(e) => updateMutation(itemId, 'destination', e.target.value)}
@@ -380,7 +382,7 @@ const PengajuanDetailView = ({ pengajuan, onClose, onSubmitMutations, onUpdatePe
                                                                             </select>
                                                                         </div>
                                                                         <div>
-                                                                            <label className="block text-xs text-silver-dark mb-1">Jumlah * (Max: {item.quantity})</label>
+                                                                            <label className="block text-xs text-silver-dark mb-1">{t("Jumlah * (Max:")} {item.quantity})</label>
                                                                             <input
                                                                                 type="number"
                                                                                 value={mutationData.quantity || ''}
@@ -390,11 +392,11 @@ const PengajuanDetailView = ({ pengajuan, onClose, onSubmitMutations, onUpdatePe
                                                                                 placeholder="0"
                                                                             />
                                                                             {mutationData.quantity && (
-                                                                                <p className="text-xs text-accent-green mt-1">Sisa: {item.quantity - (parseInt(mutationData.quantity) || 0)}</p>
+                                                                                <p className="text-xs text-accent-green mt-1">{t("Sisa:")} {item.quantity - (parseInt(mutationData.quantity) || 0)}</p>
                                                                             )}
                                                                         </div>
                                                                         <div>
-                                                                            <label className="block text-xs text-silver-dark mb-1">Tanggal *</label>
+                                                                            <label className="block text-xs text-silver-dark mb-1">{t("Tanggal *")}</label>
                                                                             <input
                                                                                 type="date"
                                                                                 value={mutationData.date || ''}
@@ -403,7 +405,7 @@ const PengajuanDetailView = ({ pengajuan, onClose, onSubmitMutations, onUpdatePe
                                                                             />
                                                                         </div>
                                                                         <div>
-                                                                            <label className="block text-xs text-silver-dark mb-1">Jam *</label>
+                                                                            <label className="block text-xs text-silver-dark mb-1">{t("Jam *")}</label>
                                                                             <input
                                                                                 type="time"
                                                                                 value={mutationData.time || ''}
@@ -412,25 +414,25 @@ const PengajuanDetailView = ({ pengajuan, onClose, onSubmitMutations, onUpdatePe
                                                                             />
                                                                         </div>
                                                                         <div className="col-span-2">
-                                                                            <label className="block text-xs text-silver-dark mb-1">PIC *</label>
+                                                                            <label className="block text-xs text-silver-dark mb-1">{t("PIC *")}</label>
                                                                             <input
                                                                                 type="text"
                                                                                 value={mutationData.pic || ''}
                                                                                 onChange={(e) => updateMutation(itemId, 'pic', e.target.value)}
                                                                                 className="w-full px-2 py-1 bg-dark-bg border border-dark-border rounded text-sm text-silver-light"
-                                                                                placeholder="Nama PIC"
+                                                                                placeholder={t("Nama PIC")}
                                                                             />
                                                                         </div>
                                                                     </div>
 
                                                                     {/* Keterangan / Remarks */}
                                                                     <div className="mt-3">
-                                                                        <label className="block text-xs text-silver-dark mb-1">Keterangan</label>
+                                                                        <label className="block text-xs text-silver-dark mb-1">{t("Keterangan")}</label>
                                                                         <textarea
                                                                             value={mutationData.remarks || ''}
                                                                             onChange={(e) => updateMutation(itemId, 'remarks', e.target.value)}
                                                                             className="w-full px-2 py-2 bg-dark-bg border border-dark-border rounded text-sm text-silver-light"
-                                                                            placeholder="Catatan tambahan untuk mutasi ini..."
+                                                                            placeholder={t("Catatan tambahan untuk mutasi ini...")}
                                                                             rows={2}
                                                                         />
                                                                     </div>
@@ -463,7 +465,7 @@ const PengajuanDetailView = ({ pengajuan, onClose, onSubmitMutations, onUpdatePe
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70">
                     <div className="glass-card rounded-lg p-6 max-w-2xl w-full mx-4 animate-fade-in">
                         <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-xl font-bold gradient-text">Edit Pengajuan</h3>
+                            <h3 className="text-xl font-bold gradient-text">{t("Edit Pengajuan")}</h3>
                             <button onClick={() => setShowEditModal(false)} className="p-2 hover:bg-dark-border rounded">
                                 <X className="w-5 h-5 text-silver" />
                             </button>
@@ -472,10 +474,10 @@ const PengajuanDetailView = ({ pengajuan, onClose, onSubmitMutations, onUpdatePe
                         <div className="space-y-4">
                             {/* Location Edit */}
                             <div>
-                                <label className="block text-sm font-medium text-silver mb-2">Lokasi Gudang</label>
+                                <label className="block text-sm font-medium text-silver mb-2">{t("Lokasi Gudang")}</label>
                                 <div className="grid grid-cols-3 gap-3">
                                     <div>
-                                        <label className="block text-xs text-silver-dark mb-1">Ruangan</label>
+                                        <label className="block text-xs text-silver-dark mb-1">{t("Ruangan")}</label>
                                         <input
                                             type="text"
                                             value={editForm.location.room}
@@ -484,11 +486,11 @@ const PengajuanDetailView = ({ pengajuan, onClose, onSubmitMutations, onUpdatePe
                                                 location: { ...editForm.location, room: e.target.value }
                                             })}
                                             className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
-                                            placeholder="Ruangan A"
+                                            placeholder={t("Ruangan A")}
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs text-silver-dark mb-1">Rak</label>
+                                        <label className="block text-xs text-silver-dark mb-1">{t("Rak")}</label>
                                         <input
                                             type="text"
                                             value={editForm.location.rack}
@@ -497,11 +499,11 @@ const PengajuanDetailView = ({ pengajuan, onClose, onSubmitMutations, onUpdatePe
                                                 location: { ...editForm.location, rack: e.target.value }
                                             })}
                                             className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
-                                            placeholder="Rak 01"
+                                            placeholder={t("Rak 01")}
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs text-silver-dark mb-1">Slot</label>
+                                        <label className="block text-xs text-silver-dark mb-1">{t("Slot")}</label>
                                         <input
                                             type="text"
                                             value={editForm.location.slot}
@@ -510,32 +512,32 @@ const PengajuanDetailView = ({ pengajuan, onClose, onSubmitMutations, onUpdatePe
                                                 location: { ...editForm.location, slot: e.target.value }
                                             })}
                                             className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
-                                            placeholder="Slot 01"
+                                            placeholder={t("Slot 01")}
                                         />
                                     </div>
                                 </div>
-                                <p className="text-xs text-silver-dark mt-2">Lokasi ini akan diterapkan ke semua item dalam pengajuan</p>
+                                <p className="text-xs text-silver-dark mt-2">{t("Lokasi ini akan diterapkan ke semua item dalam pengajuan")}</p>
                             </div>
 
                             {/* Remarks Edit */}
                             <div>
-                                <label className="block text-sm font-medium text-silver mb-2">Keterangan</label>
+                                <label className="block text-sm font-medium text-silver mb-2">{t("Keterangan")}</label>
                                 <textarea
                                     value={editForm.remarks}
                                     onChange={(e) => setEditForm({ ...editForm, remarks: e.target.value })}
                                     className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
                                     rows={4}
-                                    placeholder="Tambahkan keterangan untuk pengajuan ini..."
+                                    placeholder={t("Tambahkan keterangan untuk pengajuan ini...")}
                                 />
                             </div>
                         </div>
 
                         <div className="flex justify-end gap-3 mt-6">
                             <Button variant="secondary" onClick={() => setShowEditModal(false)}>
-                                Batal
+                                {t("Batal")}
                             </Button>
                             <Button onClick={handleSaveEdit}>
-                                Simpan Perubahan
+                                {t("Simpan Perubahan")}
                             </Button>
                         </div>
                     </div>

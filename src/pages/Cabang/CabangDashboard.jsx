@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Building2, DollarSign, FileText, TrendingUp, Users } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const fmtIDR = (value) => {
     const n = Number(value || 0);
@@ -10,6 +11,7 @@ const fmtIDR = (value) => {
 };
 
 const CabangDashboard = () => {
+    const { t } = useLanguage();
     const [summaryRows, setSummaryRows] = React.useState([]);
     const [loading, setLoading] = React.useState(true);
 
@@ -110,8 +112,8 @@ const CabangDashboard = () => {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-3xl font-bold text-silver-light">Dashboard Cabang</h1>
-                <p className="text-sm text-silver-dark mt-1">Ringkasan gabungan Sales dan Finance level Cabang (data terisolasi division = cabang).</p>
+                <h1 className="text-3xl font-bold text-silver-light">{t("Dashboard Cabang")}</h1>
+                <p className="text-sm text-silver-dark mt-1">{t("Ringkasan gabungan Sales dan Finance level Cabang (data terisolasi division = cabang).")}</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
@@ -130,30 +132,30 @@ const CabangDashboard = () => {
 
             <div className="glass-card rounded-xl border border-dark-border overflow-hidden">
                 <div className="px-5 py-4 border-b border-dark-border flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-silver-light">Performa per Cabang</h2>
-                    <span className="text-xs text-silver-dark">Sumber data: Supabase (standalone cabang)</span>
+                    <h2 className="text-lg font-semibold text-silver-light">{t("Performa per Cabang")}</h2>
+                    <span className="text-xs text-silver-dark">{t("Sumber data: Supabase (standalone cabang)")}</span>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="border-b border-dark-border/80 bg-dark-surface/40">
-                                <th className="text-left px-5 py-3 text-silver-dark">Kode</th>
-                                <th className="text-left px-5 py-3 text-silver-dark">Nama Cabang</th>
+                                <th className="text-left px-5 py-3 text-silver-dark">{t("Kode")}</th>
+                                <th className="text-left px-5 py-3 text-silver-dark">{t("Nama Cabang")}</th>
                                 <th className="text-right px-5 py-3 text-silver-dark">SO</th>
-                                <th className="text-right px-5 py-3 text-silver-dark">Invoice</th>
-                                <th className="text-right px-5 py-3 text-silver-dark">Revenue</th>
-                                <th className="text-right px-5 py-3 text-silver-dark">AR Outstanding</th>
+                                <th className="text-right px-5 py-3 text-silver-dark">{t("Invoice")}</th>
+                                <th className="text-right px-5 py-3 text-silver-dark">{t("Revenue")}</th>
+                                <th className="text-right px-5 py-3 text-silver-dark">{t("AR Outstanding")}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading && (
                                 <tr>
-                                    <td colSpan={6} className="px-5 py-8 text-center text-silver-dark">Memuat ringkasan cabang...</td>
+                                    <td colSpan={6} className="px-5 py-8 text-center text-silver-dark">{t("Memuat ringkasan cabang...")}</td>
                                 </tr>
                             )}
                             {!loading && summaryRows.length === 0 && (
                                 <tr>
-                                    <td colSpan={6} className="px-5 py-8 text-center text-silver-dark">Belum ada data transaksi cabang.</td>
+                                    <td colSpan={6} className="px-5 py-8 text-center text-silver-dark">{t("Belum ada data transaksi cabang.")}</td>
                                 </tr>
                             )}
                             {summaryRows.map((item) => (

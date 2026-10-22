@@ -38,6 +38,7 @@ import COAPicker from '../Common/COAPicker';
 import PartnerPicker from '../Common/PartnerPicker';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const getPersistedBuyingItems = (source = {}) => {
     const data = source || {};
@@ -71,6 +72,7 @@ const getDefaultCogsData = () => ({
 });
 
 const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCancel, onViewAnalysis, canEditShipment = true, canCreatePO = true }) => {
+    const { t } = useLanguage();
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('details');
     const [isEditing, setIsEditing] = useState(false);
@@ -217,17 +219,17 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
 
     const handleDeleteShipment = async () => {
         if (!canDelete('blink_shipments')) {
-            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus shipment.');
+            alert(t("Akses Ditolak: Anda tidak memiliki hak untuk menghapus shipment."));
             return;
         }
-        if (!confirm('Are you sure you want to delete this sales order? This action cannot be undone.')) {
+        if (!confirm(t("Are you sure you want to delete this sales order? This action cannot be undone."))) {
             return;
         }
 
         try {
             const success = await deleteShipmentCascade(shipment.id);
             if (!success) return;
-            alert('✅ Sales Order deleted successfully');
+            alert(t("✅ Sales Order deleted successfully"));
             onClose(); // Close modal
         } catch (error) {
             console.error('Error deleting shipment:', error);
@@ -765,7 +767,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
             const defaultVendorId = selectedPOVendorId;
 
             if (!hasAnyAssigned && !defaultVendorId) {
-                alert('Please assign at least one vendor to the items, or select a default vendor for all items.');
+                alert(t("Please assign at least one vendor to the items, or select a default vendor for all items."));
                 return;
             }
 
@@ -871,7 +873,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                     (hasError ? '\n\n⚠️ Sebagian PO gagal dibuat, periksa console untuk detail.' : '')
                 );
             } else {
-                alert('❌ Semua PO gagal dibuat. Periksa console untuk detail.');
+                alert(t("❌ Semua PO gagal dibuat. Periksa console untuk detail."));
             }
 
             onClose();
@@ -977,7 +979,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
 
             // Exit edit mode and show success
             setIsEditingCOGS(false);
-            alert('✅ COGS data saved successfully!');
+            alert(t("✅ COGS data saved successfully!"));
         } catch (error) {
             console.error('Error saving COGS:', error);
             alert('❌ Failed to save COGS: ' + error.message);
@@ -1143,7 +1145,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
             status_history: updatedShipment.statusHistory
         }).eq('id', shipment.id).then(({ error }) => {
             if (error) {
-                alert('Failed to update status');
+                alert(t("Failed to update status"));
                 return;
             }
             onUpdate(updatedShipment, true);
@@ -1156,7 +1158,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
 
     const handleAddContainer = async () => {
         if (!newContainer.containerNumber) {
-            alert('Container number is required');
+            alert(t("Container number is required"));
             return;
         }
         const updatedContainers = [...containers, { ...newContainer, id: Date.now() }];
@@ -1177,7 +1179,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
             onUpdate({ ...shipment, containers: updatedContainers }, true);
             setNewContainer({ containerNumber: '', containerType: '20ft', sealNumber: '', vgm: '' });
             setShowContainerModal(false);
-            alert('✅ Container added successfully!');
+            alert(t("✅ Container added successfully!"));
         } catch (error) {
             console.error('Error adding container:', error);
             alert('❌ Failed to add container: ' + error.message);
@@ -1197,7 +1199,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
             onUpdate({ ...shipment, containers: updatedContainers }, true);
         } catch (error) {
             console.error('Error deleting container:', error);
-            alert('Failed to delete container');
+            alert(t("Failed to delete container"));
         }
     };
 
@@ -1221,7 +1223,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                     return;
                 }
             } else {
-                if (!confirm('Create Invoice for this shipment? This will create a new draft Invoice.')) return;
+                if (!confirm(t("Create Invoice for this shipment? This will create a new draft Invoice."))) return;
             }
             // 1. Generate Invoice Number
             const { generateInvoiceNumber } = await import('../../utils/documentNumbers');
@@ -1414,7 +1416,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
 
     const handleAddTracking = () => {
         if (!newTracking.location) {
-            alert('Location is required');
+            alert(t("Location is required"));
             return;
         }
         const tracking = {
@@ -1450,7 +1452,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
             voyage: bookingData.voyageNumber
         };
         onUpdate(updatedShipment, true); // skipDbUpdate = true
-        alert('Booking details and dates saved!');
+        alert(t("Booking details and dates saved!"));
     };
 
     const getShipmentType = () => {
@@ -1617,7 +1619,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
             };
             onUpdate(updatedShipment, true); // skipDbUpdate = true (already saved above)
             setIsEditing(false);
-            alert('✅ Shipment details updated successfully!');
+            alert(t("✅ Shipment details updated successfully!"));
         } catch (error) {
             console.error('Error updating shipment:', error);
             alert('❌ Failed to update shipment: ' + error.message);
@@ -1630,7 +1632,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
 
         // Validate file count
         if (documents.length + files.length > 10) {
-            alert('❌ Maksimal 10 dokumen');
+            alert(t("❌ Maksimal 10 dokumen"));
             return;
         }
 
@@ -1692,7 +1694,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
 
     // Delete Document Handler
     const handleDeleteDocument = async (documentId) => {
-        if (!confirm('Yakin ingin menghapus dokumen ini?')) return;
+        if (!confirm(t("Yakin ingin menghapus dokumen ini?"))) return;
 
         try {
             const updatedDocuments = documents.filter(doc => doc.id !== documentId);
@@ -1706,7 +1708,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
             if (error) throw error;
 
             onUpdate({ ...shipment, documents: updatedDocuments }, true);
-            alert('✅ Dokumen berhasil dihapus');
+            alert(t("✅ Dokumen berhasil dihapus"));
         } catch (error) {
             console.error('Error deleting document:', error);
             alert('❌ Failed to delete dokumen: ' + error.message);
@@ -1758,10 +1760,10 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                         )}
                         <div className="mt-4 flex gap-2">
                             <Button onClick={() => handleDownloadDocument(previewDocument)} icon={Download}>
-                                Download
+                                {t("Download")}
                             </Button>
                             <Button variant="secondary" onClick={() => setShowPreviewModal(false)}>
-                                Tutup
+                                {t("Tutup")}
                             </Button>
                         </div>
                     </div>
@@ -1798,14 +1800,14 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                 }
                                             }}
                                         >
-                                            Edit
+                                            {t("Edit")}
                                         </Button>
                                     )}
                                     {/* Generate PO — visible from all tabs when approved */}
                                     {canCreatePO && currentStatus === 'approved' && (
                                         linkedDocs.hasPO ? (
                                             <span className="text-xs text-green-500 bg-green-500/10 border border-green-500/30 px-3 py-1.5 rounded font-medium inline-flex items-center gap-1 cursor-default">
-                                                <CheckCircle className="w-3.5 h-3.5" /> PO Created
+                                                <CheckCircle className="w-3.5 h-3.5" /> {t("PO Created")}
                                             </span>
                                         ) : (
                                             <Button
@@ -1813,21 +1815,21 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                 variant="primary"
                                                 icon={FileText}
                                                 onClick={handleGeneratePO}
-                                                title="Generate a Purchase Order from actual costs"
+                                                title={t("Generate a Purchase Order from actual costs")}
                                             >
-                                                Generate PO
+                                                {t("Generate PO")}
                                             </Button>
                                         )
                                     )}
                                     {canCreatePO && currentStatus !== 'approved' && (
-                                        <span className="text-xs text-yellow-400 bg-yellow-500/10 border border-yellow-500/30 px-2 py-1 rounded" title="Sales Order must be approved first">
-                                            🔒 Approve to unlock PO
+                                        <span className="text-xs text-yellow-400 bg-yellow-500/10 border border-yellow-500/30 px-2 py-1 rounded" title={t("Sales Order must be approved first")}>
+                                            {t("🔒 Approve to unlock PO")}
                                         </span>
                                     )}
                                     {currentStatus === 'approved' ? (
                                         linkedDocs.hasInvoice ? (
                                             <span className="text-xs text-green-500 bg-green-500/10 border border-green-500/30 px-3 py-1.5 rounded font-medium inline-flex items-center gap-1 cursor-default">
-                                                <CheckCircle className="w-3.5 h-3.5" /> Inv Created
+                                                <CheckCircle className="w-3.5 h-3.5" /> {t("Inv Created")}
                                             </span>
                                         ) : (
                                             <Button
@@ -1835,14 +1837,14 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                 variant="primary"
                                                 icon={Receipt}
                                                 onClick={handleGenerateInvoice}
-                                                title="Create Invoice from this Sales Order"
+                                                title={t("Create Invoice from this Sales Order")}
                                             >
-                                                Create Inv
+                                                {t("Create Inv")}
                                             </Button>
                                         )
                                     ) : (
-                                        <span className="text-xs text-yellow-400 bg-yellow-500/10 border border-yellow-500/30 px-2 py-1 rounded" title="Sales Order must be approved first">
-                                            🔒 Approve to invoice
+                                        <span className="text-xs text-yellow-400 bg-yellow-500/10 border border-yellow-500/30 px-2 py-1 rounded" title={t("Sales Order must be approved first")}>
+                                            {t("🔒 Approve to invoice")}
                                         </span>
                                     )}
                                     {canEditShipment && currentStatus !== 'cancelled' && (
@@ -1851,9 +1853,9 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                             variant="danger"
                                             icon={XCircle}
                                             onClick={() => onCancel(shipment.id)}
-                                            title="Batalkan sales order dan seluruh alur keuangan terkait"
+                                            title={t("Batalkan sales order dan seluruh alur keuangan terkait")}
                                         >
-                                            Batal Sales Order
+                                            {t("Batal Sales Order")}
                                         </Button>
                                     )}
                                     <Button
@@ -1862,7 +1864,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                         icon={Trash}
                                         onClick={handleDeleteShipment}
                                     >
-                                        Delete
+                                        {t("Delete")}
                                     </Button>
                                 </>
                             )}
@@ -1880,10 +1882,10 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                             }
                                         }}
                                     >
-                                        Save Changes
+                                        {t("Save Changes")}
                                     </Button>
                                     {activeTab === 'cogs' && isEditingCOGS && (
-                                        <span className="text-xs text-silver-dark italic px-1">Save first to generate PO</span>
+                                        <span className="text-xs text-silver-dark italic px-1">{t("Save first to generate PO")}</span>
                                     )}
                                     <Button
                                         size="sm"
@@ -1899,7 +1901,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                             }
                                         }}
                                     >
-                                        Cancel
+                                        {t("Cancel")}
                                     </Button>
                                 </>
                             )}
@@ -1964,13 +1966,13 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                 <div className="glass-card p-4 rounded-lg">
                                     <div className="flex items-center gap-2 mb-3">
                                         <User className="w-4 h-4 text-accent-orange" />
-                                        <h4 className="font-semibold text-silver-light">Customer Information</h4>
+                                        <h4 className="font-semibold text-silver-light">{t("Customer Information")}</h4>
                                     </div>
                                     <div className="space-y-2 text-sm">
                                         {isEditing ? (
                                             <>
                                                 <div>
-                                                    <label className="text-silver-dark text-xs">Customer Name</label>
+                                                    <label className="text-silver-dark text-xs">{t("Customer Name")}</label>
                                                     <input
                                                         type="text"
                                                         value={editedShipment.customer}
@@ -1979,7 +1981,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="text-silver-dark text-xs">PIC / Sales</label>
+                                                    <label className="text-silver-dark text-xs">{t("PIC / Sales")}</label>
                                                     <input
                                                         type="text"
                                                         value={editedShipment.salesPerson || ''}
@@ -1988,17 +1990,17 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="text-silver-dark text-xs">Arah Pengiriman</label>
+                                                    <label className="text-silver-dark text-xs">{t("Arah Pengiriman")}</label>
                                                     <select
                                                         value={editedShipment.trade_direction || ''}
                                                         onChange={(e) => setEditedShipment({ ...editedShipment, trade_direction: e.target.value || null })}
                                                         className={`w-full mt-1 px-2 py-1 bg-dark-surface border rounded text-silver-light ${soTypeValidation?.isValid ? 'border-dark-border' : 'border-red-500/50'
                                                             }`}
                                                     >
-                                                        <option value="">-- Pilih --</option>
-                                                        <option value="import">Import</option>
-                                                        <option value="export">Export</option>
-                                                        <option value="domestic">Domestik</option>
+                                                        <option value="">{t("-- Pilih --")}</option>
+                                                        <option value="import">{t("Import")}</option>
+                                                        <option value="export">{t("Export")}</option>
+                                                        <option value="domestic">{t("Domestik")}</option>
                                                     </select>
 
                                                     {/* SO Type Validation Indicator */}
@@ -2006,7 +2008,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                         <div className="mt-2 p-2 bg-red-500/10 border border-red-500/30 rounded text-xs text-red-300">
                                                             <div className="flex gap-2 items-start">
                                                                 <div className="flex-1">
-                                                                    <p className="font-semibold mb-1">SO Type Mismatch</p>
+                                                                    <p className="font-semibold mb-1">{t("SO Type Mismatch")}</p>
                                                                     {soTypeValidation.issues.map((issue, idx) => (
                                                                         <p key={idx} className="text-xs mb-1">• {issue}</p>
                                                                     ))}
@@ -2015,7 +2017,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                                     onClick={handleAutoFixSOType}
                                                                     className="mt-1 px-2 py-1 bg-amber-600/50 hover:bg-amber-600 rounded text-xs font-semibold whitespace-nowrap"
                                                                 >
-                                                                    Auto Fix
+                                                                    {t("Auto Fix")}
                                                                 </button>
                                                             </div>
                                                         </div>
@@ -2024,7 +2026,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                     {/* SO Type Display */}
                                                     {soTypeValidation?.actualSOType && (
                                                         <div className="mt-2 text-xs">
-                                                            <span className="text-silver-dark">SO Type: </span>
+                                                            <span className="text-silver-dark">{t("SO Type:")} </span>
                                                             <span className={`font-semibold ${soTypeValidation.isValid ? 'text-green-400' : 'text-amber-400'
                                                                 }`}>
                                                                 {soTypeValidation.actualSOType}
@@ -2036,57 +2038,57 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                     )}
                                                 </div>
                                                 <div>
-                                                    <label className="text-silver-dark text-xs">Incoterm</label>
+                                                    <label className="text-silver-dark text-xs">{t("Incoterm")}</label>
                                                     <input
                                                         type="text"
                                                         value={editedShipment.incoterm || ''}
                                                         onChange={(e) => setEditedShipment({ ...editedShipment, incoterm: e.target.value })}
                                                         className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light"
-                                                        placeholder="e.g. FOB, CIF, EXW"
+                                                        placeholder={t("e.g. FOB, CIF, EXW")}
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="text-silver-dark text-xs">Payment Terms</label>
+                                                    <label className="text-silver-dark text-xs">{t("Payment Terms")}</label>
                                                     <input
                                                         type="text"
                                                         value={editedShipment.paymentTerms || editedShipment.payment_terms || ''}
                                                         onChange={(e) => setEditedShipment({ ...editedShipment, paymentTerms: e.target.value })}
                                                         className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light"
-                                                        placeholder="e.g. Net 30 Days"
+                                                        placeholder={t("e.g. Net 30 Days")}
                                                     />
                                                 </div>
                                             </>
                                         ) : (
                                             <>
                                                 <div className="flex justify-between">
-                                                    <span className="text-silver-dark">Customer:</span>
+                                                    <span className="text-silver-dark">{t("Customer:")}</span>
                                                     <span className="text-silver-light font-medium">{shipment.customer}</span>
                                                 </div>
                                                 <div className="flex justify-between">
-                                                    <span className="text-silver-dark">PIC / Sales:</span>
+                                                    <span className="text-silver-dark">{t("PIC / Sales:")}</span>
                                                     <span className="text-silver-light">{shipment.salesPerson || shipment.pic_ops || '-'}</span>
                                                 </div>
                                                 {(shipment.incoterm) && (
                                                     <div className="flex justify-between">
-                                                        <span className="text-silver-dark">Incoterm:</span>
+                                                        <span className="text-silver-dark">{t("Incoterm:")}</span>
                                                         <span className="text-accent-orange font-semibold">{shipment.incoterm}</span>
                                                     </div>
                                                 )}
                                                 {(shipment.paymentTerms || shipment.payment_terms) && (
                                                     <div className="flex justify-between">
-                                                        <span className="text-silver-dark">Payment Terms:</span>
+                                                        <span className="text-silver-dark">{t("Payment Terms:")}</span>
                                                         <span className="text-silver-light">{shipment.paymentTerms || shipment.payment_terms}</span>
                                                     </div>
                                                 )}
                                                 {(shipment.trade_direction) && (
                                                     <div className="flex justify-between">
-                                                        <span className="text-silver-dark">Trade Direction:</span>
+                                                        <span className="text-silver-dark">{t("Trade Direction:")}</span>
                                                         <span className="text-silver-light font-medium capitalize">{shipment.trade_direction}</span>
                                                     </div>
                                                 )}
                                                 {soTypeValidation?.actualSOType && (
                                                     <div className="flex justify-between">
-                                                        <span className="text-silver-dark">SO Type:</span>
+                                                        <span className="text-silver-dark">{t("SO Type:")}</span>
                                                         <span className={`font-semibold ${soTypeValidation.isValid ? 'text-green-400' : 'text-amber-400'
                                                             }`}>
                                                             {soTypeValidation.actualSOType}
@@ -2096,7 +2098,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                             </>
                                         )}
                                         <div className="flex justify-between">
-                                            <span className="text-silver-dark">Type:</span>
+                                            <span className="text-silver-dark">{t("Type:")}</span>
                                             <span className="text-silver-light">{getShipmentType()}</span>
                                         </div>
                                     </div>
@@ -2106,13 +2108,13 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                 <div className="glass-card p-4 rounded-lg">
                                     <div className="flex items-center gap-2 mb-3">
                                         <MapPin className="w-4 h-4 text-accent-orange" />
-                                        <h4 className="font-semibold text-silver-light">Route & Service</h4>
+                                        <h4 className="font-semibold text-silver-light">{t("Route & Service")}</h4>
                                     </div>
                                     <div className="space-y-2 text-sm">
                                         {isEditing ? (
                                             <>
                                                 <div>
-                                                    <label className="text-silver-dark text-xs">Origin</label>
+                                                    <label className="text-silver-dark text-xs">{t("Origin")}</label>
                                                     <input
                                                         type="text"
                                                         value={editedShipment.origin}
@@ -2121,7 +2123,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="text-silver-dark text-xs">Destination</label>
+                                                    <label className="text-silver-dark text-xs">{t("Destination")}</label>
                                                     <input
                                                         type="text"
                                                         value={editedShipment.destination}
@@ -2130,37 +2132,37 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="text-silver-dark text-xs">Cargo Type</label>
+                                                    <label className="text-silver-dark text-xs">{t("Cargo Type")}</label>
                                                     <select
                                                         value={editedShipment.cargoType || 'FCL'}
                                                         onChange={(e) => setEditedShipment({ ...editedShipment, cargoType: e.target.value })}
                                                         className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light"
                                                     >
-                                                        <option value="FCL">FCL (Full Container Load)</option>
-                                                        <option value="LCL">LCL (Less than Container Load)</option>
-                                                        <option value="General">General Cargo</option>
-                                                        <option value="Bulk">Bulk Cargo</option>
+                                                        <option value="FCL">{t("FCL (Full Container Load)")}</option>
+                                                        <option value="LCL">{t("LCL (Less than Container Load)")}</option>
+                                                        <option value="General">{t("General Cargo")}</option>
+                                                        <option value="Bulk">{t("Bulk Cargo")}</option>
                                                     </select>
                                                 </div>
                                             </>
                                         ) : (
                                             <>
                                                 <div className="flex justify-between">
-                                                    <span className="text-silver-dark">Origin:</span>
+                                                    <span className="text-silver-dark">{t("Origin:")}</span>
                                                     <span className="text-silver-light font-medium">{shipment.origin}</span>
                                                 </div>
                                                 <div className="flex justify-between">
-                                                    <span className="text-silver-dark">Destination:</span>
+                                                    <span className="text-silver-dark">{t("Destination:")}</span>
                                                     <span className="text-silver-light font-medium">{shipment.destination}</span>
                                                 </div>
                                             </>
                                         )}
                                         <div className="flex justify-between">
-                                            <span className="text-silver-dark">Service:</span>
+                                            <span className="text-silver-dark">{t("Service:")}</span>
                                             <span className="text-silver-light capitalize">{shipment.serviceType}</span>
                                         </div>
                                         <div className="flex justify-between">
-                                            <span className="text-silver-dark">Cargo Type:</span>
+                                            <span className="text-silver-dark">{t("Cargo Type:")}</span>
                                             <span className="text-silver-light">{shipment.cargoType || '-'}</span>
                                         </div>
                                     </div>
@@ -2170,31 +2172,31 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                 <div className="glass-card p-4 rounded-lg">
                                     <div className="flex items-center gap-2 mb-3">
                                         <Package className="w-4 h-4 text-accent-orange" />
-                                        <h4 className="font-semibold text-silver-light">Cargo Details</h4>
+                                        <h4 className="font-semibold text-silver-light">{t("Cargo Details")}</h4>
                                     </div>
                                     <div className="space-y-2 text-sm">
                                         {isEditing ? (
                                             <>
                                                 <div>
-                                                    <label className="text-silver-dark text-xs">Weight (kg)</label>
+                                                    <label className="text-silver-dark text-xs">{t("Weight (kg)")}</label>
                                                     <input type="number" value={editedShipment.weight} onChange={(e) => setEditedShipment({ ...editedShipment, weight: e.target.value })} className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light" />
                                                 </div>
                                                 <div>
-                                                    <label className="text-silver-dark text-xs">Volume (CBM)</label>
+                                                    <label className="text-silver-dark text-xs">{t("Volume (CBM)")}</label>
                                                     <input type="number" value={editedShipment.volume} onChange={(e) => setEditedShipment({ ...editedShipment, volume: e.target.value })} className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light" />
                                                 </div>
                                                 <div>
-                                                    <label className="text-silver-dark text-xs">Commodity</label>
+                                                    <label className="text-silver-dark text-xs">{t("Commodity")}</label>
                                                     <input type="text" value={editedShipment.commodity} onChange={(e) => setEditedShipment({ ...editedShipment, commodity: e.target.value })} className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light" />
                                                 </div>
                                                 <div>
-                                                    <label className="text-silver-dark text-xs">Dimensions (L x W x H)</label>
+                                                    <label className="text-silver-dark text-xs">{t("Dimensions (L x W x H)")}</label>
                                                     <input type="text" value={editedShipment.dimensions || ''} onChange={(e) => setEditedShipment({ ...editedShipment, dimensions: e.target.value })} className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light" placeholder="12m x 2.4m x 2.6m" />
                                                 </div>
 
                                                 {/* GWT, Net Weight, Packages, Shipping Mode */}
                                                 <div>
-                                                    <label className="text-silver-dark text-xs">Gross Weight / GWT (kg)</label>
+                                                    <label className="text-silver-dark text-xs">{t("Gross Weight / GWT (kg)")}</label>
                                                     <input type="number" step="0.01"
                                                         value={editedShipment.gross_weight ?? editedShipment.weight ?? ''}
                                                         onChange={(e) => setEditedShipment({ ...editedShipment, gross_weight: e.target.value })}
@@ -2202,7 +2204,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                         placeholder="e.g. 1500" />
                                                 </div>
                                                 <div>
-                                                    <label className="text-silver-dark text-xs">Net Weight (kg)</label>
+                                                    <label className="text-silver-dark text-xs">{t("Net Weight (kg)")}</label>
                                                     <input type="number" step="0.01"
                                                         value={editedShipment.net_weight ?? ''}
                                                         onChange={(e) => setEditedShipment({ ...editedShipment, net_weight: e.target.value })}
@@ -2210,26 +2212,26 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                         placeholder="e.g. 1400" />
                                                 </div>
                                                 <div>
-                                                    <label className="text-silver-dark text-xs">No. of Packages / Pieces</label>
+                                                    <label className="text-silver-dark text-xs">{t("No. of Packages / Pieces")}</label>
                                                     <input type="text"
                                                         value={editedShipment.packages ?? ''}
                                                         onChange={(e) => setEditedShipment({ ...editedShipment, packages: e.target.value })}
                                                         className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light"
-                                                        placeholder="e.g. 10 PALLETS" />
+                                                        placeholder={t("e.g. 10 PALLETS")} />
                                                 </div>
                                                 {shipment.serviceType === 'sea' && (
                                                     <div>
-                                                        <label className="text-silver-dark text-xs">Shipping Mode</label>
+                                                        <label className="text-silver-dark text-xs">{t("Shipping Mode")}</label>
                                                         <select
                                                             value={shippingMode}
                                                             onChange={(e) => setShippingMode(e.target.value)}
                                                             className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light"
                                                         >
-                                                            <option value="">Select mode...</option>
-                                                            <option value="CY/CY">CY/CY (Container Yard to Container Yard)</option>
-                                                            <option value="CY/CF">CY/CF (Container Yard to Container Freight)</option>
-                                                            <option value="CF/CY">CF/CY (Container Freight to Container Yard)</option>
-                                                            <option value="CF/CF">CF/CF (Container Freight to Container Freight)</option>
+                                                            <option value="">{t("Select mode...")}</option>
+                                                            <option value="CY/CY">{t("CY/CY (Container Yard to Container Yard)")}</option>
+                                                            <option value="CY/CF">{t("CY/CF (Container Yard to Container Freight)")}</option>
+                                                            <option value="CF/CY">{t("CF/CY (Container Freight to Container Yard)")}</option>
+                                                            <option value="CF/CF">{t("CF/CF (Container Freight to Container Freight)")}</option>
                                                         </select>
                                                     </div>
                                                 )}
@@ -2238,19 +2240,19 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                 {shipment.serviceType === 'sea' && (
                                                     <>
                                                         <div>
-                                                            <label className="text-silver-dark text-xs">HBL (House Bill of Lading)</label>
-                                                            <input type="text" value={editedShipment.hbl || ''} onChange={(e) => setEditedShipment({ ...editedShipment, hbl: e.target.value })} className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light" placeholder="HBL-2025-001" />
+                                                            <label className="text-silver-dark text-xs">{t("HBL (House Bill of Lading)")}</label>
+                                                            <input type="text" value={editedShipment.hbl || ''} onChange={(e) => setEditedShipment({ ...editedShipment, hbl: e.target.value })} className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light" placeholder={t("HBL-2025-001")} />
                                                         </div>
                                                         <div>
-                                                            <label className="text-silver-dark text-xs">MBL (Master Bill of Lading)</label>
-                                                            <input type="text" value={editedShipment.mbl || ''} onChange={(e) => setEditedShipment({ ...editedShipment, mbl: e.target.value })} className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light" placeholder="MBL-2025-001" />
+                                                            <label className="text-silver-dark text-xs">{t("MBL (Master Bill of Lading)")}</label>
+                                                            <input type="text" value={editedShipment.mbl || ''} onChange={(e) => setEditedShipment({ ...editedShipment, mbl: e.target.value })} className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light" placeholder={t("MBL-2025-001")} />
                                                         </div>
                                                         <div>
-                                                            <label className="text-silver-dark text-xs">BL Number</label>
+                                                            <label className="text-silver-dark text-xs">{t("BL Number")}</label>
                                                             <input type="text" value={editedShipment.bl_number || ''} onChange={(e) => setEditedShipment({ ...editedShipment, bl_number: e.target.value })} className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light" placeholder="BL-2025-001" />
                                                         </div>
                                                         <div>
-                                                            <label className="text-silver-dark text-xs">BL Date</label>
+                                                            <label className="text-silver-dark text-xs">{t("BL Date")}</label>
                                                             <input type="date" value={dates.blDate || ''} onChange={(e) => setDates({ ...dates, blDate: e.target.value })} className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light" />
                                                         </div>
                                                     </>
@@ -2259,23 +2261,23 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                 {shipment.serviceType === 'air' && (
                                                     <>
                                                         <div>
-                                                            <label className="text-silver-dark text-xs">HAWB (House Air Waybill)</label>
-                                                            <input type="text" value={editedShipment.hawb || ''} onChange={(e) => setEditedShipment({ ...editedShipment, hawb: e.target.value })} className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light" placeholder="HAWB-2025-001" />
+                                                            <label className="text-silver-dark text-xs">{t("HAWB (House Air Waybill)")}</label>
+                                                            <input type="text" value={editedShipment.hawb || ''} onChange={(e) => setEditedShipment({ ...editedShipment, hawb: e.target.value })} className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light" placeholder={t("HAWB-2025-001")} />
                                                         </div>
                                                         <div>
-                                                            <label className="text-silver-dark text-xs">MAWB (Master Air Waybill)</label>
-                                                            <input type="text" value={editedShipment.mawb || ''} onChange={(e) => setEditedShipment({ ...editedShipment, mawb: e.target.value })} className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light" placeholder="MAWB-2025-001" />
+                                                            <label className="text-silver-dark text-xs">{t("MAWB (Master Air Waybill)")}</label>
+                                                            <input type="text" value={editedShipment.mawb || ''} onChange={(e) => setEditedShipment({ ...editedShipment, mawb: e.target.value })} className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light" placeholder={t("MAWB-2025-001")} />
                                                         </div>
                                                         <div>
-                                                            <label className="text-silver-dark text-xs">AWB Number</label>
-                                                            <input type="text" value={editedShipment.awb_number || ''} onChange={(e) => setEditedShipment({ ...editedShipment, awb_number: e.target.value })} className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light" placeholder="AWB-xxx" />
+                                                            <label className="text-silver-dark text-xs">{t("AWB Number")}</label>
+                                                            <input type="text" value={editedShipment.awb_number || ''} onChange={(e) => setEditedShipment({ ...editedShipment, awb_number: e.target.value })} className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light" placeholder={t("AWB-xxx")} />
                                                         </div>
                                                         <div>
-                                                            <label className="text-silver-dark text-xs">AWB Date</label>
+                                                            <label className="text-silver-dark text-xs">{t("AWB Date")}</label>
                                                             <input type="date" value={dates.blDate || ''} onChange={(e) => setDates({ ...dates, blDate: e.target.value })} className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light" />
                                                         </div>
                                                         <div>
-                                                            <label className="text-silver-dark text-xs">Flight Number</label>
+                                                            <label className="text-silver-dark text-xs">{t("Flight Number")}</label>
                                                             <input type="text" value={editedShipment.flight_number || ''} onChange={(e) => setEditedShipment({ ...editedShipment, flight_number: e.target.value })} className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light" placeholder="SQ123" />
                                                         </div>
                                                     </>
@@ -2284,19 +2286,19 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                 {shipment.serviceType === 'land' && (
                                                     <>
                                                         <div>
-                                                            <label className="text-silver-dark text-xs">Document Number</label>
-                                                            <input type="text" value={editedShipment.bl_number || ''} onChange={(e) => setEditedShipment({ ...editedShipment, bl_number: e.target.value })} className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light" placeholder="DOC-2025-001" />
+                                                            <label className="text-silver-dark text-xs">{t("Document Number")}</label>
+                                                            <input type="text" value={editedShipment.bl_number || ''} onChange={(e) => setEditedShipment({ ...editedShipment, bl_number: e.target.value })} className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light" placeholder={t("DOC-2025-001")} />
                                                         </div>
                                                         <div>
-                                                            <label className="text-silver-dark text-xs">Vehicle/Truck Number</label>
-                                                            <input type="text" value={editedShipment.voyage || ''} onChange={(e) => setEditedShipment({ ...editedShipment, voyage: e.target.value })} className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light" placeholder="B 1234 ABC" />
+                                                            <label className="text-silver-dark text-xs">{t("Vehicle/Truck Number")}</label>
+                                                            <input type="text" value={editedShipment.voyage || ''} onChange={(e) => setEditedShipment({ ...editedShipment, voyage: e.target.value })} className="w-full mt-1 px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light" placeholder={t("B 1234 ABC")} />
                                                         </div>
                                                     </>
                                                 )}
 
                                                 {/* Common fields for all service types */}
                                                 <div>
-                                                    <label className="text-silver-dark text-xs">Shipper (Vendor)</label>
+                                                    <label className="text-silver-dark text-xs">{t("Shipper (Vendor)")}</label>
                                                     <div className="flex gap-2 items-center">
                                                         <div className="flex-1">
                                                             <PartnerPicker
@@ -2305,7 +2307,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                                     setEditedShipment(prev => ({ ...prev, shipper_id: id }));
                                                                 }}
                                                                 roleFilter="vendor"
-                                                                placeholder="Search vendor by name..."
+                                                                placeholder={t("Search vendor by name...")}
                                                                 theme="light"
                                                                 onPartnerLoad={(partner) => {
                                                                     if (!partner) return;
@@ -2328,7 +2330,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                                 // Quick apply quotation shipper (priority)
                                                                 const qName = (quotationData?.shipper_name || quotationData?.shipper || '').trim();
                                                                 if (!qName) {
-                                                                    alert('No shipper data found in linked quotation');
+                                                                    alert(t("No shipper data found in linked quotation"));
                                                                     return;
                                                                 }
                                                                 setEditedShipment(prev => ({
@@ -2340,51 +2342,51 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                                     shipper_address: prev.shipper_address || quotationData?.shipper_address || ''
                                                                 }));
                                                             }}
-                                                            title="Use shipper from quotation"
-                                                        >Use Quotation</button>
+                                                            title={t("Use shipper from quotation")}
+                                                        >{t("Use Quotation")}</button>
                                                     </div>
-                                                    <div className="text-xs text-silver-dark mt-1">Or type to search vendor (server-side)</div>
+                                                    <div className="text-xs text-silver-dark mt-1">{t("Or type to search vendor (server-side)")}</div>
                                                 </div>
                                             </>
                                         ) : (
                                             <>
                                                 {/* Cargo key figures - view mode */}
                                                 <div className="flex justify-between">
-                                                    <span className="text-silver-dark">Weight (N/W):</span>
+                                                    <span className="text-silver-dark">{t("Weight (N/W):")}</span>
                                                     <span className="text-silver-light">{shipment.net_weight ? `${shipment.net_weight} kg` : (shipment.weight ? `${shipment.weight} kg` : '-')}</span>
                                                 </div>
                                                 <div className="flex justify-between">
-                                                    <span className="text-silver-dark">Gross Weight (G/W):</span>
+                                                    <span className="text-silver-dark">{t("Gross Weight (G/W):")}</span>
                                                     <span className="text-silver-light font-medium">{shipment.gross_weight ? `${shipment.gross_weight} kg` : (shipment.weight ? `${shipment.weight} kg` : '-')}</span>
                                                 </div>
                                                 <div className="flex justify-between">
-                                                    <span className="text-silver-dark">Volume:</span>
+                                                    <span className="text-silver-dark">{t("Volume:")}</span>
                                                     <span className="text-silver-light">{shipment.volume ? `${shipment.volume} CBM` : '-'}</span>
                                                 </div>
                                                 <div className="flex justify-between">
-                                                    <span className="text-silver-dark">Packages:</span>
+                                                    <span className="text-silver-dark">{t("Packages:")}</span>
                                                     <span className="text-silver-light">{shipment.packages || '-'}</span>
                                                 </div>
                                                 <div className="flex justify-between">
-                                                    <span className="text-silver-dark">Commodity:</span>
+                                                    <span className="text-silver-dark">{t("Commodity:")}</span>
                                                     <span className="text-silver-light">{shipment.commodity || '-'}</span>
                                                 </div>
                                                 {shipment.dimensions && (
                                                     <div className="flex justify-between">
-                                                        <span className="text-silver-dark">Dimensions:</span>
+                                                        <span className="text-silver-dark">{t("Dimensions:")}</span>
                                                         <span className="text-silver-light">{shipment.dimensions}</span>
                                                     </div>
                                                 )}
                                                 {shipment.shipping_mode && (
                                                     <div className="flex justify-between">
-                                                        <span className="text-silver-dark">Shipping Mode:</span>
+                                                        <span className="text-silver-dark">{t("Shipping Mode:")}</span>
                                                         <span className="text-blue-400 font-semibold">{shipment.shipping_mode}</span>
                                                     </div>
                                                 )}
                                                 {/* Vessel info (read only reference from Booking tab) */}
                                                 {(bookingData.vesselName) && (
                                                     <div className="flex justify-between">
-                                                        <span className="text-silver-dark">Vessel/Flight:</span>
+                                                        <span className="text-silver-dark">{t("Vessel/Flight:")}</span>
                                                         <span className="text-silver-light">{bookingData.vesselName}{bookingData.voyageNumber ? ` / ${bookingData.voyageNumber}` : ''}</span>
                                                     </div>
                                                 )}
@@ -2399,16 +2401,16 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                         <div className="flex items-center justify-between mb-3">
                                             <div className="flex items-center gap-2">
                                                 <Container className="w-4 h-4 text-accent-orange" />
-                                                <h4 className="font-semibold text-silver-light">Containers</h4>
+                                                <h4 className="font-semibold text-silver-light">{t("Containers")}</h4>
                                             </div>
                                             {isEditing && (
                                                 <Button size="sm" variant="secondary" onClick={() => setShowContainerModal(true)}>
-                                                    Add
+                                                    {t("Add")}
                                                 </Button>
                                             )}
                                         </div>
                                         {containers.length === 0 ? (
-                                            <p className="text-sm text-silver-dark text-center py-4">No containers added</p>
+                                            <p className="text-sm text-silver-dark text-center py-4">{t("No containers added")}</p>
                                         ) : (
                                             <div className="space-y-2 max-h-60 overflow-y-auto">
                                                 {containers.map((container) => (
@@ -2416,9 +2418,9 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                         <div className="flex justify-between items-start">
                                                             <div className="text-sm space-y-1">
                                                                 <div className="font-medium text-accent-orange">{container.containerNumber}</div>
-                                                                <div className="text-silver-dark">Type: {container.containerType}</div>
-                                                                {container.sealNumber && <div className="text-silver-dark">Seal: {container.sealNumber}</div>}
-                                                                {container.vgm && <div className="text-silver-dark">VGM: {container.vgm} kg</div>}
+                                                                <div className="text-silver-dark">{t("Type:")} {container.containerType}</div>
+                                                                {container.sealNumber && <div className="text-silver-dark">{t("Seal:")} {container.sealNumber}</div>}
+                                                                {container.vgm && <div className="text-silver-dark">{t("VGM:")} {container.vgm} kg</div>}
                                                             </div>
                                                             <button onClick={() => handleDeleteContainer(container.id)} className="text-red-400 hover:text-red-300">
                                                                 <X className="w-4 h-4" />
@@ -2436,16 +2438,16 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                         {activeTab === 'tracking' && (
                             <div className="space-y-4">
                                 <div className="flex justify-between items-center">
-                                    <h4 className="font-semibold text-silver-light">Tracking Timeline</h4>
+                                    <h4 className="font-semibold text-silver-light">{t("Tracking Timeline")}</h4>
                                     <Button size="sm" icon={Plus} onClick={() => setShowTrackingModal(true)}>
-                                        Add Update
+                                        {t("Add Update")}
                                     </Button>
                                 </div>
                                 {trackingUpdates.length === 0 ? (
                                     <div className="glass-card p-12 rounded-lg text-center">
                                         <MapPinned className="w-12 h-12 text-silver-dark mx-auto mb-4" />
-                                        <p className="text-silver-dark">No tracking updates yet</p>
-                                        <p className="text-sm text-silver-dark mt-2">Click "Add Update" to track shipment location</p>
+                                        <p className="text-silver-dark">{t("No tracking updates yet")}</p>
+                                        <p className="text-sm text-silver-dark mt-2">{t("Click \"Add Update\" to track shipment location")}</p>
                                     </div>
                                 ) : (
                                     <div className="space-y-3">
@@ -2486,7 +2488,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                             <div className="space-y-6">
                                 {/* Booking Info */}
                                 <div className="glass-card p-4 rounded-lg">
-                                    <h4 className="font-semibold text-silver-light mb-4">Booking Information</h4>
+                                    <h4 className="font-semibold text-silver-light mb-4">{t("Booking Information")}</h4>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label className="text-silver-dark text-sm">
@@ -2514,35 +2516,35 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                     value={bookingData.voyageNumber}
                                                     onChange={(e) => setBookingData({ ...bookingData, voyageNumber: e.target.value })}
                                                     className="w-full mt-1 px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
-                                                    placeholder="VOY123"
+                                                    placeholder={t("VOY123")}
                                                 />
                                             ) : (
                                                 <p className="text-silver-light font-medium mt-1">{bookingData.voyageNumber || '-'}</p>
                                             )}
                                         </div>
                                         <div>
-                                            <label className="text-silver-dark text-sm">Port/Airport of Loading</label>
+                                            <label className="text-silver-dark text-sm">{t("Port/Airport of Loading")}</label>
                                             {isEditing ? (
                                                 <input
                                                     type="text"
                                                     value={bookingData.portOfLoading}
                                                     onChange={(e) => setBookingData({ ...bookingData, portOfLoading: e.target.value })}
                                                     className="w-full mt-1 px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
-                                                    placeholder="IDJKT"
+                                                    placeholder={t("IDJKT")}
                                                 />
                                             ) : (
                                                 <p className="text-silver-light font-medium mt-1">{bookingData.portOfLoading || '-'}</p>
                                             )}
                                         </div>
                                         <div>
-                                            <label className="text-silver-dark text-sm">Port/Airport of Discharge</label>
+                                            <label className="text-silver-dark text-sm">{t("Port/Airport of Discharge")}</label>
                                             {isEditing ? (
                                                 <input
                                                     type="text"
                                                     value={bookingData.portOfDischarge}
                                                     onChange={(e) => setBookingData({ ...bookingData, portOfDischarge: e.target.value })}
                                                     className="w-full mt-1 px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
-                                                    placeholder="SGSIN"
+                                                    placeholder={t("SGSIN")}
                                                 />
                                             ) : (
                                                 <p className="text-silver-light font-medium mt-1">{bookingData.portOfDischarge || '-'}</p>
@@ -2551,18 +2553,18 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                         {/* Shipping Mode - Sea Freight only */}
                                         {shipment.serviceType === 'sea' && (
                                             <div className="col-span-2">
-                                                <label className="text-silver-dark text-sm">Shipping Mode</label>
+                                                <label className="text-silver-dark text-sm">{t("Shipping Mode")}</label>
                                                 {isEditing ? (
                                                     <select
                                                         value={shippingMode}
                                                         onChange={(e) => setShippingMode(e.target.value)}
                                                         className="w-full mt-1 px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
                                                     >
-                                                        <option value="">Select shipping mode...</option>
-                                                        <option value="CY/CY">CY/CY — Container Yard to Container Yard (Door to Door)</option>
-                                                        <option value="CY/CF">CY/CF — Container Yard to Container Freight</option>
-                                                        <option value="CF/CY">CF/CY — Container Freight to Container Yard</option>
-                                                        <option value="CF/CF">CF/CF — Container Freight to Container Freight</option>
+                                                        <option value="">{t("Select shipping mode...")}</option>
+                                                        <option value="CY/CY">{t("CY/CY — Container Yard to Container Yard (Door to Door)")}</option>
+                                                        <option value="CY/CF">{t("CY/CF — Container Yard to Container Freight")}</option>
+                                                        <option value="CF/CY">{t("CF/CY — Container Freight to Container Yard")}</option>
+                                                        <option value="CF/CF">{t("CF/CF — Container Freight to Container Freight")}</option>
                                                     </select>
                                                 ) : (
                                                     <p className={`font-semibold mt-1 ${shippingMode ? 'text-blue-400' : 'text-silver-dark'
@@ -2575,10 +2577,10 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
 
                                 {/* Dates */}
                                 <div className="glass-card p-4 rounded-lg">
-                                    <h4 className="font-semibold text-silver-light mb-4">Important Dates</h4>
+                                    <h4 className="font-semibold text-silver-light mb-4">{t("Important Dates")}</h4>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <label className="text-silver-dark text-sm">ETD (Estimated Departure)</label>
+                                            <label className="text-silver-dark text-sm">{t("ETD (Estimated Departure)")}</label>
                                             {isEditing ? (
                                                 <input
                                                     type="date"
@@ -2591,7 +2593,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                             )}
                                         </div>
                                         <div>
-                                            <label className="text-silver-dark text-sm">ETA (Estimated Arrival)</label>
+                                            <label className="text-silver-dark text-sm">{t("ETA (Estimated Arrival)")}</label>
                                             {isEditing ? (
                                                 <input
                                                     type="date"
@@ -2604,7 +2606,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                             )}
                                         </div>
                                         <div>
-                                            <label className="text-silver-dark text-sm">Actual Departure</label>
+                                            <label className="text-silver-dark text-sm">{t("Actual Departure")}</label>
                                             {isEditing ? (
                                                 <input
                                                     type="date"
@@ -2617,7 +2619,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                             )}
                                         </div>
                                         <div>
-                                            <label className="text-silver-dark text-sm">Actual Arrival</label>
+                                            <label className="text-silver-dark text-sm">{t("Actual Arrival")}</label>
                                             {isEditing ? (
                                                 <input
                                                     type="date"
@@ -2630,7 +2632,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                             )}
                                         </div>
                                         <div className="col-span-2">
-                                            <label className="text-silver-dark text-sm">Delivery Date</label>
+                                            <label className="text-silver-dark text-sm">{t("Delivery Date")}</label>
                                             {isEditing ? (
                                                 <input
                                                     type="date"
@@ -2652,9 +2654,9 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                 {/* Upload Section */}
                                 <div className="glass-card p-4 rounded-lg">
                                     <div className="flex items-center justify-between mb-4">
-                                        <h4 className="font-semibold text-silver-light">Dokumen Pendukung</h4>
+                                        <h4 className="font-semibold text-silver-light">{t("Dokumen Pendukung")}</h4>
                                         <div className="text-sm text-silver-dark">
-                                            {documents.length} / 10 dokumen
+                                            {documents.length} {t("/ 10 dokumen")}
                                         </div>
                                     </div>
 
@@ -2672,7 +2674,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                     {isUploading ? 'Mengupload...' : documents.length >= 10 ? 'Maksimal 10 dokumen tercapai' : 'Klik untuk upload dokumen'}
                                                 </p>
                                                 <p className="text-xs text-silver-dark mt-1">
-                                                    JPEG, PNG, PDF (Maks. 100KB)
+                                                    {t("JPEG, PNG, PDF (Maks. 100KB)")}
                                                 </p>
                                             </div>
                                             <input
@@ -2690,8 +2692,8 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                     {documents.length === 0 ? (
                                         <div className="text-center py-8">
                                             <FileText className="w-12 h-12 text-silver-dark mx-auto mb-3" />
-                                            <p className="text-silver-dark">Belum ada dokumen</p>
-                                            <p className="text-sm text-silver-dark mt-1">Upload dokumen pendukung shipment</p>
+                                            <p className="text-silver-dark">{t("Belum ada dokumen")}</p>
+                                            <p className="text-sm text-silver-dark mt-1">{t("Upload dokumen pendukung shipment")}</p>
                                         </div>
                                     ) : (
                                         <div className="space-y-2">
@@ -2732,21 +2734,21 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                             <button
                                                                 onClick={() => handlePreviewDocument(doc)}
                                                                 className="p-2 hover:bg-blue-500/20 text-blue-400 rounded transition-colors"
-                                                                title="Preview"
+                                                                title={t("Preview")}
                                                             >
                                                                 <FileText className="w-4 h-4" />
                                                             </button>
                                                             <button
                                                                 onClick={() => handleDownloadDocument(doc)}
                                                                 className="p-2 hover:bg-green-500/20 text-green-400 rounded transition-colors"
-                                                                title="Download"
+                                                                title={t("Download")}
                                                             >
                                                                 <Download className="w-4 h-4" />
                                                             </button>
                                                             <button
                                                                 onClick={() => handleDeleteDocument(doc.id)}
                                                                 className="p-2 hover:bg-red-500/20 text-red-400 rounded transition-colors"
-                                                                title="Hapus"
+                                                                title={t("Hapus")}
                                                             >
                                                                 <Trash2 className="w-4 h-4" />
                                                             </button>
@@ -2767,21 +2769,21 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                     <div className="glass-card p-8 rounded-lg">
                                         <div className="text-center mb-6">
                                             <DollarSign className="w-12 h-12 text-silver-dark mx-auto mb-3" />
-                                            <h4 className="text-lg font-semibold text-silver-light mb-2">No Quoted Amount</h4>
+                                            <h4 className="text-lg font-semibold text-silver-light mb-2">{t("No Quoted Amount")}</h4>
                                             <p className="text-sm text-silver-dark">
-                                                This shipment doesn't have a quoted amount from quotation.
+                                                {t("This shipment doesn't have a quoted amount from quotation.")}
                                             </p>
                                         </div>
 
                                         {/* Manual Input Option */}
                                         <div className="max-w-md mx-auto">
                                             <p className="text-sm text-silver-dark mb-4 text-center">
-                                                You can manually enter the sales/quoted amount to enable COGS tracking:
+                                                {t("You can manually enter the sales/quoted amount to enable COGS tracking:")}
                                             </p>
                                             <div className="flex gap-3">
                                                 <input
                                                     type="number"
-                                                    placeholder="Enter quoted amount (USD)"
+                                                    placeholder={t("Enter quoted amount (USD)")}
                                                     className="flex-1 px-4 py-2 bg-dark-surface border border-dark-border rounded text-silver-light"
                                                     onKeyPress={(e) => {
                                                         if (e.key === 'Enter') {
@@ -2800,20 +2802,20 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                         onUpdate({ ...shipment, quotedAmount: amount });
                                                         input.value = '';
                                                     } else {
-                                                        alert('Please enter a valid amount');
+                                                        alert(t("Please enter a valid amount"));
                                                     }
                                                 }}>
-                                                    Set Amount
+                                                    {t("Set Amount")}
                                                 </Button>
                                             </div>
                                             <p className="text-xs text-silver-dark mt-2 text-center">
-                                                Press Enter or click "Set Amount" to save
+                                                {t("Press Enter or click \"Set Amount\" to save")}
                                             </p>
                                         </div>
 
                                         <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded">
                                             <p className="text-sm text-blue-400">
-                                                💡 <strong>Tip:</strong> For future shipments, create them from Sales Orders with approved quotations to auto-fill this amount.
+                                                💡 <strong>{t("Tip:")}</strong> {t("For future shipments, create them from Sales Orders with approved quotations to auto-fill this amount.")}
                                             </p>
                                         </div>
                                     </div>
@@ -2821,24 +2823,24 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                     <>
                                         {/* Currency Settings */}
                                         <div className="glass-card p-4 rounded-lg">
-                                            <h4 className="font-semibold text-silver-light mb-4">Currency Settings</h4>
+                                            <h4 className="font-semibold text-silver-light mb-4">{t("Currency Settings")}</h4>
                                             <div className="grid grid-cols-3 gap-4">
                                                 <div>
-                                                    <label className="text-silver-dark text-sm">COGS Currency</label>
+                                                    <label className="text-silver-dark text-sm">{t("COGS Currency")}</label>
                                                     <select
                                                         value={cogsCurrency}
                                                         onChange={(e) => setCogsCurrency(e.target.value)}
                                                         disabled={!isEditingCOGS}
                                                         className="w-full mt-1 px-3 py-2 bg-dark-surface border border-dark-border rounded text-silver-light disabled:opacity-50 disabled:cursor-not-allowed"
                                                     >
-                                                        <option value="USD">USD ($)</option>
-                                                        <option value="IDR">IDR (Rp)</option>
+                                                        <option value="USD">{t("USD ($)")}</option>
+                                                        <option value="IDR">{t("IDR (Rp)")}</option>
                                                     </select>
                                                 </div>
                                                 {cogsCurrency !== (shipment?.currency || 'IDR') && (
                                                     <>
                                                         <div>
-                                                            <label className="text-silver-dark text-sm">Exchange Rate (USD ↔ IDR)</label>
+                                                            <label className="text-silver-dark text-sm">{t("Exchange Rate (USD ↔ IDR)")}</label>
                                                             <input
                                                                 type="number"
                                                                 value={exchangeRate || ''}
@@ -2849,7 +2851,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                             />
                                                         </div>
                                                         <div>
-                                                            <label className="text-silver-dark text-sm">Rate Date</label>
+                                                            <label className="text-silver-dark text-sm">{t("Rate Date")}</label>
                                                             <input
                                                                 type="date"
                                                                 value={rateDate || ''}
@@ -2864,7 +2866,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                             {cogsCurrency !== (shipment?.currency || 'IDR') && exchangeRate && (
                                                 <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded">
                                                     <p className="text-sm text-blue-400">
-                                                        💱 1 USD = Rp {parseFloat(exchangeRate).toLocaleString('id-ID')} (as of {rateDate || 'Today'})
+                                                        {t("💱 1 USD = Rp")} {parseFloat(exchangeRate).toLocaleString('id-ID')} (as of {rateDate || 'Today'})
                                                     </p>
                                                 </div>
                                             )}
@@ -2873,7 +2875,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                         {/* Summary Cards */}
                                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                             <div className="glass-card p-4 rounded-lg">
-                                                <div className="text-sm text-silver-dark">Quoted Amount</div>
+                                                <div className="text-sm text-silver-dark">{t("Quoted Amount")}</div>
                                                 <div className="text-2xl font-bold text-blue-400">
                                                     {shipment.currency === 'IDR'
                                                         ? `Rp ${calculateQuotedAmount().toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -2883,7 +2885,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                 <div className="text-xs text-silver-dark mt-1">{shipment.currency || 'USD'}</div>
                                             </div>
                                             <div className="glass-card p-4 rounded-lg">
-                                                <div className="text-sm text-silver-dark mb-1">Total COGS</div>
+                                                <div className="text-sm text-silver-dark mb-1">{t("Total COGS")}</div>
                                                 <div className="text-2xl font-bold text-orange-400">
                                                     {cogsCurrency === 'USD' ? '$' : 'Rp '}{(calculateTotalCOGS() || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </div>
@@ -2895,7 +2897,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                 </div>
                                             </div>
                                             <div className="glass-card p-4 rounded-lg">
-                                                <div className="text-sm text-silver-dark mb-1">Profit/Loss</div>
+                                                <div className="text-sm text-silver-dark mb-1">{t("Profit/Loss")}</div>
                                                 <div className={`text-2xl font-bold ${calculateProfit() >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                                                     {shipment.currency === 'IDR'
                                                         ? `Rp ${calculateProfit().toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -2905,7 +2907,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                 <div className="text-xs text-silver-dark mt-1">{shipment.currency || 'USD'}</div>
                                             </div>
                                             <div className="glass-card p-4 rounded-lg">
-                                                <div className="text-sm text-silver-dark mb-1">Margin</div>
+                                                <div className="text-sm text-silver-dark mb-1">{t("Margin")}</div>
                                                 <div className={`text-2xl font-bold ${calculateMargin() >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                                                     {calculateMargin()}%
                                                 </div>
@@ -2916,7 +2918,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                         <div className="glass-card p-6 rounded-lg mt-6" style={{ minHeight: '520px' }}>
                                             <div className="flex items-center justify-between mb-4">
                                                 <h4 className="font-semibold text-silver-light">
-                                                    Actual Costs (COGS)
+                                                    {t("Actual Costs (COGS)")}
                                                 </h4>
                                                 {isEditingCOGS && (
                                                     <Button
@@ -2935,7 +2937,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                         }}
                                                         icon={Plus}
                                                     >
-                                                        Tambah Biaya
+                                                        {t("Tambah Biaya")}
                                                     </Button>
                                                 )}
                                             </div>
@@ -2945,22 +2947,22 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                     <thead className="bg-accent-orange">
                                                         <tr>
                                                             <th className="px-2 py-2 text-center text-xs text-white w-10 font-normal">No</th>
-                                                            <th className="px-2 py-2 text-left text-xs text-white min-w-[120px] font-normal">Kode</th>
-                                                            <th className="px-2 py-2 text-left text-xs text-white min-w-[260px] font-normal">Item</th>
-                                                            <th className="px-2 py-2 text-left text-xs text-white min-w-[280px] font-normal">Description</th>
-                                                            <th className="px-2 py-2 text-center text-xs text-white min-w-[110px] font-normal">Qty</th>
-                                                            <th className="px-2 py-2 text-center text-xs text-white min-w-[110px] font-normal">Unit</th>
-                                                            <th className="px-2 py-2 text-center text-xs text-white min-w-[90px] font-normal">Curr</th>
-                                                            <th className="px-2 py-2 text-right text-xs text-white min-w-[150px] font-normal">Price</th>
-                                                            <th className="px-2 py-2 text-right text-xs text-white min-w-[150px] font-normal">Total</th>
-                                                            {isEditingCOGS && <th className="px-2 py-2 text-center text-xs text-white min-w-[60px] font-normal">Aksi</th>}
+                                                            <th className="px-2 py-2 text-left text-xs text-white min-w-[120px] font-normal">{t("Kode")}</th>
+                                                            <th className="px-2 py-2 text-left text-xs text-white min-w-[260px] font-normal">{t("Item")}</th>
+                                                            <th className="px-2 py-2 text-left text-xs text-white min-w-[280px] font-normal">{t("Description")}</th>
+                                                            <th className="px-2 py-2 text-center text-xs text-white min-w-[110px] font-normal">{t("Qty")}</th>
+                                                            <th className="px-2 py-2 text-center text-xs text-white min-w-[110px] font-normal">{t("Unit")}</th>
+                                                            <th className="px-2 py-2 text-center text-xs text-white min-w-[90px] font-normal">{t("Curr")}</th>
+                                                            <th className="px-2 py-2 text-right text-xs text-white min-w-[150px] font-normal">{t("Price")}</th>
+                                                            <th className="px-2 py-2 text-right text-xs text-white min-w-[150px] font-normal">{t("Total")}</th>
+                                                            {isEditingCOGS && <th className="px-2 py-2 text-center text-xs text-white min-w-[60px] font-normal">{t("Aksi")}</th>}
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-dark-border">
                                                         {buyingItems.length === 0 && (
                                                             <tr>
                                                                 <td colSpan={isEditingCOGS ? 10 : 9} className="text-center py-6 text-silver-dark text-sm">
-                                                                    Belum ada rincian biaya aktual.
+                                                                    {t("Belum ada rincian biaya aktual.")}
                                                                 </td>
                                                             </tr>
                                                         )}
@@ -2983,7 +2985,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                                         }}
                                                                         context="COGS"
                                                                         minLevel={1}
-                                                                        placeholder="Pilih Akun"
+                                                                        placeholder={t("Pilih Akun")}
                                                                         size="sm"
                                                                         showCode={true}
                                                                         disabled={!isEditingCOGS}
@@ -3000,7 +3002,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                                                 setBuyingItems(updated);
                                                                             }}
                                                                             className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm"
-                                                                            placeholder="Deskripsi biaya"
+                                                                            placeholder={t("Deskripsi biaya")}
                                                                         />
                                                                     ) : (
                                                                         <span className="text-silver-light text-sm">{item.description}</span>
@@ -3036,7 +3038,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                                                 setBuyingItems(updated);
                                                                             }}
                                                                             className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm text-center"
-                                                                            placeholder="Unit"
+                                                                            placeholder={t("Unit")}
                                                                         />
                                                                     ) : (
                                                                         <span className="text-silver-light text-sm">{item.unit}</span>
@@ -3116,17 +3118,17 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                             <div className="mt-6">
                                                 {calculateProfit() < 0 && (
                                                     <div className="flex items-center gap-2 text-red-400">
-                                                        <span className="text-sm">⚠️ Warning: This shipment is running at a loss!</span>
+                                                        <span className="text-sm">{t("⚠️ Warning: This shipment is running at a loss!")}</span>
                                                     </div>
                                                 )}
                                                 {calculateMargin() > 0 && calculateMargin() < 10 && (
                                                     <div className="flex items-center gap-2 text-yellow-400">
-                                                        <span className="text-sm">⚠️ Low margin: Consider reviewing costs</span>
+                                                        <span className="text-sm">{t("⚠️ Low margin: Consider reviewing costs")}</span>
                                                     </div>
                                                 )}
                                                 {calculateMargin() >= 10 && (
                                                     <div className="flex items-center gap-2 text-green-400">
-                                                        <span className="text-sm">✓ Healthy margin</span>
+                                                        <span className="text-sm">{t("✓ Healthy margin")}</span>
                                                     </div>
                                                 )}
                                             </div>
@@ -3138,9 +3140,9 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                 <div className="flex items-center gap-3">
                                                     <DollarSign className="w-6 h-6 text-blue-400" />
                                                     <div>
-                                                        <h4 className="font-semibold text-silver-light">Selling vs Buying Analysis</h4>
+                                                        <h4 className="font-semibold text-silver-light">{t("Selling vs Buying Analysis")}</h4>
                                                         <p className="text-xs text-silver-dark">
-                                                            Untuk analisis perbandingan lengkap, gunakan halaman khusus Selling vs Buying
+                                                            {t("Untuk analisis perbandingan lengkap, gunakan halaman khusus Selling vs Buying")}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -3166,7 +3168,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                     }}
                                                     className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
                                                 >
-                                                    Lihat Analisis
+                                                    {t("Lihat Analisis")}
                                                     <span>→</span>
                                                 </button>
                                             </div>
@@ -3180,11 +3182,11 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
 
                     {/* Approval Status Bar */}
                     <div className="mt-6 pt-4 border-t border-dark-border">
-                        <p className="text-xs text-silver-dark mb-3 font-medium uppercase tracking-wider">Approval Status</p>
+                        <p className="text-xs text-silver-dark mb-3 font-medium uppercase tracking-wider">{t("Approval Status")}</p>
                         {currentStatus === 'rejected' ? (
                             <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400">
                                 <XCircle className="w-4 h-4 flex-shrink-0" />
-                                <span className="text-sm font-medium">Shipment Rejected — gunakan tombol ↩ Reset di atas untuk mengembalikan ke Pending.</span>
+                                <span className="text-sm font-medium">{t("Shipment Rejected — gunakan tombol ↩ Reset di atas untuk mengembalikan ke Pending.")}</span>
                             </div>
                         ) : (
                             <div className="flex items-center gap-0">
@@ -3207,13 +3209,13 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                 <span className={`text-xs mt-1 font-medium ${isDone || isCurrent ? 'text-accent-orange' : 'text-silver-dark'
                                                     }`}>{cfg.label}</span>
                                                 {isCurrent && step === 'pending' && (
-                                                    <span className="text-xs text-yellow-400 mt-0.5">Menunggu approval</span>
+                                                    <span className="text-xs text-yellow-400 mt-0.5">{t("Menunggu approval")}</span>
                                                 )}
                                                 {isDone && step === 'pending' && (
-                                                    <span className="text-xs text-green-400 mt-0.5">✓ Done</span>
+                                                    <span className="text-xs text-green-400 mt-0.5">{t("✓ Done")}</span>
                                                 )}
                                                 {isCurrent && step === 'approved' && (
-                                                    <span className="text-xs text-green-400 mt-0.5">PO & BL terbuka ✓</span>
+                                                    <span className="text-xs text-green-400 mt-0.5">{t("PO & BL terbuka ✓")}</span>
                                                 )}
                                             </div>
                                             {idx < statusSteps.length - 1 && (
@@ -3230,85 +3232,85 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
             </Modal >
 
             {/* Status Update Modal */}
-            < Modal isOpen={showStatusModal} onClose={() => setShowStatusModal(false)} title="Update Status" size="small" >
+            < Modal isOpen={showStatusModal} onClose={() => setShowStatusModal(false)} title={t("Update Status")} size="small" >
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-silver mb-2">New Status</label>
+                        <label className="block text-sm font-medium text-silver mb-2">{t("New Status")}</label>
                         <select value={newStatus} onChange={(e) => setNewStatus(e.target.value)} className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light">
-                            <option value="">Select status...</option>
+                            <option value="">{t("Select status...")}</option>
                             {Object.entries(statusConfig).map(([key, config]) => (
                                 <option key={key} value={key}>{config.label}</option>
                             ))}
                         </select>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-silver mb-2">Notes (optional)</label>
-                        <textarea rows={3} value={statusNotes} onChange={(e) => setStatusNotes(e.target.value)} placeholder="Add notes..." className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light" />
+                        <label className="block text-sm font-medium text-silver mb-2">{t("Notes (optional)")}</label>
+                        <textarea rows={3} value={statusNotes} onChange={(e) => setStatusNotes(e.target.value)} placeholder={t("Add notes...")} className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light" />
                     </div>
                     <div className="flex justify-end gap-2">
-                        <Button variant="secondary" onClick={() => setShowStatusModal(false)}>Cancel</Button>
-                        <Button onClick={handleStatusUpdate} disabled={!newStatus}>Update</Button>
+                        <Button variant="secondary" onClick={() => setShowStatusModal(false)}>{t("Cancel")}</Button>
+                        <Button onClick={handleStatusUpdate} disabled={!newStatus}>{t("Update")}</Button>
                     </div>
                 </div>
             </Modal >
 
             {/* Add Container Modal */}
-            < Modal isOpen={showContainerModal} onClose={() => setShowContainerModal(false)} title="Add Container" size="small" >
+            < Modal isOpen={showContainerModal} onClose={() => setShowContainerModal(false)} title={t("Add Container")} size="small" >
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-silver mb-2">Container Number <span className="text-red-400">*</span></label>
-                        <input type="text" value={newContainer.containerNumber} onChange={(e) => setNewContainer({ ...newContainer, containerNumber: e.target.value.toUpperCase() })} placeholder="ABCD1234567" className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light" />
+                        <label className="block text-sm font-medium text-silver mb-2">{t("Container Number")} <span className="text-red-400">*</span></label>
+                        <input type="text" value={newContainer.containerNumber} onChange={(e) => setNewContainer({ ...newContainer, containerNumber: e.target.value.toUpperCase() })} placeholder={t("ABCD1234567")} className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light" />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-silver mb-2">Container Type</label>
+                        <label className="block text-sm font-medium text-silver mb-2">{t("Container Type")}</label>
                         <select value={newContainer.containerType} onChange={(e) => setNewContainer({ ...newContainer, containerType: e.target.value })} className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light">
                             {containerTypes.map(type => <option key={type} value={type}>{type}</option>)}
                         </select>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-silver mb-2">Seal Number</label>
-                        <input type="text" value={newContainer.sealNumber} onChange={(e) => setNewContainer({ ...newContainer, sealNumber: e.target.value.toUpperCase() })} placeholder="SEAL12345" className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light" />
+                        <label className="block text-sm font-medium text-silver mb-2">{t("Seal Number")}</label>
+                        <input type="text" value={newContainer.sealNumber} onChange={(e) => setNewContainer({ ...newContainer, sealNumber: e.target.value.toUpperCase() })} placeholder={t("SEAL12345")} className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light" />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-silver mb-2">VGM (kg)</label>
+                        <label className="block text-sm font-medium text-silver mb-2">{t("VGM (kg)")}</label>
                         <input type="number" value={newContainer.vgm} onChange={(e) => setNewContainer({ ...newContainer, vgm: e.target.value })} placeholder="28500" className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light" />
                     </div>
                     <div className="flex justify-end gap-2 pt-4">
-                        <Button variant="secondary" onClick={() => setShowContainerModal(false)}>Cancel</Button>
-                        <Button onClick={handleAddContainer}>Add Container</Button>
+                        <Button variant="secondary" onClick={() => setShowContainerModal(false)}>{t("Cancel")}</Button>
+                        <Button onClick={handleAddContainer}>{t("Add Container")}</Button>
                     </div>
                 </div>
             </Modal >
 
             {/* Add Tracking Update Modal */}
-            < Modal isOpen={showTrackingModal} onClose={() => setShowTrackingModal(false)} title="Add Tracking Update" size="small" >
+            < Modal isOpen={showTrackingModal} onClose={() => setShowTrackingModal(false)} title={t("Add Tracking Update")} size="small" >
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-silver mb-2">Location <span className="text-red-400">*</span></label>
-                        <input type="text" value={newTracking.location} onChange={(e) => setNewTracking({ ...newTracking, location: e.target.value })} placeholder="e.g., Singapore Port, Jakarta Warehouse" className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light" />
+                        <label className="block text-sm font-medium text-silver mb-2">{t("Location")} <span className="text-red-400">*</span></label>
+                        <input type="text" value={newTracking.location} onChange={(e) => setNewTracking({ ...newTracking, location: e.target.value })} placeholder={t("e.g., Singapore Port, Jakarta Warehouse")} className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light" />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-silver mb-2">Notes</label>
-                        <textarea rows={3} value={newTracking.notes} onChange={(e) => setNewTracking({ ...newTracking, notes: e.target.value })} placeholder="Container departed on schedule..." className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light" />
+                        <label className="block text-sm font-medium text-silver mb-2">{t("Notes")}</label>
+                        <textarea rows={3} value={newTracking.notes} onChange={(e) => setNewTracking({ ...newTracking, notes: e.target.value })} placeholder={t("Container departed on schedule...")} className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light" />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-silver mb-2">Status Tracking</label>
+                        <label className="block text-sm font-medium text-silver mb-2">{t("Status Tracking")}</label>
                         <select
                             value={newTracking.status}
                             onChange={(e) => setNewTracking({ ...newTracking, status: e.target.value })}
                             className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
                         >
-                            <option value="pending">Pending</option>
-                            <option value="preparation">Preparation</option>
-                            <option value="pickup">Pickup</option>
-                            <option value="in_transit">In Transit</option>
-                            <option value="arrived">Arrived</option>
-                            <option value="delivered">Delivered</option>
+                            <option value="pending">{t("Pending")}</option>
+                            <option value="preparation">{t("Preparation")}</option>
+                            <option value="pickup">{t("Pickup")}</option>
+                            <option value="in_transit">{t("In Transit")}</option>
+                            <option value="arrived">{t("Arrived")}</option>
+                            <option value="delivered">{t("Delivered")}</option>
                         </select>
                     </div>
                     <div className="flex justify-end gap-2 pt-4">
-                        <Button variant="secondary" onClick={() => setShowTrackingModal(false)}>Cancel</Button>
-                        <Button onClick={handleAddTracking}>Add Update</Button>
+                        <Button variant="secondary" onClick={() => setShowTrackingModal(false)}>{t("Cancel")}</Button>
+                        <Button onClick={handleAddTracking}>{t("Add Update")}</Button>
                     </div>
                 </div>
             </Modal >
@@ -3317,7 +3319,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
             <Modal
                 isOpen={showPOVendorModal}
                 onClose={() => setShowPOVendorModal(false)}
-                title="Generate Purchase Order"
+                title={t("Generate Purchase Order")}
                 size="large"
             >
                 <div className="space-y-5">
@@ -3325,19 +3327,18 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                     <div className="flex items-start gap-2 px-3 py-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                         <span className="text-blue-400 text-sm mt-0.5">ℹ️</span>
                         <p className="text-xs text-blue-300">
-                            Assign setiap item ke vendor yang sesuai. Item dengan vendor sama akan digabung dalam satu PO.
-                            Jika semua item ke vendor yang sama, pilih <b>Default Vendor</b> saja.
+                            {t("Assign setiap item ke vendor yang sesuai. Item dengan vendor sama akan digabung dalam satu PO. Jika semua item ke vendor yang sama, pilih")} <b>{t("Default Vendor")}</b> {t("saja.")}
                         </p>
                     </div>
 
                     {/* Default Vendor (applies to all unassigned items) */}
                     <div>
                         <label className="block text-sm font-medium text-silver mb-2">
-                            Default Vendor <span className="text-silver-dark text-xs">(untuk item yang tidak di-assign secara spesifik)</span>
+                            {t("Default Vendor")} <span className="text-silver-dark text-xs">{t("(untuk item yang tidak di-assign secara spesifik)")}</span>
                         </label>
                         {poVendors.length === 0 ? (
                             <div className="px-3 py-3 bg-yellow-50 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/30 rounded-lg text-yellow-600 dark:text-yellow-400 text-sm">
-                                ⚠️ No vendor mitra found. Add vendors in Blink Master Data → Business Partners.
+                                {t("⚠️ No vendor mitra found. Add vendors in Blink Master Data → Business Partners.")}
                             </div>
                         ) : (
                             <select
@@ -3345,7 +3346,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                 onChange={e => setSelectedPOVendorId(e.target.value)}
                                 className="w-full px-3 py-2.5 bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded-lg text-gray-900 dark:text-silver-light text-sm focus:ring-2 focus:ring-accent-orange/20 focus:border-accent-orange outline-none transition-all shadow-sm"
                             >
-                                <option value="">— Pilih Default Vendor (opsional) —</option>
+                                <option value="">{t("— Pilih Default Vendor (opsional) —")}</option>
                                 {poVendors.map(v => (
                                     <option key={v.id} value={v.id}>
                                         {v.partner_name}{v.partner_code ? ` (${v.partner_code})` : ''}
@@ -3358,17 +3359,17 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                     {/* Per-Item Vendor Assignment Table */}
                     <div>
                         <p className="text-sm font-medium text-gray-700 dark:text-silver mb-2 hidden">
-                            Assign Vendor Per Item ({pendingPOItems.length} items)
+                            {t("Assign Vendor Per Item (")}{pendingPOItems.length} {t("items)")}
                         </p>
                         <div className="rounded-xl border border-gray-200 dark:border-dark-border overflow-hidden bg-white dark:bg-dark-card shadow-sm">
                             <table className="w-full text-sm">
                                 <thead className="bg-gray-50 dark:bg-dark-surface border-b border-gray-200 dark:border-dark-border">
                                     <tr>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-silver-dark uppercase tracking-wider">Item</th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-silver-dark uppercase tracking-wider">Description</th>
-                                        <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-silver-dark uppercase tracking-wider">Qty</th>
-                                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 dark:text-silver-dark uppercase tracking-wider">Amount</th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-silver-dark uppercase tracking-wider min-w-[200px]">Vendor <span className="text-red-500">*</span></th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-silver-dark uppercase tracking-wider">{t("Item")}</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-silver-dark uppercase tracking-wider">{t("Description")}</th>
+                                        <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-silver-dark uppercase tracking-wider">{t("Qty")}</th>
+                                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 dark:text-silver-dark uppercase tracking-wider">{t("Amount")}</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-silver-dark uppercase tracking-wider min-w-[200px]">{t("Vendor")} <span className="text-red-500">*</span></th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
@@ -3391,7 +3392,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                                         onChange={e => setPoItemVendorMap(prev => ({ ...prev, [idx]: e.target.value }))}
                                                         className="w-full px-3 py-1.5 bg-white dark:bg-dark-surface border border-gray-300 dark:border-dark-border rounded-md text-gray-900 dark:text-silver-light text-sm focus:ring-2 focus:ring-accent-orange/20 focus:border-accent-orange outline-none shadow-sm transition-all"
                                                     >
-                                                        <option value="">— Default —</option>
+                                                        <option value="">{t("— Default —")}</option>
                                                         {poVendors.map(v => (
                                                             <option key={v.id} value={v.id}>{v.partner_name}</option>
                                                         ))}
@@ -3408,7 +3409,7 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                                 </tbody>
                                 <tfoot className="bg-gray-50 dark:bg-dark-card border-t border-gray-200 dark:border-accent-orange/50">
                                     <tr>
-                                        <td colSpan="3" className="px-4 py-3 text-right font-bold text-gray-500 dark:text-silver-light text-xs tracking-wider">TOTAL</td>
+                                        <td colSpan="3" className="px-4 py-3 text-right font-bold text-gray-500 dark:text-silver-light text-xs tracking-wider">{t("TOTAL")}</td>
                                         <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-accent-orange text-base font-mono">
                                             {cogsCurrency} {pendingPOTotal.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </td>
@@ -3440,14 +3441,14 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                         return (
                             <div className="bg-dark-surface rounded-lg p-3 border border-dark-border">
                                 <p className="text-xs font-semibold text-silver-dark mb-2">
-                                    📦 Preview: {vendorCount} PO akan dibuat
+                                    {t("📦 Preview:")} {vendorCount} {t("PO akan dibuat")}
                                 </p>
                                 <div className="space-y-1">
                                     {Object.entries(groups).map(([vname, { count, total }], i) => (
                                         <div key={vname} className="flex items-center justify-between text-xs">
                                             <span className="text-silver-light">
                                                 <span className="font-mono text-accent-orange mr-1">{vendorCount > 1 ? `PO-xxx-${String.fromCharCode(65 + i)}` : 'PO-xxx'}</span>
-                                                → {vname} ({count} item)
+                                                → {vname} ({count} {t("item)")}
                                             </span>
                                             <span className="text-green-400 font-mono">{cogsCurrency} {total.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                         </div>
@@ -3459,32 +3460,32 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
 
                     <div className="flex justify-end gap-2 pt-2 border-t border-dark-border">
                         <Button variant="secondary" onClick={() => setShowPOVendorModal(false)}>
-                            Cancel
+                            {t("Cancel")}
                         </Button>
                         <Button onClick={handleConfirmGeneratePO}>
-                            Generate PO(s)
+                            {t("Generate PO(s)")}
                         </Button>
                     </div>
                 </div>
             </Modal>
 
             {/* Status Confirmation Modal */}
-            <Modal isOpen={!!confirmAction} onClose={() => setConfirmAction(null)} title="Konfirmasi" size="small">
+            <Modal isOpen={!!confirmAction} onClose={() => setConfirmAction(null)} title={t("Konfirmasi")} size="small">
                 <div className="space-y-4 text-silver-light">
                     <p className="text-lg">{confirmAction?.message}</p>
                     <div className="flex justify-end gap-2 mt-6">
-                        <Button variant="secondary" onClick={() => setConfirmAction(null)}>Batal</Button>
-                        <Button variant="primary" onClick={handleConfirmStatusChange}>Ya, Lanjutkan</Button>
+                        <Button variant="secondary" onClick={() => setConfirmAction(null)}>{t("Batal")}</Button>
+                        <Button variant="primary" onClick={handleConfirmStatusChange}>{t("Ya, Lanjutkan")}</Button>
                     </div>
                 </div>
             </Modal>
 
             {/* Success Message Modal */}
-            <Modal isOpen={!!successMsg} onClose={() => setSuccessMsg('')} title="Berhasil" size="small">
+            <Modal isOpen={!!successMsg} onClose={() => setSuccessMsg('')} title={t("Berhasil")} size="small">
                 <div className="space-y-4 text-center">
                     <p className="text-lg text-emerald-400 font-semibold mt-4">{successMsg}</p>
                     <div className="flex justify-center mt-6">
-                        <Button variant="primary" onClick={() => setSuccessMsg('')}>Tutup</Button>
+                        <Button variant="primary" onClick={() => setSuccessMsg('')}>{t("Tutup")}</Button>
                     </div>
                 </div>
             </Modal>

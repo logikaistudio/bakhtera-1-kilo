@@ -1,5 +1,6 @@
 import React from 'react';
 import { PlusCircle, Search, ShoppingCart, UserRound } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const SALES_ROWS = [
     { soNo: 'SO-CBG-JKT-2401', customer: 'PT Nusantara Freight', status: 'Confirmed', amount: 132000000, assignee: 'Alya' },
@@ -16,16 +17,17 @@ const badgeCls = {
 };
 
 const CabangSales = () => {
+    const { t } = useLanguage();
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <div>
-                    <h1 className="text-3xl font-bold text-silver-light">Cabang Sales</h1>
-                    <p className="text-sm text-silver-dark mt-1">Pengelolaan Sales Order dan customer per cabang.</p>
+                    <h1 className="text-3xl font-bold text-silver-light">{t("Cabang Sales")}</h1>
+                    <p className="text-sm text-silver-dark mt-1">{t("Pengelolaan Sales Order dan customer per cabang.")}</p>
                 </div>
                 <button className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-blue text-white text-sm font-medium hover:bg-accent-blue/90 smooth-transition">
                     <PlusCircle className="w-4 h-4" />
-                    Buat Sales Order
+                    {t("Buat Sales Order")}
                 </button>
             </div>
 
@@ -35,15 +37,15 @@ const CabangSales = () => {
                         <Search className="w-4 h-4 text-silver-dark absolute left-3 top-1/2 -translate-y-1/2" />
                         <input
                             type="text"
-                            placeholder="Cari SO / customer"
+                            placeholder={t("Cari SO / customer")}
                             className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-dark-surface border border-dark-border text-silver-light text-sm focus:outline-none focus:ring-2 focus:ring-accent-blue/40"
                         />
                     </div>
                     <select className="w-full px-3 py-2.5 rounded-lg bg-dark-surface border border-dark-border text-silver-light text-sm focus:outline-none focus:ring-2 focus:ring-accent-blue/40">
-                        <option>Semua Cabang</option>
-                        <option>Cabang Jakarta</option>
-                        <option>Cabang Surabaya</option>
-                        <option>Cabang Denpasar</option>
+                        <option>{t("Semua Cabang")}</option>
+                        <option>{t("Cabang Jakarta")}</option>
+                        <option>{t("Cabang Surabaya")}</option>
+                        <option>{t("Cabang Denpasar")}</option>
                     </select>
                 </div>
             </div>
@@ -51,16 +53,16 @@ const CabangSales = () => {
             <div className="glass-card border border-dark-border rounded-xl overflow-hidden">
                 <div className="px-5 py-4 border-b border-dark-border flex items-center gap-2">
                     <ShoppingCart className="w-4 h-4 text-blue-300" />
-                    <h2 className="text-base font-semibold text-silver-light">Sales Order Cabang</h2>
+                    <h2 className="text-base font-semibold text-silver-light">{t("Sales Order Cabang")}</h2>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="bg-dark-surface/40 border-b border-dark-border/80">
                                 <th className="text-left px-5 py-3 text-silver-dark">No SO</th>
-                                <th className="text-left px-5 py-3 text-silver-dark">Customer</th>
-                                <th className="text-left px-5 py-3 text-silver-dark">Status</th>
-                                <th className="text-right px-5 py-3 text-silver-dark">Nominal</th>
+                                <th className="text-left px-5 py-3 text-silver-dark">{t("Customer")}</th>
+                                <th className="text-left px-5 py-3 text-silver-dark">{t("Status")}</th>
+                                <th className="text-right px-5 py-3 text-silver-dark">{t("Nominal")}</th>
                                 <th className="text-left px-5 py-3 text-silver-dark">PIC</th>
                             </tr>
                         </thead>

@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { Plus, Package as PackageIcon, Trash2, Edit2, ChevronDown, ChevronRight, Eye } from 'lucide-react';
 import Button from './Button';
 import PackageItemManager from './PackageItemManager';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const PackageManager = ({ packages = [], onChange, itemMaster = [], readOnly = false, defaultCurrency = 'IDR' }) => {
+    const { t } = useLanguage();
     const [expandedPackages, setExpandedPackages] = useState({});
     const [showPackageForm, setShowPackageForm] = useState(false);
     const [editingPackageId, setEditingPackageId] = useState(null);
@@ -19,7 +21,7 @@ const PackageManager = ({ packages = [], onChange, itemMaster = [], readOnly = f
     const handleAddPackage = () => {
         if (readOnly) return;
         if (!packageNumber.trim()) {
-            alert('Masukkan nomor package');
+            alert(t("Masukkan nomor package"));
             return;
         }
 
@@ -101,18 +103,18 @@ const PackageManager = ({ packages = [], onChange, itemMaster = [], readOnly = f
                         {readOnly ? '📦 Data Package (Referensi)' : 'Package Management'}
                     </h3>
                     <span className="text-xs text-silver-dark">
-                        ({totalPackages} package, {totalItems} total barang)
+                        ({totalPackages} {t("package,")} {totalItems} {t("total barang)")}
                     </span>
                     {readOnly && (
                         <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs rounded-full border border-yellow-500/30">
                             <Eye className="w-3 h-3 inline mr-1" />
-                            Read Only
+                            {t("Read Only")}
                         </span>
                     )}
                 </div>
                 {!showPackageForm && !readOnly && (
                     <Button size="sm" onClick={() => setShowPackageForm(true)} icon={Plus}>
-                        Tambah Package
+                        {t("Tambah Package")}
                     </Button>
                 )}
             </div>
@@ -126,14 +128,14 @@ const PackageManager = ({ packages = [], onChange, itemMaster = [], readOnly = f
                     <div className="flex gap-3">
                         <div className="flex-1">
                             <label className="block text-sm font-medium text-silver mb-2">
-                                Nomor Package *
+                                {t("Nomor Package *")}
                             </label>
                             <input
                                 type="text"
                                 value={packageNumber}
                                 onChange={(e) => setPackageNumber(e.target.value)}
                                 onKeyPress={(e) => e.key === 'Enter' && handleAddPackage()}
-                                placeholder="contoh: PKG-001, BOX-A1"
+                                placeholder={t("contoh: PKG-001, BOX-A1")}
                                 className="w-full"
                                 autoFocus
                             />
@@ -145,7 +147,7 @@ const PackageManager = ({ packages = [], onChange, itemMaster = [], readOnly = f
                                 size="sm"
                                 onClick={handleCancelPackageForm}
                             >
-                                Batal
+                                {t("Batal")}
                             </Button>
                             <Button
                                 type="button"
@@ -164,8 +166,8 @@ const PackageManager = ({ packages = [], onChange, itemMaster = [], readOnly = f
             {packages.length === 0 && !showPackageForm && (
                 <div className="glass-card p-8 rounded-lg text-center text-silver-dark">
                     <PackageIcon className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                    <p>Belum ada package</p>
-                    {!readOnly && <p className="text-xs mt-1">Klik "Tambah Package" untuk mulai</p>}
+                    <p>{t("Belum ada package")}</p>
+                    {!readOnly && <p className="text-xs mt-1">{t("Klik \"Tambah Package\" untuk mulai")}</p>}
                 </div>
             )}
 
@@ -200,11 +202,11 @@ const PackageManager = ({ packages = [], onChange, itemMaster = [], readOnly = f
                                                 {pkg.packageNumber}
                                             </h4>
                                             <span className="text-xs text-silver-dark">
-                                                Package #{index + 1}
+                                                {t("Package #")}{index + 1}
                                             </span>
                                         </div>
                                         <p className="text-xs text-silver-dark mt-1">
-                                            {itemCount} barang
+                                            {itemCount} {t("barang")}
                                             {pkgValue > 0 && ` • Nilai total: Rp ${pkgValue.toLocaleString('id-ID')}`}
                                         </p>
                                     </div>
@@ -217,7 +219,7 @@ const PackageManager = ({ packages = [], onChange, itemMaster = [], readOnly = f
                                             type="button"
                                             onClick={(e) => { e.stopPropagation(); handleEditPackage(pkg); }}
                                             className="p-2 hover:bg-blue-500/20 rounded smooth-transition"
-                                            title="Edit Package"
+                                            title={t("Edit Package")}
                                         >
                                             <Edit2 className="w-4 h-4 text-blue-400" />
                                         </button>
@@ -225,7 +227,7 @@ const PackageManager = ({ packages = [], onChange, itemMaster = [], readOnly = f
                                             type="button"
                                             onClick={(e) => { e.stopPropagation(); handleRemovePackage(pkg.id); }}
                                             className="p-2 hover:bg-red-500/20 rounded smooth-transition"
-                                            title="Hapus Package"
+                                            title={t("Hapus Package")}
                                         >
                                             <Trash2 className="w-4 h-4 text-red-400" />
                                         </button>

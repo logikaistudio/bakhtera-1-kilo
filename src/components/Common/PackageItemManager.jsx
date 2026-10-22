@@ -3,8 +3,10 @@ import { Plus, Package, X, Edit2, Save, Trash2, Check, Eye } from 'lucide-react'
 import Button from './Button';
 import { useData } from '../../context/DataContext';
 import { formatCurrency, parseCurrency } from '../../utils/currencyFormatter';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const PackageItemManager = ({ items = [], onChange, readOnly = false, defaultCurrency = 'IDR' }) => {
+    const { t } = useLanguage();
     const { itemMaster = [], hsCodes = [], addItemCode } = useData();
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
@@ -67,7 +69,7 @@ const PackageItemManager = ({ items = [], onChange, readOnly = false, defaultCur
     const handleAdd = async () => {
         if (readOnly) return;
         if (!formData.name || !formData.quantity) {
-            alert('Nama Item dan Jumlah wajib diisi');
+            alert(t("Nama Item dan Jumlah wajib diisi"));
             return;
         }
 
@@ -179,15 +181,15 @@ const PackageItemManager = ({ items = [], onChange, readOnly = false, defaultCur
             {/* Header / Summary */}
             <div className="flex items-center justify-between text-sm text-silver-dark px-2">
                 <div className="flex items-center gap-2">
-                    <span>Total: {items.length} item ({totalQty} unit)</span>
+                    <span>{t("Total:")} {items.length} {t("item (")}{totalQty} {t("unit)")}</span>
                     {readOnly && (
                         <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs rounded-full border border-yellow-300">
                             <Eye className="w-3 h-3 inline mr-1" />
-                            Read Only
+                            {t("Read Only")}
                         </span>
                     )}
                 </div>
-                <span className="text-emerald-600 dark:text-accent-green font-bold">Total Nilai: Rp {formatCurrency(totalVal)}</span>
+                <span className="text-emerald-600 dark:text-accent-green font-bold">{t("Total Nilai: Rp")} {formatCurrency(totalVal)}</span>
             </div>
 
             {/* Main Table Layout */}
@@ -195,15 +197,15 @@ const PackageItemManager = ({ items = [], onChange, readOnly = false, defaultCur
                 <table className="w-full text-xs">
                     <thead>
                         <tr className={`border-b-2 h-6 ${readOnly ? 'bg-yellow-100 border-yellow-200 text-yellow-700' : 'bg-gradient-to-r from-gray-50 to-gray-100 border-gray-200 text-gray-600'}`}>
-                            <th className="px-1 py-0.5 text-left w-6">No Urut</th>
-                            <th className="px-1 py-0.5 text-left w-24">Kode</th>
+                            <th className="px-1 py-0.5 text-left w-6">{t("No Urut")}</th>
+                            <th className="px-1 py-0.5 text-left w-24">{t("Kode")}</th>
                             <th className="px-1 py-0.5 text-left w-16">HS</th>
-                            <th className="px-1 py-0.5 text-left">Item</th>
-                            <th className="px-1 py-0.5 text-right w-12">Jml</th>
-                            <th className="px-1 py-0.5 text-left w-12">Sat</th>
-                            <th className="px-1 py-0.5 text-right w-24">Nominal</th>
-                            <th className="px-1 py-0.5 text-right w-24 hidden md:table-cell">Total</th>
-                            <th className="px-1 py-0.5 text-left w-12 hidden md:table-cell">Kurs</th>
+                            <th className="px-1 py-0.5 text-left">{t("Item")}</th>
+                            <th className="px-1 py-0.5 text-right w-12">{t("Jml")}</th>
+                            <th className="px-1 py-0.5 text-left w-12">{t("Sat")}</th>
+                            <th className="px-1 py-0.5 text-right w-24">{t("Nominal")}</th>
+                            <th className="px-1 py-0.5 text-right w-24 hidden md:table-cell">{t("Total")}</th>
+                            <th className="px-1 py-0.5 text-left w-12 hidden md:table-cell">{t("Kurs")}</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y-2 divide-gray-100">
@@ -240,7 +242,7 @@ const PackageItemManager = ({ items = [], onChange, readOnly = false, defaultCur
                             {/* Line 1: Identification */}
                             <div className="md:col-span-2">
                                 <div className="flex items-center justify-between mb-1">
-                                    <label className="text-xs text-silver-dark">Kode Barang</label>
+                                    <label className="text-xs text-silver-dark">{t("Kode Barang")}</label>
                                     <button
                                         type="button"
                                         onClick={() => setManualItemCode(!manualItemCode)}
@@ -255,7 +257,7 @@ const PackageItemManager = ({ items = [], onChange, readOnly = false, defaultCur
                                         className="w-full text-sm p-2 bg-dark-bg border border-dark-border rounded focus:border-accent-blue"
                                         value={formData.itemCode}
                                         onChange={e => setFormData({ ...formData, itemCode: e.target.value })}
-                                        placeholder="Ketik kode barang..."
+                                        placeholder={t("Ketik kode barang...")}
                                     />
                                 ) : (
                                     <select
@@ -263,7 +265,7 @@ const PackageItemManager = ({ items = [], onChange, readOnly = false, defaultCur
                                         value={formData.itemCode}
                                         onChange={e => setFormData({ ...formData, itemCode: e.target.value })}
                                     >
-                                        <option value="">Pilih...</option>
+                                        <option value="">{t("Pilih...")}</option>
                                         {itemMaster.map(i => (
                                             <option key={i.id} value={i.itemCode}>
                                                 {i.itemCode}
@@ -273,32 +275,32 @@ const PackageItemManager = ({ items = [], onChange, readOnly = false, defaultCur
                                 )}
                             </div>
                             <div className="md:col-span-2">
-                                <label className="text-xs text-silver-dark block mb-1">HS Code</label>
+                                <label className="text-xs text-silver-dark block mb-1">{t("HS Code")}</label>
                                 <input
                                     list="hsCodesList"
                                     type="text"
                                     className="w-full text-sm p-2 bg-dark-bg border border-dark-border rounded focus:border-accent-blue"
                                     value={formData.hsCode}
                                     onChange={e => setFormData({ ...formData, hsCode: e.target.value })}
-                                    placeholder="Ketik atau pilih..."
+                                    placeholder={t("Ketik atau pilih...")}
                                 />
                                 <datalist id="hsCodesList">
                                     {hsCodes.map(h => <option key={h.id} value={h.hsCode} />)}
                                 </datalist>
                             </div>
                             <div className="md:col-span-3">
-                                <label className="text-xs text-silver-dark block mb-1">Nama Item</label>
+                                <label className="text-xs text-silver-dark block mb-1">{t("Nama Item")}</label>
                                 <input
                                     className="w-full text-sm p-2 bg-dark-bg border border-dark-border rounded focus:border-accent-blue"
                                     value={formData.name}
                                     onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                    placeholder="Nama barang..."
+                                    placeholder={t("Nama barang...")}
                                 />
                             </div>
 
                             {/* Line 2: Quantities */}
                             <div className="md:col-span-1">
-                                <label className="text-xs text-silver-dark block mb-1">Jml</label>
+                                <label className="text-xs text-silver-dark block mb-1">{t("Jml")}</label>
                                 <input
                                     type="number"
                                     className="w-full text-sm p-2 bg-dark-bg border border-dark-border rounded focus:border-accent-blue"
@@ -307,7 +309,7 @@ const PackageItemManager = ({ items = [], onChange, readOnly = false, defaultCur
                                 />
                             </div>
                             <div className="md:col-span-1">
-                                <label className="text-xs text-silver-dark block mb-1">Satuan</label>
+                                <label className="text-xs text-silver-dark block mb-1">{t("Satuan")}</label>
                                 <select
                                     className="w-full text-sm p-2 bg-dark-bg border border-dark-border rounded focus:border-accent-blue"
                                     value={formData.unit}
@@ -319,7 +321,7 @@ const PackageItemManager = ({ items = [], onChange, readOnly = false, defaultCur
 
                             {/* Line 3: Pricing */}
                             <div className="md:col-span-1">
-                                <label className="text-xs text-silver-dark block mb-1">Mata Uang</label>
+                                <label className="text-xs text-silver-dark block mb-1">{t("Mata Uang")}</label>
                                 <select
                                     className="w-full text-sm p-2 bg-dark-bg border border-dark-border rounded focus:border-accent-blue"
                                     value={formData.currency}
@@ -329,7 +331,7 @@ const PackageItemManager = ({ items = [], onChange, readOnly = false, defaultCur
                                 </select>
                             </div>
                             <div className="md:col-span-2">
-                                <label className="text-xs text-silver-dark block mb-1">Nominal (@)</label>
+                                <label className="text-xs text-silver-dark block mb-1">{t("Nominal (@)")}</label>
                                 <input
                                     type="text"
                                     inputMode="numeric"
@@ -350,7 +352,7 @@ const PackageItemManager = ({ items = [], onChange, readOnly = false, defaultCur
                             </div>
                             <div className="md:col-span-2">
                                 <div className="flex items-center justify-between mb-1">
-                                    <label className="text-xs text-silver-dark">Total Nominal</label>
+                                    <label className="text-xs text-silver-dark">{t("Total Nominal")}</label>
                                     <button
                                         type="button"
                                         onClick={() => setFormData({ ...formData, isManualTotal: !formData.isManualTotal })}
@@ -385,12 +387,12 @@ const PackageItemManager = ({ items = [], onChange, readOnly = false, defaultCur
                                 <div>
                                     {editingId && (
                                         <Button size="sm" variant="danger" onClick={() => handleRemove(editingId)} icon={Trash2}>
-                                            Hapus
+                                            {t("Hapus")}
                                         </Button>
                                     )}
                                 </div>
                                 <div className="flex gap-2">
-                                    <Button size="sm" variant="secondary" onClick={handleCancel}>Cancel</Button>
+                                    <Button size="sm" variant="secondary" onClick={handleCancel}>{t("Cancel")}</Button>
                                     <Button size="sm" onClick={handleAdd} icon={editingId ? Check : Plus}>
                                         {editingId ? 'Update' : 'Tambah'}
                                     </Button>
@@ -404,7 +406,7 @@ const PackageItemManager = ({ items = [], onChange, readOnly = false, defaultCur
                             onClick={() => setShowForm(true)}
                             className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 transition-colors py-2 px-4 rounded hover:bg-blue-50"
                         >
-                            <Plus className="w-4 h-4" /> Tambah Item
+                            <Plus className="w-4 h-4" /> {t("Tambah Item")}
                         </button>
                     </div>
                 ) : null}

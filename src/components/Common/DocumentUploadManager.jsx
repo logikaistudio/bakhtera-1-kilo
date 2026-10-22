@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { Upload, File, X, FileText, Image } from 'lucide-react';
 import Button from './Button';
 import { formatCurrency } from '../../utils/currencyFormatter';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const DocumentUploadManager = ({ documents = [], onChange, maxFiles = null, maxSizeKB = 200 }) => {
+    const { t } = useLanguage();
     const [documentName, setDocumentName] = useState('');
     const [uploading, setUploading] = useState(false);
 
@@ -17,7 +19,7 @@ const DocumentUploadManager = ({ documents = [], onChange, maxFiles = null, maxS
         // Check file type
         const validTypes = ['application/pdf', 'image/jpeg', 'image/png'];
         if (!validTypes.includes(file.type)) {
-            alert('Tipe file tidak valid. Hanya PDF, JPEG, dan PNG yang diperbolehkan.');
+            alert(t("Tipe file tidak valid. Hanya PDF, JPEG, dan PNG yang diperbolehkan."));
             return false;
         }
 
@@ -50,7 +52,7 @@ const DocumentUploadManager = ({ documents = [], onChange, maxFiles = null, maxS
 
         // Check if document name is provided
         if (!documentName.trim()) {
-            alert('Masukkan nama dokumen terlebih dahulu.');
+            alert(t("Masukkan nama dokumen terlebih dahulu."));
             e.target.value = '';
             return;
         }
@@ -78,7 +80,7 @@ const DocumentUploadManager = ({ documents = [], onChange, maxFiles = null, maxS
             };
 
             reader.onerror = () => {
-                alert('Gagal membaca file');
+                alert(t("Gagal membaca file"));
                 setUploading(false);
                 e.target.value = '';
             };
@@ -105,9 +107,9 @@ const DocumentUploadManager = ({ documents = [], onChange, maxFiles = null, maxS
         <div className="space-y-4">
             <div className="flex items-center gap-2">
                 <Upload className="w-5 h-5 text-accent-purple" />
-                <h3 className="text-lg font-semibold text-silver-light">Dokumen Pendukung</h3>
+                <h3 className="text-lg font-semibold text-silver-light">{t("Dokumen Pendukung")}</h3>
                 <span className="text-xs text-silver-dark">
-                    ({documents.length}{maxFiles ? `/${maxFiles}` : ''} dokumen, max {maxSizeKB}KB per file)
+                    ({documents.length}{maxFiles ? `/${maxFiles}` : ''} {t("dokumen, max")} {maxSizeKB}{t("KB per file)")}
                 </span>
             </div>
 
@@ -116,20 +118,20 @@ const DocumentUploadManager = ({ documents = [], onChange, maxFiles = null, maxS
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
                         <label className="block text-sm font-medium text-silver mb-2">
-                            Nama Dokumen
+                            {t("Nama Dokumen")}
                         </label>
                         <input
                             type="text"
                             value={documentName}
                             onChange={(e) => setDocumentName(e.target.value)}
-                            placeholder="contoh: KTP Direktur, NPWP Perusahaan"
+                            placeholder={t("contoh: KTP Direktur, NPWP Perusahaan")}
                             className="w-full"
                             disabled={uploading || (maxFiles ? documents.length >= maxFiles : false)}
                         />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-silver mb-2">
-                            Pilih File (PDF/JPEG/PNG)
+                            {t("Pilih File (PDF/JPEG/PNG)")}
                         </label>
                         <input
                             type="file"
@@ -142,12 +144,12 @@ const DocumentUploadManager = ({ documents = [], onChange, maxFiles = null, maxS
                 </div>
                 {uploading && (
                     <div className="text-sm text-accent-blue">
-                        Mengupload dokumen...
+                        {t("Mengupload dokumen...")}
                     </div>
                 )}
                 {maxFiles && documents.length >= maxFiles && (
                     <div className="text-sm text-accent-orange">
-                        ⚠️ Batas maksimal {maxFiles} dokumen tercapai
+                        {t("⚠️ Batas maksimal")} {maxFiles} {t("dokumen tercapai")}
                     </div>
                 )}
             </div>
@@ -158,12 +160,12 @@ const DocumentUploadManager = ({ documents = [], onChange, maxFiles = null, maxS
                     <table className="w-full">
                         <thead className="bg-accent-purple">
                             <tr>
-                                <th className="px-4 py-3 text-left text-sm font-semibold text-white">Icon</th>
-                                <th className="px-4 py-3 text-left text-sm font-semibold text-white">Nama Dokumen</th>
-                                <th className="px-4 py-3 text-left text-sm font-semibold text-white">File</th>
-                                <th className="px-4 py-3 text-left text-sm font-semibold text-white">Ukuran</th>
-                                <th className="px-4 py-3 text-left text-sm font-semibold text-white">Upload</th>
-                                <th className="px-4 py-3 text-center text-sm font-semibold text-white">Aksi</th>
+                                <th className="px-4 py-3 text-left text-sm font-semibold text-white">{t("Icon")}</th>
+                                <th className="px-4 py-3 text-left text-sm font-semibold text-white">{t("Nama Dokumen")}</th>
+                                <th className="px-4 py-3 text-left text-sm font-semibold text-white">{t("File")}</th>
+                                <th className="px-4 py-3 text-left text-sm font-semibold text-white">{t("Ukuran")}</th>
+                                <th className="px-4 py-3 text-left text-sm font-semibold text-white">{t("Upload")}</th>
+                                <th className="px-4 py-3 text-center text-sm font-semibold text-white">{t("Aksi")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
@@ -192,7 +194,7 @@ const DocumentUploadManager = ({ documents = [], onChange, maxFiles = null, maxS
                                                     type="button"
                                                     onClick={() => handleRemove(doc.id)}
                                                     className="p-1 hover:bg-red-500 hover:bg-opacity-20 rounded smooth-transition"
-                                                    title="Hapus Dokumen"
+                                                    title={t("Hapus Dokumen")}
                                                 >
                                                     <X className="w-4 h-4 text-red-400" />
                                                 </button>

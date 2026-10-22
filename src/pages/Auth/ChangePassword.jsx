@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { changePassword } from '../../services/userService';
 import { Eye, EyeOff, Lock, AlertCircle, CheckCircle, Key } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const ChangePassword = () => {
+    const { t } = useLanguage();
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     
@@ -82,18 +84,18 @@ const ChangePassword = () => {
                         <Key className="w-8 h-8 text-blue-600" />
                     </div>
                     <h1 className="text-3xl font-bold text-white tracking-tight drop-shadow-sm">
-                        Perbarui Password
+                        {t("Perbarui Password")}
                     </h1>
                     <p className="text-sm text-blue-100/80 mt-1 font-medium">
-                        <span className="text-white">Bakhtera</span><span className="text-orange-300">One</span> Freight Management Portal
+                        <span className="text-white">{t("Bakhtera")}</span><span className="text-orange-300">{t("One")}</span> {t("Freight Management Portal")}
                     </p>
                 </div>
 
                 {/* Card */}
                 <div className="rounded-2xl bg-white shadow-2xl shadow-blue-900/40 p-8">
                     <div className="mb-6">
-                        <h2 className="text-xl font-semibold text-gray-800">Ubah Password Anda</h2>
-                        <p className="text-sm text-gray-500 mt-1">Anda diwajibkan untuk mengubah password default sebelum melanjutkan</p>
+                        <h2 className="text-xl font-semibold text-gray-800">{t("Ubah Password Anda")}</h2>
+                        <p className="text-sm text-gray-500 mt-1">{t("Anda diwajibkan untuk mengubah password default sebelum melanjutkan")}</p>
                     </div>
 
                     {/* Alerts */}
@@ -115,7 +117,7 @@ const ChangePassword = () => {
                         {/* Old Password */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Password Lama
+                                {t("Password Lama")}
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -127,7 +129,7 @@ const ChangePassword = () => {
                                     value={oldPassword}
                                     onChange={(e) => setOldPassword(e.target.value)}
                                     disabled={loading}
-                                    placeholder="Masukkan password saat ini"
+                                    placeholder={t("Masukkan password saat ini")}
                                     className="w-full pl-10 pr-12 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-800 placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400 transition-all disabled:opacity-50"
                                 />
                                 <button
@@ -143,7 +145,7 @@ const ChangePassword = () => {
                         {/* New Password */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Password Baru
+                                {t("Password Baru")}
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -155,7 +157,7 @@ const ChangePassword = () => {
                                     value={newPassword}
                                     onChange={(e) => setNewPassword(e.target.value)}
                                     disabled={loading}
-                                    placeholder="Minimal 8 karakter, huruf & angka"
+                                    placeholder={t("Minimal 8 karakter, huruf & angka")}
                                     className="w-full pl-10 pr-12 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-800 placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400 transition-all disabled:opacity-50"
                                 />
                                 <button
@@ -171,7 +173,7 @@ const ChangePassword = () => {
                         {/* Confirm Password */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Konfirmasi Password Baru
+                                {t("Konfirmasi Password Baru")}
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -183,7 +185,7 @@ const ChangePassword = () => {
                                     value={confirmPassword}
                                     onChange={(e) => setConfirmPassword(e.target.value)}
                                     disabled={loading}
-                                    placeholder="Ulangi password baru"
+                                    placeholder={t("Ulangi password baru")}
                                     className="w-full pl-10 pr-12 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-800 placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400 transition-all disabled:opacity-50"
                                 />
                                 <button

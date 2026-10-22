@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { Search, Building2, User, ChevronDown } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getActiveDivision } from '../../utils/divisionContext';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 /**
  * PartnerPicker - Universal component for selecting business partners
@@ -25,6 +26,7 @@ const PartnerPicker = ({
     theme = 'dark',
     onPartnerLoad
 }) => {
+    const { t } = useLanguage();
     const { isAdmin, canAccess } = useAuth();
     const [partners, setPartners] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -194,7 +196,7 @@ const PartnerPicker = ({
                             <Search className={`absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 ${theme === 'light' ? 'text-gray-400' : 'text-silver-dark'}`} />
                             <input
                                 type="text"
-                                placeholder="Search mitra..."
+                                placeholder={t("Search mitra...")}
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 className={`w-full pl-8 pr-3 py-2 border rounded text-sm outline-none
@@ -208,11 +210,11 @@ const PartnerPicker = ({
                     {/* List */}
                     <div className="overflow-y-auto max-h-64">
                         {loading ? (
-                            <div className={`p-4 text-center text-sm ${theme === 'light' ? 'text-gray-500' : 'text-silver-dark'}`}>Loading...</div>
+                            <div className={`p-4 text-center text-sm ${theme === 'light' ? 'text-gray-500' : 'text-silver-dark'}`}>{t("Loading...")}</div>
                         ) : filteredPartners.length === 0 ? (
                             <div className={`p-4 text-center text-sm ${theme === 'light' ? 'text-gray-500' : 'text-silver-dark'}`}>
                                 {searchTerm ? 'Tidak ditemukan' : 'Belum ada mitra'}
-                                <p className="mt-1 text-[11px] opacity-80">Pastikan role Customer aktif, status Active, dan divisi sesuai konteks portal.</p>
+                                <p className="mt-1 text-[11px] opacity-80">{t("Pastikan role Customer aktif, status Active, dan divisi sesuai konteks portal.")}</p>
                             </div>
                         ) : (
                                 filteredPartners.map(partner => (
@@ -254,7 +256,7 @@ const PartnerPicker = ({
                         ${theme === 'light' ? 'border-gray-200' : 'border-dark-border bg-dark-surface/50 text-silver-dark'}`}
                         style={theme === 'light' ? { backgroundColor: '#f9fafb', color: '#6b7280' } : {}}
                     >
-                        <p>Tip: Cust=Customer, Vend=Vendor, Agent=Agent, Consignee=Consignee, Shipper=Shipper, Transp=Transporter</p>
+                        <p>{t("Tip: Cust=Customer, Vend=Vendor, Agent=Agent, Consignee=Consignee, Shipper=Shipper, Transp=Transporter")}</p>
                     </div>
                 </div>
             )}

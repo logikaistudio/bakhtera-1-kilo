@@ -3,9 +3,11 @@ import { Plus, Trash2, ChevronDown, Search, GripVertical } from 'lucide-react';
 import Button from './Button';
 import { supabase } from '../../lib/supabase';
 import { parseCurrency } from '../../utils/currencyFormatter';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 // ─── Custom Item Picker ───────────────────────────────────────────────────────
 const ItemPicker = ({ value, onChange, accounts, readOnly }) => {
+    const { t } = useLanguage();
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState('');
     const ref = useRef(null);
@@ -38,7 +40,7 @@ const ItemPicker = ({ value, onChange, accounts, readOnly }) => {
                 className={`w-full flex items-center justify-between gap-1 px-3 py-2 text-sm border bg-white text-gray-800 border-gray-200 hover:border-blue-400 focus:ring-2 focus:ring-blue-100 rounded-md text-left transition-all shadow-sm ${isOpen ? 'border-blue-400 ring-2 ring-blue-100' : ''}`}
             >
                 <span className="truncate">
-                    {selected ? selected.name : <span className="text-gray-400">Select COA...</span>}
+                    {selected ? selected.name : <span className="text-gray-400">{t("Select COA...")}</span>}
                 </span>
                 <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
             </button>
@@ -50,7 +52,7 @@ const ItemPicker = ({ value, onChange, accounts, readOnly }) => {
                             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                             <input
                                 type="text"
-                                placeholder="Search code or name..."
+                                placeholder={t("Search code or name...")}
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 autoFocus
@@ -64,10 +66,10 @@ const ItemPicker = ({ value, onChange, accounts, readOnly }) => {
                             onClick={() => { onChange(''); setIsOpen(false); }}
                             className="w-full px-3 py-2 text-left text-sm text-gray-500 hover:bg-gray-50 rounded-md mb-1 transition-colors border border-transparent hover:border-gray-200"
                         >
-                            <span className="italic">— Clear selection —</span>
+                            <span className="italic">{t("— Clear selection —")}</span>
                         </button>
                         {filtered.length === 0 ? (
-                            <div className="p-4 text-center text-sm text-gray-500">No matching COA found</div>
+                            <div className="p-4 text-center text-sm text-gray-500">{t("No matching COA found")}</div>
                         ) : (
                             filtered.map(acc => (
                                 <button
@@ -98,6 +100,7 @@ const GroupedServiceItemManager = ({
     readOnly = false,
     coaType = 'REVENUE' // Can be REVENUE or COST
 }) => {
+    const { t } = useLanguage();
     // items format: [{ id: 'g1', groupName: '...', items: [...] }]
     const [groups, setGroups] = useState(Array.isArray(items) && items.length > 0 && items[0].groupName !== undefined ? items : []);
     const [accounts, setAccounts] = useState([]);
@@ -324,13 +327,13 @@ const GroupedServiceItemManager = ({
         <div className="space-y-6">
             <div className="flex items-end justify-between border-b border-gray-200 pb-4">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Quotation Items</h2>
-                    <p className="text-sm text-gray-500 mt-1">Group and manage your service items and costs</p>
+                    <h2 className="text-2xl font-bold text-gray-900">{t("Quotation Items")}</h2>
+                    <p className="text-sm text-gray-500 mt-1">{t("Group and manage your service items and costs")}</p>
                 </div>
                 <div className="flex gap-3">
                     <div className="bg-white px-4 py-2 rounded-lg border border-gray-200 shadow-sm flex items-center gap-2">
-                        <span className="text-sm text-gray-500">Global Rate:</span>
-                        <span className="text-sm font-bold text-blue-600">Rp {formatNumber(exchangeRate)} / USD</span>
+                        <span className="text-sm text-gray-500">{t("Global Rate:")}</span>
+                        <span className="text-sm font-bold text-blue-600">Rp {formatNumber(exchangeRate)} {t("/ USD")}</span>
                     </div>
                     {!readOnly && (
                         <button
@@ -339,7 +342,7 @@ const GroupedServiceItemManager = ({
                             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm rounded-lg transition-colors shadow-sm focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                         >
                             <Plus className="w-4 h-4" />
-                            <span>Add Group</span>
+                            <span>{t("Add Group")}</span>
                         </button>
                     )}
                 </div>
@@ -350,14 +353,14 @@ const GroupedServiceItemManager = ({
                     <div className="bg-white w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm border border-gray-200">
                         <Plus className="w-6 h-6 text-gray-400" />
                     </div>
-                    <p className="text-base font-medium text-gray-700">No item groups added yet</p>
-                    <p className="text-sm text-gray-500 mt-1">Click "Add Group" to structure your quotation items.</p>
+                    <p className="text-base font-medium text-gray-700">{t("No item groups added yet")}</p>
+                    <p className="text-sm text-gray-500 mt-1">{t("Click \"Add Group\" to structure your quotation items.")}</p>
                 </div>
             )}
 
             {groups.length === 0 && readOnly && (
                 <div className="text-center py-6 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-                    <p className="text-sm text-gray-400 italic">Belum ada item — dapat ditambahkan saat edit quotation.</p>
+                    <p className="text-sm text-gray-400 italic">{t("Belum ada item — dapat ditambahkan saat edit quotation.")}</p>
                 </div>
             )}
 
@@ -391,18 +394,18 @@ const GroupedServiceItemManager = ({
                                         value={group.groupName} 
                                         onChange={(e) => updateGroupName(group.id, e.target.value)}
                                         className="bg-white border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-md text-gray-900 font-semibold outline-none px-3 py-1.5 w-1/2 md:w-1/3 transition-all shadow-sm"
-                                        placeholder="Group Name (e.g., A. Handling Import)"
+                                        placeholder={t("Group Name (e.g., A. Handling Import)")}
                                     />
                                 )}
                             </div>
                             <div className="flex flex-wrap items-center gap-4 justify-end">
                                 {readOnly ? (
                                     <div className="text-sm text-gray-500">
-                                        Rate: <span className="font-medium text-gray-800">Rp {formatNumber(currentGroupRate)}</span>
+                                        {t("Rate:")} <span className="font-medium text-gray-800">Rp {formatNumber(currentGroupRate)}</span>
                                     </div>
                                 ) : (
                                     <div className="flex items-center gap-2">
-                                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Rate:</label>
+                                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{t("Rate:")}</label>
                                         <div className="relative">
                                             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">Rp</span>
                                             <input
@@ -417,11 +420,11 @@ const GroupedServiceItemManager = ({
                                 )}
                                 <div className="hidden sm:flex items-center gap-3 px-3 py-1.5 bg-white border border-gray-200 rounded-md shadow-sm">
                                     <div className="text-xs text-gray-500">
-                                        Sub (IDR): <span className="font-bold text-green-600 text-sm">{formatNumber(groupTotalIdr)}</span>
+                                        {t("Sub (IDR):")} <span className="font-bold text-green-600 text-sm">{formatNumber(groupTotalIdr)}</span>
                                     </div>
                                     <div className="w-px h-4 bg-gray-300"></div>
                                     <div className="text-xs text-gray-500">
-                                        Sub (USD): <span className="font-bold text-blue-600 text-sm">{formatNumber(groupTotalUsd, 2)}</span>
+                                        {t("Sub (USD):")} <span className="font-bold text-blue-600 text-sm">{formatNumber(groupTotalUsd, 2)}</span>
                                     </div>
                                 </div>
                                 {!readOnly && (
@@ -431,13 +434,13 @@ const GroupedServiceItemManager = ({
                                             onClick={() => addItemToGroup(group.id)} 
                                             className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 hover:text-blue-600 text-sm font-medium rounded-md transition-colors shadow-sm flex items-center gap-1.5"
                                         >
-                                            <Plus className="w-3.5 h-3.5" /> Item
+                                            <Plus className="w-3.5 h-3.5" /> {t("Item")}
                                         </button>
                                         <button 
                                             type="button"
                                             onClick={() => deleteGroup(group.id)} 
                                             className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-all border border-transparent hover:border-red-100"
-                                            title="Delete Group"
+                                            title={t("Delete Group")}
                                         >
                                             <Trash2 className="w-4 h-4" />
                                         </button>
@@ -452,13 +455,13 @@ const GroupedServiceItemManager = ({
                                 <div className="space-y-3 min-w-[850px]">
                                     {/* Grid Header */}
                                     <div className="hidden lg:grid grid-cols-[3fr_0.7fr_0.8fr_0.8fr_1.3fr_1.3fr_1.3fr_min-content] gap-3 px-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                                        <div>Description</div>
-                                        <div className="text-right">Qty</div>
-                                        <div className="text-center">Unit</div>
-                                        <div className="text-center">Curr</div>
-                                        <div className="text-right">Rate/Price</div>
-                                        <div className="text-right">Amount (IDR)</div>
-                                        <div className="text-right">Amount (USD)</div>
+                                        <div>{t("Description")}</div>
+                                        <div className="text-right">{t("Qty")}</div>
+                                        <div className="text-center">{t("Unit")}</div>
+                                        <div className="text-center">{t("Curr")}</div>
+                                        <div className="text-right">{t("Rate/Price")}</div>
+                                        <div className="text-right">{t("Amount (IDR)")}</div>
+                                        <div className="text-right">{t("Amount (USD)")}</div>
                                         {!readOnly && <div className="w-8"></div>}
                                     </div>
                                     
@@ -479,12 +482,12 @@ const GroupedServiceItemManager = ({
                                                 <div key={item.id} className="grid grid-cols-1 lg:grid-cols-[3fr_0.7fr_0.8fr_0.8fr_1.3fr_1.3fr_1.3fr_min-content] gap-3 items-center p-3 lg:p-2 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-md transition-all group/row relative">
                                                     
                                                     {/* Mobile Labels (Hidden on Desktop) */}
-                                                    <div className="lg:hidden text-xs font-bold text-gray-400 uppercase mb-1">Item Details</div>
+                                                    <div className="lg:hidden text-xs font-bold text-gray-400 uppercase mb-1">{t("Item Details")}</div>
                                                     <div className="min-w-0">
                                                         <textarea
                                                             value={item.description}
                                                             onChange={(e) => updateItem(group.id, item.id, 'description', e.target.value)}
-                                                            placeholder="Item description..."
+                                                            placeholder={t("Item description...")}
                                                             className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all resize-y min-h-[38px] text-gray-800 shadow-sm placeholder-gray-400"
                                                             readOnly={readOnly}
                                                             rows={1}
@@ -494,7 +497,7 @@ const GroupedServiceItemManager = ({
                                                     {/* Row 2 on Mobile */}
                                                     <div className="grid grid-cols-3 lg:contents gap-3">
                                                         <div>
-                                                            <div className="lg:hidden text-[10px] font-semibold text-gray-400 uppercase mb-1">Qty</div>
+                                                            <div className="lg:hidden text-[10px] font-semibold text-gray-400 uppercase mb-1">{t("Qty")}</div>
                                                             <input
                                                                 type="text"
                                                                 min="0"
@@ -506,18 +509,18 @@ const GroupedServiceItemManager = ({
                                                             />
                                                         </div>
                                                         <div>
-                                                            <div className="lg:hidden text-[10px] font-semibold text-gray-400 uppercase mb-1">Unit</div>
+                                                            <div className="lg:hidden text-[10px] font-semibold text-gray-400 uppercase mb-1">{t("Unit")}</div>
                                                             <input
                                                                 type="text"
                                                                 value={item.unit}
                                                                 onChange={(e) => updateItem(group.id, item.id, 'unit', e.target.value)}
-                                                                placeholder="Unit"
+                                                                placeholder={t("Unit")}
                                                                 className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all text-center text-gray-800 shadow-sm placeholder-gray-400"
                                                                 readOnly={readOnly}
                                                             />
                                                         </div>
                                                         <div>
-                                                            <div className="lg:hidden text-[10px] font-semibold text-gray-400 uppercase mb-1">Curr</div>
+                                                            <div className="lg:hidden text-[10px] font-semibold text-gray-400 uppercase mb-1">{t("Curr")}</div>
                                                             {readOnly ? (
                                                                 <div className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-md text-center text-gray-800">{item.currency}</div>
                                                             ) : (
@@ -534,7 +537,7 @@ const GroupedServiceItemManager = ({
                                                     </div>
 
                                                     <div>
-                                                        <div className="lg:hidden text-[10px] font-semibold text-gray-400 uppercase mb-1 mt-2">Rate / Price</div>
+                                                        <div className="lg:hidden text-[10px] font-semibold text-gray-400 uppercase mb-1 mt-2">{t("Rate / Price")}</div>
                                                         <input
                                                             type="text"
                                                             value={item.unitPrice || item.unitPrice === 0 ? (typeof item.unitPrice === 'string' ? item.unitPrice : (item.currency==='IDR'? formatNumber(item.unitPrice) : item.unitPrice)) : ''}
@@ -546,14 +549,14 @@ const GroupedServiceItemManager = ({
                                                     </div>
 
                                                     <div className="flex justify-between lg:block items-center bg-gray-50 lg:bg-transparent p-2 lg:p-0 rounded border border-gray-100 lg:border-none mt-2 lg:mt-0">
-                                                        <div className="lg:hidden text-xs font-semibold text-gray-500">Amount (IDR)</div>
+                                                        <div className="lg:hidden text-xs font-semibold text-gray-500">{t("Amount (IDR)")}</div>
                                                         <div className="text-right text-sm font-mono font-bold text-green-600">
                                                             {idrEq > 0 ? formatNumber(idrEq) : '-'}
                                                         </div>
                                                     </div>
 
                                                     <div className="flex justify-between lg:block items-center bg-gray-50 lg:bg-transparent p-2 lg:p-0 rounded border border-gray-100 lg:border-none">
-                                                        <div className="lg:hidden text-xs font-semibold text-gray-500">Amount (USD)</div>
+                                                        <div className="lg:hidden text-xs font-semibold text-gray-500">{t("Amount (USD)")}</div>
                                                         <div className="text-right text-sm font-mono font-bold text-blue-600">
                                                             {usdEq > 0 ? formatNumber(usdEq, 2) : '-'}
                                                         </div>
@@ -565,7 +568,7 @@ const GroupedServiceItemManager = ({
                                                                 type="button"
                                                                 onClick={() => deleteItem(group.id, item.id)} 
                                                                 className="p-1.5 text-red-400 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors border border-transparent hover:border-red-200"
-                                                                title="Delete Item"
+                                                                title={t("Delete Item")}
                                                             >
                                                                 <Trash2 className="w-4 h-4" />
                                                             </button>
@@ -578,13 +581,13 @@ const GroupedServiceItemManager = ({
                                 </div>
                             ) : (
                                 <div className="py-8 text-center bg-gray-50/50 rounded-xl border border-dashed border-gray-200">
-                                    <p className="text-sm text-gray-500 font-medium italic">This group is currently empty.</p>
+                                    <p className="text-sm text-gray-500 font-medium italic">{t("This group is currently empty.")}</p>
                                     <button 
                                         type="button" 
                                         onClick={() => addItemToGroup(group.id)} 
                                         className="mt-2 text-sm text-blue-600 hover:text-blue-800 font-semibold underline-offset-2 hover:underline"
                                     >
-                                        Add your first item
+                                        {t("Add your first item")}
                                     </button>
                                 </div>
                             )}
@@ -592,11 +595,11 @@ const GroupedServiceItemManager = ({
                             {/* Mobile Group Totals (Visible only on mobile) */}
                             <div className="sm:hidden mt-4 pt-4 border-t border-gray-100 grid grid-cols-2 gap-3">
                                 <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                                    <div className="text-[10px] font-bold text-gray-500 uppercase mb-1">Sub Total (IDR)</div>
+                                    <div className="text-[10px] font-bold text-gray-500 uppercase mb-1">{t("Sub Total (IDR)")}</div>
                                     <div className="text-sm font-bold text-green-600">{formatNumber(groupTotalIdr)}</div>
                                 </div>
                                 <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                                    <div className="text-[10px] font-bold text-gray-500 uppercase mb-1">Sub Total (USD)</div>
+                                    <div className="text-[10px] font-bold text-gray-500 uppercase mb-1">{t("Sub Total (USD)")}</div>
                                     <div className="text-sm font-bold text-blue-600">{formatNumber(groupTotalUsd, 2)}</div>
                                 </div>
                             </div>
@@ -613,19 +616,19 @@ const GroupedServiceItemManager = ({
                             Σ
                         </div>
                         <div>
-                            <div className="text-lg font-bold text-gray-900 uppercase tracking-wider">Grand Total</div>
-                            <div className="text-xs text-gray-500 font-medium mt-0.5">Estimated quotation value</div>
+                            <div className="text-lg font-bold text-gray-900 uppercase tracking-wider">{t("Grand Total")}</div>
+                            <div className="text-xs text-gray-500 font-medium mt-0.5">{t("Estimated quotation value")}</div>
                         </div>
                     </div>
                     
                     <div className="flex gap-8 mt-5 md:mt-0 w-full md:w-auto justify-between md:justify-end bg-white md:bg-transparent p-4 md:p-0 rounded-xl border md:border-none border-gray-100 shadow-sm md:shadow-none">
                         <div className="text-left md:text-right">
-                            <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Total (IDR)</div>
+                            <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t("Total (IDR)")}</div>
                             <div className="text-2xl font-black text-green-600">Rp {formatNumber(totalIdr)}</div>
                         </div>
                         <div className="w-px bg-gray-200 hidden md:block"></div>
                         <div className="text-right">
-                            <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Total (USD)</div>
+                            <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t("Total (USD)")}</div>
                             <div className="text-2xl font-black text-blue-600">$ {formatNumber(totalUsd, 2)}</div>
                         </div>
                     </div>

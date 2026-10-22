@@ -9,6 +9,7 @@ import {
     Users, Shield, CheckCircle2, AlertCircle, Edit2, Save, X,
     UserCheck, UserX, Info, RefreshCw
 } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 /**
  * Penugasan Role User
@@ -42,6 +43,7 @@ const RoleBadge = ({ role, roles }) => {
 };
 
 const UserPermissionAssignment = () => {
+    const { t } = useLanguage();
     const [users, setUsers] = useState([]);
     const [roles, setRoles] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -229,7 +231,7 @@ const UserPermissionAssignment = () => {
             <div className="flex items-center justify-center h-64">
                 <div className="text-center space-y-3">
                     <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto" />
-                    <p className="text-sm text-gray-500">Memuat data...</p>
+                    <p className="text-sm text-gray-500">{t("Memuat data...")}</p>
                 </div>
             </div>
         );
@@ -243,10 +245,10 @@ const UserPermissionAssignment = () => {
                 <div>
                     <h1 className="text-2xl font-bold text-silver-light flex items-center gap-2.5">
                         <Users className="w-6 h-6 text-accent-blue" />
-                        Penugasan Role User
+                        {t("Penugasan Role User")}
                     </h1>
                     <p className="text-sm text-silver-dark mt-1">
-                        Tetapkan role untuk setiap user. Hak akses per role diatur di <strong className="text-silver">Manajemen Role & Akses</strong>.
+                        {t("Tetapkan role untuk setiap user. Hak akses per role diatur di")} <strong className="text-silver">{t("Manajemen Role & Akses")}</strong>.
                     </p>
                 </div>
                 <button
@@ -254,7 +256,7 @@ const UserPermissionAssignment = () => {
                     className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dark-border text-silver-dark hover:text-silver-light hover:border-accent-blue/50 smooth-transition text-sm"
                 >
                     <RefreshCw className="w-4 h-4" />
-                    Refresh
+                    {t("Refresh")}
                 </button>
             </div>
 
@@ -265,11 +267,11 @@ const UserPermissionAssignment = () => {
             }}>
                 <Info style={{ width: 18, height: 18, color: '#3b82f6', flexShrink: 0, marginTop: 1 }} />
                 <div style={{ fontSize: 13, color: '#1e40af', lineHeight: 1.6 }}>
-                    <strong>Cara Kerja Terintegrasi:</strong>
+                    <strong>{t("Cara Kerja Terintegrasi:")}</strong>
                     <ul style={{ marginTop: 4, paddingLeft: 16, color: '#1d4ed8' }}>
-                        <li><strong>Manajemen Role & Akses</strong> → membuat role dan mengatur hak akses per menu</li>
-                        <li><strong>Halaman ini</strong> → menentukan role mana yang diberikan kepada setiap user</li>
-                        <li><strong>Manajemen User</strong> → membuat/mengedit user beserta role awalnya</li>
+                        <li><strong>{t("Manajemen Role & Akses")}</strong> {t("→ membuat role dan mengatur hak akses per menu")}</li>
+                        <li><strong>{t("Halaman ini")}</strong> {t("→ menentukan role mana yang diberikan kepada setiap user")}</li>
+                        <li><strong>{t("Manajemen User")}</strong> {t("→ membuat/mengedit user beserta role awalnya")}</li>
                     </ul>
                 </div>
             </div>
@@ -303,7 +305,7 @@ const UserPermissionAssignment = () => {
                     borderRadius: 12, padding: '12px 14px', textAlign: 'center'
                 }}>
                     <div style={{ fontSize: 22, fontWeight: 700, color: '#16a34a' }}>{activeCount}</div>
-                    <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>Aktif</div>
+                    <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{t("Aktif")}</div>
                 </div>
             </div>
 
@@ -398,8 +400,8 @@ const UserPermissionAssignment = () => {
                                                 title={u.is_active ? 'Klik untuk nonaktifkan' : 'Klik untuk aktifkan'}
                                             >
                                                 {u.is_active
-                                                    ? <><UserCheck style={{ width: 13, height: 13 }} /> Aktif</>
-                                                    : <><UserX style={{ width: 13, height: 13 }} /> Nonaktif</>
+                                                    ? <><UserCheck style={{ width: 13, height: 13 }} /> {t("Aktif")}</>
+                                                    : <><UserX style={{ width: 13, height: 13 }} /> {t("Nonaktif")}</>
                                                 }
                                             </button>
                                         </td>
@@ -430,7 +432,7 @@ const UserPermissionAssignment = () => {
                                                         }}
                                                     >
                                                         <X style={{ width: 13, height: 13 }} />
-                                                        Batal
+                                                        {t("Batal")}
                                                     </button>
                                                 </div>
                                             ) : (
@@ -445,7 +447,7 @@ const UserPermissionAssignment = () => {
                                                     }}
                                                 >
                                                     <Edit2 style={{ width: 13, height: 13 }} />
-                                                    Ubah Role
+                                                    {t("Ubah Role")}
                                                 </button>
                                             )}
                                         </td>
@@ -458,7 +460,7 @@ const UserPermissionAssignment = () => {
                     {users.length === 0 && (
                         <div style={{ padding: '48px 24px', textAlign: 'center', color: '#6b7280' }}>
                             <Users style={{ width: 40, height: 40, margin: '0 auto 12px', opacity: 0.4 }} />
-                            <p style={{ fontSize: 14 }}>Tidak ada user ditemukan</p>
+                            <p style={{ fontSize: 14 }}>{t("Tidak ada user ditemukan")}</p>
                         </div>
                     )}
                 </div>
@@ -470,7 +472,7 @@ const UserPermissionAssignment = () => {
                 borderRadius: 12, padding: '16px 20px'
             }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>
-                    Role Tersedia (dari Manajemen Role & Akses)
+                    {t("Role Tersedia (dari Manajemen Role & Akses)")}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
                     {roles.map(r => {

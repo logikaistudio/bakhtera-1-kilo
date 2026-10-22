@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const DocumentPreviewModal = ({ show, doc, onClose }) => {
+    const { t } = useLanguage();
     if (!show || !doc) return null;
 
     const getMime = (d) => {
@@ -82,18 +84,18 @@ const DocumentPreviewModal = ({ show, doc, onClose }) => {
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-70 p-4" style={{ zIndex: 9999 }}>
             <div className="bg-dark-surface rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden">
                 <div className="flex items-center justify-between p-3 border-b border-dark-border">
-                    <div className="text-sm font-semibold text-silver-light">Preview: {doc.name || doc.fileName || 'Dokumen'}</div>
+                    <div className="text-sm font-semibold text-silver-light">{t("Preview:")} {doc.name || doc.fileName || 'Dokumen'}</div>
                     <button onClick={onClose} className="text-silver-dark hover:text-white p-1">✕</button>
                 </div>
                 <div className="p-3 overflow-auto" style={{height: '75vh'}}>
                     {loading ? (
-                        <div className="text-sm text-silver-dark">Memuat preview...</div>
+                        <div className="text-sm text-silver-dark">{t("Memuat preview...")}</div>
                     ) : error ? (
-                        <div className="text-sm text-silver-dark">Error memuat preview: {error}</div>
+                        <div className="text-sm text-silver-dark">{t("Error memuat preview:")} {error}</div>
                     ) : (resolvedSrc ? (
                         (mime === 'application/pdf' || (resolvedSrc && resolvedSrc.endsWith && resolvedSrc.endsWith('.pdf'))) ? (
                             <iframe
-                                title="pdf-preview"
+                                title={t("pdf-preview")}
                                 src={resolvedSrc}
                                 className="w-full h-full"
                                 onLoad={() => console.debug('iframe loaded for', doc.name || doc.fileName)}
@@ -106,14 +108,14 @@ const DocumentPreviewModal = ({ show, doc, onClose }) => {
                         ) : mime.startsWith('image/') || (resolvedSrc && /blob:|data:/.test(resolvedSrc)) ? (
                             <img src={resolvedSrc} alt={doc.name || doc.fileName} className="mx-auto max-h-[70vh]" />
                         ) : (
-                            <div className="text-sm text-silver-dark">Tidak dapat menampilkan preview untuk tipe file ini. Silakan unduh untuk melihat.</div>
+                            <div className="text-sm text-silver-dark">{t("Tidak dapat menampilkan preview untuk tipe file ini. Silakan unduh untuk melihat.")}</div>
                         )
                     ) : (
-                        <div className="text-sm text-silver-dark">Tidak ada sumber preview.</div>
+                        <div className="text-sm text-silver-dark">{t("Tidak ada sumber preview.")}</div>
                     ))}
                 </div>
                 <div className="p-3 border-t border-dark-border flex justify-end gap-2">
-                    <a href={resolvedSrc || src} target="_blank" rel="noopener noreferrer" className="px-3 py-1 bg-accent-blue text-white rounded">Open in new tab</a>
+                    <a href={resolvedSrc || src} target="_blank" rel="noopener noreferrer" className="px-3 py-1 bg-accent-blue text-white rounded">{t("Open in new tab")}</a>
                 </div>
             </div>
         </div>

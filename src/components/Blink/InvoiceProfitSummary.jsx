@@ -1,5 +1,6 @@
 import React from 'react';
 import { TrendingUp, TrendingDown, DollarSign, Package, AlertTriangle } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 /**
  * InvoiceProfitSummary
@@ -10,6 +11,7 @@ import { TrendingUp, TrendingDown, DollarSign, Package, AlertTriangle } from 'lu
  * item.currency is shown as an informational badge only (indicates source currency).
  */
 const InvoiceProfitSummary = ({ invoice, formatCurrency }) => {
+    const { t } = useLanguage();
     if (!invoice) return null;
 
     const invCurrency = invoice.currency || 'IDR';
@@ -49,13 +51,13 @@ const InvoiceProfitSummary = ({ invoice, formatCurrency }) => {
                 <div className="glass-card p-2.5 rounded-lg border border-blue-500/30 bg-blue-500/5">
                     <div className="flex items-center gap-2 mb-1">
                         <DollarSign className="w-3.5 h-3.5 text-blue-400" />
-                        <span className="text-[10px] text-silver-dark">Revenue</span>
+                        <span className="text-[10px] text-silver-dark">{t("Revenue")}</span>
                     </div>
                     <div className="text-sm font-bold text-blue-400">
                         {formatCurrency(totalRevenue, invCurrency)}
                     </div>
                     <div className="text-[9px] text-silver-dark mt-0.5">
-                        {revenueItems.length} item(s)
+                        {revenueItems.length} {t("item(s)")}
                     </div>
                 </div>
 
@@ -63,13 +65,13 @@ const InvoiceProfitSummary = ({ invoice, formatCurrency }) => {
                 <div className="glass-card p-2.5 rounded-lg border border-orange-500/30 bg-orange-500/5">
                     <div className="flex items-center gap-2 mb-1">
                         <Package className="w-3.5 h-3.5 text-orange-400" />
-                        <span className="text-[10px] text-silver-dark">COGS</span>
+                        <span className="text-[10px] text-silver-dark">{t("COGS")}</span>
                     </div>
                     <div className="text-sm font-bold text-orange-400">
                         {formatCurrency(cogsSubtotalDisplay, invCurrency)}
                     </div>
                     <div className="text-[9px] text-silver-dark mt-0.5">
-                        {cogsItems.length} cost item(s)
+                        {cogsItems.length} {t("cost item(s)")}
                     </div>
                 </div>
 
@@ -77,7 +79,7 @@ const InvoiceProfitSummary = ({ invoice, formatCurrency }) => {
                 <div className={`glass-card p-2.5 rounded-lg border ${status.color.replace('text-', 'border-')}/30 ${status.bgColor}`}>
                     <div className="flex items-center gap-2 mb-1">
                         <StatusIcon className={`w-3.5 h-3.5 ${status.color}`} />
-                        <span className="text-[10px] text-silver-dark">Gross Profit</span>
+                        <span className="text-[10px] text-silver-dark">{t("Gross Profit")}</span>
                     </div>
                     <div className={`text-sm font-bold ${status.color}`}>
                         {formatCurrency(grossProfit, invCurrency)}
@@ -91,13 +93,13 @@ const InvoiceProfitSummary = ({ invoice, formatCurrency }) => {
                 <div className={`glass-card p-2.5 rounded-lg border ${status.color.replace('text-', 'border-')}/30 ${status.bgColor}`}>
                     <div className="flex items-center gap-2 mb-1">
                         <TrendingUp className={`w-3.5 h-3.5 ${status.color}`} />
-                        <span className="text-[10px] text-silver-dark">Margin</span>
+                        <span className="text-[10px] text-silver-dark">{t("Margin")}</span>
                     </div>
                     <div className={`text-sm font-bold ${status.color}`}>
                         {profitMargin.toFixed(2)}%
                     </div>
                     <div className="text-[9px] text-silver-dark mt-0.5">
-                        Profit Margin
+                        {t("Profit Margin")}
                     </div>
                 </div>
             </div>
@@ -107,17 +109,17 @@ const InvoiceProfitSummary = ({ invoice, formatCurrency }) => {
                 <div className="glass-card p-3 rounded-lg border border-dark-border">
                     <h4 className="text-xs font-semibold text-silver-light mb-2 flex items-center gap-2">
                         <Package className="w-3.5 h-3.5 text-orange-400" />
-                        Cost of Goods Sold (COGS) Details
+                        {t("Cost of Goods Sold (COGS) Details")}
                         <span className="ml-auto text-[9px] font-normal text-silver-dark bg-dark-surface px-2 py-0.5 rounded">
-                            Amounts in {invCurrency}
+                            {t("Amounts in")} {invCurrency}
                         </span>
                     </h4>
                     <div className="space-y-1">
                         <div className="grid grid-cols-12 gap-2 text-[9px] font-semibold text-silver-dark pb-1 border-b border-dark-border">
-                            <div className="col-span-5">Description</div>
-                            <div className="col-span-2 text-center">Qty</div>
-                            <div className="col-span-2 text-right">Rate</div>
-                            <div className="col-span-3 text-right">Amount ({invCurrency})</div>
+                            <div className="col-span-5">{t("Description")}</div>
+                            <div className="col-span-2 text-center">{t("Qty")}</div>
+                            <div className="col-span-2 text-right">{t("Rate")}</div>
+                            <div className="col-span-3 text-right">{t("Amount (")}{invCurrency})</div>
                         </div>
                         {cogsItems.map((item, index) => {
                             // item.currency is the SOURCE currency label (informational only)
@@ -132,7 +134,7 @@ const InvoiceProfitSummary = ({ invoice, formatCurrency }) => {
                                         {/* Show source currency badge if different — for info only */}
                                         {showSourceBadge && (
                                             <span className="ml-1 px-1 py-0.5 rounded text-[8px] font-semibold bg-yellow-500/20 text-yellow-400">
-                                                src:{sourceCurr}
+                                                {t("src:")}{sourceCurr}
                                             </span>
                                         )}
                                         {item.vendor && (
@@ -156,7 +158,7 @@ const InvoiceProfitSummary = ({ invoice, formatCurrency }) => {
                         })}
                         <div className="grid grid-cols-12 gap-2 text-[10px] font-bold text-orange-400 pt-2 border-t border-dark-border">
                             <div className="col-span-9 text-right">
-                                TOTAL COGS ({invCurrency}):
+                                {t("TOTAL COGS (")}{invCurrency}):
                             </div>
                             <div className="col-span-3 text-right font-mono">
                                 {formatCurrency(cogsSubtotalDisplay, invCurrency)}
@@ -168,23 +170,23 @@ const InvoiceProfitSummary = ({ invoice, formatCurrency }) => {
 
             {/* Profit Analysis Summary */}
             <div className="glass-card p-3 rounded-lg border border-accent-orange/30 bg-accent-orange/5">
-                <h4 className="text-xs font-semibold text-accent-orange mb-2">Profit Analysis Summary</h4>
+                <h4 className="text-xs font-semibold text-accent-orange mb-2">{t("Profit Analysis Summary")}</h4>
                 <div className="space-y-1.5 text-[10px]">
                     <div className="flex justify-between">
-                        <span className="text-silver-dark">Revenue (incl. VAT):</span>
+                        <span className="text-silver-dark">{t("Revenue (incl. VAT):")}</span>
                         <span className="text-blue-400 font-semibold">{formatCurrency(totalRevenue, invCurrency)}</span>
                     </div>
                     <div className="flex justify-between">
-                        <span className="text-silver-dark">Cost of Goods Sold:</span>
+                        <span className="text-silver-dark">{t("Cost of Goods Sold:")}</span>
                         <span className="text-orange-400 font-semibold">{formatCurrency(cogsSubtotalDisplay, invCurrency)}</span>
                     </div>
                     <div className="h-px bg-dark-border my-1"></div>
                     <div className="flex justify-between items-center">
-                        <span className={`font-semibold ${status.color}`}>Gross Profit:</span>
+                        <span className={`font-semibold ${status.color}`}>{t("Gross Profit:")}</span>
                         <span className={`font-bold text-sm ${status.color}`}>{formatCurrency(grossProfit, invCurrency)}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                        <span className={`font-semibold ${status.color}`}>Profit Margin:</span>
+                        <span className={`font-semibold ${status.color}`}>{t("Profit Margin:")}</span>
                         <span className={`font-bold text-sm ${status.color}`}>{profitMargin.toFixed(2)}%</span>
                     </div>
                 </div>
@@ -196,10 +198,9 @@ const InvoiceProfitSummary = ({ invoice, formatCurrency }) => {
                     <div className="flex items-start gap-2">
                         <AlertTriangle className="w-3.5 h-3.5 text-yellow-400 mt-0.5 flex-shrink-0" />
                         <div className="flex-1">
-                            <p className="text-[10px] text-yellow-400 font-semibold mb-0.5">No COGS Data</p>
+                            <p className="text-[10px] text-yellow-400 font-semibold mb-0.5">{t("No COGS Data")}</p>
                             <p className="text-[9px] text-silver-dark">
-                                Cost of Goods Sold data is not available for this invoice.
-                                Profit calculation shows 100% margin. Add COGS items from shipment for accurate profit analysis.
+                                {t("Cost of Goods Sold data is not available for this invoice. Profit calculation shows 100% margin. Add COGS items from shipment for accurate profit analysis.")}
                             </p>
                         </div>
                     </div>

@@ -6,6 +6,9 @@ import { quotationArApPairs } from './dictionaries/quotationArAp';
 import { blinkPagePairs } from './dictionaries/blinkPages';
 import { bridgeBigPairs1 } from './dictionaries/bridgeBig1';
 import { bridgeBigPairs2 } from './dictionaries/bridgeBig2';
+import { modulesRestPairs1 } from './dictionaries/modulesRest1';
+import { modulesRestPairs2 } from './dictionaries/modulesRest2';
+import { modulesRestPairs3 } from './dictionaries/modulesRest3';
 
 const allPairs = [
     ...commonPairs,
@@ -18,6 +21,9 @@ const allPairs = [
     ...blinkPagePairs,
     ...bridgeBigPairs1,
     ...bridgeBigPairs2,
+    ...modulesRestPairs1,
+    ...modulesRestPairs2,
+    ...modulesRestPairs3,
 ];
 
 const en = {};

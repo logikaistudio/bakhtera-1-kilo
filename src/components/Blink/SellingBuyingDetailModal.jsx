@@ -2,8 +2,10 @@ import React, { useMemo } from 'react';
 import { X, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, DollarSign, Download } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const SellingBuyingDetailModal = ({ isOpen, onClose, shipment }) => {
+    const { t } = useLanguage();
     if (!isOpen || !shipment) return null;
 
     // Smart Mapping Logic
@@ -252,7 +254,7 @@ const SellingBuyingDetailModal = ({ isOpen, onClose, shipment }) => {
                         <TrendingUp className="w-5 h-5 text-accent-orange" />
                         <div>
                             <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                                Profit Analysis: {shipment.jobNumber}
+                                {t("Profit Analysis:")} {shipment.jobNumber}
                             </h2>
                             <p className="text-xs text-gray-500 dark:text-silver-dark mt-0.5">
                                 {shipment.customer || 'Unknown Customer'} • {shipment.origin || 'Origin'} → {shipment.destination || 'Destination'}
@@ -265,7 +267,7 @@ const SellingBuyingDetailModal = ({ isOpen, onClose, shipment }) => {
                             className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 text-gray-700 dark:text-gray-200 rounded-lg text-xs font-medium transition-colors"
                         >
                             <Download className="w-4 h-4" />
-                            Export PDF
+                            {t("Export PDF")}
                         </button>
                         <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition-colors text-gray-400 hover:text-gray-600 dark:text-silver-dark dark:hover:text-white">
                             <X className="w-5 h-5" />
@@ -283,7 +285,7 @@ const SellingBuyingDetailModal = ({ isOpen, onClose, shipment }) => {
                                 'bg-yellow-50 border-yellow-200 dark:bg-yellow-500/10 dark:border-yellow-500/30'
                             }`}>
                             <div>
-                                <p className="text-[10px] uppercase font-semibold tracking-wider mb-1 text-gray-500 dark:text-silver-dark opacity-80">Margin</p>
+                                <p className="text-[10px] uppercase font-semibold tracking-wider mb-1 text-gray-500 dark:text-silver-dark opacity-80">{t("Margin")}</p>
                                 <p className={`text-3xl font-bold ${isLoss ? 'text-red-700 dark:text-red-400' :
                                     isHealthy ? 'text-emerald-700 dark:text-emerald-400' :
                                         'text-yellow-700 dark:text-yellow-400'
@@ -298,7 +300,7 @@ const SellingBuyingDetailModal = ({ isOpen, onClose, shipment }) => {
 
                         {/* Profit Card */}
                         <div className="bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border p-4 rounded-xl shadow-sm">
-                            <p className="text-[10px] uppercase text-gray-500 dark:text-silver-dark font-semibold tracking-wider mb-2">Profit</p>
+                            <p className="text-[10px] uppercase text-gray-500 dark:text-silver-dark font-semibold tracking-wider mb-2">{t("Profit")}</p>
                             <p className={`text-2xl font-bold ${isLoss ? 'text-red-600 dark:text-red-400' : 'text-gray-800 dark:text-white'}`}>
                                 {currency} {profit.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </p>
@@ -306,7 +308,7 @@ const SellingBuyingDetailModal = ({ isOpen, onClose, shipment }) => {
 
                         {/* Selling Card */}
                         <div className="bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border p-4 rounded-xl shadow-sm">
-                            <p className="text-[10px] uppercase text-gray-500 dark:text-silver-dark font-semibold tracking-wider mb-2">Selling</p>
+                            <p className="text-[10px] uppercase text-gray-500 dark:text-silver-dark font-semibold tracking-wider mb-2">{t("Selling")}</p>
                             <p className="text-2xl font-bold text-gray-800 dark:text-white">
                                 {currency} {comparisonData.grandTotalS.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </p>
@@ -314,7 +316,7 @@ const SellingBuyingDetailModal = ({ isOpen, onClose, shipment }) => {
 
                         {/* Buying Card */}
                         <div className="bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border p-4 rounded-xl shadow-sm">
-                            <p className="text-[10px] uppercase text-gray-500 dark:text-silver-dark font-semibold tracking-wider mb-2">Buying</p>
+                            <p className="text-[10px] uppercase text-gray-500 dark:text-silver-dark font-semibold tracking-wider mb-2">{t("Buying")}</p>
                             <p className="text-2xl font-bold text-gray-800 dark:text-white">
                                 {currency} {comparisonData.grandTotalB.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </p>
@@ -324,9 +326,9 @@ const SellingBuyingDetailModal = ({ isOpen, onClose, shipment }) => {
                     {/* Apple-to-Apple Comparison Table */}
                     <div className="border border-gray-100 dark:border-dark-border rounded-xl local-table-shadow overflow-hidden">
                         <div className="grid grid-cols-12 bg-gray-50 dark:bg-dark-card py-3 px-6 border-b border-gray-100 dark:border-dark-border text-xs font-bold text-gray-500 dark:text-silver-dark uppercase tracking-wider">
-                            <div className="col-span-2">Category</div>
-                            <div className="col-span-5 border-r border-gray-200 dark:border-dark-border/50 pr-4">Selling Items</div>
-                            <div className="col-span-5 pl-4">Buying Items (COGS)</div>
+                            <div className="col-span-2">{t("Category")}</div>
+                            <div className="col-span-5 border-r border-gray-200 dark:border-dark-border/50 pr-4">{t("Selling Items")}</div>
+                            <div className="col-span-5 pl-4">{t("Buying Items (COGS)")}</div>
                         </div>
 
                         <div className="bg-white dark:bg-dark-surface">

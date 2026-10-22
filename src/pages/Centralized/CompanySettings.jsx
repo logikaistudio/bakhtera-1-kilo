@@ -4,6 +4,7 @@ import Modal from '../../components/Common/Modal';
 import Button from '../../components/Common/Button';
 import { Plus, Building, CreditCard, Upload, Trash2, Phone, Mail, FileText, Image as ImageIcon, Layers } from 'lucide-react';
 import { validateAndConvertImage } from '../../utils/validateImage';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 /**
  * Pengaturan Perusahaan — Pusat (Central)
@@ -11,6 +12,7 @@ import { validateAndConvertImage } from '../../utils/validateImage';
  * Menu code: central_settings
  */
 const CentralCompanySettings = () => {
+    const { t } = useLanguage();
     const {
         companySettings,
         bankAccounts,
@@ -72,7 +74,7 @@ const CentralCompanySettings = () => {
                 logo_url: logoUrl
             }, MODULE);
             await fetchCompanySettings(MODULE);
-            alert('✅ Informasi perusahaan berhasil disimpan');
+            alert(t("✅ Informasi perusahaan berhasil disimpan"));
         } catch (error) {
             alert('❌ Gagal menyimpan: ' + error.message);
         } finally {
@@ -100,7 +102,7 @@ const CentralCompanySettings = () => {
 
     const handleAddBank = () => {
         if (!companySettings?.id) {
-            alert('Simpan informasi perusahaan terlebih dahulu sebelum menambahkan rekening bank.');
+            alert(t("Simpan informasi perusahaan terlebih dahulu sebelum menambahkan rekening bank."));
             return;
         }
         setEditingBank(null);
@@ -126,7 +128,7 @@ const CentralCompanySettings = () => {
             try {
                 await deleteBankAccount(id, MODULE);
             } catch (error) {
-                alert('Gagal menghapus rekening');
+                alert(t("Gagal menghapus rekening"));
             }
         }
     };
@@ -149,9 +151,9 @@ const CentralCompanySettings = () => {
         <div className="p-6 max-w-7xl mx-auto">
             <h1 className="text-2xl font-bold mb-1 flex items-center gap-2">
                 <Layers className="h-6 w-6 text-purple-600" />
-                Pengaturan Perusahaan (Pusat)
+                {t("Pengaturan Perusahaan (Pusat)")}
             </h1>
-            <p className="text-sm text-gray-500 mb-6">Pengaturan global yang berlaku di seluruh modul</p>
+            <p className="text-sm text-gray-500 mb-6">{t("Pengaturan global yang berlaku di seluruh modul")}</p>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Left Column */}
@@ -159,32 +161,32 @@ const CentralCompanySettings = () => {
                     <div className="bg-white rounded-lg shadow p-6 border border-gray-100">
                         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 border-b pb-2">
                             <FileText className="h-5 w-5 text-gray-500" />
-                            Informasi Umum
+                            {t("Informasi Umum")}
                         </h2>
                         <div className="grid grid-cols-1 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Nama Perusahaan</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">{t("Nama Perusahaan")}</label>
                                 <input type="text" value={companyName} onChange={(e) => setCompanyName(e.target.value)}
                                     className="w-full px-3 py-2 border rounded-md focus:ring-purple-500 focus:border-purple-500"
-                                    placeholder="PT. Bakhtera Nusantara" />
+                                    placeholder={t("PT. Bakhtera Nusantara")} />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Alamat Lengkap</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">{t("Alamat Lengkap")}</label>
                                 <textarea value={companyAddress} onChange={(e) => setCompanyAddress(e.target.value)}
                                     rows={3} className="w-full px-3 py-2 border rounded-md focus:ring-purple-500 focus:border-purple-500"
-                                    placeholder="Jl. Alamat Perusahaan..." />
+                                    placeholder={t("Jl. Alamat Perusahaan...")} />
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
-                                        <Phone className="h-3 w-3" /> Telepon
+                                        <Phone className="h-3 w-3" /> {t("Telepon")}
                                     </label>
                                     <input type="text" value={companyPhone} onChange={(e) => setCompanyPhone(e.target.value)}
                                         className="w-full px-3 py-2 border rounded-md" />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
-                                        <Phone className="h-3 w-3" /> Fax
+                                        <Phone className="h-3 w-3" /> {t("Fax")}
                                     </label>
                                     <input type="text" value={companyFax} onChange={(e) => setCompanyFax(e.target.value)}
                                         className="w-full px-3 py-2 border rounded-md" />
@@ -193,13 +195,13 @@ const CentralCompanySettings = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
-                                        <Mail className="h-3 w-3" /> Email
+                                        <Mail className="h-3 w-3" /> {t("Email")}
                                     </label>
                                     <input type="email" value={companyEmail} onChange={(e) => setCompanyEmail(e.target.value)}
                                         className="w-full px-3 py-2 border rounded-md" />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">NPWP</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">{t("NPWP")}</label>
                                     <input type="text" value={companyNpwp} onChange={(e) => setCompanyNpwp(e.target.value)}
                                         className="w-full px-3 py-2 border rounded-md" />
                                 </div>
@@ -217,13 +219,13 @@ const CentralCompanySettings = () => {
                         <div className="flex justify-between items-center mb-4 border-b pb-2">
                             <h2 className="text-lg font-semibold flex items-center gap-2">
                                 <CreditCard className="h-5 w-5 text-gray-500" />
-                                Rekening Bank
+                                {t("Rekening Bank")}
                             </h2>
-                            <Button size="sm" disabled={!companySettings?.id} onClick={handleAddBank} Icon={Plus}>Tambah Rekening</Button>
+                            <Button size="sm" disabled={!companySettings?.id} onClick={handleAddBank} Icon={Plus}>{t("Tambah Rekening")}</Button>
                         </div>
                         <div className="space-y-3">
                             {bankAccounts.length === 0 ? (
-                                <p className="text-gray-500 text-center py-4">Belum ada rekening bank terdaftar.</p>
+                                <p className="text-gray-500 text-center py-4">{t("Belum ada rekening bank terdaftar.")}</p>
                             ) : (
                                 bankAccounts.map((bank) => (
                                     <div key={bank.id} className="flex justify-between items-center p-3 border rounded-md hover:bg-gray-50">
@@ -231,10 +233,10 @@ const CentralCompanySettings = () => {
                                             <div className="font-bold text-gray-800">{bank.bank_name} ({bank.currency || 'IDR'})</div>
                                             <div className="text-purple-600 font-mono">{bank.account_number}</div>
                                             <div className="text-sm text-gray-600">a/n {bank.account_holder}</div>
-                                            {bank.branch && <div className="text-xs text-gray-500">Cabang: {bank.branch}</div>}
+                                            {bank.branch && <div className="text-xs text-gray-500">{t("Cabang:")} {bank.branch}</div>}
                                         </div>
                                         <div className="flex gap-2">
-                                            <button onClick={() => handleEditBank(bank)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded">Edit</button>
+                                            <button onClick={() => handleEditBank(bank)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded">{t("Edit")}</button>
                                             <button onClick={() => handleDeleteBank(bank.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded">
                                                 <Trash2 className="h-4 w-4" />
                                             </button>
@@ -251,7 +253,7 @@ const CentralCompanySettings = () => {
                     <div className="bg-white rounded-lg shadow p-6 border border-gray-100">
                         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                             <ImageIcon className="h-5 w-5 text-gray-500" />
-                            Logo Perusahaan
+                            {t("Logo Perusahaan")}
                         </h2>
                         <div className="flex flex-col items-center">
                             <div className="w-48 h-48 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-gray-50 mb-4 overflow-hidden relative">
@@ -260,12 +262,12 @@ const CentralCompanySettings = () => {
                                 ) : (
                                     <div className="text-gray-400 text-center p-4">
                                         <Building className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                                        <span className="text-sm">No Logo</span>
+                                        <span className="text-sm">{t("No Logo")}</span>
                                     </div>
                                 )}
                                 {isUploading && (
                                     <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center text-white">
-                                        Uploading...
+                                        {t("Uploading...")}
                                     </div>
                                 )}
                             </div>
@@ -274,7 +276,7 @@ const CentralCompanySettings = () => {
                                 <Upload className="h-4 w-4" />
                                 {logoUrl ? 'Ganti Logo' : 'Upload Logo'}
                             </label>
-                            <p className="text-xs text-gray-500 mt-2 text-center">Format: PNG, JPG (Max 2MB)</p>
+                            <p className="text-xs text-gray-500 mt-2 text-center">{t("Format: PNG, JPG (Max 2MB)")}</p>
                         </div>
                     </div>
                 </div>
@@ -285,26 +287,26 @@ const CentralCompanySettings = () => {
                 title={editingBank ? 'Edit Rekening Bank' : 'Tambah Rekening Bank'}>
                 <form onSubmit={handleBankSubmit} className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium mb-1">Nama Bank</label>
+                        <label className="block text-sm font-medium mb-1">{t("Nama Bank")}</label>
                         <input type="text" value={bankFormData.bank_name}
                             onChange={(e) => setBankFormData({ ...bankFormData, bank_name: e.target.value })}
-                            placeholder="BCA, Mandiri..." className="w-full px-3 py-2 border rounded-md" required />
+                            placeholder={t("BCA, Mandiri...")} className="w-full px-3 py-2 border rounded-md" required />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium mb-1">Nomor Rekening</label>
+                        <label className="block text-sm font-medium mb-1">{t("Nomor Rekening")}</label>
                         <input type="text" value={bankFormData.account_number}
                             onChange={(e) => setBankFormData({ ...bankFormData, account_number: e.target.value })}
                             className="w-full px-3 py-2 border rounded-md" required />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium mb-1">Atas Nama (A/N)</label>
+                        <label className="block text-sm font-medium mb-1">{t("Atas Nama (A/N)")}</label>
                         <input type="text" value={bankFormData.account_holder}
                             onChange={(e) => setBankFormData({ ...bankFormData, account_holder: e.target.value })}
                             className="w-full px-3 py-2 border rounded-md" required />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium mb-1">Mata Uang</label>
+                            <label className="block text-sm font-medium mb-1">{t("Mata Uang")}</label>
                             <select value={bankFormData.currency}
                                 onChange={(e) => setBankFormData({ ...bankFormData, currency: e.target.value })}
                                 className="w-full px-3 py-2 border rounded-md">
@@ -315,20 +317,20 @@ const CentralCompanySettings = () => {
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium mb-1">Cabang</label>
+                            <label className="block text-sm font-medium mb-1">{t("Cabang")}</label>
                             <input type="text" value={bankFormData.branch}
                                 onChange={(e) => setBankFormData({ ...bankFormData, branch: e.target.value })}
-                                placeholder="KCU Jakarta" className="w-full px-3 py-2 border rounded-md" />
+                                placeholder={t("KCU Jakarta")} className="w-full px-3 py-2 border rounded-md" />
                         </div>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium mb-1">SWIFT Code (Opsional)</label>
+                        <label className="block text-sm font-medium mb-1">{t("SWIFT Code (Opsional)")}</label>
                         <input type="text" value={bankFormData.swift_code}
                             onChange={(e) => setBankFormData({ ...bankFormData, swift_code: e.target.value })}
-                            placeholder="BMRIIDJA" className="w-full px-3 py-2 border rounded-md" />
+                            placeholder={t("BMRIIDJA")} className="w-full px-3 py-2 border rounded-md" />
                     </div>
                     <div className="flex gap-3 justify-end mt-6">
-                        <Button type="button" variant="secondary" onClick={() => setIsBankModalOpen(false)}>Batal</Button>
+                        <Button type="button" variant="secondary" onClick={() => setIsBankModalOpen(false)}>{t("Batal")}</Button>
                         <Button type="submit">{editingBank ? 'Update' : 'Simpan'}</Button>
                     </div>
                 </form>

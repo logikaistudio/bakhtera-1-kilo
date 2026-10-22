@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Search, Edit2, Trash2, Eye } from 'lucide-react';
 import Button from './Button';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const DataTable = ({
     data = [],
@@ -13,6 +14,7 @@ const DataTable = ({
     searchPlaceholder = 'Search...',
     emptyMessage = 'No data available'
 }) => {
+    const { t } = useLanguage();
     const [searchTerm, setSearchTerm] = useState('');
 
     const filteredData = searchable
@@ -55,7 +57,7 @@ const DataTable = ({
                                 ))}
                                 {(onView || onEdit || onRemove) && !onRowClick && (
                                     <th className="px-6 py-4 text-right text-sm font-semibold text-silver uppercase tracking-wider">
-                                        Actions
+                                        {t("Actions")}
                                     </th>
                                 )}
                             </tr>
@@ -92,7 +94,7 @@ const DataTable = ({
                                                         <button
                                                             onClick={() => onView(row)}
                                                             className="p-2 rounded-lg hover:bg-dark-card smooth-transition text-silver-dark hover:text-silver"
-                                                            title="View"
+                                                            title={t("View")}
                                                         >
                                                             <Eye className="w-4 h-4" />
                                                         </button>
@@ -101,7 +103,7 @@ const DataTable = ({
                                                         <button
                                                             onClick={() => onEdit(row)}
                                                             className="p-2 rounded-lg hover:bg-dark-card smooth-transition text-silver-dark hover:text-silver"
-                                                            title="Edit"
+                                                            title={t("Edit")}
                                                         >
                                                             <Edit2 className="w-4 h-4" />
                                                         </button>
@@ -110,7 +112,7 @@ const DataTable = ({
                                                         <button
                                                             onClick={() => onRemove(row)}
                                                             className="p-2 rounded-lg hover:bg-dark-card smooth-transition text-silver-dark hover:text-red-500"
-                                                            title="Remove"
+                                                            title={t("Remove")}
                                                         >
                                                             <Trash2 className="w-4 h-4" />
                                                         </button>

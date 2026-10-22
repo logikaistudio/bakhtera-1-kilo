@@ -3,8 +3,10 @@ import { X, Package, TrendingUp, TrendingDown, Plus, FileText } from 'lucide-rea
 import Button from '../Common/Button';
 import DocumentUploadManager from '../Common/DocumentUploadManager';
 import { LOCATION_OPTIONS, DEFAULT_LOCATION } from '../../constants/locationOptions';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const ItemDetailModal = ({ item, onClose, onAddMovement }) => {
+    const { t } = useLanguage();
     const [showAddMovement, setShowAddMovement] = useState(false);
     const [movementForm, setMovementForm] = useState({
         date: new Date().toISOString().split('T')[0],
@@ -27,12 +29,12 @@ const ItemDetailModal = ({ item, onClose, onAddMovement }) => {
 
         // Validation
         if (!quantity || quantity <= 0) {
-            alert('❌ Quantity harus lebih dari 0');
+            alert(t("❌ Quantity harus lebih dari 0"));
             return;
         }
 
         if (!movementForm.pic.trim()) {
-            alert('❌ PIC wajib diisi');
+            alert(t("❌ PIC wajib diisi"));
             return;
         }
 
@@ -84,7 +86,7 @@ const ItemDetailModal = ({ item, onClose, onAddMovement }) => {
                     <div>
                         <h2 className="text-2xl font-bold gradient-text">{item.itemName || item.assetName}</h2>
                         <p className="text-sm text-silver-dark mt-1">
-                            SN: {item.serialNumber} | Package: {item.packageNumber}
+                            SN: {item.serialNumber} {t("| Package:")} {item.packageNumber}
                         </p>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-dark-border rounded">
@@ -96,19 +98,19 @@ const ItemDetailModal = ({ item, onClose, onAddMovement }) => {
                     {/* Item Summary */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div className="glass-card p-4 rounded-lg">
-                            <p className="text-sm text-silver-dark">Stock Saat Ini</p>
+                            <p className="text-sm text-silver-dark">{t("Stock Saat Ini")}</p>
                             <p className="text-2xl font-bold text-accent-blue">{item.currentStock || item.quantity || 0}</p>
                         </div>
                         <div className="glass-card p-4 rounded-lg">
-                            <p className="text-sm text-silver-dark">Nilai Satuan</p>
+                            <p className="text-sm text-silver-dark">{t("Nilai Satuan")}</p>
                             <p className="text-lg font-semibold text-accent-green">Rp {(item.value || 0).toLocaleString('id-ID')}</p>
                         </div>
                         <div className="glass-card p-4 rounded-lg">
-                            <p className="text-sm text-silver-dark">Total Nilai</p>
+                            <p className="text-sm text-silver-dark">{t("Total Nilai")}</p>
                             <p className="text-lg font-semibold text-accent-green">Rp {totalValue.toLocaleString('id-ID')}</p>
                         </div>
                         <div className="glass-card p-4 rounded-lg">
-                            <p className="text-sm text-silver-dark">Kondisi</p>
+                            <p className="text-sm text-silver-dark">{t("Kondisi")}</p>
                             <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${item.condition === 'new' ? 'bg-green-500/20 text-green-400' :
                                     item.condition === 'used' ? 'bg-blue-500/20 text-blue-400' :
                                         item.condition === 'damaged' ? 'bg-red-500/20 text-red-400' :
@@ -122,28 +124,28 @@ const ItemDetailModal = ({ item, onClose, onAddMovement }) => {
                     {/* Movement History */}
                     <div className="glass-card p-6 rounded-lg">
                         <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-semibold text-silver-light">Riwayat Mutasi Barang</h3>
+                            <h3 className="text-lg font-semibold text-silver-light">{t("Riwayat Mutasi Barang")}</h3>
                             <Button size="sm" icon={Plus} onClick={() => setShowAddMovement(!showAddMovement)}>
-                                Tambah Mutasi
+                                {t("Tambah Mutasi")}
                             </Button>
                         </div>
 
                         {/* Add Movement Form */}
                         {showAddMovement && (
                             <form onSubmit={handleAddMovement} className="mb-6 p-4 bg-dark-surface rounded-lg space-y-4">
-                                <h4 className="font-semibold text-silver-light mb-3">Tambah Mutasi Barang</h4>
+                                <h4 className="font-semibold text-silver-light mb-3">{t("Tambah Mutasi Barang")}</h4>
 
                                 {/* Stock Info */}
                                 <div className="p-3 bg-accent-blue bg-opacity-10 border border-accent-blue rounded-lg">
                                     <p className="text-sm text-silver">
-                                        <span className="font-semibold">Stock Tersedia:</span> {item.currentStock || 0} unit
+                                        <span className="font-semibold">{t("Stock Tersedia:")}</span> {item.currentStock || 0} {t("unit")}
                                     </p>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
                                     {/* Date */}
                                     <div>
-                                        <label className="block text-sm font-medium text-silver mb-2">Tanggal *</label>
+                                        <label className="block text-sm font-medium text-silver mb-2">{t("Tanggal *")}</label>
                                         <input
                                             type="date"
                                             value={movementForm.date}
@@ -155,7 +157,7 @@ const ItemDetailModal = ({ item, onClose, onAddMovement }) => {
 
                                     {/* Time */}
                                     <div>
-                                        <label className="block text-sm font-medium text-silver mb-2">Jam *</label>
+                                        <label className="block text-sm font-medium text-silver mb-2">{t("Jam *")}</label>
                                         <input
                                             type="time"
                                             value={movementForm.time}
@@ -167,20 +169,20 @@ const ItemDetailModal = ({ item, onClose, onAddMovement }) => {
 
                                     {/* Movement Type */}
                                     <div>
-                                        <label className="block text-sm font-medium text-silver mb-2">Jenis Mutasi *</label>
+                                        <label className="block text-sm font-medium text-silver mb-2">{t("Jenis Mutasi *")}</label>
                                         <select
                                             value={movementForm.movementType}
                                             onChange={(e) => setMovementForm({ ...movementForm, movementType: e.target.value })}
                                             className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
                                         >
-                                            <option value="in">Masuk</option>
-                                            <option value="out">Keluar</option>
+                                            <option value="in">{t("Masuk")}</option>
+                                            <option value="out">{t("Keluar")}</option>
                                         </select>
                                     </div>
 
                                     {/* Quantity */}
                                     <div>
-                                        <label className="block text-sm font-medium text-silver mb-2">Jumlah *</label>
+                                        <label className="block text-sm font-medium text-silver mb-2">{t("Jumlah *")}</label>
                                         <input
                                             type="number"
                                             value={movementForm.quantity}
@@ -191,13 +193,13 @@ const ItemDetailModal = ({ item, onClose, onAddMovement }) => {
                                             required
                                         />
                                         {movementForm.quantity && movementForm.movementType === 'out' && parseInt(movementForm.quantity) > (item.currentStock || 0) && (
-                                            <p className="text-xs text-red-400 mt-1">⚠️ Melebihi stock tersedia!</p>
+                                            <p className="text-xs text-red-400 mt-1">{t("⚠️ Melebihi stock tersedia!")}</p>
                                         )}
                                     </div>
 
                                     {/* Origin */}
                                     <div>
-                                        <label className="block text-sm font-medium text-silver mb-2">Asal *</label>
+                                        <label className="block text-sm font-medium text-silver mb-2">{t("Asal *")}</label>
                                         <select
                                             value={movementForm.origin}
                                             onChange={(e) => setMovementForm({ ...movementForm, origin: e.target.value })}
@@ -211,7 +213,7 @@ const ItemDetailModal = ({ item, onClose, onAddMovement }) => {
 
                                     {/* Destination */}
                                     <div>
-                                        <label className="block text-sm font-medium text-silver mb-2">Tujuan *</label>
+                                        <label className="block text-sm font-medium text-silver mb-2">{t("Tujuan *")}</label>
                                         <select
                                             value={movementForm.destination}
                                             onChange={(e) => setMovementForm({ ...movementForm, destination: e.target.value })}
@@ -225,28 +227,28 @@ const ItemDetailModal = ({ item, onClose, onAddMovement }) => {
 
                                     {/* Condition */}
                                     <div>
-                                        <label className="block text-sm font-medium text-silver mb-2">Kondisi</label>
+                                        <label className="block text-sm font-medium text-silver mb-2">{t("Kondisi")}</label>
                                         <select
                                             value={movementForm.condition}
                                             onChange={(e) => setMovementForm({ ...movementForm, condition: e.target.value })}
                                             className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
                                         >
-                                            <option value="new">New</option>
-                                            <option value="used">Used</option>
-                                            <option value="refurbished">Refurbished</option>
-                                            <option value="damaged">Damaged</option>
+                                            <option value="new">{t("New")}</option>
+                                            <option value="used">{t("Used")}</option>
+                                            <option value="refurbished">{t("Refurbished")}</option>
+                                            <option value="damaged">{t("Damaged")}</option>
                                         </select>
                                     </div>
 
                                     {/* PIC */}
                                     <div>
-                                        <label className="block text-sm font-medium text-silver mb-2">PIC *</label>
+                                        <label className="block text-sm font-medium text-silver mb-2">{t("PIC *")}</label>
                                         <input
                                             type="text"
                                             value={movementForm.pic}
                                             onChange={(e) => setMovementForm({ ...movementForm, pic: e.target.value })}
                                             className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
-                                            placeholder="Nama PIC"
+                                            placeholder={t("Nama PIC")}
                                             required
                                         />
                                     </div>
@@ -256,29 +258,29 @@ const ItemDetailModal = ({ item, onClose, onAddMovement }) => {
                                 {movementForm.quantity && (
                                     <div className="p-3 bg-accent-green bg-opacity-10 border border-accent-green rounded-lg">
                                         <p className="text-sm text-silver">
-                                            <span className="font-semibold">Sisa Stock Setelah Mutasi:</span>{' '}
+                                            <span className="font-semibold">{t("Sisa Stock Setelah Mutasi:")}</span>{' '}
                                             <span className="text-accent-green font-bold text-lg">
                                                 {movementForm.movementType === 'in'
                                                     ? (item.currentStock || 0) + parseInt(movementForm.quantity || 0)
                                                     : (item.currentStock || 0) - parseInt(movementForm.quantity || 0)
-                                                } unit
+                                                } {t("unit")}
                                             </span>
                                         </p>
                                         <p className="text-xs text-silver-dark mt-1">
-                                            Dari: <span className="capitalize">{movementForm.origin}</span> → Ke: <span className="capitalize">{movementForm.destination}</span>
+                                            {t("Dari:")} <span className="capitalize">{movementForm.origin}</span> → Ke: <span className="capitalize">{movementForm.destination}</span>
                                         </p>
                                     </div>
                                 )}
 
                                 {/* Notes */}
                                 <div>
-                                    <label className="block text-sm font-medium text-silver mb-2">Keterangan</label>
+                                    <label className="block text-sm font-medium text-silver mb-2">{t("Keterangan")}</label>
                                     <textarea
                                         value={movementForm.notes}
                                         onChange={(e) => setMovementForm({ ...movementForm, notes: e.target.value })}
                                         className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light focus:border-accent-blue focus:outline-none"
                                         rows={2}
-                                        placeholder="Keterangan mutasi..."
+                                        placeholder={t("Keterangan mutasi...")}
                                     />
                                 </div>
 
@@ -292,10 +294,10 @@ const ItemDetailModal = ({ item, onClose, onAddMovement }) => {
 
                                 <div className="flex justify-end gap-3">
                                     <Button type="button" variant="secondary" onClick={() => setShowAddMovement(false)}>
-                                        Batal
+                                        {t("Batal")}
                                     </Button>
                                     <Button type="submit" icon={Plus}>
-                                        Tambah Mutasi
+                                        {t("Tambah Mutasi")}
                                     </Button>
                                 </div>
                             </form>
@@ -306,17 +308,17 @@ const ItemDetailModal = ({ item, onClose, onAddMovement }) => {
                             <table className="w-full">
                                 <thead className="bg-accent-blue">
                                     <tr>
-                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white">Tanggal</th>
-                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white">Jam</th>
-                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white">Jenis</th>
-                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white">Jumlah</th>
-                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white">Asal</th>
-                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white">Tujuan</th>
-                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white">Kondisi</th>
-                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white">Sisa Stock</th>
+                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white">{t("Tanggal")}</th>
+                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white">{t("Jam")}</th>
+                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white">{t("Jenis")}</th>
+                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white">{t("Jumlah")}</th>
+                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white">{t("Asal")}</th>
+                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white">{t("Tujuan")}</th>
+                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white">{t("Kondisi")}</th>
+                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white">{t("Sisa Stock")}</th>
                                         <th className="px-3 py-2 text-left text-xs font-semibold text-white">PIC</th>
-                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white">Ket.</th>
-                                        <th className="px-3 py-2 text-center text-xs font-semibold text-white">Dok</th>
+                                        <th className="px-3 py-2 text-left text-xs font-semibold text-white">{t("Ket.")}</th>
+                                        <th className="px-3 py-2 text-center text-xs font-semibold text-white">{t("Dok")}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-dark-border">
@@ -363,7 +365,7 @@ const ItemDetailModal = ({ item, onClose, onAddMovement }) => {
                         {movements.length === 0 && (
                             <div className="text-center py-8">
                                 <Package className="w-12 h-12 text-silver-dark mx-auto mb-2" />
-                                <p className="text-silver-dark text-sm">Belum ada mutasi barang</p>
+                                <p className="text-silver-dark text-sm">{t("Belum ada mutasi barang")}</p>
                             </div>
                         )}
                     </div>

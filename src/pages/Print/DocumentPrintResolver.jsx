@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { printBLCertificate } from '../../utils/printUtils';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const normalizeContainers = (rawContainers) => {
     if (!rawContainers) return [];
@@ -140,6 +141,7 @@ const mapShipmentToPrintData = (shipment = {}, docType = 'BL') => {
 };
 
 const DocumentPrintResolver = () => {
+    const { t } = useLanguage();
     const [searchParams] = useSearchParams();
     const params = useParams();
     const [loading, setLoading] = useState(true);
@@ -209,26 +211,26 @@ const DocumentPrintResolver = () => {
 
     return (
         <div className="p-6 max-w-3xl mx-auto">
-            <h1 className="text-2xl font-bold text-silver-light mb-2">Print Document Resolver</h1>
+            <h1 className="text-2xl font-bold text-silver-light mb-2">{t("Print Document Resolver")}</h1>
             <p className="text-sm text-silver-dark mb-5">
-                Scan barcode mengarah ke halaman ini. Dokumen akan otomatis dibuka ke preview cetak.
+                {t("Scan barcode mengarah ke halaman ini. Dokumen akan otomatis dibuka ke preview cetak.")}
             </p>
 
             <div className="glass-card border border-dark-border rounded-xl p-4 space-y-3">
-                <div className="text-sm"><strong>Doc Type:</strong> {docType}</div>
-                <div className="text-sm"><strong>Doc Number:</strong> {docNo || '-'}</div>
+                <div className="text-sm"><strong>{t("Doc Type:")}</strong> {docType}</div>
+                <div className="text-sm"><strong>{t("Doc Number:")}</strong> {docNo || '-'}</div>
 
-                {loading && <div className="text-sm text-silver-dark">Memuat data dokumen...</div>}
+                {loading && <div className="text-sm text-silver-dark">{t("Memuat data dokumen...")}</div>}
                 {!loading && error && <div className="text-sm text-red-400">{error}</div>}
 
                 {!loading && printData && (
                     <>
-                        <div className="text-sm text-green-400">Dokumen ditemukan. Jendela print/preview sudah dibuka otomatis.</div>
+                        <div className="text-sm text-green-400">{t("Dokumen ditemukan. Jendela print/preview sudah dibuka otomatis.")}</div>
                         <button
                             onClick={() => printBLCertificate(printData)}
                             className="px-4 py-2 text-sm bg-accent-blue text-white rounded-lg hover:bg-accent-blue/90 smooth-transition"
                         >
-                            Buka Ulang Preview Cetak
+                            {t("Buka Ulang Preview Cetak")}
                         </button>
                     </>
                 )}
