@@ -26,7 +26,7 @@ const PabeanDashboard = () => {
             }, 0);
         }, 0);
 
-    const stock = Math.round(totalInbound - totalOutbound);
+    const stock = totalInbound - totalOutbound;
 
     // 2. Prepare Table Data (From Quotations)
     // Sort by date desc
@@ -54,14 +54,14 @@ const PabeanDashboard = () => {
                 {/* Barang Masuk */}
                 <div className="glass-card p-4 rounded-lg border-l-4 border-accent-blue bg-dark-bg/40">
                     <p className="text-xs font-semibold text-silver-dark uppercase tracking-wider mb-1">{t("Total Barang Masuk")}</p>
-                    <p className="text-2xl font-bold text-silver-light">{Math.round(totalInbound).toLocaleString('id-ID')}</p>
+                    <p className="text-2xl font-bold text-silver-light">{totalInbound.toLocaleString('id-ID', { maximumFractionDigits: 4 })}</p>
                     <p className="text-[10px] text-silver-dark mt-1">{t("Total Quantity Detail")}</p>
                 </div>
 
                 {/* Barang Keluar */}
                 <div className="glass-card p-4 rounded-lg border-l-4 border-accent-orange bg-dark-bg/40">
                     <p className="text-xs font-semibold text-silver-dark uppercase tracking-wider mb-1">{t("Total Barang Keluar")}</p>
-                    <p className="text-2xl font-bold text-silver-light">{Math.round(totalOutbound).toLocaleString('id-ID')}</p>
+                    <p className="text-2xl font-bold text-silver-light">{totalOutbound.toLocaleString('id-ID', { maximumFractionDigits: 4 })}</p>
                     <p className="text-[10px] text-silver-dark mt-1">{t("Total Quantity Detail")}</p>
                 </div>
 
@@ -69,7 +69,7 @@ const PabeanDashboard = () => {
                 <div className="glass-card p-4 rounded-lg border-l-4 border-accent-green bg-dark-bg/40">
                     <p className="text-xs font-semibold text-silver-dark uppercase tracking-wider mb-1">{t("Barang di TPPB")}</p>
                     <p className={`text-2xl font-bold ${stock < 0 ? 'text-red-400' : 'text-accent-green'}`}>
-                        {stock.toLocaleString('id-ID')}
+                        {stock.toLocaleString('id-ID', { maximumFractionDigits: 4 })}
                     </p>
                     <p className="text-[10px] text-silver-dark mt-1">{t("Masuk - Keluar")}</p>
                 </div>

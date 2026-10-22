@@ -396,7 +396,7 @@ const BarangMasuk = () => {
                 <div className="glass-card p-4 rounded-lg border border-orange-500">
                     <p className="text-xs text-silver-dark">{t("Barang Masuk")}</p>
                     <p className="text-2xl font-bold text-orange-500">
-                        {Math.round(flatRows.reduce((sum, r) => sum + (r.jumlahBarang || 0), 0)).toLocaleString('id-ID')}
+                        {flatRows.reduce((sum, r) => sum + (r.jumlahBarang || 0), 0).toLocaleString('id-ID', { maximumFractionDigits: 4 })}
                     </p>
                     <p className="text-[10px] text-silver-dark mt-1">
                         {Object.entries(totalsByUnit).map(([u, n]) => `${n.toLocaleString('id-ID', { maximumFractionDigits: 4 })} ${u}`).join(' · ') || '-'}
@@ -485,7 +485,7 @@ const BarangMasuk = () => {
                                         <td className="px-2 py-1.5 text-silver-light text-xs max-w-[144px] truncate whitespace-nowrap">{row.itemName}</td>
                                         <td className="px-2 py-1.5 text-center text-silver text-xs whitespace-nowrap">{row.unit || '-'}</td>
                                         <td className="px-2 py-1.5 text-right text-silver-light font-medium text-xs whitespace-nowrap">
-                                            {row.jumlahBarang ? Number(row.jumlahBarang).toLocaleString('id-ID') : '-'}
+                                            {row.jumlahBarang ? Number(row.jumlahBarang).toLocaleString('id-ID', { maximumFractionDigits: 4 }) : '-'}
                                         </td>
                                         <td className="px-2 py-1.5 text-center text-silver text-xs whitespace-nowrap">{row.itemCurrency}</td>
                                         <td className="px-2 py-1.5 text-right text-silver-light font-medium text-xs whitespace-nowrap">
