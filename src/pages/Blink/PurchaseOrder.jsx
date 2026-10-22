@@ -308,19 +308,19 @@ const PurchaseOrder = () => {
     const handleCreatePO = async (e) => {
         e.preventDefault();
         if (!canCreate('blink_purchase_order')) {
-            alert('Anda tidak memiliki hak akses untuk membuat PO.');
+            alert(t("Anda tidak memiliki hak akses untuk membuat PO."));
             return;
         }
         console.log('Starting PO Creation... (Form Data):', formData);
         console.log('Vendor ID present?:', formData.vendor_id);
 
         if (!formData.vendor_id) {
-            alert('Please select a vendor');
+            alert(t("Please select a vendor"));
             return;
         }
 
         if (formData.po_items.length === 0) {
-            alert('Please add at least one item');
+            alert(t("Please add at least one item"));
             return;
         }
 
@@ -362,7 +362,7 @@ const PurchaseOrder = () => {
             fetchPOs();
             setShowCreateModal(false);
             resetForm();
-            alert('Purchase Order created successfully!');
+            alert(t("Purchase Order created successfully!"));
         } catch (error) {
             console.error('Error creating PO:', error);
             alert('Failed to create PO: ' + error.message);
@@ -371,7 +371,7 @@ const PurchaseOrder = () => {
 
     const handleApprovePO = async (po) => {
         if (!canApprove('blink_purchase_order')) {
-            alert('Anda tidak memiliki hak akses untuk mengubah status (Approve) PO.');
+            alert(t("Anda tidak memiliki hak akses untuk mengubah status (Approve) PO."));
             return;
         }
         if (!confirm(`Approve PO ${po.po_number}? This will create an AP entry.`)) return;
@@ -484,7 +484,7 @@ const PurchaseOrder = () => {
 
     const handleSubmitPO = async (po) => {
         if (!canEdit('blink_purchase_order')) {
-            alert('Anda tidak memiliki hak akses untuk memanipulasi (Submit) PO.');
+            alert(t("Anda tidak memiliki hak akses untuk memanipulasi (Submit) PO."));
             return;
         }
         if (!confirm(`Submit PO ${po.po_number} for manager approval?`)) return;
@@ -501,7 +501,7 @@ const PurchaseOrder = () => {
             if (error) throw error;
 
             await fetchPOs();
-            alert('✅ PO successfully submitted!\nCheck Approval Center for the approval process.');
+            alert(t("✅ PO successfully submitted!\nCheck Approval Center for the approval process."));
         } catch (error) {
             console.error('Error submitting PO:', error);
             alert('Failed to submit PO: ' + error.message);
@@ -510,12 +510,12 @@ const PurchaseOrder = () => {
 
     const handleDeletePO = async (po) => {
         if (!canDelete('blink_purchase_order')) {
-            alert('Anda tidak memiliki hak akses untuk menghapus PO.');
+            alert(t("Anda tidak memiliki hak akses untuk menghapus PO."));
             return;
         }
         // Don't allow delete if there's already payment
         if (po.paid_amount && po.paid_amount > 0) {
-            alert('PO tidak dapat dihapus karena sudah ada pembayaran tercatat.');
+            alert(t("PO tidak dapat dihapus karena sudah ada pembayaran tercatat."));
             return;
         }
 
@@ -538,18 +538,18 @@ const PurchaseOrder = () => {
 
     const handleCleanseAllPOs = async () => {
         if (!canCleansePO) {
-            alert('Akses Ditolak: Anda tidak memiliki hak untuk cleansing PO.');
+            alert(t("Akses Ditolak: Anda tidak memiliki hak untuk cleansing PO."));
             return;
         }
         if (pos.length === 0) {
-            alert('Tidak ada data PO untuk dihapus.');
+            alert(t("Tidak ada data PO untuk dihapus."));
             return;
         }
 
         const confirm1 = confirm(`Cleansing akan menghapus SEMUA PO (${pos.length} baris) beserta AP, pembayaran, dan jurnal terkait. Lanjutkan?`);
         if (!confirm1) return;
 
-        const confirm2 = confirm('Konfirmasi terakhir: semua data PO terkait akan dihapus permanen. Yakin lanjut?');
+        const confirm2 = confirm(t("Konfirmasi terakhir: semua data PO terkait akan dihapus permanen. Yakin lanjut?"));
         if (!confirm2) return;
 
         try {
@@ -560,7 +560,7 @@ const PurchaseOrder = () => {
             });
             if (!success) return;
             await fetchPOs();
-            alert('✅ Cleansing PO selesai.');
+            alert(t("✅ Cleansing PO selesai."));
         } catch (error) {
             console.error('Error cleansing PO:', error);
             alert('❌ Gagal cleansing PO: ' + (error.message || error));
@@ -571,17 +571,17 @@ const PurchaseOrder = () => {
 
     const handleDeleteSelectedPOs = async () => {
         if (!canRunSuperAdminBatch) {
-            alert('Akses Ditolak: Hanya Super Admin yang dapat menghapus PO terpilih.');
+            alert(t("Akses Ditolak: Hanya Super Admin yang dapat menghapus PO terpilih."));
             return;
         }
         if (selectedPOIds.length === 0) {
-            alert('Pilih minimal 1 PO untuk dihapus.');
+            alert(t("Pilih minimal 1 PO untuk dihapus."));
             return;
         }
 
         const confirm1 = confirm(`Hapus ${selectedPOIds.length} PO terpilih beserta AP, pembayaran, dan jurnal terkait?`);
         if (!confirm1) return;
-        const confirm2 = confirm('Konfirmasi terakhir: data terpilih akan dihapus permanen. Lanjutkan?');
+        const confirm2 = confirm(t("Konfirmasi terakhir: data terpilih akan dihapus permanen. Lanjutkan?"));
         if (!confirm2) return;
 
         try {
@@ -593,7 +593,7 @@ const PurchaseOrder = () => {
             if (!success) return;
             await fetchPOs();
             setSelectedPOIds([]);
-            alert('✅ PO terpilih berhasil dihapus.');
+            alert(t("✅ PO terpilih berhasil dihapus."));
         } catch (error) {
             console.error('Error deleting selected POs:', error);
             alert('❌ Gagal hapus PO terpilih: ' + (error.message || error));
@@ -1232,12 +1232,12 @@ const PurchaseOrder = () => {
         console.log('Delivery Date Value:', formData.delivery_date);
 
         if (!formData.vendor_id) {
-            alert('Please select a vendor');
+            alert(t("Please select a vendor"));
             return;
         }
 
         if (formData.po_items.length === 0) {
-            alert('Please add at least one item');
+            alert(t("Please add at least one item"));
             return;
         }
 
@@ -1256,7 +1256,7 @@ const PurchaseOrder = () => {
 
             // Don't allow edit if there's already payment
             if (hasPayment) {
-                alert('PO tidak dapat diubah karena sudah ada pembayaran tercatat.');
+                alert(t("PO tidak dapat diubah karena sudah ada pembayaran tercatat."));
                 return;
             }
 
@@ -1338,9 +1338,9 @@ const PurchaseOrder = () => {
             resetForm();
 
             if (wasApproved) {
-                alert('✅ PO diperbarui!\n\nKarena PO sebelumnya sudah disetujui, PO ini perlu disetujui ulang.\nStatus berubah ke "Submitted".');
+                alert(t("✅ PO diperbarui!\n\nKarena PO sebelumnya sudah disetujui, PO ini perlu disetujui ulang.\nStatus berubah ke \"Submitted\"."));
             } else {
-                alert('Purchase Order updated successfully!');
+                alert(t("Purchase Order updated successfully!"));
             }
         } catch (error) {
             console.error('Error updating PO:', error);
@@ -1470,8 +1470,8 @@ const PurchaseOrder = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text">Purchase Orders</h1>
-                    <p className="text-silver-dark mt-1">Kelola pembelian dari vendor</p>
+                    <h1 className="text-3xl font-bold gradient-text">{t("Purchase Orders")}</h1>
+                    <p className="text-silver-dark mt-1">{t("Kelola pembelian dari vendor")}</p>
                 </div>
                 <div className="flex gap-2">
                     {canRunSuperAdminBatch && (
@@ -1482,7 +1482,7 @@ const PurchaseOrder = () => {
                                 variant="danger"
                                 disabled={selectedPOIds.length === 0 || isCleansing}
                             >
-                                Hapus Terpilih ({selectedPOIds.length})
+                                {t("Hapus Terpilih (")}{selectedPOIds.length})
                             </Button>
                             <Button
                                 onClick={handleCleanseAllPOs}
@@ -1495,11 +1495,11 @@ const PurchaseOrder = () => {
                         </>
                     )}
                     <Button onClick={handleExportXLS} icon={Download} variant="secondary">
-                        Export to Excel
+                        {t("Export to Excel")}
                     </Button>
                     {canCreate('blink_purchase_order') && (
                         <Button onClick={() => setShowCreateModal(true)} icon={Plus}>
-                            Buat PO Baru
+                            {t("Buat PO Baru")}
                         </Button>
                     )}
                 </div>
@@ -1507,7 +1507,7 @@ const PurchaseOrder = () => {
 
             {isCleansing && (
                 <div className="glass-card px-4 py-2 rounded-lg border border-amber-500/30 bg-amber-500/10">
-                    <p className="text-xs text-amber-300">Progress Cleansing: {cleanseProgress || 'Sedang memproses...'}</p>
+                    <p className="text-xs text-amber-300">{t("Progress Cleansing:")} {cleanseProgress || 'Sedang memproses...'}</p>
                 </div>
             )}
 
@@ -1515,7 +1515,7 @@ const PurchaseOrder = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="glass-card p-4 rounded-lg">
                     <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark">Total PO</p>
+                        <p className="text-xs text-silver-dark">{t("Total PO")}</p>
                         <FileText className="w-4 h-4 text-blue-400" />
                     </div>
                     <p className="text-xl font-bold text-silver-light">{totalPOs}</p>
@@ -1523,7 +1523,7 @@ const PurchaseOrder = () => {
 
                 <div className="glass-card p-4 rounded-lg">
                     <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark">Total Nilai PO</p>
+                        <p className="text-xs text-silver-dark">{t("Total Nilai PO")}</p>
                         <TrendingUp className="w-4 h-4 text-green-400" />
                     </div>
                     <p className="text-lg font-bold text-green-400">{formatCurrency(totalValueSummary.idr, 'IDR')}</p>
@@ -1532,7 +1532,7 @@ const PurchaseOrder = () => {
 
                 <div className="glass-card p-4 rounded-lg">
                     <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark">Pending Approval</p>
+                        <p className="text-xs text-silver-dark">{t("Pending Approval")}</p>
                         <Clock className="w-4 h-4 text-yellow-400" />
                     </div>
                     <p className="text-xl font-bold text-yellow-400">{pendingApproval}</p>
@@ -1540,7 +1540,7 @@ const PurchaseOrder = () => {
 
                 <div className="glass-card p-4 rounded-lg">
                     <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark">Approved PO</p>
+                        <p className="text-xs text-silver-dark">{t("Approved PO")}</p>
                         <CheckCircle className="w-4 h-4 text-emerald-400" />
                     </div>
                     <p className="text-xl font-bold text-emerald-400">{approvedPOs}</p>
@@ -1553,7 +1553,7 @@ const PurchaseOrder = () => {
                     <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                     <input
                         type="text"
-                        placeholder="Search PO number atau vendor..."
+                        placeholder={t("Search PO number atau vendor...")}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-12 pr-4 py-3 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-base"
@@ -1576,14 +1576,14 @@ const PurchaseOrder = () => {
                                         className="w-4 h-4"
                                     />
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">PO Number</th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Vendor</th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">PO Date</th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Delivery Date</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">{t("PO Number")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">{t("Vendor")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">{t("PO Date")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">{t("Delivery Date")}</th>
                                 <th className="px-4 py-3 text-right text-xs font-bold text-white uppercase tracking-wider">VAT</th>
-                                <th className="px-4 py-3 text-right text-xs font-bold text-white uppercase tracking-wider">Amount</th>
-                                <th className="px-4 py-3 text-center text-xs font-bold text-white uppercase tracking-wider">Status</th>
-                                <th className="px-4 py-3 text-center text-xs font-bold text-white uppercase tracking-wider">Actions</th>
+                                <th className="px-4 py-3 text-right text-xs font-bold text-white uppercase tracking-wider">{t("Amount")}</th>
+                                <th className="px-4 py-3 text-center text-xs font-bold text-white uppercase tracking-wider">{t("Status")}</th>
+                                <th className="px-4 py-3 text-center text-xs font-bold text-white uppercase tracking-wider">{t("Actions")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
@@ -1653,10 +1653,10 @@ const PurchaseOrder = () => {
                                                 <button
                                                     onClick={() => handleEditPO(po, vendors)}
                                                     className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-semibold transition-colors"
-                                                    title="Edit PO"
+                                                    title={t("Edit PO")}
                                                 >
                                                     <Edit className="w-3.5 h-3.5" />
-                                                    Edit
+                                                    {t("Edit")}
                                                 </button>
                                             </td>
                                         </tr>
@@ -1730,6 +1730,7 @@ const PurchaseOrder = () => {
 
 const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, setFormData, handleVendorSelect, addPOItem, removePOItem,
     updatePOItem, calculateTotals, handleSubmit, formatCurrency, onClose, handleGlobalTaxChange }) => {
+    const { t } = useLanguage();
 
     const [vendorSearch, setVendorSearch] = useState('');
     const [showVendorDropdown, setShowVendorDropdown] = useState(false);
@@ -1891,7 +1892,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
 
                     <div className="glass-card p-4 rounded-lg bg-blue-500/10 border border-blue-500/30">
                         <label className="block text-sm font-semibold text-accent-blue mb-2">
-                            Alokasi Job / Shipment
+                            {t("Alokasi Job / Shipment")}
                         </label>
 
                         {formData.shipment_id ? (
@@ -1904,7 +1905,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                         return (
                                             <div>
                                                 <p className="text-sm font-semibold text-green-400">
-                                                    Linked to Shipment
+                                                    {t("Linked to Shipment")}
                                                     {formData.job_number && <span className="ml-2 font-mono">#{formData.job_number}</span>}
                                                 </p>
                                                 {linked && (
@@ -1914,28 +1915,28 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                                     </p>
                                                 )}
                                                 {!linked && formData.job_number && (
-                                                    <p className="text-xs text-silver-dark mt-0.5">Job: {formData.job_number}</p>
+                                                    <p className="text-xs text-silver-dark mt-0.5">{t("Job:")} {formData.job_number}</p>
                                                 )}
                                             </div>
                                         );
                                     })()}
                                 </div>
                                 <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded-full font-medium">
-                                    Auto-linked from SO
+                                    {t("Auto-linked from SO")}
                                 </span>
                             </div>
                         ) : (
                             /* Free dropdown for manual PO */
                             <>
                                 <p className="text-xs text-silver-dark mb-3">
-                                    Hubungkan PO ini dengan Shipment atau Quotation untuk menghitung profit per job.
+                                    {t("Hubungkan PO ini dengan Shipment atau Quotation untuk menghitung profit per job.")}
                                 </p>
                                 <select
                                     value={currentAllocationValue}
                                     onChange={handleAllocationSelect}
                                     className="w-full px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
                                 >
-                                    <option value="">-- Tidak Ada Alokasi (Biaya Umum/Overhead) --</option>
+                                    <option value="">{t("-- Tidak Ada Alokasi (Biaya Umum/Overhead) --")}</option>
                                     {shipments.length > 0 && (
                                         <optgroup label={`Shipments (${shipments.length})`}>
                                             {shipments.map(s => (
@@ -1960,7 +1961,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                 </select>
                                 {(formData.job_number) && (
                                     <p className="mt-2 text-xs text-green-400">
-                                        ✓ Linked to Job: <strong>{formData.job_number}</strong>
+                                        {t("✓ Linked to Job:")} <strong>{formData.job_number}</strong>
                                     </p>
                                 )}
                             </>
@@ -1969,7 +1970,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-silver-light mb-2">Vendor *</label>
+                            <label className="block text-sm font-medium text-silver-light mb-2">{t("Vendor *")}</label>
                             {/* Custom vendor dropdown – white background for macOS compatibility */}
                             <div className="relative">
                                 <div
@@ -1986,7 +1987,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                         <div className="p-2 border-b border-gray-100">
                                             <input
                                                 type="text"
-                                                placeholder="Cari vendor..."
+                                                placeholder={t("Cari vendor...")}
                                                 value={vendorSearch}
                                                 onChange={e => setVendorSearch(e.target.value)}
                                                 className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded text-gray-800 text-sm focus:outline-none focus:border-orange-400"
@@ -2023,11 +2024,11 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                 )}
                             </div>
                             {vendors.length === 0 && (
-                                <p className="mt-1 text-xs text-yellow-400">⚠️ No vendors loaded. Go to Blink Master Data → Business Partners and mark partners as "Vendor".</p>
+                                <p className="mt-1 text-xs text-yellow-400">{t("⚠️ No vendors loaded. Go to Blink Master Data → Business Partners and mark partners as \"Vendor\".")}</p>
                             )}
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-silver-light mb-2">Currency</label>
+                            <label className="block text-sm font-medium text-silver-light mb-2">{t("Currency")}</label>
                             <select
                                 value={formData.currency}
                                 onChange={(e) => {
@@ -2040,18 +2041,18 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                 }}
                                 className="w-full px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
                             >
-                                <option value="IDR">IDR (Rupiah)</option>
-                                <option value="USD">USD (US Dollar)</option>
-                                <option value="SGD">SGD (Singapore Dollar)</option>
-                                <option value="EUR">EUR (Euro)</option>
+                                <option value="IDR">{t("IDR (Rupiah)")}</option>
+                                <option value="USD">{t("USD (US Dollar)")}</option>
+                                <option value="SGD">{t("SGD (Singapore Dollar)")}</option>
+                                <option value="EUR">{t("EUR (Euro)")}</option>
                             </select>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-silver-light mb-2">
-                                Exchange Rate
+                                {t("Exchange Rate")}
                                 {formData.currency !== 'IDR' && (
                                     <span className="ml-2 text-xs text-amber-400 font-normal">
-                                        {formData.currency} → IDR
+                                        {formData.currency} {t("→ IDR")}
                                     </span>
                                 )}
                             </label>
@@ -2076,7 +2077,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                     {/* ... Dates ... */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-silver-light mb-2">PO Date</label>
+                            <label className="block text-sm font-medium text-silver-light mb-2">{t("PO Date")}</label>
                             <input
                                 type="date"
                                 value={formData.po_date}
@@ -2086,7 +2087,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-silver-light mb-2">Delivery Date</label>
+                            <label className="block text-sm font-medium text-silver-light mb-2">{t("Delivery Date")}</label>
                             <input
                                 type="date"
                                 value={formData.delivery_date}
@@ -2096,7 +2097,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-silver-light mb-2">Payment Terms</label>
+                            <label className="block text-sm font-medium text-silver-light mb-2">{t("Payment Terms")}</label>
                             <select
                                 value={
                                     ['30 Days (NET 30)', '60 Days (NET 60)', '90 Days (NET 90)', 'Cash on Delivery'].includes(formData.payment_terms)
@@ -2109,16 +2110,16 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                 }}
                                 className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm focus:outline-none focus:border-accent-orange"
                             >
-                                <option value="30 Days (NET 30)">30 Hari (NET 30)</option>
-                                <option value="60 Days (NET 60)">60 Hari (NET 60)</option>
-                                <option value="90 Days (NET 90)">90 Hari (NET 90)</option>
-                                <option value="Cash on Delivery">Cash on Delivery (COD)</option>
-                                <option value="manual">Manual / Lainnya</option>
+                                <option value="30 Days (NET 30)">{t("30 Hari (NET 30)")}</option>
+                                <option value="60 Days (NET 60)">{t("60 Hari (NET 60)")}</option>
+                                <option value="90 Days (NET 90)">{t("90 Hari (NET 90)")}</option>
+                                <option value="Cash on Delivery">{t("Cash on Delivery (COD)")}</option>
+                                <option value="manual">{t("Manual / Lainnya")}</option>
                             </select>
                             {(!['30 Days (NET 30)', '60 Days (NET 60)', '90 Days (NET 90)', 'Cash on Delivery'].includes(formData.payment_terms)) && (
                                 <input
                                     type="text"
-                                    placeholder="Contoh: NET 45, Cash Before Delivery..."
+                                    placeholder={t("Contoh: NET 45, Cash Before Delivery...")}
                                     value={formData.payment_terms}
                                     onChange={e => setFormData(prev => ({ ...prev, payment_terms: e.target.value }))}
                                     className="mt-2 w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm focus:outline-none focus:border-accent-orange"
@@ -2130,12 +2131,12 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                     {/* ... Items ... */}
                     <div>
                         <div className="flex items-center justify-between mb-3">
-                            <label className="text-sm font-medium text-silver-light">PO Items *</label>
+                            <label className="text-sm font-medium text-silver-light">{t("PO Items *")}</label>
                             
                             <div className="flex items-center gap-4">
                                 {/* Global Tax Input */}
                                 <div className="flex items-center gap-2 bg-dark-surface px-3 py-1.5 rounded-lg border border-dark-border">
-                                    <span className="text-xs text-silver-dark font-medium">Set All VAT %:</span>
+                                    <span className="text-xs text-silver-dark font-medium">{t("Set All VAT %:")}</span>
                                     <input
                                         type="number"
                                         className="w-16 px-2 py-1 bg-transparent border-b border-gray-600 text-silver-light text-sm text-center focus:outline-none focus:border-accent-orange"
@@ -2150,7 +2151,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                 </div>
                                 
                                 <button type="button" onClick={addPOItem} className="text-accent-orange hover:text-accent-orange/80 text-sm flex items-center gap-1">
-                                    <Plus className="w-4 h-4" /> Add Item
+                                    <Plus className="w-4 h-4" /> {t("Add Item")}
                                 </button>
                             </div>
                         </div>
@@ -2166,7 +2167,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                             type="button"
                                             onClick={() => removePOItem(index)}
                                             className="absolute top-2 right-2 p-1.5 hover:bg-red-500/20 text-red-400 rounded-md transition-colors"
-                                            title="Hapus Item"
+                                            title={t("Hapus Item")}
                                         >
                                             <X className="w-4 h-4" />
                                         </button>
@@ -2175,7 +2176,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                     {/* ROW 1: COA & Description */}
                                     <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-start md:pr-8">
                                         <div className="md:col-span-4">
-                                            <label className="text-[10px] font-semibold text-silver-dark uppercase mb-1 block">Item (COA)</label>
+                                            <label className="text-[10px] font-semibold text-silver-dark uppercase mb-1 block">{t("Item (COA)")}</label>
                                             {/* COA dropdown for item_name */}
                                             <div className="relative">
                                                 <div
@@ -2192,7 +2193,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                                         <div className="p-2 border-b border-gray-200">
                                                             <input
                                                                 type="text"
-                                                                placeholder="Cari nama / kode COA..."
+                                                                placeholder={t("Cari nama / kode COA...")}
                                                                 value={coaSearchMap[index] || ''}
                                                                 onChange={e => setCoaSearchMap(prev => ({ ...prev, [index]: e.target.value }))}
                                                                 className="w-full px-2 py-1.5 bg-gray-50 border border-gray-300 rounded text-black text-xs focus:outline-none focus:border-blue-500"
@@ -2201,7 +2202,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                                         </div>
                                                         <div className="overflow-y-auto flex-1">
                                                             {getFilteredCOA(coaSearchMap[index]).length === 0 ? (
-                                                                <div className="px-3 py-2 text-black text-xs">Tidak ditemukan</div>
+                                                                <div className="px-3 py-2 text-black text-xs">{t("Tidak ditemukan")}</div>
                                                             ) : (
                                                                 getFilteredCOA(coaSearchMap[index]).map(coa => {
                                                                     const isActive = item.coa_id === coa.id;
@@ -2240,10 +2241,10 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                             </div>
                                         </div>
                                         <div className="md:col-span-8">
-                                            <label className="text-[10px] font-semibold text-silver-dark uppercase mb-1 block">Description</label>
+                                            <label className="text-[10px] font-semibold text-silver-dark uppercase mb-1 block">{t("Description")}</label>
                                             <input
                                                 type="text"
-                                                placeholder="Deskripsi spesifik item"
+                                                placeholder={t("Deskripsi spesifik item")}
                                                 value={item.description}
                                                 onChange={(e) => updatePOItem(index, 'description', e.target.value)}
                                                 className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm focus:border-accent-orange outline-none"
@@ -2255,7 +2256,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                     {/* ROW 2: Qty, Harga, VAT, Total */}
                                     <div className="grid grid-cols-2 md:grid-cols-12 gap-3 items-start md:pr-8">
                                         <div className="md:col-span-2">
-                                            <label className="text-[10px] font-semibold text-silver-dark uppercase mb-1 block">Qty</label>
+                                            <label className="text-[10px] font-semibold text-silver-dark uppercase mb-1 block">{t("Qty")}</label>
                                             <input
                                                 type="number"
                                                 placeholder="0"
@@ -2267,7 +2268,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                             />
                                         </div>
                                         <div className="md:col-span-3">
-                                            <label className="text-[10px] font-semibold text-silver-dark uppercase mb-1 block">Harga Satuan</label>
+                                            <label className="text-[10px] font-semibold text-silver-dark uppercase mb-1 block">{t("Harga Satuan")}</label>
                                             <div className="relative">
                                                 <input
                                                     type="number"
@@ -2282,7 +2283,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                             </div>
                                         </div>
                                         <div className="md:col-span-3">
-                                            <label className="text-[10px] font-semibold text-silver-dark uppercase mb-1 block">VAT %</label>
+                                            <label className="text-[10px] font-semibold text-silver-dark uppercase mb-1 block">{t("VAT %")}</label>
                                             <div className="flex items-center gap-2">
                                                 <input
                                                     type="number"
@@ -2303,9 +2304,9 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                                             )}
                                         </div>
                                         <div className="md:col-span-4">
-                                            <label className="text-[10px] font-semibold text-silver-dark uppercase mb-1 block text-right">Total (Subtotal + VAT)</label>
+                                            <label className="text-[10px] font-semibold text-silver-dark uppercase mb-1 block text-right">{t("Total (Subtotal + VAT)")}</label>
                                             <div className="px-3 py-1.5 bg-dark-surface/50 border border-dark-border rounded-lg text-sm text-right">
-                                                <div className="text-silver-dark text-[10px] leading-tight">Murni: {formatCurrency(item.amount, formData.currency)}</div>
+                                                <div className="text-silver-dark text-[10px] leading-tight">{t("Murni:")} {formatCurrency(item.amount, formData.currency)}</div>
                                                 <div className="text-silver-light font-bold text-base leading-tight">
                                                     {formatCurrency((item.amount || 0) + (item.tax_amount || 0), formData.currency)}
                                                 </div>
@@ -2320,27 +2321,27 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                     {/* ... Totals and Notes ... */}
                     <div className="space-y-2 border-t border-dark-border pt-4">
                         <div className="flex justify-between text-silver-dark">
-                            <span>Subtotal:</span>
+                            <span>{t("Subtotal:")}</span>
                             <span className="font-semibold">{formatCurrency(subtotal, formData.currency)}</span>
                         </div>
                         <div className="flex justify-between text-silver-dark">
-                            <span>VAT (from items):</span>
+                            <span>{t("VAT (from items):")}</span>
                             <span className="font-semibold">{formatCurrency(taxAmount, formData.currency)}</span>
                         </div>
                         <div className="flex justify-between text-xl font-bold text-silver-light">
-                            <span>Total:</span>
+                            <span>{t("Total:")}</span>
                             <span className="text-accent-orange">{formatCurrency(total, formData.currency)}</span>
                         </div>
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-silver-light mb-2">Notes</label>
+                        <label className="block text-sm font-medium text-silver-light mb-2">{t("Notes")}</label>
                         <textarea
                             value={formData.notes}
                             onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                             rows="3"
                             className="w-full px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
-                            placeholder="Additional notes..."
+                            placeholder={t("Additional notes...")}
                         />
                     </div>
 
@@ -2352,7 +2353,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
                             onClick={onClose}
                             className="px-6 py-2 border border-dark-border text-silver-light rounded-lg hover:bg-dark-surface smooth-transition"
                         >
-                            Cancel
+                            {t("Cancel")}
                         </button>
                         <Button type="submit" icon={isEditing ? Save : Plus}>
                             {isEditing ? 'Save Changes' : 'Create PO'}
@@ -2366,6 +2367,7 @@ const POCreateModal = ({ isEditing, vendors, shipments, quotations, formData, se
 
 // PO View Modal Component
 const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove, onPrint, onPrintPreview, onDelete, statusConfig, canEditPO, canApprovePO, canDeletePO }) => {
+    const { t } = useLanguage();
     const config = statusConfig[po.status];
     const StatusIcon = config?.icon || FileText;
 
@@ -2374,7 +2376,7 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
             <div className="p-6">
                 {/* Status Header */}
                 <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-2xl font-bold gradient-text">Purchase Order Details</h2>
+                    <h2 className="text-2xl font-bold gradient-text">{t("Purchase Order Details")}</h2>
                     <div className={`inline - flex items - center gap - 2 px - 4 py - 2 rounded - lg ${config?.color} `}>
                         <StatusIcon className="w-5 h-5" />
                         <span className="font-semibold">{config?.label}</span>
@@ -2386,8 +2388,8 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                     <div className="mb-4 p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/40 flex items-center gap-3">
                         <Clock className="w-6 h-6 text-yellow-400 flex-shrink-0" />
                         <div>
-                            <p className="text-yellow-300 font-semibold text-sm">Menunggu Persetujuan Manager</p>
-                            <p className="text-yellow-400/70 text-xs mt-0.5">This PO is currently under review. Approval is managed via the <span className="font-bold">Approval Center</span> menu. The PO cannot be modified at this time.</p>
+                            <p className="text-yellow-300 font-semibold text-sm">{t("Menunggu Persetujuan Manager")}</p>
+                            <p className="text-yellow-400/70 text-xs mt-0.5">{t("This PO is currently under review. Approval is managed via the")} <span className="font-bold">{t("Approval Center")}</span> {t("menu. The PO cannot be modified at this time.")}</p>
                         </div>
                     </div>
                 )}
@@ -2396,23 +2398,23 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                 <div className="space-y-6">
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <p className="text-sm text-silver-dark">PO Number</p>
+                            <p className="text-sm text-silver-dark">{t("PO Number")}</p>
                             <p className="text-lg font-semibold text-accent-orange">{po.po_number}</p>
                         </div>
                         <div>
-                            <p className="text-sm text-silver-dark">Vendor</p>
+                            <p className="text-sm text-silver-dark">{t("Vendor")}</p>
                             <p className="text-lg font-semibold text-silver-light">{po.vendor_name}</p>
                         </div>
                         <div>
-                            <p className="text-sm text-silver-dark">PO Date</p>
+                            <p className="text-sm text-silver-dark">{t("PO Date")}</p>
                             <p className="text-silver-light">{po.po_date ? new Date(po.po_date).toLocaleDateString('id-ID') : '-'}</p>
                         </div>
                         <div>
-                            <p className="text-sm text-silver-dark">Delivery Date</p>
+                            <p className="text-sm text-silver-dark">{t("Delivery Date")}</p>
                             <p className="text-silver-light">{po.delivery_date ? new Date(po.delivery_date).toLocaleDateString('id-ID') : '-'}</p>
                         </div>
                         <div>
-                            <p className="text-sm text-silver-dark">Payment Terms</p>
+                            <p className="text-sm text-silver-dark">{t("Payment Terms")}</p>
                             <p className="text-silver-light">{po.payment_terms}</p>
                         </div>
                     </div>
@@ -2420,17 +2422,17 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                     {/* Job Allocation Info */}
                     {(po.job_number || po.quotation_id || po.shipment_id) && (
                         <div className="glass-card p-3 rounded-lg border border-blue-500/30 bg-blue-500/5">
-                            <h4 className="text-sm font-bold text-accent-blue mb-1">Job Allocation</h4>
+                            <h4 className="text-sm font-bold text-accent-blue mb-1">{t("Job Allocation")}</h4>
                             <div className="flex items-center gap-4 text-sm">
                                 {po.job_number && (
                                     <div>
-                                        <span className="text-silver-dark mr-2">Job Number:</span>
+                                        <span className="text-silver-dark mr-2">{t("Job Number:")}</span>
                                         <span className="text-silver-light font-medium">{po.job_number}</span>
                                     </div>
                                 )}
                                 {po.shipment_id && (
                                     <div className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded">
-                                        Linked to Shipment
+                                        {t("Linked to Shipment")}
                                     </div>
                                 )}
                             </div>
@@ -2439,16 +2441,16 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
 
 
                     <div>
-                        <h3 className="text-lg font-semibold text-silver-light mb-3">Items</h3>
+                        <h3 className="text-lg font-semibold text-silver-light mb-3">{t("Items")}</h3>
                         <div className="overflow-x-auto">
                             <table className="w-full">
                                 <thead className="bg-dark-surface">
                                     <tr>
-                                        <th className="px-4 py-2 text-left text-xs text-blue-400 font-semibold">Item</th>
-                                        <th className="px-4 py-2 text-left text-xs text-silver-dark">Description</th>
-                                        <th className="px-4 py-2 text-right text-xs text-silver-dark">Qty</th>
-                                        <th className="px-4 py-2 text-right text-xs text-silver-dark">Unit Price</th>
-                                        <th className="px-4 py-2 text-right text-xs text-silver-dark">Amount</th>
+                                        <th className="px-4 py-2 text-left text-xs text-blue-400 font-semibold">{t("Item")}</th>
+                                        <th className="px-4 py-2 text-left text-xs text-silver-dark">{t("Description")}</th>
+                                        <th className="px-4 py-2 text-right text-xs text-silver-dark">{t("Qty")}</th>
+                                        <th className="px-4 py-2 text-right text-xs text-silver-dark">{t("Unit Price")}</th>
+                                        <th className="px-4 py-2 text-right text-xs text-silver-dark">{t("Amount")}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-dark-border">
@@ -2469,7 +2471,7 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                     {/* ... Totals ... */}
                     <div className="space-y-2 border-t border-dark-border pt-4">
                         <div className="flex justify-between text-silver-dark">
-                            <span>Subtotal:</span>
+                            <span>{t("Subtotal:")}</span>
                             <span className="font-semibold">{formatCurrency(po.subtotal, po.currency)}</span>
                         </div>
                         <div className="flex justify-between text-silver-dark">
@@ -2477,7 +2479,7 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                             <span className="font-semibold">{formatCurrency(po.tax_amount, po.currency)}</span>
                         </div>
                         <div className="flex justify-between text-xl font-bold text-silver-light">
-                            <span>Total:</span>
+                            <span>{t("Total:")}</span>
                             <span className="text-accent-orange">{formatCurrency(po.total_amount, po.currency)}</span>
                         </div>
                     </div>
@@ -2487,19 +2489,19 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                         <div className="glass-card p-4 rounded-lg border border-dark-border">
                             <div className="flex items-center gap-2 mb-3">
                                 <DollarSign className="w-5 h-5 text-accent-blue" />
-                                <h3 className="font-semibold text-silver-light">Status Pembayaran</h3>
+                                <h3 className="font-semibold text-silver-light">{t("Status Pembayaran")}</h3>
                             </div>
                             <div className="grid grid-cols-3 gap-4">
                                 <div className="text-center p-3 rounded-lg bg-dark-surface">
-                                    <p className="text-xs text-silver-dark mb-1">Total PO</p>
+                                    <p className="text-xs text-silver-dark mb-1">{t("Total PO")}</p>
                                     <p className="font-bold text-silver-light">{formatCurrency(po.total_amount, po.currency)}</p>
                                 </div>
                                 <div className="text-center p-3 rounded-lg bg-dark-surface">
-                                    <p className="text-xs text-silver-dark mb-1">Sudah Dibayar</p>
+                                    <p className="text-xs text-silver-dark mb-1">{t("Sudah Dibayar")}</p>
                                     <p className="font-bold text-green-400">{formatCurrency(po.paid_amount || 0, po.currency)}</p>
                                 </div>
                                 <div className="text-center p-3 rounded-lg bg-dark-surface">
-                                    <p className="text-xs text-silver-dark mb-1">Sisa</p>
+                                    <p className="text-xs text-silver-dark mb-1">{t("Sisa")}</p>
                                     <p className={`font - bold ${(po.outstanding_amount || po.total_amount) <= 0 ? 'text-green-400' : 'text-red-400'} `}>
                                         {formatCurrency(po.outstanding_amount ?? po.total_amount, po.currency)}
                                     </p>
@@ -2507,27 +2509,27 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                             </div>
                             {/* Payment Status Badge */}
                             <div className="mt-3 pt-3 border-t border-dark-border flex items-center justify-between">
-                                <span className="text-sm text-silver-dark">Status:</span>
+                                <span className="text-sm text-silver-dark">{t("Status:")}</span>
                                 {(po.outstanding_amount ?? po.total_amount) <= 0 ? (
                                     <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-500/20 text-green-400 flex items-center gap-1">
                                         <CheckCircle className="w-3 h-3" />
-                                        LUNAS
+                                        {t("LUNAS")}
                                     </span>
                                 ) : (po.paid_amount > 0) ? (
                                     <span className="px-3 py-1 rounded-full text-xs font-semibold bg-yellow-500/20 text-yellow-400 flex items-center gap-1">
                                         <Clock className="w-3 h-3" />
-                                        SEBAGIAN DIBAYAR
+                                        {t("SEBAGIAN DIBAYAR")}
                                     </span>
                                 ) : (
                                     <span className="px-3 py-1 rounded-full text-xs font-semibold bg-red-500/20 text-red-400 flex items-center gap-1">
                                         <AlertCircle className="w-3 h-3" />
-                                        BELUM DIBAYAR
+                                        {t("BELUM DIBAYAR")}
                                     </span>
                                 )}
                             </div>
                             {/* Info to check AP module */}
                             <p className="text-xs text-silver-dark mt-2 italic">
-                                * Untuk mencatat pembayaran, silakan buka modul Accounts Payable (AP)
+                                {t("* Untuk mencatat pembayaran, silakan buka modul Accounts Payable (AP)")}
                             </p>
                         </div>
                     )}
@@ -2535,7 +2537,7 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                     {/* ... Notes ... */}
                     {po.notes && (
                         <div>
-                            <p className="text-sm text-silver-dark mb-2">Notes</p>
+                            <p className="text-sm text-silver-dark mb-2">{t("Notes")}</p>
                             <p className="text-silver-light">{po.notes}</p>
                         </div>
                     )}
@@ -2546,7 +2548,7 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                             <div className="flex items-center gap-2">
                                 <AlertTriangle className="w-5 h-5 text-yellow-400" />
                                 <p className="text-sm text-yellow-400 font-medium">
-                                    PO tidak dapat diubah karena sudah ada pembayaran tercatat
+                                    {t("PO tidak dapat diubah karena sudah ada pembayaran tercatat")}
                                 </p>
                             </div>
                         </div>
@@ -2560,7 +2562,7 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                             variant="secondary"
                             size="sm"
                         >
-                            Print PO
+                            {t("Print PO")}
                         </Button>
 
                         {/* Print Preview Button - opens and auto-triggers print dialog */}
@@ -2570,7 +2572,7 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                             size="sm"
                             className="!border-green-500/50 !text-green-400 hover:!bg-green-500/10"
                         >
-                            Print Preview
+                            {t("Print Preview")}
                         </Button>
 
                         {/* Edit Button - Locked only if there is payment */}
@@ -2580,7 +2582,7 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                                 variant="secondary"
                                 size="sm"
                             >
-                                Edit PO
+                                {t("Edit PO")}
                             </Button>
                         )}
 
@@ -2591,14 +2593,14 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                                 variant="primary"
                                 size="sm"
                             >
-                                Submit for Approval
+                                {t("Submit for Approval")}
                             </Button>
                         )}
 
                         {/* Approval pending note only */}
                         {(po.status === 'submitted' || po.status === 'manager_approval') && (
                             <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-yellow-500/10 text-yellow-400 text-xs border border-yellow-500/30">
-                                Waiting for Approval Center
+                                {t("Waiting for Approval Center")}
                             </span>
                         )}
 
@@ -2610,7 +2612,7 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                                 size="sm"
                                 className="!border-red-500/50 !text-red-400 hover:!bg-red-500/10"
                             >
-                                Hapus PO
+                                {t("Hapus PO")}
                             </Button>
                         )}
 
@@ -2618,7 +2620,7 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                             onClick={onClose}
                             className="px-4 py-1.5 border border-dark-border text-sm text-silver-light rounded-lg hover:bg-dark-surface smooth-transition"
                         >
-                            Tutup
+                            {t("Tutup")}
                         </button>
                     </div>
                 </div>
@@ -2629,6 +2631,7 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
 
 // Payment Record Modal Component for PO
 const POPaymentRecordModal = ({ po, formatCurrency, onClose, onSuccess }) => {
+    const { t } = useLanguage();
     const [formData, setFormData] = useState({
         payment_date: new Date().toISOString().split('T')[0],
         amount: po.outstanding_amount || po.total_amount || 0,
@@ -2672,7 +2675,7 @@ const POPaymentRecordModal = ({ po, formatCurrency, onClose, onSuccess }) => {
         const outstandingAmount = po.outstanding_amount || po.total_amount || 0;
 
         if (formData.amount <= 0) {
-            alert('Payment amount must be greater than 0');
+            alert(t("Payment amount must be greater than 0"));
             return;
         }
 
@@ -2764,28 +2767,28 @@ const POPaymentRecordModal = ({ po, formatCurrency, onClose, onSuccess }) => {
                         <CheckCircle className="w-12 h-12 text-green-500" />
                     </div>
 
-                    <h2 className="text-2xl font-bold text-green-500 mb-2">Pembayaran Berhasil!</h2>
-                    <p className="text-silver-dark mb-6">Pembayaran PO telah dicatat dalam sistem</p>
+                    <h2 className="text-2xl font-bold text-green-500 mb-2">{t("Pembayaran Berhasil!")}</h2>
+                    <p className="text-silver-dark mb-6">{t("Pembayaran PO telah dicatat dalam sistem")}</p>
 
                     {/* Payment Details */}
                     <div className="glass-card p-4 rounded-lg mb-6 text-left bg-green-500/5 border border-green-500/20">
                         <div className="space-y-3">
                             <div className="flex justify-between">
-                                <span className="text-silver-dark">No. Pembayaran:</span>
+                                <span className="text-silver-dark">{t("No. Pembayaran:")}</span>
                                 <span className="text-silver-light font-mono font-medium">{successData.paymentNumber}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-silver-dark">Jumlah Dibayar:</span>
+                                <span className="text-silver-dark">{t("Jumlah Dibayar:")}</span>
                                 <span className="text-green-400 font-bold">{formatCurrency(successData.amountPaid, successData.currency)}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-silver-dark">Sisa Outstanding:</span>
+                                <span className="text-silver-dark">{t("Sisa Outstanding:")}</span>
                                 <span className={`font - bold ${successData.newOutstanding <= 0 ? 'text-green-400' : 'text-yellow-400'} `}>
                                     {formatCurrency(Math.max(0, successData.newOutstanding), successData.currency)}
                                 </span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-silver-dark">Status Baru:</span>
+                                <span className="text-silver-dark">{t("Status Baru:")}</span>
                                 <span className={`px - 3 py - 1 rounded - full text - xs font - semibold ${successData.newStatus === 'received' ? 'bg-purple-500/20 text-purple-400' :
                                     successData.newStatus === 'approved' ? 'bg-green-500/20 text-green-400' :
                                         'bg-blue-500/20 text-blue-400'
@@ -2798,7 +2801,7 @@ const POPaymentRecordModal = ({ po, formatCurrency, onClose, onSuccess }) => {
                     </div>
 
                     <Button onClick={() => { onSuccess(); }} className="w-full">
-                        Tutup
+                        {t("Tutup")}
                     </Button>
                 </div>
             </Modal>
@@ -2808,7 +2811,7 @@ const POPaymentRecordModal = ({ po, formatCurrency, onClose, onSuccess }) => {
     return (
         <Modal isOpen={true} onClose={onClose} maxWidth="max-w-2xl">
             <div className="p-6">
-                <h2 className="text-2xl font-bold gradient-text mb-6">Catat Pembayaran</h2>
+                <h2 className="text-2xl font-bold gradient-text mb-6">{t("Catat Pembayaran")}</h2>
 
                 {/* PO Info Summary */}
                 <div className="glass-card p-4 rounded-lg mb-6 bg-gradient-to-br from-accent-orange/10 to-transparent border border-accent-orange/30">
@@ -2818,15 +2821,15 @@ const POPaymentRecordModal = ({ po, formatCurrency, onClose, onSuccess }) => {
                             <span className="text-silver-light font-medium ml-2">{po.po_number}</span>
                         </div>
                         <div>
-                            <span className="text-silver-dark">Vendor:</span>
+                            <span className="text-silver-dark">{t("Vendor:")}</span>
                             <span className="text-silver-light font-medium ml-2">{po.vendor_name}</span>
                         </div>
                         <div>
-                            <span className="text-silver-dark">Total:</span>
+                            <span className="text-silver-dark">{t("Total:")}</span>
                             <span className="text-silver-light font-medium ml-2">{formatCurrency(po.total_amount, po.currency)}</span>
                         </div>
                         <div>
-                            <span className="text-silver-dark">Sisa:</span>
+                            <span className="text-silver-dark">{t("Sisa:")}</span>
                             <span className="text-yellow-400 font-semibold ml-2">
                                 {formatCurrency(po.outstanding_amount || po.total_amount, po.currency)}
                             </span>
@@ -2840,7 +2843,7 @@ const POPaymentRecordModal = ({ po, formatCurrency, onClose, onSuccess }) => {
                         {/* Payment Date */}
                         <div>
                             <label className="block text-sm font-medium text-silver-light mb-2">
-                                Tanggal Pembayaran *
+                                {t("Tanggal Pembayaran *")}
                             </label>
                             <input
                                 type="date"
@@ -2854,7 +2857,7 @@ const POPaymentRecordModal = ({ po, formatCurrency, onClose, onSuccess }) => {
                         {/* Amount */}
                         <div>
                             <label className="block text-sm font-medium text-silver-light mb-2">
-                                Jumlah ({po.currency}) *
+                                {t("Jumlah (")}{po.currency}) *
                             </label>
                             <input
                                 type="number"
@@ -2871,7 +2874,7 @@ const POPaymentRecordModal = ({ po, formatCurrency, onClose, onSuccess }) => {
                         {/* Payment Method */}
                         <div>
                             <label className="block text-sm font-medium text-silver-light mb-2">
-                                Metode Pembayaran *
+                                {t("Metode Pembayaran *")}
                             </label>
                             <select
                                 value={formData.payment_method}
@@ -2879,24 +2882,24 @@ const POPaymentRecordModal = ({ po, formatCurrency, onClose, onSuccess }) => {
                                 className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
                                 required
                             >
-                                <option value="bank_transfer">Transfer Bank</option>
-                                <option value="cash">Tunai</option>
-                                <option value="check">Cek / Giro</option>
-                                <option value="credit_card">Kartu Kredit</option>
+                                <option value="bank_transfer">{t("Transfer Bank")}</option>
+                                <option value="cash">{t("Tunai")}</option>
+                                <option value="check">{t("Cek / Giro")}</option>
+                                <option value="credit_card">{t("Kartu Kredit")}</option>
                             </select>
                         </div>
 
                         {/* Bank Account */}
                         <div>
                             <label className="block text-sm font-medium text-silver-light mb-2">
-                                Dari Rekening
+                                {t("Dari Rekening")}
                             </label>
                             <select
                                 value={formData.bank_account}
                                 onChange={(e) => setFormData({ ...formData, bank_account: e.target.value })}
                                 className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
                             >
-                                <option value="">Pilih Rekening Bank</option>
+                                <option value="">{t("Pilih Rekening Bank")}</option>
                                 {bankAccounts.map(acc => (
                                     <option key={acc.id} value={acc.id}>
                                         {acc.bank_name} - {acc.account_number}
@@ -2909,13 +2912,13 @@ const POPaymentRecordModal = ({ po, formatCurrency, onClose, onSuccess }) => {
                     {/* Transaction Reference */}
                     <div>
                         <label className="block text-sm font-medium text-silver-light mb-2">
-                            No. Referensi Transaksi
+                            {t("No. Referensi Transaksi")}
                         </label>
                         <input
                             type="text"
                             value={formData.transaction_ref}
                             onChange={(e) => setFormData({ ...formData, transaction_ref: e.target.value })}
-                            placeholder="contoh: TRX123456 atau Cek #789"
+                            placeholder={t("contoh: TRX123456 atau Cek #789")}
                             className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
                         />
                     </div>
@@ -2923,13 +2926,13 @@ const POPaymentRecordModal = ({ po, formatCurrency, onClose, onSuccess }) => {
                     {/* Notes */}
                     <div>
                         <label className="block text-sm font-medium text-silver-light mb-2">
-                            Catatan
+                            {t("Catatan")}
                         </label>
                         <textarea
                             value={formData.notes}
                             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                             rows={3}
-                            placeholder="Catatan tambahan pembayaran..."
+                            placeholder={t("Catatan tambahan pembayaran...")}
                             className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
                         />
                     </div>
@@ -2942,7 +2945,7 @@ const POPaymentRecordModal = ({ po, formatCurrency, onClose, onSuccess }) => {
                             className="px-6 py-2 border border-dark-border text-silver-light rounded-lg hover:bg-dark-surface smooth-transition"
                             disabled={loading}
                         >
-                            Batal
+                            {t("Batal")}
                         </button>
                         <Button
                             type="submit"

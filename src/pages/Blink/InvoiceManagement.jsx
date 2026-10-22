@@ -66,18 +66,18 @@ const InvoiceManagement = () => {
 
     const handleCleanseAllInvoices = async () => {
         if (!canRunSuperAdminBatch) {
-            alert('Akses Ditolak: Hanya Super Admin yang dapat cleansing Invoice.');
+            alert(t("Akses Ditolak: Hanya Super Admin yang dapat cleansing Invoice."));
             return;
         }
         if (invoices.length === 0) {
-            alert('Tidak ada data invoice untuk dihapus.');
+            alert(t("Tidak ada data invoice untuk dihapus."));
             return;
         }
 
         const confirm1 = confirm(`Cleansing akan menghapus SEMUA invoice (${invoices.length} baris) beserta AR, pembayaran, dan jurnal terkait. Lanjutkan?`);
         if (!confirm1) return;
 
-        const confirm2 = confirm('Konfirmasi terakhir: semua data invoice terkait akan dihapus permanen. Yakin lanjut?');
+        const confirm2 = confirm(t("Konfirmasi terakhir: semua data invoice terkait akan dihapus permanen. Yakin lanjut?"));
         if (!confirm2) return;
 
         try {
@@ -88,7 +88,7 @@ const InvoiceManagement = () => {
             });
             if (!success) return;
             await fetchInvoices();
-            alert('✅ Cleansing invoice selesai.');
+            alert(t("✅ Cleansing invoice selesai."));
         } catch (error) {
             console.error('Error cleansing invoices:', error);
             alert('❌ Gagal cleansing invoice: ' + (error.message || error));
@@ -99,17 +99,17 @@ const InvoiceManagement = () => {
 
     const handleDeleteSelectedInvoices = async () => {
         if (!canRunSuperAdminBatch) {
-            alert('Akses Ditolak: Hanya Super Admin yang dapat menghapus invoice terpilih.');
+            alert(t("Akses Ditolak: Hanya Super Admin yang dapat menghapus invoice terpilih."));
             return;
         }
         if (selectedInvoiceIds.length === 0) {
-            alert('Pilih minimal 1 invoice untuk dihapus.');
+            alert(t("Pilih minimal 1 invoice untuk dihapus."));
             return;
         }
 
         const confirm1 = confirm(`Hapus ${selectedInvoiceIds.length} invoice terpilih beserta AR, payment, dan jurnal terkait?`);
         if (!confirm1) return;
-        const confirm2 = confirm('Konfirmasi terakhir: data terpilih akan dihapus permanen. Lanjutkan?');
+        const confirm2 = confirm(t("Konfirmasi terakhir: data terpilih akan dihapus permanen. Lanjutkan?"));
         if (!confirm2) return;
 
         try {
@@ -121,7 +121,7 @@ const InvoiceManagement = () => {
             if (!success) return;
             await fetchInvoices();
             setSelectedInvoiceIds([]);
-            alert('✅ Invoice terpilih berhasil dihapus.');
+            alert(t("✅ Invoice terpilih berhasil dihapus."));
         } catch (error) {
             console.error('Error deleting selected invoices:', error);
             alert('❌ Gagal hapus invoice terpilih: ' + (error.message || error));
@@ -665,12 +665,12 @@ const InvoiceManagement = () => {
 
     const handleCreateFromReadySO = (shipment) => {
         if (!canCreate('blink_invoices') && !canEdit('blink_invoices')) {
-            alert('Anda tidak memiliki akses untuk membuat invoice.');
+            alert(t("Anda tidak memiliki akses untuk membuat invoice."));
             return;
         }
 
         if (!shipment?.id) {
-            alert('Data SO tidak valid.');
+            alert(t("Data SO tidak valid."));
             return;
         }
 
@@ -880,12 +880,12 @@ const InvoiceManagement = () => {
         e.preventDefault();
 
         if (!formData.quotation_id && !formData.shipment_id && !formData.is_additional_invoice) {
-            alert('Please select a reference (Quotation or Shipment)');
+            alert(t("Please select a reference (Quotation or Shipment)"));
             return;
         }
 
         if (formData.invoice_items.length === 0) {
-            alert('Please add at least one invoice item');
+            alert(t("Please add at least one invoice item"));
             return;
         }
 
@@ -1062,7 +1062,7 @@ const InvoiceManagement = () => {
             setShowCreateModal(false);
 
             resetForm();
-            alert('Invoice created successfully! Invoice will be posted to accounting after manager approval.');
+            alert(t("Invoice created successfully! Invoice will be posted to accounting after manager approval."));
         } catch (error) {
             console.error('Error creating invoice:', error);
             alert('Failed to create invoice: ' + error.message);
@@ -1184,7 +1184,7 @@ const InvoiceManagement = () => {
             
             const currentInvoice = invoices.find(inv => inv.id === editInvoiceId);
             if (currentInvoice && currentInvoice.paid_amount > 0) {
-                alert('Invoice tidak dapat diedit karena sudah terdapat pembayaran tercatat.');
+                alert(t("Invoice tidak dapat diedit karena sudah terdapat pembayaran tercatat."));
                 return;
             }
 
@@ -1283,7 +1283,7 @@ const InvoiceManagement = () => {
             await fetchInvoices();
             setShowCreateModal(false);
             resetForm();
-            alert('Invoice updated successfully!');
+            alert(t("Invoice updated successfully!"));
         } catch (error) {
             console.error('Error updating invoice:', error);
             alert('Failed to update invoice: ' + error.message);
@@ -1794,7 +1794,7 @@ const InvoiceManagement = () => {
 
     const handleSubmitInvoice = async (invoice) => {
         if (!canCreate('blink_invoices') && !canEdit('blink_invoices')) {
-            alert('You do not have permission to submit invoices.');
+            alert(t("You do not have permission to submit invoices."));
             return;
         }
         setConfirmSubmitAction(invoice);
@@ -1847,13 +1847,13 @@ const InvoiceManagement = () => {
     // Blocked if original invoice has partial payments
     const handleCreateReimbursement = async (invoice, newItems, amendmentNote) => {
         if (!canEdit('blink_invoices')) {
-            alert('Anda tidak memiliki hak akses untuk memanipulasi (Edit) invoice.');
+            alert(t("Anda tidak memiliki hak akses untuk memanipulasi (Edit) invoice."));
             return;
         }
 
         // Validate: Cannot create reimbursement if invoice has partial payments
         if (invoice.paid_amount && invoice.paid_amount > 0) {
-            alert('❌ Reimbursement tidak dapat dibuat untuk invoice dengan pembayaran sebagian.\n\nInvoice ini sudah menerima pembayaran. Hubungi finance team untuk adjustment.');
+            alert(t("❌ Reimbursement tidak dapat dibuat untuk invoice dengan pembayaran sebagian.\n\nInvoice ini sudah menerima pembayaran. Hubungi finance team untuk adjustment."));
             return;
         }
 
@@ -1966,12 +1966,12 @@ const InvoiceManagement = () => {
     // Creates a new draft invoice from an existing invoice with unique -R suffix.
     const handleCreateReinvoice = async (invoice, newInvoiceDate, reinvoiceNote) => {
         if (!canEdit('blink_invoices')) {
-            alert('Anda tidak memiliki hak akses untuk memanipulasi (Edit) invoice.');
+            alert(t("Anda tidak memiliki hak akses untuk memanipulasi (Edit) invoice."));
             return;
         }
 
         if (!newInvoiceDate) {
-            alert('Tanggal invoice baru wajib diisi.');
+            alert(t("Tanggal invoice baru wajib diisi."));
             return;
         }
 
@@ -2105,17 +2105,17 @@ const InvoiceManagement = () => {
 
     const handleCreateRecreateRate = async (invoice, newInvoiceDate, newExchangeRate, recreateNote) => {
         if (!canEdit('blink_invoices')) {
-            alert('Anda tidak memiliki hak akses untuk memanipulasi (Edit) invoice.');
+            alert(t("Anda tidak memiliki hak akses untuk memanipulasi (Edit) invoice."));
             return;
         }
 
         const rateParsed = Number(newExchangeRate);
         if (!newInvoiceDate) {
-            alert('Tanggal invoice baru wajib diisi.');
+            alert(t("Tanggal invoice baru wajib diisi."));
             return;
         }
         if (!Number.isFinite(rateParsed) || rateParsed <= 0) {
-            alert('Kurs baru wajib angka lebih besar dari 0.');
+            alert(t("Kurs baru wajib angka lebih besar dari 0."));
             return;
         }
 
@@ -2430,8 +2430,8 @@ const InvoiceManagement = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold gradient-text">Invoice Management</h1>
-                    <p className="text-silver-dark mt-1">Kelola invoice dan tracking pembayaran</p>
+                    <h1 className="text-3xl font-bold gradient-text">{t("Invoice Management")}</h1>
+                    <p className="text-silver-dark mt-1">{t("Kelola invoice dan tracking pembayaran")}</p>
                 </div>
                 <div className="flex items-center gap-3">
                     {canRunSuperAdminBatch && (
@@ -2442,7 +2442,7 @@ const InvoiceManagement = () => {
                                 icon={Trash}
                                 disabled={selectedInvoiceIds.length === 0 || isCleansing}
                             >
-                                Hapus Terpilih ({selectedInvoiceIds.length})
+                                {t("Hapus Terpilih (")}{selectedInvoiceIds.length})
                             </Button>
                             <Button
                                 onClick={handleCleanseAllInvoices}
@@ -2455,14 +2455,14 @@ const InvoiceManagement = () => {
                         </>
                     )}
                     <Button onClick={handleExportXLS} variant="secondary" icon={Download}>
-                        Export XLS
+                        {t("Export XLS")}
                     </Button>
                 </div>
             </div>
 
             {isCleansing && (
                 <div className="glass-card px-4 py-2 rounded-lg border border-amber-500/30 bg-amber-500/10">
-                    <p className="text-xs text-amber-300">Progress Cleansing: {cleanseProgress || 'Sedang memproses...'}</p>
+                    <p className="text-xs text-amber-300">{t("Progress Cleansing:")} {cleanseProgress || 'Sedang memproses...'}</p>
                 </div>
             )}
 
@@ -2470,7 +2470,7 @@ const InvoiceManagement = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="glass-card p-4 rounded-lg">
                     <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark">Total Invoices</p>
+                        <p className="text-xs text-silver-dark">{t("Total Invoices")}</p>
                         <FileText className="w-4 h-4 text-blue-400" />
                     </div>
                     <p className="text-xl font-bold text-silver-light">{activeInvoices.length}</p>
@@ -2478,7 +2478,7 @@ const InvoiceManagement = () => {
 
                 <div className="glass-card p-4 rounded-lg">
                     <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark">Total Revenue</p>
+                        <p className="text-xs text-silver-dark">{t("Total Revenue")}</p>
                         <TrendingUp className="w-4 h-4 text-green-400" />
                     </div>
                     <p className="text-lg font-bold text-green-400">{formatCurrency(revenueSummary.idr, 'IDR')}</p>
@@ -2487,7 +2487,7 @@ const InvoiceManagement = () => {
 
                 <div className="glass-card p-4 rounded-lg">
                     <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark">Outstanding</p>
+                        <p className="text-xs text-silver-dark">{t("Outstanding")}</p>
                         <DollarSign className="w-4 h-4 text-yellow-400" />
                     </div>
                     <p className="text-lg font-bold text-yellow-400">{formatCurrency(outstandingSummary.idr, 'IDR')}</p>
@@ -2496,7 +2496,7 @@ const InvoiceManagement = () => {
 
                 <div className="glass-card p-4 rounded-lg">
                     <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-silver-dark">Overdue</p>
+                        <p className="text-xs text-silver-dark">{t("Overdue")}</p>
                         <AlertTriangle className="w-4 h-4 text-red-400" />
                     </div>
                     <p className="text-xl font-bold text-red-400">{overdueCount}</p>
@@ -2513,7 +2513,7 @@ const InvoiceManagement = () => {
                             : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50 hover:text-slate-900'
                             }`}
                     >
-                        SO List ({filteredReadySOShipments.length})
+                        {t("SO List (")}{filteredReadySOShipments.length})
                     </button>
                     <button
                         onClick={() => setActiveInvoicePage('invoice-list')}
@@ -2522,7 +2522,7 @@ const InvoiceManagement = () => {
                             : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50 hover:text-slate-900'
                             }`}
                     >
-                        Invoice ({filteredInvoices.length})
+                        {t("Invoice (")}{filteredInvoices.length})
                     </button>
                 </div>
             </div>
@@ -2535,7 +2535,7 @@ const InvoiceManagement = () => {
                             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-silver-dark" />
                             <input
                                 type="text"
-                                placeholder="Search invoice, job number, atau customer..."
+                                placeholder={t("Search invoice, job number, atau customer...")}
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 className="w-full pl-12 pr-4 py-3 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-base"
@@ -2550,16 +2550,16 @@ const InvoiceManagement = () => {
             <div className="glass-card rounded-lg overflow-hidden">
                 <div className="px-4 py-3 border-b border-dark-border flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                     <div>
-                        <h2 className="text-base font-semibold text-silver-light">SO List</h2>
+                        <h2 className="text-base font-semibold text-silver-light">{t("SO List")}</h2>
                         <p className="text-xs text-silver-dark mt-0.5">
-                            Menampilkan SO full approved. Aksi berubah ke Revisi jika invoice sudah terbuat dan belum dibayar.
+                            {t("Menampilkan SO full approved. Aksi berubah ke Revisi jika invoice sudah terbuat dan belum dibayar.")}
                         </p>
                     </div>
                     <div className="w-full md:w-96 relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-silver-dark" />
                         <input
                             type="text"
-                            placeholder="Cari SO, Job Number, customer, atau route..."
+                            placeholder={t("Cari SO, Job Number, customer, atau route...")}
                             value={soSearchTerm}
                             onChange={(e) => setSoSearchTerm(e.target.value)}
                             className="w-full pl-10 pr-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm"
@@ -2571,13 +2571,13 @@ const InvoiceManagement = () => {
                     <table className="w-full text-sm">
                         <thead className="bg-accent-blue">
                             <tr>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">SO Number</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Job Number</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Customer</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Route</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Service</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Tanggal SO</th>
-                                <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap">Aksi</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">{t("SO Number")}</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">{t("Job Number")}</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">{t("Customer")}</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">{t("Route")}</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">{t("Service")}</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">{t("Tanggal SO")}</th>
+                                <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap">{t("Aksi")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
@@ -2585,7 +2585,7 @@ const InvoiceManagement = () => {
                                 <tr>
                                     <td colSpan="7" className="px-3 py-8 text-center text-silver-dark">
                                         <Package className="w-10 h-10 text-silver-dark mx-auto mb-2 opacity-50" />
-                                        <p className="text-sm">Tidak ada SO yang siap invoice saat ini.</p>
+                                        <p className="text-sm">{t("Tidak ada SO yang siap invoice saat ini.")}</p>
                                     </td>
                                 </tr>
                             ) : (
@@ -2629,10 +2629,10 @@ const InvoiceManagement = () => {
                                                         onClick={() => handleEditInvoice(unpaidInvoice)}
                                                         disabled={!canRevise}
                                                         className="px-2.5 py-1 bg-blue-100 hover:bg-blue-200 text-blue-800 border border-blue-300 rounded text-xs font-medium inline-flex items-center gap-1 smooth-transition disabled:opacity-40 disabled:cursor-not-allowed"
-                                                        title="Invoice sudah dibuat dan belum dibayar. Lanjutkan revisi invoice."
+                                                        title={t("Invoice sudah dibuat dan belum dibayar. Lanjutkan revisi invoice.")}
                                                     >
                                                         <Edit className="w-3 h-3" />
-                                                        Revisi
+                                                        {t("Revisi")}
                                                     </button>
                                                 ) : hasAnyActiveInvoice ? (
                                                     <button
@@ -2654,7 +2654,7 @@ const InvoiceManagement = () => {
                                                         className="px-2.5 py-1 bg-accent-orange/25 hover:bg-accent-orange/40 text-accent-orange border border-accent-orange/50 rounded text-xs font-medium inline-flex items-center gap-1 smooth-transition disabled:opacity-40 disabled:cursor-not-allowed"
                                                     >
                                                         <Plus className="w-3 h-3" />
-                                                        Buat Invoice
+                                                        {t("Buat Invoice")}
                                                     </button>
                                                 )}
                                             </td>
@@ -2684,16 +2684,16 @@ const InvoiceManagement = () => {
                                         className="w-4 h-4"
                                     />
                                 </th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Invoice #</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Job Number</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Customer</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Date</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">Due Date</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">{t("Invoice #")}</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">{t("Job Number")}</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">{t("Customer")}</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">{t("Date")}</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-white uppercase whitespace-nowrap">{t("Due Date")}</th>
                                 <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">VAT</th>
-                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">Amount</th>
-                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">Outstanding</th>
-                                <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap">Status</th>
-                                <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap">Aksi</th>
+                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">{t("Amount")}</th>
+                                <th className="px-3 py-2 text-right text-xs font-semibold text-white uppercase whitespace-nowrap">{t("Outstanding")}</th>
+                                <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap">{t("Status")}</th>
+                                <th className="px-3 py-2 text-center text-xs font-semibold text-white uppercase whitespace-nowrap">{t("Aksi")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
@@ -2732,17 +2732,17 @@ const InvoiceManagement = () => {
                                                     {invoice.invoice_number}
                                                     {/-R\d+$/i.test(invoice.invoice_number || '') && (
                                                         <span className="bg-orange-500/20 text-orange-300 text-[9px] px-1 py-0.2 rounded border border-orange-500/30">
-                                                            Reinvoice
+                                                            {t("Reinvoice")}
                                                         </span>
                                                     )}
                                                     {/-FX\d+$/i.test(invoice.invoice_number || '') && (
                                                         <span className="bg-cyan-500/20 text-cyan-300 text-[9px] px-1 py-0.2 rounded border border-cyan-500/30">
-                                                            Recreate Kurs
+                                                            {t("Recreate Kurs")}
                                                         </span>
                                                     )}
                                                     {invoice.is_additional && (
                                                         <span className="bg-purple-500/20 text-purple-300 text-[9px] px-1 py-0.2 rounded border border-purple-500/30">
-                                                            Versi
+                                                            {t("Versi")}
                                                         </span>
                                                     )}
                                                 </span>
@@ -2796,7 +2796,7 @@ const InvoiceManagement = () => {
                                                     }
                                                 >
                                                     <FileText className="w-3 h-3" />
-                                                    Reinvoice
+                                                    {t("Reinvoice")}
                                                 </button>
 
                                                 <button
@@ -2815,16 +2815,16 @@ const InvoiceManagement = () => {
                                                     }
                                                 >
                                                     <RefreshCw className="w-3 h-3" />
-                                                    Recreate Kurs
+                                                    {t("Recreate Kurs")}
                                                 </button>
 
                                                 <button
                                                     onClick={() => handleOpenAdditionalInvoiceModal(invoice)}
                                                     className="px-2.5 py-1 bg-violet-100 hover:bg-violet-200 text-violet-800 border border-violet-300 rounded text-xs font-medium inline-flex items-center gap-1 smooth-transition"
-                                                    title="Buat invoice tambahan (v1, v2, dsb) untuk pengajuan ini"
+                                                    title={t("Buat invoice tambahan (v1, v2, dsb) untuk pengajuan ini")}
                                                 >
                                                     <Plus className="w-3 h-3" />
-                                                    Invoice Tambahan
+                                                    {t("Invoice Tambahan")}
                                                 </button>
                                             </div>
                                         </td>
@@ -2993,22 +2993,22 @@ const InvoiceManagement = () => {
             }
 
             {/* Status Confirmation Modal */}
-            <Modal isOpen={!!confirmSubmitAction} onClose={() => setConfirmSubmitAction(null)} title="Confirmation" size="small">
+            <Modal isOpen={!!confirmSubmitAction} onClose={() => setConfirmSubmitAction(null)} title={t("Confirmation")} size="small">
                 <div className="space-y-4 text-silver-light">
-                    <p className="text-lg">Submit invoice {confirmSubmitAction?.invoice_number} to the Approval Center for Manager approval?</p>
+                    <p className="text-lg">{t("Submit invoice")} {confirmSubmitAction?.invoice_number} {t("to the Approval Center for Manager approval?")}</p>
                     <div className="flex justify-end gap-2 mt-6">
-                        <Button variant="secondary" onClick={() => setConfirmSubmitAction(null)}>Cancel</Button>
-                        <Button variant="primary" onClick={confirmAndProcessSubmit}>Yes, Continue</Button>
+                        <Button variant="secondary" onClick={() => setConfirmSubmitAction(null)}>{t("Cancel")}</Button>
+                        <Button variant="primary" onClick={confirmAndProcessSubmit}>{t("Yes, Continue")}</Button>
                     </div>
                 </div>
             </Modal>
 
             {/* Success Message Modal */}
-            <Modal isOpen={!!successSubmitMsg} onClose={() => setSuccessSubmitMsg('')} title="Success" size="small">
+            <Modal isOpen={!!successSubmitMsg} onClose={() => setSuccessSubmitMsg('')} title={t("Success")} size="small">
                 <div className="space-y-4 text-center">
                     <p className="text-lg text-emerald-400 font-semibold mt-4">{successSubmitMsg}</p>
                     <div className="flex justify-center mt-6">
-                        <Button variant="primary" onClick={() => setSuccessSubmitMsg('')}>Close</Button>
+                        <Button variant="primary" onClick={() => setSuccessSubmitMsg('')}>{t("Close")}</Button>
                     </div>
                 </div>
             </Modal>
@@ -3021,6 +3021,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
     referenceType, setReferenceType, handleQuotationSelect, handleShipmentSelect, handlePaymentTermsChange,
     addInvoiceItem, removeInvoiceItem, updateInvoiceItem, calculateTotals, handleGlobalTaxRateChange,
     handleCreateInvoice, formatCurrency, onClose, bankAccounts, revenueAccounts }) => {
+    const { t } = useLanguage();
 
     const { subtotal, taxAmount, total, cogsSubtotal, grossProfit, profitMargin } = calculateTotals();
 
@@ -3142,15 +3143,15 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                 <div>
                                     <h4 className="text-sm font-semibold text-purple-300 flex items-center gap-2">
                                         <Plus className="w-4 h-4 text-purple-400" />
-                                        Invoice Tambahan (Versioned Invoice)
+                                        {t("Invoice Tambahan (Versioned Invoice)")}
                                     </h4>
                                     <p className="text-xs text-silver-dark mt-1">
-                                        Mengikuti Nomor Pengajuan yang Sama: <strong className="text-silver-light font-mono">{formData.job_number}</strong> (Induk: <span className="text-silver-light font-mono">{formData.parent_invoice_number}</span>)
+                                        {t("Mengikuti Nomor Pengajuan yang Sama:")} <strong className="text-silver-light font-mono">{formData.job_number}</strong> {t("(Induk:")} <span className="text-silver-light font-mono">{formData.parent_invoice_number}</span>)
                                     </p>
                                 </div>
                                 {formData.preview_invoice_number && (
                                     <div className="bg-dark-surface px-3 py-1.5 rounded border border-purple-500/30 text-right">
-                                        <span className="text-[10px] text-silver-dark uppercase tracking-wider block">No. Invoice Tambahan</span>
+                                        <span className="text-[10px] text-silver-dark uppercase tracking-wider block">{t("No. Invoice Tambahan")}</span>
                                         <span className="text-sm font-bold text-accent-orange font-mono">
                                             {formData.preview_invoice_number}
                                         </span>
@@ -3161,7 +3162,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                     ) : !isEditing && (
                         <div className="glass-card p-4 rounded-lg">
                             <label className="block text-[11px] font-semibold text-silver-light mb-1.5">
-                                Referensi (Sales Order) <span className="text-red-400">*</span>
+                                {t("Referensi (Sales Order)")} <span className="text-red-400">*</span>
                             </label>
                             <select
                                 value={formData.shipment_id || formData.quotation_id || ''}
@@ -3169,7 +3170,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                 className="w-full px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded text-silver-light text-[11px]"
                                 required
                             >
-                                <option value="">-- Pilih Sales Order --</option>
+                                <option value="">{t("-- Pilih Sales Order --")}</option>
                                 {blendedReferences.map(ref => (
                                     <option key={`${ref.type}-${ref.id}`} value={ref.id}>
                                         {ref.label}
@@ -3195,21 +3196,21 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                     {(selectedQuotation || selectedShipment) && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                             <div className="glass-card p-2 rounded-lg">
-                                <h3 className="text-[11px] font-semibold text-accent-orange mb-1.5">Informasi Customer</h3>
+                                <h3 className="text-[11px] font-semibold text-accent-orange mb-1.5">{t("Informasi Customer")}</h3>
                                 <div className="space-y-1 text-[11px]">
-                                    <div><span className="text-silver-dark">Nama:</span> <span className="text-silver-light font-medium">{formData.customer_name}</span></div>
-                                    <div><span className="text-silver-dark">Job Number:</span> <span className="text-silver-light">{formData.job_number}</span></div>
+                                    <div><span className="text-silver-dark">{t("Nama:")}</span> <span className="text-silver-light font-medium">{formData.customer_name}</span></div>
+                                    <div><span className="text-silver-dark">{t("Job Number:")}</span> <span className="text-silver-light">{formData.job_number}</span></div>
                                     {formData.quotation_number && (
-                                        <div><span className="text-silver-dark">Quotation Number:</span> <span className="text-silver-light">{formData.quotation_number}</span></div>
+                                        <div><span className="text-silver-dark">{t("Quotation Number:")}</span> <span className="text-silver-light">{formData.quotation_number}</span></div>
                                     )}
                                 </div>
                             </div>
 
                             <div className="glass-card p-2 rounded-lg">
-                                <h3 className="text-[11px] font-semibold text-accent-orange mb-1.5">Informasi SO</h3>
+                                <h3 className="text-[11px] font-semibold text-accent-orange mb-1.5">{t("Informasi SO")}</h3>
                                 <div className="space-y-1 text-[11px]">
-                                    <div><span className="text-silver-dark">Route:</span> <span className="text-silver-light">{formData.origin} → {formData.destination}</span></div>
-                                    <div><span className="text-silver-dark">Service:</span> <span className="text-silver-light">{formData.service_type?.toUpperCase()}</span></div>
+                                    <div><span className="text-silver-dark">{t("Route:")}</span> <span className="text-silver-light">{formData.origin} → {formData.destination}</span></div>
+                                    <div><span className="text-silver-dark">{t("Service:")}</span> <span className="text-silver-light">{formData.service_type?.toUpperCase()}</span></div>
                                 </div>
                             </div>
                         </div>
@@ -3219,42 +3220,42 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                     {/* Extended Shipment Details for Print */}
                     <div className="glass-card p-3 rounded-lg border border-dark-border/50">
                         <h3 className="text-xs font-semibold text-accent-orange mb-3 flex items-center gap-2">
-                            Shipment Details (For Print Output)
+                            {t("Shipment Details (For Print Output)")}
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                             <div className="col-span-1 md:col-span-2">
-                                <label className="block text-[10px] text-silver-dark mb-1">Consignor / Shipper</label>
+                                <label className="block text-[10px] text-silver-dark mb-1">{t("Consignor / Shipper")}</label>
                                 <input
                                     type="text"
                                     value={formData.consignor}
                                     onChange={(e) => setFormData(prev => ({ ...prev, consignor: e.target.value }))}
                                     className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-xs"
-                                    placeholder="Shipper Name"
+                                    placeholder={t("Shipper Name")}
                                 />
                             </div>
                             <div className="col-span-1 md:col-span-2">
-                                <label className="block text-[10px] text-silver-dark mb-1">Consignee</label>
+                                <label className="block text-[10px] text-silver-dark mb-1">{t("Consignee")}</label>
                                 <input
                                     type="text"
                                     value={formData.consignee}
                                     onChange={(e) => setFormData(prev => ({ ...prev, consignee: e.target.value }))}
                                     className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-xs"
-                                    placeholder="Consignee Name"
+                                    placeholder={t("Consignee Name")}
                                 />
                             </div>
                             <div className="col-span-1 md:col-span-4 lg:col-span-4">
-                                <label className="block text-[10px] text-silver-dark mb-1">Customer Address (Printed in Invoice)</label>
+                                <label className="block text-[10px] text-silver-dark mb-1">{t("Customer Address (Printed in Invoice)")}</label>
                                 <textarea
                                     value={formData.customer_address || ''}
                                     onChange={(e) => setFormData(prev => ({ ...prev, customer_address: e.target.value }))}
                                     className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-xs"
-                                    placeholder="Alamat Customer..."
+                                    placeholder={t("Alamat Customer...")}
                                     rows="2"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-[10px] text-silver-dark mb-1">Vessel Name</label>
+                                <label className="block text-[10px] text-silver-dark mb-1">{t("Vessel Name")}</label>
                                 <input
                                     type="text"
                                     value={formData.vessel_name}
@@ -3263,7 +3264,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                 />
                             </div>
                             <div>
-                                <label className="block text-[10px] text-silver-dark mb-1">Voyage No.</label>
+                                <label className="block text-[10px] text-silver-dark mb-1">{t("Voyage No.")}</label>
                                 <input
                                     type="text"
                                     value={formData.voyage_number}
@@ -3272,7 +3273,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                 />
                             </div>
                             <div>
-                                <label className="block text-[10px] text-silver-dark mb-1">Ocean BL (MBL)</label>
+                                <label className="block text-[10px] text-silver-dark mb-1">{t("Ocean BL (MBL)")}</label>
                                 <input
                                     type="text"
                                     value={formData.ocean_bl}
@@ -3281,7 +3282,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                 />
                             </div>
                             <div>
-                                <label className="block text-[10px] text-silver-dark mb-1">House BL (HBL)</label>
+                                <label className="block text-[10px] text-silver-dark mb-1">{t("House BL (HBL)")}</label>
                                 <input
                                     type="text"
                                     value={formData.house_bl}
@@ -3309,7 +3310,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                 />
                             </div>
                             <div>
-                                <label className="block text-[10px] text-silver-dark mb-1">Chargeable W (Kg)</label>
+                                <label className="block text-[10px] text-silver-dark mb-1">{t("Chargeable W (Kg)")}</label>
                                 <input
                                     type="number"
                                     value={formData.chargeable_weight}
@@ -3318,18 +3319,18 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                 />
                             </div>
                             <div>
-                                <label className="block text-[10px] text-silver-dark mb-1">Packages</label>
+                                <label className="block text-[10px] text-silver-dark mb-1">{t("Packages")}</label>
                                 <input
                                     type="text"
                                     value={formData.packages}
                                     onChange={(e) => setFormData(prev => ({ ...prev, packages: e.target.value }))}
                                     className="w-full px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-xs"
-                                    placeholder="e.g. 10 CTNS"
+                                    placeholder={t("e.g. 10 CTNS")}
                                 />
                             </div>
 
                             <div className="col-span-1 md:col-span-2">
-                                <label className="block text-[10px] text-silver-dark mb-1">Goods Description</label>
+                                <label className="block text-[10px] text-silver-dark mb-1">{t("Goods Description")}</label>
                                 <input
                                     type="text"
                                     value={formData.goods_description}
@@ -3338,7 +3339,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                 />
                             </div>
                             <div className="col-span-1 md:col-span-2">
-                                <label className="block text-[10px] text-silver-dark mb-1">Containers</label>
+                                <label className="block text-[10px] text-silver-dark mb-1">{t("Containers")}</label>
                                 <input
                                     type="text"
                                     value={formData.containers}
@@ -3348,7 +3349,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                 />
                             </div>
                             <div className="col-span-1 md:col-span-2">
-                                <label className="block text-[10px] text-silver-dark mb-1">Order Ref / PO #</label>
+                                <label className="block text-[10px] text-silver-dark mb-1">{t("Order Ref / PO #")}</label>
                                 <input
                                     type="text"
                                     value={formData.order_reference}
@@ -3357,7 +3358,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                 />
                             </div>
                             <div className="col-span-1 md:col-span-2">
-                                <label className="block text-[10px] text-silver-dark mb-1">Import Customs Broker</label>
+                                <label className="block text-[10px] text-silver-dark mb-1">{t("Import Customs Broker")}</label>
                                 <input
                                     type="text"
                                     value={formData.import_broker}
@@ -3372,7 +3373,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div>
                             <label className="block text-[11px] font-semibold text-silver-light mb-1">
-                                Tanggal Invoice
+                                {t("Tanggal Invoice")}
                             </label>
                             <input
                                 type="date"
@@ -3385,23 +3386,23 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
 
                         <div>
                             <label className="block text-[11px] font-semibold text-silver-light mb-1">
-                                Payment Terms
+                                {t("Payment Terms")}
                             </label>
                             <select
                                 value={formData.payment_terms}
                                 onChange={handlePaymentTermsChange}
                                 className="w-full px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
                             >
-                                <option value="NET 7">NET 7</option>
-                                <option value="NET 14">NET 14</option>
-                                <option value="NET 30">NET 30</option>
-                                <option value="NET 60">NET 60</option>
+                                <option value="NET 7">{t("NET 7")}</option>
+                                <option value="NET 14">{t("NET 14")}</option>
+                                <option value="NET 30">{t("NET 30")}</option>
+                                <option value="NET 60">{t("NET 60")}</option>
                             </select>
                         </div>
 
                         <div>
                             <label className="block text-[11px] font-semibold text-silver-light mb-1">
-                                Due Date
+                                {t("Due Date")}
                             </label>
                             <input
                                 type="date"
@@ -3417,7 +3418,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-[11px] font-semibold text-silver-light mb-1">
-                                Mata Uang Penagihan <span className="text-red-400">*</span>
+                                {t("Mata Uang Penagihan")} <span className="text-red-400">*</span>
                             </label>
                             <select
                                 value={formData.billing_currency}
@@ -3454,7 +3455,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
 
                         <div>
                             <label className="block text-[11px] font-semibold text-silver-light mb-1">
-                                Kurs Rate ({formData.billing_currency || 'USD'} ke IDR)
+                                {t("Kurs Rate (")}{formData.billing_currency || 'USD'} {t("ke IDR)")}
                                 {formData.billing_currency !== 'IDR' && (
                                     <span className="text-red-400 ml-1">*</span>
                                 )}
@@ -3492,19 +3493,19 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                     {bankAccounts && bankAccounts.length > 0 && (
                         <div className="glass-card p-3 rounded-lg border border-blue-500/20">
                             <h3 className="text-xs font-semibold text-blue-400 mb-2 flex items-center gap-2">
-                                🏦 Rekening Bank Penerima Pembayaran
+                                {t("🏦 Rekening Bank Penerima Pembayaran")}
                             </h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
                                 <div>
                                     <label className="block text-[11px] font-semibold text-silver-light mb-1">
-                                        Pilih Rekening Bank <span className="text-silver-dark font-normal">(opsional)</span>
+                                        {t("Pilih Rekening Bank")} <span className="text-silver-dark font-normal">{t("(opsional)")}</span>
                                     </label>
                                     <select
                                         value={formData.payment_bank_id || ''}
                                         onChange={(e) => setFormData(prev => ({ ...prev, payment_bank_id: e.target.value }))}
                                         className="w-full px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm"
                                     >
-                                        <option value="">-- Tampilkan semua rekening --</option>
+                                        <option value="">{t("-- Tampilkan semua rekening --")}</option>
                                         {bankAccounts.map(bank => (
                                             <option key={bank.id} value={bank.id}>
                                                 {bank.bank_name} ({bank.currency || 'IDR'}) – {bank.account_number}
@@ -3512,7 +3513,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                         ))}
                                     </select>
                                     <p className="text-[10px] text-silver-dark mt-1">
-                                        Jika dipilih, hanya rekening ini yang tampil di cetak invoice
+                                        {t("Jika dipilih, hanya rekening ini yang tampil di cetak invoice")}
                                     </p>
                                 </div>
 
@@ -3522,10 +3523,10 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                     return selected ? (
                                         <div className="p-2.5 rounded-lg bg-blue-500/10 border border-blue-500/30 text-[11px] space-y-0.5">
                                             <div className="font-bold text-blue-300">{selected.bank_name} ({selected.currency || 'IDR'})</div>
-                                            <div className="text-silver-light">No. Rekening: <span className="font-mono">{selected.account_number}</span></div>
+                                            <div className="text-silver-light">{t("No. Rekening:")} <span className="font-mono">{selected.account_number}</span></div>
                                             <div className="text-silver-light">A/N: {selected.account_holder}</div>
-                                            {selected.branch && <div className="text-silver-dark">Cabang: {selected.branch}</div>}
-                                            {selected.swift_code && <div className="text-silver-dark">SWIFT: {selected.swift_code}</div>}
+                                            {selected.branch && <div className="text-silver-dark">{t("Cabang:")} {selected.branch}</div>}
+                                            {selected.swift_code && <div className="text-silver-dark">{t("SWIFT:")} {selected.swift_code}</div>}
                                         </div>
                                     ) : null;
                                 })()}
@@ -3536,14 +3537,14 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                     {/* Invoice Items */}
                     <div className="glass-card p-4 rounded-lg">
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-sm font-semibold text-accent-orange">Invoice Items</h3>
+                            <h3 className="text-sm font-semibold text-accent-orange">{t("Invoice Items")}</h3>
                             <button
                                 type="button"
                                 onClick={addInvoiceItem}
                                 className="flex items-center gap-2 px-3 py-1.5 bg-accent-orange hover:bg-accent-orange/80 text-white rounded-lg smooth-transition text-sm"
                             >
                                 <Plus className="w-4 h-4" />
-                                Tambah Item
+                                {t("Tambah Item")}
                             </button>
                         </div>
 
@@ -3552,16 +3553,16 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                 <thead className="bg-accent-orange">
                                     <tr>
                                         <th className="px-2 py-2 text-center text-xs text-white w-10 font-normal">No</th>
-                                        <th className="px-2 py-2 text-left text-xs text-white min-w-[220px] font-normal">Item (COA)</th>
-                                        <th className="px-2 py-2 text-left text-xs text-white min-w-[400px] font-normal">Description</th>
-                                        <th className="px-2 py-2 text-center text-xs text-white min-w-[120px] font-normal">Qty</th>
-                                        <th className="px-2 py-2 text-center text-xs text-white min-w-[120px] font-normal">Unit</th>
-                                        <th className="px-2 py-2 text-center text-xs text-white w-20 font-normal">Curr</th>
-                                        <th className="px-2 py-2 text-right text-xs text-white min-w-[140px] font-normal">Price</th>
-                                        <th className="px-2 py-2 text-right text-xs text-white min-w-[80px] font-normal">VAT %</th>
-                                        <th className="px-2 py-2 text-right text-xs text-white min-w-[100px] font-normal">VAT Amt</th>
-                                        <th className="px-2 py-2 text-right text-xs text-white min-w-[100px] font-normal">Total</th>
-                                        <th className="px-2 py-2 text-center text-xs text-white w-10 font-normal">Action</th>
+                                        <th className="px-2 py-2 text-left text-xs text-white min-w-[220px] font-normal">{t("Item (COA)")}</th>
+                                        <th className="px-2 py-2 text-left text-xs text-white min-w-[400px] font-normal">{t("Description")}</th>
+                                        <th className="px-2 py-2 text-center text-xs text-white min-w-[120px] font-normal">{t("Qty")}</th>
+                                        <th className="px-2 py-2 text-center text-xs text-white min-w-[120px] font-normal">{t("Unit")}</th>
+                                        <th className="px-2 py-2 text-center text-xs text-white w-20 font-normal">{t("Curr")}</th>
+                                        <th className="px-2 py-2 text-right text-xs text-white min-w-[140px] font-normal">{t("Price")}</th>
+                                        <th className="px-2 py-2 text-right text-xs text-white min-w-[80px] font-normal">{t("VAT %")}</th>
+                                        <th className="px-2 py-2 text-right text-xs text-white min-w-[100px] font-normal">{t("VAT Amt")}</th>
+                                        <th className="px-2 py-2 text-right text-xs text-white min-w-[100px] font-normal">{t("Total")}</th>
+                                        <th className="px-2 py-2 text-center text-xs text-white w-10 font-normal">{t("Action")}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-dark-border">
@@ -3585,7 +3586,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                                             <div className="p-2 border-b border-gray-200">
                                                                 <input
                                                                     type="text"
-                                                                    placeholder="Cari kode / nama akun revenue..."
+                                                                    placeholder={t("Cari kode / nama akun revenue...")}
                                                                     value={coaSearchMapInv[index] || ''}
                                                                     onChange={e => setCoaSearchMapInv(prev => ({ ...prev, [index]: e.target.value }))}
                                                                     className="w-full px-2 py-1.5 bg-gray-50 border border-gray-300 rounded text-black text-xs focus:outline-none focus:border-blue-500"
@@ -3601,7 +3602,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                                                             a.code?.toLowerCase().includes(q))
                                                                         : revenueAccounts;
                                                                     return filtered.slice(0, 50).length === 0
-                                                                        ? <div className="px-3 py-2 text-black text-xs">Tidak ditemukan</div>
+                                                                        ? <div className="px-3 py-2 text-black text-xs">{t("Tidak ditemukan")}</div>
                                                                         : filtered.slice(0, 50).map(acc => (
                                                                             <button
                                                                                 type="button"
@@ -3634,7 +3635,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                                     value={item.description}
                                                     onChange={(e) => updateInvoiceItem(index, 'description', e.target.value)}
                                                     className="w-full min-w-[380px] px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm"
-                                                    placeholder="Deskripsi layanan"
+                                                    placeholder={t("Deskripsi layanan")}
                                                     required
                                                 />
                                             </td>
@@ -3655,7 +3656,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                                     value={item.unit}
                                                     onChange={(e) => updateInvoiceItem(index, 'unit', e.target.value)}
                                                     className="w-full min-w-[100px] px-2 py-1 bg-dark-surface border border-dark-border rounded text-silver-light text-sm text-center"
-                                                    placeholder="Unit"
+                                                    placeholder={t("Unit")}
                                                     required
                                                 />
                                             </td>
@@ -3724,7 +3725,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-[11px] font-semibold text-silver-light mb-1">
-                                Global VAT Rate (%)
+                                {t("Global VAT Rate (%)")}
                             </label>
                             <input
                                 type="number"
@@ -3737,13 +3738,13 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                 placeholder="e.g., 11"
                             />
                             <p className="text-[10px] text-silver-dark mt-1">
-                                Mengubah ini akan mengupdate semua item di atas
+                                {t("Mengubah ini akan mengupdate semua item di atas")}
                             </p>
                         </div>
 
                         <div>
                             <label className="block text-[11px] font-semibold text-silver-light mb-1">
-                                Discount Amount ({formData.currency})
+                                {t("Discount Amount (")}{formData.currency})
                             </label>
                             <input
                                 type="number"
@@ -3758,25 +3759,25 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
 
                     {/* Summary Calculation */}
                     <div className="glass-card p-4 rounded-lg bg-gradient-to-br from-accent-orange/10 to-transparent border border-accent-orange/30">
-                        <h3 className="text-sm font-semibold text-accent-orange mb-3">Summary</h3>
+                        <h3 className="text-sm font-semibold text-accent-orange mb-3">{t("Summary")}</h3>
                         <div className="space-y-2">
                             <div className="flex justify-between text-sm">
-                                <span className="text-silver-dark">Subtotal:</span>
+                                <span className="text-silver-dark">{t("Subtotal:")}</span>
                                 <span className="text-silver-light font-medium">{formatCurrency(subtotal, formData.currency)}</span>
                             </div>
                             <div className="flex justify-between text-sm">
-                                <span className="text-silver-dark">VAT (from items):</span>
+                                <span className="text-silver-dark">{t("VAT (from items):")}</span>
                                 <span className="text-silver-light font-medium">{formatCurrency(taxAmount, formData.currency)}</span>
                             </div>
                             {formData.discount_amount > 0 && (
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-silver-dark">Discount:</span>
+                                    <span className="text-silver-dark">{t("Discount:")}</span>
                                     <span className="text-red-400 font-medium">-{formatCurrency(formData.discount_amount, formData.currency)}</span>
                                 </div>
                             )}
                             <div className="border-t border-dark-border pt-2 mt-2">
                                 <div className="flex justify-between">
-                                    <span className="text-silver-light font-bold">Total:</span>
+                                    <span className="text-silver-light font-bold">{t("Total:")}</span>
                                     <span className="text-accent-orange font-bold text-lg">{formatCurrency(total, formData.currency)}</span>
                                 </div>
                             </div>
@@ -3788,30 +3789,30 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                         <div className="glass-card p-3 rounded-lg border border-accent-orange/30 bg-accent-orange/5">
                             <h4 className="text-xs font-semibold text-accent-orange mb-2 flex items-center gap-2">
                                 <TrendingUp className="w-3.5 h-3.5" />
-                                Profit Preview
+                                {t("Profit Preview")}
                             </h4>
                             <div className="grid grid-cols-3 gap-2 mb-2">
                                 <div className="text-center p-2 rounded bg-blue-500/10 border border-blue-500/30">
-                                    <div className="text-[9px] text-silver-dark mb-0.5">Revenue</div>
+                                    <div className="text-[9px] text-silver-dark mb-0.5">{t("Revenue")}</div>
                                     <div className="text-xs font-bold text-blue-400">
                                         {formatCurrency(total, formData.billing_currency)}
                                     </div>
                                 </div>
                                 <div className="text-center p-2 rounded bg-orange-500/10 border border-orange-500/30">
-                                    <div className="text-[9px] text-silver-dark mb-0.5">COGS</div>
+                                    <div className="text-[9px] text-silver-dark mb-0.5">{t("COGS")}</div>
                                     <div className="text-xs font-bold text-orange-400">
                                         {formatCurrency(cogsSubtotal, formData.billing_currency)}
                                     </div>
                                 </div>
                                 <div className="text-center p-2 rounded bg-green-500/10 border border-green-500/30">
-                                    <div className="text-[9px] text-silver-dark mb-0.5">Profit</div>
+                                    <div className="text-[9px] text-silver-dark mb-0.5">{t("Profit")}</div>
                                     <div className="text-xs font-bold text-green-400">
                                         {formatCurrency(grossProfit, formData.billing_currency)}
                                     </div>
                                 </div>
                             </div>
                             <div className="flex items-center justify-between p-2 rounded bg-dark-surface">
-                                <span className="text-[10px] text-silver-dark">Profit Margin:</span>
+                                <span className="text-[10px] text-silver-dark">{t("Profit Margin:")}</span>
                                 <span className={`text-sm font-bold ${profitMargin >= 30 ? 'text-green-400' :
                                     profitMargin >= 20 ? 'text-blue-400' :
                                         profitMargin >= 10 ? 'text-yellow-400' :
@@ -3821,7 +3822,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                 </span>
                             </div>
                             <p className="text-[9px] text-silver-dark mt-2">
-                                💡 {formData.cogs_items.length} COGS item(s) from shipment will be tracked for profit analysis
+                                💡 {formData.cogs_items.length} {t("COGS item(s) from shipment will be tracked for profit analysis")}
                             </p>
                         </div>
                     )}
@@ -3830,27 +3831,27 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-[11px] font-semibold text-silver-light mb-1">
-                                Customer Notes (tampil di invoice)
+                                {t("Customer Notes (tampil di invoice)")}
                             </label>
                             <textarea
                                 value={formData.customer_notes}
                                 onChange={(e) => setFormData(prev => ({ ...prev, customer_notes: e.target.value }))}
                                 className="w-full px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
                                 rows="3"
-                                placeholder="Catatan untuk customer..."
+                                placeholder={t("Catatan untuk customer...")}
                             />
                         </div>
 
                         <div>
                             <label className="block text-[11px] font-semibold text-silver-light mb-1">
-                                Internal Notes (tidak tampil di invoice)
+                                {t("Internal Notes (tidak tampil di invoice)")}
                             </label>
                             <textarea
                                 value={formData.notes}
                                 onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                                 className="w-full px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
                                 rows="3"
-                                placeholder="Catatan internal..."
+                                placeholder={t("Catatan internal...")}
                             />
                         </div>
                     </div>
@@ -3862,7 +3863,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                             onClick={onClose}
                             className="px-6 py-2 border border-dark-border text-silver-light rounded-lg hover:bg-dark-surface smooth-transition"
                         >
-                            Batal
+                            {t("Batal")}
                         </button>
                         <button
                             type="submit"
@@ -3879,6 +3880,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
 
 // Invoice View Modal Component
 const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint, onPreview, onSubmit, onAddItem, onReinvoice, onCreateAdditional, statusConfig, canEditInvoice, canSubmitInvoice, bankAccounts, onInvoiceUpdate, onEdit }) => {
+    const { t } = useLanguage();
     const [payments, setPayments] = useState([]);
     const [loadingPayments, setLoadingPayments] = useState(true);
     const [selectedBankId, setSelectedBankId] = useState(invoice.payment_bank_id || '');
@@ -3955,7 +3957,7 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                     <div>
                         <h2 className="text-2xl font-bold gradient-text">{invoice.invoice_number}</h2>
                         <p className="text-silver-dark text-sm mt-1">
-                            Job: {invoice.job_number} {invoice.so_number && `• SO: ${invoice.so_number}`}
+                            {t("Job:")} {invoice.job_number} {invoice.so_number && `• SO: ${invoice.so_number}`}
                         </p>
                     </div>
 
@@ -3967,7 +3969,7 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                         <div className="glass-card p-4 rounded-lg">
                             <div className="flex items-center gap-2 mb-3">
                                 <User className="w-4 h-4 text-accent-orange" />
-                                <h3 className="text-sm font-semibold text-accent-orange">Customer</h3>
+                                <h3 className="text-sm font-semibold text-accent-orange">{t("Customer")}</h3>
                             </div>
                             <div className="space-y-1 text-sm">
                                 <div className="text-silver-light font-medium">{invoice.customer_name}</div>
@@ -3983,21 +3985,21 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                         <div className="glass-card p-4 rounded-lg">
                             <div className="flex items-center gap-2 mb-3">
                                 <Calendar className="w-4 h-4 text-accent-orange" />
-                                <h3 className="text-sm font-semibold text-accent-orange">Tanggal</h3>
+                                <h3 className="text-sm font-semibold text-accent-orange">{t("Tanggal")}</h3>
                             </div>
                             <div className="space-y-2 text-sm">
                                 <div>
-                                    <span className="text-silver-dark">Invoice:</span>
+                                    <span className="text-silver-dark">{t("Invoice:")}</span>
                                     <span className="text-silver-light ml-2">{invoice.invoice_date}</span>
                                 </div>
                                 <div>
-                                    <span className="text-silver-dark">Due:</span>
+                                    <span className="text-silver-dark">{t("Due:")}</span>
                                     <span className={`ml-2 font-medium ${invoice.status === 'overdue' ? 'text-red-400' : 'text-silver-light'}`}>
                                         {invoice.due_date}
                                     </span>
                                 </div>
                                 <div>
-                                    <span className="text-silver-dark">Terms:</span>
+                                    <span className="text-silver-dark">{t("Terms:")}</span>
                                     <span className="text-silver-light ml-2">{invoice.payment_terms}</span>
                                 </div>
                             </div>
@@ -4009,40 +4011,40 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                             <div className="glass-card p-4 rounded-lg">
                                 <div className="flex items-center gap-2 mb-3">
                                     <Receipt className="w-4 h-4 text-accent-orange" />
-                                    <h3 className="text-sm font-semibold text-accent-orange">Shipment</h3>
+                                    <h3 className="text-sm font-semibold text-accent-orange">{t("Shipment")}</h3>
                                 </div>
                                 <div className="space-y-2 text-sm">
                                     <div>
-                                        <span className="text-silver-dark">Route:</span>
+                                        <span className="text-silver-dark">{t("Route:")}</span>
                                         <span className="text-silver-light ml-2 whitespace-normal break-words leading-snug inline-block align-top">
                                             {invoice.origin} → {invoice.destination}
                                         </span>
                                     </div>
                                     <div>
-                                        <span className="text-silver-dark">Service:</span>
+                                        <span className="text-silver-dark">{t("Service:")}</span>
                                         <span className="text-silver-light ml-2">{invoice.service_type?.toUpperCase()}</span>
                                     </div>
                                     {invoice.bl_awb_number && (
                                         <div>
-                                            <span className="text-silver-dark">BL/AWB:</span>
+                                            <span className="text-silver-dark">{t("BL/AWB:")}</span>
                                             <span className="text-silver-light ml-2">{invoice.bl_awb_number}</span>
                                         </div>
                                     )}
                                     {invoice.voyage && (
                                         <div>
-                                            <span className="text-silver-dark">Voyage:</span>
+                                            <span className="text-silver-dark">{t("Voyage:")}</span>
                                             <span className="text-silver-light ml-2">{invoice.voyage}</span>
                                         </div>
                                     )}
                                     {invoice.shipper_name && (
                                         <div>
-                                            <span className="text-silver-dark">Shipper:</span>
+                                            <span className="text-silver-dark">{t("Shipper:")}</span>
                                             <span className="text-silver-light ml-2">{invoice.shipper_name}</span>
                                         </div>
                                     )}
                                     {invoice.delivery_date && (
                                         <div>
-                                            <span className="text-silver-dark">Delivery Date:</span>
+                                            <span className="text-silver-dark">{t("Delivery Date:")}</span>
                                             <span className="text-silver-light ml-2">{invoice.delivery_date}</span>
                                         </div>
                                     )}
@@ -4054,30 +4056,30 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                                 <div className="glass-card p-4 rounded-lg">
                                     <div className="flex items-center gap-2 mb-3">
                                         <Package className="w-4 h-4 text-accent-orange" />
-                                        <h3 className="text-sm font-semibold text-accent-orange">Cargo Details</h3>
+                                        <h3 className="text-sm font-semibold text-accent-orange">{t("Cargo Details")}</h3>
                                     </div>
                                     <div className="space-y-2 text-sm">
                                         {invoice.container_type && (
                                             <div>
-                                                <span className="text-silver-dark">Container:</span>
+                                                <span className="text-silver-dark">{t("Container:")}</span>
                                                 <span className="text-silver-light ml-2">{invoice.container_type}</span>
                                             </div>
                                         )}
                                         {Boolean(invoice.weight && invoice.weight > 0) && (
                                             <div>
-                                                <span className="text-silver-dark">Weight:</span>
+                                                <span className="text-silver-dark">{t("Weight:")}</span>
                                                 <span className="text-silver-light ml-2">{invoice.weight} kg</span>
                                             </div>
                                         )}
                                         {invoice.dimensions && (
                                             <div>
-                                                <span className="text-silver-dark">Dimensions:</span>
+                                                <span className="text-silver-dark">{t("Dimensions:")}</span>
                                                 <span className="text-silver-light ml-2">{invoice.dimensions}</span>
                                             </div>
                                         )}
                                         {Boolean(invoice.cbm && invoice.cbm > 0) && (
                                             <div>
-                                                <span className="text-silver-dark">CBM:</span>
+                                                <span className="text-silver-dark">{t("CBM:")}</span>
                                                 <span className="text-silver-light ml-2">{invoice.cbm} m³</span>
                                             </div>
                                         )}
@@ -4090,19 +4092,19 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                     {/* Invoice Items Table */}
                     <div className="glass-card rounded-lg overflow-hidden">
                         <div className="px-4 py-3 bg-accent-orange">
-                            <h3 className="font-semibold text-white">Invoice Items</h3>
+                            <h3 className="font-semibold text-white">{t("Invoice Items")}</h3>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead className="bg-[#0070bc]">
                                     <tr className="text-left">
-                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase rounded-tl-lg">Item</th>
-                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase">Description</th>
-                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-center w-20">Qty</th>
-                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-center w-24">Unit</th>
-                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right w-32">Rate</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase rounded-tl-lg">{t("Item")}</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase">{t("Description")}</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-center w-20">{t("Qty")}</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-center w-24">{t("Unit")}</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right w-32">{t("Rate")}</th>
                                         <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right w-32">VAT</th>
-                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right w-32 rounded-tr-lg">Amount</th>
+                                        <th className="py-2.5 px-4 text-white font-semibold text-xs tracking-wider uppercase text-right w-32 rounded-tr-lg">{t("Amount")}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-dark-border/50 bg-dark-bg">
@@ -4127,41 +4129,41 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                         <div>
                             {invoice.customer_notes && (
                                 <div className="glass-card p-4 rounded-lg">
-                                    <h3 className="text-sm font-semibold text-accent-orange mb-2">Customer Notes</h3>
+                                    <h3 className="text-sm font-semibold text-accent-orange mb-2">{t("Customer Notes")}</h3>
                                     <p className="text-sm text-silver-light">{invoice.customer_notes}</p>
                                 </div>
                             )}
                         </div>
 
                         <div className="glass-card p-4 rounded-lg bg-gradient-to-br from-accent-orange/10 to-transparent border border-accent-orange/30">
-                            <h3 className="text-sm font-semibold text-accent-orange mb-3">Summary</h3>
+                            <h3 className="text-sm font-semibold text-accent-orange mb-3">{t("Summary")}</h3>
                             <div className="space-y-2">
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-silver-dark">Subtotal:</span>
+                                    <span className="text-silver-dark">{t("Subtotal:")}</span>
                                     <span className="text-silver-light">{formatCurrency(invoice.subtotal, invoice.currency)}</span>
                                 </div>
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-silver-dark">VAT (from items):</span>
+                                    <span className="text-silver-dark">{t("VAT (from items):")}</span>
                                     <span className="text-silver-light">{formatCurrency(invoice.tax_amount, invoice.currency)}</span>
                                 </div>
                                 {invoice.discount_amount > 0 && (
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-silver-dark">Discount:</span>
+                                        <span className="text-silver-dark">{t("Discount:")}</span>
                                         <span className="text-red-400">-{formatCurrency(invoice.discount_amount, invoice.currency)}</span>
                                     </div>
                                 )}
                                 <div className="border-t border-dark-border pt-2 mt-2">
                                     <div className="flex justify-between font-bold">
-                                        <span className="text-silver-light">Total:</span>
+                                        <span className="text-silver-light">{t("Total:")}</span>
                                         <span className="text-accent-orange text-lg">{formatCurrency(invoice.total_amount, invoice.currency)}</span>
                                     </div>
                                 </div>
                                 <div className="flex justify-between text-sm pt-2 border-t border-dark-border/50">
-                                    <span className="text-silver-dark">Paid:</span>
+                                    <span className="text-silver-dark">{t("Paid:")}</span>
                                     <span className="text-green-400 font-medium">{formatCurrency(invoice.paid_amount || 0, invoice.currency)}</span>
                                 </div>
                                 <div className="flex justify-between font-semibold">
-                                    <span className="text-silver-light">Outstanding:</span>
+                                    <span className="text-silver-light">{t("Outstanding:")}</span>
                                     <span className={invoice.outstanding_amount > 0 ? 'text-yellow-400' : 'text-green-400'}>
                                         {formatCurrency(invoice.outstanding_amount || 0, invoice.currency)}
                                     </span>
@@ -4176,16 +4178,16 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                     {/* Payment History */}
                     <div className="glass-card p-4 rounded-lg">
                         <div className="flex items-center justify-between mb-3">
-                            <h3 className="text-sm font-semibold text-accent-orange">Payment History</h3>
+                            <h3 className="text-sm font-semibold text-accent-orange">{t("Payment History")}</h3>
                             {payments.length > 0 && (
-                                <span className="text-xs text-silver-dark">{payments.length} payment(s)</span>
+                                <span className="text-xs text-silver-dark">{payments.length} {t("payment(s)")}</span>
                             )}
                         </div>
 
                         {loadingPayments ? (
-                            <div className="text-center py-4 text-silver-dark">Loading payments...</div>
+                            <div className="text-center py-4 text-silver-dark">{t("Loading payments...")}</div>
                         ) : payments.length === 0 ? (
-                            <div className="text-center py-4 text-silver-dark">Belum ada pembayaran</div>
+                            <div className="text-center py-4 text-silver-dark">{t("Belum ada pembayaran")}</div>
                         ) : (
                             <div className="space-y-2">
                                 {payments.map((payment) => (
@@ -4214,9 +4216,9 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                         <div className="glass-card p-4 rounded-lg border border-blue-500/20">
                             <div className="flex items-center justify-between mb-3">
                                 <h3 className="text-sm font-semibold text-blue-400 flex items-center gap-2">
-                                    🏦 Rekening Bank Pembayaran
+                                    {t("🏦 Rekening Bank Pembayaran")}
                                 </h3>
-                                {savingBank && <span className="text-xs text-silver-dark animate-pulse">Menyimpan...</span>}
+                                {savingBank && <span className="text-xs text-silver-dark animate-pulse">{t("Menyimpan...")}</span>}
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
                                 <div>
@@ -4226,7 +4228,7 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                                         className="w-full px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm"
                                         disabled={savingBank}
                                     >
-                                        <option value="">-- Tampilkan semua rekening --</option>
+                                        <option value="">{t("-- Tampilkan semua rekening --")}</option>
                                         {bankAccounts.map(bank => (
                                             <option key={bank.id} value={bank.id}>
                                                 {bank.bank_name} ({bank.currency || 'IDR'}) – {bank.account_number}
@@ -4234,7 +4236,7 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                                         ))}
                                     </select>
                                     <p className="text-[10px] text-silver-dark mt-1">
-                                        Pilihan rekening yang tampil di cetak invoice
+                                        {t("Pilihan rekening yang tampil di cetak invoice")}
                                     </p>
                                 </div>
                                 {selectedBankId && (() => {
@@ -4242,10 +4244,10 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                                     return sel ? (
                                         <div className="p-2.5 rounded-lg bg-blue-500/10 border border-blue-500/30 text-xs space-y-0.5">
                                             <div className="font-bold text-blue-300">{sel.bank_name} ({sel.currency || 'IDR'})</div>
-                                            <div className="text-silver-light">No. Rek: <span className="font-mono">{sel.account_number}</span></div>
+                                            <div className="text-silver-light">{t("No. Rek:")} <span className="font-mono">{sel.account_number}</span></div>
                                             <div className="text-silver-light">A/N: {sel.account_holder}</div>
-                                            {sel.branch && <div className="text-silver-dark">Cabang: {sel.branch}</div>}
-                                            {sel.swift_code && <div className="text-silver-dark">SWIFT: {sel.swift_code}</div>}
+                                            {sel.branch && <div className="text-silver-dark">{t("Cabang:")} {sel.branch}</div>}
+                                            {sel.swift_code && <div className="text-silver-dark">{t("SWIFT:")} {sel.swift_code}</div>}
                                         </div>
                                     ) : null;
                                 })()}
@@ -4257,14 +4259,14 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                     <div className="flex gap-3 justify-end pt-4 border-t border-dark-border flex-wrap">
                         {invoice.outstanding_amount > 0 && (
                             <p className="text-xs text-silver-dark self-center mr-auto">
-                                💡 Payment via AR (Accounts Receivable) module
+                                {t("💡 Payment via AR (Accounts Receivable) module")}
                             </p>
                         )}
                         <button
                             onClick={onClose}
                             className="px-6 py-2 border border-dark-border text-silver-light rounded-lg hover:bg-dark-surface smooth-transition"
                         >
-                            Close
+                            {t("Close")}
                         </button>
 
                         {/* Create Reimbursement — always visible, but blocked if partial payment exists */}
@@ -4280,7 +4282,7 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                                 title={invoice.paid_amount > 0 ? "Cannot create reimbursement for partially paid invoice" : "Create reimbursement invoice for additional charges"}
                             >
                                 <Plus className="w-4 h-4" />
-                                Create Reimbursement
+                                {t("Create Reimbursement")}
                             </button>
                         )}
 
@@ -4291,10 +4293,10 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                                     onCreateAdditional(invoice);
                                 }}
                                 className="flex items-center gap-2 px-4 py-2 border border-violet-300 text-violet-800 rounded-lg hover:bg-violet-100 smooth-transition font-semibold text-xs"
-                                title="Buat invoice tambahan mengikuti nomor pengajuan yang sama (v1, v2, dsb)"
+                                title={t("Buat invoice tambahan mengikuti nomor pengajuan yang sama (v1, v2, dsb)")}
                             >
                                 <Plus className="w-4 h-4" />
-                                Invoice Tambahan
+                                {t("Invoice Tambahan")}
                             </button>
                         )}
 
@@ -4302,10 +4304,10 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                             <button
                                 onClick={onReinvoice}
                                 className="flex items-center gap-2 px-4 py-2 border border-orange-300 text-orange-800 rounded-lg hover:bg-orange-100 smooth-transition font-semibold"
-                                title="Create new draft reinvoice from this invoice"
+                                title={t("Create new draft reinvoice from this invoice")}
                             >
                                 <FileText className="w-4 h-4" />
-                                Create Reinvoice
+                                {t("Create Reinvoice")}
                             </button>
                         )}
 
@@ -4313,10 +4315,10 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                             <button
                                 onClick={onEdit}
                                 className="flex items-center gap-2 px-5 py-2 border border-blue-500 text-blue-400 rounded-lg hover:bg-blue-500/10 smooth-transition"
-                                title="Edit invoice details and amounts"
+                                title={t("Edit invoice details and amounts")}
                             >
                                 <div className="w-4 h-4">✏️</div>
-                                Edit
+                                {t("Edit")}
                             </button>
                         )}
 
@@ -4326,7 +4328,7 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                                 className="flex items-center gap-2 px-5 py-2 border border-blue-500 text-blue-400 rounded-lg hover:bg-blue-500/10 smooth-transition"
                             >
                                 <div className="w-4 h-4">🖨️</div>
-                                Print
+                                {t("Print")}
                             </button>
                         )}
                         {onPreview && (
@@ -4335,7 +4337,7 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                                 className="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg smooth-transition font-semibold"
                             >
                                 <Eye className="w-4 h-4" />
-                                Preview
+                                {t("Preview")}
                             </button>
                         )}
                         {invoice.status === 'draft' && onSubmit && canSubmitInvoice && (
@@ -4344,7 +4346,7 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                                 className="flex items-center gap-2 px-5 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg smooth-transition font-semibold"
                             >
                                 <Send className="w-4 h-4" />
-                                Submit for Approval
+                                {t("Submit for Approval")}
                             </button>
                         )}
                     </div>
@@ -4356,6 +4358,7 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
 
 // Payment Record Modal Component
 const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => {
+    const { t } = useLanguage();
     const [formData, setFormData] = useState({
         payment_date: new Date().toISOString().split('T')[0],
         amount: invoice.outstanding_amount || 0,
@@ -4396,7 +4399,7 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
         e.preventDefault();
 
         if (formData.amount <= 0) {
-            alert('Payment amount must be greater than 0');
+            alert(t("Payment amount must be greater than 0"));
             return;
         }
 
@@ -4487,25 +4490,25 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
     return (
         <Modal isOpen={true} onClose={onClose} maxWidth="max-w-2xl">
             <div className="p-6">
-                <h2 className="text-2xl font-bold gradient-text mb-6">Record Payment</h2>
+                <h2 className="text-2xl font-bold gradient-text mb-6">{t("Record Payment")}</h2>
 
                 {/* Invoice Info Summary */}
                 <div className="glass-card p-4 rounded-lg mb-6 bg-gradient-to-br from-accent-orange/10 to-transparent border border-accent-orange/30">
                     <div className="grid grid-cols-2 gap-3 text-sm">
                         <div>
-                            <span className="text-silver-dark">Invoice:</span>
+                            <span className="text-silver-dark">{t("Invoice:")}</span>
                             <span className="text-silver-light font-medium ml-2">{invoice.invoice_number}</span>
                         </div>
                         <div>
-                            <span className="text-silver-dark">Customer:</span>
+                            <span className="text-silver-dark">{t("Customer:")}</span>
                             <span className="text-silver-light font-medium ml-2">{invoice.customer_name}</span>
                         </div>
                         <div>
-                            <span className="text-silver-dark">Total Amount:</span>
+                            <span className="text-silver-dark">{t("Total Amount:")}</span>
                             <span className="text-silver-light font-medium ml-2">{formatCurrency(invoice.total_amount, invoice.currency)}</span>
                         </div>
                         <div>
-                            <span className="text-silver-dark">Outstanding:</span>
+                            <span className="text-silver-dark">{t("Outstanding:")}</span>
                             <span className="text-yellow-400 font-bold ml-2">{formatCurrency(invoice.outstanding_amount, invoice.currency)}</span>
                         </div>
                     </div>
@@ -4516,7 +4519,7 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-[11px] font-semibold text-silver-light mb-1">
-                                Payment Date <span className="text-red-400">*</span>
+                                {t("Payment Date")} <span className="text-red-400">*</span>
                             </label>
                             <input
                                 type="date"
@@ -4529,7 +4532,7 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
 
                         <div>
                             <label className="block text-[11px] font-semibold text-silver-light mb-1">
-                                Amount ({invoice.currency}) <span className="text-red-400">*</span>
+                                {t("Amount (")}{invoice.currency}) <span className="text-red-400">*</span>
                             </label>
                             <input
                                 type="number"
@@ -4542,7 +4545,7 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
                                 required
                             />
                             <p className="text-xs text-silver-dark mt-1">
-                                Max: {formatCurrency(invoice.outstanding_amount, invoice.currency)}
+                                {t("Max:")} {formatCurrency(invoice.outstanding_amount, invoice.currency)}
                             </p>
                         </div>
                     </div>
@@ -4550,7 +4553,7 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
                     {/* Payment Method */}
                     <div>
                         <label className="block text-[11px] font-semibold text-silver-light mb-1">
-                            Payment Method <span className="text-red-400">*</span>
+                            {t("Payment Method")} <span className="text-red-400">*</span>
                         </label>
                         <select
                             value={formData.payment_method}
@@ -4558,38 +4561,38 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
                             className="w-full px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
                             required
                         >
-                            <option value="bank_transfer">Bank Transfer</option>
-                            <option value="cash">Cash</option>
-                            <option value="check">Check</option>
-                            <option value="credit_card">Credit Card</option>
+                            <option value="bank_transfer">{t("Bank Transfer")}</option>
+                            <option value="cash">{t("Cash")}</option>
+                            <option value="check">{t("Check")}</option>
+                            <option value="credit_card">{t("Credit Card")}</option>
                         </select>
                     </div>
 
                     {/* Reference Number */}
                     <div>
                         <label className="block text-[11px] font-semibold text-silver-light mb-1">
-                            Reference Number
+                            {t("Reference Number")}
                         </label>
                         <input
                             type="text"
                             value={formData.reference_number}
                             onChange={(e) => setFormData(prev => ({ ...prev, reference_number: e.target.value }))}
                             className="w-full px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
-                            placeholder="Transaction ID, Check number, etc."
+                            placeholder={t("Transaction ID, Check number, etc.")}
                         />
                     </div>
 
                     {/* Received in Account */}
                     <div>
                         <label className="block text-[11px] font-semibold text-silver-light mb-1">
-                            Received in Account
+                            {t("Received in Account")}
                         </label>
                         <select
                             value={formData.received_in_account}
                             onChange={(e) => setFormData(prev => ({ ...prev, received_in_account: e.target.value }))}
                             className="w-full px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
                         >
-                            <option value="">-- Select Bank Account --</option>
+                            <option value="">{t("-- Select Bank Account --")}</option>
                             {bankAccounts.map(account => (
                                 <option key={account.id} value={account.id}>
                                     {account.bank_name} - {account.account_number} ({account.currency})
@@ -4602,14 +4605,14 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
                     {/* Notes */}
                     <div>
                         <label className="block text-[11px] font-semibold text-silver-light mb-1">
-                            Notes
+                            {t("Notes")}
                         </label>
                         <textarea
                             value={formData.notes}
                             onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                             className="w-full px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded-lg text-silver-light"
                             rows="3"
-                            placeholder="Additional payment notes..."
+                            placeholder={t("Additional payment notes...")}
                         />
                     </div>
 
@@ -4621,7 +4624,7 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
                             className="px-6 py-2 border border-dark-border text-silver-light rounded-lg hover:bg-dark-surface smooth-transition"
                             disabled={loading}
                         >
-                            Batal
+                            {t("Batal")}
                         </button>
                         <button
                             type="submit"
@@ -4711,16 +4714,16 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
             <div className="p-6">
                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
                     <div>
-                        <h2 className="text-2xl font-bold gradient-text">Print Preview</h2>
-                        <p className="text-sm text-silver-dark mt-1">Gunakan opsi Split Invoice untuk membagi tagihan per termin perjalanan.</p>
+                        <h2 className="text-2xl font-bold gradient-text">{t("Print Preview")}</h2>
+                        <p className="text-sm text-silver-dark mt-1">{t("Gunakan opsi Split Invoice untuk membagi tagihan per termin perjalanan.")}</p>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3">
                         <div className="flex items-center gap-2 bg-dark-bg p-2 rounded-lg border border-dark-border">
-                            <label className="text-xs text-silver-light font-medium whitespace-nowrap">Print Label:</label>
+                            <label className="text-xs text-silver-light font-medium whitespace-nowrap">{t("Print Label:")}</label>
                             <input
                                 type="text"
-                                placeholder="Misal: Termin 1 (DP)"
+                                placeholder={t("Misal: Termin 1 (DP)")}
                                 value={splitLabel}
                                 onChange={(e) => setSplitLabel(e.target.value)}
                                 className="bg-dark-surface border border-dark-border text-silver-light px-2 py-1 rounded text-sm w-32 ml-1"
@@ -4728,7 +4731,7 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                         </div>
 
                         <div className="flex items-center gap-2 bg-dark-bg p-2 rounded-lg border border-dark-border">
-                            <label className="text-xs text-silver-light font-medium whitespace-nowrap">VAT Rate (%):</label>
+                            <label className="text-xs text-silver-light font-medium whitespace-nowrap">{t("VAT Rate (%):")}</label>
                             <input
                                 type="number"
                                 step="0.01"
@@ -4739,7 +4742,7 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                         </div>
 
                         <div className="flex items-center gap-2 bg-dark-bg p-2 rounded-lg border border-dark-border">
-                            <label className="text-xs text-silver-light font-medium whitespace-nowrap">Filter Kurs / Cetak:</label>
+                            <label className="text-xs text-silver-light font-medium whitespace-nowrap">{t("Filter Kurs / Cetak:")}</label>
                             <select
                                 value={printCurrency}
                                 onChange={(e) => handleCurrencyFilter(e.target.value)}
@@ -4756,31 +4759,31 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                             className="flex items-center gap-2 px-4 py-2 bg-accent-orange hover:bg-accent-orange/80 text-white rounded-lg smooth-transition font-semibold h-[38px]"
                         >
                             <Download className="w-4 h-4" />
-                            Print / PDF
+                            {t("Print / PDF")}
                         </button>
                         <button
                             onClick={onClose}
                             className="px-4 py-2 border border-dark-border text-silver-light rounded-lg hover:bg-dark-surface smooth-transition h-[38px]"
                         >
-                            Close
+                            {t("Close")}
                         </button>
                     </div>
                 </div>
 
                 {/* Custom Split Invoice Configurator */}
                 <div className="bg-dark-surface mb-6 p-4 rounded-lg border border-dark-border">
-                    <h3 className="text-sm font-semibold text-silver-light mb-3">Pilih Item untuk Dicetak</h3>
+                    <h3 className="text-sm font-semibold text-silver-light mb-3">{t("Pilih Item untuk Dicetak")}</h3>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm text-silver-light">
                             <thead className="text-xs text-silver-dark uppercase bg-dark-bg">
                                 <tr>
-                                    <th className="px-3 py-2 text-center w-10">Pilih</th>
-                                    <th className="px-3 py-2">Item deskripsi</th>
-                                    <th className="px-3 py-2 w-24 text-center">Qty Total</th>
-                                    <th className="px-3 py-2 w-24 text-center">Qty Cetak</th>
-                                    <th className="px-3 py-2 w-32 text-right">Harga Asli</th>
-                                    <th className="px-3 py-2 w-32 text-right">Harga Cetak</th>
-                                    <th className="px-3 py-2 w-32 text-right">Subtotal</th>
+                                    <th className="px-3 py-2 text-center w-10">{t("Pilih")}</th>
+                                    <th className="px-3 py-2">{t("Item deskripsi")}</th>
+                                    <th className="px-3 py-2 w-24 text-center">{t("Qty Total")}</th>
+                                    <th className="px-3 py-2 w-24 text-center">{t("Qty Cetak")}</th>
+                                    <th className="px-3 py-2 w-32 text-right">{t("Harga Asli")}</th>
+                                    <th className="px-3 py-2 w-32 text-right">{t("Harga Cetak")}</th>
+                                    <th className="px-3 py-2 w-32 text-right">{t("Subtotal")}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -4847,16 +4850,16 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                                         <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', fontStyle: 'italic', color: '#000' }}>
                                             {companySettings?.company_name?.split(' ')[0] || 'FREIGHT'}ONE
                                         </h1>
-                                        <p style={{ margin: 0, fontSize: '8px', letterSpacing: '3px', color: '#555', textTransform: 'uppercase' }}>LOGISTICS SOLUTIONS</p>
+                                        <p style={{ margin: 0, fontSize: '8px', letterSpacing: '3px', color: '#555', textTransform: 'uppercase' }}>{t("LOGISTICS SOLUTIONS")}</p>
                                     </>
                                 )}
                             </div>
                             <div style={{ textAlign: 'right', fontSize: '9px', lineHeight: '1.4', color: '#333' }}>
                                 <strong>{companySettings?.company_name || 'PT. Freight One Indonesia'}</strong><br />
                                 {(companySettings?.company_address || '').split('\n').map((line, i) => <span key={i}>{line}<br /></span>)}
-                                Phone: {companySettings?.company_phone || '-'}<br />
-                                Email: {companySettings?.company_email || '-'}
-                                {companySettings?.company_npwp && <><br />NPWP: {companySettings.company_npwp}</>}
+                                {t("Phone:")} {companySettings?.company_phone || '-'}<br />
+                                {t("Email:")} {companySettings?.company_email || '-'}
+                                {companySettings?.company_npwp && <><br />{t("NPWP:")} {companySettings.company_npwp}</>}
                             </div>
                         </div>
 
@@ -4865,14 +4868,14 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                             backgroundColor: '#FF9B00', color: '#000000', padding: '8px 10px', marginBottom: '15px',
                             fontWeight: 'bold', fontSize: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
                         }}>
-                            <span>VAT INVOICE {invoice.invoice_number}</span>
-                            <span style={{ fontSize: '10px', fontWeight: 'normal', color: 'rgba(0,0,0,0.6)' }}>Page 1 of 1</span>
+                            <span>{t("VAT INVOICE")} {invoice.invoice_number}</span>
+                            <span style={{ fontSize: '10px', fontWeight: 'normal', color: 'rgba(0,0,0,0.6)' }}>{t("Page 1 of 1")}</span>
                         </div>
 
                         {/* Top Info */}
                         <div style={{ display: 'flex', marginBottom: '25px' }}>
                             <div style={{ width: '55%', paddingRight: '20px' }}>
-                                <div style={{ marginBottom: '4px', fontWeight: 'bold', fontSize: '9px', color: '#555' }}>BILL TO / CUSTOMER:</div>
+                                <div style={{ marginBottom: '4px', fontWeight: 'bold', fontSize: '9px', color: '#555' }}>{t("BILL TO / CUSTOMER:")}</div>
                                 <div style={{ fontWeight: 'bold', fontSize: '12px', marginBottom: '3px' }}>{invoice.customer_name}</div>
                                 <div style={{ marginBottom: '3px', fontSize: '11px' }}>
                                     {(() => {
@@ -4880,17 +4883,17 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                                         return addr && addr.trim() !== '-' ? String(addr).split('\n').map((line, i) => <span key={i}>{line}<br /></span>) : null;
                                     })()}
                                 </div>
-                                <div style={{ fontSize: '11px' }}>Attn: {invoice.customer_contact_name || invoice.customer_pic || '-'}</div>
+                                <div style={{ fontSize: '11px' }}>{t("Attn:")} {invoice.customer_contact_name || invoice.customer_pic || '-'}</div>
                             </div>
                             <div style={{ width: '45%' }}>
                                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                     <tbody>
-                                        <tr><td style={{ width: '120px', fontWeight: 'bold', color: '#444', padding: '4px 0', verticalAlign: 'top', fontSize: '11px' }}>INVOICE DATE</td><td style={{ fontWeight: 'bold', padding: '4px 0', verticalAlign: 'top', fontSize: '11px' }}>: {safeDate(invoice.invoice_date)}</td></tr>
-                                        <tr><td style={{ fontWeight: 'bold', color: '#444', padding: '4px 0', verticalAlign: 'top', fontSize: '11px' }}>JOB NUMBER</td><td style={{ fontWeight: 'bold', padding: '4px 0', verticalAlign: 'top', fontSize: '11px' }}>: {invoice.job_number}</td></tr>
-                                        <tr><td style={{ fontWeight: 'bold', color: '#444', padding: '4px 0', verticalAlign: 'top', fontSize: '11px' }}>DUE DATE</td><td style={{ fontWeight: 'bold', padding: '4px 0', verticalAlign: 'top', fontSize: '11px' }}>: {safeDate(invoice.due_date)}</td></tr>
-                                        <tr><td style={{ fontWeight: 'bold', color: '#444', padding: '4px 0', verticalAlign: 'top', fontSize: '11px' }}>TERMS</td><td style={{ fontWeight: 'bold', padding: '4px 0', verticalAlign: 'top', fontSize: '11px' }}>: {invoice.payment_terms}</td></tr>
+                                        <tr><td style={{ width: '120px', fontWeight: 'bold', color: '#444', padding: '4px 0', verticalAlign: 'top', fontSize: '11px' }}>{t("INVOICE DATE")}</td><td style={{ fontWeight: 'bold', padding: '4px 0', verticalAlign: 'top', fontSize: '11px' }}>: {safeDate(invoice.invoice_date)}</td></tr>
+                                        <tr><td style={{ fontWeight: 'bold', color: '#444', padding: '4px 0', verticalAlign: 'top', fontSize: '11px' }}>{t("JOB NUMBER")}</td><td style={{ fontWeight: 'bold', padding: '4px 0', verticalAlign: 'top', fontSize: '11px' }}>: {invoice.job_number}</td></tr>
+                                        <tr><td style={{ fontWeight: 'bold', color: '#444', padding: '4px 0', verticalAlign: 'top', fontSize: '11px' }}>{t("DUE DATE")}</td><td style={{ fontWeight: 'bold', padding: '4px 0', verticalAlign: 'top', fontSize: '11px' }}>: {safeDate(invoice.due_date)}</td></tr>
+                                        <tr><td style={{ fontWeight: 'bold', color: '#444', padding: '4px 0', verticalAlign: 'top', fontSize: '11px' }}>{t("TERMS")}</td><td style={{ fontWeight: 'bold', padding: '4px 0', verticalAlign: 'top', fontSize: '11px' }}>: {invoice.payment_terms}</td></tr>
                                         {invoice.customer_npwp && (
-                                            <tr><td style={{ fontWeight: 'bold', color: '#444', padding: '4px 0', verticalAlign: 'top', fontSize: '11px' }}>NPWP</td><td style={{ fontWeight: 'bold', padding: '4px 0', verticalAlign: 'top', fontSize: '11px' }}>: {invoice.customer_npwp}</td></tr>
+                                            <tr><td style={{ fontWeight: 'bold', color: '#444', padding: '4px 0', verticalAlign: 'top', fontSize: '11px' }}>{t("NPWP")}</td><td style={{ fontWeight: 'bold', padding: '4px 0', verticalAlign: 'top', fontSize: '11px' }}>: {invoice.customer_npwp}</td></tr>
                                         )}
                                     </tbody>
                                 </table>
@@ -4900,69 +4903,69 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                         {/* Shipment Details Box */}
                         <div style={{ border: '1px solid #000', marginBottom: '20px' }}>
                             <div style={{ background: '#FF9B00', color: '#000000', fontWeight: 'bold', padding: '4px 8px', textTransform: 'uppercase', fontSize: '11px', borderBottom: 'none' }}>
-                                SHIPMENT DETAILS
+                                {t("SHIPMENT DETAILS")}
                             </div>
 
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid #ccc' }}>
                                 <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}>
-                                    <label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>CONSIGNOR / SHIPPER</label>
+                                    <label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>{t("CONSIGNOR / SHIPPER")}</label>
                                     <span style={{ display: 'block', fontWeight: 'bold', fontSize: '11px', color: '#000', minHeight: '12px' }}>{safeStr(invoice.consignor || invoice.shipper_name)}</span>
                                 </div>
                                 <div style={{ padding: '3px 6px' }}>
-                                    <label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>CONSIGNEE</label>
+                                    <label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>{t("CONSIGNEE")}</label>
                                     <span style={{ display: 'block', fontWeight: 'bold', fontSize: '11px', color: '#000', minHeight: '12px' }}>{safeStr(invoice.consignee || invoice.consignee_name || invoice.customer_name)}</span>
                                 </div>
                             </div>
 
                             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1.5fr', borderBottom: '1px solid #ccc' }}>
-                                <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>VESSEL / VOYAGE</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeStr(invoice.vessel_name || invoice.vessel)} / {safeStr(invoice.voyage_number || invoice.voyage)}</span></div>
+                                <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>{t("VESSEL / VOYAGE")}</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeStr(invoice.vessel_name || invoice.vessel)} / {safeStr(invoice.voyage_number || invoice.voyage)}</span></div>
                                 <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>ETD</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeDate(invoice.etd)}</span></div>
                                 <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>ETA</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeDate(invoice.eta)}</span></div>
-                                <div style={{ padding: '3px 6px' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>REF NO</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeStr(invoice.order_reference)}</span></div>
+                                <div style={{ padding: '3px 6px' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>{t("REF NO")}</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeStr(invoice.order_reference)}</span></div>
                             </div>
 
                             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1.5fr', borderBottom: '1px solid #ccc' }}>
-                                <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>ORIGIN (POL)</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeStr(invoice.origin)}</span></div>
-                                <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>DESTINATION (POD)</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeStr(invoice.destination)}</span></div>
+                                <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>{t("ORIGIN (POL)")}</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeStr(invoice.origin)}</span></div>
+                                <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>{t("DESTINATION (POD)")}</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeStr(invoice.destination)}</span></div>
                                 <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>{(invoice.service_type || '').toLowerCase().includes('air') ? 'MAWB' : 'MASTER BL'}</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeStr(invoice.ocean_bl || invoice.bl_awb_number)}</span></div>
                                 <div style={{ padding: '3px 6px' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>{(invoice.service_type || '').toLowerCase().includes('air') ? 'HAWB' : 'HOUSE BL'}</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeStr(invoice.house_bl)}</span></div>
                             </div>
 
                             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1.5fr', borderBottom: '1px solid #ccc' }}>
-                                <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>PACKAGES</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeStr(invoice.packages)}</span></div>
-                                <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>GROSS WEIGHT</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{invoice.weight || 0} KGS</span></div>
-                                <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>MEASUREMENT</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{invoice.cbm || 0} CBM</span></div>
-                                <div style={{ padding: '3px 6px' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>CHG WEIGHT</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{invoice.chargeable_weight || 0} KGS</span></div>
+                                <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>{t("PACKAGES")}</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeStr(invoice.packages)}</span></div>
+                                <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>{t("GROSS WEIGHT")}</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{invoice.weight || 0} KGS</span></div>
+                                <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>{t("MEASUREMENT")}</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{invoice.cbm || 0} CBM</span></div>
+                                <div style={{ padding: '3px 6px' }}><label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>{t("CHG WEIGHT")}</label><span style={{ fontWeight: 'bold', fontSize: '11px' }}>{invoice.chargeable_weight || 0} KGS</span></div>
                             </div>
 
                             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', borderBottom: '1px solid #ccc' }}>
                                 <div style={{ padding: '3px 6px', borderRight: '1px solid #ccc' }}>
-                                    <label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>DESCRIPTION OF GOODS</label>
+                                    <label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>{t("DESCRIPTION OF GOODS")}</label>
                                     <span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeStr(invoice.goods_description)}</span>
                                 </div>
                                 <div style={{ padding: '3px 6px' }}>
-                                    <label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>CONTAINER NOS</label>
+                                    <label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>{t("CONTAINER NOS")}</label>
                                     <span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeStr(invoice.containers)}</span>
                                 </div>
                             </div>
 
                             <div style={{ padding: '3px 6px' }}>
-                                <label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>IMPORT BROKER</label>
+                                <label style={{ display: 'block', fontSize: '9px', color: '#666', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>{t("IMPORT BROKER")}</label>
                                 <span style={{ fontWeight: 'bold', fontSize: '11px' }}>{safeStr(invoice.import_broker)}</span>
                             </div>
                         </div>
 
                         {/* Charges Table */}
-                        <div style={{ marginBottom: '2px', fontWeight: 'bold', fontSize: '11px', marginTop: '10px' }}>CHARGES BREAKDOWN</div>
+                        <div style={{ marginBottom: '2px', fontWeight: 'bold', fontSize: '11px', marginTop: '10px' }}>{t("CHARGES BREAKDOWN")}</div>
                         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '5px', border: '1px solid #000' }}>
                             <thead>
                                 <tr style={{ background: '#e0e0e0' }}>
                                     <th style={{ borderBottom: '1px solid #000', borderRight: '1px solid #ccc', padding: '6px 8px', textAlign: 'center', fontWeight: 'bold', fontSize: '11px', width: '5%' }}>NO</th>
-                                    <th style={{ borderBottom: '1px solid #000', borderRight: '1px solid #ccc', padding: '6px 8px', textAlign: 'left', fontWeight: 'bold', fontSize: '11px', width: '35%', paddingLeft: '10px' }}>DESCRIPTION</th>
+                                    <th style={{ borderBottom: '1px solid #000', borderRight: '1px solid #ccc', padding: '6px 8px', textAlign: 'left', fontWeight: 'bold', fontSize: '11px', width: '35%', paddingLeft: '10px' }}>{t("DESCRIPTION")}</th>
                                     <th style={{ borderBottom: '1px solid #000', borderRight: '1px solid #ccc', padding: '6px 8px', textAlign: 'center', fontWeight: 'bold', fontSize: '11px', width: '10%' }}>QTY</th>
-                                    <th style={{ borderBottom: '1px solid #000', borderRight: '1px solid #ccc', padding: '6px 8px', textAlign: 'right', fontWeight: 'bold', fontSize: '11px', width: '15%' }}>UNIT PRICE</th>
+                                    <th style={{ borderBottom: '1px solid #000', borderRight: '1px solid #ccc', padding: '6px 8px', textAlign: 'right', fontWeight: 'bold', fontSize: '11px', width: '15%' }}>{t("UNIT PRICE")}</th>
                                     <th style={{ borderBottom: '1px solid #000', borderRight: '1px solid #ccc', padding: '6px 8px', textAlign: 'right', fontWeight: 'bold', fontSize: '11px', width: '15%' }}>VAT</th>
-                                    <th style={{ borderBottom: '1px solid #000', padding: '6px 8px', textAlign: 'right', fontWeight: 'bold', fontSize: '11px', width: '20%', paddingRight: '10px' }}>TOTAL ({printCurrency})</th>
+                                    <th style={{ borderBottom: '1px solid #000', padding: '6px 8px', textAlign: 'right', fontWeight: 'bold', fontSize: '11px', width: '20%', paddingRight: '10px' }}>{t("TOTAL (")}{printCurrency})</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -5018,7 +5021,7 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
 
                         {isSplit && (
                             <div style={{ fontStyle: 'italic', marginBottom: '10px', fontSize: '11px', color: '#444' }}>
-                                * This is a partial billing: <strong>{splitLabel}</strong>
+                                {t("* This is a partial billing:")} <strong>{splitLabel}</strong>
                             </div>
                         )}
 
@@ -5026,15 +5029,15 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
                             <div style={{ width: '320px', border: '1px solid #000', borderTop: 'none' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', fontWeight: 'bold', fontSize: '11px', borderBottom: '1px solid #ccc', background: '#f9f9f9' }}>
-                                    <span>SUBTOTAL</span>
+                                    <span>{t("SUBTOTAL")}</span>
                                     <span>{formatCurrency(splitSubtotal, printCurrency)}</span>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', fontWeight: 'bold', fontSize: '11px', borderBottom: '1px solid #ccc' }}>
-                                    <span>VAT Total</span>
+                                    <span>{t("VAT Total")}</span>
                                     <span>{formatCurrency(splitTax, printCurrency)}</span>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', fontWeight: 'bold', fontSize: '13px', background: '#FF9B00', color: 'black' }}>
-                                    <span>TOTAL AMOUNT</span>
+                                    <span>{t("TOTAL AMOUNT")}</span>
                                     <span>{formatCurrency(splitTotal, printCurrency)}</span>
                                 </div>
                             </div>
@@ -5044,8 +5047,8 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                         <div style={{ display: 'flex', marginTop: 'auto', borderTop: '2px solid #000', paddingTop: '20px' }}>
                             <div style={{ flex: '1', paddingRight: '40px', fontSize: '10px' }}>
                                 <div style={{ border: '1px solid #999', background: '#fcfcfc', padding: '10px', marginTop: '8px', borderRadius: '4px' }}>
-                                    <b style={{ fontSize: '11px' }}>PAYMENT DETAILS:</b><br /><br />
-                                    Please transfer to:<br />
+                                    <b style={{ fontSize: '11px' }}>{t("PAYMENT DETAILS:")}</b><br /><br />
+                                    {t("Please transfer to:")}<br />
                                     {(() => {
                                         const selectedBank = invoice.payment_bank_id
                                             ? (bankAccounts || []).find(b => b.id === invoice.payment_bank_id)
@@ -5058,15 +5061,15 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                                                 <b>{bank.bank_name} ({bank.currency || invoice.currency})</b><br />
                                                 A/C No: {bank.account_number}<br />
                                                 A/N: {bank.account_holder}<br />
-                                                {bank.branch && <>Branch: {bank.branch}<br /></>}
-                                                {bank.swift_code && <>SWIFT: {bank.swift_code}</>}
+                                                {bank.branch && <>{t("Branch:")} {bank.branch}<br /></>}
+                                                {bank.swift_code && <>{t("SWIFT:")} {bank.swift_code}</>}
                                             </div>
                                         )) : (
                                             <>
-                                                <b>BANK CENTRAL ASIA (BCA)</b><br />
+                                                <b>{t("BANK CENTRAL ASIA (BCA)")}</b><br />
                                                 A/C No: 000-000-000<br />
-                                                A/N: PT. BAKHTERA FREIGHT WORLDWIDE<br />
-                                                Branch: KCU JAKARTA
+                                                {t("A/N: PT. BAKHTERA FREIGHT WORLDWIDE")}<br />
+                                                {t("Branch: KCU JAKARTA")}
                                             </>
                                         );
                                     })()}
@@ -5074,20 +5077,20 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
 
                                 <div style={{ marginTop: '10px', border: '1px solid #d7d7d7', background: '#fafafa' }}>
                                     <div style={{ padding: '8px 10px', fontSize: '10px', lineHeight: 1.55, borderBottom: '1px solid #e3e3e3', fontStyle: 'normal' }}>
-                                        All payments shall be made in full amount, except for withholding tax deductions. The full invoiced amount must be received by the Seller within thirty (30) calendar days from the invoice date.
+                                        {t("All payments shall be made in full amount, except for withholding tax deductions. The full invoiced amount must be received by the Seller within thirty (30) calendar days from the invoice date.")}
                                     </div>
                                     <div style={{ padding: '8px 10px', fontSize: '10px', lineHeight: 1.55, fontStyle: 'normal' }}>
-                                        Any payment received after the thirty (30)-day due date shall be subject to a late payment charge of 2% of the total invoice amount per month, calculated from the due date until the date on which full payment is received.
+                                        {t("Any payment received after the thirty (30)-day due date shall be subject to a late payment charge of 2% of the total invoice amount per month, calculated from the due date until the date on which full payment is received.")}
                                     </div>
                                 </div>
 
                                 <div style={{ marginTop: '10px', fontStyle: 'italic', whiteSpace: 'pre-line' }}>
-                                    <strong>Notes:</strong><br />
+                                    <strong>{t("Notes:")}</strong><br />
                                     {safeStr(invoice.customer_notes)}
                                 </div>
                             </div>
                             <div style={{ width: '200px', textAlign: 'center' }}>
-                                <b>AUTHORIZED SIGNATURE</b>
+                                <b>{t("AUTHORIZED SIGNATURE")}</b>
                                 <br /><br /><br /><br /><br /><br />
                                 <div style={{ marginTop: '70px', borderTop: '1px solid #000', paddingTop: '5px', fontWeight: 'bold', fontSize: '11px' }}>
                                     {companySettings?.company_name || 'PT. BAKHTERA FREIGHT WORLDWIDE'}
@@ -5104,6 +5107,7 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
 
 // Existing Invoices Indicator Component
 const ExistingInvoicesIndicator = ({ jobNumber, isAdditional = false, selectedCurrency = 'IDR', onSelectCurrency }) => {
+    const { t } = useLanguage();
     const [existingInvoices, setExistingInvoices] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -5147,7 +5151,7 @@ const ExistingInvoicesIndicator = ({ jobNumber, isAdditional = false, selectedCu
                 <AlertCircle className="w-4 h-4 text-accent-orange mt-0.5 flex-shrink-0" />
                 <div className="flex-1">
                     <h4 className="text-xs font-semibold text-accent-orange mb-0.5">
-                        Existing Invoices for Job {jobNumber}
+                        {t("Existing Invoices for Job")} {jobNumber}
                     </h4>
                     <p className="text-[10px] text-silver-dark mb-1">
                         {isAdditional 
@@ -5182,12 +5186,12 @@ const ExistingInvoicesIndicator = ({ jobNumber, isAdditional = false, selectedCu
                                 <Circle className="w-3.5 h-3.5 text-silver-dark" />
                             )}
                             <span className={`text-[11px] font-bold ${selectedCurrency === 'IDR' ? 'text-blue-300' : 'text-silver-light'}`}>
-                                IDR Invoice
+                                {t("IDR Invoice")}
                             </span>
                         </div>
                         {selectedCurrency === 'IDR' && (
                             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500/30 text-blue-300 uppercase">
-                                Selected
+                                {t("Selected")}
                             </span>
                         )}
                     </div>
@@ -5195,11 +5199,11 @@ const ExistingInvoicesIndicator = ({ jobNumber, isAdditional = false, selectedCu
                         <div className="text-[9px] text-silver-dark space-y-0.5 pl-5">
                             <div className="font-mono text-green-400 font-semibold">{idrInvoice.invoice_number}</div>
                             <div>IDR {Number(idrInvoice.total_amount || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                            <div>Kurs: {Number(idrInvoice.exchange_rate || 1).toLocaleString('id-ID')}</div>
+                            <div>{t("Kurs:")} {Number(idrInvoice.exchange_rate || 1).toLocaleString('id-ID')}</div>
                             <div className="text-[8px] opacity-70 uppercase">{idrInvoice.status}</div>
                         </div>
                     ) : (
-                        <div className="text-[9px] text-silver-dark pl-5">Available to create (Klik untuk pilih)</div>
+                        <div className="text-[9px] text-silver-dark pl-5">{t("Available to create (Klik untuk pilih)")}</div>
                     )}
                 </div>
 
@@ -5226,12 +5230,12 @@ const ExistingInvoicesIndicator = ({ jobNumber, isAdditional = false, selectedCu
                                 <Circle className="w-3.5 h-3.5 text-silver-dark" />
                             )}
                             <span className={`text-[11px] font-bold ${selectedCurrency === 'USD' ? 'text-blue-300' : 'text-silver-light'}`}>
-                                USD Invoice
+                                {t("USD Invoice")}
                             </span>
                         </div>
                         {selectedCurrency === 'USD' && (
                             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500/30 text-blue-300 uppercase">
-                                Selected
+                                {t("Selected")}
                             </span>
                         )}
                     </div>
@@ -5239,11 +5243,11 @@ const ExistingInvoicesIndicator = ({ jobNumber, isAdditional = false, selectedCu
                         <div className="text-[9px] text-silver-dark space-y-0.5 pl-5">
                             <div className="font-mono text-green-400 font-semibold">{usdInvoice.invoice_number}</div>
                             <div>USD {Number(usdInvoice.total_amount || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                            <div>Kurs: {Number(usdInvoice.exchange_rate || 1).toLocaleString('id-ID')}</div>
+                            <div>{t("Kurs:")} {Number(usdInvoice.exchange_rate || 1).toLocaleString('id-ID')}</div>
                             <div className="text-[8px] opacity-70 uppercase">{usdInvoice.status}</div>
                         </div>
                     ) : (
-                        <div className="text-[9px] text-silver-dark pl-5">Available to create (Klik untuk pilih)</div>
+                        <div className="text-[9px] text-silver-dark pl-5">{t("Available to create (Klik untuk pilih)")}</div>
                     )}
                 </div>
             </div>
@@ -5251,7 +5255,7 @@ const ExistingInvoicesIndicator = ({ jobNumber, isAdditional = false, selectedCu
             {!isAdditional && !canCreateIDR && !canCreateUSD && (
                 <div className="mt-2 p-2 bg-red-500/10 border border-red-500/30 rounded">
                     <p className="text-[9px] text-red-400">
-                        ⚠️ Both IDR and USD standard invoices already exist. Cancel one to create a replacement, or use "Invoice Tambahan" for additional versioned invoices.
+                        {t("⚠️ Both IDR and USD standard invoices already exist. Cancel one to create a replacement, or use \"Invoice Tambahan\" for additional versioned invoices.")}
                     </p>
                 </div>
             )}
@@ -5264,6 +5268,7 @@ const ExistingInvoicesIndicator = ({ jobNumber, isAdditional = false, selectedCu
 // Creates separate invoice with -RB suffix linked to original invoice
 // ─────────────────────────────────────────────────────────────────────────────
 const ReimbursementModal = ({ invoice, formatCurrency, revenueAccounts, onClose, onSave }) => {
+    const { t } = useLanguage();
     const emptyItem = () => ({ item_name: '', description: '', qty: 1, unit: 'Job', rate: 0, amount: 0, tax_amount: 0, coa_id: null });
     const [newItems, setNewItems] = useState([emptyItem()]);
     const [amendmentNote, setAmendmentNote] = useState('');
@@ -5301,7 +5306,7 @@ const ReimbursementModal = ({ invoice, formatCurrency, revenueAccounts, onClose,
     const handleSave = async () => {
         const validItems = newItems.filter(it => it.item_name && parseFloat(it.amount) > 0);
         if (validItems.length === 0) {
-            alert('Please fill at least one item with a name and amount > 0.');
+            alert(t("Please fill at least one item with a name and amount > 0."));
             return;
         }
         setSaving(true);
@@ -5317,18 +5322,18 @@ const ReimbursementModal = ({ invoice, formatCurrency, revenueAccounts, onClose,
                     <div>
                         <h2 className="text-xl font-bold gradient-text flex items-center gap-2">
                             <Plus className="w-5 h-5 text-green-400" />
-                            Create Reimbursement Invoice
+                            {t("Create Reimbursement Invoice")}
                         </h2>
                         <p className="text-silver-dark text-sm mt-1">
-                            Original: {invoice.invoice_number} — {invoice.customer_name}
+                            {t("Original:")} {invoice.invoice_number} — {invoice.customer_name}
                         </p>
                     </div>
                     {/* Status badge */}
                     <div className="flex flex-col items-end gap-1">
                         <span className="text-[10px] bg-green-500/15 border border-green-500/40 text-green-400 rounded-full px-2.5 py-0.5 font-semibold uppercase tracking-wider">
-                            ✓ New Invoice
+                            {t("✓ New Invoice")}
                         </span>
-                        <span className="text-[10px] text-silver-dark">Will use: <span className="text-silver-light font-mono font-bold">{invoice.invoice_number}-RB</span></span>
+                        <span className="text-[10px] text-silver-dark">{t("Will use:")} <span className="text-silver-light font-mono font-bold">{invoice.invoice_number}-RB</span></span>
                     </div>
                 </div>
 
@@ -5349,10 +5354,10 @@ const ReimbursementModal = ({ invoice, formatCurrency, revenueAccounts, onClose,
                 {/* Reimbursement Items Table */}
                 <div className="mb-4">
                     <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-sm font-semibold text-green-400">Reimbursement Items</h3>
+                        <h3 className="text-sm font-semibold text-green-400">{t("Reimbursement Items")}</h3>
                         <button onClick={addRow}
                             className="flex items-center gap-1 text-xs text-green-400 border border-green-400/40 px-2.5 py-1 rounded hover:bg-green-400/10 smooth-transition">
-                            <Plus className="w-3 h-3" /> Add Row
+                            <Plus className="w-3 h-3" /> {t("Add Row")}
                         </button>
                     </div>
                     <div className="glass-card rounded-lg overflow-hidden border border-dark-border">
@@ -5370,13 +5375,13 @@ const ReimbursementModal = ({ invoice, formatCurrency, revenueAccounts, onClose,
                                         <td className="px-2 py-1.5">
                                             <input value={item.item_name}
                                                 onChange={e => updateItem(idx, 'item_name', e.target.value)}
-                                                placeholder="e.g. Handling Fee"
+                                                placeholder={t("e.g. Handling Fee")}
                                                 className="w-full bg-dark-surface border border-dark-border rounded px-2 py-1 text-silver-light text-xs focus:border-yellow-500/60 outline-none" />
                                         </td>
                                         <td className="px-2 py-1.5">
                                             <input value={item.description}
                                                 onChange={e => updateItem(idx, 'description', e.target.value)}
-                                                placeholder="Details..."
+                                                placeholder={t("Details...")}
                                                 className="w-full bg-dark-surface border border-dark-border rounded px-2 py-1 text-silver-light text-xs focus:border-yellow-500/60 outline-none" />
                                         </td>
                                         <td className="px-2 py-1.5 w-16">
@@ -5406,7 +5411,7 @@ const ReimbursementModal = ({ invoice, formatCurrency, revenueAccounts, onClose,
                                             <select value={item.coa_id || ''}
                                                 onChange={e => updateItem(idx, 'coa_id', e.target.value || null)}
                                                 className="w-full bg-dark-surface border border-dark-border rounded px-1.5 py-1 text-silver-light text-[10px] focus:border-yellow-500/60 outline-none">
-                                                <option value="">-- COA --</option>
+                                                <option value="">{t("-- COA --")}</option>
                                                 {revenueAccounts.map(a => (
                                                     <option key={a.id} value={a.id}>{a.code} {a.name}</option>
                                                 ))}
@@ -5429,32 +5434,32 @@ const ReimbursementModal = ({ invoice, formatCurrency, revenueAccounts, onClose,
 
                 {/* Reimbursement Note */}
                 <div className="mb-5">
-                    <label className="block text-xs text-silver-dark mb-1">Reimbursement Note</label>
+                    <label className="block text-xs text-silver-dark mb-1">{t("Reimbursement Note")}</label>
                     <input value={amendmentNote}
                         onChange={e => setAmendmentNote(e.target.value)}
-                        placeholder="e.g. Additional handling charges per customer request..."
+                        placeholder={t("e.g. Additional handling charges per customer request...")}
                         className="w-full bg-dark-surface border border-dark-border rounded-lg px-3 py-2 text-silver-light text-sm focus:border-green-500/60 outline-none" />
                 </div>
 
                 {/* Reimbursement Total Preview */}
                 {newItemsSubtotal > 0 && (
                     <div className="mb-5 glass-card p-4 rounded-lg border border-green-500/30 bg-green-500/5">
-                        <h3 className="text-xs font-semibold text-green-400 mb-3 uppercase tracking-wider">Reimbursement Invoice Summary</h3>
+                        <h3 className="text-xs font-semibold text-green-400 mb-3 uppercase tracking-wider">{t("Reimbursement Invoice Summary")}</h3>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                             <div>
-                                <p className="text-[10px] text-silver-dark">Reimbursement Items</p>
+                                <p className="text-[10px] text-silver-dark">{t("Reimbursement Items")}</p>
                                 <p className="font-mono font-bold text-green-400">{formatCurrency(newItemsSubtotal, invoice.currency)}</p>
                             </div>
                             <div>
-                                <p className="text-[10px] text-silver-dark">VAT Amount</p>
+                                <p className="text-[10px] text-silver-dark">{t("VAT Amount")}</p>
                                 <p className="font-mono font-bold text-silver-light">{formatCurrency(preview.tax, invoice.currency)}</p>
                             </div>
                             <div>
-                                <p className="text-[10px] text-silver-dark">Total (incl. VAT)</p>
+                                <p className="text-[10px] text-silver-dark">{t("Total (incl. VAT)")}</p>
                                 <p className="font-mono font-bold text-accent-orange">{formatCurrency(preview.total, invoice.currency)}</p>
                             </div>
                             <div>
-                                <p className="text-[10px] text-silver-dark">Invoice Number</p>
+                                <p className="text-[10px] text-silver-dark">{t("Invoice Number")}</p>
                                 <p className="font-mono font-bold text-blue-400">{invoice.invoice_number}-RB</p>
                             </div>
                         </div>
@@ -5465,14 +5470,14 @@ const ReimbursementModal = ({ invoice, formatCurrency, revenueAccounts, onClose,
                 <div className="flex gap-3 justify-end border-t border-dark-border pt-4">
                     <button onClick={onClose} disabled={saving}
                         className="px-5 py-2 border border-dark-border text-silver-light rounded-lg hover:bg-dark-surface smooth-transition">
-                        Cancel
+                        {t("Cancel")}
                     </button>
                     <button onClick={handleSave} disabled={saving}
                         className="flex items-center gap-2 px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg smooth-transition font-semibold disabled:opacity-50">
                         {saving ? (
-                            <><div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> Creating...</>
+                            <><div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> {t("Creating...")}</>
                         ) : (
-                            <><Plus className="w-4 h-4" /> Create Reimbursement Invoice</>
+                            <><Plus className="w-4 h-4" /> {t("Create Reimbursement Invoice")}</>
                         )}
                     </button>
                 </div>
@@ -5482,6 +5487,7 @@ const ReimbursementModal = ({ invoice, formatCurrency, revenueAccounts, onClose,
 };
 
 const ReinvoiceModal = ({ invoice, onClose, onSave }) => {
+    const { t } = useLanguage();
     const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
     const [internalNote, setInternalNote] = useState('Perubahan terhadap invoice lama.');
     const [saving, setSaving] = useState(false);
@@ -5496,26 +5502,26 @@ const ReinvoiceModal = ({ invoice, onClose, onSave }) => {
         <Modal isOpen={true} onClose={onClose} maxWidth="max-w-2xl">
             <div className="p-6">
                 <div className="mb-5">
-                    <h2 className="text-xl font-bold gradient-text">Create Reinvoice Draft</h2>
+                    <h2 className="text-xl font-bold gradient-text">{t("Create Reinvoice Draft")}</h2>
                     <p className="text-silver-dark text-sm mt-1">
-                        Source: {invoice.invoice_number} - {invoice.customer_name}
+                        {t("Source:")} {invoice.invoice_number} - {invoice.customer_name}
                     </p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
                     <div className="glass-card p-3 rounded-lg border border-dark-border">
-                        <p className="text-[10px] text-silver-dark uppercase tracking-wider">Invoice Number</p>
+                        <p className="text-[10px] text-silver-dark uppercase tracking-wider">{t("Invoice Number")}</p>
                         <p className="text-sm font-mono font-bold text-silver-light mt-1">{invoice.invoice_number}-R*</p>
-                        <p className="text-[10px] text-silver-dark mt-1">Nomor reinvoice akan dibuat otomatis (R1, R2, dst) untuk menghindari duplikasi nomor invoice.</p>
+                        <p className="text-[10px] text-silver-dark mt-1">{t("Nomor reinvoice akan dibuat otomatis (R1, R2, dst) untuk menghindari duplikasi nomor invoice.")}</p>
                     </div>
                     <div className="glass-card p-3 rounded-lg border border-dark-border">
-                        <p className="text-[10px] text-silver-dark uppercase tracking-wider">Source Status</p>
+                        <p className="text-[10px] text-silver-dark uppercase tracking-wider">{t("Source Status")}</p>
                         <p className="text-sm font-bold text-green-400 mt-1">{invoice.status || 'paid'}</p>
                     </div>
                 </div>
 
                 <div className="mb-4">
-                    <label className="block text-sm text-silver-dark mb-1">Invoice Date (baru)</label>
+                    <label className="block text-sm text-silver-dark mb-1">{t("Invoice Date (baru)")}</label>
                     <input
                         type="date"
                         value={invoiceDate}
@@ -5525,13 +5531,13 @@ const ReinvoiceModal = ({ invoice, onClose, onSave }) => {
                 </div>
 
                 <div className="mb-5">
-                    <label className="block text-sm text-silver-dark mb-1">Internal Note (wajib untuk jejak reinvoicing)</label>
+                    <label className="block text-sm text-silver-dark mb-1">{t("Internal Note (wajib untuk jejak reinvoicing)")}</label>
                     <textarea
                         rows={3}
                         value={internalNote}
                         onChange={(e) => setInternalNote(e.target.value)}
                         className="w-full bg-dark-surface border border-dark-border rounded-lg px-3 py-2 text-silver-light"
-                        placeholder="Contoh: Revisi nominal karena koreksi item handling"
+                        placeholder={t("Contoh: Revisi nominal karena koreksi item handling")}
                     />
                 </div>
 
@@ -5541,7 +5547,7 @@ const ReinvoiceModal = ({ invoice, onClose, onSave }) => {
                         disabled={saving}
                         className="px-5 py-2 border border-dark-border text-silver-light rounded-lg hover:bg-dark-surface smooth-transition"
                     >
-                        Cancel
+                        {t("Cancel")}
                     </button>
                     <button
                         onClick={handleSave}
@@ -5557,6 +5563,7 @@ const ReinvoiceModal = ({ invoice, onClose, onSave }) => {
 };
 
 const RecreateRateModal = ({ invoice, onClose, onSave }) => {
+    const { t } = useLanguage();
     const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
     const [newRate, setNewRate] = useState(String(invoice?.exchange_rate || 1));
     const [internalNote, setInternalNote] = useState('Penyesuaian kurs untuk invoice dengan pengajuan yang sama.');
@@ -5572,26 +5579,26 @@ const RecreateRateModal = ({ invoice, onClose, onSave }) => {
         <Modal isOpen={true} onClose={onClose} maxWidth="max-w-2xl">
             <div className="p-6">
                 <div className="mb-5">
-                    <h2 className="text-xl font-bold gradient-text">Recreate Invoice Dengan Kurs Baru</h2>
+                    <h2 className="text-xl font-bold gradient-text">{t("Recreate Invoice Dengan Kurs Baru")}</h2>
                     <p className="text-silver-dark text-sm mt-1">
-                        Source: {invoice.invoice_number} - {invoice.customer_name}
+                        {t("Source:")} {invoice.invoice_number} - {invoice.customer_name}
                     </p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
                     <div className="glass-card p-3 rounded-lg border border-dark-border">
-                        <p className="text-[10px] text-silver-dark uppercase tracking-wider">Source Rate</p>
+                        <p className="text-[10px] text-silver-dark uppercase tracking-wider">{t("Source Rate")}</p>
                         <p className="text-sm font-mono font-bold text-silver-light mt-1">{Number(invoice.exchange_rate || 1).toLocaleString('id-ID')}</p>
-                        <p className="text-[10px] text-silver-dark mt-1">Nomor baru otomatis suffix FX (FX1, FX2, dst).</p>
+                        <p className="text-[10px] text-silver-dark mt-1">{t("Nomor baru otomatis suffix FX (FX1, FX2, dst).")}</p>
                     </div>
                     <div className="glass-card p-3 rounded-lg border border-dark-border">
-                        <p className="text-[10px] text-silver-dark uppercase tracking-wider">Currency</p>
+                        <p className="text-[10px] text-silver-dark uppercase tracking-wider">{t("Currency")}</p>
                         <p className="text-sm font-bold text-cyan-300 mt-1">{invoice.currency || 'IDR'}</p>
                     </div>
                 </div>
 
                 <div className="mb-4">
-                    <label className="block text-sm text-silver-dark mb-1">Invoice Date (baru)</label>
+                    <label className="block text-sm text-silver-dark mb-1">{t("Invoice Date (baru)")}</label>
                     <input
                         type="date"
                         value={invoiceDate}
@@ -5601,7 +5608,7 @@ const RecreateRateModal = ({ invoice, onClose, onSave }) => {
                 </div>
 
                 <div className="mb-4">
-                    <label className="block text-sm text-silver-dark mb-1">Kurs Baru</label>
+                    <label className="block text-sm text-silver-dark mb-1">{t("Kurs Baru")}</label>
                     <input
                         type="number"
                         min="0.000001"
@@ -5613,13 +5620,13 @@ const RecreateRateModal = ({ invoice, onClose, onSave }) => {
                 </div>
 
                 <div className="mb-5">
-                    <label className="block text-sm text-silver-dark mb-1">Internal Note</label>
+                    <label className="block text-sm text-silver-dark mb-1">{t("Internal Note")}</label>
                     <textarea
                         rows={3}
                         value={internalNote}
                         onChange={(e) => setInternalNote(e.target.value)}
                         className="w-full bg-dark-surface border border-dark-border rounded-lg px-3 py-2 text-silver-light"
-                        placeholder="Contoh: Kurs revisi sesuai tanggal invoice customer"
+                        placeholder={t("Contoh: Kurs revisi sesuai tanggal invoice customer")}
                     />
                 </div>
 
@@ -5629,7 +5636,7 @@ const RecreateRateModal = ({ invoice, onClose, onSave }) => {
                         disabled={saving}
                         className="px-5 py-2 border border-dark-border text-silver-light rounded-lg hover:bg-dark-surface smooth-transition"
                     >
-                        Cancel
+                        {t("Cancel")}
                     </button>
                     <button
                         onClick={handleSave}

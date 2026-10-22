@@ -1,6 +1,7 @@
 import { commonPairs, loginPairs, sidebarPairs } from './dictionaries/common';
 import { dashboardPairs } from './dictionaries/dashboard';
 import { financeDocPairs } from './dictionaries/financeDocs';
+import { financeDocsSweepPairs } from './dictionaries/financeDocsSweep';
 
 const allPairs = [
     ...commonPairs,
@@ -8,6 +9,7 @@ const allPairs = [
     ...sidebarPairs,
     ...dashboardPairs,
     ...financeDocPairs,
+    ...financeDocsSweepPairs,
 ];
 
 const en = {};
