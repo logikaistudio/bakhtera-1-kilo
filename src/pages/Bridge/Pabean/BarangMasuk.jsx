@@ -162,6 +162,17 @@ const BarangMasuk = () => {
     });
 
     // Helper: Calculate Total Value
+    // Rekap per satuan dan per mata uang agar tidak menjumlahkan unit/kurs berbeda
+    const totalsByUnit = flatRows.reduce((acc, r) => {
+        const u = (r.unit && r.unit !== '-') ? r.unit : 'pcs';
+        acc[u] = (acc[u] || 0) + (r.jumlahBarang || 0);
+        return acc;
+    }, {});
+    const valueByCurrency = flatRows.reduce((acc, r) => {
+        const c = r.itemCurrency || 'IDR';
+        acc[c] = (acc[c] || 0) + (r.nilaiBarang || 0);
+        return acc;
+    }, {});
     const getTransactionTotal = (t) => {
         if (t.invoiceValue) return Number(t.invoiceValue);
         return (t.items || []).reduce((sum, item) => sum + (Number(item.value) || 0), 0);
@@ -387,12 +398,17 @@ const BarangMasuk = () => {
                     <p className="text-2xl font-bold text-orange-500">
                         {flatRows.reduce((sum, r) => sum + (r.jumlahBarang || 0), 0).toLocaleString('id-ID')}
                     </p>
+                    <p className="text-[10px] text-silver-dark mt-1">
+                        {Object.entries(totalsByUnit).map(([u, n]) => `${n.toLocaleString('id-ID', { maximumFractionDigits: 4 })} ${u}`).join(' · ') || '-'}
+                    </p>
                 </div>
                 <div className="glass-card p-4 rounded-lg border border-accent-green">
                     <p className="text-xs text-silver-dark">{t("Nilai Barang")}</p>
-                    <p className="text-xl font-bold text-accent-green">
-                        {formatCurrency(flatRows.reduce((sum, r) => sum + (r.nilaiBarang || 0), 0))}
-                    </p>
+                    <div className="text-sm font-bold text-accent-green space-y-0.5">
+                        {Object.entries(valueByCurrency).map(([c, v]) => (
+                            <p key={c}>{c} {v.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                        ))}
+                    </div>
                 </div>
             </div>
 
