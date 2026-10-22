@@ -396,7 +396,7 @@ const BarangMasuk = () => {
                 <div className="glass-card p-4 rounded-lg border border-orange-500">
                     <p className="text-xs text-silver-dark">{t("Barang Masuk")}</p>
                     <p className="text-2xl font-bold text-orange-500">
-                        {flatRows.reduce((sum, r) => sum + (r.jumlahBarang || 0), 0).toLocaleString('id-ID')}
+                        {Math.round(flatRows.reduce((sum, r) => sum + (r.jumlahBarang || 0), 0)).toLocaleString('id-ID')}
                     </p>
                     <p className="text-[10px] text-silver-dark mt-1">
                         {Object.entries(totalsByUnit).map(([u, n]) => `${n.toLocaleString('id-ID', { maximumFractionDigits: 4 })} ${u}`).join(' · ') || '-'}
