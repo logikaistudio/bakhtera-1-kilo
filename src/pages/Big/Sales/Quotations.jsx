@@ -603,7 +603,7 @@ const BigQuotations = () => {
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium mb-1">Tax Rate (%)</label>
+                            <label className="block text-sm font-medium mb-1">VAT Rate (%)</label>
                             <input
                                 type="number"
                                 value={formData.tax_rate}
@@ -662,7 +662,7 @@ const BigQuotations = () => {
                     {/* Totals */}
                     <div className="border-t pt-4 space-y-1 text-right">
                         <div className="text-sm">Subtotal: {formatCurrency(subtotal)}</div>
-                        <div className="text-sm">Tax ({formData.tax_rate}%): {formatCurrency(taxAmount)}</div>
+                        <div className="text-sm">VAT ({formData.tax_rate}%): {formatCurrency(taxAmount)}</div>
                         <div className="text-lg font-bold">Total: {formatCurrency(total)}</div>
                     </div>
 

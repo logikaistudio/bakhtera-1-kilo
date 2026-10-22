@@ -348,7 +348,7 @@ const RolePermissions = () => {
                 if (error) throw error;
             }
 
-            setNotification({ type: 'success', message: `✅ Pengaturan role berhasil disimpan! (${rows.length} entri) — User yang sedang login perlu logout & login ulang agar perubahan berlaku.` });
+            setNotification({ type: 'success', message: `✅ Pengaturan role berhasil disimpan! (${rows.length} entri) — Izin akan dimuat ulang saat user kembali ke aplikasi.` });
             // Refresh permissions untuk admin yang sedang login
             await refreshPermissions();
             notifyRoleConfigUpdated();
@@ -735,7 +735,8 @@ const RolePermissions = () => {
                             {ModuleIcon && <ModuleIcon style={{ width: 18, height: 18, color: '#0284c7' }} />}
                             <span style={{ fontWeight: 600, color: '#0369a1', fontSize: 14 }}>Modul {activeModule}</span>
                             <span style={{ fontSize: 12, color: '#64748b' }}>
-                                — Role: <strong style={{ color: '#334155' }}>{roles.find(r => r.id === activeRole)?.label}</strong>
+                                — Role: <strong style={{ color: '#334155' }}>{roles.find(r => r.id === activeRole)?.label}</strong>{' '}
+                                <code style={{ fontSize: 11, color: '#475569' }}>({activeRole})</code>
                             </span>
                         </div>
                         <div style={{ display: 'flex', gap: 8 }}>
