@@ -229,6 +229,13 @@ const PergerakanBarang = () => {
         });
     }, [allInboundItems, allOutboundItems]);
 
+    // Rekap per satuan agar pcs/kg/ton tidak tercampur tanpa keterangan
+    const sumByUnit = (key) => filteredData.reduce((acc, i) => {
+        const u = i.unit || 'pcs';
+        acc[u] = (acc[u] || 0) + (Number(i[key]) || 0);
+        return acc;
+    }, {});
+
     // Edit Handlers
     const handleEdit = (item) => {
         setEditingRow(`${item.inboundId}-${item.itemIdx}`);
@@ -391,7 +398,10 @@ const PergerakanBarang = () => {
                 <div className="glass-card p-4 rounded-lg border border-accent-blue">
                     <p className="text-xs text-silver-dark">{t("Barang Masuk")}</p>
                     <p className="text-2xl font-bold text-accent-blue">
-                        {filteredData.reduce((sum, i) => sum + (Number(i.qtyMasuk) || 0), 0)}
+                        {filteredData.reduce((sum, i) => sum + (Number(i.qtyMasuk) || 0), 0).toLocaleString('id-ID', { maximumFractionDigits: 4 })}
+                    </p>
+                    <p className="text-[10px] text-silver-dark mt-1">
+                        {Object.entries(sumByUnit('qtyMasuk')).map(([u, n]) => `${n.toLocaleString('id-ID', { maximumFractionDigits: 4 })} ${u}`).join(' · ') || '-'}
                     </p>
                 </div>
 
@@ -399,7 +409,10 @@ const PergerakanBarang = () => {
                 <div className="glass-card p-4 rounded-lg border border-red-500">
                     <p className="text-xs text-silver-dark">{t("Barang Keluar")}</p>
                     <p className="text-2xl font-bold text-red-500">
-                        {filteredData.reduce((sum, i) => sum + (Number(i.qtyKeluar) || 0), 0)}
+                        {filteredData.reduce((sum, i) => sum + (Number(i.qtyKeluar) || 0), 0).toLocaleString('id-ID', { maximumFractionDigits: 4 })}
+                    </p>
+                    <p className="text-[10px] text-silver-dark mt-1">
+                        {Object.entries(sumByUnit('qtyKeluar')).map(([u, n]) => `${n.toLocaleString('id-ID', { maximumFractionDigits: 4 })} ${u}`).join(' · ') || '-'}
                     </p>
                 </div>
 
@@ -407,7 +420,10 @@ const PergerakanBarang = () => {
                 <div className="glass-card p-4 rounded-lg border border-green-500">
                     <p className="text-xs text-silver-dark">{t("Saldo")}</p>
                     <p className="text-2xl font-bold text-green-500">
-                        {filteredData.reduce((sum, i) => sum + (Number(i.qtySisa) || 0), 0)}
+                        {filteredData.reduce((sum, i) => sum + (Number(i.qtySisa) || 0), 0).toLocaleString('id-ID', { maximumFractionDigits: 4 })}
+                    </p>
+                    <p className="text-[10px] text-silver-dark mt-1">
+                        {Object.entries(sumByUnit('qtySisa')).map(([u, n]) => `${n.toLocaleString('id-ID', { maximumFractionDigits: 4 })} ${u}`).join(' · ') || '-'}
                     </p>
                 </div>
             </div>
@@ -483,8 +499,8 @@ const PergerakanBarang = () => {
                                         <td className="px-3 py-1 text-[11px] text-silver-light font-mono whitespace-nowrap">{item.itemCode || '-'}</td>
                                         <td className="px-3 py-1 text-[11px] text-silver-light whitespace-nowrap truncate max-w-[200px]">{item.assetName}</td>
                                         <td className="px-3 py-1 text-[11px] text-center text-silver-light whitespace-nowrap">{item.unit || 'pcs'}</td>
-                                        <td className="px-3 py-1 text-[11px] text-center text-silver-light font-semibold whitespace-nowrap">{item.qtyMasuk}</td>
-                                        <td className="px-3 py-1 text-[11px] text-center text-orange-400 font-semibold whitespace-nowrap">{item.qtyKeluar}</td>
+                                        <td className="px-3 py-1 text-[11px] text-center text-silver-light font-semibold whitespace-nowrap">{Number(item.qtyMasuk).toLocaleString('id-ID', { maximumFractionDigits: 4 })}</td>
+                                        <td className="px-3 py-1 text-[11px] text-center text-orange-400 font-semibold whitespace-nowrap">{Number(item.qtyKeluar).toLocaleString('id-ID', { maximumFractionDigits: 4 })}</td>
                                         <td className="px-3 py-1 text-[11px] text-center text-yellow-400 font-semibold whitespace-nowrap">
                                             {editingRow === `${item.inboundId}-${item.itemIdx}` ? (
                                                 <input
@@ -498,7 +514,7 @@ const PergerakanBarang = () => {
                                             )}
                                         </td>
                                         <td className={`px-3 py-1 text-[11px] text-center font-bold whitespace-nowrap ${item.qtySisa > 0 ? 'text-green-400' : 'text-silver-dark'}`}>
-                                            {item.qtySisa}
+                                            {Number(item.qtySisa).toLocaleString('id-ID', { maximumFractionDigits: 4 })}
                                         </td>
                                         <td className="px-3 py-1 text-[11px] text-left text-silver-dark whitespace-nowrap">
                                             {editingRow === `${item.inboundId}-${item.itemIdx}` ? (
