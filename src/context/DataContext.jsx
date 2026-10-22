@@ -6,6 +6,34 @@ import { getActiveDivision, canViewPartnerInDivision } from '../utils/divisionCo
 
 const DataContext = createContext();
 
+const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Loads a whole table in small pages with retries. A single select('*') on tables with large
+// JSON/base64 columns hits Supabase's statement timeout (and the 1000-row cap), which used to
+// leave pages empty. On failure it returns { error } so callers keep their current state.
+const fetchTablePaged = async (table, { columns = '*', pageSize = 100, orderBy = 'id', ascending = true, retries = 3 } = {}) => {
+    const rows = [];
+    for (let from = 0; ; from += pageSize) {
+        let page = null;
+        let lastError = null;
+        for (let attempt = 1; attempt <= retries; attempt++) {
+            let query = supabase.from(table).select(columns).order(orderBy, { ascending });
+            if (orderBy !== 'id') query = query.order('id', { ascending });
+            const { data, error } = await query.range(from, from + pageSize - 1);
+            if (!error) { page = data || []; lastError = null; break; }
+            lastError = error;
+            await wait(400 * attempt);
+        }
+        if (lastError) {
+            console.error(`❌ Failed to load ${table} (offset ${from}):`, lastError);
+            return { data: null, error: lastError };
+        }
+        rows.push(...page);
+        if (page.length < pageSize) break;
+    }
+    return { data: rows, error: null };
+};
+
 export const useData = () => {
     const context = useContext(DataContext);
     if (!context) {
@@ -391,12 +419,12 @@ export const DataProvider = ({ children }) => {
                 };
 
                 // Load TPPB Workflow Data (Quotations, etc.)
-                const { data: quotData, error: quotError } = await supabase.from('freight_quotations').select('*');
+                const { data: quotData, error: quotError } = await fetchTablePaged('freight_quotations', { pageSize: 5 });
                 if (quotError) console.error('Error fetching quotations:', quotError);
                 else setQuotations((quotData || []).map(normalizeQuotation));
 
                 // Load Warehouse Inventory
-                const { data: whData, error: whError } = await supabase.from('freight_warehouse').select('*');
+                const { data: whData, error: whError } = await fetchTablePaged('freight_warehouse', { pageSize: 200 });
                 if (whError) console.error('Error fetching inventory:', whError);
                 else setWarehouseInventory((whData || []).map(mapWarehouseToState));
 
@@ -473,10 +501,10 @@ export const DataProvider = ({ children }) => {
 
 
                 // Load Transactions (Inbound, Outbound, Reject)
-                const { data: inData, error: inError } = await supabase.from('freight_inbound').select('*');
+                const { data: inData, error: inError } = await fetchTablePaged('freight_inbound', { pageSize: 10 });
                 if (!inError) setInboundTransactions((inData || []).map(mapInboundToState));
 
-                const { data: outData, error: outError } = await supabase.from('freight_outbound').select('*');
+                const { data: outData, error: outError } = await fetchTablePaged('freight_outbound', { pageSize: 100 });
                 if (!outError) setOutboundTransactions((outData || []).map(mapOutboundToState));
 
                 const { data: rejData, error: rejError } = await supabase.from('freight_reject').select('*');
@@ -556,10 +584,12 @@ export const DataProvider = ({ children }) => {
 
         const loadMutationLogs = async () => {
             try {
-                const { data, error } = await supabase
-                    .from('freight_mutation_logs')
-                    .select('id,pengajuan_id,pengajuan_number,bc_document_number,item_code,item_name,serial_number,date,time,pic,total_stock,mutated_qty,remaining_stock,origin,destination,remarks,created_at')
-                    .order('created_at', { ascending: false });
+                const { data, error } = await fetchTablePaged('freight_mutation_logs', {
+                    columns: 'id,pengajuan_id,pengajuan_number,bc_document_number,item_code,item_name,serial_number,date,time,pic,total_stock,mutated_qty,remaining_stock,origin,destination,remarks,created_at',
+                    pageSize: 500,
+                    orderBy: 'created_at',
+                    ascending: false
+                });
 
                 if (error) throw error;
                 if (!isActive) return;
