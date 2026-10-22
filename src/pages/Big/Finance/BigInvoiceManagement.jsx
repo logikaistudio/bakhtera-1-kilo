@@ -44,7 +44,7 @@ const RecreateRateModal = ({ invoice, onClose, onSave }) => {
             <div className="p-6">
                 <div className="mb-5">
                     <h2 className="text-xl font-bold gradient-text">{t('Recreate Invoice with New Exchange Rate')}</h2>
-                    <p className="text-silver-dark text-sm mt-1">Source: {invoice.invoice_number} - {invoice.customer_name}</p>
+                    <p className="text-silver-dark text-sm mt-1">{t("Source:")} {invoice.invoice_number} - {invoice.customer_name}</p>
                 </div>
 
                 <div className="mb-4">
@@ -70,7 +70,7 @@ const RecreateRateModal = ({ invoice, onClose, onSave }) => {
                 </div>
 
                 <div className="mb-5">
-                    <label className="block text-sm text-silver-dark mb-1">Internal Note</label>
+                    <label className="block text-sm text-silver-dark mb-1">{t("Internal Note")}</label>
                     <textarea
                         rows={3}
                         value={internalNote}
@@ -86,7 +86,7 @@ const RecreateRateModal = ({ invoice, onClose, onSave }) => {
                         disabled={saving}
                         className="px-5 py-2 border border-dark-border text-silver-light rounded-lg hover:bg-dark-surface smooth-transition"
                     >
-                        Cancel
+                        {t("Cancel")}
                     </button>
                     <button
                         onClick={handleSave}
@@ -117,8 +117,8 @@ const ReinvoiceModal = ({ invoice, onClose, onSave }) => {
         <Modal isOpen onClose={onClose} maxWidth="max-w-2xl">
             <div className="p-6">
                 <div className="mb-5">
-                    <h2 className="text-xl font-bold gradient-text">Create Reinvoice Draft</h2>
-                    <p className="text-silver-dark text-sm mt-1">Source: {invoice.invoice_number} - {invoice.customer_name}</p>
+                    <h2 className="text-xl font-bold gradient-text">{t("Create Reinvoice Draft")}</h2>
+                    <p className="text-silver-dark text-sm mt-1">{t("Source:")} {invoice.invoice_number} - {invoice.customer_name}</p>
                 </div>
 
                 <div className="mb-4">
@@ -132,7 +132,7 @@ const ReinvoiceModal = ({ invoice, onClose, onSave }) => {
                 </div>
 
                 <div className="mb-5">
-                    <label className="block text-sm text-silver-dark mb-1">Internal Note</label>
+                    <label className="block text-sm text-silver-dark mb-1">{t("Internal Note")}</label>
                     <textarea
                         rows={3}
                         value={internalNote}
@@ -148,14 +148,14 @@ const ReinvoiceModal = ({ invoice, onClose, onSave }) => {
                         disabled={saving}
                         className="px-5 py-2 border border-dark-border text-silver-light rounded-lg hover:bg-dark-surface smooth-transition"
                     >
-                        Cancel
+                        {t("Cancel")}
                     </button>
                     <button
                         onClick={handleSave}
                         disabled={saving}
                         className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg smooth-transition font-semibold disabled:opacity-50"
                     >
-                        {saving ? 'Creating...' : 'Create Reinvoice Draft'}
+                        {saving ? t('Creating...') : t('Create Reinvoice Draft')}
                     </button>
                 </div>
             </div>
@@ -165,6 +165,7 @@ const ReinvoiceModal = ({ invoice, onClose, onSave }) => {
 
 // ─── Item Row ────────────────────────────────────────────────────────────────
 const ItemRow = ({ item, idx, coaList, canEdit, onChange, onRemove }) => {
+    const { t } = useLanguage();
     const handleChange = (field, val) => {
         const updated = { ...item, [field]: val };
         if (field === 'qty' || field === 'unit_price') {
@@ -181,7 +182,7 @@ const ItemRow = ({ item, idx, coaList, canEdit, onChange, onRemove }) => {
         <tr className="border-b border-dark-border/40 hover:bg-white/5">
             <td className="px-3 py-2">
                 <input value={item.description} onChange={e => handleChange('description', e.target.value)}
-                    className="w-full bg-transparent text-silver-light text-sm border-b border-dark-border focus:outline-none" placeholder="Deskripsi item" />
+                    className="w-full bg-transparent text-silver-light text-sm border-b border-dark-border focus:outline-none" placeholder={t("Deskripsi item")} />
             </td>
             <td className="px-3 py-2 w-20">
                 <input type="number" value={item.qty} min="0" step="any"
@@ -209,7 +210,7 @@ const ItemRow = ({ item, idx, coaList, canEdit, onChange, onRemove }) => {
                 <select value={item.coa_id || ''} disabled={!canEdit}
                     onChange={e => handleChange('coa_id', e.target.value || null)}
                     className="w-full bg-dark-surface border border-dark-border rounded px-1 py-1 text-xs text-silver-light">
-                    <option value="">— Pilih COA —</option>
+                    <option value="">{t("— Pilih COA —")}</option>
                     {coaList.map(c => <option key={c.id} value={c.id}>{c.code} - {c.name}</option>)}
                 </select>
             </td>
@@ -361,13 +362,13 @@ const InvoiceFormModal = ({ invoice, seedData, coaList, onClose, onSave }) => {
                         <table className="w-full text-sm">
                             <thead className="bg-dark-surface/60 text-silver-dark text-xs uppercase">
                                 <tr>
-                                    <th className="px-3 py-2 text-left">Deskripsi</th>
-                                    <th className="px-3 py-2 text-right w-20">Qty</th>
-                                    <th className="px-3 py-2 text-left w-20">Unit</th>
-                                    <th className="px-3 py-2 text-right w-32">Harga Satuan</th>
-                                    <th className="px-3 py-2 text-right w-16">VAT %</th>
-                                    <th className="px-3 py-2 text-right w-36">Total</th>
-                                    <th className="px-3 py-2 w-48">COA Big</th>
+                                    <th className="px-3 py-2 text-left">{t("Deskripsi")}</th>
+                                    <th className="px-3 py-2 text-right w-20">{t("Qty")}</th>
+                                    <th className="px-3 py-2 text-left w-20">{t("Unit")}</th>
+                                    <th className="px-3 py-2 text-right w-32">{t("Harga Satuan")}</th>
+                                    <th className="px-3 py-2 text-right w-16">{t("VAT %")}</th>
+                                    <th className="px-3 py-2 text-right w-36">{t("Total")}</th>
+                                    <th className="px-3 py-2 w-48">{t("COA Big")}</th>
                                     <th className="px-3 py-2 w-10"></th>
                                 </tr>
                             </thead>
@@ -378,7 +379,7 @@ const InvoiceFormModal = ({ invoice, seedData, coaList, onClose, onSave }) => {
                                         onChange={updateItem} onRemove={removeItem} />
                                 ))}
                                 {form.invoice_items.length === 0 && (
-                                    <tr><td colSpan={8} className="text-center py-6 text-silver-dark text-sm italic">Belum ada item — klik "+ Tambah Item"</td></tr>
+                                    <tr><td colSpan={8} className="text-center py-6 text-silver-dark text-sm italic">{t("Belum ada item — klik \"+ Tambah Item\"")}</td></tr>
                                 )}
                             </tbody>
                         </table>
@@ -389,19 +390,19 @@ const InvoiceFormModal = ({ invoice, seedData, coaList, onClose, onSave }) => {
                         <div className="flex justify-end">
                             <div className="w-72 space-y-2 text-sm">
                                 <div className="flex justify-between text-silver-dark">
-                                    <span>Subtotal</span><span className="font-mono">{fmtIDR(subtotal)}</span>
+                                    <span>{t("Subtotal")}</span><span className="font-mono">{fmtIDR(subtotal)}</span>
                                 </div>
                                 <div className="flex justify-between text-silver-dark">
-                                    <span>Total VAT</span><span className="font-mono">{fmtIDR(taxTotal)}</span>
+                                    <span>{t("Total VAT")}</span><span className="font-mono">{fmtIDR(taxTotal)}</span>
                                 </div>
                                 <div className="flex justify-between text-silver-dark items-center gap-2">
-                                    <span>Diskon</span>
+                                    <span>{t("Diskon")}</span>
                                     <input type="number" value={form.discount_amount} min="0"
                                         onChange={e => setForm(p => ({ ...p, discount_amount: parseFloat(e.target.value) || 0 }))}
                                         className="w-32 bg-dark-surface border border-dark-border rounded px-2 py-1 text-right text-silver-light text-sm font-mono" />
                                 </div>
                                 <div className="flex justify-between text-white font-bold text-base pt-2 border-t border-dark-border">
-                                    <span>Grand Total</span><span className="font-mono text-accent-orange">{fmtIDR(grandTotal)}</span>
+                                    <span>{t("Grand Total")}</span><span className="font-mono text-accent-orange">{fmtIDR(grandTotal)}</span>
                                 </div>
                             </div>
                         </div>
@@ -410,13 +411,13 @@ const InvoiceFormModal = ({ invoice, seedData, coaList, onClose, onSave }) => {
 
                 {/* Notes */}
                 <div>
-                    <label className="block text-xs text-silver-dark mb-1">Catatan</label>
+                    <label className="block text-xs text-silver-dark mb-1">{t("Catatan")}</label>
                     <textarea rows={2} value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
                         className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-silver-light text-sm" />
                 </div>
 
                 <div className="flex gap-3 justify-end pt-4 border-t border-dark-border">
-                    <Button variant="secondary" onClick={onClose}>Batal</Button>
+                    <Button variant="secondary" onClick={onClose}>{t("Batal")}</Button>
                     <Button variant="ghost" onClick={() => handleSave('draft')} disabled={saving}>
                         {saving ? 'Menyimpan...' : 'Simpan Draft'}
                     </Button>
@@ -610,8 +611,8 @@ const BigInvoiceManagement = () => {
     };
 
     const handleCreateReinvoice = async (invoice, newInvoiceDate, reinvoiceNote) => {
-        if (!canEdit('big_finance')) return alert('Tidak ada akses.');
-        if (!newInvoiceDate) return alert('Tanggal invoice baru wajib diisi.');
+        if (!canEdit('big_finance')) return alert(t("Tidak ada akses."));
+        if (!newInvoiceDate) return alert(t("Tanggal invoice baru wajib diisi."));
 
         try {
             const timestamp = new Date().toISOString();
@@ -771,7 +772,7 @@ const BigInvoiceManagement = () => {
                             : 'bg-dark-surface/80 text-silver-dark hover:text-silver-light'
                             }`}
                     >
-                        SO List ({filteredReadyQuotations.length})
+                        {t("SO List (")}{filteredReadyQuotations.length})
                     </button>
                     <button
                         onClick={() => setActiveInvoicePage('invoice-list')}
@@ -780,7 +781,7 @@ const BigInvoiceManagement = () => {
                             : 'bg-dark-surface/80 text-silver-dark hover:text-silver-light'
                             }`}
                     >
-                        Invoice ({filtered.length})
+                        {t("Invoice (")}{filtered.length})
                     </button>
                 </div>
             </div>
@@ -797,7 +798,7 @@ const BigInvoiceManagement = () => {
                         </div>
                         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
                             className="bg-dark-surface border border-dark-border rounded-lg px-3 py-2 text-silver-light text-sm">
-                            <option value="all">Semua Status</option>
+                            <option value="all">{t("Semua Status")}</option>
                             {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                         </select>
                     </div>
@@ -809,16 +810,16 @@ const BigInvoiceManagement = () => {
             <div className="glass-card rounded-xl overflow-hidden">
                 <div className="px-4 py-3 border-b border-dark-border flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                     <div>
-                        <h2 className="text-base font-semibold text-silver-light">SO List</h2>
+                        <h2 className="text-base font-semibold text-silver-light">{t("SO List")}</h2>
                         <p className="text-xs text-silver-dark mt-0.5">
-                            Hanya SO full approved yang belum memiliki invoice aktif.
+                            {t("Hanya SO full approved yang belum memiliki invoice aktif.")}
                         </p>
                     </div>
                     <div className="w-full md:w-96 relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-silver-dark" />
                         <input
                             type="text"
-                            placeholder="Cari SO/quotation number atau customer..."
+                            placeholder={t("Cari SO/quotation number atau customer...")}
                             value={readySearchTerm}
                             onChange={(e) => setReadySearchTerm(e.target.value)}
                             className="w-full pl-10 pr-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm"
@@ -831,17 +832,17 @@ const BigInvoiceManagement = () => {
                         <thead className="bg-accent-blue text-white">
                             <tr>
                                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase">SO #</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Customer</th>
-                                <th className="px-4 py-3 text-right text-xs font-semibold uppercase">Total</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Valid Until</th>
-                                <th className="px-4 py-3 text-center text-xs font-semibold uppercase">Aksi</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold uppercase">{t("Customer")}</th>
+                                <th className="px-4 py-3 text-right text-xs font-semibold uppercase">{t("Total")}</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold uppercase">{t("Valid Until")}</th>
+                                <th className="px-4 py-3 text-center text-xs font-semibold uppercase">{t("Aksi")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border/40">
                             {filteredReadyQuotations.length === 0 ? (
                                 <tr>
                                     <td colSpan={5} className="text-center py-10 text-silver-dark italic">
-                                        Tidak ada SO siap invoice saat ini
+                                        {t("Tidak ada SO siap invoice saat ini")}
                                     </td>
                                 </tr>
                             ) : (
@@ -858,7 +859,7 @@ const BigInvoiceManagement = () => {
                                                 className="px-2.5 py-1 bg-accent-orange/25 hover:bg-accent-orange/40 text-accent-orange border border-accent-orange/50 rounded text-xs font-medium inline-flex items-center gap-1 smooth-transition disabled:opacity-40 disabled:cursor-not-allowed"
                                             >
                                                 <Plus className="w-3 h-3" />
-                                                Buat Invoice
+                                                {t("Buat Invoice")}
                                             </button>
                                         </td>
                                     </tr>
@@ -874,21 +875,21 @@ const BigInvoiceManagement = () => {
             {activeInvoicePage === 'invoice-list' && (
             <div className="glass-card rounded-xl overflow-hidden">
                 {loading ? (
-                    <div className="text-center py-16 text-silver-dark">Memuat data...</div>
+                    <div className="text-center py-16 text-silver-dark">{t("Memuat data...")}</div>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead className="bg-[#0070BB] text-white">
                                 <tr>
-                                    <th className="px-4 py-3 text-left">No Invoice</th>
-                                    <th className="px-4 py-3 text-left">Customer</th>
+                                    <th className="px-4 py-3 text-left">{t("No Invoice")}</th>
+                                    <th className="px-4 py-3 text-left">{t("Customer")}</th>
                                     <th className="px-4 py-3 text-left">{t('Invoice Date')}</th>
-                                    <th className="px-4 py-3 text-left">Jatuh Tempo</th>
-                                    <th className="px-4 py-3 text-right">Grand Total</th>
-                                    <th className="px-4 py-3 text-right">Terbayar</th>
-                                    <th className="px-4 py-3 text-right">Outstanding</th>
-                                    <th className="px-4 py-3 text-center">Status</th>
-                                    <th className="px-4 py-3 text-center">Aksi</th>
+                                    <th className="px-4 py-3 text-left">{t("Jatuh Tempo")}</th>
+                                    <th className="px-4 py-3 text-right">{t("Grand Total")}</th>
+                                    <th className="px-4 py-3 text-right">{t("Terbayar")}</th>
+                                    <th className="px-4 py-3 text-right">{t("Outstanding")}</th>
+                                    <th className="px-4 py-3 text-center">{t("Status")}</th>
+                                    <th className="px-4 py-3 text-center">{t("Aksi")}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-dark-border/40">
@@ -904,12 +905,12 @@ const BigInvoiceManagement = () => {
                                                     <span className="font-mono text-accent-orange">{inv.invoice_number}</span>
                                                     {/-R\d+$/i.test(inv.invoice_number || '') && (
                                                         <span className="bg-orange-500/20 text-orange-300 text-[9px] px-1 py-0.2 rounded border border-orange-500/30">
-                                                            Reinvoice
+                                                            {t("Reinvoice")}
                                                         </span>
                                                     )}
                                                     {/-FX\d+$/i.test(inv.invoice_number || '') && (
                                                         <span className="bg-cyan-500/20 text-cyan-300 text-[9px] px-1 py-0.2 rounded border border-cyan-500/30">
-                                                            Recreate Kurs
+                                                            {t("Recreate Kurs")}
                                                         </span>
                                                     )}
                                                 </div>
@@ -927,31 +928,31 @@ const BigInvoiceManagement = () => {
                                                 <div className="flex items-center justify-center gap-2">
                                                     {canEdit('big_finance') && inv.status === 'draft' && (
                                                         <button onClick={() => { setEditInvoice(inv); setShowForm(true); }}
-                                                            className="text-blue-400 hover:text-blue-300 p-1" title="Edit">
+                                                            className="text-blue-400 hover:text-blue-300 p-1" title={t("Edit")}>
                                                             <Edit className="w-4 h-4" />
                                                         </button>
                                                     )}
                                                     {canEdit('big_finance') && inv.status !== 'cancelled' && (
                                                         <button onClick={() => { setReinvoiceSourceInvoice(inv); setShowReinvoiceModal(true); }}
-                                                            className="text-orange-400 hover:text-orange-300 p-1" title="Reinvoice">
+                                                            className="text-orange-400 hover:text-orange-300 p-1" title={t("Reinvoice")}>
                                                             <FileText className="w-4 h-4" />
                                                         </button>
                                                     )}
                                                     {canEdit('big_finance') && inv.status !== 'cancelled' && (
                                                         <button onClick={() => { setRecreateRateSourceInvoice(inv); setShowRecreateRateModal(true); }}
-                                                            className="text-cyan-400 hover:text-cyan-300 p-1" title="Recreate Kurs">
+                                                            className="text-cyan-400 hover:text-cyan-300 p-1" title={t("Recreate Kurs")}>
                                                             <RefreshCw className="w-4 h-4" />
                                                         </button>
                                                     )}
                                                     {canDelete('big_finance') && inv.status === 'draft' && (
                                                         <button onClick={() => handleDelete(inv.id)}
-                                                            className="text-red-400 hover:text-red-300 p-1" title="Hapus">
+                                                            className="text-red-400 hover:text-red-300 p-1" title={t("Hapus")}>
                                                             <Trash className="w-4 h-4" />
                                                         </button>
                                                     )}
                                                     {canEdit('big_finance') && (inv.status === 'sent' || inv.status === 'partially_paid') && (
                                                         <button onClick={() => handleCancel(inv.id)}
-                                                            className="text-gray-400 hover:text-gray-300 p-1" title="Cancel">
+                                                            className="text-gray-400 hover:text-gray-300 p-1" title={t("Cancel")}>
                                                             <XCircle className="w-4 h-4" />
                                                         </button>
                                                     )}

@@ -151,34 +151,34 @@ const POFormModal = ({ po, coaList, onClose, onSave }) => {
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
-                        <label className="block text-xs text-silver-dark mb-1">Nomor PO</label>
+                        <label className="block text-xs text-silver-dark mb-1">{t("Nomor PO")}</label>
                         <input value={form.po_number} onChange={e => setForm(p => ({ ...p, po_number: e.target.value }))}
                             className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-silver-light text-sm" />
                     </div>
                     <div>
-                        <label className="block text-xs text-silver-dark mb-1">Tanggal PO *</label>
+                        <label className="block text-xs text-silver-dark mb-1">{t("Tanggal PO *")}</label>
                         <input type="date" value={form.po_date} onChange={e => setForm(p => ({ ...p, po_date: e.target.value }))}
                             className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-silver-light text-sm" />
                     </div>
                     <div>
-                        <label className="block text-xs text-silver-dark mb-1">Term Pembayaran</label>
+                        <label className="block text-xs text-silver-dark mb-1">{t("Term Pembayaran")}</label>
                         <select value={form.payment_terms} onChange={e => handleTermsChange(e.target.value)}
                             className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-silver-light text-sm">
                             {PAYMENT_TERMS.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                     </div>
                     <div>
-                        <label className="block text-xs text-silver-dark mb-1">Jatuh Tempo</label>
+                        <label className="block text-xs text-silver-dark mb-1">{t("Jatuh Tempo")}</label>
                         <input type="date" value={form.due_date} onChange={e => setForm(p => ({ ...p, due_date: e.target.value }))}
                             className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-silver-light text-sm" />
                     </div>
                     <div className="col-span-2">
-                        <label className="block text-xs text-silver-dark mb-1">Nama Vendor *</label>
+                        <label className="block text-xs text-silver-dark mb-1">{t("Nama Vendor *")}</label>
                         <input value={form.vendor_name} onChange={e => setForm(p => ({ ...p, vendor_name: e.target.value }))}
-                            className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-silver-light text-sm" placeholder="Nama vendor / pemasok" />
+                            className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-silver-light text-sm" placeholder={t("Nama vendor / pemasok")} />
                     </div>
                     <div>
-                        <label className="block text-xs text-silver-dark mb-1">Mata Uang</label>
+                        <label className="block text-xs text-silver-dark mb-1">{t("Mata Uang")}</label>
                         <select value={form.currency} onChange={e => setForm(p => ({ ...p, currency: e.target.value }))}
                             className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-silver-light text-sm">
                             <option value="IDR">IDR</option>
@@ -186,7 +186,7 @@ const POFormModal = ({ po, coaList, onClose, onSave }) => {
                         </select>
                     </div>
                     <div className="col-span-2">
-                        <label className="block text-xs text-silver-dark mb-1">Alamat Vendor</label>
+                        <label className="block text-xs text-silver-dark mb-1">{t("Alamat Vendor")}</label>
                         <input value={form.vendor_address} onChange={e => setForm(p => ({ ...p, vendor_address: e.target.value }))}
                             className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-silver-light text-sm" />
                     </div>
@@ -195,22 +195,22 @@ const POFormModal = ({ po, coaList, onClose, onSave }) => {
                 {/* Items */}
                 <div className="glass-card rounded-xl overflow-hidden">
                     <div className="flex items-center justify-between px-4 py-3 bg-[#0070BB]">
-                        <span className="text-white font-semibold text-sm">Item PO</span>
+                        <span className="text-white font-semibold text-sm">{t("Item PO")}</span>
                         <button onClick={addItem} className="flex items-center gap-1 text-white text-xs hover:text-yellow-300">
-                            <Plus className="w-4 h-4" /> Tambah Item
+                            <Plus className="w-4 h-4" /> {t("Tambah Item")}
                         </button>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead className="bg-dark-surface/60 text-silver-dark text-xs uppercase">
                                 <tr>
-                                    <th className="px-3 py-2 text-left">Deskripsi</th>
-                                    <th className="px-3 py-2 text-right w-20">Qty</th>
-                                    <th className="px-3 py-2 text-left w-20">Unit</th>
-                                    <th className="px-3 py-2 text-right w-32">Harga Satuan</th>
-                                    <th className="px-3 py-2 text-right w-16">VAT %</th>
-                                    <th className="px-3 py-2 text-right w-36">Total</th>
-                                    <th className="px-3 py-2 w-48">COA Big (Beban)</th>
+                                    <th className="px-3 py-2 text-left">{t("Deskripsi")}</th>
+                                    <th className="px-3 py-2 text-right w-20">{t("Qty")}</th>
+                                    <th className="px-3 py-2 text-left w-20">{t("Unit")}</th>
+                                    <th className="px-3 py-2 text-right w-32">{t("Harga Satuan")}</th>
+                                    <th className="px-3 py-2 text-right w-16">{t("VAT %")}</th>
+                                    <th className="px-3 py-2 text-right w-36">{t("Total")}</th>
+                                    <th className="px-3 py-2 w-48">{t("COA Big (Beban)")}</th>
                                     <th className="px-3 py-2 w-10"></th>
                                 </tr>
                             </thead>
@@ -229,10 +229,10 @@ const POFormModal = ({ po, coaList, onClose, onSave }) => {
                         <div className="flex justify-end">
                             <div className="w-72 space-y-2 text-sm">
                                 <div className="flex justify-between text-silver-dark">
-                                    <span>Subtotal</span><span className="font-mono">{fmtIDR(subtotal)}</span>
+                                    <span>{t("Subtotal")}</span><span className="font-mono">{fmtIDR(subtotal)}</span>
                                 </div>
                                 <div className="flex justify-between text-silver-dark">
-                                    <span>Total VAT</span><span className="font-mono">{fmtIDR(taxTotal)}</span>
+                                    <span>{t("Total VAT")}</span><span className="font-mono">{fmtIDR(taxTotal)}</span>
                                 </div>
                                 <div className="flex justify-between text-silver-dark items-center gap-2">
                                     <span>{t('Discount')}</span>
@@ -241,7 +241,7 @@ const POFormModal = ({ po, coaList, onClose, onSave }) => {
                                         className="w-32 bg-dark-surface border border-dark-border rounded px-2 py-1 text-right text-silver-light text-sm font-mono" />
                                 </div>
                                 <div className="flex justify-between text-white font-bold text-base pt-2 border-t border-dark-border">
-                                    <span>Grand Total</span>
+                                    <span>{t("Grand Total")}</span>
                                     <span className="font-mono text-accent-orange">{fmtIDR(grandTotal)}</span>
                                 </div>
                             </div>
@@ -373,21 +373,21 @@ const BigPurchaseOrder = () => {
             {/* Table */}
             <div className="glass-card rounded-xl overflow-hidden">
                 {loading ? (
-                    <div className="text-center py-16 text-silver-dark">Memuat data...</div>
+                    <div className="text-center py-16 text-silver-dark">{t("Memuat data...")}</div>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead className="bg-[#0070BB] text-white">
                                 <tr>
                                     <th className="px-4 py-3 text-left">No PO</th>
-                                    <th className="px-4 py-3 text-left">Vendor</th>
+                                    <th className="px-4 py-3 text-left">{t("Vendor")}</th>
                                     <th className="px-4 py-3 text-left">{t('PO Date')}</th>
-                                    <th className="px-4 py-3 text-left">Jatuh Tempo</th>
-                                    <th className="px-4 py-3 text-right">Grand Total</th>
-                                    <th className="px-4 py-3 text-right">Terbayar</th>
-                                    <th className="px-4 py-3 text-right">Outstanding</th>
-                                    <th className="px-4 py-3 text-center">Status</th>
-                                    <th className="px-4 py-3 text-center">Aksi</th>
+                                    <th className="px-4 py-3 text-left">{t("Jatuh Tempo")}</th>
+                                    <th className="px-4 py-3 text-right">{t("Grand Total")}</th>
+                                    <th className="px-4 py-3 text-right">{t("Terbayar")}</th>
+                                    <th className="px-4 py-3 text-right">{t("Outstanding")}</th>
+                                    <th className="px-4 py-3 text-center">{t("Status")}</th>
+                                    <th className="px-4 py-3 text-center">{t("Aksi")}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-dark-border/40">
@@ -411,25 +411,25 @@ const BigPurchaseOrder = () => {
                                                 <div className="flex items-center justify-center gap-2">
                                                     {canEdit('big_finance') && po.status === 'draft' && (
                                                         <button onClick={() => { setEditPO(po); setShowForm(true); }}
-                                                            className="text-blue-400 hover:text-blue-300 p-1" title="Edit">
+                                                            className="text-blue-400 hover:text-blue-300 p-1" title={t("Edit")}>
                                                             <Edit className="w-4 h-4" />
                                                         </button>
                                                     )}
                                                     {canApprove('big_finance') && po.status === 'submitted' && (
                                                         <>
                                                             <button onClick={() => handleApprove(po.id)}
-                                                                className="text-green-400 hover:text-green-300 p-1" title="Approve">
+                                                                className="text-green-400 hover:text-green-300 p-1" title={t("Approve")}>
                                                                 <CheckCircle className="w-4 h-4" />
                                                             </button>
                                                             <button onClick={() => handleReject(po.id)}
-                                                                className="text-red-400 hover:text-red-300 p-1" title="Reject">
+                                                                className="text-red-400 hover:text-red-300 p-1" title={t("Reject")}>
                                                                 <XCircle className="w-4 h-4" />
                                                             </button>
                                                         </>
                                                     )}
                                                     {canDelete('big_finance') && po.status === 'draft' && (
                                                         <button onClick={() => handleDelete(po.id)}
-                                                            className="text-red-400 hover:text-red-300 p-1" title="Hapus">
+                                                            className="text-red-400 hover:text-red-300 p-1" title={t("Hapus")}>
                                                             <Trash className="w-4 h-4" />
                                                         </button>
                                                     )}
