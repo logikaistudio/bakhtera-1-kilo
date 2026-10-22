@@ -195,6 +195,45 @@ export const DataProvider = ({ children }) => {
         itemDate: q.item_date || q.itemDate || null,
     });
 
+    const normalizeMutationLog = (log) => {
+        const docs = log.documents || {};
+        const isMeta = docs && !Array.isArray(docs);
+        const meta = isMeta ? docs : {};
+        const files = isMeta ? (docs.files || []) : (Array.isArray(docs) ? docs : []);
+
+        return {
+            id: log.id?.toString(),
+            pengajuanId: log.pengajuan_id,
+            pengajuanNumber: log.pengajuan_number,
+            bcDocumentNumber: log.bc_document_number,
+            packageNumber: log.package_number || meta.packageNumber,
+            itemCode: log.item_code,
+            itemName: log.item_name,
+            assetName: log.item_name,
+            hsCode: log.hs_code || meta.hsCode,
+            bcDocType: meta.bcDocType,
+            serialNumber: log.serial_number,
+            totalStock: log.total_stock,
+            mutatedQty: log.mutated_qty,
+            remainingStock: log.remaining_stock,
+            origin: log.origin,
+            destination: log.destination,
+            condition: log.condition || meta.condition || 'Baik',
+            date: log.date,
+            time: log.time,
+            pic: log.pic,
+            remarks: log.remarks,
+            documents: files,
+            uom: log.uom || meta.uom || 'pcs',
+            mutationLocation: log.mutation_location || meta.mutationLocation,
+            storageLocation: log.storage_location || meta.storageLocation,
+            sender: log.sender || meta.sender,
+            createdAt: log.created_at,
+            submissionDate: log.date,
+            approvedDate: log.date
+        };
+    };
+
     // Shared Helper: Map Inbound DB -> State (freight_inbound schema)
     const mapInboundToState = (i) => {
         // Parse documents JSONB
@@ -450,55 +489,6 @@ export const DataProvider = ({ children }) => {
                 const { data: custDocData, error: custDocError } = await supabase.from('freight_customs').select('*');
                 if (!custDocError) setCustomsDocuments(custDocData || []);
 
-                // Load Mutation Logs from freight_mutation_logs table
-                const { data: mLogData, error: mLogError } = await supabase.from('freight_mutation_logs').select('*');
-                if (!mLogError) {
-                    // Map snake_case to camelCase for UI
-                    const mappedLogs = (mLogData || []).map(log => {
-                        // Extract metadata from documents if valid object (and not array of files)
-                        // Note: older logs might have array of files in documents. 
-                        // Newer logs (post-fix) have object { files: [], ...meta }
-                        const docs = log.documents || {};
-                        const isMeta = docs && !Array.isArray(docs);
-                        const meta = isMeta ? docs : {};
-                        const files = isMeta ? (docs.files || []) : (Array.isArray(docs) ? docs : []);
-
-                        return {
-                            id: log.id?.toString(),
-                            pengajuanId: log.pengajuan_id,
-                            pengajuanNumber: log.pengajuan_number,
-                            bcDocumentNumber: log.bc_document_number,
-                            packageNumber: log.package_number || meta.packageNumber,
-                            itemCode: log.item_code,
-                            itemName: log.item_name,
-                            assetName: log.item_name,
-                            hsCode: log.hs_code || meta.hsCode,
-                            bcDocType: meta.bcDocType, // Extracted for Pabean Mutation Report
-                            serialNumber: log.serial_number,
-                            totalStock: log.total_stock,
-                            mutatedQty: log.mutated_qty,
-                            remainingStock: log.remaining_stock,
-                            origin: log.origin,
-                            destination: log.destination,
-                            condition: log.condition || meta.condition || 'Baik',
-                            date: log.date,
-                            time: log.time,
-                            pic: log.pic,
-                            remarks: log.remarks,
-                            documents: files, // Return array of files to UI for compatibility
-                            uom: log.uom || meta.uom || 'pcs',
-                            mutationLocation: log.mutation_location || meta.mutationLocation,
-                            storageLocation: log.storage_location || meta.storageLocation,
-                            sender: log.sender || meta.sender,
-                            createdAt: log.created_at,
-                            submissionDate: log.date,
-                            approvedDate: log.date
-                        };
-                    });
-                    setMutationLogs(mappedLogs);
-                    console.log(`✅ Loaded ${mappedLogs.length} mutation logs from Supabase`);
-                }
-
                 // Load Finance Data
                 const { data: invData, error: invError } = await supabase.from('freight_invoices').select('*');
                 if (!invError) setInvoices(invData || []);
@@ -559,6 +549,67 @@ export const DataProvider = ({ children }) => {
             }
         };
         loadData();
+    }, []);
+
+    useEffect(() => {
+        let isActive = true;
+
+        const loadMutationLogs = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('freight_mutation_logs')
+                    .select('id,pengajuan_id,pengajuan_number,bc_document_number,item_code,item_name,serial_number,date,time,pic,total_stock,mutated_qty,remaining_stock,origin,destination,remarks,created_at')
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+                if (!isActive) return;
+
+                const logs = (data || []).map(normalizeMutationLog);
+                setMutationLogs(logs);
+                console.log(`✅ Loaded ${logs.length} mutation logs from Supabase`);
+
+                // `documents` can hold large base64 files, so select('*') hits the statement timeout.
+                // Metadata inside it is fetched in small pages and merged by id.
+                const metaSelect = 'id,meta_package:documents->>packageNumber,meta_hs:documents->>hsCode,meta_sender:documents->>sender,meta_uom:documents->>uom,meta_mloc:documents->>mutationLocation,meta_sloc:documents->>storageLocation,meta_cond:documents->>condition,meta_bc:documents->>bcDocType';
+                const pageSize = 100;
+                for (let from = 0; from < logs.length; from += pageSize) {
+                    const { data: metaRows, error: metaError } = await supabase
+                        .from('freight_mutation_logs')
+                        .select(metaSelect)
+                        .order('created_at', { ascending: false })
+                        .order('id', { ascending: false })
+                        .range(from, from + pageSize - 1);
+                    if (!isActive) return;
+                    if (metaError) {
+                        console.warn('Could not load mutation log metadata:', metaError.message);
+                        break;
+                    }
+                    const metaById = new Map((metaRows || []).map(m => [String(m.id), m]));
+                    setMutationLogs(prev => prev.map(log => {
+                        const m = metaById.get(log.id);
+                        if (!m) return log;
+                        return {
+                            ...log,
+                            packageNumber: log.packageNumber || m.meta_package || undefined,
+                            hsCode: log.hsCode || m.meta_hs || undefined,
+                            sender: log.sender || m.meta_sender || undefined,
+                            uom: m.meta_uom || log.uom,
+                            mutationLocation: log.mutationLocation || m.meta_mloc || undefined,
+                            storageLocation: log.storageLocation || m.meta_sloc || undefined,
+                            condition: m.meta_cond || log.condition,
+                            bcDocType: log.bcDocType || m.meta_bc || undefined
+                        };
+                    }));
+                }
+            } catch (error) {
+                console.error('Error fetching mutation logs:', error);
+            }
+        };
+
+        loadMutationLogs();
+        return () => {
+            isActive = false;
+        };
     }, []);
 
     // Realtime Subscriptions
@@ -685,49 +736,13 @@ export const DataProvider = ({ children }) => {
             // Add subscription for Mutation Logs (for Bridge UI)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'freight_mutation_logs' }, (payload) => {
                 console.log('⚡ Realtime Mutation Log Update:', payload);
-                const mapRealtimeLog = (log) => {
-                    const docs = log.documents || {};
-                    const isMeta = docs && !Array.isArray(docs);
-                    const meta = isMeta ? docs : {};
-                    const files = isMeta ? (docs.files || []) : (Array.isArray(docs) ? docs : []);
-
-                    return {
-                        id: log.id?.toString(),
-                        pengajuanId: log.pengajuan_id,
-                        pengajuanNumber: log.pengajuan_number,
-                        bcDocumentNumber: log.bc_document_number,
-                        packageNumber: log.package_number || meta.packageNumber,
-                        itemCode: log.item_code,
-                        itemName: log.item_name,
-                        assetName: log.item_name, // fallback or same
-                        hsCode: log.hs_code || meta.hsCode,
-                        serialNumber: log.serial_number,
-                        totalStock: log.total_stock,
-                        mutatedQty: log.mutated_qty,
-                        remainingStock: log.remaining_stock,
-                        origin: log.origin,
-                        destination: log.destination,
-                        condition: log.condition || meta.condition || 'Baik',
-                        date: log.date,
-                        time: log.time,
-                        pic: log.pic,
-                        remarks: log.remarks,
-                        documents: files,
-                        uom: log.uom || meta.uom || 'pcs',
-                        mutationLocation: log.mutation_location || meta.mutationLocation,
-                        storageLocation: log.storage_location || meta.storageLocation,
-                        sender: log.sender || meta.sender,
-                        createdAt: log.created_at,
-                        submissionDate: log.date,
-                        approvedDate: log.date
-                    };
-                };
-
                 if (payload.eventType === 'INSERT') {
-                    setMutationLogs(prev => [...prev, mapRealtimeLog(payload.new)]);
+                    const newLog = normalizeMutationLog(payload.new);
+                    setMutationLogs(prev => [newLog, ...prev]);
                 }
                 else if (payload.eventType === 'UPDATE') {
-                    setMutationLogs(prev => prev.map(item => item.id === payload.new.id.toString() ? mapRealtimeLog(payload.new) : item));
+                    const updatedLog = normalizeMutationLog(payload.new);
+                    setMutationLogs(prev => prev.map(item => item.id === updatedLog.id ? updatedLog : item));
                 }
                 else if (payload.eventType === 'DELETE') {
                     setMutationLogs(prev => prev.filter(item => item.id !== payload.old.id.toString()));
@@ -2272,6 +2287,17 @@ export const DataProvider = ({ children }) => {
     };
 
     // ========== MUTATION LOGS ==========
+    const fetchMutationLogDetails = async (logId) => {
+        const { data, error } = await supabase
+            .from('freight_mutation_logs')
+            .select('*')
+            .eq('id', logId)
+            .single();
+
+        if (error) throw error;
+        return normalizeMutationLog(data);
+    };
+
     const addMutationLog = async (mutationData) => {
         try {
             const newLog = {
@@ -4504,6 +4530,7 @@ export const DataProvider = ({ children }) => {
         setWarehouseInventory,
         mutationLogs,
         setMutationLogs,
+        fetchMutationLogDetails,
         addMutationLog,
         updateMutationLog,
         deleteMutationLog,
