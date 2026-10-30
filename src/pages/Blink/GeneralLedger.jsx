@@ -29,7 +29,9 @@ const COA_TYPE_CONFIG = {
 const SOURCE_CONFIG = {
     ar_payment: { label: 'AR Payment', color: 'bg-green-500/20 text-green-400 border-green-500/30' },
     ap_payment: { label: 'AP Payment', color: 'bg-red-500/20 text-red-400 border-red-500/30' },
+    blink_invoice: { label: 'Invoice', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
     invoice: { label: 'Invoice', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
+    ar: { label: 'AR Invoice', color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' },
     ar_invoice: { label: 'AR Invoice', color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' },
     po: { label: 'Purchase Order', color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
     ap: { label: 'AP Entry', color: 'bg-pink-500/20 text-pink-400 border-pink-500/30' },
@@ -41,6 +43,20 @@ const SOURCE_CONFIG = {
 const getSourceConfig = (entry) => {
     const key = entry.reference_type || entry.entry_type || (entry.source === 'manual' ? 'manual' : 'auto');
     return SOURCE_CONFIG[key] || SOURCE_CONFIG.auto;
+};
+
+const getDisplayReferenceNumber = (entry) => {
+    const referenceType = entry.reference_type || entry.entry_type;
+    if (['blink_invoice', 'invoice', 'ar', 'ar_invoice'].includes(referenceType)) {
+        return entry.invoice_number || entry.reference_number || '';
+    }
+    if (referenceType === 'ar_payment') {
+        return entry.invoice_number || '';
+    }
+    if (referenceType === 'ap_payment') {
+        return entry.payment_number || entry.reference_number || '';
+    }
+    return entry.reference_number || '';
 };
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
@@ -167,7 +183,7 @@ const exportToPDF = (selectedAccount, accountInfo, dateRange, openingBalance, to
                         <td class="muted">${fmtDatePrint(entry.entry_date)}</td>
                         <td class="code">${entry.entry_number || '-'}</td>
                         <td>${(entry.description || '-').substring(0, 50)}</td>
-                        <td class="muted">${entry.reference_number || '-'}</td>
+                        <td class="muted">${getDisplayReferenceNumber(entry) || '-'}</td>
                         <td class="muted">${(entry.party_name || '-').substring(0, 20)}</td>
                         <td class="muted">${(entry.reference_type || entry.source || 'auto').toUpperCase()}</td>
                         <td class="text-right mono green">${entry.debit > 0 ? fmtAmt(entry.debit, entry.currency, entry.exchange_rate) : ''}</td>
@@ -419,13 +435,96 @@ const GeneralLedger = () => {
                 }
             });
             const unique = await filterActiveBlinkJournalEntries(Array.from(uniqueMap.values()), activeDivision);
+
+            const invoiceEntries = unique.filter(entry =>
+                ['blink_invoice', 'invoice', 'ar', 'ar_invoice'].includes(entry.reference_type || entry.entry_type)
+            );
+            const arPaymentEntries = unique.filter(entry =>
+                (entry.reference_type || entry.entry_type) === 'ar_payment'
+            );
+            const apPaymentEntries = unique.filter(entry =>
+                (entry.reference_type || entry.entry_type) === 'ap_payment' &&
+                !entry.payment_number && !entry.reference_number
+            );
+            const referencedArPaymentIds = [...new Set(arPaymentEntries.map(entry => entry.reference_id).filter(Boolean))];
+            const apPaymentIds = [...new Set(apPaymentEntries.map(entry => entry.reference_id).filter(Boolean))];
+            const arPaymentNumbers = [...new Set(arPaymentEntries.map(entry => entry.reference_number).filter(Boolean))];
+
+            const [paymentsByIdResult, paymentsByNumberResult] = await Promise.all([
+                referencedArPaymentIds.length || apPaymentIds.length
+                    ? supabase.from('blink_payments').select('*')
+                        .in('id', [...new Set([...referencedArPaymentIds, ...apPaymentIds])])
+                    : Promise.resolve({ data: [], error: null }),
+                arPaymentNumbers.length
+                    ? supabase.from('blink_payments').select('*').in('payment_number', arPaymentNumbers)
+                    : Promise.resolve({ data: [], error: null })
+            ]);
+            if (paymentsByIdResult.error) throw paymentsByIdResult.error;
+            if (paymentsByNumberResult.error) throw paymentsByNumberResult.error;
+            const paymentRows = [...(paymentsByIdResult.data || []), ...(paymentsByNumberResult.data || [])];
+            const paymentsById = new Map(paymentRows.map(payment => [payment.id, payment]));
+            const paymentsByNumber = new Map(paymentRows.map(payment => [payment.payment_number, payment]));
+
+            // AR journal references may point to an invoice, an AR transaction, or a payment row.
+            const invoiceIds = [...new Set([
+                ...invoiceEntries.map(entry => entry.reference_id),
+                ...arPaymentEntries.map(entry => entry.reference_id),
+                ...arPaymentEntries.map(entry =>
+                    (paymentsById.get(entry.reference_id) || paymentsByNumber.get(entry.reference_number))?.reference_id ||
+                    (paymentsById.get(entry.reference_id) || paymentsByNumber.get(entry.reference_number))?.invoice_id
+                )
+            ].filter(Boolean))];
+            const [invoiceResult, arByIdResult, arByInvoiceIdResult] = await Promise.all([
+                invoiceIds.length
+                    ? supabase.from('blink_invoices').select('id, invoice_number').in('id', invoiceIds)
+                    : Promise.resolve({ data: [], error: null }),
+                invoiceIds.length
+                    ? supabase.from('blink_ar_transactions').select('id, invoice_id, invoice_number')
+                        .eq('division', activeDivision).in('id', invoiceIds)
+                    : Promise.resolve({ data: [], error: null }),
+                invoiceIds.length
+                    ? supabase.from('blink_ar_transactions').select('id, invoice_id, invoice_number')
+                        .eq('division', activeDivision).in('invoice_id', invoiceIds)
+                    : Promise.resolve({ data: [], error: null })
+            ]);
+            if (invoiceResult.error) throw invoiceResult.error;
+            if (arByIdResult.error) throw arByIdResult.error;
+            if (arByInvoiceIdResult.error) throw arByInvoiceIdResult.error;
+
+            const invoiceNumbers = new Map((invoiceResult.data || []).map(invoice => [invoice.id, invoice.invoice_number]));
+            const arInvoicesById = new Map((arByIdResult.data || []).map(ar => [ar.id, ar]));
+            const arInvoicesByInvoiceId = new Map((arByInvoiceIdResult.data || []).map(ar => [ar.invoice_id, ar]));
+            const entriesWithReferenceNumbers = unique.map(entry => {
+                const referenceType = entry.reference_type || entry.entry_type;
+                if (['blink_invoice', 'invoice', 'ar', 'ar_invoice'].includes(referenceType)) {
+                    const ar = arInvoicesById.get(entry.reference_id) || arInvoicesByInvoiceId.get(entry.reference_id);
+                    return {
+                        ...entry,
+                        invoice_number: invoiceNumbers.get(entry.reference_id) || ar?.invoice_number || entry.invoice_number
+                    };
+                }
+                if (referenceType === 'ar_payment') {
+                    const payment = paymentsById.get(entry.reference_id) || paymentsByNumber.get(entry.reference_number);
+                    const referenceId = payment?.reference_id || payment?.invoice_id || entry.reference_id;
+                    const ar = arInvoicesById.get(referenceId) || arInvoicesByInvoiceId.get(referenceId);
+                    const invoiceId = ar?.invoice_id || referenceId;
+                    return {
+                        ...entry,
+                        invoice_number: invoiceNumbers.get(invoiceId) || ar?.invoice_number || entry.invoice_number
+                    };
+                }
+                if (referenceType === 'ap_payment') {
+                    return { ...entry, payment_number: paymentsById.get(entry.reference_id)?.payment_number || entry.payment_number };
+                }
+                return entry;
+            });
             
             // sort chronologically
-            unique.sort((a, b) => {
+            entriesWithReferenceNumbers.sort((a, b) => {
                 const d = a.entry_date.localeCompare(b.entry_date);
                 return d !== 0 ? d : (a.created_at || '').localeCompare(b.created_at || '');
             });
-            setEntries(unique);
+            setEntries(entriesWithReferenceNumbers);
         } catch (e) {
             console.error('Error fetching ledger:', e);
         } finally {
@@ -453,7 +552,7 @@ const GeneralLedger = () => {
             const t = searchTerm.toLowerCase();
             list = list.filter(e =>
                 e.description?.toLowerCase().includes(t) ||
-                e.reference_number?.toLowerCase().includes(t) ||
+                getDisplayReferenceNumber(e).toLowerCase().includes(t) ||
                 e.entry_number?.toLowerCase().includes(t) ||
                 e.party_name?.toLowerCase().includes(t)
             );
@@ -491,7 +590,7 @@ const GeneralLedger = () => {
     // ── Navigate to source ────────────────────────────────────────────────────
     const goToSource = (entry) => {
         const rt = entry.reference_type;
-        if (rt === 'invoice' || rt === 'ar_invoice') navigate('/blink/finance/invoices');
+        if (rt === 'blink_invoice' || rt === 'invoice' || rt === 'ar' || rt === 'ar_invoice') navigate('/blink/finance/invoices');
         else if (rt === 'po' || rt === 'ap') navigate('/blink/finance/purchase-orders');
         else if (rt === 'ar_payment') navigate('/blink/finance/ar');
         else if (rt === 'ap_payment') navigate('/blink/finance/ap');
@@ -505,7 +604,7 @@ const GeneralLedger = () => {
             ['Opening Balance', '', '', '', '', '', '', openingBalance, '', ''],
             ...rows.map(r => [
                 r.entry_date, r.entry_number, r.description || '',
-                r.reference_number || '', r.party_name || '',
+                getDisplayReferenceNumber(r), r.party_name || '',
                 toIDR(r.debit, r.currency, r.exchange_rate) ?? 0,
                 toIDR(r.credit, r.currency, r.exchange_rate) ?? 0,
                 r.runningBalance, r.currency || 'IDR',
@@ -787,7 +886,8 @@ const GeneralLedger = () => {
                                                     <tr><td colSpan={9} className="px-4 py-10 text-center text-silver-dark">{t("Tidak ada transactions pada periode dan akun ini.")}</td></tr>
                                                 ) : rows.map((entry, idx) => {
                                                     const srcCfg = getSourceConfig(entry);
-                                                    const isLinked = entry.reference_type && entry.reference_type !== 'adjustment' && entry.reference_number;
+                                                    const referenceNumber = getDisplayReferenceNumber(entry);
+                                                    const isLinked = entry.reference_type && entry.reference_type !== 'adjustment' && referenceNumber;
                                                     const debitAmt = fmtAmount(entry.debit, entry.currency, entry.exchange_rate);
                                                     const creditAmt = fmtAmount(entry.credit, entry.currency, entry.exchange_rate);
                                                     return (
@@ -798,9 +898,9 @@ const GeneralLedger = () => {
                                                             <td className="px-3 py-2 whitespace-nowrap">
                                                                 {isLinked ? (
                                                                     <button onClick={() => goToSource(entry)} className="flex items-center gap-1 text-accent-blue hover:text-blue-300 smooth-transition">
-                                                                        {entry.reference_number}<ExternalLink className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100" />
+                                                                        {referenceNumber}<ExternalLink className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100" />
                                                                     </button>
-                                                                ) : <span className="text-silver-dark">{entry.reference_number || '-'}</span>}
+                                                                ) : <span className="text-silver-dark">{referenceNumber || '-'}</span>}
                                                             </td>
                                                             <td className="px-3 py-2 text-silver-dark whitespace-nowrap max-w-[110px]"><span className="block truncate">{entry.party_name || '-'}</span></td>
                                                             <td className="px-3 py-2 text-center">
