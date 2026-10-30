@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createInvoiceJournal, createARPaymentJournal, getAllCOA, generateUUID } from '../../utils/journalHelper';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useData } from '../../context/DataContext';
 import { generateInvoiceNumber, generateAdditionalInvoiceNumber } from '../../utils/documentNumbers';
@@ -31,7 +31,8 @@ const InvoiceManagement = () => {
     const [shipments, setShipments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all');
-    const [searchTerm, setSearchTerm] = useState('');
+    const location = useLocation();
+    const [searchTerm, setSearchTerm] = useState(location.state?.searchTerm || '');
     const [soSearchTerm, setSoSearchTerm] = useState('');
     const [activeInvoicePage, setActiveInvoicePage] = useState('invoice-list');
 

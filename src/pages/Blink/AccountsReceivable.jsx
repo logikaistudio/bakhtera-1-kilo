@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { createARPaymentJournal, ensureJournalSuccess, getAllCOA } from '../../utils/journalHelper';
 import Button from '../../components/Common/Button';
@@ -19,7 +20,8 @@ const AccountsReceivable = () => {
     const activeDivision = getActiveDivision();
     const [arTransactions, setARTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState('');
+    const location = useLocation();
+    const [searchTerm, setSearchTerm] = useState(location.state?.searchTerm || '');
     const [selectedAR, setSelectedAR] = useState(null);
     const [showEditModal, setShowEditModal] = useState(false);
     const [showPaymentModal, setShowPaymentModal] = useState(false);

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useData } from '../../context/DataContext';
 import { generatePONumber, generateAPNumber } from '../../utils/documentNumbers';
@@ -63,7 +64,8 @@ const PurchaseOrder = () => {
     const [quotations, setQuotations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all');
-    const [searchTerm, setSearchTerm] = useState('');
+    const location = useLocation();
+    const [searchTerm, setSearchTerm] = useState(location.state?.searchTerm || '');
 
     // Modals
     const [showCreateModal, setShowCreateModal] = useState(false);

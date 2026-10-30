@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { createAPPaymentJournal, ensureJournalSuccess, getAllCOA } from '../../utils/journalHelper';
 import Button from '../../components/Common/Button';
@@ -845,7 +846,8 @@ const AccountsPayable = () => {
     const [apTransactions, setAPTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all');
-    const [searchTerm, setSearchTerm] = useState('');
+    const location = useLocation();
+    const [searchTerm, setSearchTerm] = useState(location.state?.searchTerm || '');
     const [selectedAP, setSelectedAP] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [showPaymentModal, setShowPaymentModal] = useState(false);

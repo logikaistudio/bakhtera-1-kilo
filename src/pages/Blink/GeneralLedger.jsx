@@ -448,15 +448,20 @@ const GeneralLedger = () => {
             );
             const referencedArPaymentIds = [...new Set(arPaymentEntries.map(entry => entry.reference_id).filter(Boolean))];
             const apPaymentIds = [...new Set(apPaymentEntries.map(entry => entry.reference_id).filter(Boolean))];
-            const arPaymentNumbers = [...new Set(arPaymentEntries.map(entry => entry.reference_number).filter(Boolean))];
+            const paymentNumbersToFetch = [...new Set(
+                unique
+                    .filter(entry => ['ar_payment', 'ap_payment'].includes(entry.reference_type || entry.entry_type))
+                    .map(entry => entry.reference_number)
+                    .filter(Boolean)
+            )];
 
             const [paymentsByIdResult, paymentsByNumberResult] = await Promise.all([
                 referencedArPaymentIds.length || apPaymentIds.length
                     ? supabase.from('blink_payments').select('*')
                         .in('id', [...new Set([...referencedArPaymentIds, ...apPaymentIds])])
                     : Promise.resolve({ data: [], error: null }),
-                arPaymentNumbers.length
-                    ? supabase.from('blink_payments').select('*').in('payment_number', arPaymentNumbers)
+                paymentNumbersToFetch.length
+                    ? supabase.from('blink_payments').select('*').in('payment_number', paymentNumbersToFetch)
                     : Promise.resolve({ data: [], error: null })
             ]);
             if (paymentsByIdResult.error) throw paymentsByIdResult.error;
@@ -514,7 +519,12 @@ const GeneralLedger = () => {
                     };
                 }
                 if (referenceType === 'ap_payment') {
-                    return { ...entry, payment_number: paymentsById.get(entry.reference_id)?.payment_number || entry.payment_number };
+                    const payment = paymentsById.get(entry.reference_id) || paymentsByNumber.get(entry.reference_number);
+                    return {
+                        ...entry,
+                        payment_number: payment?.payment_number || entry.payment_number,
+                        source_number: payment?.reference_number || entry.reference_number
+                    };
                 }
                 return entry;
             });
@@ -590,10 +600,12 @@ const GeneralLedger = () => {
     // ── Navigate to source ────────────────────────────────────────────────────
     const goToSource = (entry) => {
         const rt = entry.reference_type;
-        if (rt === 'blink_invoice' || rt === 'invoice' || rt === 'ar' || rt === 'ar_invoice') navigate('/blink/finance/invoices');
-        else if (rt === 'po' || rt === 'ap') navigate('/blink/finance/purchase-orders');
-        else if (rt === 'ar_payment') navigate('/blink/finance/ar');
-        else if (rt === 'ap_payment') navigate('/blink/finance/ap');
+        const searchTerm = entry.source_number || getDisplayReferenceNumber(entry);
+        const state = { searchTerm };
+        if (rt === 'blink_invoice' || rt === 'invoice' || rt === 'ar' || rt === 'ar_invoice') navigate('/blink/finance/invoices', { state });
+        else if (rt === 'po') navigate('/blink/finance/purchase-orders', { state });
+        else if (rt === 'ap' || rt === 'ap_payment') navigate('/blink/finance/ap', { state });
+        else if (rt === 'ar_payment') navigate('/blink/finance/ar', { state });
     };
 
     // ── Export ────────────────────────────────────────────────────────────────
