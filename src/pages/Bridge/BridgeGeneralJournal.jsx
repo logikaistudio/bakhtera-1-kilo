@@ -14,6 +14,7 @@ import { printReport, fmtDatePrint } from '../../utils/printPDF';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../i18n/LanguageContext';
+import { buildBalancingLine, getJournalBalanceDifference } from '../../utils/journalBalance';
 
 // ─── Source badge config ─────────────────────────────────────────────────────
 const SOURCE_CONFIG = {
@@ -108,6 +109,8 @@ const BridgeGeneralJournal = () => {
             { coa_id: '', account_code: '', account_name: '', debit: 0, credit: 0 }
         ]
     });
+    const [adjustmentAccountId, setAdjustmentAccountId] = useState('');
+    const [adjustmentDescription, setAdjustmentDescription] = useState('');
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
@@ -246,9 +249,23 @@ const BridgeGeneralJournal = () => {
     };
 
     const isBalanced = () => {
-        const d = newEntry.lines.reduce((s, l) => s + (l.debit || 0), 0);
-        const c = newEntry.lines.reduce((s, l) => s + (l.credit || 0), 0);
-        return Math.abs(d - c) < 0.01 && d > 0;
+        const totalDebit = newEntry.lines.reduce((sum, line) => sum + (line.debit || 0), 0);
+        return Math.abs(getBalanceDifference()) < 0.01 && totalDebit > 0;
+    };
+
+    const getBalanceDifference = () => getJournalBalanceDifference(newEntry.lines);
+
+    const addBalancingLine = () => {
+        const difference = getBalanceDifference();
+        const account = accounts.find(item => item.id === adjustmentAccountId);
+        const line = buildBalancingLine(difference, account, adjustmentDescription);
+        if (!line) return;
+
+        setNewEntry(current => ({
+            ...current,
+            lines: [...current.lines, line]
+        }));
+        setAdjustmentDescription('');
     };
 
     const generateEntryNumber = async () => {
@@ -288,7 +305,7 @@ const BridgeGeneralJournal = () => {
     };
 
     const saveEntry = async () => {
-        if (!canCreate('blink_journal')) {
+        if (!canCreate('bridge_finance')) {
             alert(t("Anda tidak memiliki hak akses untuk membuat entri jurnal manual."));
             return;
         }
@@ -314,7 +331,7 @@ const BridgeGeneralJournal = () => {
                 coa_id: line.coa_id,
                 debit: line.debit || 0,
                 credit: line.credit || 0,
-                description: newEntry.description,
+                description: line.description || newEntry.description,
                 batch_id: batchId,
                 source: 'manual',
                 currency: 'IDR',
@@ -349,7 +366,7 @@ const BridgeGeneralJournal = () => {
 
     // ── Delete ──────────────────────────────────────────────────────────────────
     const deleteEntry = async (batchId) => {
-        if (!canDelete('blink_journal')) {
+        if (!canDelete('bridge_finance')) {
             alert(t("Anda tidak memiliki hak akses untuk menghapus entri jurnal manual."));
             return;
         }
@@ -418,7 +435,6 @@ const BridgeGeneralJournal = () => {
         };
 
         const groupsHTML = groupedEntries.map(group => {
-            const badge = getSourceBadge(group);
             const linesHTML = group.lines.map(line => `
                 <tr>
                     <td></td>
@@ -505,7 +521,7 @@ const BridgeGeneralJournal = () => {
                         className="flex items-center gap-2 px-3 py-2 bg-dark-surface text-red-400 hover:bg-dark-card border border-dark-border rounded-lg smooth-transition text-xs disabled:opacity-40">
                         <Printer className="w-4 h-4" /> {t("Print PDF")}
                     </button>
-                    {canCreate('blink_journal') && (
+                    {canCreate('bridge_finance') && (
                         <Button icon={Plus} onClick={() => setShowNewEntryModal(true)}>{t("Manual Entry")}</Button>
                     )}
                 </div>
@@ -646,6 +662,14 @@ const BridgeGeneralJournal = () => {
                                                 {group.reference_number && (
                                                     <div className="font-mono text-xs text-silver-dark mt-0.5 truncate max-w-[200px]" title={group.reference_number}>↑ {group.reference_number}</div>
                                                 )}
+                                                <button
+                                                    type="button"
+                                                    onClick={event => { event.stopPropagation(); setSelectedGroup(group); setShowDetailModal(true); }}
+                                                    className="mt-1 inline-flex items-center gap-1 text-xs text-blue-300 hover:text-blue-200"
+                                                    title={t("View journal details")}
+                                                >
+                                                    <Eye className="w-3 h-3" /> {t("Details")}
+                                                </button>
                                             </td>
                                             <td className="px-3 py-2.5 text-silver-dark text-xs whitespace-nowrap" colSpan={2}>
                                                 <span className="italic">{group.lines.length} {t("line")}{group.lines.length > 1 ? 's' : ''}</span>
@@ -755,7 +779,7 @@ const BridgeGeneralJournal = () => {
                                     </button>
                                 )}
                                 {/* Delete (manual only) */}
-                                {selectedGroup.source === 'manual' && canDelete('blink_journal') && (
+                                {selectedGroup.source === 'manual' && canDelete('bridge_finance') && (
                                     <button
                                         onClick={() => deleteEntry(selectedGroup.batch_id)}
                                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 rounded-lg border border-red-500/30 smooth-transition"
@@ -921,6 +945,28 @@ const BridgeGeneralJournal = () => {
                                 </tfoot>
                             </table>
                         </div>
+
+                        {Math.abs(getBalanceDifference()) >= 0.01 && (
+                            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-end gap-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 mb-4">
+                                <div>
+                                    <label className="block text-xs font-medium text-silver-light mb-1">{t('Balancing account')}</label>
+                                    <select value={adjustmentAccountId} onChange={event => setAdjustmentAccountId(event.target.value)} className="w-full">
+                                        <option value="">{t('-- Select account --')}</option>
+                                        {accounts.filter(account => account.is_active !== false).map(account => (
+                                            <option key={account.id} value={account.id}>{account.code} - {account.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-silver-light mb-1">{t('Adjustment reason')}</label>
+                                    <input type="text" value={adjustmentDescription} onChange={event => setAdjustmentDescription(event.target.value)} placeholder={t('Bank fee, tax withheld, etc.')} className="w-full" />
+                                </div>
+                                <Button onClick={addBalancingLine} disabled={!adjustmentAccountId || !adjustmentDescription.trim()}>
+                                    {t('Add balancing line')} ({getBalanceDifference() < 0 ? t('Debit') : t('Credit')} {fmt(Math.abs(getBalanceDifference()))})
+                                </Button>
+                                <p className="md:col-span-3 text-xs text-amber-300">{t('A balancing line is available only while total debit and credit differ.')}</p>
+                            </div>
+                        )}
 
                         <div className={`p-3 rounded-lg mb-5 flex items-center gap-3 ${isBalanced() ? 'bg-green-500/10 border border-green-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
                             {isBalanced()

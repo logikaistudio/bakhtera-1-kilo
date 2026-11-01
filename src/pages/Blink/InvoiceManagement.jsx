@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { createInvoiceJournal, createARPaymentJournal, getAllCOA, generateUUID } from '../../utils/journalHelper';
+import { createInvoiceJournal, createARPaymentJournal, ensureJournalSuccess, getAllCOA, generateUUID } from '../../utils/journalHelper';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useData } from '../../context/DataContext';
@@ -4422,7 +4422,7 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
             // Create payment record
             const paymentData = {
                 payment_number: paymentNumber,
-                division: invoice.division || activeDivision,
+                division: invoice.division || getActiveDivision(),
                 payment_type: 'incoming',
                 payment_date: formData.payment_date,
                 reference_type: 'invoice',
@@ -4445,7 +4445,7 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
 
             // Update invoice
             const newPaidAmount = (invoice.paid_amount || 0) + parseFloat(formData.amount);
-            const newOutstanding = invoice.total_amount - newPaidAmount;
+            const newOutstanding = Math.max(0, invoice.total_amount - newPaidAmount);
 
             let newStatus = invoice.status;
             if (newOutstanding === 0) {
@@ -4462,21 +4462,22 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
                     status: newStatus
                 })
                 .eq('id', invoice.id)
-                .eq('division', invoice.division || activeDivision);
+                .eq('division', invoice.division || getActiveDivision());
 
             if (invoiceError) throw invoiceError;
 
             // CREATE PAYMENT JOURNAL ENTRY
-            try {
-                const journalResult = await createARPaymentJournal(invoice, parseFloat(formData.amount), formData.payment_date, supabase);
-                if (!journalResult.success) {
-                    console.warn('Journal creation warning:', journalResult.message);
-                } else {
-                    console.log('✅ Payment journal created:', journalResult.entryNumber);
-                }
-            } catch (journalError) {
-                console.error('Journal creation failed:', journalError);
-            }
+            const coaList = await getAllCOA();
+            const journalResult = await createARPaymentJournal({
+                invoice,
+                paymentAmount: parseFloat(formData.amount),
+                paymentDate: formData.payment_date,
+                paymentNumber,
+                selectedBank,
+                bankCOAId: selectedBank?.coa_id || null,
+                coaList
+            });
+            ensureJournalSuccess(journalResult, `AR payment journal ${paymentNumber}`);
 
             alert(`✅ Payment recorded successfully! Payment Number: ${paymentNumber}`);
             onSuccess();

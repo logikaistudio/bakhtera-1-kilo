@@ -4160,7 +4160,7 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
 
             // Update invoice
             const newPaidAmount = (invoice.paid_amount || 0) + parseFloat(formData.amount);
-            const newOutstanding = invoice.total_amount - newPaidAmount;
+            const newOutstanding = Math.max(0, invoice.total_amount - newPaidAmount);
 
             let newStatus = invoice.status;
             if (newOutstanding === 0) {
@@ -4181,16 +4181,17 @@ const PaymentRecordModal = ({ invoice, formatCurrency, onClose, onSuccess }) => 
             if (invoiceError) throw invoiceError;
 
             // CREATE PAYMENT JOURNAL ENTRY
-            try {
-                const journalResult = await createARPaymentJournal(invoice, parseFloat(formData.amount), formData.payment_date, supabase);
-                if (!journalResult.success) {
-                    console.warn('Journal creation warning:', journalResult.message);
-                } else {
-                    console.log('✅ Payment journal created:', journalResult.entryNumber);
-                }
-            } catch (journalError) {
-                console.error('Journal creation failed:', journalError);
-            }
+            const coaList = await getAllCOA();
+            const journalResult = await createARPaymentJournal({
+                invoice,
+                paymentAmount: parseFloat(formData.amount),
+                paymentDate: formData.payment_date,
+                paymentNumber,
+                selectedBank,
+                bankCOAId: selectedBank?.coa_id || null,
+                coaList
+            });
+            if (!journalResult.success) throw new Error(journalResult.error?.message || journalResult.reason || 'AR payment journal failed');
 
             alert(`✅ Payment recorded successfully! Payment Number: ${paymentNumber}`);
             onSuccess();
