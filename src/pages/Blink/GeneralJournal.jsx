@@ -16,6 +16,7 @@ import { useAuth } from '../../context/AuthContext';
 import { getActiveDivision } from '../../utils/divisionContext';
 import { filterActiveBlinkJournalEntries } from '../../utils/blinkJournalIntegrity';
 import { buildBalancingLine, getJournalLinesStatus, getUnbalancedJournalBatchKeys } from '../../utils/journalBalance';
+import JournalFxAuditReport from '../../components/Common/JournalFxAuditReport';
 import { useLanguage } from '../../i18n/LanguageContext';
 
 // ─── Source badge config ─────────────────────────────────────────────────────
@@ -93,6 +94,7 @@ const GeneralJournal = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [sourceFilter, setSourceFilter] = useState('all');
     const [showUnbalancedOnly, setShowUnbalancedOnly] = useState(false);
+    const [showFxAuditReport, setShowFxAuditReport] = useState(false);
     const [expandedGroups, setExpandedGroups] = useState(new Set());
     const [dateRange, setDateRange] = useState({
         start: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
@@ -532,6 +534,9 @@ const GeneralJournal = () => {
                     <p className="text-xs text-blue-300 mt-1">{t("Data ditampilkan sesuai divisi aktif:")} {activeDivision?.toUpperCase()}</p>
                 </div>
                 <div className="flex gap-2 flex-wrap">
+                    <Button variant="secondary" icon={FileSpreadsheet} onClick={() => setShowFxAuditReport(true)}>
+                        {t('FX Audit')}
+                    </Button>
                     <button
                         type="button"
                         aria-pressed={showUnbalancedOnly}
@@ -1028,6 +1033,17 @@ const GeneralJournal = () => {
                     </div>
                 </Modal>
             )}
+            <JournalFxAuditReport
+                open={showFxAuditReport}
+                onClose={() => setShowFxAuditReport(false)}
+                entries={entries}
+                dateRange={dateRange}
+                setDateRange={setDateRange}
+                loading={loading}
+                companyInfo={companySettings}
+                module="blink"
+                t={t}
+            />
         </div>
     );
 };

@@ -15,6 +15,7 @@ import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { buildBalancingLine, getJournalLinesStatus, getUnbalancedJournalBatchKeys } from '../../utils/journalBalance';
+import JournalFxAuditReport from '../../components/Common/JournalFxAuditReport';
 
 // ─── Source badge config ─────────────────────────────────────────────────────
 const SOURCE_CONFIG = {
@@ -90,6 +91,7 @@ const BridgeGeneralJournal = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [sourceFilter, setSourceFilter] = useState('all');
     const [showUnbalancedOnly, setShowUnbalancedOnly] = useState(false);
+    const [showFxAuditReport, setShowFxAuditReport] = useState(false);
     const [expandedGroups, setExpandedGroups] = useState(new Set());
     const [dateRange, setDateRange] = useState({
         start: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
@@ -546,6 +548,9 @@ const BridgeGeneralJournal = () => {
                     <p className="text-silver-dark mt-1">{t("Double-entry transaction records from AR, AP, Invoices & PO")}</p>
                 </div>
                 <div className="flex gap-2 flex-wrap">
+                    <Button variant="secondary" icon={FileSpreadsheet} onClick={() => setShowFxAuditReport(true)}>
+                        {t('FX Audit')}
+                    </Button>
                     <button
                         type="button"
                         aria-pressed={showUnbalancedOnly}
@@ -1042,6 +1047,17 @@ const BridgeGeneralJournal = () => {
                     </div>
                 </Modal>
             )}
+            <JournalFxAuditReport
+                open={showFxAuditReport}
+                onClose={() => setShowFxAuditReport(false)}
+                entries={entries}
+                dateRange={dateRange}
+                setDateRange={setDateRange}
+                loading={loading}
+                companyInfo={companySettings}
+                module="bridge"
+                t={t}
+            />
         </div>
     );
 };

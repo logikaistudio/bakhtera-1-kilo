@@ -340,6 +340,7 @@ export function buildJERow({
         exchange_rate: 1,
         foreign_amount: computedForeignAmount,
         foreign_currency: isForeign ? normalizedCurrency : (foreignCurrency || 'IDR'),
+        transaction_exchange_rate: isForeign ? normalizedRate : null,
         journal_type: resolvedJournalType,
         cash_direction: cashDirection,
         period_month: periodMonth ?? period.periodMonth,
