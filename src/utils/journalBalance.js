@@ -4,6 +4,19 @@ export const getJournalBalanceDifference = (lines) => {
     return Math.round((debit - credit) * 100) / 100;
 };
 
+export const getUnbalancedJournalBatchKeys = (entries) => {
+    const batches = new Map();
+    entries.forEach(entry => {
+        const key = entry.batch_id || entry.entry_number || entry.id;
+        if (!batches.has(key)) batches.set(key, []);
+        batches.get(key).push(entry);
+    });
+
+    return new Set([...batches.entries()]
+        .filter(([, lines]) => Math.abs(getJournalBalanceDifference(lines)) >= 0.01)
+        .map(([key]) => key));
+};
+
 export const getJournalLinesStatus = (lines) => {
     const enteredLines = lines.filter(line => (Number(line.debit) || 0) > 0 || (Number(line.credit) || 0) > 0);
     const invalidLines = enteredLines.filter(line =>

@@ -15,7 +15,7 @@ import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { getActiveDivision } from '../../utils/divisionContext';
 import { filterActiveBlinkJournalEntries } from '../../utils/blinkJournalIntegrity';
-import { buildBalancingLine, getJournalLinesStatus } from '../../utils/journalBalance';
+import { buildBalancingLine, getJournalLinesStatus, getUnbalancedJournalBatchKeys } from '../../utils/journalBalance';
 import { useLanguage } from '../../i18n/LanguageContext';
 
 // ─── Source badge config ─────────────────────────────────────────────────────
@@ -92,6 +92,7 @@ const GeneralJournal = () => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [sourceFilter, setSourceFilter] = useState('all');
+    const [showUnbalancedOnly, setShowUnbalancedOnly] = useState(false);
     const [expandedGroups, setExpandedGroups] = useState(new Set());
     const [dateRange, setDateRange] = useState({
         start: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
@@ -158,8 +159,13 @@ const GeneralJournal = () => {
     };
 
     // ── Filter & Group ─────────────────────────────────────────────────────────
+    const unbalancedBatchKeys = useMemo(() => getUnbalancedJournalBatchKeys(entries), [entries]);
+
     const filteredEntries = useMemo(() => {
         let list = entries;
+        if (showUnbalancedOnly) {
+            list = list.filter(entry => unbalancedBatchKeys.has(entry.batch_id || entry.entry_number || entry.id));
+        }
         if (sourceFilter !== 'all') {
             list = list.filter(e => {
                 const src = e.reference_type || e.entry_type || (e.source === 'manual' ? 'manual' : 'auto');
@@ -178,7 +184,7 @@ const GeneralJournal = () => {
             );
         }
         return list;
-    }, [entries, searchTerm, sourceFilter]);
+    }, [entries, searchTerm, sourceFilter, showUnbalancedOnly, unbalancedBatchKeys]);
 
     const groupedEntries = useMemo(() => {
         const groups = {};
@@ -526,6 +532,22 @@ const GeneralJournal = () => {
                     <p className="text-xs text-blue-300 mt-1">{t("Data ditampilkan sesuai divisi aktif:")} {activeDivision?.toUpperCase()}</p>
                 </div>
                 <div className="flex gap-2 flex-wrap">
+                    <button
+                        type="button"
+                        aria-pressed={showUnbalancedOnly}
+                        onClick={() => {
+                            const nextValue = !showUnbalancedOnly;
+                            setShowUnbalancedOnly(nextValue);
+                            if (nextValue) {
+                                setSearchTerm('');
+                                setSourceFilter('all');
+                            }
+                        }}
+                        className={`flex items-center gap-2 px-3 py-2 border rounded-lg smooth-transition text-xs ${showUnbalancedOnly ? 'bg-red-500/15 border-red-500/50 text-red-300' : 'bg-dark-surface border-dark-border text-silver-light hover:bg-dark-card'}`}
+                    >
+                        <AlertCircle className="w-4 h-4" />
+                        {showUnbalancedOnly ? t('Show All') : `${t('Unbalanced')} (${unbalancedBatchKeys.size})`}
+                    </button>
                     <Button variant="secondary" icon={RefreshCw} onClick={fetchEntries}>{t("Refresh")}</Button>
                     <button onClick={exportCSV} className="flex items-center gap-2 px-3 py-2 bg-dark-surface text-silver-light hover:bg-dark-card border border-dark-border rounded-lg smooth-transition text-xs">
                         <FileText className="w-4 h-4" /> CSV
@@ -654,6 +676,7 @@ const GeneralJournal = () => {
                                 const isMultiCcy = currencies.some(c => c !== 'IDR');
                                 const hasMixed = group.lines.some(e => e.currency && e.currency !== 'IDR' && !hasRealRate(e.currency, e.exchange_rate));
                                 const badge = getSourceBadge(group);
+                                const isGroupUnbalanced = unbalancedBatchKeys.has(group.key);
 
                                 return (
                                     <React.Fragment key={group.key}>
@@ -705,6 +728,7 @@ const GeneralJournal = () => {
                                                 <span className={`px-2 py-0.5 rounded text-xs font-semibold border ${badge.color}`}>
                                                     {badge.label}
                                                 </span>
+                                                {isGroupUnbalanced && <div className="mt-1 text-[10px] font-semibold text-red-400">{t('Unbalanced')}</div>}
                                             </td>
                                         </tr>
 
