@@ -27,6 +27,9 @@ export const buildBalancingLine = (difference, account, description) => {
 
     return {
         coa_id: account.id,
+        journal_coa_id: Object.prototype.hasOwnProperty.call(account, 'journal_coa_id')
+            ? account.journal_coa_id
+            : account.id,
         account_code: account.code,
         account_name: account.name,
         debit: difference < 0 ? amount : 0,

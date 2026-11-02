@@ -124,8 +124,24 @@ const BridgeGeneralJournal = () => {
     // ── Fetch ──────────────────────────────────────────────────────────────────
     const fetchAccounts = async () => {
         try {
-            const { data } = await supabase.from('bridge_coa').select('*').order('code');
-            setAccounts(data || []);
+            const { data: bridgeAccounts, error: bridgeError } = await supabase
+                .from('bridge_coa')
+                .select('*')
+                .order('code');
+
+            if (!bridgeError && bridgeAccounts?.length) {
+                setAccounts(bridgeAccounts.map(account => ({ ...account, journal_coa_id: account.id })));
+                return;
+            }
+
+            if (bridgeError) console.warn('[Bridge Journal] bridge_coa unavailable, using Master COA:', bridgeError.message);
+            const { data: masterAccounts, error: masterError } = await supabase
+                .from('code_of_accounts')
+                .select('id, code, name, account_group, is_active')
+                .eq('is_active', true)
+                .order('code');
+            if (masterError) throw masterError;
+            setAccounts((masterAccounts || []).map(account => ({ ...account, journal_coa_id: null })));
         } catch (e) { console.error(e); }
     };
 
@@ -235,7 +251,13 @@ const BridgeGeneralJournal = () => {
         const updated = [...newEntry.lines];
         if (field === 'coa_id') {
             const acc = accounts.find(a => a.id === value);
-            updated[index] = { ...updated[index], coa_id: value, account_code: acc?.code || '', account_name: acc?.name || '' };
+            updated[index] = {
+                ...updated[index],
+                coa_id: value,
+                journal_coa_id: acc?.journal_coa_id || null,
+                account_code: acc?.code || '',
+                account_name: acc?.name || ''
+            };
         } else {
             updated[index] = { ...updated[index], [field]: (field === 'debit' || field === 'credit') ? parseFloat(value) || 0 : value };
         }
@@ -333,7 +355,7 @@ const BridgeGeneralJournal = () => {
                 entry_type: 'adjustment',
                 account_code: line.account_code,
                 account_name: line.account_name,
-                coa_id: line.coa_id,
+                coa_id: line.journal_coa_id || null,
                 debit: line.debit || 0,
                 credit: line.credit || 0,
                 description: line.description || newEntry.description,
