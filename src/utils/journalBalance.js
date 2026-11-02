@@ -4,6 +4,23 @@ export const getJournalBalanceDifference = (lines) => {
     return Math.round((debit - credit) * 100) / 100;
 };
 
+export const getJournalLinesStatus = (lines) => {
+    const enteredLines = lines.filter(line => (Number(line.debit) || 0) > 0 || (Number(line.credit) || 0) > 0);
+    const invalidLines = enteredLines.filter(line =>
+        !line.coa_id || ((Number(line.debit) || 0) > 0 && (Number(line.credit) || 0) > 0)
+    );
+    const difference = getJournalBalanceDifference(enteredLines);
+    const totalDebit = enteredLines.reduce((sum, line) => sum + (Number(line.debit) || 0), 0);
+
+    return {
+        enteredLines,
+        invalidLines,
+        difference,
+        canBalance: enteredLines.length > 0 && invalidLines.length === 0 && Math.abs(difference) >= 0.01,
+        isBalanced: enteredLines.length > 0 && invalidLines.length === 0 && Math.abs(difference) < 0.01 && totalDebit > 0
+    };
+};
+
 export const buildBalancingLine = (difference, account, description) => {
     const amount = Math.round(Math.abs(Number(difference) || 0) * 100) / 100;
     if (amount < 0.01 || !account || !description?.trim()) return null;

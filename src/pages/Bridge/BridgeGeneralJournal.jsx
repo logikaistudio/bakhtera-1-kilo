@@ -14,7 +14,7 @@ import { printReport, fmtDatePrint } from '../../utils/printPDF';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../i18n/LanguageContext';
-import { buildBalancingLine, getJournalBalanceDifference } from '../../utils/journalBalance';
+import { buildBalancingLine, getJournalLinesStatus } from '../../utils/journalBalance';
 
 // ─── Source badge config ─────────────────────────────────────────────────────
 const SOURCE_CONFIG = {
@@ -248,15 +248,15 @@ const BridgeGeneralJournal = () => {
         setNewEntry({ ...newEntry, lines: newEntry.lines.filter((_, idx) => idx !== i) });
     };
 
-    const isBalanced = () => {
-        const totalDebit = newEntry.lines.reduce((sum, line) => sum + (line.debit || 0), 0);
-        return Math.abs(getBalanceDifference()) < 0.01 && totalDebit > 0;
-    };
+    const getEntryStatus = () => getJournalLinesStatus(newEntry.lines);
+    const isBalanced = () => getEntryStatus().isBalanced;
 
-    const getBalanceDifference = () => getJournalBalanceDifference(newEntry.lines);
+    const getBalanceDifference = () => getEntryStatus().difference;
 
     const addBalancingLine = () => {
-        const difference = getBalanceDifference();
+        const status = getEntryStatus();
+        if (!status.canBalance) return;
+        const difference = status.difference;
         const account = accounts.find(item => item.id === adjustmentAccountId);
         const line = buildBalancingLine(difference, account, adjustmentDescription);
         if (!line) return;
@@ -309,7 +309,12 @@ const BridgeGeneralJournal = () => {
             alert(t("Anda tidak memiliki hak akses untuk membuat entri jurnal manual."));
             return;
         }
-        if (!isBalanced()) { alert(t("Journal entry must balance! Total Debit must equal Total Credit.")); return; }
+        const entryStatus = getEntryStatus();
+        if (entryStatus.invalidLines.length > 0) {
+            alert(t('Every used journal line must have an account and either a debit or a credit, not both.'));
+            return;
+        }
+        if (!entryStatus.isBalanced) { alert(t("Journal entry must balance! Total Debit must equal Total Credit.")); return; }
         if (!newEntry.description) { alert(t("Description is required.")); return; }
         try {
             setSaving(true);
@@ -317,7 +322,7 @@ const BridgeGeneralJournal = () => {
             const baseEntryNumber = await generateEntryNumber();
             const batchId = crypto.randomUUID();
 
-            const validLines = newEntry.lines.filter(l => l.coa_id && (l.debit > 0 || l.credit > 0));
+            const validLines = entryStatus.enteredLines;
 
             // Each line gets a UNIQUE entry_number with line index suffix
             // e.g. JE-2603-0001-L01, JE-2603-0001-L02, ...
@@ -861,7 +866,7 @@ const BridgeGeneralJournal = () => {
             {showNewEntryModal && (
                 <Modal isOpen={true} onClose={() => setShowNewEntryModal(false)} maxWidth="max-w-4xl">
                     <div className="p-6">
-                        <h2 className="text-2xl font-bold gradient-text mb-6">{t("New Manual Journal Entry")}</h2>
+                        <h2 className="text-2xl font-bold gradient-text mb-6">{t("New Manual Journal Voucher")}</h2>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                             <div>
@@ -871,7 +876,7 @@ const BridgeGeneralJournal = () => {
                                     className="w-full px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-silver-light" />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-silver-light mb-2">{t("Description *")}</label>
+                                <label className="block text-sm font-medium text-silver-light mb-2">{t("Voucher / Transaction Description *")}</label>
                                 <input type="text" placeholder={t("Transaction description...")}
                                     value={newEntry.description}
                                     onChange={e => setNewEntry({ ...newEntry, description: e.target.value })}
@@ -881,7 +886,7 @@ const BridgeGeneralJournal = () => {
 
                         <div className="glass-card p-4 rounded-lg mb-4">
                             <div className="flex justify-between items-center mb-3">
-                                <h3 className="font-semibold text-silver-light">{t("Journal Lines")}</h3>
+                                <h3 className="font-semibold text-silver-light">{t("Lines in This Voucher")}</h3>
                                 <button onClick={addLine} className="flex items-center gap-1 text-sm text-accent-orange hover:text-accent-orange/80">
                                     <Plus className="w-4 h-4" /> {t("Add Line")}
                                 </button>
@@ -946,7 +951,7 @@ const BridgeGeneralJournal = () => {
                             </table>
                         </div>
 
-                        {Math.abs(getBalanceDifference()) >= 0.01 && (
+                        {getEntryStatus().canBalance && (
                             <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-end gap-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 mb-4">
                                 <div>
                                     <label className="block text-xs font-medium text-silver-light mb-1">{t('Balancing account')}</label>
@@ -969,7 +974,9 @@ const BridgeGeneralJournal = () => {
                         )}
 
                         <div className={`p-3 rounded-lg mb-5 flex items-center gap-3 ${isBalanced() ? 'bg-green-500/10 border border-green-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
-                            {isBalanced()
+                            {getEntryStatus().invalidLines.length > 0
+                                ? <><AlertCircle className="w-5 h-5 text-red-400" /><span className="text-red-400 font-medium">{t('Each used line needs an account and exactly one amount side.')}</span></>
+                                : isBalanced()
                                 ? <><CheckCircle className="w-5 h-5 text-green-400" /><span className="text-green-400 font-medium">{t("Journal is Balanced ✓")}</span></>
                                 : <><AlertCircle className="w-5 h-5 text-red-400" /><span className="text-red-400 font-medium">
                                     {t("Unbalanced — Difference:")} {fmt(
