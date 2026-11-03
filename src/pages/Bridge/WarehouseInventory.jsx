@@ -18,7 +18,7 @@ const WarehouseInventory = () => {
     const canClearAll = hasDelete && isSuperAdmin();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    const { quotations, updateQuotation, addMutationLog, mutationLogs = [], deleteMutationLog, updateInventoryStock, outboundTransactions = [], updateItemCheckout, requestApproval, isExhibitionLocation, getExhibitionLocation } = useData();
+    const { quotations, warehouseInventory = [], updateQuotation, addMutationLog, mutationLogs = [], deleteMutationLog, updateInventoryStock, outboundTransactions = [], updateItemCheckout, requestApproval, isExhibitionLocation, getExhibitionLocation } = useData();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedPengajuan, setSelectedPengajuan] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
@@ -33,11 +33,73 @@ const WarehouseInventory = () => {
     const [activeDocumentRow, setActiveDocumentRow] = useState(null); // { pkgIndex, itemIdx }
     const fileInputRef = useRef(null);
 
-    // Filter only approved INBOUND pengajuan (these are in warehouse inventory)
     const approvedInboundPengajuan = quotations.filter(q =>
-        (q.documentStatus === 'approved' || q.document_status === 'approved') &&
-        (q.type === 'inbound' || !q.type) // default to inbound if type not specified
+        ['approved'].includes(String(q.documentStatus || q.document_status || '').trim().toLowerCase()) &&
+        (String(q.type || '').trim().toLowerCase() === 'inbound' || !q.type)
     );
+
+    // Keep inventory rows visible even when their quotation status no longer qualifies.
+    const warehouseGroups = new Map();
+    warehouseInventory.forEach(item => {
+        const pengajuanId = item.pengajuanId || item.pengajuan_id;
+        const pengajuanNumber = item.pengajuanNumber || item.pengajuan_number;
+        const groupKey = pengajuanId || pengajuanNumber || item.id;
+        if (!groupKey) return;
+        if (!warehouseGroups.has(groupKey)) warehouseGroups.set(groupKey, []);
+        warehouseGroups.get(groupKey).push(item);
+    });
+
+    const warehouseBackedPengajuan = Array.from(warehouseGroups.entries()).flatMap(([groupKey, items]) => {
+        const firstItem = items[0];
+        const pengajuanId = firstItem.pengajuanId || firstItem.pengajuan_id;
+        const pengajuanNumber = firstItem.pengajuanNumber || firstItem.pengajuan_number;
+        const quotation = quotations.find(q =>
+            (pengajuanId && q.id === pengajuanId) ||
+            (pengajuanNumber && String(q.quotationNumber || q.quotation_number || '').trim().toLowerCase() === String(pengajuanNumber).trim().toLowerCase())
+        );
+
+        if (String(quotation?.type || '').trim().toLowerCase() === 'outbound') return [];
+        if (quotation && approvedInboundPengajuan.includes(quotation) && quotation.packages?.length) return [];
+
+        const packagesByNumber = new Map();
+        items.forEach(item => {
+            const packageNumber = item.packageNumber || item.package_number || 'Tanpa Package';
+            if (!packagesByNumber.has(packageNumber)) {
+                packagesByNumber.set(packageNumber, { packageNumber, items: [] });
+            }
+            packagesByNumber.get(packageNumber).items.push({
+                itemCode: item.itemCode || item.item_code,
+                name: item.itemName || item.item_name || item.assetName || item.asset_name || '-',
+                itemName: item.itemName || item.item_name || item.assetName || item.asset_name || '-',
+                serialNumber: item.serialNumber || item.serial_number,
+                quantity: Number(item.currentStock ?? item.quantity ?? 0),
+                uom: item.unit || 'pcs',
+                condition: item.condition,
+                value: item.value,
+                notes: item.notes || item.remarks || ''
+            });
+        });
+
+        return [{
+            ...(quotation || {}),
+            id: quotation?.id || pengajuanId || `warehouse-${groupKey}`,
+            quotationNumber: pengajuanNumber || quotation?.quotationNumber || quotation?.quotation_number || '-',
+            quotation_number: pengajuanNumber || quotation?.quotation_number || quotation?.quotationNumber || '-',
+            bcDocumentNumber: firstItem.bcDocumentNumber || firstItem.bc_document_number || quotation?.bcDocumentNumber || quotation?.bc_document_number,
+            bc_document_number: firstItem.bc_document_number || firstItem.bcDocumentNumber || quotation?.bc_document_number || quotation?.bcDocumentNumber,
+            submissionDate: firstItem.submissionDate || firstItem.submission_date || firstItem.entryDate || firstItem.entry_date || quotation?.submissionDate || quotation?.submission_date,
+            submission_date: firstItem.submission_date || firstItem.submissionDate || firstItem.entry_date || firstItem.entryDate || quotation?.submission_date || quotation?.submissionDate,
+            type: 'inbound',
+            documentStatus: 'approved',
+            packages: Array.from(packagesByNumber.values()),
+            isWarehouseFallback: true
+        }];
+    });
+
+    const visibleInboundPengajuan = [
+        ...approvedInboundPengajuan.filter(q => !warehouseBackedPengajuan.some(item => item.id === q.id)),
+        ...warehouseBackedPengajuan
+    ];
 
     // Filter only approved OUTBOUND pengajuan (these are leaving warehouse)
     const approvedOutboundPengajuan = quotations.filter(q =>
@@ -46,7 +108,7 @@ const WarehouseInventory = () => {
     );
 
     // Filter inbound based on search
-    const filteredInboundPengajuan = approvedInboundPengajuan.filter(q => {
+    const filteredInboundPengajuan = visibleInboundPengajuan.filter(q => {
         const searchLower = searchTerm.toLowerCase();
         const pengajuanNo = q.quotationNumber || q.quotation_number || '';
         const bcNo = q.bcDocumentNumber || q.bc_document_number || '';
@@ -1451,7 +1513,7 @@ const WarehouseInventory = () => {
                 {filteredInboundPengajuan.length === 0 && (
                     <div className="text-center py-12">
                         <Warehouse className="w-16 h-16 text-silver-dark mx-auto mb-4" />
-                        <p className="text-silver-dark">{t("Belum ada pengajuan yang disetujui")}</p>
+                        <p className="text-silver-dark">{t("Belum ada data inventaris gudang")}</p>
                     </div>
                 )}
             </div>
@@ -1473,15 +1535,15 @@ const WarehouseInventory = () => {
                                             {/* Only show mutation buttons for inbound pengajuan */}
                                             {selectedPengajuan.type !== 'outbound' && (
                                                 <>
-                                                    {canClearAll && (
+                                                    {canClearAll && !selectedPengajuan.isWarehouseFallback && (
                                                         <Button onClick={handleDeleteAllMutations} variant="secondary" icon={Trash2} className="text-sm text-red-600 hover:text-red-800">{t("Hapus Mutasi")}</Button>
                                                     )}
-                                                    {hasEdit && (
+                                                    {hasEdit && !selectedPengajuan.isWarehouseFallback && (
                                                         <Button onClick={() => handleStartMutation(selectedPengajuan)} variant="primary" icon={ArrowRightLeft} className="text-sm">{t("Mutasi")}</Button>
                                                     )}
                                                 </>
                                             )}
-                                            {hasEdit && (
+                                            {hasEdit && !selectedPengajuan.isWarehouseFallback && (
                                                 <Button onClick={handleStartEdit} variant="secondary" icon={Edit2} className="text-sm">{t("Kelola")}</Button>
                                             )}
                                         </>

@@ -279,13 +279,10 @@ export const AuthProvider = ({ children }) => {
     };
 
     /**
-     * Check if user can delete in a menu
-     * @param {string} menuCode - Menu code
+     * Only super admins may delete application data.
      */
-    const canDelete = (menuCode) => {
-        if (isSuperAdmin() || isAdmin()) return true;
-        if (user?.user_level === 'view_only') return false;
-        return getPermissionCandidates(menuCode).some(code => permissions[code]?.can_delete) || false;
+    const canDelete = () => {
+        return isSuperAdmin();
     };
 
     /**

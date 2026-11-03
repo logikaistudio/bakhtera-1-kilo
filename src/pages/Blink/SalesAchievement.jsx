@@ -108,6 +108,10 @@ const SalesAchievement = () => {
     };
 
     const handleDeleteTarget = async (id) => {
+        if (!canDelete('blink_sales')) {
+            alert(t("Akses Ditolak: hanya superadmin yang dapat menghapus data."));
+            return;
+        }
         if (!window.confirm('Hapus target ini?')) return;
         try {
             const { error } = await supabase.from('blink_sales_targets').delete().eq('id', id);

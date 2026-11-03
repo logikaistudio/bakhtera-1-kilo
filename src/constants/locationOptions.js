@@ -15,6 +15,7 @@ export const LOCATION_OPTIONS = [
   { value: 'Hall 11', label: 'Hall 11' },
   { value: 'Supplier', label: 'Supplier' },
   { value: 'Customer', label: 'Customer' },
+  { value: 'TPPB', label: 'TPPB' },
   { value: 'Barang Habis/Rusak', label: 'Barang Habis/Rusak' },
   { value: 'Lainnya', label: 'Lainnya' }
 ];

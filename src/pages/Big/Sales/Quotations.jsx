@@ -8,9 +8,11 @@ import {
 import Button from '../../../components/Common/Button';
 import Modal from '../../../components/Common/Modal';
 import { parseCurrency } from '../../../utils/currencyFormatter';
+import { useAuth } from '../../../context/AuthContext';
 
 const BigQuotations = () => {
     const navigate = useNavigate();
+    const { canDelete } = useAuth();
     const [quotations, setQuotations] = useState([]);
     const [events, setEvents] = useState([]);
     const [customers, setCustomers] = useState([]);
@@ -431,6 +433,10 @@ const BigQuotations = () => {
     };
 
     const handleDelete = async (id) => {
+        if (!canDelete('big_quotations')) {
+            alert('Access denied: only super admins can delete data.');
+            return;
+        }
         if (!confirm('Delete this quotation? This will also delete related Invoices and COGS.')) return;
         try {
             // Manual Cascade Delete
@@ -679,18 +685,20 @@ const BigQuotations = () => {
                     <div className="flex justify-between gap-2 pt-4">
                         {selectedQuotation ? (
                             <div className="flex gap-2">
-                                <Button
-                                    type="button"
-                                    variant="danger"
-                                    onClick={() => {
-                                        if (confirm('Delete this quotation?')) {
-                                            handleDelete(selectedQuotation.id);
-                                            setShowModal(false);
-                                        }
-                                    }}
-                                >
-                                    Delete
-                                </Button>
+                                {canDelete('big_quotations') && (
+                                    <Button
+                                        type="button"
+                                        variant="danger"
+                                        onClick={() => {
+                                            if (confirm('Delete this quotation?')) {
+                                                handleDelete(selectedQuotation.id);
+                                                setShowModal(false);
+                                            }
+                                        }}
+                                    >
+                                        Delete
+                                    </Button>
+                                )}
                                 {selectedQuotation.status === 'draft' && (
                                     <Button
                                         type="button"

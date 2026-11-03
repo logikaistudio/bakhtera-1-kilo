@@ -451,7 +451,7 @@ const QuotationManagement = () => {
 
     // Delete quotation (Cascading delete to all financial records)
     const handleForceCascadeDelete = async (quotationIds) => {
-        if (!(isAdmin() || canDelete('blink_quotations'))) {
+        if (!canDelete('blink_quotations')) {
             alert(t("Akses Ditolak: Anda tidak memiliki hak untuk menghapus pengajuan ini."));
             return;
         }
@@ -1782,7 +1782,7 @@ const QuotationManagement = () => {
                                                 {t("Edit")}
                                             </Button>
                                         )}
-                                        {(isAdmin() || canDelete('blink_quotations')) && (
+                                        {canDelete('blink_quotations') && (
                                             <Button
                                                 size="sm"
                                                 variant="danger"

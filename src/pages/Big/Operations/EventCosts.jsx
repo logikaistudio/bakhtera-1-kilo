@@ -7,9 +7,11 @@ import {
 import Button from '../../../components/Common/Button';
 import Modal from '../../../components/Common/Modal';
 import { useLanguage } from '../../../i18n/LanguageContext';
+import { useAuth } from '../../../context/AuthContext';
 
 const BigCosts = () => {
     const { t } = useLanguage();
+    const { canDelete } = useAuth();
     const [costs, setCosts] = useState([]);
     const [groupedCosts, setGroupedCosts] = useState([]);
     const [events, setEvents] = useState([]);
@@ -165,6 +167,10 @@ const BigCosts = () => {
     };
 
     const handleDelete = async () => {
+        if (!canDelete('big_costs')) {
+            alert(t("Akses Ditolak: hanya superadmin yang dapat menghapus data."));
+            return;
+        }
         const id = selectedCost?.id;
         if (!id) return;
         if (!confirm(t("Delete?"))) return;
@@ -349,9 +355,11 @@ const BigCosts = () => {
                         <div className="flex gap-2">
                             {selectedCost && (
                                 <>
-                                    <Button type="button" variant="danger" onClick={handleDelete} className="flex items-center gap-1">
-                                        <Trash2 className="w-4 h-4" /> {t("Delete")}
-                                    </Button>
+                                    {canDelete('big_costs') && (
+                                        <Button type="button" variant="danger" onClick={handleDelete} className="flex items-center gap-1">
+                                            <Trash2 className="w-4 h-4" /> {t("Delete")}
+                                        </Button>
+                                    )}
                                     {selectedCost.status === 'pending' && (
                                         <Button type="button" variant="success" onClick={handleApprove} className="flex items-center gap-1">
                                             <Check className="w-4 h-4" /> {t("Approve")}

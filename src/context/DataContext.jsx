@@ -81,7 +81,12 @@ export const DataProvider = ({ children }) => {
     const [activityLogs, setActivityLogs] = useState([]);
 
     // Auth helpers (AuthProvider wraps DataProvider)
-    const { isAdmin, canDelete } = useAuth();
+    const { isAdmin, isSuperAdmin } = useAuth();
+    const ensureSuperAdminDelete = () => {
+        if (isSuperAdmin()) return true;
+        alert('Akses Ditolak: hanya superadmin yang dapat menghapus data.');
+        return false;
+    };
 
     // Helper function to log activity
     const logActivity = (module, action, entityType, entityId, entityName, details, user = 'System User') => {
@@ -1131,10 +1136,7 @@ export const DataProvider = ({ children }) => {
     };
 
     const deleteBusinessPartner = async (id, table = 'blink_business_partners', menuCode = 'central_vendors') => {
-        if (!(isAdmin() || canDelete(menuCode))) {
-            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus partner.');
-            return false;
-        }
+        if (!ensureSuperAdminDelete()) return false;
         const { error } = await supabase.from(table).delete().eq('id', id);
         if (error) {
             console.error('Error deleting business partner:', error);
@@ -1145,7 +1147,7 @@ export const DataProvider = ({ children }) => {
         setBusinessPartners(prev => prev.filter(p => p.id !== id));
         setCustomers(prev => prev.filter(c => c.id !== id));
         setVendors(prev => prev.filter(v => v.id !== id));
-        logActivity('central_vendors', 'delete', 'business_partner', id, id, `Deleted business partner ${id}`);
+        logActivity(menuCode, 'delete', 'business_partner', id, id, `Deleted business partner ${id}`);
         return true;
     };
 
@@ -1244,10 +1246,7 @@ export const DataProvider = ({ children }) => {
     // Bulk delete helper for Business Partners (selected IDs or all rows)
     const deleteBusinessPartnersBulk = async (ids = [], table = 'blink_business_partners', menuCode = 'central_vendors', options = {}) => {
         const onProgress = typeof options?.onProgress === 'function' ? options.onProgress : null;
-        if (!(isAdmin() || canDelete(menuCode))) {
-            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus partner.');
-            return false;
-        }
+        if (!ensureSuperAdminDelete()) return false;
 
         try {
             const hasIds = Array.isArray(ids) && ids.length > 0;
@@ -1308,10 +1307,7 @@ export const DataProvider = ({ children }) => {
 
     // Delete COA - centralized helper with permission check and audit
     const deleteCOA = async (id, menuCode = 'central_coa') => {
-        if (!(isAdmin() || canDelete(menuCode))) {
-            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus COA.');
-            return false;
-        }
+        if (!ensureSuperAdminDelete()) return false;
 
         try {
             const { error } = await supabase.from('finance_coa').delete().eq('id', id);
@@ -1334,10 +1330,7 @@ export const DataProvider = ({ children }) => {
 
     // Bridge COA delete (soft-delete for code_of_accounts table)
     const deleteBridgeCOA = async (id) => {
-        if (!(isAdmin() || canDelete('bridge_coa'))) {
-            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus COA di Bridge.');
-            return false;
-        }
+        if (!ensureSuperAdminDelete()) return false;
 
         try {
             const { error } = await supabase.from('code_of_accounts').update({ is_active: false }).eq('id', id);
@@ -1356,10 +1349,7 @@ export const DataProvider = ({ children }) => {
     // Delete Blink quotation with cascade (UI should confirm first). Returns true on success.
     const deleteBlinkQuotationCascade = async (quotationIds, quotationsTable = 'blink_quotations', menuCode = 'blink_quotations', options = {}) => {
         const onProgress = typeof options?.onProgress === 'function' ? options.onProgress : null;
-        if (!(isAdmin() || canDelete(menuCode))) {
-            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus pengajuan ini.');
-            return false;
-        }
+        if (!ensureSuperAdminDelete()) return false;
 
         try {
             const assertNoError = (error, context) => {
@@ -1517,6 +1507,7 @@ export const DataProvider = ({ children }) => {
     };
 
     const deleteVendor = async (id) => {
+        if (!ensureSuperAdminDelete()) return false;
         const { error } = await supabase.from('freight_vendors').delete().eq('id', id);
         if (error) {
             console.error('Error deleting vendor:', error);
@@ -1563,6 +1554,7 @@ export const DataProvider = ({ children }) => {
     };
 
     const deleteCustomer = async (id) => {
+        if (!ensureSuperAdminDelete()) return false;
         const { error } = await supabase.from('freight_customers').delete().eq('id', id);
         if (error) {
             console.error('Error deleting customer:', error);
@@ -1600,6 +1592,7 @@ export const DataProvider = ({ children }) => {
     };
 
     const deleteFinanceTransaction = async (id) => {
+        if (!ensureSuperAdminDelete()) return false;
         const { error } = await supabase.from('freight_finance').delete().eq('id', id);
         if (error) {
             console.error('Error deleting finance transaction:', error);
@@ -1636,6 +1629,7 @@ export const DataProvider = ({ children }) => {
     };
 
     const deleteShipment = async (id) => {
+        if (!ensureSuperAdminDelete()) return false;
         const { error } = await supabase.from('freight_shipments').delete().eq('id', id);
         if (error) {
             console.error('Error deleting shipment:', error);
@@ -1647,10 +1641,7 @@ export const DataProvider = ({ children }) => {
     // Cascade delete for Shipments in Blink module
     const deleteShipmentCascade = async (shipmentIds, options = {}) => {
         const onProgress = typeof options?.onProgress === 'function' ? options.onProgress : null;
-        if (!(isAdmin() || canDelete('blink_shipments'))) {
-            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus shipment.');
-            return false;
-        }
+        if (!ensureSuperAdminDelete()) return false;
 
         try {
             const assertNoError = (error, context) => {
@@ -1779,6 +1770,7 @@ export const DataProvider = ({ children }) => {
     };
 
     const deleteAsset = async (id) => {
+        if (!ensureSuperAdminDelete()) return false;
         const { error } = await supabase.from('freight_assets').delete().eq('id', id);
         if (error) {
             console.error('Error deleting asset:', error);
@@ -1821,6 +1813,7 @@ export const DataProvider = ({ children }) => {
     };
 
     const deleteEvent = async (id) => {
+        if (!ensureSuperAdminDelete()) return false;
         const { error } = await supabase.from('big_events').delete().eq('id', id);
         if (error) {
             console.error('Error deleting event:', error);
@@ -2010,6 +2003,7 @@ export const DataProvider = ({ children }) => {
     };
 
     const deleteInboundTransaction = (id) => {
+        if (!ensureSuperAdminDelete()) return false;
         setInboundTransactions(inboundTransactions.filter(t => t.id !== id));
     };
 
@@ -2187,6 +2181,7 @@ export const DataProvider = ({ children }) => {
     };
 
     const deleteOutboundTransaction = (id) => {
+        if (!ensureSuperAdminDelete()) return false;
         setOutboundTransactions(outboundTransactions.filter(t => t.id !== id));
     };
 
@@ -2508,6 +2503,7 @@ export const DataProvider = ({ children }) => {
     };
 
     const deleteMutationLog = async (id) => {
+        if (!ensureSuperAdminDelete()) return false;
         try {
             // Delete from Supabase
             const { error } = await supabase
@@ -2568,6 +2564,7 @@ export const DataProvider = ({ children }) => {
     };
 
     const deleteWarehouseInventory = async (id) => {
+        if (!ensureSuperAdminDelete()) return false;
         const { error } = await supabase.from('freight_warehouse').delete().eq('id', id);
         if (error) {
             console.error('Error deleting inventory:', error);
@@ -2627,6 +2624,7 @@ export const DataProvider = ({ children }) => {
     };
 
     const deleteCustomsDocument = async (id) => {
+        if (!ensureSuperAdminDelete()) return false;
         const { error } = await supabase.from('freight_customs').delete().eq('id', id);
         if (error) {
             console.error('Error deleting customs document:', error);
@@ -2782,6 +2780,10 @@ export const DataProvider = ({ children }) => {
     };
 
     const deleteQuotation = async (id) => {
+        if (!isSuperAdmin()) {
+            alert('Akses Ditolak: hanya superadmin yang dapat menghapus data.');
+            return { success: false, error: new Error('Superadmin access required') };
+        }
         try {
             console.log('🗑️ [DELETE START] Deleting quotation:', id);
 
@@ -2795,8 +2797,41 @@ export const DataProvider = ({ children }) => {
 
             if (fetchError) {
                 console.error('❌ [STEP 0] Fetch error:', fetchError);
-            } else {
-                console.log('✅ [STEP 0] Fetched quotation:', quotation);
+                return { success: false, error: fetchError };
+            }
+            console.log('✅ [STEP 0] Fetched quotation:', quotation);
+
+            const { data: linkedWarehouseById, error: warehouseIdError } = await supabase
+                .from('freight_warehouse')
+                .select('id')
+                .eq('pengajuan_id', id)
+                .limit(1);
+
+            if (warehouseIdError) {
+                console.error('❌ Unable to verify linked warehouse inventory:', warehouseIdError);
+                return { success: false, error: warehouseIdError };
+            }
+
+            let hasWarehouseInventory = (linkedWarehouseById || []).length > 0;
+            if (!hasWarehouseInventory && quotation.quotation_number) {
+                const { data: linkedWarehouseByNumber, error: warehouseNumberError } = await supabase
+                    .from('freight_warehouse')
+                    .select('id')
+                    .eq('pengajuan_number', quotation.quotation_number)
+                    .limit(1);
+
+                if (warehouseNumberError) {
+                    console.error('❌ Unable to verify warehouse inventory by pengajuan number:', warehouseNumberError);
+                    return { success: false, error: warehouseNumberError };
+                }
+                hasWarehouseInventory = (linkedWarehouseByNumber || []).length > 0;
+            }
+
+            if (hasWarehouseInventory) {
+                return {
+                    success: false,
+                    error: new Error('Pengajuan tidak dapat dihapus karena masih memiliki data inventaris warehouse.')
+                };
             }
 
             // 0.5. CRITICAL: Delete linked outbound quotations that reference this inbound (Cascade Delete)
@@ -2816,7 +2851,8 @@ export const DataProvider = ({ children }) => {
                 // Recursively delete each linked outbound first
                 for (const linked of linkedOutbound) {
                     console.log(`🔄 [STEP 0.5] Recursively deleting linked outbound: ${linked.quotation_number}`);
-                    await deleteQuotation(linked.id);
+                    const deleteResult = await deleteQuotation(linked.id);
+                    if (!deleteResult.success) return deleteResult;
                 }
                 console.log('✅ [STEP 0.5] All linked outbound quotations deleted');
             } else {
@@ -2860,19 +2896,6 @@ export const DataProvider = ({ children }) => {
                 console.error('❌ [STEP 3] Purchase unlink error:', purchaseError);
             } else {
                 console.log('✅ [STEP 3] Purchases unlinked');
-            }
-
-            // 4. Delete Warehouse Inventory
-            console.log('📋 [STEP 4] Deleting warehouse inventory...');
-            const { error: inventoryError } = await supabase
-                .from('warehouse_inventory')
-                .delete()
-                .eq('pengajuan_id', id);
-
-            if (inventoryError) {
-                console.error('❌ [STEP 4] Inventory delete error:', inventoryError);
-            } else {
-                console.log('✅ [STEP 4] Warehouse inventory deleted');
             }
 
             // 5. Unlink Freight Shipments (if any)
@@ -2952,18 +2975,6 @@ export const DataProvider = ({ children }) => {
                 console.error('❌ [STEP 7c] Reject delete error:', rejectError);
             } else {
                 console.log('✅ [STEP 7c] Reject transactions deleted');
-            }
-
-            console.log('📋 [STEP 7d] Deleting Warehouse inventory logs...');
-            const { error: whError } = await supabase
-                .from('freight_warehouse')
-                .delete()
-                .eq('pengajuan_id', id);
-
-            if (whError) {
-                console.error('❌ [STEP 7d] Warehouse delete error:', whError);
-            } else {
-                console.log('✅ [STEP 7d] Warehouse inventory logs deleted');
             }
 
             // 8. Finally, Delete the quotation
@@ -3807,6 +3818,7 @@ export const DataProvider = ({ children }) => {
     };
 
     const deleteBankAccount = async (id, module = 'blink') => {
+        if (!ensureSuperAdminDelete()) return false;
         try {
             const actualModule = module === 'central' ? 'blink' : module;
             let bankTable = 'company_bank_accounts';
@@ -3879,6 +3891,7 @@ export const DataProvider = ({ children }) => {
     };
 
     const deleteBCCode = async (id) => {
+        if (!ensureSuperAdminDelete()) return false;
         const { error } = await supabase
             .from('freight_bc_codes')
             .delete()
@@ -3941,6 +3954,7 @@ export const DataProvider = ({ children }) => {
     };
 
     const deleteHSCode = async (id) => {
+        if (!ensureSuperAdminDelete()) return false;
         const { error } = await supabase.from('freight_hs_codes').delete().eq('id', id);
         if (error) {
             console.error('Error deleting HS code:', error);
@@ -4003,6 +4017,7 @@ export const DataProvider = ({ children }) => {
     };
 
     const deleteItemCode = async (id) => {
+        if (!ensureSuperAdminDelete()) return false;
         const { error } = await supabase
             .from('freight_inventory')
             .delete()
@@ -4071,6 +4086,7 @@ export const DataProvider = ({ children }) => {
     };
 
     const deletePIC = async (id) => {
+        if (!ensureSuperAdminDelete()) return false;
         const { error } = await supabase
             .from('freight_pic')
             .delete()
@@ -4152,6 +4168,7 @@ export const DataProvider = ({ children }) => {
     };
 
     const deleteInvoice = (invoiceId) => {
+        if (!ensureSuperAdminDelete()) return false;
         setInvoices(prev => prev.filter(inv => inv.id !== invoiceId));
     };
 
@@ -4172,6 +4189,7 @@ export const DataProvider = ({ children }) => {
     };
 
     const deletePurchase = (purchaseId) => {
+        if (!ensureSuperAdminDelete()) return false;
         setPurchases(prev => prev.filter(pur => pur.id !== purchaseId));
     };
 
@@ -4184,10 +4202,7 @@ export const DataProvider = ({ children }) => {
     // Cascade delete for Invoices in Blink module
     const deleteInvoiceCascade = async (invoiceIds, options = {}) => {
         const onProgress = typeof options?.onProgress === 'function' ? options.onProgress : null;
-        if (!(isAdmin() || canDelete('blink_invoices'))) {
-            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus Invoice.');
-            return false;
-        }
+        if (!ensureSuperAdminDelete()) return false;
 
         try {
             const ids = Array.isArray(invoiceIds) ? invoiceIds : [invoiceIds];
@@ -4283,16 +4298,14 @@ export const DataProvider = ({ children }) => {
     };
 
     const deletePurchaseOrder = (poId) => {
+        if (!ensureSuperAdminDelete()) return false;
         setPurchaseOrders(prev => prev.filter(po => po.id !== poId));
     };
 
     // Cascade delete for Purchase Orders in Blink module
     const deletePurchaseOrderCascade = async (poIds, options = {}) => {
         const onProgress = typeof options?.onProgress === 'function' ? options.onProgress : null;
-        if (!(isAdmin() || canDelete('blink_purchase_order'))) {
-            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus PO.');
-            return false;
-        }
+        if (!ensureSuperAdminDelete()) return false;
 
         try {
             const ids = Array.isArray(poIds) ? poIds : [poIds];
@@ -4378,10 +4391,7 @@ export const DataProvider = ({ children }) => {
     // Cascade delete for Purchase Orders in Bridge module (chunk-safe)
     const deleteBridgePurchaseOrderCascade = async (poIds, options = {}) => {
         const onProgress = typeof options?.onProgress === 'function' ? options.onProgress : null;
-        if (!(isAdmin() || canDelete('bridge_finance'))) {
-            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus PO Bridge.');
-            return false;
-        }
+        if (!ensureSuperAdminDelete()) return false;
 
         try {
             const ids = Array.isArray(poIds) ? poIds : [poIds];
@@ -4455,10 +4465,7 @@ export const DataProvider = ({ children }) => {
     // Cascade delete for Invoices in Bridge module (chunk-safe)
     const deleteBridgeInvoiceCascade = async (invoiceIds, options = {}) => {
         const onProgress = typeof options?.onProgress === 'function' ? options.onProgress : null;
-        if (!(isAdmin() || canDelete('bridge_finance'))) {
-            alert('Akses Ditolak: Anda tidak memiliki hak untuk menghapus Invoice Bridge.');
-            return false;
-        }
+        if (!ensureSuperAdminDelete()) return false;
 
         try {
             const ids = Array.isArray(invoiceIds) ? invoiceIds : [invoiceIds];

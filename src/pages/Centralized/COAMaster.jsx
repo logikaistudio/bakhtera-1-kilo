@@ -14,7 +14,7 @@ const { read, utils } = XLSX;
 
     const COAMaster = () => {
     const { t } = useLanguage();
-    const { isAdmin, canDelete, isSuperAdmin } = useAuth();
+    const { canDelete, isSuperAdmin } = useAuth();
     const { deleteCOA } = useData();
     const [accounts, setAccounts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -623,7 +623,7 @@ const { read, utils } = XLSX;
     };
 
     const handleDelete = async (id) => {
-        if (!(isAdmin() || canDelete('central_coa'))) {
+        if (!canDelete('central_coa')) {
             alert(t("Akses Ditolak: Anda tidak memiliki hak untuk menghapus COA."));
             return;
         }
@@ -683,7 +683,7 @@ const { read, utils } = XLSX;
     };
 
     const handleDeleteSelected = async () => {
-        if (!(isAdmin() || canDelete('central_coa'))) {
+        if (!canDelete('central_coa')) {
             alert(t("Akses Ditolak: Anda tidak memiliki hak untuk menghapus COA."));
             return;
         }

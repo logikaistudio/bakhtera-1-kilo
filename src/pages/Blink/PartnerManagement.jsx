@@ -174,7 +174,7 @@ const PartnerManagement = () => {
         }
     };
 
-    const canDeletePartner = isAdminUser() || canDelete(partnerMenuCode);
+    const canDeletePartner = canDelete(partnerMenuCode);
     const canRunSuperAdminBatch = isSuperAdmin();
 
     const handleDelete = async (partnerId) => {

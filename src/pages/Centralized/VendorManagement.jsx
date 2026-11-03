@@ -11,7 +11,7 @@ import { useLanguage } from '../../i18n/LanguageContext';
 const VendorManagement = () => {
     const { t } = useLanguage();
     const { businessPartners, addBusinessPartner, updateBusinessPartner, deleteBusinessPartner } = useData();
-    const { isAdmin, canDelete } = useAuth();
+    const { canDelete } = useAuth();
 
     // Filter vendors from business partners
     const vendors = useMemo(() =>
@@ -85,7 +85,7 @@ const VendorManagement = () => {
     };
 
     const handleRemove = (vendor) => {
-        if (!(isAdmin() || canDelete('central_vendors'))) {
+        if (!canDelete('central_vendors')) {
             alert(t("Akses Ditolak: Anda tidak memiliki hak untuk menghapus partner."));
             return;
         }
@@ -365,7 +365,7 @@ const VendorManagement = () => {
                     </div>
 
                     <div className="flex justify-between gap-3 mt-6">
-                        {editingVendor && (isAdmin() || canDelete('central_vendors')) && (
+                        {editingVendor && canDelete('central_vendors') && (
                             <Button
                                 type="button"
                                 variant="secondary"

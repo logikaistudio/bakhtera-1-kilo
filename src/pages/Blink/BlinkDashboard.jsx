@@ -11,6 +11,7 @@ import { supabase } from '../../lib/supabase';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadialBarChart, RadialBar, Legend, Cell } from 'recharts';
 import { getCurrencySymbol, formatCurrency } from '../../utils/currencyFormatter';
 import { useLanguage } from '../../i18n/LanguageContext';
+import { useAuth } from '../../context/AuthContext';
 
 // ─── Table definitions with order of deletion (child → parent) ───────────────
 const BLINK_TABLES = [
@@ -105,6 +106,7 @@ const CATEGORY_LABELS = {
 // ─── Reset Modal ──────────────────────────────────────────────────────────────
 const ResetDataModal = ({ onClose }) => {
     const { t } = useLanguage();
+    const { isSuperAdmin } = useAuth();
     const [step, setStep] = useState(1); // 1=select, 2=confirm, 3=processing, 4=done
     const [selectedKeys, setSelectedKeys] = useState(new Set());
     const [selectAll, setSelectAll] = useState(false);
@@ -147,6 +149,10 @@ const ResetDataModal = ({ onClose }) => {
     const canConfirm = confirmText === CONFIRM_KEYWORD;
 
     const handleExecuteDelete = async () => {
+        if (!isSuperAdmin()) {
+            alert(t("Akses Ditolak: hanya superadmin yang dapat menghapus data."));
+            return;
+        }
         setStep(3);
         const orderedSelected = BLINK_TABLES.filter(t => selectedKeys.has(t.key));
         const resultList = [];
