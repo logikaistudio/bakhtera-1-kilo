@@ -93,6 +93,7 @@ const AccountsReceivable = () => {
                 finalRows = (invoiceRows || []).map(inv => ({
                     id: inv.id,
                     invoice_id: inv.id,  // ← KUNCI: invoice_id selalu = inv.id di path ini
+                    ar_coa_id: inv.ar_coa_id || null,
                     ar_number: `AR-${inv.invoice_number || inv.id.slice(0, 8).toUpperCase()}`,
                     invoice_number: inv.invoice_number,
                     customer_name: inv.customer_name || inv.customer_company || 'Unknown',
@@ -113,6 +114,7 @@ const AccountsReceivable = () => {
                 return {
                     id: ar.id,
                     invoice_id: ar.invoice_id,
+                    ar_coa_id: ar.ar_coa_id || null,
                     ar_number: ar.ar_number || `AR-${fallbackInvoiceNumber}`,
                     invoice_number: ar.invoice_number || fallbackInvoiceNumber,
                     customer_name: ar.customer_name || 'Unknown',
@@ -921,7 +923,7 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
         payment_method: 'bank_transfer',
         reference_number: '',
         received_in_account: '',
-        ar_coa_id: '',
+        ar_coa_id: ar.ar_coa_id || '',
         notes: ''
     });
     const [bankAccounts, setBankAccounts] = useState([]);
@@ -938,9 +940,24 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
 
     const fetchARAccounts = async () => {
         try {
-            const { data } = await supabase.from('finance_coa').select('*').eq('type', 'ASSET').order('code');
+            const invoiceId = ar.invoice_id || ar.id;
+            const { data: invoiceRow, error: invoiceError } = await supabase
+                .from('blink_invoices')
+                .select('*')
+                .eq('id', invoiceId)
+                .eq('division', ar.division || getActiveDivision())
+                .maybeSingle();
+            if (invoiceError) throw invoiceError;
+
+            const { data, error } = await supabase.from('finance_coa').select('*').eq('type', 'ASSET').order('code');
+            if (error) throw error;
             if (data && data.length > 0) {
                 setArAccountsList(data);
+                const invoiceARCOAId = invoiceRow?.ar_coa_id || ar.ar_coa_id;
+                if (invoiceARCOAId) {
+                    setFormData(prev => ({ ...prev, ar_coa_id: invoiceARCOAId }));
+                    return;
+                }
 
                 // Attempt to pre-select 'Piutang Usaha'
                 const match = data.find(c => c.name.toLowerCase().includes('piutang') || c.code.startsWith('1-03'));
@@ -1114,6 +1131,7 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
                 invoice: {
                     id: invoiceId,
                     invoice_number: ar.invoice_number,
+                    ar_coa_id: formData.ar_coa_id || null,
                     customer_id: ar.customer_id,
                     customer_name: ar.customer_name,
                     currency: ar.currency,
@@ -1372,19 +1390,32 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
                         <label className="block text-sm font-medium text-silver-dark mb-2">
                             {t("Akun Piutang (AR Account)")}
                         </label>
-                        <select
-                            value={formData.ar_coa_id}
-                            onChange={(e) => setFormData(prev => ({ ...prev, ar_coa_id: e.target.value }))}
-                            className="w-full"
-                        >
-                            <option value="">{t("-- Pilih Akun Piutang --")}</option>
-                            {arAccountsList.map(c => (
-                                <option key={c.id} value={c.id}>
-                                    {c.code} - {c.name}
-                                </option>
-                            ))}
-                        </select>
-                        <p className="text-xs text-silver-dark mt-1">{t("Dicatat di General Ledger sebagai pengurang piutang.")}</p>
+                        {formData.ar_coa_id ? (
+                            <p className="w-full rounded-lg border border-dark-border bg-dark-surface px-3 py-2 text-sm text-silver-light">
+                                {(() => {
+                                    const account = arAccountsList.find(c => c.id === formData.ar_coa_id);
+                                    return account ? `${account.code} - ${account.name}` : t("COA piutang tersimpan pada invoice");
+                                })()}
+                            </p>
+                        ) : (
+                            <select
+                                value={formData.ar_coa_id}
+                                onChange={(e) => setFormData(prev => ({ ...prev, ar_coa_id: e.target.value }))}
+                                className="w-full"
+                            >
+                                <option value="">{t("-- Pilih Akun Piutang --")}</option>
+                                {arAccountsList.map(c => (
+                                    <option key={c.id} value={c.id}>
+                                        {c.code} - {c.name}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
+                        <p className="text-xs text-silver-dark mt-1">
+                            {formData.ar_coa_id
+                                ? t("COA ini diambil dari invoice dan digunakan otomatis pada jurnal settlement.")
+                                : t("Invoice lama belum memiliki COA tersimpan; pilih akun untuk mempertahankan alur settlement lama.")}
+                        </p>
                     </div>
 
                     <div>

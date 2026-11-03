@@ -39,7 +39,7 @@ export async function getAllCOA() {
     if (_coaCache && now - _coaCacheTime < COA_CACHE_TTL) return _coaCache;
     const { data, error } = await supabase
         .from('finance_coa')
-        .select('id, code, name, type, is_active')
+        .select('id, code, name, type, is_active, level')
         .order('code', { ascending: true });
     if (error) throw error;
     _coaCache = data || [];
@@ -679,8 +679,14 @@ export async function createInvoiceJournal({ invoice, coaList: providedCOA }) {
     }
 
     const coaList = providedCOA || await getAllCOA();
+    const storedARCOA = invoice.ar_coa_id
+        ? coaList.find(c => c.id === invoice.ar_coa_id && c.type === 'ASSET' && c.is_active !== false)
+        : null;
+    if (invoice.ar_coa_id && !storedARCOA) {
+        throw new Error(`COA piutang invoice ${invoice.invoice_number} tidak ditemukan atau tidak aktif.`);
+    }
     const [arCOA, defaultRevCOA] = await Promise.all([
-        resolveARAccount(coaList),
+        storedARCOA || resolveARAccount(coaList),
         resolveRevenueAccount(coaList)
     ]);
 
@@ -814,7 +820,13 @@ export async function createARPaymentJournal({
     let bankCOA = bankCOAId ? coaList.find(c => c.id === bankCOAId) : null;
     if (!bankCOA) bankCOA = await resolveBankAccount(coaList, selectedBank);
 
-    let arCOA = arCOAId ? coaList.find(c => c.id === arCOAId) : null;
+    const selectedARCOAId = arCOAId || invoice.ar_coa_id;
+    let arCOA = selectedARCOAId
+        ? coaList.find(c => c.id === selectedARCOAId && c.type === 'ASSET' && c.is_active !== false)
+        : null;
+    if (selectedARCOAId && !arCOA) {
+        throw new Error(`COA piutang invoice ${invoice.invoice_number} tidak ditemukan atau tidak aktif.`);
+    }
     if (!arCOA) arCOA = await resolveARAccount(coaList);
 
     const batchId = generateUUID();
@@ -910,8 +922,14 @@ export async function createARReversalJournal({ invoice, coaList: providedCOA })
         return { success: true, skipped: true, reason: 'duplicate_ar_reversal_journal' };
     }
     const coaList = providedCOA || await getAllCOA();
+    const storedARCOA = invoice.ar_coa_id
+        ? coaList.find(c => c.id === invoice.ar_coa_id && c.type === 'ASSET' && c.is_active !== false)
+        : null;
+    if (invoice.ar_coa_id && !storedARCOA) {
+        throw new Error(`COA piutang invoice ${invoice.invoice_number} tidak ditemukan atau tidak aktif.`);
+    }
     const [arCOA, defaultRevCOA] = await Promise.all([
-        resolveARAccount(coaList),
+        storedARCOA || resolveARAccount(coaList),
         resolveRevenueAccount(coaList)
     ]);
 

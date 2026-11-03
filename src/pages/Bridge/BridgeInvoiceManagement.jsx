@@ -26,6 +26,7 @@ const BridgeInvoiceManagement = () => {
     const { companySettings: blinkCompanySettings, bridgeSettings, bankAccounts, quotations: ctxQuotations = [], shipments: ctxShipments = [], bridgeBusinessPartners = [], deleteBridgeInvoiceCascade } = useData();
     const companySettings = bridgeSettings || blinkCompanySettings;
     const [invoices, setInvoices] = useState([]);
+    const [arCOAAccounts, setARCOAAccounts] = useState([]);
     const [quotations, setQuotations] = useState([]);
     const [shipments, setShipments] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -86,6 +87,8 @@ const BridgeInvoiceManagement = () => {
         billing_currency: 'IDR',
         exchange_rate: 1,
         payment_bank_id: '',  // Selected bank account for payment
+        ar_coa_id: '',
+        status: 'draft',
         invoice_items: [
             { item_name: 'Freight', description: 'Ocean Freight', qty: 1, unit: 'Job', rate: 0, amount: 0, tax_rate: 0, tax_amount: 0, coa_id: null }
         ],
@@ -140,6 +143,27 @@ const BridgeInvoiceManagement = () => {
             fetchShipments();
         }
         fetchRevenueAccounts();
+    }, []);
+
+    useEffect(() => {
+        const fetchARCOAAccounts = async () => {
+            try {
+                const coaList = await getAllCOA();
+                setARCOAAccounts(coaList.filter(account => {
+                    const code = String(account.code || '');
+                    const isReceivable = /(piutang|receivable|\bar\b)/i.test(account.name || '') ||
+                        /^(1-01-4|1200)/.test(code);
+                    return account.type === 'ASSET' &&
+                        !code.startsWith('1-03') &&
+                        isReceivable &&
+                        (account.level == null || Number(account.level) >= 3);
+                }));
+            } catch (error) {
+                console.error('Error fetching invoice receivable accounts:', error);
+                alert(`Gagal memuat COA piutang: ${error.message}`);
+            }
+        };
+        fetchARCOAAccounts();
     }, []);
 
     // Keep local lists in sync with DataContext updates
@@ -674,6 +698,8 @@ const BridgeInvoiceManagement = () => {
             billing_currency: sourceInvoice.currency || 'IDR',
             exchange_rate: sourceInvoice.exchange_rate || 1,
             payment_bank_id: sourceInvoice.payment_bank_id || '',
+            ar_coa_id: sourceInvoice.ar_coa_id || '',
+            status: 'draft',
             customer_id: sourceInvoice.customer_id || '',
             customer_name: sourceInvoice.customer_name || '',
             customer_company: sourceInvoice.customer_company || '',
@@ -727,6 +753,11 @@ const BridgeInvoiceManagement = () => {
 
     const handleCreateInvoice = async (e) => {
         e.preventDefault();
+
+        if (!formData.ar_coa_id) {
+            alert(t("Pilih COA piutang untuk invoice ini sebelum menyimpan."));
+            return;
+        }
 
         if (!formData.quotation_id && !formData.shipment_id && !formData.is_additional_invoice) {
             alert(t("Please select a reference (Quotation or Shipment)"));
@@ -809,6 +840,7 @@ const BridgeInvoiceManagement = () => {
 
             const newInvoice = {
                 invoice_number: invoiceNumber,
+                ar_coa_id: formData.ar_coa_id || null,
                 is_additional: formData.is_additional_invoice || false,
                 parent_invoice_id: formData.parent_invoice_id || null,
                 quotation_id: selectedQuotation?.id || null,
@@ -954,6 +986,8 @@ const BridgeInvoiceManagement = () => {
             billing_currency: invoice.currency || 'IDR',
             exchange_rate: invoice.exchange_rate || 1,
             payment_bank_id: invoice.payment_bank_id || '',
+            ar_coa_id: invoice.ar_coa_id || '',
+            status: invoice.status || 'draft',
             invoice_items: migratedItems,
             cogs_items: invoice.cogs_items || [],
             tax_rate: invoice.tax_rate || 0,
@@ -990,7 +1024,7 @@ const BridgeInvoiceManagement = () => {
 
     const handleUpdateInvoice = async (e) => {
         e.preventDefault();
-        
+
         try {
             // Validate duplicates for the same SO / shipment reference.
             if (formData.job_number) {
@@ -1045,6 +1079,7 @@ const BridgeInvoiceManagement = () => {
                 currency: formData.billing_currency,
                 exchange_rate: formData.billing_currency === 'IDR' ? 1 : (parseFloat(formData.exchange_rate) > 0 ? parseFloat(formData.exchange_rate) : 1),
                 payment_bank_id: formData.payment_bank_id || null,
+                ar_coa_id: formData.ar_coa_id || null,
                 invoice_items: formData.invoice_items,
                 cogs_items: formData.cogs_items || [],
                 tax_rate: formData.tax_rate || 0,
@@ -1147,6 +1182,8 @@ const BridgeInvoiceManagement = () => {
             billing_currency: 'IDR',
             exchange_rate: 1,
             payment_bank_id: '',
+            ar_coa_id: '',
+            status: 'draft',
             invoice_items: [
                 { item_name: 'Freight', description: 'Ocean Freight', qty: 1, unit: 'Job', rate: 0, amount: 0, tax_amount: 0, coa_id: null }
             ],
@@ -1654,6 +1691,7 @@ const BridgeInvoiceManagement = () => {
                 customer_id: invoice.customer_id,
                 customer_name: invoice.customer_name,
                 invoice_number: reimbursementInvoiceNumber,
+                ar_coa_id: invoice.ar_coa_id || null,
                 invoice_date: new Date().toISOString().split('T')[0],
                 due_date: invoice.due_date || null,
                 currency: invoice.currency,
@@ -1787,6 +1825,7 @@ const BridgeInvoiceManagement = () => {
                 customer_email: invoice.customer_email || null,
                 customer_phone: invoice.customer_phone || null,
                 invoice_number: recreatedInvoiceNumber,
+                ar_coa_id: invoice.ar_coa_id || null,
                 invoice_date: newInvoiceDate,
                 due_date: newDueDate,
                 payment_terms: invoice.payment_terms || 'NET 30',
@@ -1925,6 +1964,7 @@ const BridgeInvoiceManagement = () => {
                 customer_email: invoice.customer_email || null,
                 customer_phone: invoice.customer_phone || null,
                 invoice_number: reinvoiceNumber,
+                ar_coa_id: invoice.ar_coa_id || null,
                 invoice_date: newInvoiceDate,
                 due_date: newDueDate,
                 payment_terms: invoice.payment_terms || 'NET 30',
@@ -2615,6 +2655,7 @@ const BridgeInvoiceManagement = () => {
                         formatCurrency={formatCurrency}
                         bankAccounts={bankAccounts}
                         revenueAccounts={revenueAccounts}
+                        arCOAAccounts={arCOAAccounts}
                         onClose={() => {
                             setShowCreateModal(false);
                             resetForm();
@@ -2773,7 +2814,7 @@ const BridgeInvoiceManagement = () => {
 const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotations, shipments, formData, setFormData, selectedQuotation, selectedShipment,
     referenceType, setReferenceType, handleQuotationSelect, handleShipmentSelect, handlePaymentTermsChange,
     addInvoiceItem, removeInvoiceItem, updateInvoiceItem, calculateTotals, handleGlobalTaxRateChange,
-    handleCreateInvoice, formatCurrency, onClose, bankAccounts, revenueAccounts }) => {
+    handleCreateInvoice, formatCurrency, onClose, bankAccounts, revenueAccounts, arCOAAccounts }) => {
     const { t } = useLanguage();
 
     const { subtotal, taxAmount, total, cogsSubtotal, grossProfit, profitMargin } = calculateTotals();
@@ -3208,6 +3249,31 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                 }
                             </p>
                         </div>
+                    </div>
+
+                    <div className="glass-card p-3 rounded-lg border border-emerald-500/20">
+                        <label className="block text-xs font-semibold text-emerald-300 mb-2">
+                            {t("COA Piutang untuk Invoice")} <span className="text-red-400">*</span>
+                        </label>
+                        <select
+                            value={formData.ar_coa_id || ''}
+                            onChange={event => setFormData(prev => ({ ...prev, ar_coa_id: event.target.value }))}
+                            disabled={isEditing}
+                            required={!isEditing}
+                            className="w-full px-2.5 py-1.5 bg-dark-surface border border-dark-border rounded-lg text-silver-light text-sm disabled:opacity-60"
+                        >
+                            <option value="">{t("-- Pilih akun piutang --")}</option>
+                            {(arCOAAccounts || []).map(account => (
+                                <option key={account.id} value={account.id} disabled={account.is_active === false}>
+                                    {account.code} - {account.name}{account.is_active === false ? ` (${t("inactive")})` : ''}
+                                </option>
+                            ))}
+                        </select>
+                        <p className="text-[10px] text-silver-dark mt-1">
+                            {isEditing
+                                ? t("COA invoice ditetapkan saat invoice dibuat agar jurnal tetap konsisten.")
+                                : t("Settlement invoice ini akan otomatis menggunakan COA piutang yang dipilih.")}
+                        </p>
                     </div>
 
                     {/* Payment Bank Account Selection */}
