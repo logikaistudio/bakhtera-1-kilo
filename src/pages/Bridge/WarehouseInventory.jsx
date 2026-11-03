@@ -18,7 +18,7 @@ const WarehouseInventory = () => {
     const canClearAll = hasDelete && isSuperAdmin();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    const { quotations, warehouseInventory = [], updateQuotation, addMutationLog, mutationLogs = [], deleteMutationLog, updateInventoryStock, outboundTransactions = [], updateItemCheckout, requestApproval, isExhibitionLocation, getExhibitionLocation } = useData();
+    const { quotations, warehouseInventory = [], updateQuotation, updateWarehouseInventory, addMutationLog, mutationLogs = [], deleteMutationLog, updateInventoryStock, outboundTransactions = [], updateItemCheckout, requestApproval, isExhibitionLocation, getExhibitionLocation } = useData();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedPengajuan, setSelectedPengajuan] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
@@ -68,6 +68,7 @@ const WarehouseInventory = () => {
                 packagesByNumber.set(packageNumber, { packageNumber, items: [] });
             }
             packagesByNumber.get(packageNumber).items.push({
+                warehouseInventoryId: item.id,
                 itemCode: item.itemCode || item.item_code,
                 name: item.itemName || item.item_name || item.assetName || item.asset_name || '-',
                 itemName: item.itemName || item.item_name || item.assetName || item.asset_name || '-',
@@ -92,6 +93,7 @@ const WarehouseInventory = () => {
             type: 'inbound',
             documentStatus: 'approved',
             packages: Array.from(packagesByNumber.values()),
+            warehouseQuotationExists: Boolean(quotation),
             isWarehouseFallback: true
         }];
     });
@@ -257,6 +259,42 @@ const WarehouseInventory = () => {
                     })
                 }))
             };
+
+            if (selectedPengajuan.isWarehouseFallback) {
+                const warehouseUpdates = (cleanedData.packages || []).flatMap(pkg =>
+                    (pkg.items || []).map(item => {
+                        const quantity = Number(item.quantity);
+                        if (!item.warehouseInventoryId || !Number.isFinite(quantity) || quantity < 0) {
+                            throw new Error('Data inventaris tidak valid atau ID baris warehouse tidak ditemukan.');
+                        }
+                        return updateWarehouseInventory(item.warehouseInventoryId, {
+                            item_code: item.itemCode || null,
+                            item_name: item.name || item.itemName || null,
+                            asset_name: item.name || item.itemName || null,
+                            package_number: pkg.packageNumber || null,
+                            quantity,
+                            unit: item.uom || 'pcs',
+                            condition: item.condition || null,
+                            value: item.value || 0,
+                            notes: item.notes || '',
+                            remarks: item.notes || '',
+                            entry_date: cleanedData.submissionDate || cleanedData.submission_date || null,
+                            submission_date: cleanedData.submissionDate || cleanedData.submission_date || null,
+                            bc_document_number: cleanedData.bcDocumentNumber || cleanedData.bc_document_number || null
+                        });
+                    })
+                );
+                const updateResults = await Promise.all(warehouseUpdates);
+                if (updateResults.some(result => result !== true)) {
+                    throw new Error('Sebagian data warehouse gagal disimpan. Periksa pesan error dan muat ulang sebelum mencoba lagi.');
+                }
+
+                setSelectedPengajuan(cleanedData);
+                setEditData(cleanedData);
+                setIsEditing(false);
+                alert(t("Data inventaris berhasil disimpan"));
+                return;
+            }
 
             // 1. Save quotation data (without mutation fields)
             await updateQuotation(selectedPengajuan.id, cleanedData);
@@ -938,6 +976,7 @@ const WarehouseInventory = () => {
                             packageNumber: pkg.packageNumber,
                             itemCode: item.itemCode,
                             itemName: item.name || item.itemName,
+                            warehouseInventoryId: item.warehouseInventoryId,
                             hsCode: item.hsCode,
                             sender: senderName, // Added for Pabean Barang Mutasi
                             totalStock: item.quantity,
@@ -965,6 +1004,7 @@ const WarehouseInventory = () => {
                             packageNumber: pkg.packageNumber,
                             itemCode: item.itemCode,
                             itemName: item.name || item.itemName,
+                            warehouseInventoryId: item.warehouseInventoryId,
                             hsCode: item.hsCode,
                             sender: senderName, // Added for Pabean Barang Mutasi
                             totalStock: item.quantity,
@@ -989,17 +1029,38 @@ const WarehouseInventory = () => {
             console.log('📊 Total mutations to save:', mutations.length);
 
             if (addMutationLog && mutations.length > 0) {
+                const fallbackStocks = new Map();
+                if (selectedPengajuan.isWarehouseFallback) {
+                    mutations.forEach(mutation => {
+                        const inventoryItem = warehouseInventory.find(item => item.id === mutation.warehouseInventoryId);
+                        if (!inventoryItem) throw new Error('Baris inventaris untuk mutasi tidak ditemukan. Muat ulang halaman.');
+                        fallbackStocks.set(mutation.warehouseInventoryId, Number(inventoryItem.currentStock ?? inventoryItem.quantity ?? 0));
+                    });
+                }
+
                 // Save each mutation AND Update Inventory
                 for (const mutation of mutations) {
                     console.log('💾 Saving mutation:', mutation.itemName, 'qty:', mutation.mutatedQty);
-                    await addMutationLog(mutation);
+                    await addMutationLog({
+                        ...mutation,
+                        pengajuanId: selectedPengajuan.isWarehouseFallback && !selectedPengajuan.warehouseQuotationExists
+                            ? null
+                            : mutation.pengajuanId
+                    });
 
                     // Update Warehouse Inventory Stock (RESTORED LOGIC)
                     // Outbound (Mutasi) = Decrease Stock
                     // Inbound (Remutasi) = Increase Stock
                     const qtyChange = mutation._type === 'outbound' ? -Math.abs(mutation.mutatedQty) : Math.abs(mutation.mutatedQty);
 
-                    if (updateInventoryStock) {
+                    if (selectedPengajuan.isWarehouseFallback) {
+                        const inventoryId = mutation.warehouseInventoryId;
+                        const nextStock = fallbackStocks.get(inventoryId) + qtyChange;
+                        if (nextStock < 0) throw new Error('Stok warehouse tidak mencukupi untuk mutasi ini.');
+                        const saved = await updateWarehouseInventory(inventoryId, { quantity: nextStock });
+                        if (!saved) throw new Error(`Gagal memperbarui stok warehouse untuk ${mutation.itemName}.`);
+                        fallbackStocks.set(inventoryId, nextStock);
+                    } else if (updateInventoryStock) {
                         await updateInventoryStock(
                             mutation.itemCode,
                             mutation.itemName,
@@ -1042,9 +1103,13 @@ const WarehouseInventory = () => {
                     }
                 }
 
-                // Save updated quotation with mutation tracking
-                await updateQuotation(qId, { packages: updatedPackages });
-                console.log('✅ Quotation updated with mutation labels');
+                if (selectedPengajuan.isWarehouseFallback) {
+                    console.log('✅ Mutasi tersimpan langsung ke log dan stok inventaris warehouse');
+                } else {
+                    // Save updated quotation with mutation tracking
+                    await updateQuotation(qId, { packages: updatedPackages });
+                    console.log('✅ Quotation updated with mutation labels');
+                }
             }
 
             console.log('✅ Mutasi berhasil disimpan:', mutations.length, 'records');
@@ -1538,12 +1603,12 @@ const WarehouseInventory = () => {
                                                     {canClearAll && !selectedPengajuan.isWarehouseFallback && (
                                                         <Button onClick={handleDeleteAllMutations} variant="secondary" icon={Trash2} className="text-sm text-red-600 hover:text-red-800">{t("Hapus Mutasi")}</Button>
                                                     )}
-                                                    {hasEdit && !selectedPengajuan.isWarehouseFallback && (
+                                                    {hasEdit && (
                                                         <Button onClick={() => handleStartMutation(selectedPengajuan)} variant="primary" icon={ArrowRightLeft} className="text-sm">{t("Mutasi")}</Button>
                                                     )}
                                                 </>
                                             )}
-                                            {hasEdit && !selectedPengajuan.isWarehouseFallback && (
+                                            {hasEdit && (
                                                 <Button onClick={handleStartEdit} variant="secondary" icon={Edit2} className="text-sm">{t("Kelola")}</Button>
                                             )}
                                         </>
@@ -1586,7 +1651,11 @@ const WarehouseInventory = () => {
                                         <tbody>
                                             <tr className="bg-white dark:bg-dark-card">
                                                 <td className="px-2 py-0.5 text-xs text-gray-900 dark:text-silver-light font-semibold">{displayData.quotationNumber || displayData.quotation_number || '-'}</td>
-                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center">{displayData.bcDocumentNumber || displayData.bc_document_number || '-'}</td>
+                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center">
+                                                    {isEditing && selectedPengajuan.isWarehouseFallback
+                                                        ? <input type="text" value={editData.bcDocumentNumber || editData.bc_document_number || ''} onChange={(e) => setEditData({ ...editData, bcDocumentNumber: e.target.value, bc_document_number: e.target.value })} className="w-32 px-1 py-0.5 text-xs border rounded text-center" />
+                                                        : (displayData.bcDocumentNumber || displayData.bc_document_number || '-')}
+                                                </td>
                                                 <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center">
                                                     {isEditing ? <input type="date" value={editData.submissionDate || editData.submission_date || ''} onChange={(e) => setEditData({ ...editData, submissionDate: e.target.value })} className="px-1 py-0.5 text-xs border rounded" /> : formatDate(displayData.submissionDate || displayData.submission_date)}
                                                 </td>
@@ -1792,14 +1861,14 @@ const WarehouseInventory = () => {
                                                         <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white" style={{ fontWeight: 'bold' }}>{t("Item")}</th>
                                                         <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white w-12" style={{ fontWeight: 'bold' }}>{t("Awal")}</th>
                                                         <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white w-12" style={{ fontWeight: 'bold' }}>{t("Sat")}</th>
-                                                        {isEditing && selectedPengajuan.type !== 'outbound' && (
+                                                        {isEditing && selectedPengajuan.type !== 'outbound' && !selectedPengajuan.isWarehouseFallback && (
                                                             <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white bg-green-700 w-16" style={{ fontWeight: 'bold' }}>{t("Stok")}</th>
                                                         )}
                                                         <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white w-28" style={{ fontWeight: 'bold' }}>{t("Status")}</th>
                                                         { /* Lokasi removed from here */}
                                                         <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-14" style={{ fontWeight: 'bold' }}>{t("Kondisi")}</th>
                                                         {/* Mutation columns - only in edit mode for inbound */}
-                                                        {isEditing && selectedPengajuan.type !== 'outbound' && (
+                                                        {isEditing && selectedPengajuan.type !== 'outbound' && !selectedPengajuan.isWarehouseFallback && (
                                                             <>
                                                                 <th className="px-1 py-0.5 text-center text-xs font-bold whitespace-nowrap text-white bg-red-700 w-16" style={{ fontWeight: 'bold' }}>{t("Keluar")}</th>
                                                                 {/* New Outbound Details */}
@@ -1845,14 +1914,28 @@ const WarehouseInventory = () => {
                                                         return (
                                                             <tr key={itemIdx} className={rowClass}>
                                                                 <td className={`px-1 py-0 text-xs ${isCheckedOut ? 'text-amber-800 dark:text-amber-400' : 'text-gray-700 dark:text-silver'}`}>{itemIdx + 1}</td>
-                                                                <td className="px-1 py-0 text-xs text-gray-700 dark:text-silver">{(item.itemCode || '-')}</td>
-                                                                <td className="px-1 py-0 text-xs text-gray-700 dark:text-silver">{(item.hsCode || '-')}</td>
-                                                                <td className="px-1 py-0 text-xs text-gray-700 dark:text-silver max-w-[250px] break-words">{(item.name || item.itemName || '-')}</td>
-                                                                <td className="px-1 py-0 text-xs text-gray-700 dark:text-silver text-center">
-                                                                    <span className="font-semibold">{item.quantity || 0}</span>
+                                                                <td className="px-1 py-0 text-xs text-gray-700 dark:text-silver">
+                                                                    {isEditing && selectedPengajuan.isWarehouseFallback
+                                                                        ? <input type="text" value={item.itemCode || ''} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'itemCode', e.target.value)} className="w-24 px-1 py-0 text-xs border rounded" />
+                                                                        : (item.itemCode || '-')}
                                                                 </td>
-                                                                <td className="px-1 py-0 text-xs text-gray-700 dark:text-silver text-center">{(item.uom || 'pcs')}</td>
-                                                                {isEditing && selectedPengajuan.type !== 'outbound' && (
+                                                                <td className="px-1 py-0 text-xs text-gray-700 dark:text-silver">{(item.hsCode || '-')}</td>
+                                                                <td className="px-1 py-0 text-xs text-gray-700 dark:text-silver max-w-[250px] break-words">
+                                                                    {isEditing && selectedPengajuan.isWarehouseFallback
+                                                                        ? <input type="text" value={item.name || item.itemName || ''} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'name', e.target.value)} className="w-40 px-1 py-0 text-xs border rounded" />
+                                                                        : (item.name || item.itemName || '-')}
+                                                                </td>
+                                                                <td className="px-1 py-0 text-xs text-gray-700 dark:text-silver text-center">
+                                                                    {isEditing && selectedPengajuan.isWarehouseFallback
+                                                                        ? <input type="number" min="0" value={item.quantity ?? 0} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'quantity', e.target.value === '' ? '' : Number(e.target.value))} className="w-16 px-1 py-0 text-xs border rounded text-center" />
+                                                                        : <span className="font-semibold">{item.quantity || 0}</span>}
+                                                                </td>
+                                                                <td className="px-1 py-0 text-xs text-gray-700 dark:text-silver text-center">
+                                                                    {isEditing && selectedPengajuan.isWarehouseFallback
+                                                                        ? <input type="text" value={item.uom || 'pcs'} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'uom', e.target.value)} className="w-14 px-1 py-0 text-xs border rounded text-center" />
+                                                                        : (item.uom || 'pcs')}
+                                                                </td>
+                                                                {isEditing && selectedPengajuan.type !== 'outbound' && !selectedPengajuan.isWarehouseFallback && (
                                                                     <td className="px-1 py-0 text-xs text-center bg-green-50 font-bold text-green-700">
                                                                         {projectedSisa}
                                                                     </td>
@@ -1885,7 +1968,7 @@ const WarehouseInventory = () => {
                                                                 {/* <td ... Lokasi removed from here ... ></td> */}
                                                                 <td className="px-1 py-0 text-xs text-gray-700 dark:text-silver">{isEditing ? <select value={item.condition || 'Baik'} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'condition', e.target.value)} className="px-1 py-0 text-xs border rounded"><option value="Baik">{t("Baik")}</option><option value="Rusak">{t("Rusak")}</option><option value="Cacat">{t("Cacat")}</option></select> : (item.condition || 'Baik')}</td>
                                                                 {/* Mutation columns - only in edit mode for inbound */}
-                                                                {isEditing && selectedPengajuan.type !== 'outbound' && (
+                                                                {isEditing && selectedPengajuan.type !== 'outbound' && !selectedPengajuan.isWarehouseFallback && (
                                                                     <>
                                                                         {/* Keluar Cols */}
                                                                         <td className="px-1 py-0 text-xs text-center bg-red-50">
@@ -2030,45 +2113,45 @@ const WarehouseInventory = () => {
             {/* ========== MUTATION MODAL ========== */}
             {
                 showMutationModal && mutationData && (
-                    <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
-                        <div className="bg-white dark:bg-dark-card rounded-xl w-full max-w-7xl max-h-[90vh] overflow-hidden shadow-xl">
+                    <div className="fixed inset-0 flex items-center justify-center z-50 p-2 sm:p-3" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+                        <div className="bg-white dark:bg-dark-card rounded-xl w-full max-w-[98vw] h-[96vh] max-h-[96vh] overflow-hidden shadow-xl flex flex-col">
                             {/* Modal Header */}
-                            <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-dark-border bg-red-50 dark:bg-red-900/20">
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 p-4 sm:p-5 border-b border-gray-200 dark:border-dark-border bg-red-50 dark:bg-red-900/20 shrink-0">
                                 <div>
-                                    <h2 className="text-xl font-bold text-red-700 dark:text-red-400">{t("Mutasi Barang")}</h2>
-                                    <p className="text-sm text-red-600 dark:text-red-500">{selectedPengajuan.quotationNumber || selectedPengajuan.quotation_number}</p>
+                                    <h2 className="text-2xl font-bold text-red-700 dark:text-red-400">{t("Mutasi Barang")}</h2>
+                                    <p className="text-base text-red-600 dark:text-red-500">{selectedPengajuan.quotationNumber || selectedPengajuan.quotation_number}</p>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <Button onClick={handleCloseMutation} variant="secondary" icon={XCircle} className="text-sm">{t("Batal")}</Button>
-                                    <Button onClick={handleSaveMutation} variant="danger" icon={Save} className="text-sm">{t("Simpan Mutasi")}</Button>
+                                <div className="flex items-center gap-2 self-end sm:self-auto">
+                                    <Button onClick={handleCloseMutation} variant="secondary" icon={XCircle} className="text-sm min-h-11">{t("Batal")}</Button>
+                                    <Button onClick={handleSaveMutation} variant="danger" icon={Save} className="text-sm min-h-11">{t("Simpan Mutasi")}</Button>
                                     <button onClick={handleCloseMutation} className="p-2 hover:bg-red-100 rounded-lg"><X className="w-5 h-5 text-red-500" /></button>
                                 </div>
                             </div>
 
                             {/* Mutation Header Table */}
-                            <div className="p-4 border-b border-gray-200 dark:border-dark-border">
+                            <div className="p-3 sm:p-4 border-b border-gray-200 dark:border-dark-border shrink-0">
                                 <div className="overflow-x-auto border border-gray-200 dark:border-dark-border rounded-lg">
-                                    <table className="w-full">
+                                    <table className="w-full min-w-[900px]">
                                         <thead className="bg-red-600">
                                             <tr>
-                                                <th className="px-2 py-1 text-left text-xs font-semibold text-white">{t("No. Pengajuan")}</th>
-                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">{t("No. Pabean")}</th>
-                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">{t("Tgl Masuk")}</th>
-                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">{t("Jam Masuk")}</th>
-                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">{t("Jml Pkg")}</th>
-                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">{t("Jml Item")}</th>
-                                                <th className="px-2 py-1 text-center text-xs font-semibold text-white">PIC</th>
+                                                <th className="px-3 py-2 text-left text-sm font-semibold text-white">{t("No. Pengajuan")}</th>
+                                                <th className="px-3 py-2 text-center text-sm font-semibold text-white">{t("No. Pabean")}</th>
+                                                <th className="px-3 py-2 text-center text-sm font-semibold text-white">{t("Tgl Masuk")}</th>
+                                                <th className="px-3 py-2 text-center text-sm font-semibold text-white">{t("Jam Masuk")}</th>
+                                                <th className="px-3 py-2 text-center text-sm font-semibold text-white">{t("Jml Pkg")}</th>
+                                                <th className="px-3 py-2 text-center text-sm font-semibold text-white">{t("Jml Item")}</th>
+                                                <th className="px-3 py-2 text-center text-sm font-semibold text-white">PIC</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <tr className="bg-white dark:bg-dark-card">
-                                                <td className="px-2 py-1 text-xs font-semibold">{mutationData.quotationNumber || mutationData.quotation_number || '-'}</td>
-                                                <td className="px-2 py-1 text-xs text-center">{mutationData.bcDocumentNumber || mutationData.bc_document_number || '-'}</td>
-                                                <td className="px-2 py-1 text-xs text-center">{formatDate(mutationData.submissionDate || mutationData.submission_date)}</td>
-                                                <td className="px-2 py-1 text-xs text-center">{formatTime(mutationData.approvedDate || mutationData.approved_date)}</td>
-                                                <td className="px-2 py-1 text-xs text-center font-bold">{countPackagesAndItems(mutationData).packageCount}</td>
-                                                <td className="px-2 py-1 text-xs text-center font-bold">{countPackagesAndItems(mutationData).itemCount}</td>
-                                                <td className="px-2 py-1 text-xs text-center">{mutationData.pic || '-'}</td>
+                                                <td className="px-3 py-3 text-sm font-semibold">{mutationData.quotationNumber || mutationData.quotation_number || '-'}</td>
+                                                <td className="px-3 py-3 text-sm text-center">{mutationData.bcDocumentNumber || mutationData.bc_document_number || '-'}</td>
+                                                <td className="px-3 py-3 text-sm text-center">{formatDate(mutationData.submissionDate || mutationData.submission_date)}</td>
+                                                <td className="px-3 py-3 text-sm text-center">{formatTime(mutationData.approvedDate || mutationData.approved_date)}</td>
+                                                <td className="px-3 py-3 text-sm text-center font-bold">{countPackagesAndItems(mutationData).packageCount}</td>
+                                                <td className="px-3 py-3 text-sm text-center font-bold">{countPackagesAndItems(mutationData).itemCount}</td>
+                                                <td className="px-3 py-3 text-sm text-center">{mutationData.pic || '-'}</td>
                                                 {/* Header-level mutation fields removed to move them to row level */}
                                             </tr>
                                         </tbody>
@@ -2077,30 +2160,30 @@ const WarehouseInventory = () => {
                             </div>
 
                             {/* Mutation Body */}
-                            <div className="p-4 overflow-y-auto max-h-[calc(90vh-400px)] space-y-4">
+                            <div className="p-3 sm:p-5 overflow-auto flex-1 min-h-0 space-y-4">
                                 {(mutationData.packages || []).map((pkg, pkgIndex) => (
                                     <div key={pkgIndex} className="border border-gray-200 dark:border-dark-border rounded-lg overflow-hidden">
-                                        <div className="bg-gray-100 dark:bg-dark-surface px-3 py-2 border-b border-gray-200 dark:border-dark-border">
-                                            <span className="text-sm font-semibold">{t("Kode Packing:")} {pkg.packageNumber || `PKG-${pkgIndex + 1}`}</span>
+                                        <div className="bg-gray-100 dark:bg-dark-surface px-4 py-3 border-b border-gray-200 dark:border-dark-border">
+                                            <span className="text-base font-semibold">{t("Kode Packing:")} {pkg.packageNumber || `PKG-${pkgIndex + 1}`}</span>
                                         </div>
                                         <div className="overflow-x-auto">
-                                            <table className="w-full">
+                                            <table className="w-full min-w-[1500px]">
                                                 <thead className="bg-accent-blue">
                                                     <tr>
-                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-8">No.</th>
-                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-20">{t("Kode Brg")}</th>
-                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white">{t("Item")}</th>
-                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white w-14">{t("Stok")}</th>
-                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-32">{t("Tujuan/Lokasi")}</th>
+                                                        <th className="px-3 py-3 text-left text-sm font-semibold text-white w-12">No.</th>
+                                                        <th className="px-3 py-3 text-left text-sm font-semibold text-white w-32">{t("Kode Brg")}</th>
+                                                        <th className="px-3 py-3 text-left text-sm font-semibold text-white min-w-[220px]">{t("Item")}</th>
+                                                        <th className="px-3 py-3 text-center text-sm font-semibold text-white w-24">{t("Stok")}</th>
+                                                        <th className="px-3 py-3 text-left text-sm font-semibold text-white w-44">{t("Tujuan/Lokasi")}</th>
                                                         {/* Mutation columns */}
-                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-20">{t("Mutasi")}</th>
-                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-16">{t("Sisa")}</th>
-                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-24">{t("Tgl")}</th>
-                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-20">{t("Jam")}</th>
-                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-24">PIC</th>
-                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white bg-red-700 w-24">{t("Dokumen")}</th>
-                                                        <th className="px-2 py-1 text-left text-xs font-semibold text-white w-32">{t("Keterangan")}</th>
-                                                        <th className="px-2 py-1 text-center text-xs font-semibold text-white w-14">{t("Aksi")}</th>
+                                                        <th className="px-3 py-3 text-center text-sm font-semibold text-white bg-red-700 w-28">{t("Mutasi")}</th>
+                                                        <th className="px-3 py-3 text-center text-sm font-semibold text-white bg-red-700 w-24">{t("Sisa")}</th>
+                                                        <th className="px-3 py-3 text-center text-sm font-semibold text-white bg-red-700 w-40">{t("Tgl")}</th>
+                                                        <th className="px-3 py-3 text-center text-sm font-semibold text-white bg-red-700 w-32">{t("Jam")}</th>
+                                                        <th className="px-3 py-3 text-center text-sm font-semibold text-white bg-red-700 w-40">PIC</th>
+                                                        <th className="px-3 py-3 text-center text-sm font-semibold text-white bg-red-700 w-36">{t("Dokumen")}</th>
+                                                        <th className="px-3 py-3 text-left text-sm font-semibold text-white w-56">{t("Keterangan")}</th>
+                                                        <th className="px-3 py-3 text-center text-sm font-semibold text-white w-20">{t("Aksi")}</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-gray-200 dark:divide-dark-border">
@@ -2155,17 +2238,17 @@ const WarehouseInventory = () => {
 
                                                         return (
                                                             <tr key={itemIdx} className={`hover:bg-gray-50 dark:hover:bg-dark-surface/50 ${isFullyMutated ? 'opacity-75 bg-gray-50' : ''}`}>
-                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{itemIdx + 1}</td>
-                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{item.itemCode || '-'}</td>
-                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">{item.name || item.itemName || '-'}</td>
-                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver text-center">
+                                                                <td className="px-3 py-3 text-sm text-gray-700 dark:text-silver">{itemIdx + 1}</td>
+                                                                <td className="px-3 py-3 text-sm text-gray-700 dark:text-silver">{item.itemCode || '-'}</td>
+                                                                <td className="px-3 py-3 text-sm text-gray-700 dark:text-silver whitespace-normal">{item.name || item.itemName || '-'}</td>
+                                                                <td className="px-3 py-3 text-sm text-gray-700 dark:text-silver text-center">
                                                                     {isToGudang ? item.atPameran : item.inWarehouse} {item.uom || 'pcs'}
                                                                 </td>
-                                                                <td className="px-2 py-0.5 text-xs text-gray-700 dark:text-silver">
+                                                                <td className="px-3 py-3 text-sm text-gray-700 dark:text-silver">
                                                                     <select
                                                                         value={mutationLocation}
                                                                         onChange={(e) => handleMutationItemChange(pkgIndex, itemIdx, 'mutationLocation', e.target.value)}
-                                                                        className="w-full px-1 py-0.5 text-xs border rounded bg-white text-center"
+                                                                        className="w-full min-w-36 min-h-11 px-3 py-2 text-sm border rounded-lg bg-white dark:bg-dark-surface dark:text-silver-light text-center"
                                                                         disabled={!isWarehouseRow}
                                                                     >
                                                                         {/* For warehouse rows: show non-Gudang options only. For remutation: show Gudang only. */}
@@ -2177,7 +2260,7 @@ const WarehouseInventory = () => {
                                                                 </td>
 
                                                                 {/* Mutation input (Unified) */}
-                                                                <td className={`px-2 py-0.5 text-xs text-center border-r border-red-100 dark:border-red-900/20 bg-red-50 dark:bg-red-900/10`}>
+                                                                <td className="px-3 py-3 text-center border-r border-red-100 dark:border-red-900/20 bg-red-50 dark:bg-red-900/10">
                                                                     <div className="flex flex-col items-center">
                                                                         <input
                                                                             type="number"
@@ -2195,76 +2278,76 @@ const WarehouseInventory = () => {
                                                                                 if (val > maxMutasi) val = maxMutasi;
                                                                                 handleMutationItemChange(pkgIndex, itemIdx, 'mutationQty', val);
                                                                             }}
-                                                                            className={`w-16 px-1 py-0.5 text-xs text-center border rounded focus:ring-1 ${maxMutasi > 0 ? 'border-red-300 focus:ring-red-500 bg-white' : 'border-gray-300 bg-gray-200 cursor-not-allowed'}`}
+                                                                            className={`w-full max-w-24 min-h-11 px-3 py-2 text-base text-center border rounded-lg focus:ring-2 ${maxMutasi > 0 ? 'border-red-300 focus:ring-red-500 bg-white dark:bg-dark-surface dark:text-silver-light' : 'border-gray-300 bg-gray-200 cursor-not-allowed'}`}
                                                                             disabled={maxMutasi === 0}
                                                                         />
-                                                                        <span className={`text-[9px] mt-0.5 text-red-500`}>{t("Max:")} {maxMutasi}</span>
+                                                                        <span className="text-xs mt-1 text-red-500">{t("Max:")} {maxMutasi}</span>
                                                                     </div>
                                                                 </td>
 
                                                                 {/* Total Saat Ini (Projected Warehouse Stock) */}
-                                                                <td className="px-2 py-0.5 text-xs text-center bg-red-50 dark:bg-red-900/10 font-bold text-gray-800 dark:text-gray-200">
+                                                                <td className="px-3 py-3 text-base text-center bg-red-50 dark:bg-red-900/10 font-bold text-gray-800 dark:text-gray-200">
                                                                     {projectedStock}
                                                                 </td>
 
                                                                 {/* Tgl Mutasi */}
-                                                                <td className="px-1 py-0.5 text-xs text-center bg-red-50 dark:bg-red-900/10">
-                                                                    <input type="date" value={item.mutationDate || ''} onChange={(e) => handleMutationItemChange(pkgIndex, itemIdx, 'mutationDate', e.target.value)} className="w-full px-1 py-0.5 text-xs border border-red-300 rounded" />
+                                                                <td className="px-2 py-3 text-sm text-center bg-red-50 dark:bg-red-900/10">
+                                                                    <input type="date" value={item.mutationDate || ''} onChange={(e) => handleMutationItemChange(pkgIndex, itemIdx, 'mutationDate', e.target.value)} className="w-full min-w-36 min-h-11 px-2 py-2 text-sm border border-red-300 rounded-lg dark:bg-dark-surface dark:text-silver-light" />
                                                                 </td>
                                                                 
                                                                 {/* Jam Mutasi */}
-                                                                <td className="px-1 py-0.5 text-xs text-center bg-red-50 dark:bg-red-900/10">
-                                                                    <input type="time" value={item.mutationTime || ''} onChange={(e) => handleMutationItemChange(pkgIndex, itemIdx, 'mutationTime', e.target.value)} className="w-full px-1 py-0.5 text-xs border border-red-300 rounded" />
+                                                                <td className="px-2 py-3 text-sm text-center bg-red-50 dark:bg-red-900/10">
+                                                                    <input type="time" value={item.mutationTime || ''} onChange={(e) => handleMutationItemChange(pkgIndex, itemIdx, 'mutationTime', e.target.value)} className="w-full min-w-28 min-h-11 px-2 py-2 text-sm border border-red-300 rounded-lg dark:bg-dark-surface dark:text-silver-light" />
                                                                 </td>
                                                                 
                                                                 {/* PIC Mutasi */}
-                                                                <td className="px-1 py-0.5 text-xs text-center bg-red-50 dark:bg-red-900/10">
-                                                                    <input type="text" value={item.mutationPic || ''} onChange={(e) => handleMutationItemChange(pkgIndex, itemIdx, 'mutationPic', e.target.value)} placeholder="PIC" className="w-full px-1 py-0.5 text-xs border border-red-300 rounded" />
+                                                                <td className="px-2 py-3 text-sm text-center bg-red-50 dark:bg-red-900/10">
+                                                                    <input type="text" value={item.mutationPic || ''} onChange={(e) => handleMutationItemChange(pkgIndex, itemIdx, 'mutationPic', e.target.value)} placeholder="PIC" className="w-full min-w-32 min-h-11 px-3 py-2 text-sm border border-red-300 rounded-lg dark:bg-dark-surface dark:text-silver-light" />
                                                                 </td>
 
                                                                 {/* Dokumen */}
-                                                                <td className="px-1 py-0.5 text-xs text-center bg-red-50 dark:bg-red-900/10">
+                                                                <td className="px-2 py-3 text-sm text-center bg-red-50 dark:bg-red-900/10">
                                                                     <Button 
                                                                         onClick={() => setActiveDocumentRow({ pkgIndex, itemIdx })} 
                                                                         variant="secondary" 
-                                                                        className="!px-2 !py-0.5 !text-[10px] w-full flex justify-center"
+                                                                        className="!px-3 !py-2 !text-sm min-h-11 w-full flex justify-center"
                                                                     >
-                                                                        <Paperclip className="w-3 h-3 mr-1" /> {(item.mutationDocuments || []).length}/5
+                                                                        <Paperclip className="w-4 h-4 mr-2" /> {(item.mutationDocuments || []).length}/5
                                                                     </Button>
                                                                 </td>
 
                                                                 {/* Notes */}
-                                                                <td className="px-1 py-0.5 text-xs bg-red-50 dark:bg-red-900/10">
-                                                                    <input
-                                                                        type="text"
+                                                                <td className="px-2 py-3 text-sm bg-red-50 dark:bg-red-900/10">
+                                                                    <textarea
                                                                         value={item.notes || ''}
                                                                         onChange={(e) => handleMutationItemChange(pkgIndex, itemIdx, 'notes', e.target.value)}
-                                                                        className="w-full px-1 py-0.5 text-xs border border-red-300 rounded"
-                                                                        placeholder={t("Ket...")}
+                                                                        rows={2}
+                                                                        className="w-full min-w-48 min-h-11 px-3 py-2 text-sm border border-red-300 rounded-lg resize-y dark:bg-dark-surface dark:text-silver-light"
+                                                                        placeholder={t("Keterangan mutasi...")}
                                                                     />
                                                                 </td>
                                                                 
                                                                 {/* Aksi */}
-                                                                <td className="px-2 py-0.5 text-xs text-center border-l border-gray-200 dark:border-dark-border">
+                                                                <td className="px-3 py-3 text-sm text-center border-l border-gray-200 dark:border-dark-border">
                                                                     {String(item._replicaIndex).startsWith('warehouse') && !isFullyMutated && (
                                                                         <div className="flex gap-1 justify-center">
                                                                             {String(item._replicaIndex) === 'warehouse' ? (
                                                                                 <Button
                                                                                     onClick={() => handleAddMultiMutation(pkgIndex, itemIdx)}
                                                                                     variant="primary"
-                                                                                    className="!p-1"
+                                                                                    className="!p-2 min-h-11 min-w-11"
                                                                                     title={t("Tambah Lokasi Mutasi")}
                                                                                 >
-                                                                                    <Plus className="w-3 h-3" />
+                                                                                    <Plus className="w-5 h-5" />
                                                                                 </Button>
                                                                             ) : (
                                                                                 <Button
                                                                                     onClick={() => handleRemoveMultiMutation(pkgIndex, itemIdx)}
                                                                                     variant="danger"
-                                                                                    className="!p-1"
+                                                                                    className="!p-2 min-h-11 min-w-11"
                                                                                     title={t("Hapus Baris")}
                                                                                 >
-                                                                                    <Trash2 className="w-3 h-3" />
+                                                                                    <Trash2 className="w-5 h-5" />
                                                                                 </Button>
                                                                             )}
                                                                         </div>

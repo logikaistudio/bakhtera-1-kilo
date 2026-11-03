@@ -2557,10 +2557,23 @@ export const DataProvider = ({ children }) => {
 
         if (error) {
             console.error('Error updating inventory:', error);
-            alert('Failed to update inventory');
-            return;
+            alert(`Gagal memperbarui inventaris: ${error.message}`);
+            return false;
         }
-        setWarehouseInventory(prev => prev.map(i => i.id === id ? { ...i, ...updatedInventory } : i));
+        setWarehouseInventory(prev => prev.map(i => i.id === id ? {
+            ...i,
+            ...updatedInventory,
+            pengajuanNumber: updatedInventory.pengajuan_number ?? i.pengajuanNumber,
+            bcDocumentNumber: updatedInventory.bc_document_number ?? i.bcDocumentNumber,
+            packageNumber: updatedInventory.package_number ?? i.packageNumber,
+            itemCode: updatedInventory.item_code ?? i.itemCode,
+            itemName: updatedInventory.item_name ?? i.itemName,
+            assetName: updatedInventory.asset_name ?? i.assetName,
+            currentStock: updatedInventory.quantity ?? i.currentStock,
+            entryDate: updatedInventory.entry_date ?? i.entryDate,
+            submissionDate: updatedInventory.submission_date ?? i.submissionDate
+        } : i));
+        return true;
     };
 
     const deleteWarehouseInventory = async (id) => {
