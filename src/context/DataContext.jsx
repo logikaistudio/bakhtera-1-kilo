@@ -2195,51 +2195,58 @@ export const DataProvider = ({ children }) => {
 
     // Warehouse Inventory helper function
     const updateInventoryStock = async (assetId, assetName, quantity, unit, type, transactionId, value) => {
-        // Query DB directly first for source of truth
-        let { data: existingInventory, error } = await supabase
+        const { data: existingInventory, error } = await supabase
             .from('freight_warehouse')
             .select('*')
             .eq('item_code', assetId)
-            .single();
+            .limit(1)
+            .maybeSingle();
 
-        // Fallback to local state if DB query fails or returns nothing
-        if (!existingInventory && !error) {
-            existingInventory = warehouseInventory.find(i => i.assetId === assetId);
+        if (error) {
+            console.error('Error reading warehouse stock:', error);
+            throw error;
         }
 
-        const existingStock = existingInventory ? (existingInventory.current_stock ?? existingInventory.currentStock ?? 0) : 0;
-        const existsId = existingInventory ? existingInventory.id : null;
-        const existingMovements = existingInventory ? (existingInventory.movements || []) : [];
+        const inventory = existingInventory || warehouseInventory.find(i => i.assetId === assetId);
+        const stockChange = Number(quantity) || 0;
+        if (stockChange === 0) return true;
+
+        const existingStock = inventory ? Number(inventory.quantity ?? inventory.current_stock ?? inventory.currentStock ?? 0) : 0;
+        const existsId = inventory ? inventory.id : null;
 
         if (existsId) {
-            const newStock = Number(existingStock) + Number(quantity);
+            const newStock = existingStock + stockChange;
+            if (newStock < 0) throw new Error(`Stok gudang ${assetName || assetId} tidak mencukupi.`);
             const movement = {
                 type,
                 transactionId,
-                quantity: Math.abs(quantity),
+                quantity: Math.abs(stockChange),
                 date: new Date().toISOString(),
             };
 
             const updatedDataPayload = {
                 quantity: newStock,
-                value: value || existingInventory.value,
+                value: value || inventory.value,
                 updated_at: new Date().toISOString()
             };
 
             const { error: updateError } = await supabase.from('freight_warehouse').update(updatedDataPayload).eq('id', existsId);
 
-            if (!updateError) {
-                setWarehouseInventory(prev => prev.map(i => i.id === existsId ? { ...i, currentStock: newStock, lastUpdated: new Date().toISOString(), movements: [...(i.movements || []), movement] } : i));
-            } else {
+            if (updateError) {
                 console.error("Error updating warehouse stock:", updateError);
+                throw updateError;
             }
-        } else if (quantity > 0) {
+
+            setWarehouseInventory(prev => prev.map(i => i.id === existsId ? { ...i, quantity: newStock, currentStock: newStock, lastUpdated: new Date().toISOString(), movements: [...(i.movements || []), movement] } : i));
+            return true;
+        } else if (stockChange > 0) {
             // Create new inventory item
             const newInventoryState = {
                 id: Date.now().toString(),
                 assetId: assetId,
                 assetName: assetName,
-                currentStock: quantity,
+                quantity: stockChange,
+                currentStock: stockChange,
                 unit: unit,
                 minStock: 10,
                 maxStock: 1000,
@@ -2259,7 +2266,7 @@ export const DataProvider = ({ children }) => {
                 id: newInventoryState.id,
                 item_code: newInventoryState.assetId,
                 asset_name: newInventoryState.assetName,
-                quantity: newInventoryState.currentStock,
+                quantity: newInventoryState.quantity,
                 unit: newInventoryState.unit,
                 value: newInventoryState.value,
                 location: JSON.stringify({ zone: newInventoryState.location }),
@@ -2269,12 +2276,15 @@ export const DataProvider = ({ children }) => {
 
             const { error: insertError } = await supabase.from('freight_warehouse').insert([newInventoryPayload]);
 
-            if (!insertError) {
-                setWarehouseInventory(prev => [...prev, newInventoryState]);
-            } else {
+            if (insertError) {
                 console.error("Error creating warehouse inventory:", insertError);
+                throw insertError;
             }
+            setWarehouseInventory(prev => [...prev, newInventoryState]);
+            return true;
         }
+
+        throw new Error(`Data inventaris ${assetName || assetId} tidak ditemukan.`);
     };
 
     // ========== ITEM CHECKOUT (Mark items as checked out from warehouse) ==========

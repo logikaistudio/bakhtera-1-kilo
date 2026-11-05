@@ -24,6 +24,9 @@ const GoodsMovement = () => {
     const [isEditMode, setIsEditMode] = useState(false);
     const [isSavingLocation, setIsSavingLocation] = useState(false);
     const [locationForm, setLocationForm] = useState({ destination: '', storageLocation: '' });
+    const [isRemutationMode, setIsRemutationMode] = useState(false);
+    const [isSavingRemutation, setIsSavingRemutation] = useState(false);
+    const [remutationForm, setRemutationForm] = useState({ quantity: '0', date: '', time: '', pic: '', remarks: '', storageLocation: '' });
     const debugMode = (typeof window !== 'undefined') && new URLSearchParams(window.location.search).get('debug') === '1';
 
     // Filter mutation logs based on search
@@ -55,6 +58,7 @@ const GoodsMovement = () => {
 
     const handleOpenLog = async (log) => {
         setIsEditMode(false);
+        setIsRemutationMode(false);
         setSelectedLog({ ...log, documents: [], documentsLoading: true });
         try {
             const details = await fetchMutationLogDetails(log.id);
@@ -67,8 +71,41 @@ const GoodsMovement = () => {
         }
     };
 
+    const getRemutationInfo = (log) => {
+        const isWarehouseLocation = (location) => ['warehouse', 'gudang'].includes(String(location || '').trim().toLowerCase());
+        const normalizeLocation = (location) => String(location || '').trim().toLowerCase();
+        const sourceLocation = normalizeLocation(log.destination);
+        const relatedRemutations = mutationLogs.filter(mutation => {
+            if (mutation.id === log.id ||
+                mutation.pengajuanNumber !== log.pengajuanNumber ||
+                mutation.itemCode !== log.itemCode ||
+                (mutation.packageNumber || '') !== (log.packageNumber || '') ||
+                (mutation.serialNumber || '') !== (log.serialNumber || '')) return false;
+
+            const isReturn = normalizeLocation(mutation.origin) === sourceLocation && isWarehouseLocation(mutation.destination);
+            const isCorrection = isWarehouseLocation(mutation.origin) && normalizeLocation(mutation.destination) === sourceLocation;
+            return isReturn || isCorrection;
+        });
+
+        const totalRemutated = relatedRemutations.reduce((total, mutation) => {
+            const quantity = Number(mutation.mutatedQty) || 0;
+            return total + (isWarehouseLocation(mutation.destination) ? quantity : -Math.abs(quantity));
+        }, 0);
+        const cappedRemutated = Math.min(Math.max(0, totalRemutated), Number(log.mutatedQty) || 0);
+        const lastRemutationLog = [...relatedRemutations].sort((a, b) =>
+            new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date)
+        )[0] || null;
+
+        return {
+            totalRemutated: cappedRemutated,
+            remainingAtLocation: Math.max(0, (Number(log.mutatedQty) || 0) - cappedRemutated),
+            lastRemutationLog
+        };
+    };
+
     const handleStartLocationEdit = () => {
         if (!hasEdit || !selectedLog) return;
+        setIsRemutationMode(false);
         setLocationForm({
             destination: selectedLog.destination || '',
             storageLocation: selectedLog.storageLocation || ''
@@ -92,6 +129,130 @@ const GoodsMovement = () => {
             alert(t('Gagal memperbarui lokasi mutasi'));
         } finally {
             setIsSavingLocation(false);
+        }
+    };
+
+    const handleStartRemutation = (log) => {
+        if (!(hasCreate || hasEdit)) return;
+        const { totalRemutated, lastRemutationLog } = getRemutationInfo(log);
+        const now = new Date();
+        setIsEditMode(false);
+        setRemutationForm({
+            quantity: String(totalRemutated),
+            date: lastRemutationLog?.date || now.toISOString().split('T')[0],
+            time: lastRemutationLog?.time || now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false }),
+            pic: lastRemutationLog?.pic || '',
+            remarks: lastRemutationLog?.remarks || '',
+            storageLocation: lastRemutationLog?.storageLocation || ''
+        });
+        setIsRemutationMode(true);
+    };
+
+    const handleSaveRemutation = async () => {
+        if (!(hasCreate || hasEdit) || !selectedLog || isSavingRemutation) return;
+        const targetQuantity = Number(remutationForm.quantity);
+        const originalQuantity = Number(selectedLog.mutatedQty) || 0;
+        if (!Number.isInteger(targetQuantity) || targetQuantity < 0 || targetQuantity > originalQuantity) {
+            alert(t(`Jumlah remutasi harus antara 0 dan ${originalQuantity}`));
+            return;
+        }
+
+        const { totalRemutated, lastRemutationLog } = getRemutationInfo(selectedLog);
+        const quantityDelta = targetQuantity - totalRemutated;
+        if (quantityDelta === 0 && !lastRemutationLog) {
+            alert(t('Tidak ada perubahan remutasi untuk disimpan'));
+            return;
+        }
+        if (quantityDelta !== 0 && !remutationForm.pic.trim()) {
+            alert(t('PIC remutasi wajib diisi'));
+            return;
+        }
+        if (quantityDelta < 0 && !window.confirm(t(`Jumlah remutasi akan dikurangi ${Math.abs(quantityDelta)} unit. Lanjutkan?`))) return;
+
+        setIsSavingRemutation(true);
+        const sourceLocation = selectedLog.destination;
+        const transactionId = `REM-${Date.now()}`;
+        let adjustedStock = false;
+        try {
+            if (quantityDelta === 0) {
+                const lastRemutationDetails = await fetchMutationLogDetails(lastRemutationLog.id);
+                await updateMutationLog(lastRemutationLog.id, {
+                    ...lastRemutationDetails,
+                    date: remutationForm.date,
+                    time: remutationForm.time,
+                    pic: remutationForm.pic.trim(),
+                    remarks: remutationForm.remarks.trim(),
+                    storageLocation: remutationForm.storageLocation.trim()
+                });
+            } else {
+                const isReturningToWarehouse = quantityDelta > 0;
+                const stockDelta = quantityDelta;
+                const hasRecordedRemaining = selectedLog.remainingStock !== null && selectedLog.remainingStock !== undefined;
+                const warehouseBalanceBeforeReturns = hasRecordedRemaining
+                    ? Number(selectedLog.remainingStock) || 0
+                    : Math.max(0, Number(selectedLog.totalStock) - originalQuantity);
+                const newMutation = {
+                    pengajuanId: selectedLog.pengajuanId || null,
+                    pengajuanNumber: selectedLog.pengajuanNumber,
+                    bcDocumentNumber: selectedLog.bcDocumentNumber,
+                    packageNumber: selectedLog.packageNumber,
+                    itemCode: selectedLog.itemCode,
+                    itemName: selectedLog.itemName,
+                    serialNumber: selectedLog.serialNumber,
+                    totalStock: selectedLog.totalStock,
+                    origin: isReturningToWarehouse ? sourceLocation : 'Gudang',
+                    destination: isReturningToWarehouse ? 'Gudang' : sourceLocation,
+                    mutatedQty: Math.abs(quantityDelta),
+                    remainingStock: warehouseBalanceBeforeReturns + targetQuantity,
+                    date: remutationForm.date,
+                    time: remutationForm.time,
+                    pic: remutationForm.pic.trim(),
+                    remarks: remutationForm.remarks.trim() || (isReturningToWarehouse
+                        ? `Remutasi ke Gudang: ${quantityDelta} unit`
+                        : `Koreksi remutasi: ${Math.abs(quantityDelta)} unit dikembalikan ke ${sourceLocation}`),
+                    condition: selectedLog.condition || 'Baik',
+                    uom: selectedLog.uom || 'pcs',
+                    storageLocation: remutationForm.storageLocation.trim()
+                };
+
+                await updateInventoryStock(
+                    selectedLog.itemCode,
+                    selectedLog.itemName,
+                    stockDelta,
+                    selectedLog.uom || 'pcs',
+                    isReturningToWarehouse ? 'remutation' : 'remutation-correction',
+                    transactionId,
+                    0
+                );
+                adjustedStock = true;
+                await addMutationLog(newMutation);
+            }
+
+            setIsRemutationMode(false);
+            setSelectedLog(null);
+            alert(t('Data remutasi berhasil disimpan'));
+        } catch (error) {
+            console.error('Error saving remutation:', error);
+            if (adjustedStock) {
+                try {
+                    await updateInventoryStock(
+                        selectedLog.itemCode,
+                        selectedLog.itemName,
+                        -quantityDelta,
+                        selectedLog.uom || 'pcs',
+                        'remutation-rollback',
+                        transactionId,
+                        0
+                    );
+                } catch (rollbackError) {
+                    console.error('Failed to roll back warehouse stock after remutation error:', rollbackError);
+                    alert(t('Log gagal disimpan dan stok gagal dikembalikan. Perlu rekonsiliasi stok manual.'));
+                    return;
+                }
+            }
+            alert(`${t('Gagal menyimpan remutasi')}: ${error.message || error}`);
+        } finally {
+            setIsSavingRemutation(false);
         }
     };
 
@@ -543,6 +704,10 @@ const GoodsMovement = () => {
                     ...(selectedLog.destination ? [selectedLog.destination] : []),
                     ...LOCATION_OPTIONS.map(option => option.value)
                 ])];
+                const remutationInfo = getRemutationInfo(selectedLog);
+                const isWarehouseDestination = ['warehouse', 'gudang'].includes(String(selectedLog.destination || '').trim().toLowerCase());
+                const canRemutate = (hasCreate || hasEdit) && !isWarehouseDestination &&
+                    (remutationInfo.remainingAtLocation > 0 || remutationInfo.totalRemutated > 0);
 
                 return (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -749,6 +914,97 @@ const GoodsMovement = () => {
                                         </label>
                                     </div>
                                 </div>
+
+                                {canRemutate && (
+                                    <div className="mt-4 p-4 rounded-lg border border-green-200 bg-white">
+                                        <div className="flex flex-wrap items-center gap-3 justify-between">
+                                            <div>
+                                                <h4 className="font-semibold text-gray-800">{t('Remutasi ke Gudang')}</h4>
+                                                <p className="text-sm text-gray-600">
+                                                    {t('Sudah kembali:')} {remutationInfo.totalRemutated} / {selectedLog.mutatedQty || 0} {selectedLog.uom || 'pcs'}
+                                                    {' · '}{t('Sisa di lokasi:')} {remutationInfo.remainingAtLocation} {selectedLog.uom || 'pcs'}
+                                                </p>
+                                            </div>
+                                            <button
+                                                onClick={() => isRemutationMode ? setIsRemutationMode(false) : handleStartRemutation(selectedLog)}
+                                                disabled={isSavingRemutation}
+                                                className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-4 py-2 rounded text-sm font-medium"
+                                            >
+                                                {isRemutationMode ? t('Batal') : t(remutationInfo.totalRemutated > 0 ? 'Edit Remutasi' : 'Mulai Remutasi')}
+                                            </button>
+                                        </div>
+
+                                        {isRemutationMode && (
+                                            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                <label className="text-sm text-gray-700">
+                                                    <span className="block mb-1 font-medium">{t('Total Kembali ke Gudang')}</span>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        max={selectedLog.mutatedQty || 0}
+                                                        step="1"
+                                                        value={remutationForm.quantity}
+                                                        onChange={event => setRemutationForm(current => ({ ...current, quantity: event.target.value }))}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900"
+                                                    />
+                                                </label>
+                                                <label className="text-sm text-gray-700">
+                                                    <span className="block mb-1 font-medium">{t('Tanggal Remutasi')}</span>
+                                                    <input
+                                                        type="date"
+                                                        value={remutationForm.date}
+                                                        onChange={event => setRemutationForm(current => ({ ...current, date: event.target.value }))}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900"
+                                                    />
+                                                </label>
+                                                <label className="text-sm text-gray-700">
+                                                    <span className="block mb-1 font-medium">{t('Jam Remutasi')}</span>
+                                                    <input
+                                                        type="time"
+                                                        value={remutationForm.time}
+                                                        onChange={event => setRemutationForm(current => ({ ...current, time: event.target.value }))}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900"
+                                                    />
+                                                </label>
+                                                <label className="text-sm text-gray-700">
+                                                    <span className="block mb-1 font-medium">PIC</span>
+                                                    <input
+                                                        value={remutationForm.pic}
+                                                        onChange={event => setRemutationForm(current => ({ ...current, pic: event.target.value }))}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900"
+                                                    />
+                                                </label>
+                                                <label className="text-sm text-gray-700">
+                                                    <span className="block mb-1 font-medium">{t('Lokasi Penyimpanan')}</span>
+                                                    <input
+                                                        value={remutationForm.storageLocation}
+                                                        onChange={event => setRemutationForm(current => ({ ...current, storageLocation: event.target.value }))}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900"
+                                                        placeholder={t('Contoh: Rak A-1')}
+                                                    />
+                                                </label>
+                                                <label className="text-sm text-gray-700 md:col-span-3">
+                                                    <span className="block mb-1 font-medium">{t('Keterangan')}</span>
+                                                    <textarea
+                                                        value={remutationForm.remarks}
+                                                        onChange={event => setRemutationForm(current => ({ ...current, remarks: event.target.value }))}
+                                                        rows={2}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900"
+                                                    />
+                                                </label>
+                                                <div className="md:col-span-3 flex justify-end">
+                                                    <button
+                                                        onClick={handleSaveRemutation}
+                                                        disabled={isSavingRemutation || !remutationForm.date || !remutationForm.time}
+                                                        className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-4 py-2 rounded text-sm font-medium"
+                                                    >
+                                                        {isSavingRemutation ? t('Menyimpan...') : t('Simpan Remutasi')}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
