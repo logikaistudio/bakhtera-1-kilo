@@ -7,6 +7,7 @@ import Button from '../../components/Common/Button';
 import { exportToCSV } from '../../utils/exportCSV';
 import { exportToXLS } from '../../utils/exportXLS';
 import { useLanguage } from '../../i18n/LanguageContext';
+import { LOCATION_OPTIONS } from '../../constants/locationOptions';
 
 const GoodsMovement = () => {
     const { t } = useLanguage();
@@ -22,7 +23,7 @@ const GoodsMovement = () => {
     const [selectedLog, setSelectedLog] = useState(null);
     const [isEditMode, setIsEditMode] = useState(false);
     const [isSavingLocation, setIsSavingLocation] = useState(false);
-    const [locationForm, setLocationForm] = useState({ destination: '', mutationLocation: 'warehouse', storageLocation: '' });
+    const [locationForm, setLocationForm] = useState({ destination: '', storageLocation: '' });
     const debugMode = (typeof window !== 'undefined') && new URLSearchParams(window.location.search).get('debug') === '1';
 
     // Filter mutation logs based on search
@@ -68,14 +69,8 @@ const GoodsMovement = () => {
 
     const handleStartLocationEdit = () => {
         if (!hasEdit || !selectedLog) return;
-        const destination = selectedLog.destination || '';
-        const isWarehouse = ['warehouse', 'gudang'].includes(destination.trim().toLowerCase());
-        const isExhibition = destination && (isExhibitionLocation
-            ? isExhibitionLocation(destination)
-            : String(destination).toLowerCase().includes(String(exhibitionLocation || '').toLowerCase()));
         setLocationForm({
-            destination,
-            mutationLocation: selectedLog.mutationLocation || (isExhibition ? 'pameran' : isWarehouse ? 'warehouse' : 'outbound'),
+            destination: selectedLog.destination || '',
             storageLocation: selectedLog.storageLocation || ''
         });
         setIsEditMode(true);
@@ -88,7 +83,6 @@ const GoodsMovement = () => {
             const updatedLog = await updateMutationLog(selectedLog.id, {
                 ...selectedLog,
                 destination: locationForm.destination.trim(),
-                mutationLocation: locationForm.mutationLocation,
                 storageLocation: locationForm.storageLocation.trim()
             });
             setSelectedLog(current => current?.id === selectedLog.id ? { ...current, ...updatedLog } : current);
@@ -289,7 +283,15 @@ const GoodsMovement = () => {
     })();
 
     const renderTable = (data, title, icon, colorClass, emptyMessage) => {
-        const isAllInTableSelected = data.length > 0 && data.every(log => selectedIds.includes(log.id));
+        const getLogTimestamp = (log) => {
+            const value = log.createdAt || (log.date ? `${log.date}T${log.time || '00:00:00'}` : null);
+            const timestamp = value ? new Date(value).getTime() : 0;
+            return Number.isNaN(timestamp) ? 0 : timestamp;
+        };
+        const sortedData = [...data].sort((a, b) =>
+            getLogTimestamp(b) - getLogTimestamp(a) || String(b.id).localeCompare(String(a.id))
+        );
+        const isAllInTableSelected = sortedData.length > 0 && sortedData.every(log => selectedIds.includes(log.id));
 
         const toggleSelectAllInTable = () => {
             if (data.length === 0) return;
@@ -336,7 +338,7 @@ const GoodsMovement = () => {
                 </div>
             </div>
 
-            {data.length === 0 ? (
+            {sortedData.length === 0 ? (
                 <div className="p-12 text-center text-silver-dark">
                     <Package className="w-16 h-16 mx-auto mb-4 opacity-30" />
                     <p className="text-lg">{emptyMessage}</p>
@@ -371,7 +373,7 @@ const GoodsMovement = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-border">
-                            {data.map((log, idx) => {
+                            {sortedData.map((log, idx) => {
                                 const pengajuan = quotations.find(q => q.quotationNumber === log.pengajuanNumber || q.quotation_number === log.pengajuanNumber);
                                 const masukDate = pengajuan ? (pengajuan.submissionDate || pengajuan.submission_date || pengajuan.date) : null;
                                 const masukTime = pengajuan ? (pengajuan.approvedDate || pengajuan.approved_date) : null;
@@ -537,9 +539,10 @@ const GoodsMovement = () => {
 
             {/* Detail Modal - Combined Edit & Mutation */}
             {selectedLog && (() => {
-                const isOutbound = selectedLog.destination &&
-                    selectedLog.destination.toLowerCase() !== 'warehouse' &&
-                    selectedLog.destination.toLowerCase() !== 'gudang';
+                const destinationOptions = [...new Set([
+                    ...(selectedLog.destination ? [selectedLog.destination] : []),
+                    ...LOCATION_OPTIONS.map(option => option.value)
+                ])];
 
                 return (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -716,33 +719,22 @@ const GoodsMovement = () => {
                                     )}
                                 </div>
 
-                                {/* Status Info */}
+                                {/* Location details */}
                                 <div className="mt-4 p-3 rounded-lg border bg-white">
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                         <label className="text-sm text-gray-700">
-                                            <span className="block mb-1 font-medium">{t('Lokasi Tujuan')}</span>
-                                            {isEditMode ? (
-                                                <input
-                                                    value={locationForm.destination}
-                                                    onChange={event => setLocationForm(current => ({ ...current, destination: event.target.value }))}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900"
-                                                    placeholder={t('Contoh: Gudang, Pameran, atau lokasi lain')}
-                                                />
-                                            ) : <span className="text-gray-900 capitalize">{selectedLog.destination || '-'}</span>}
-                                        </label>
-                                        <label className="text-sm text-gray-700">
-                                            <span className="block mb-1 font-medium">{t('Kategori Mutasi')}</span>
+                                            <span className="block mb-1 font-medium">{t('Lokasi Mutasi')}</span>
                                             {isEditMode ? (
                                                 <select
-                                                    value={locationForm.mutationLocation}
-                                                    onChange={event => setLocationForm(current => ({ ...current, mutationLocation: event.target.value }))}
+                                                    value={locationForm.destination}
+                                                    onChange={event => setLocationForm(current => ({ ...current, destination: event.target.value }))}
                                                     className="w-full px-3 py-2 border border-gray-300 rounded bg-white text-gray-900"
                                                 >
-                                                    <option value="warehouse">Warehouse</option>
-                                                    <option value="pameran">Pameran</option>
-                                                    <option value="outbound">Outbound</option>
+                                                    {destinationOptions.map(location => (
+                                                        <option key={location} value={location}>{location}</option>
+                                                    ))}
                                                 </select>
-                                            ) : <span className="text-gray-900 capitalize">{selectedLog.mutationLocation || '-'}</span>}
+                                            ) : <span className="text-gray-900">{selectedLog.destination || '-'}</span>}
                                         </label>
                                         <label className="text-sm text-gray-700">
                                             <span className="block mb-1 font-medium">{t('Lokasi Penyimpanan')}</span>
@@ -756,11 +748,6 @@ const GoodsMovement = () => {
                                             ) : <span className="text-gray-900">{selectedLog.storageLocation || '-'}</span>}
                                         </label>
                                     </div>
-                                    {!isEditMode && (
-                                        <p className="text-gray-600 text-sm mt-3">
-                                            {isOutbound ? t('Item ini telah dimutasi keluar (Outbound/Pameran)') : t('Item ini adalah remutasi (sudah kembali ke Gudang)')}
-                                        </p>
-                                    )}
                                 </div>
                             </div>
                         </div>

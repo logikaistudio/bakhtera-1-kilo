@@ -258,13 +258,21 @@ export const DataProvider = ({ children }) => {
             remarks: log.remarks,
             documents: files,
             uom: log.uom || meta.uom || 'pcs',
-            mutationLocation: log.mutation_location || meta.mutationLocation,
+            mutationLocation: log.destination || meta.mutationLocation || log.mutation_location,
             storageLocation: log.storage_location || meta.storageLocation,
             sender: log.sender || meta.sender,
             createdAt: log.created_at,
             submissionDate: log.date,
             approvedDate: log.date
         };
+    };
+
+    const getMutationLocationCategory = (location) => {
+        const normalizedLocation = String(location || '').trim().toLowerCase();
+        if (['warehouse', 'gudang'].includes(normalizedLocation)) return 'warehouse';
+        if (normalizedLocation === 'outbound') return 'outbound';
+        if (normalizedLocation.includes('hall') || normalizedLocation.includes('pameran')) return 'pameran';
+        return null;
     };
 
     // Shared Helper: Map Inbound DB -> State (freight_inbound schema)
@@ -2355,6 +2363,7 @@ export const DataProvider = ({ children }) => {
                     remaining_stock: mutationData.remainingStock || 0,
                     origin: mutationData.origin || 'warehouse',
                     destination: mutationData.destination || 'warehouse',
+                    mutation_location: getMutationLocationCategory(mutationData.destination),
                     // condition is NOT in schema based on my read? Wait.
                     // Line 284: CREATE TABLE freight_mutation_logs
                     // Cols: id, pengajuan_id, ..., remarks, documents, created_at, updated_at
@@ -2367,7 +2376,7 @@ export const DataProvider = ({ children }) => {
                         files: Array.isArray(mutationData.documents) ? mutationData.documents : [],
                         sender: mutationData.sender,
                         uom: mutationData.uom || 'pcs',
-                        mutationLocation: mutationData.mutationLocation,
+                        mutationLocation: mutationData.destination || mutationData.mutationLocation,
                         storageLocation: mutationData.storageLocation,
                         packageNumber: mutationData.packageNumber,
                         hsCode: mutationData.hsCode,
@@ -2416,7 +2425,7 @@ export const DataProvider = ({ children }) => {
                 remarks: savedLog.remarks,
                 documents: files,
                 uom: savedLog.uom || meta.uom || 'pcs',
-                mutationLocation: savedLog.mutation_location || meta.mutationLocation,
+                mutationLocation: savedLog.destination || meta.mutationLocation || savedLog.mutation_location,
                 storageLocation: savedLog.storage_location || meta.storageLocation,
                 createdAt: savedLog.created_at
             };
@@ -2439,7 +2448,7 @@ export const DataProvider = ({ children }) => {
                 files: documents,
                 sender: updates.sender,
                 uom: updates.uom,
-                mutationLocation: updates.mutationLocation,
+                mutationLocation: updates.destination || updates.mutationLocation,
                 storageLocation: updates.storageLocation,
                 packageNumber: updates.packageNumber,
                 hsCode: updates.hsCode,
@@ -2447,22 +2456,34 @@ export const DataProvider = ({ children }) => {
             } : documents;
 
             // Update in Supabase
-            const { data, error } = await supabase
+            const basePayload = {
+                destination: updates.destination,
+                condition: updates.condition,
+                pic: updates.pic,
+                date: updates.date,
+                time: updates.time,
+                remarks: updates.remarks,
+                documents: documentsPayload,
+                updated_at: new Date().toISOString()
+            };
+            const updateQuery = (payload) => supabase
                 .from('freight_mutation_logs')
-                .update({
-                    destination: updates.destination,
-                    condition: updates.condition,
-                    pic: updates.pic,
-                    date: updates.date,
-                    time: updates.time,
-                    remarks: updates.remarks,
-                    mutation_location: updates.mutationLocation,
-                    storage_location: updates.storageLocation,
-                    documents: documentsPayload,
-                    updated_at: new Date().toISOString()
-                })
+                .update(payload)
                 .eq('id', id)
                 .select();
+            let { data, error } = await updateQuery({
+                ...basePayload,
+                mutation_location: getMutationLocationCategory(updates.destination),
+                storage_location: updates.storageLocation
+            });
+
+            const errorMessage = `${error?.message || ''} ${error?.details || ''}`.toLowerCase();
+            const missingLocationColumns = error &&
+                ['42703', 'PGRST204'].includes(error.code) &&
+                (errorMessage.includes('mutation_location') || errorMessage.includes('storage_location'));
+            if (missingLocationColumns) {
+                ({ data, error } = await updateQuery(basePayload));
+            }
 
             if (error) {
                 console.error('❌ Error updating mutation in Supabase:', error);
