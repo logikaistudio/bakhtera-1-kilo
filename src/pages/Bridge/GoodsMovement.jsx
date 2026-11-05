@@ -20,6 +20,9 @@ const GoodsMovement = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedIds, setSelectedIds] = useState([]);
     const [selectedLog, setSelectedLog] = useState(null);
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [isSavingLocation, setIsSavingLocation] = useState(false);
+    const [locationForm, setLocationForm] = useState({ destination: '', mutationLocation: 'warehouse', storageLocation: '' });
     const debugMode = (typeof window !== 'undefined') && new URLSearchParams(window.location.search).get('debug') === '1';
 
     // Filter mutation logs based on search
@@ -50,6 +53,7 @@ const GoodsMovement = () => {
     };
 
     const handleOpenLog = async (log) => {
+        setIsEditMode(false);
         setSelectedLog({ ...log, documents: [], documentsLoading: true });
         try {
             const details = await fetchMutationLogDetails(log.id);
@@ -59,6 +63,41 @@ const GoodsMovement = () => {
             setSelectedLog(current => current?.id === log.id
                 ? { ...current, documentsLoading: false, documentsLoadError: true }
                 : current);
+        }
+    };
+
+    const handleStartLocationEdit = () => {
+        if (!hasEdit || !selectedLog) return;
+        const destination = selectedLog.destination || '';
+        const isWarehouse = ['warehouse', 'gudang'].includes(destination.trim().toLowerCase());
+        const isExhibition = destination && (isExhibitionLocation
+            ? isExhibitionLocation(destination)
+            : String(destination).toLowerCase().includes(String(exhibitionLocation || '').toLowerCase()));
+        setLocationForm({
+            destination,
+            mutationLocation: selectedLog.mutationLocation || (isExhibition ? 'pameran' : isWarehouse ? 'warehouse' : 'outbound'),
+            storageLocation: selectedLog.storageLocation || ''
+        });
+        setIsEditMode(true);
+    };
+
+    const handleSaveLocation = async () => {
+        if (!hasEdit || !selectedLog || isSavingLocation) return;
+        setIsSavingLocation(true);
+        try {
+            const updatedLog = await updateMutationLog(selectedLog.id, {
+                ...selectedLog,
+                destination: locationForm.destination.trim(),
+                mutationLocation: locationForm.mutationLocation,
+                storageLocation: locationForm.storageLocation.trim()
+            });
+            setSelectedLog(current => current?.id === selectedLog.id ? { ...current, ...updatedLog } : current);
+            setIsEditMode(false);
+        } catch (error) {
+            console.error('Error updating mutation location:', error);
+            alert(t('Gagal memperbarui lokasi mutasi'));
+        } finally {
+            setIsSavingLocation(false);
         }
     };
 
@@ -512,8 +551,33 @@ const GoodsMovement = () => {
                                     <p className="text-sm text-white/90">{selectedLog.pengajuanNumber}</p>
                                 </div>
                                 <div className="flex gap-2">
+                                    {hasEdit && (isEditMode ? (
+                                        <>
+                                            <button
+                                                onClick={() => setIsEditMode(false)}
+                                                disabled={isSavingLocation}
+                                                className="bg-white/20 hover:bg-white/30 disabled:opacity-50 text-white px-4 py-2 rounded text-sm font-medium"
+                                            >
+                                                {t('Batal')}
+                                            </button>
+                                            <button
+                                                onClick={handleSaveLocation}
+                                                disabled={isSavingLocation || !locationForm.destination.trim()}
+                                                className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-4 py-2 rounded text-sm font-medium"
+                                            >
+                                                {isSavingLocation ? t('Menyimpan...') : t('Simpan Lokasi')}
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <button
+                                            onClick={handleStartLocationEdit}
+                                            className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded text-sm font-medium"
+                                        >
+                                            {t('Edit Lokasi')}
+                                        </button>
+                                    ))}
                                     <button
-                                        onClick={() => setSelectedLog(null)}
+                                        onClick={() => { setSelectedLog(null); setIsEditMode(false); }}
                                         className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm font-medium flex items-center gap-1"
                                     >
                                         {t("✕ Tutup")}
@@ -654,10 +718,48 @@ const GoodsMovement = () => {
 
                                 {/* Status Info */}
                                 <div className="mt-4 p-3 rounded-lg border bg-white">
-                                    {isOutbound ? (
-                                        <p className="text-blue-600 text-sm">{t("ℹ️ Item ini telah dimutasi keluar (Outbound/Pameran)")}</p>
-                                    ) : (
-                                        <p className="text-gray-600 text-sm">{t("✓ Item ini adalah remutasi (sudah kembali ke Gudang)")}</p>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        <label className="text-sm text-gray-700">
+                                            <span className="block mb-1 font-medium">{t('Lokasi Tujuan')}</span>
+                                            {isEditMode ? (
+                                                <input
+                                                    value={locationForm.destination}
+                                                    onChange={event => setLocationForm(current => ({ ...current, destination: event.target.value }))}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900"
+                                                    placeholder={t('Contoh: Gudang, Pameran, atau lokasi lain')}
+                                                />
+                                            ) : <span className="text-gray-900 capitalize">{selectedLog.destination || '-'}</span>}
+                                        </label>
+                                        <label className="text-sm text-gray-700">
+                                            <span className="block mb-1 font-medium">{t('Kategori Mutasi')}</span>
+                                            {isEditMode ? (
+                                                <select
+                                                    value={locationForm.mutationLocation}
+                                                    onChange={event => setLocationForm(current => ({ ...current, mutationLocation: event.target.value }))}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded bg-white text-gray-900"
+                                                >
+                                                    <option value="warehouse">Warehouse</option>
+                                                    <option value="pameran">Pameran</option>
+                                                    <option value="outbound">Outbound</option>
+                                                </select>
+                                            ) : <span className="text-gray-900 capitalize">{selectedLog.mutationLocation || '-'}</span>}
+                                        </label>
+                                        <label className="text-sm text-gray-700">
+                                            <span className="block mb-1 font-medium">{t('Lokasi Penyimpanan')}</span>
+                                            {isEditMode ? (
+                                                <input
+                                                    value={locationForm.storageLocation}
+                                                    onChange={event => setLocationForm(current => ({ ...current, storageLocation: event.target.value }))}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900"
+                                                    placeholder={t('Contoh: Rak A-1')}
+                                                />
+                                            ) : <span className="text-gray-900">{selectedLog.storageLocation || '-'}</span>}
+                                        </label>
+                                    </div>
+                                    {!isEditMode && (
+                                        <p className="text-gray-600 text-sm mt-3">
+                                            {isOutbound ? t('Item ini telah dimutasi keluar (Outbound/Pameran)') : t('Item ini adalah remutasi (sudah kembali ke Gudang)')}
+                                        </p>
                                     )}
                                 </div>
                             </div>

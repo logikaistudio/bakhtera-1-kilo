@@ -2434,6 +2434,18 @@ export const DataProvider = ({ children }) => {
 
     const updateMutationLog = async (id, updates) => {
         try {
+            const documents = updates.documents;
+            const documentsPayload = Array.isArray(documents) ? {
+                files: documents,
+                sender: updates.sender,
+                uom: updates.uom,
+                mutationLocation: updates.mutationLocation,
+                storageLocation: updates.storageLocation,
+                packageNumber: updates.packageNumber,
+                hsCode: updates.hsCode,
+                condition: updates.condition
+            } : documents;
+
             // Update in Supabase
             const { data, error } = await supabase
                 .from('freight_mutation_logs')
@@ -2444,7 +2456,9 @@ export const DataProvider = ({ children }) => {
                     date: updates.date,
                     time: updates.time,
                     remarks: updates.remarks,
-                    documents: updates.documents,
+                    mutation_location: updates.mutationLocation,
+                    storage_location: updates.storageLocation,
+                    documents: documentsPayload,
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', id)
@@ -2455,42 +2469,13 @@ export const DataProvider = ({ children }) => {
                 throw error;
             }
 
+            const savedLog = data?.[0];
+            if (!savedLog) throw new Error('Mutation log tidak ditemukan atau tidak dapat diperbarui.');
+
             console.log('✅ Mutation log updated in Supabase:', data);
 
             // Update local state
-            const savedLog = data[0];
-            const docs = savedLog.documents || {};
-            const isMeta = docs && !Array.isArray(docs);
-            const meta = isMeta ? docs : {};
-            const files = isMeta ? (docs.files || []) : (Array.isArray(docs) ? docs : []);
-
-            const formattedLog = {
-                id: savedLog.id?.toString(),
-                pengajuanId: savedLog.pengajuan_id,
-                pengajuanNumber: savedLog.pengajuan_number,
-                bcDocumentNumber: savedLog.bc_document_number,
-                packageNumber: savedLog.package_number || meta.packageNumber,
-                itemCode: savedLog.item_code,
-                itemName: savedLog.item_name,
-                assetName: savedLog.item_name,
-                hsCode: savedLog.hs_code || meta.hsCode,
-                totalStock: savedLog.total_stock,
-                mutatedQty: savedLog.mutated_qty,
-                remainingStock: savedLog.remaining_stock,
-                origin: savedLog.origin,
-                destination: savedLog.destination,
-                condition: savedLog.condition || meta.condition || 'Baik',
-                date: savedLog.date,
-                time: savedLog.time,
-                pic: savedLog.pic,
-                remarks: savedLog.remarks,
-                documents: files,
-                uom: savedLog.uom || meta.uom || 'pcs',
-                mutationLocation: savedLog.mutation_location || meta.mutationLocation,
-                storageLocation: savedLog.storage_location || meta.storageLocation,
-                sender: savedLog.sender || meta.sender,
-                createdAt: savedLog.created_at
-            };
+            const formattedLog = normalizeMutationLog(savedLog);
 
             setMutationLogs(prev => prev.map(log => log.id === id ? formattedLog : log));
 
