@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { getActiveDivision } from '../../utils/divisionContext';
-import { filterActiveBlinkJournalEntries } from '../../utils/blinkJournalIntegrity';
+import { fetchAllBlinkRows, fetchBlinkJournalEntries, filterActiveBlinkJournalEntries } from '../../utils/blinkJournalIntegrity';
 import { useLanguage } from '../../i18n/LanguageContext';
 
 const ProfitLoss = () => {
@@ -119,23 +119,12 @@ const ProfitLoss = () => {
             const queryEnd = `${targetYear}-${String(targetMonth).padStart(2, '0')}-${String(new Date(targetYear, targetMonth, 0).getDate()).padStart(2, '0')}`;
 
             // BUG FIX #2: Ambil juga entri yang menggunakan account_code (coa_id = null)
-            const [r1, r2] = await Promise.all([
-                supabase.from('blink_journal_entries')
-                    .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate, reference_type, reference_id, source, entry_type, journal_type')
-                    .eq('division', activeDivision)
-                    .not('coa_id', 'is', null)
-                    .gte('entry_date', queryStart).lte('entry_date', queryEnd),
-                supabase.from('blink_journal_entries')
-                    .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate, reference_type, reference_id, source, entry_type, journal_type')
-                    .eq('division', activeDivision)
-                    .is('coa_id', null)
-                    .gte('entry_date', queryStart).lte('entry_date', queryEnd)
-            ]);
-            if (r1.error) throw r1.error;
-            if (r2.error) throw r2.error;
-            const combined = [...(r1.data || []), ...(r2.data || [])];
-            const dedupedEntries = [...new Map(combined.map(r => [r.id, r])).values()];
-            const entries = await filterActiveBlinkJournalEntries(dedupedEntries, activeDivision);
+            const journalEntries = await fetchBlinkJournalEntries({
+                division: activeDivision,
+                startDate: queryStart,
+                endDate: queryEnd
+            });
+            const entries = await filterActiveBlinkJournalEntries(journalEntries, activeDivision);
 
             const idToCode = {};
             const coaMapByCode = {};
@@ -215,14 +204,15 @@ const ProfitLoss = () => {
                 return defaultRevenueAccount;
             };
 
-            const { data: invoiceRows, error: invoiceFallbackError } = await supabase
+            const invoiceRows = await fetchAllBlinkRows(() => supabase
                 .from('blink_invoices')
                 .select('id, invoice_date, status, subtotal, total_amount, invoice_items, currency, exchange_rate')
                 .eq('division', activeDivision)
                 .in('status', ['unpaid', 'paid', 'partially_paid', 'overdue'])
                 .gte('invoice_date', queryStart)
-                .lte('invoice_date', queryEnd);
-            if (invoiceFallbackError) throw invoiceFallbackError;
+                .lte('invoice_date', queryEnd)
+                .order('invoice_date', { ascending: true })
+                .order('id', { ascending: true }));
 
             (invoiceRows || []).forEach(invoice => {
                 if (postedRevenueInvoiceIds.has(String(invoice.id))) return;

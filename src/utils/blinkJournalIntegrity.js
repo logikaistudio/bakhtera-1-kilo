@@ -5,6 +5,7 @@ const PO_REF_TYPES = new Set(['po', 'ap_reversal']);
 const AP_REF_TYPES = new Set(['ap_payment']);
 const PAYMENT_REF_TYPES = new Set(['payment']);
 const TRANSACTIONAL_ENTRY_TYPES = new Set(['invoice', 'payment', 'bill_payment', 'purchase_order', 'cogs']);
+const PAGE_SIZE = 500;
 
 const cache = new Map();
 const CACHE_TTL_MS = 30 * 1000;
@@ -13,41 +14,68 @@ const getCacheKey = (division) => `blink-active-refs:${division || 'all'}`;
 
 const toIdSet = (rows) => new Set((rows || []).map((row) => String(row.id)));
 
+export const fetchAllBlinkRows = async (buildQuery) => {
+    const rows = [];
+    let offset = 0;
+
+    while (true) {
+        const { data, error } = await buildQuery().range(offset, offset + PAGE_SIZE - 1);
+        if (error) throw error;
+
+        const page = data || [];
+        rows.push(...page);
+        if (page.length < PAGE_SIZE) return rows;
+
+        offset += PAGE_SIZE;
+    }
+};
+
+export const fetchBlinkJournalEntries = ({ division, startDate, endDate }) => fetchAllBlinkRows(() => {
+    let query = supabase
+        .from('blink_journal_entries')
+        .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate, reference_type, reference_id, source, entry_type, journal_type')
+        .eq('division', division);
+
+    if (startDate) query = query.gte('entry_date', startDate);
+    if (endDate) query = query.lte('entry_date', endDate);
+
+    return query.order('entry_date', { ascending: true }).order('id', { ascending: true });
+});
+
 const fetchActiveReferenceSets = async (division) => {
     const [invRes, poRes, arRes, apRes, paymentRes] = await Promise.all([
-        supabase
+        fetchAllBlinkRows(() => supabase
             .from('blink_invoices')
             .select('id')
             .eq('division', division)
-            .neq('status', 'cancelled'),
-        supabase
+            .neq('status', 'cancelled')
+            .order('id', { ascending: true })),
+        fetchAllBlinkRows(() => supabase
             .from('blink_purchase_orders')
             .select('id')
             .eq('division', division)
-            .neq('status', 'cancelled'),
-        supabase
+            .neq('status', 'cancelled')
+            .order('id', { ascending: true })),
+        fetchAllBlinkRows(() => supabase
             .from('blink_ar_transactions')
-            .select('id'),
-        supabase
+            .select('id')
+            .order('id', { ascending: true })),
+        fetchAllBlinkRows(() => supabase
             .from('blink_ap_transactions')
-            .select('id'),
-        supabase
+            .select('id')
+            .order('id', { ascending: true })),
+        fetchAllBlinkRows(() => supabase
             .from('blink_payments')
-            .select('id'),
+            .select('id')
+            .order('id', { ascending: true })),
     ]);
 
-    if (invRes.error) throw invRes.error;
-    if (poRes.error) throw poRes.error;
-    if (arRes.error) throw arRes.error;
-    if (apRes.error) throw apRes.error;
-    if (paymentRes.error) throw paymentRes.error;
-
     return {
-        activeInvoiceIds: toIdSet(invRes.data),
-        activePOIds: toIdSet(poRes.data),
-        activeARIds: toIdSet(arRes.data),
-        activeAPIds: toIdSet(apRes.data),
-        activePaymentIds: toIdSet(paymentRes.data),
+        activeInvoiceIds: toIdSet(invRes),
+        activePOIds: toIdSet(poRes),
+        activeARIds: toIdSet(arRes),
+        activeAPIds: toIdSet(apRes),
+        activePaymentIds: toIdSet(paymentRes),
     };
 };
 

@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { getActiveDivision } from '../../utils/divisionContext';
-import { filterActiveBlinkJournalEntries } from '../../utils/blinkJournalIntegrity';
+import { fetchBlinkJournalEntries, filterActiveBlinkJournalEntries } from '../../utils/blinkJournalIntegrity';
 import { useLanguage } from '../../i18n/LanguageContext';
 
 const ProfitLossDetail = () => {
@@ -99,24 +99,12 @@ const ProfitLossDetail = () => {
             const queryEnd = new Date(targetYear, targetMonth, 0).toISOString().split('T')[0];
             const fetchStart = prevYear < targetYear ? `${prevYear}-12-01` : `${targetYear}-01-01`;
 
-            const [r1, r2] = await Promise.all([
-                supabase.from('blink_journal_entries')
-                    .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate, reference_type, reference_id, source, entry_type, journal_type')
-                    .eq('division', activeDivision)
-                    .not('coa_id', 'is', null)
-                    .gte('entry_date', fetchStart).lte('entry_date', queryEnd),
-                supabase.from('blink_journal_entries')
-                    .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate, reference_type, reference_id, source, entry_type, journal_type')
-                    .eq('division', activeDivision)
-                    .is('coa_id', null)
-                    .gte('entry_date', fetchStart).lte('entry_date', queryEnd)
-            ]);
-            if (r1.error) throw r1.error;
-            if (r2.error) throw r2.error;
-
-            const combined = [...(r1.data || []), ...(r2.data || [])];
-            const dedupedEntries = [...new Map(combined.map(r => [r.id, r])).values()];
-            const entries = await filterActiveBlinkJournalEntries(dedupedEntries, activeDivision);
+            const journalEntries = await fetchBlinkJournalEntries({
+                division: activeDivision,
+                startDate: fetchStart,
+                endDate: queryEnd
+            });
+            const entries = await filterActiveBlinkJournalEntries(journalEntries, activeDivision);
 
             const idToCode = {};
             const coaMapByCode = {};
