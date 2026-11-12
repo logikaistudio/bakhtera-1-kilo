@@ -185,7 +185,12 @@ const ProfitLoss = () => {
                 let val = 0;
                 if (prefix === '4' || prefix === '7' || prefix === '8') {
                     val = (credit - debit);
-                    if (prefix === '4' && e.entry_type === 'invoice' && ['ar', 'blink_invoice', 'invoice'].includes(e.reference_type) && e.reference_id) {
+                    const referenceType = String(e.reference_type || '').toLowerCase();
+                    const entryType = String(e.entry_type || '').toLowerCase();
+                    const isInvoiceRevenueEntry =
+                        ['ar', 'blink_invoice', 'invoice'].includes(referenceType) &&
+                        !['payment', 'bill_payment', 'purchase_order', 'cogs'].includes(entryType);
+                    if (prefix === '4' && isInvoiceRevenueEntry && e.reference_id) {
                         const invoiceId = String(e.reference_id);
                         postedRevenueInvoiceIds.add(invoiceId);
                         const postedRows = postedRevenueByInvoice.get(invoiceId) || [];
