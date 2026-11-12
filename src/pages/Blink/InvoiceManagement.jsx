@@ -459,9 +459,12 @@ const InvoiceManagement = () => {
                 },
                 invoice_items: quotation.service_items && quotation.service_items.length > 0
                     ? quotation.service_items.map(item => {
-                        const acc = (typeof revenueAccounts !== 'undefined' && revenueAccounts) ? revenueAccounts.find(a => a.code === item.itemCode) : null;
+                        const quotationCOACode = item.coa_code || item.itemCode;
+                        const selectedAccount = revenueAccounts.find(account => account.id === item.coa_id);
+                        const accountByCode = revenueAccounts.find(account => account.code === quotationCOACode);
+                        const acc = selectedAccount || accountByCode;
                         return {
-                            item_name: acc?.name || item.itemCode || item.name || item.service_name || 'Item',
+                            item_name: acc?.name || quotationCOACode || item.name || item.service_name || 'Item',
                             description: item.description || item.name || '',
                             qty: parseCurrency(item.quantity) || parseCurrency(item.qty) || 1,
                             unit: item.unit || 'Job',
@@ -471,8 +474,8 @@ const InvoiceManagement = () => {
                             tax_amount: typeof item.tax_amount !== 'undefined' ? Number(item.tax_amount) : 0,
                             tax_rate: typeof item.tax_rate !== 'undefined' ? Number(item.tax_rate) : 0,
                             currency: item.currency || quotation.currency || 'IDR',
-                            coa_id: acc?.id || item.coa_id || null,
-                            coa_code: acc?.code || item.itemCode || item.coa_code || null
+                            coa_id: item.coa_id || acc?.id || null,
+                            coa_code: selectedAccount?.code || accountByCode?.code || quotationCOACode || null
                         };
                     })
                     : [{

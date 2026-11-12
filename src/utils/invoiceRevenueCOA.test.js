@@ -19,7 +19,7 @@ test('default invoice revenue account prefers sales income over the generic inco
 test('invoice item description maps to a matching detailed sales account', () => {
     assert.equal(
         resolveInvoiceRevenueCOA(
-            { item_name: 'Ocean Freight', coa_id: 'income' },
+            { item_name: 'Ocean Freight' },
             accounts,
             accounts[1]
         )?.id,
@@ -27,14 +27,36 @@ test('invoice item description maps to a matching detailed sales account', () =>
     );
 });
 
-test('item description overrides the selected aggregate sales account', () => {
+test('selected quotation COA ID takes precedence over a conflicting item description', () => {
     assert.equal(
         resolveInvoiceRevenueCOA(
-            { item_name: 'Handling Fee', coa_id: 'sales' },
+            { item_name: 'Handling Fee', coa_id: 'ocean' },
             accounts,
             accounts[1]
         )?.id,
-        'handling'
+        'ocean'
+    );
+});
+
+test('selected quotation COA code takes precedence over a conflicting item description', () => {
+    assert.equal(
+        resolveInvoiceRevenueCOA(
+            { item_name: 'Handling Fee', coa_code: '4-01-301-0-1-00' },
+            accounts,
+            accounts[1]
+        )?.id,
+        'ocean'
+    );
+});
+
+test('selected quotation COA ID takes precedence over a conflicting COA code', () => {
+    assert.equal(
+        resolveInvoiceRevenueCOA(
+            { coa_id: 'ocean', coa_code: '4-01-202-0-1-00' },
+            accounts,
+            accounts[1]
+        )?.id,
+        'ocean'
     );
 });
 
@@ -47,7 +69,7 @@ test('freight invoice abbreviations resolve to the matching detailed accounts', 
 
     assert.equal(
         resolveInvoiceRevenueCOA({ description: 'THC - Invoice INV-001', coa_id: 'ocean' }, accountsWithMoreDetails, accountsWithMoreDetails[1])?.id,
-        'handling'
+        'ocean'
     );
     assert.equal(
         resolveInvoiceRevenueCOA({ description: 'AGENCY FEE - Invoice INV-001' }, accountsWithMoreDetails, accountsWithMoreDetails[1])?.id,
@@ -67,7 +89,7 @@ test('freight invoice abbreviations resolve to the matching detailed accounts', 
     );
     assert.equal(
         resolveInvoiceRevenueCOA({ description: 'INWARD MANIFEST FEE - Invoice INV-001', coa_id: 'sales' }, accountsWithMoreDetails, accountsWithMoreDetails[1])?.id,
-        'document'
+        'sales'
     );
 });
 
