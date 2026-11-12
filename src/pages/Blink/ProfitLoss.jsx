@@ -202,9 +202,10 @@ const ProfitLoss = () => {
             const defaultRevenueAccount = resolvedDefaultRevenueAccount
                 ? coaMapByCode[String(resolvedDefaultRevenueAccount.code || '').trim()] || null
                 : null;
+            const invoiceColumns = 'id, invoice_date, status, subtotal, total_amount, invoice_items, currency, exchange_rate';
             const invoiceRows = await fetchAllBlinkRows(() => supabase
                 .from('blink_invoices')
-                .select('id, invoice_date, status, subtotal, total_amount, invoice_items, currency, exchange_rate')
+                .select(invoiceColumns)
                 .eq('division', activeDivision)
                 .in('status', ['approved', 'sent', 'unpaid', 'paid', 'partially_paid', 'overdue'])
                 .gte('invoice_date', queryStart)
@@ -212,7 +213,22 @@ const ProfitLoss = () => {
                 .order('invoice_date', { ascending: true })
                 .order('id', { ascending: true }));
 
-            (invoiceRows || []).forEach(invoice => {
+            const invoiceRowsById = new Map((invoiceRows || []).map(invoice => [String(invoice.id), invoice]));
+            const postedInvoiceIds = [...postedRevenueByInvoice.keys()]
+                .filter(invoiceId => !invoiceRowsById.has(invoiceId));
+
+            for (let offset = 0; offset < postedInvoiceIds.length; offset += 100) {
+                const invoiceIdBatch = postedInvoiceIds.slice(offset, offset + 100);
+                const matchingPostedInvoices = await fetchAllBlinkRows(() => supabase
+                    .from('blink_invoices')
+                    .select(invoiceColumns)
+                    .in('id', invoiceIdBatch));
+                matchingPostedInvoices.forEach(invoice => {
+                    invoiceRowsById.set(String(invoice.id), invoice);
+                });
+            }
+
+            [...invoiceRowsById.values()].forEach(invoice => {
                 const invoiceId = String(invoice.id);
                 const postedRows = postedRevenueByInvoice.get(invoiceId) || [];
                 const allocations = getInvoiceRevenueAllocations(
