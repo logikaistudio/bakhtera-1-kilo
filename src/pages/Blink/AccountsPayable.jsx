@@ -846,6 +846,7 @@ const AccountsPayable = () => {
     const activeDivision = getActiveDivision();
     const [apTransactions, setAPTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState('');
     const [filter, setFilter] = useState('all');
     const location = useLocation();
     const [searchTerm, setSearchTerm] = useState(location.state?.searchTerm || '');
@@ -862,35 +863,49 @@ const AccountsPayable = () => {
         try {
             setLoading(true);
 
+            const scopeByDivision = (query) => {
+                if (activeDivision === 'blink') {
+                    return query.or('division.ilike.blink,division.is.null');
+                }
+                return query.ilike('division', activeDivision);
+            };
+
             // ── BLINK ONLY: Primary source = blink_ap_transactions ──────────
-            const [apResult, poRows] = await Promise.all([
-                fetchAllBlinkRows(() => supabase
+            const [apResult, poResult] = await Promise.all([
+                fetchAllBlinkRows(() => scopeByDivision(supabase
                     .from('blink_ap_transactions')
                     .select('*')
-                    .eq('division', activeDivision)
+                )
                     .order('bill_date', { ascending: false })
                     .order('id', { ascending: true })
                 ).then(data => ({ data, error: null }))
                     .catch(error => ({ data: [], error })),
-                fetchAllBlinkRows(() => supabase
+                fetchAllBlinkRows(() => scopeByDivision(supabase
                     .from('blink_purchase_orders')
                     .select('*')
-                    .eq('division', activeDivision)
+                )
                     .in('status', ['approved', 'received', 'paid'])
                     .order('po_date', { ascending: false })
-                    .order('id', { ascending: true }))
+                    .order('id', { ascending: true })
+                ).then(data => ({ data, error: null }))
+                    .catch(error => ({ data: [], error }))
             ]);
 
             if (apResult.error) {
                 console.warn('[Blink AP] blink_ap_transactions error; using approved PO fallback:', apResult.error.message);
             }
+            if (poResult.error) {
+                console.warn('[Blink AP] Failed to load approved PO fallback:', poResult.error.message);
+            }
+            const sourceErrors = [apResult.error, poResult.error].filter(Boolean);
+            setLoadError(sourceErrors.map(error => error.message || String(error)).join(' | '));
 
             const apRows = apResult.data || [];
             const existingPOIds = new Set(apRows.map(row => row.po_id).filter(Boolean).map(String));
             const existingPONumbers = new Set(apRows.map(row =>
                 String(row.po_number || '').trim().toLowerCase()
             ).filter(Boolean));
-            const missingPOs = (poRows || []).filter(po =>
+            const missingPOs = (poResult.data || []).filter(po =>
                 !existingPOIds.has(String(po.id))
                 && !existingPONumbers.has(String(po.po_number || '').trim().toLowerCase())
             );
@@ -962,6 +977,7 @@ const AccountsPayable = () => {
             setAPTransactions(updatedData);
         } catch (error) {
             console.error('Error fetching AP:', error);
+            setLoadError(error.message || String(error));
             setAPTransactions([]);
         } finally {
             setLoading(false);
@@ -1089,7 +1105,15 @@ const AccountsPayable = () => {
                 </div>
                 <Button onClick={handleExportXLS} icon={Download}>{t("Export to Excel")}</Button>
             </div>
-                    <p className="text-xs text-blue-300 mt-1">{t("Data ditampilkan sesuai divisi aktif:")} {activeDivision?.toUpperCase()}</p>
+            <p className="text-xs text-blue-300 mt-1">{t("Data ditampilkan sesuai divisi aktif:")} {activeDivision?.toUpperCase()}</p>
+            {loadError && (
+                <div className="glass-card p-4 rounded-lg border border-red-500/40 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <p className="text-sm text-red-300">
+                        {t("Unable to load all AP data:")} {loadError}
+                    </p>
+                    <Button variant="secondary" onClick={fetchAPTransactions}>{t("Retry")}</Button>
+                </div>
+            )}
 
             {/* Summary Cards - Currency Breakdown */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1257,7 +1281,6 @@ const AccountsPayable = () => {
                 const currRows = filteredAP.filter(ap =>
                     currency === 'IDR' ? ap.currency !== 'USD' : ap.currency === 'USD'
                 );
-                if (currRows.length === 0) return null;
 
                 const fmtAmt = (v) => currency === 'USD'
                     ? `$ ${Number(v).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`

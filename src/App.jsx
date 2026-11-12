@@ -235,6 +235,7 @@ function App() {
                     <Route path="/blink/finance/profit" element={<ProtectedRoute menuCode="blink_pnl"><ProfitAnalysis /></ProtectedRoute>} />
                     <Route path="/blink/approvals" element={<ProtectedRoute menuCode="blink_approval"><BlinkApproval scope="operations" /></ProtectedRoute>} />
                     <Route path="/blink/finance/approvals" element={<ProtectedRoute menuCode="blink_finance_approval" menuCodes={['blink_approval', 'blink_invoices', 'blink_finance']}><BlinkApproval scope="finance" /></ProtectedRoute>} />
+                    <Route path="/blink/finance/purchase-approvals" element={<ProtectedRoute menuCode="blink_purchase_approval" menuCodes={['blink_purchase_order', 'blink_approval']}><BlinkApproval scope="purchase" /></ProtectedRoute>} />
 
                     {/* Bridge Module */}
                     <Route path="/bridge" element={<ProtectedRoute menuCode="bridge_dashboard"><BridgeOverview /></ProtectedRoute>} />

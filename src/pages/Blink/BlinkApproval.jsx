@@ -18,7 +18,7 @@ import { useLanguage } from '../../i18n/LanguageContext';
  * This component handles BLINK MODULE approvals ONLY.
  * Completely isolated from Bridge approvals.
  * 
- * Two separate approval flows within Blink:
+ * BLINK approvals are separated by scope:
  * 
  * 1️⃣ SALES APPROVALS (blink_sales):
  *    - Quotations → Shipments
@@ -27,7 +27,9 @@ import { useLanguage } from '../../i18n/LanguageContext';
  * 
  * 2️⃣ OPERATIONS APPROVALS (blink_operations):
  *    - Shipments (for BL/AWB issuance)
- *    - Purchase Orders
+ *    - Quotations and other operational documents
+ * 3️⃣ PURCHASE APPROVALS:
+ *    - Purchase Orders submitted from BLINK Finance
  *    Data Source: blink_approval_history table (module = 'blink_operations')
  * 
  * Bridge Approvals are handled separately in:
@@ -216,6 +218,7 @@ const BlinkApproval = ({ scope = 'operations' }) => {
     const [rejectReason, setRejectReason] = useState('');
     const [showRejectInput, setShowRejectInput] = useState(false);
     const isFinanceScope = scope === 'finance';
+    const isPurchaseScope = scope === 'purchase';
 
     const normalizeServiceType = (value) => {
         const source = String(value || '').toLowerCase();
@@ -251,6 +254,7 @@ const BlinkApproval = ({ scope = 'operations' }) => {
 
     const resolveApprovalMenuCodes = () => {
         const division = getActiveDivision();
+        if (isPurchaseScope) return ['blink_purchase_approval', 'blink_purchase_order', 'blink_approval'];
         if (isFinanceScope) {
             if (division === 'cabang') return ['cabang_finance_approval', 'cabang_approval', 'cabang_invoices'];
             return ['blink_finance_approval', 'blink_approval', 'blink_invoices', 'blink_finance'];
@@ -289,7 +293,7 @@ const BlinkApproval = ({ scope = 'operations' }) => {
 
             // Fetch pending sales quotations for divisions that use sales quotation approval flow
             let salesQuotations = [];
-            if (!isFinanceScope && (division === 'bxpo' || division === 'cabang')) {
+            if (!isFinanceScope && !isPurchaseScope && (division === 'bxpo' || division === 'cabang')) {
                 const { data, error } = await supabase
                     .from('blink_sales_quotations')
                     .select('*')
@@ -301,7 +305,7 @@ const BlinkApproval = ({ scope = 'operations' }) => {
 
             // Fetch pending quotations
             let quotations = [];
-            if (!isFinanceScope) {
+            if (!isFinanceScope && !isPurchaseScope) {
                 const { data, error } = await supabase
                     .from('blink_quotations')
                     .select('*')
@@ -313,7 +317,7 @@ const BlinkApproval = ({ scope = 'operations' }) => {
 
             // Fetch pending Purchase Orders (filtered by division)
             let purchaseOrders = [];
-            if (!isFinanceScope) {
+            if (isPurchaseScope || (!isFinanceScope && division !== 'blink')) {
                 const { data, error } = await supabase
                     .from('blink_purchase_orders')
                     .select('*')
@@ -326,7 +330,7 @@ const BlinkApproval = ({ scope = 'operations' }) => {
 
             // Fetch pending Shipments
             let shipments = [];
-            if (!isFinanceScope) {
+            if (!isFinanceScope && !isPurchaseScope) {
                 const { data, error } = await supabase
                     .from('blink_shipments')
                     .select('*')
@@ -337,12 +341,14 @@ const BlinkApproval = ({ scope = 'operations' }) => {
             }
 
             // Fetch pending Invoices (filtered by division)
-            const { data: invoices, error: invErr } = await supabase
-                .from('blink_invoices')
-                .select('*')
-                .in('status', ['submitted', 'manager_approval', 'pending', 'pending_approval'])
-                .eq('division', division)
-                .order('created_at', { ascending: false });
+            const { data: invoices, error: invErr } = isPurchaseScope
+                ? { data: [], error: null }
+                : await supabase
+                    .from('blink_invoices')
+                    .select('*')
+                    .in('status', ['submitted', 'manager_approval', 'pending', 'pending_approval'])
+                    .eq('division', division)
+                    .order('created_at', { ascending: false });
             if (invErr) console.error('Error fetching invoices:', invErr);
 
             const mappedSalesQuotations = salesQuotations.map(sq => ({
@@ -460,7 +466,9 @@ const BlinkApproval = ({ scope = 'operations' }) => {
 
             const pendingSubmissions = isFinanceScope
                 ? [...mappedInvoices]
-                : [...mappedSalesQuotations, ...mappedShipments, ...mappedPOs, ...mappedQuotations];
+                : isPurchaseScope
+                    ? [...mappedPOs]
+                    : [...mappedSalesQuotations, ...mappedShipments, ...mappedPOs, ...mappedQuotations];
             setSubmissions(pendingSubmissions);
 
             // Fetch History - ISOLATED for Blink / BXPO
@@ -501,7 +509,7 @@ const BlinkApproval = ({ scope = 'operations' }) => {
 
             // Fetch cancellation activity as history fallback by scope.
             const [cancelShipRes, cancelPoRes, cancelInvRes, cancelQuotRes, cancelSalesQuotRes] = await Promise.all([
-                isFinanceScope
+                isFinanceScope || isPurchaseScope
                     ? Promise.resolve({ data: [], error: null })
                     : supabase
                         .from('blink_shipments')
@@ -514,12 +522,14 @@ const BlinkApproval = ({ scope = 'operations' }) => {
                         .select('id, po_number, updated_at, created_at, rejection_reason')
                         .eq('status', 'cancelled')
                         .eq('division', division),
-                supabase
-                    .from('blink_invoices')
-                    .select('id, invoice_number, updated_at, created_at, rejection_reason')
-                    .eq('status', 'cancelled')
-                    .eq('division', division),
-                isFinanceScope
+                isPurchaseScope
+                    ? Promise.resolve({ data: [], error: null })
+                    : supabase
+                        .from('blink_invoices')
+                        .select('id, invoice_number, updated_at, created_at, rejection_reason')
+                        .eq('status', 'cancelled')
+                        .eq('division', division),
+                isFinanceScope || isPurchaseScope
                     ? Promise.resolve({ data: [], error: null })
                     : supabase
                         .from('blink_quotations')
@@ -602,7 +612,7 @@ const BlinkApproval = ({ scope = 'operations' }) => {
 
             // Fallback history from document statuses by scope.
             const [histShipRes, histPoRes, histInvRes, histQuotRes] = await Promise.all([
-                isFinanceScope
+                isFinanceScope || isPurchaseScope
                     ? Promise.resolve({ data: [], error: null })
                     : supabase
                         .from('blink_shipments')
@@ -616,16 +626,19 @@ const BlinkApproval = ({ scope = 'operations' }) => {
                         .from('blink_purchase_orders')
                         .select('id, po_number, status, updated_at, created_at, rejection_reason')
                         .or('status.in.(approved,cancelled),rejection_reason.not.is.null')
+                        .eq('division', division)
                         .order('updated_at', { ascending: false })
                         .limit(200),
-                supabase
-                    .from('blink_invoices')
-                    .select('id, invoice_number, status, updated_at, created_at, rejection_reason, division')
-                    .eq('division', division)
-                    .in('status', ['approved', 'unpaid', 'paid', 'partially_paid', 'overdue', 'rejected', 'cancelled'])
-                    .order('updated_at', { ascending: false })
-                    .limit(200),
-                isFinanceScope
+                isPurchaseScope
+                    ? Promise.resolve({ data: [], error: null })
+                    : supabase
+                        .from('blink_invoices')
+                        .select('id, invoice_number, status, updated_at, created_at, rejection_reason, division')
+                        .eq('division', division)
+                        .in('status', ['approved', 'unpaid', 'paid', 'partially_paid', 'overdue', 'rejected', 'cancelled'])
+                        .order('updated_at', { ascending: false })
+                        .limit(200),
+                isFinanceScope || isPurchaseScope
                     ? Promise.resolve({ data: [], error: null })
                     : supabase
                         .from('blink_quotations')
@@ -750,7 +763,9 @@ const BlinkApproval = ({ scope = 'operations' }) => {
             const mergedHistory = [...historyData, ...cancellationLogs, ...derivedLogs]
                 .filter((row) => {
                     const docType = String(row.document_type || '').toLowerCase();
-                    return isFinanceScope ? docType === 'invoice' : docType !== 'invoice';
+                    if (isPurchaseScope) return docType === 'po';
+                    if (isFinanceScope) return docType === 'invoice';
+                    return docType !== 'invoice' && !(division === 'blink' && docType === 'po');
                 })
                 .sort((a, b) => {
                     const aDate = new Date(a.approved_at || a.created_at || 0).getTime();
@@ -1205,6 +1220,7 @@ const BlinkApproval = ({ scope = 'operations' }) => {
             setShowDetailModal(false);
             setSelectedItem(null);
             fetchSubmissions();
+            window.dispatchEvent(new Event('blink_approval_updated'));
             
             alert(`✅ ${item.typeLabel} ${item.refNumber} berhasil disetujui!`);
         } catch (err) {
@@ -1272,6 +1288,7 @@ const BlinkApproval = ({ scope = 'operations' }) => {
             setRejectReason('');
             setShowRejectInput(false);
             fetchSubmissions();
+            window.dispatchEvent(new Event('blink_approval_updated'));
         } catch (err) {
             alert('Failed to reject: ' + err.message);
         } finally {
@@ -1319,13 +1336,19 @@ const BlinkApproval = ({ scope = 'operations' }) => {
                     <div className="flex items-center gap-3">
                         <h1 style={{ color: '#111827' }} className="text-2xl font-bold flex items-center gap-2">
                             <CheckCircle className="w-6 h-6 text-blue-600" />
-                            {isFinanceScope ? 'Finance Approval Center' : 'Operation Approval Center'}
+                            {isPurchaseScope
+                                ? 'Purchase Approval Center (PO)'
+                                : isFinanceScope
+                                    ? 'Finance Approval Center'
+                                    : 'Operation Approval Center'}
                         </h1>
                     </div>
                     <p style={{ color: '#4B5563' }} className="text-sm mt-1">
-                        {isFinanceScope
-                            ? 'Manage all invoice approval submissions in the BLINK finance module'
-                            : 'Manage all operational document submissions in the BLINK module'}
+                        {isPurchaseScope
+                            ? 'Review and approve purchase orders submitted from BLINK Finance'
+                            : isFinanceScope
+                                ? 'Manage all invoice approval submissions in the BLINK finance module'
+                                : 'Manage all operational document submissions in the BLINK module'}
                     </p>
                 </div>
                 <div className="flex items-center gap-3 bg-white p-1 rounded-xl shadow-sm border border-gray-100">
@@ -1489,8 +1512,13 @@ const BlinkApproval = ({ scope = 'operations' }) => {
                 /* HISTORY TAB */
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                     <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                        <h2 className="font-semibold text-gray-800">{t("Historical Operational Approvals")}</h2>
-                                                <h2 className="font-semibold text-gray-800">{isFinanceScope ? 'Historical Finance Approvals' : 'Historical Operational Approvals'}</h2>
+                        <h2 className="font-semibold text-gray-800">
+                            {isPurchaseScope
+                                ? 'Purchase Approval History'
+                                : isFinanceScope
+                                    ? 'Historical Finance Approvals'
+                                    : 'Historical Operational Approvals'}
+                        </h2>
                         <div className="text-sm text-gray-500">{t("Showing")} {historyLogs.length} {t("records")}</div>
                     </div>
                     {historyLogs.length === 0 ? (

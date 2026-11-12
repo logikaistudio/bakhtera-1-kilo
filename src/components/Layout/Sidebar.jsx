@@ -72,11 +72,13 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
     const [blinkOpsPendingCount, setBlinkOpsPendingCount] = React.useState(0);
     const [blinkSalesPendingCount, setBlinkSalesPendingCount] = React.useState(0);
     const [blinkFinancePendingCount, setBlinkFinancePendingCount] = React.useState(0);
+    const [blinkPurchasePendingCount, setBlinkPurchasePendingCount] = React.useState(0);
 
     const getApprovalBadgeCount = (itemObj = {}) => {
         const menuCode = itemObj.menuCode;
         const path = itemObj.path || '';
         if (menuCode === 'blink_sales_approval' || menuCode === 'cabang_sales_approval') return blinkSalesPendingCount;
+        if (menuCode === 'blink_purchase_approval') return blinkPurchasePendingCount;
         if (menuCode === 'blink_approval' || menuCode === 'bxpo_approval' || menuCode === 'cabang_approval') {
             return menuCode === 'bxpo_approval' ? (blinkOpsPendingCount + blinkSalesPendingCount) : blinkOpsPendingCount;
         }
@@ -95,11 +97,13 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                 const [qRes, sRes, pRes, iRes] = await Promise.all([
                     supabase.from('blink_quotations').select('id', { count: 'exact', head: true }).eq('status', 'manager_approval'),
                     supabase.from('blink_shipments').select('id', { count: 'exact', head: true }).eq('status', 'manager_approval'),
-                    supabase.from('blink_purchase_orders').select('id', { count: 'exact', head: true }).in('status', ['submitted', 'manager_approval']).eq('division', division),
+                    supabase.from('blink_purchase_orders').select('id', { count: 'exact', head: true }).in('status', ['submitted', 'manager_approval', 'pending', 'pending_approval']).eq('division', division),
                     supabase.from('blink_invoices').select('id', { count: 'exact', head: true }).in('status', ['submitted', 'manager_approval', 'pending', 'pending_approval']).eq('division', division)
                 ]);
-                const opsCount = (qRes.count || 0) + (sRes.count || 0) + (pRes.count || 0);
+                const poCount = pRes.count || 0;
+                const opsCount = (qRes.count || 0) + (sRes.count || 0) + (division === 'blink' ? 0 : poCount);
                 setBlinkOpsPendingCount(opsCount);
+                setBlinkPurchasePendingCount(division === 'blink' ? poCount : 0);
                 setBlinkFinancePendingCount(iRes.count || 0);
                 
                 // Fetch Sales Pending
@@ -377,6 +381,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
                 { path: '/blink/finance/invoices', label: 'Invoice', menuCode: 'blink_invoices', menuCodes: ['blink_invoice', 'blink_finance'] },
                     { path: '/blink/finance/approvals', label: 'Approval Center (Invoice)', menuCode: 'blink_finance_approval', menuCodes: ['blink_approval', 'blink_invoices', 'blink_finance'], showBadge: true },
                 { path: '/blink/finance/purchase-orders', label: 'Purchase Order', menuCode: 'blink_purchase_order' },
+                { path: '/blink/finance/purchase-approvals', label: 'Purchase Approval Center (PO)', menuCode: 'blink_purchase_approval', menuCodes: ['blink_purchase_order', 'blink_approval'], showBadge: true },
                 { path: '/blink/finance/ar', label: 'Account Receivables (AR)', menuCode: 'blink_ar' },
                 { path: '/blink/finance/ap', label: 'Account Payables (AP)', menuCode: 'blink_ap' },
                 { type: 'divider', label: '📝 Records' },

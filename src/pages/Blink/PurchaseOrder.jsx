@@ -20,6 +20,8 @@ const isMissingTableError = (error) => {
     return /relation .* does not exist|table .* does not exist|no such table|does not exist|could not find the table|column .* does not exist|missing column/.test(message);
 };
 
+const isDraftPO = (po) => String(po?.status || '').toLowerCase() === 'draft';
+
 const tryInsertTable = async (tableName, payload) => {
     const { error } = await supabase.from(tableName).insert([payload]);
     if (!error) return true;
@@ -489,21 +491,32 @@ const PurchaseOrder = () => {
             alert(t("Anda tidak memiliki hak akses untuk memanipulasi (Submit) PO."));
             return;
         }
-        if (!confirm(`Submit PO ${po.po_number} for manager approval?`)) return;
+        if (!isDraftPO(po)) {
+            alert(t("Only draft purchase orders can be submitted for approval."));
+            return;
+        }
+        if (!confirm(`${t("Submit PO")} ${po.po_number} ${t("to Purchase Approval?")}`)) return;
 
         try {
-            const { error } = await supabase
+            const { data, error } = await supabase
                 .from('blink_purchase_orders')
                 .update({
-                    status: 'submitted'
+                    status: 'submitted',
+                    rejection_reason: null,
+                    updated_at: new Date().toISOString()
                 })
                 .eq('id', po.id)
-                .eq('division', po.division || activeDivision);
+                .eq('division', po.division || activeDivision)
+                .eq('status', po.status)
+                .select('id')
+                .maybeSingle();
 
             if (error) throw error;
+            if (!data) throw new Error(t("PO was not updated. Check its division and your access."));
 
             await fetchPOs();
-            alert(t("✅ PO successfully submitted!\nCheck Approval Center for the approval process."));
+            window.dispatchEvent(new Event('blink_approval_updated'));
+            alert(t("✅ PO successfully submitted!\nCheck Purchase Approval Center in BLINK Finance."));
         } catch (error) {
             console.error('Error submitting PO:', error);
             alert('Failed to submit PO: ' + error.message);
@@ -1652,14 +1665,24 @@ const PurchaseOrder = () => {
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3 text-center whitespace-nowrap" onClick={e => e.stopPropagation()}>
-                                                <button
-                                                    onClick={() => handleEditPO(po, vendors)}
-                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-semibold transition-colors"
-                                                    title={t("Edit PO")}
-                                                >
-                                                    <Edit className="w-3.5 h-3.5" />
-                                                    {t("Edit")}
-                                                </button>
+                                                <div className="inline-flex items-center gap-2">
+                                                    {isDraftPO(po) && canEdit('blink_purchase_order') && (
+                                                        <button
+                                                            onClick={() => handleSubmitPO(po)}
+                                                            className="inline-flex items-center whitespace-nowrap px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-md text-xs font-semibold transition-colors"
+                                                        >
+                                                            {t("Submit to Purchase Approval")}
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={() => handleEditPO(po, vendors)}
+                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-semibold transition-colors"
+                                                        title={t("Edit PO")}
+                                                    >
+                                                        <Edit className="w-3.5 h-3.5" />
+                                                        {t("Edit")}
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     );
@@ -2589,13 +2612,13 @@ const POViewModal = ({ po, formatCurrency, onClose, onEdit, onSubmit, onApprove,
                         )}
 
                         {/* Submit Button - Only for draft */}
-                        {po.status === 'draft' && canEditPO && (
+                        {isDraftPO(po) && canEditPO && (
                             <Button
                                 onClick={onSubmit}
                                 variant="primary"
                                 size="sm"
                             >
-                                {t("Submit for Approval")}
+                                {t("Submit to Purchase Approval")}
                             </Button>
                         )}
 
