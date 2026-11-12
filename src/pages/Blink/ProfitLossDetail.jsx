@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -29,8 +29,37 @@ const ProfitLossDetail = () => {
     const [expandedSections, setExpandedSections] = useState({
         revenue: true, cogs: true, expenses: true, other_income: true, other_expense: true
     });
+    const fetchReportDataRef = useRef(null);
 
     useEffect(() => { fetchReportData(); }, [selectedMonth]);
+
+    useEffect(() => {
+        fetchReportDataRef.current = fetchReportData;
+    });
+
+    useEffect(() => {
+        let refreshTimeout;
+        const channel = supabase
+            .channel(`blink-profit-loss-detail-${activeDivision}`)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'blink_journal_entries'
+            }, () => {
+                clearTimeout(refreshTimeout);
+                refreshTimeout = setTimeout(() => fetchReportDataRef.current?.(), 250);
+            })
+            .subscribe((status) => {
+                if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                    console.error(`P&L detail journal subscription ${status.toLowerCase()}.`);
+                }
+            });
+
+        return () => {
+            clearTimeout(refreshTimeout);
+            supabase.removeChannel(channel);
+        };
+    }, [activeDivision]);
 
     useEffect(() => {
         if (totals.prof && totals.prof.current) {
