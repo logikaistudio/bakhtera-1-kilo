@@ -33,7 +33,7 @@ export const fetchAllBlinkRows = async (buildQuery) => {
 export const fetchBlinkJournalEntries = ({ division, startDate, endDate }) => fetchAllBlinkRows(() => {
     let query = supabase
         .from('blink_journal_entries')
-        .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate, reference_type, reference_id, source, entry_type, journal_type')
+        .select('id, coa_id, account_code, debit, credit, entry_date, currency, exchange_rate, reference_type, reference_id, source, entry_type, journal_type, description')
         .eq('division', division);
 
     if (startDate) query = query.gte('entry_date', startDate);

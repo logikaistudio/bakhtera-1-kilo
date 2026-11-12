@@ -10,6 +10,10 @@ const normalizeName = (value) => String(value || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
+    .replace(/\b(?:thc|terminal handling charge|agency fee|seal fee)\b/g, 'handling fee')
+    .replace(/\b(?:doc|docs|documentation)\b/g, 'document')
+    .replace(/\b(?:adm|admin)\b/g, 'administration')
+    .replace(/\bmanifest\b/g, 'document')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
 

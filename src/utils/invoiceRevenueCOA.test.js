@@ -38,6 +38,39 @@ test('item description overrides the selected aggregate sales account', () => {
     );
 });
 
+test('freight invoice abbreviations resolve to the matching detailed accounts', () => {
+    const accountsWithMoreDetails = [
+        ...accounts,
+        { id: 'document', code: '4-01-304-0-1-00', name: 'OE : DOCUMENT FEE', level: 3, parent_code: '4-01-000-0-1-00' },
+        { id: 'admin', code: '4-01-310-0-1-00', name: 'OE : ADMINISTRATION FEE', level: 3, parent_code: '4-01-000-0-1-00' }
+    ];
+
+    assert.equal(
+        resolveInvoiceRevenueCOA({ description: 'THC - Invoice INV-001' }, accountsWithMoreDetails, accountsWithMoreDetails[1])?.id,
+        'handling'
+    );
+    assert.equal(
+        resolveInvoiceRevenueCOA({ description: 'AGENCY FEE - Invoice INV-001' }, accountsWithMoreDetails, accountsWithMoreDetails[1])?.id,
+        'handling'
+    );
+    assert.equal(
+        resolveInvoiceRevenueCOA({ description: 'SEAL FEE - Invoice INV-001' }, accountsWithMoreDetails, accountsWithMoreDetails[1])?.id,
+        'handling'
+    );
+    assert.equal(
+        resolveInvoiceRevenueCOA({ description: 'DOC FEE - Invoice INV-001' }, accountsWithMoreDetails, accountsWithMoreDetails[1])?.id,
+        'document'
+    );
+    assert.equal(
+        resolveInvoiceRevenueCOA({ description: 'ADM FEE - Invoice INV-001' }, accountsWithMoreDetails, accountsWithMoreDetails[1])?.id,
+        'admin'
+    );
+    assert.equal(
+        resolveInvoiceRevenueCOA({ description: 'INWARD MANIFEST FEE - Invoice INV-001' }, accountsWithMoreDetails, accountsWithMoreDetails[1])?.id,
+        'document'
+    );
+});
+
 test('an ambiguous generic description falls back to sales income, not generic income', () => {
     assert.equal(
         resolveInvoiceRevenueCOA({ description: 'Freight' }, accounts, accounts[1])?.id,

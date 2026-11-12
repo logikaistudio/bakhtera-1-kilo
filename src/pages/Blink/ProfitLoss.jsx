@@ -9,7 +9,11 @@ import {
 import { useData } from '../../context/DataContext';
 import { getActiveDivision } from '../../utils/divisionContext';
 import { fetchAllBlinkRows, fetchBlinkJournalEntries, filterActiveBlinkJournalEntries } from '../../utils/blinkJournalIntegrity';
-import { getInvoiceRevenueAllocations, resolveDefaultInvoiceRevenueCOA } from '../../utils/invoiceRevenueCOA';
+import {
+    getInvoiceRevenueAllocations,
+    resolveDefaultInvoiceRevenueCOA,
+    resolveInvoiceRevenueCOA
+} from '../../utils/invoiceRevenueCOA';
 import { useLanguage } from '../../i18n/LanguageContext';
 
 const ProfitLoss = () => {
@@ -194,7 +198,7 @@ const ProfitLoss = () => {
                         const invoiceId = String(e.reference_id);
                         postedRevenueInvoiceIds.add(invoiceId);
                         const postedRows = postedRevenueByInvoice.get(invoiceId) || [];
-                        postedRows.push({ account: acc, amount: val, date: e.entry_date });
+                        postedRows.push({ account: acc, amount: val, date: e.entry_date, description: e.description });
                         postedRevenueByInvoice.set(invoiceId, postedRows);
                     }
                 } else {
@@ -221,6 +225,23 @@ const ProfitLoss = () => {
             const invoiceRowsById = new Map((invoiceRows || []).map(invoice => [String(invoice.id), invoice]));
             const postedInvoiceIds = [...postedRevenueByInvoice.keys()]
                 .filter(invoiceId => !invoiceRowsById.has(invoiceId));
+            const reconciledPostedInvoiceIds = new Set();
+            const reclassifyPostedRowsByDescription = (postedRows) => {
+                postedRows.forEach(row => {
+                    const account = resolveInvoiceRevenueCOA(
+                        { description: row.description },
+                        coaData || [],
+                        defaultRevenueAccount
+                    );
+                    const accountCode = String(account?.code || '').trim();
+                    const sourceCode = String(row.account.code || '').trim();
+                    const defaultCode = String(defaultRevenueAccount?.code || '').trim();
+                    if (!accountCode || accountCode === sourceCode || accountCode === defaultCode) return;
+
+                    applyAmountToAccount(row.account, -row.amount, row.date);
+                    applyAmountToAccount(coaMapByCode[accountCode], row.amount, row.date);
+                });
+            };
 
             for (let offset = 0; offset < postedInvoiceIds.length; offset += 100) {
                 const invoiceIdBatch = postedInvoiceIds.slice(offset, offset + 100);
@@ -253,7 +274,10 @@ const ProfitLoss = () => {
                             const account = coaMapByCode[String(allocation.account.code || '').trim()];
                             applyAmountToAccount(account, amount, invoice.invoice_date);
                         });
+                    } else {
+                        reclassifyPostedRowsByDescription(postedRows);
                     }
+                    reconciledPostedInvoiceIds.add(invoiceId);
                     return;
                 }
 
@@ -269,6 +293,12 @@ const ProfitLoss = () => {
                 const fallbackAmount = Number(invoice.subtotal ?? invoice.total_amount) || 0;
                 const exchangeRate = invoice.currency !== 'IDR' ? (Number(invoice.exchange_rate) || 1) : 1;
                 applyAmountToAccount(defaultRevenueAccount, toIDR(fallbackAmount, invoice.currency || 'IDR', exchangeRate), invoice.invoice_date);
+            });
+
+            postedRevenueByInvoice.forEach((postedRows, invoiceId) => {
+                if (!reconciledPostedInvoiceIds.has(invoiceId)) {
+                reclassifyPostedRowsByDescription(postedRows);
+                }
             });
 
             const all = Object.values(coaMapByCode);
