@@ -159,6 +159,16 @@ const ProfitLoss = () => {
             const getCodePrefix = (code) => code ? String(code).trim().charAt(0) : null;
             const postedRevenueInvoiceIds = new Set();
             const postedRevenueByInvoice = new Map();
+            const resolvedDefaultRevenueAccount = resolveDefaultInvoiceRevenueCOA(coaData || []);
+            const defaultRevenueAccount = resolvedDefaultRevenueAccount
+                ? coaMapByCode[String(resolvedDefaultRevenueAccount.code || '').trim()] || null
+                : null;
+            const isInvoiceRevenueEntry = (entry) => {
+                const referenceType = String(entry.reference_type || '').toLowerCase();
+                const entryType = String(entry.entry_type || '').toLowerCase();
+                return ['ar', 'blink_invoice', 'invoice'].includes(referenceType) &&
+                    !['payment', 'bill_payment', 'purchase_order', 'cogs'].includes(entryType);
+            };
 
             const applyAmountToAccount = (account, amount, dateValue) => {
                 if (!account || !amount) return;
@@ -180,21 +190,31 @@ const ProfitLoss = () => {
                     if (coaMapByCode[accCodeStr]) code = accCodeStr;
                 }
                 if (!code) return;
-                const acc = coaMapByCode[code];
+                let acc = coaMapByCode[code];
                 if (!acc) return;
 
                 const debit = toIDR(e.debit, e.currency, e.exchange_rate);
                 const credit = toIDR(e.credit, e.currency, e.exchange_rate);
-                const prefix = getCodePrefix(acc.code);
+                let prefix = getCodePrefix(acc.code);
+                if (prefix === '4' && isInvoiceRevenueEntry(e) && e.reference_id) {
+                    const descriptionAccount = resolveInvoiceRevenueCOA(
+                        { description: e.description },
+                        coaData || [],
+                        null
+                    );
+                    const matchedAccount = descriptionAccount
+                        ? coaMapByCode[String(descriptionAccount.code || '').trim()]
+                        : null;
+                    if (matchedAccount) {
+                        acc = matchedAccount;
+                        prefix = getCodePrefix(acc.code);
+                    }
+                }
+
                 let val = 0;
                 if (prefix === '4' || prefix === '7' || prefix === '8') {
                     val = (credit - debit);
-                    const referenceType = String(e.reference_type || '').toLowerCase();
-                    const entryType = String(e.entry_type || '').toLowerCase();
-                    const isInvoiceRevenueEntry =
-                        ['ar', 'blink_invoice', 'invoice'].includes(referenceType) &&
-                        !['payment', 'bill_payment', 'purchase_order', 'cogs'].includes(entryType);
-                    if (prefix === '4' && isInvoiceRevenueEntry && e.reference_id) {
+                    if (prefix === '4' && isInvoiceRevenueEntry(e) && e.reference_id) {
                         const invoiceId = String(e.reference_id);
                         postedRevenueInvoiceIds.add(invoiceId);
                         const postedRows = postedRevenueByInvoice.get(invoiceId) || [];
@@ -207,10 +227,6 @@ const ProfitLoss = () => {
                 applyAmountToAccount(acc, val, e.entry_date);
             });
 
-            const resolvedDefaultRevenueAccount = resolveDefaultInvoiceRevenueCOA(coaData || []);
-            const defaultRevenueAccount = resolvedDefaultRevenueAccount
-                ? coaMapByCode[String(resolvedDefaultRevenueAccount.code || '').trim()] || null
-                : null;
             const invoiceColumns = 'id, invoice_date, status, subtotal, total_amount, invoice_items, currency, exchange_rate';
             const invoiceRows = await fetchAllBlinkRows(() => supabase
                 .from('blink_invoices')
