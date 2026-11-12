@@ -2919,6 +2919,7 @@ const InvoiceManagement = () => {
                         invoice={selectedInvoice}
                         formatCurrency={formatCurrency}
                         bankAccounts={bankAccounts}
+                        revenueAccounts={revenueAccounts}
                         onInvoiceUpdate={(updatedInvoice) => {
                             setSelectedInvoice(updatedInvoice);
                             setInvoices(prev => prev.map(inv => inv.id === updatedInvoice.id ? updatedInvoice : inv));
@@ -3642,8 +3643,15 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
                                                         className="w-full px-2 py-1.5 bg-white border border-gray-300 rounded cursor-pointer flex justify-between items-center text-sm shadow-sm"
                                                         onClick={() => setCoaDropdownMapInv(prev => ({ ...prev, [index]: !prev[index] }))}
                                                     >
-                                                        <span className={item.item_name ? 'text-black font-semibold truncate text-xs' : 'text-gray-500 text-xs'}>
-                                                            {item.item_name || 'Pilih COA...'}
+                                                        <span className="min-w-0 flex-1 truncate">
+                                                            <span className={item.item_name ? 'text-black font-semibold text-xs' : 'text-gray-500 text-xs'}>
+                                                                {item.item_name || 'Pilih COA...'}
+                                                            </span>
+                                                            {(item.coa_code || revenueAccounts.find(account => account.id === item.coa_id)?.code) && (
+                                                                <span className="ml-1 text-[10px] font-mono text-gray-500">
+                                                                    {item.coa_code || revenueAccounts.find(account => account.id === item.coa_id)?.code}
+                                                                </span>
+                                                            )}
                                                         </span>
                                                         <span className="text-black text-xs ml-1">▼</span>
                                                     </div>
@@ -3945,7 +3953,7 @@ const InvoiceCreateModal = ({ isEditing, editInvoiceId, invoices = [], quotation
 };
 
 // Invoice View Modal Component
-const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint, onPreview, onSubmit, onAddItem, onReinvoice, onCreateAdditional, statusConfig, canEditInvoice, canSubmitInvoice, bankAccounts, onInvoiceUpdate, onEdit }) => {
+const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint, onPreview, onSubmit, onAddItem, onReinvoice, onCreateAdditional, statusConfig, canEditInvoice, canSubmitInvoice, bankAccounts, revenueAccounts = [], onInvoiceUpdate, onEdit }) => {
     const { t } = useLanguage();
     const [payments, setPayments] = useState([]);
     const [loadingPayments, setLoadingPayments] = useState(true);
@@ -4176,7 +4184,12 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                                 <tbody className="divide-y divide-dark-border/50 bg-dark-bg">
                                     {invoice.invoice_items?.map((item, index) => (
                                         <tr key={index} className="hover:bg-blue-500/5 transition-colors">
-                                            <td className="px-4 py-3 text-silver-light font-medium align-top">{item.item_name || 'Item ' + (index + 1)}</td>
+                                            <td className="px-4 py-3 text-silver-light font-medium align-top">
+                                                <div>{item.item_name || 'Item ' + (index + 1)}</div>
+                                                <div className="text-[10px] font-mono text-silver-dark">
+                                                    {item.coa_code || revenueAccounts.find(account => account.id === item.coa_id)?.code || '-'}
+                                                </div>
+                                            </td>
                                             <td className="px-4 py-3 text-silver-light align-top">{item.description}</td>
                                             <td className="px-4 py-3 text-center text-silver-light align-top">{item.qty}</td>
                                             <td className="px-4 py-3 text-center text-silver-dark align-top">{item.unit}</td>

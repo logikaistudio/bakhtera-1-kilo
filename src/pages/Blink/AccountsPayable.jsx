@@ -12,6 +12,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { getCurrencySummary, getAgingByCurrency, formatCurrencySummary } from '../../utils/multiCurrencyHelper';
 import { getActiveDivision } from '../../utils/divisionContext';
+import { fetchAllBlinkRows } from '../../utils/blinkJournalIntegrity';
 import { useLanguage } from '../../i18n/LanguageContext';
 
 // AP Payment Record Modal Component
@@ -862,62 +863,73 @@ const AccountsPayable = () => {
             setLoading(true);
 
             // ── BLINK ONLY: Primary source = blink_ap_transactions ──────────
-            const { data: apData, error: apError } = await supabase
-                .from('blink_ap_transactions')
-                .select('*')
-                .eq('division', activeDivision)
-                .order('bill_date', { ascending: false });
-
-            let finalRows = [];
-
-            if (!apError && apData && apData.length > 0) {
-                // ✅ Data exists in blink_ap_transactions — use it directly
-                finalRows = apData;
-            } else {
-                // ⚠️ blink_ap_transactions kosong atau error → fallback ke purchase orders
-                if (apError) {
-                    console.warn('[Blink AP] blink_ap_transactions error:', apError.message);
-                } else {
-                    console.warn('[Blink AP] blink_ap_transactions kosong, fallback ke blink_purchase_orders');
-                }
-
-                const { data: poRows, error: poErr } = await supabase
+            const [apResult, poRows] = await Promise.all([
+                fetchAllBlinkRows(() => supabase
+                    .from('blink_ap_transactions')
+                    .select('*')
+                    .eq('division', activeDivision)
+                    .order('bill_date', { ascending: false })
+                    .order('id', { ascending: true })
+                ).then(data => ({ data, error: null }))
+                    .catch(error => ({ data: [], error })),
+                fetchAllBlinkRows(() => supabase
                     .from('blink_purchase_orders')
                     .select('*')
                     .eq('division', activeDivision)
                     .in('status', ['approved', 'received', 'paid'])
-                    .order('po_date', { ascending: false });
+                    .order('po_date', { ascending: false })
+                    .order('id', { ascending: true }))
+            ]);
 
-                if (poErr) throw poErr;
-
-                // Map PO → format AP
-                finalRows = (poRows || []).map(po => {
-                    let daysToAdd = 30;
-                    if (po.payment_terms) {
-                        const m = String(po.payment_terms).match(/\d+/);
-                        if (m) daysToAdd = parseInt(m[0], 10);
-                    }
-                    const dueDate = new Date(po.po_date || po.created_at || new Date());
-                    dueDate.setDate(dueDate.getDate() + daysToAdd);
-
-                    return {
-                        ...po,
-                        source: 'po_fallback',
-                        po_id: po.id,
-                        ap_transaction_id: null,
-                        ap_number: po.ap_number || `AP-${po.po_number || po.id?.slice(0, 8).toUpperCase()}`,
-                        po_number: po.po_number,
-                        vendor_name: po.vendor_name || 'Unknown Vendor',
-                        bill_date: po.po_date,
-                        due_date: dueDate.toISOString().split('T')[0],
-                        original_amount: po.total_amount || 0,
-                        paid_amount: po.paid_amount || 0,
-                        outstanding_amount: Math.max(0, (po.total_amount || 0) - (po.paid_amount || 0)),
-                        currency: po.currency || 'IDR',
-                        status: po.status === 'paid' ? 'paid' : 'outstanding'
-                    };
-                });
+            if (apResult.error) {
+                console.warn('[Blink AP] blink_ap_transactions error; using approved PO fallback:', apResult.error.message);
             }
+
+            const apRows = apResult.data || [];
+            const existingPOIds = new Set(apRows.map(row => row.po_id).filter(Boolean).map(String));
+            const existingPONumbers = new Set(apRows.map(row =>
+                String(row.po_number || '').trim().toLowerCase()
+            ).filter(Boolean));
+            const missingPOs = (poRows || []).filter(po =>
+                !existingPOIds.has(String(po.id))
+                && !existingPONumbers.has(String(po.po_number || '').trim().toLowerCase())
+            );
+
+            // Merge PO fallback rows individually so one existing AP row cannot hide other approved POs.
+            const fallbackRows = missingPOs.map(po => {
+                let daysToAdd = 30;
+                if (po.payment_terms) {
+                    const match = String(po.payment_terms).match(/\d+/);
+                    if (match) daysToAdd = parseInt(match[0], 10);
+                }
+                const billDate = po.po_date || po.created_at || new Date().toISOString().split('T')[0];
+                const dueDate = new Date(billDate);
+                dueDate.setDate(dueDate.getDate() + daysToAdd);
+                const originalAmount = Number(po.total_amount || 0);
+                const paidAmount = Number(po.paid_amount || 0);
+                const outstandingAmount = Number(
+                    po.outstanding_amount ?? Math.max(0, originalAmount - paidAmount)
+                );
+
+                return {
+                    ...po,
+                    source: 'po_fallback',
+                    po_id: po.id,
+                    ap_transaction_id: null,
+                    ap_number: po.ap_number || `AP-${po.po_number || po.id?.slice(0, 8).toUpperCase()}`,
+                    po_number: po.po_number,
+                    vendor_name: po.vendor_name || 'Unknown Vendor',
+                    bill_date: billDate,
+                    due_date: po.due_date || dueDate.toISOString().split('T')[0],
+                    original_amount: originalAmount,
+                    paid_amount: paidAmount,
+                    outstanding_amount: outstandingAmount,
+                    currency: po.currency || 'IDR',
+                    status: outstandingAmount <= 0 ? 'paid' : paidAmount > 0 ? 'partial' : 'outstanding'
+                };
+            });
+
+            const finalRows = [...apRows, ...fallbackRows];
 
             // Update aging bucket and metadata dynamically
             const updatedData = (finalRows || []).map(ap => {

@@ -7,6 +7,7 @@ import {
 import { useData } from '../../context/DataContext';
 import { getActiveDivision } from '../../utils/divisionContext';
 import { fetchAllBlinkRows, fetchBlinkJournalEntries, filterActiveBlinkJournalEntries } from '../../utils/blinkJournalIntegrity';
+import { getInvoiceRevenueAllocations } from '../../utils/invoiceRevenueCOA';
 import { useLanguage } from '../../i18n/LanguageContext';
 
 const ProfitLossDetail = () => {
@@ -127,6 +128,7 @@ const ProfitLossDetail = () => {
             };
 
             const postedRevenueInvoiceIds = new Set();
+            const postedRevenueByInvoice = new Map();
             entries.forEach(e => {
                 let code = null;
                 if (e.coa_id && idToCode[e.coa_id]) {
@@ -151,7 +153,11 @@ const ProfitLossDetail = () => {
                         && e.entry_type === 'invoice'
                         && ['ar', 'blink_invoice', 'invoice'].includes(e.reference_type)
                         && e.reference_id) {
-                        postedRevenueInvoiceIds.add(String(e.reference_id));
+                        const invoiceId = String(e.reference_id);
+                        postedRevenueInvoiceIds.add(invoiceId);
+                        const postedRows = postedRevenueByInvoice.get(invoiceId) || [];
+                        postedRows.push({ account: acc, amount: val, date: e.entry_date });
+                        postedRevenueByInvoice.set(invoiceId, postedRows);
                     }
                 }
                 else if (['EXPENSE', 'COGS', 'COST', 'DIRECT_COST', 'OTHER_EXPENSE'].includes(acc.type)) val = (debit - credit);
@@ -161,63 +167,67 @@ const ProfitLossDetail = () => {
                 if (mKey.startsWith(String(targetYear)) && mKey <= currentMonthCol) acc.ytdAmount += val;
             });
 
-            const defaultRevenueAccount = Object.values(coaMapByCode).find(acc => acc.type === 'REVENUE');
-            const resolveRevenueAccountForItem = (item = {}) => {
-                if (item.coa_id && idToCode[item.coa_id]) {
-                    const account = coaMapByCode[idToCode[item.coa_id]];
-                    if (account?.type === 'REVENUE') return account;
-                }
-                const code = String(item.coa_code || item.itemCode || '').trim();
-                const account = code ? coaMapByCode[code] : null;
-                return account?.type === 'REVENUE' ? account : defaultRevenueAccount;
-            };
+            const defaultRevenueAccount = Object.values(coaMapByCode).find(account =>
+                String(account.code || '').trim().startsWith('4')
+            );
             const invoiceRows = await fetchAllBlinkRows(() => supabase
                 .from('blink_invoices')
                 .select('id, invoice_date, status, subtotal, total_amount, invoice_items, currency, exchange_rate')
                 .eq('division', activeDivision)
-                .in('status', ['approved', 'unpaid', 'paid', 'partially_paid', 'overdue'])
+                .in('status', ['approved', 'sent', 'unpaid', 'paid', 'partially_paid', 'overdue'])
                 .gte('invoice_date', fetchStart)
                 .lte('invoice_date', queryEnd)
                 .order('invoice_date', { ascending: true })
                 .order('id', { ascending: true }));
 
             invoiceRows.forEach(invoice => {
-                if (postedRevenueInvoiceIds.has(String(invoice.id))) return;
+                const invoiceId = String(invoice.id);
+                const postedRows = postedRevenueByInvoice.get(invoiceId) || [];
+                const allocations = getInvoiceRevenueAllocations(
+                    invoice,
+                    coaData || [],
+                    defaultRevenueAccount,
+                    toIDR
+                );
+                const applyRevenueAmount = (account, amount) => {
+                    if (!account || !amount) return;
+                    const target = coaMapByCode[String(account.code || '').trim()];
+                    if (!target) return;
+                    const monthKey = invoice.invoice_date?.substring(0, 7);
+                    if (monthKey === currentMonthCol) target.currentMonthAmount += amount;
+                    if (monthKey === prevMonthCol) target.prevMonthAmount += amount;
+                    if (monthKey?.startsWith(String(targetYear)) && monthKey <= currentMonthCol) target.ytdAmount += amount;
+                };
 
-                const invoiceItems = Array.isArray(invoice.invoice_items) ? invoice.invoice_items : [];
-                const exchangeRate = invoice.currency !== 'IDR' ? (Number(invoice.exchange_rate) || 1) : 1;
-                if (invoiceItems.length > 0) {
-                    invoiceItems.forEach(item => {
-                        const account = resolveRevenueAccountForItem(item);
-                        const amount = toIDR(
-                            Number(item.amount) || 0,
-                            item.currency || invoice.currency || 'IDR',
-                            exchangeRate
-                        );
-                        if (!account || !amount) return;
-
-                        account.amount += amount;
-                        if (invoice.invoice_date?.startsWith(currentMonthCol)) account.currentMonthAmount += amount;
-                        if (invoice.invoice_date?.startsWith(prevMonthCol)) account.prevMonthAmount += amount;
-                        if (invoice.invoice_date?.startsWith(String(targetYear))
-                            && invoice.invoice_date.substring(0, 7) <= currentMonthCol) {
-                            account.ytdAmount += amount;
-                        }
-                    });
+                if (postedRows.length > 0) {
+                    const itemTotal = allocations.reduce((sum, allocation) => sum + allocation.amount, 0);
+                    const postedTotal = postedRows.reduce((sum, row) => sum + row.amount, 0);
+                    if (itemTotal > 0 && postedTotal !== 0) {
+                        postedRows.forEach(row => {
+                            const monthKey = row.date?.substring(0, 7);
+                            if (monthKey === currentMonthCol) row.account.currentMonthAmount -= row.amount;
+                            if (monthKey === prevMonthCol) row.account.prevMonthAmount -= row.amount;
+                            if (monthKey?.startsWith(String(targetYear)) && monthKey <= currentMonthCol) row.account.ytdAmount -= row.amount;
+                        });
+                        allocations.forEach(allocation => {
+                            applyRevenueAmount(allocation.account, allocation.amount * (postedTotal / itemTotal));
+                        });
+                    }
                     return;
                 }
 
-                const fallbackAmount = Number(invoice.subtotal ?? invoice.total_amount) || 0;
-                const amount = toIDR(fallbackAmount, invoice.currency || 'IDR', exchangeRate);
-                if (!defaultRevenueAccount || !amount) return;
-
-                defaultRevenueAccount.amount += amount;
-                if (invoice.invoice_date?.startsWith(currentMonthCol)) defaultRevenueAccount.currentMonthAmount += amount;
-                if (invoice.invoice_date?.startsWith(prevMonthCol)) defaultRevenueAccount.prevMonthAmount += amount;
-                if (invoice.invoice_date?.startsWith(String(targetYear))
-                    && invoice.invoice_date.substring(0, 7) <= currentMonthCol) {
-                    defaultRevenueAccount.ytdAmount += amount;
+                if (postedRevenueInvoiceIds.has(invoiceId)) return;
+                if (allocations.length > 0) {
+                    allocations.forEach(({ account, amount }) => applyRevenueAmount(account, amount));
+                    return;
                 }
+
+                const amount = toIDR(
+                    Number(invoice.subtotal ?? invoice.total_amount) || 0,
+                    invoice.currency || 'IDR',
+                    invoice.currency !== 'IDR' ? (Number(invoice.exchange_rate) || 1) : 1
+                );
+                applyRevenueAmount(defaultRevenueAccount, amount);
             });
 
             const all = Object.values(coaMapByCode);

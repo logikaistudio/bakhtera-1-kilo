@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase';
 
-const INVOICE_REF_TYPES = new Set(['ar', 'invoice', 'ar_payment', 'ar_reversal']);
+const INVOICE_REF_TYPES = new Set(['ar', 'invoice', 'blink_invoice', 'ar_payment', 'ar_reversal']);
 const PO_REF_TYPES = new Set(['po', 'ap_reversal']);
 const AP_REF_TYPES = new Set(['ap_payment']);
 const PAYMENT_REF_TYPES = new Set(['payment']);

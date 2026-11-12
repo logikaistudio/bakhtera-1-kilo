@@ -16,6 +16,7 @@
  */
 
 import { supabase } from '../lib/supabase';
+import { resolveInvoiceRevenueCOA } from './invoiceRevenueCOA';
 import { generateAPNumber, generateARNumber } from './documentNumbers';
 
 // ── COA Cache (in-memory, refreshed per session) ─────────────────────────────
@@ -746,13 +747,13 @@ export async function createInvoiceJournal({ invoice, coaList: providedCOA }) {
             if (amount <= 0) continue;
             itemIdx++;
 
-            let itemCOA = null;
-            if (item.coa_id) itemCOA = coaList.find(c => c.id === item.coa_id) || null;
-            if (!itemCOA) {
-                const itemNameHint = item.description || item.item_name || '';
-                const isDiscountItem = itemNameHint.toLowerCase().includes('discount') || itemNameHint.toLowerCase().includes('diskon');
-                itemCOA = isDiscountItem && discountCOA ? discountCOA : defaultRevCOA;
-            }
+            const itemNameHint = item.description || item.item_name || '';
+            const isDiscountItem = itemNameHint.toLowerCase().includes('discount') || itemNameHint.toLowerCase().includes('diskon');
+            const itemCOA = resolveInvoiceRevenueCOA(
+                item,
+                coaList,
+                isDiscountItem && discountCOA ? discountCOA : defaultRevCOA
+            );
 
             rows.push(buildJERow({
                 entryNumber: jeNum, suffix: `-C${String(itemIdx).padStart(2, '0')}`,

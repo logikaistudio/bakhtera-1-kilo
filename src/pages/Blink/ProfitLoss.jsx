@@ -9,6 +9,7 @@ import {
 import { useData } from '../../context/DataContext';
 import { getActiveDivision } from '../../utils/divisionContext';
 import { fetchAllBlinkRows, fetchBlinkJournalEntries, filterActiveBlinkJournalEntries } from '../../utils/blinkJournalIntegrity';
+import { getInvoiceRevenueAllocations } from '../../utils/invoiceRevenueCOA';
 import { useLanguage } from '../../i18n/LanguageContext';
 
 const ProfitLoss = () => {
@@ -153,6 +154,7 @@ const ProfitLoss = () => {
 
             const getCodePrefix = (code) => code ? String(code).trim().charAt(0) : null;
             const postedRevenueInvoiceIds = new Set();
+            const postedRevenueByInvoice = new Map();
 
             const applyAmountToAccount = (account, amount, dateValue) => {
                 if (!account || !amount) return;
@@ -184,7 +186,11 @@ const ProfitLoss = () => {
                 if (prefix === '4' || prefix === '7' || prefix === '8') {
                     val = (credit - debit);
                     if (prefix === '4' && e.entry_type === 'invoice' && ['ar', 'blink_invoice', 'invoice'].includes(e.reference_type) && e.reference_id) {
-                        postedRevenueInvoiceIds.add(String(e.reference_id));
+                        const invoiceId = String(e.reference_id);
+                        postedRevenueInvoiceIds.add(invoiceId);
+                        const postedRows = postedRevenueByInvoice.get(invoiceId) || [];
+                        postedRows.push({ account: acc, amount: val, date: e.entry_date });
+                        postedRevenueByInvoice.set(invoiceId, postedRows);
                     }
                 } else {
                     val = (debit - credit);
@@ -193,44 +199,51 @@ const ProfitLoss = () => {
             });
 
             const defaultRevenueAccount = Object.values(coaMapByCode).find(acc => getCodePrefix(acc.code) === '4');
-            const resolveRevenueAccountForItem = (item = {}) => {
-                if (item.coa_id && idToCode[item.coa_id] && getCodePrefix(idToCode[item.coa_id]) === '4') {
-                    return coaMapByCode[idToCode[item.coa_id]];
-                }
-                const code = String(item.coa_code || item.itemCode || '').trim();
-                if (code && coaMapByCode[code] && getCodePrefix(code) === '4') {
-                    return coaMapByCode[code];
-                }
-                return defaultRevenueAccount;
-            };
-
             const invoiceRows = await fetchAllBlinkRows(() => supabase
                 .from('blink_invoices')
                 .select('id, invoice_date, status, subtotal, total_amount, invoice_items, currency, exchange_rate')
                 .eq('division', activeDivision)
-                .in('status', ['approved', 'unpaid', 'paid', 'partially_paid', 'overdue'])
+                .in('status', ['approved', 'sent', 'unpaid', 'paid', 'partially_paid', 'overdue'])
                 .gte('invoice_date', queryStart)
                 .lte('invoice_date', queryEnd)
                 .order('invoice_date', { ascending: true })
                 .order('id', { ascending: true }));
 
             (invoiceRows || []).forEach(invoice => {
-                if (postedRevenueInvoiceIds.has(String(invoice.id))) return;
+                const invoiceId = String(invoice.id);
+                const postedRows = postedRevenueByInvoice.get(invoiceId) || [];
+                const allocations = getInvoiceRevenueAllocations(
+                    invoice,
+                    coaData || [],
+                    defaultRevenueAccount,
+                    toIDR
+                );
 
-                const invoiceItems = Array.isArray(invoice.invoice_items) ? invoice.invoice_items : [];
-                const exchangeRate = invoice.currency !== 'IDR' ? (Number(invoice.exchange_rate) || 1) : 1;
+                if (postedRows.length > 0) {
+                    const itemTotal = allocations.reduce((sum, allocation) => sum + allocation.amount, 0);
+                    const postedTotal = postedRows.reduce((sum, row) => sum + row.amount, 0);
+                    if (itemTotal > 0 && postedTotal !== 0) {
+                        postedRows.forEach(row => applyAmountToAccount(row.account, -row.amount, row.date));
+                        allocations.forEach(allocation => {
+                            const amount = allocation.amount * (postedTotal / itemTotal);
+                            const account = coaMapByCode[String(allocation.account.code || '').trim()];
+                            applyAmountToAccount(account, amount, invoice.invoice_date);
+                        });
+                    }
+                    return;
+                }
 
-                if (invoiceItems.length > 0) {
-                    invoiceItems.forEach(item => {
-                        const account = resolveRevenueAccountForItem(item);
-                        const rawAmount = Number(item.amount) || 0;
-                        const amount = toIDR(rawAmount, item.currency || invoice.currency || 'IDR', exchangeRate);
-                        applyAmountToAccount(account, amount, invoice.invoice_date);
+                if (postedRevenueInvoiceIds.has(invoiceId)) return;
+                if (allocations.length > 0) {
+                    allocations.forEach(({ account, amount }) => {
+                        const targetAccount = coaMapByCode[String(account.code || '').trim()];
+                        applyAmountToAccount(targetAccount, amount, invoice.invoice_date);
                     });
                     return;
                 }
 
                 const fallbackAmount = Number(invoice.subtotal ?? invoice.total_amount) || 0;
+                const exchangeRate = invoice.currency !== 'IDR' ? (Number(invoice.exchange_rate) || 1) : 1;
                 applyAmountToAccount(defaultRevenueAccount, toIDR(fallbackAmount, invoice.currency || 'IDR', exchangeRate), invoice.invoice_date);
             });
 

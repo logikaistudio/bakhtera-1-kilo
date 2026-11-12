@@ -598,7 +598,7 @@ const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency, canEditAR
             const { data, error } = await supabase
                 .from('finance_coa')
                 .select('*')
-                .eq('type', 'REVENUE')
+                .like('code', '4%')
                 .eq('is_active', true)
                 .order('code', { ascending: true });
             if (error) throw error;
@@ -608,8 +608,10 @@ const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency, canEditAR
             // Fallback: fetch any active COA
             try {
                 const { data } = await supabase.from('finance_coa').select('*').eq('is_active', true).order('code');
-                setAccounts((data || []).filter(a => a.type === 'REVENUE'));
-            } catch { }
+                setAccounts((data || []).filter(a => String(a.code || '').trim().startsWith('4')));
+            } catch (fallbackError) {
+                console.error('Error fetching fallback COA accounts:', fallbackError);
+            }
         }
     };
 
@@ -667,17 +669,30 @@ const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency, canEditAR
             return;
         }
         const updatedItems = [...invoiceItems];
-        updatedItems[index] = { ...updatedItems[index], coa_id: newCoaId };
-        setInvoiceItems(updatedItems);
-        // Auto-save on change
+        const selectedAccount = accounts.find(account => account.id === newCoaId);
+        updatedItems[index] = {
+            ...updatedItems[index],
+            coa_id: newCoaId || null,
+            coa_code: selectedAccount?.code || null
+        };
+        const invoiceId = invoiceFull?.id || ar.invoice_id || ar.id;
         try {
-            await supabase
+            setSavingItems(true);
+            const { data, error } = await supabase
                 .from('blink_invoices')
                 .update({ invoice_items: updatedItems })
-                .eq('id', ar.id)
-                .eq('division', ar.division || getActiveDivision());
+                .eq('id', invoiceId)
+                .eq('division', ar.division || getActiveDivision())
+                .select('id')
+                .maybeSingle();
+            if (error) throw error;
+            if (!data) throw new Error('Invoice tidak ditemukan atau tidak dapat diperbarui.');
+            setInvoiceItems(updatedItems);
         } catch (error) {
             console.error('Error auto-saving COA assignment:', error);
+            alert(`Gagal menyimpan COA invoice: ${error.message}`);
+        } finally {
+            setSavingItems(false);
         }
     };
 
@@ -781,8 +796,29 @@ const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency, canEditAR
                                 <tbody className="divide-y divide-dark-border/50">
                                     {invoiceItems.map((item, idx) => (
                                         <tr key={idx} className="hover:bg-blue-500/5 transition-colors">
-                                            <td className="py-3 px-4 text-silver-light font-medium align-top whitespace-nowrap">
-                                                {item.item_name || item.name || ('Item ' + (idx + 1))}
+                                            <td className="py-3 px-4 text-silver-light font-medium align-top min-w-[220px]">
+                                                <div className="whitespace-nowrap">
+                                                    {item.item_name || item.name || ('Item ' + (idx + 1))}
+                                                </div>
+                                                <div className="text-[10px] font-mono text-silver-dark">
+                                                    {item.coa_code || accounts.find(account => account.id === item.coa_id)?.code || item.itemCode || '-'}
+                                                </div>
+                                                {canEditAR && (
+                                                    <select
+                                                        value={item.coa_id || ''}
+                                                        onChange={event => handleItemCoaChange(idx, event.target.value)}
+                                                        disabled={savingItems}
+                                                        className="mt-1 w-full rounded border border-dark-border bg-dark-surface px-2 py-1 text-[10px] text-silver-light"
+                                                        aria-label={`COA untuk ${item.item_name || item.name || `item ${idx + 1}`}`}
+                                                    >
+                                                        <option value="">-- Pilih COA Pendapatan --</option>
+                                                        {accounts.map(account => (
+                                                            <option key={account.id} value={account.id}>
+                                                                {account.code} - {account.name}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                )}
                                             </td>
                                             <td className="py-3 px-4 text-silver-light align-top min-w-[200px]">
                                                 {item.description || '-'}
