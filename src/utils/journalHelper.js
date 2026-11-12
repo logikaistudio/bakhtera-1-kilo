@@ -16,7 +16,7 @@
  */
 
 import { supabase } from '../lib/supabase';
-import { resolveInvoiceRevenueCOA } from './invoiceRevenueCOA';
+import { resolveDefaultInvoiceRevenueCOA, resolveInvoiceRevenueCOA } from './invoiceRevenueCOA';
 import { generateAPNumber, generateARNumber } from './documentNumbers';
 
 // ── COA Cache (in-memory, refreshed per session) ─────────────────────────────
@@ -155,13 +155,9 @@ export async function resolveARAccount(coaList) {
 
 /** Revenue / Pendapatan — REVENUE, code 4 */
 export async function resolveRevenueAccount(coaList) {
-    return resolveCOA({
-        coaList,
-        codes: ['4100', '4000', '4-01-001', '4-01-100', '4-01-301'],
-        prefixes: ['4-01', '4-00', '4'],
-        type: 'REVENUE',
-        nameHint: 'pendapatan'
-    }) || { code: '4100', name: 'Pendapatan Jasa', id: null, type: 'REVENUE' };
+    const list = coaList || await getAllCOA();
+    return resolveDefaultInvoiceRevenueCOA(list) ||
+        { code: '4100', name: 'Pendapatan Jasa', id: null, type: 'REVENUE' };
 }
 
 /**
@@ -1374,9 +1370,7 @@ export async function ensureBlinkARTransaction(invoice) {
         .eq('invoice_id', invoice.id)
         .maybeSingle();
 
-    if (existingError && !/no rows|null/.test(String(existingError.message || '').toLowerCase())) {
-        throw existingError;
-    }
+    if (existingError) throw existingError;
     if (existing) return { success: true, skipped: true, reason: 'existing' };
 
     const originalAmount = Number(invoice.total_amount || invoice.subtotal || 0);
@@ -1397,8 +1391,14 @@ export async function ensureBlinkARTransaction(invoice) {
         paid_amount: paidAmount,
         outstanding_amount: outstandingAmount,
         currency: invoice.currency || 'IDR',
-        exchange_rate: invoice.exchange_rate || 1,
-        status: outstandingAmount <= 0 ? 'paid' : paidAmount > 0 ? 'partial' : 'outstanding',
+        division: invoice.division || 'blink',
+        status: outstandingAmount <= 0
+            ? 'paid'
+            : paidAmount > 0
+                ? 'partial'
+                : invoice.status === 'overdue'
+                    ? 'overdue'
+                    : 'outstanding',
         notes: `Migrated from invoice ${invoice.invoice_number || invoice.id}`
     };
 
@@ -1468,22 +1468,39 @@ export async function migrateBlinkFinancialRecords() {
     if (journalError) throw journalError;
 
     const existingJournalKeys = new Set((journalData || []).map(j => `${j.reference_type}:${j.reference_id}`));
-    const coaList = await getAllCOA();
+    let coaList;
+    const getCOAList = async () => {
+        if (!coaList) coaList = await getAllCOA();
+        return coaList;
+    };
     let migratedInvoices = 0;
     let migratedPOs = 0;
 
     for (const invoice of invoiceData || []) {
         const journalKeyAR = `ar:${invoice.id}`;
         const journalKeyInvoice = `blink_invoice:${invoice.id}`;
-        if (existingJournalKeys.has(journalKeyAR) || existingJournalKeys.has(journalKeyInvoice)) continue;
+        const hasJournal = existingJournalKeys.has(journalKeyAR) || existingJournalKeys.has(journalKeyInvoice);
+        const invoiceStatus = String(invoice.status || '').toLowerCase();
+        const shouldHaveAR = ['approved', 'unpaid', 'partially_paid', 'paid', 'overdue'].includes(invoiceStatus);
+        let arCreated = false;
 
-        await ensureBlinkARTransaction(invoice);
-        await createInvoiceJournal({ invoice, coaList });
-        const cogsAmount = Number(invoice.cogs_subtotal || invoice.cogs_amount || 0);
-        if (cogsAmount > 0) {
-            await createCOGSJournal({ invoice, cogsAmount, coaList });
+        if (shouldHaveAR) {
+            const arResult = await ensureBlinkARTransaction(invoice);
+            if (!arResult.success) {
+                throw arResult.error || new Error(`Failed to create AR for invoice ${invoice.invoice_number || invoice.id}`);
+            }
+            arCreated = !arResult.skipped;
         }
-        migratedInvoices++;
+
+        if (!hasJournal) {
+            await createInvoiceJournal({ invoice, coaList: await getCOAList() });
+            const cogsAmount = Number(invoice.cogs_subtotal || invoice.cogs_amount || 0);
+            if (cogsAmount > 0) {
+                await createCOGSJournal({ invoice, cogsAmount, coaList: await getCOAList() });
+            }
+        }
+
+        if (arCreated || !hasJournal) migratedInvoices++;
     }
 
     for (const po of poData || []) {
@@ -1491,7 +1508,7 @@ export async function migrateBlinkFinancialRecords() {
         if (existingJournalKeys.has(journalKey)) continue;
 
         await ensureBlinkAPTransaction(po);
-        await createPOApprovalJournal({ po, coaList });
+        await createPOApprovalJournal({ po, coaList: await getCOAList() });
         migratedPOs++;
     }
 

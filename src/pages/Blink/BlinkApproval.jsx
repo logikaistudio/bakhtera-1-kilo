@@ -7,8 +7,8 @@ import {
     FileText, User, Calendar, ChevronRight,
     RefreshCw, AlertCircle, Check, X, Ship, Plane, Truck, ShoppingBag, Receipt
 } from 'lucide-react';
-import { createPOApprovalJournal, createInvoiceJournal, ensureJournalSuccess, getAllCOA } from '../../utils/journalHelper';
-import { generateAPNumber, generateARNumber } from '../../utils/documentNumbers';
+import { createPOApprovalJournal, createInvoiceJournal, ensureBlinkARTransaction, ensureJournalSuccess, getAllCOA } from '../../utils/journalHelper';
+import { generateAPNumber } from '../../utils/documentNumbers';
 import { getActiveDivision } from '../../utils/divisionContext';
 import { useLanguage } from '../../i18n/LanguageContext';
 
@@ -83,38 +83,6 @@ const safeUpdateById = async (table, id, payload) => {
         return { success: false, error };
     } catch (e) {
         return { success: false, error: e };
-    }
-};
-
-const insertARTransaction = async (blinkRow, fallbackRow) => {
-    try {
-        const { data: existing } = await supabase.from('blink_ar_transactions').select('id').eq('invoice_id', blinkRow.invoice_id).single();
-        if (existing) {
-            await supabase.from('blink_ar_transactions').update({
-                status: blinkRow.status,
-                original_amount: blinkRow.original_amount,
-                outstanding_amount: blinkRow.outstanding_amount,
-                due_date: blinkRow.due_date,
-                updated_at: new Date().toISOString()
-            }).eq('id', existing.id);
-            return;
-        }
-        if (await tryInsertTable('blink_ar_transactions', blinkRow)) return;
-        
-        const { data: existingBig } = await supabase.from('big_ar_transactions').select('id').eq('invoice_id', fallbackRow.invoice_id).single();
-        if (existingBig) {
-            await supabase.from('big_ar_transactions').update({
-                status: fallbackRow.status,
-                original_amount: fallbackRow.original_amount,
-                outstanding_amount: fallbackRow.outstanding_amount,
-                due_date: fallbackRow.due_date
-            }).eq('id', existingBig.id);
-            return;
-        }
-        const { error } = await supabase.from('big_ar_transactions').insert([fallbackRow]);
-        if (error) throw error;
-    } catch (e) {
-        console.warn('AR transaction creation/update skipped (no valid DB table available):', e.message);
     }
 };
 
@@ -912,40 +880,11 @@ const BlinkApproval = ({ scope = 'operations' }) => {
                     .single();
                 if (invFetchErr) throw invFetchErr;
 
-                const today = new Date();
-                const billDate = today.toISOString().split('T')[0];
-
-                const blinkARRow = {
-                    invoice_id: invData.id,
-                    invoice_number: invData.invoice_number,
-                    ar_number: generateARNumber(),
-                    customer_id: invData.customer_id,
-                    customer_name: invData.customer_name,
-                    transaction_date: billDate,
-                    due_date: invData.due_date || billDate,
-                    original_amount: item.amount,
-                    paid_amount: 0,
-                    outstanding_amount: item.amount,
-                    currency: invData.currency || 'IDR',
-                    exchange_rate: invData.exchange_rate || 1,
-                    status: 'outstanding',
-                    notes: `Auto-created from Invoice ${invData.invoice_number}`
-                };
-
-                const bigARRow = {
-                    invoice_id: invData.id,
-                    client_id: invData.customer_id || null,
-                    transaction_date: billDate,
-                    due_date: invData.due_date || billDate,
-                    original_amount: item.amount,
-                    paid_amount: 0,
-                    outstanding_amount: item.amount,
-                    status: 'outstanding'
-                };
-
                 try {
-                    await insertARTransaction(blinkARRow, bigARRow);
-                    console.log('AR entry created successfully for Invoice', invData.invoice_number);
+                    const arResult = await ensureBlinkARTransaction(invData);
+                    if (!arResult.success) {
+                        throw arResult.error || new Error(`Failed to create AR for invoice ${invData.invoice_number}`);
+                    }
 
                     // 4. Auto-create Journal Entries: Debit AR, Credit Revenue
                     const coaList = await getAllCOA();

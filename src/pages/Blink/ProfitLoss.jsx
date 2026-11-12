@@ -9,7 +9,7 @@ import {
 import { useData } from '../../context/DataContext';
 import { getActiveDivision } from '../../utils/divisionContext';
 import { fetchAllBlinkRows, fetchBlinkJournalEntries, filterActiveBlinkJournalEntries } from '../../utils/blinkJournalIntegrity';
-import { getInvoiceRevenueAllocations } from '../../utils/invoiceRevenueCOA';
+import { getInvoiceRevenueAllocations, resolveDefaultInvoiceRevenueCOA } from '../../utils/invoiceRevenueCOA';
 import { useLanguage } from '../../i18n/LanguageContext';
 
 const ProfitLoss = () => {
@@ -198,7 +198,10 @@ const ProfitLoss = () => {
                 applyAmountToAccount(acc, val, e.entry_date);
             });
 
-            const defaultRevenueAccount = Object.values(coaMapByCode).find(acc => getCodePrefix(acc.code) === '4');
+            const resolvedDefaultRevenueAccount = resolveDefaultInvoiceRevenueCOA(coaData || []);
+            const defaultRevenueAccount = resolvedDefaultRevenueAccount
+                ? coaMapByCode[String(resolvedDefaultRevenueAccount.code || '').trim()] || null
+                : null;
             const invoiceRows = await fetchAllBlinkRows(() => supabase
                 .from('blink_invoices')
                 .select('id, invoice_date, status, subtotal, total_amount, invoice_items, currency, exchange_rate')
