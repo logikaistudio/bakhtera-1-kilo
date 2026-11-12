@@ -7,9 +7,9 @@ import {
 
 const accounts = [
     { id: 'income', code: '4-00-000-0-1-00', name: 'INCOME', level: 1 },
-    { id: 'sales', code: '4100', name: 'Pendapatan Freight & Pengiriman', level: 2 },
-    { id: 'ocean', code: '4-01-301-0-1-00', name: 'OE : OCEAN FREIGHT', level: 3, parent_code: '4100' },
-    { id: 'handling', code: '4-01-202-0-1-00', name: 'AI : HANDLING FEE', level: 3, parent_code: '4100' }
+    { id: 'sales', code: '4-01-000-0-1-00', name: 'SALES INCOME', level: 2 },
+    { id: 'ocean', code: '4-01-301-0-1-00', name: 'OE : OCEAN FREIGHT', level: 3, parent_code: '4-01-000-0-1-00' },
+    { id: 'handling', code: '4-01-202-0-1-00', name: 'AI : HANDLING FEE', level: 3, parent_code: '4-01-000-0-1-00' }
 ];
 
 test('default invoice revenue account prefers sales income over the generic income account', () => {
@@ -24,6 +24,17 @@ test('invoice item description maps to a matching detailed sales account', () =>
             accounts[1]
         )?.id,
         'ocean'
+    );
+});
+
+test('item description overrides the selected aggregate sales account', () => {
+    assert.equal(
+        resolveInvoiceRevenueCOA(
+            { item_name: 'Handling Fee', coa_id: 'sales' },
+            accounts,
+            accounts[1]
+        )?.id,
+        'handling'
     );
 });
 

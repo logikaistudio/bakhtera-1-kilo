@@ -40,15 +40,19 @@ export const resolveInvoiceRevenueCOA = (item, coaList, fallbackAccount) => {
     const accountById = item?.coa_id
         ? accounts.find(account => account.id === item.coa_id)
         : null;
-    if (isRevenueAccount(accountById) && !isGenericIncomeAccount(accountById)) return accountById;
 
     const itemCode = String(item?.coa_code || item?.itemCode || '').trim();
-    if (itemCode) {
-        const accountByCode = accounts.find(account =>
-            String(account.code || '').trim() === itemCode
-        );
-        if (isRevenueAccount(accountByCode) && !isGenericIncomeAccount(accountByCode)) return accountByCode;
-    }
+    const accountByCode = itemCode
+        ? accounts.find(account => String(account.code || '').trim() === itemCode)
+        : null;
+
+    const isSpecificRevenueAccount = account =>
+        isRevenueAccount(account) &&
+        !isGenericIncomeAccount(account) &&
+        !hasChildAccount(account, accounts);
+
+    if (isSpecificRevenueAccount(accountById)) return accountById;
+    if (isSpecificRevenueAccount(accountByCode)) return accountByCode;
 
     const itemHints = [item?.item_name, item?.description, item?.name, item?.service_name]
         .map(normalizeName)
@@ -67,6 +71,9 @@ export const resolveInvoiceRevenueCOA = (item, coaList, fallbackAccount) => {
         });
         if (matches.length === 1) return matches[0];
     }
+
+    if (isRevenueAccount(accountById) && !isGenericIncomeAccount(accountById)) return accountById;
+    if (isRevenueAccount(accountByCode) && !isGenericIncomeAccount(accountByCode)) return accountByCode;
 
     return fallbackAccount;
 };
