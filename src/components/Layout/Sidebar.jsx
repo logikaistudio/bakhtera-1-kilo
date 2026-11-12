@@ -56,6 +56,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
     const [branches, setBranches] = useState([]);
     const [expandedCategories, setExpandedCategories] = useState([
         'blink-marketing', 'blink-operations', 'blink-costing', 'blink-profit', 'blink-data', 'blink-approval',
+        'blink-finance',
         'bridge-operasional', 'bridge-finance', 'bridge-data', 'bridge-persetujuan',
         'finance-blinkfinance', 'finance-bridgefinance', 'finance-bigfinance',
         'central-users'
@@ -359,6 +360,13 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
         {
             type: 'category', label: '📈 Profit & Costing', items: [
                 { path: '/blink/finance/selling-buying', label: 'Selling vs Buying Analysis', menuCode: 'blink_selling_buying' },
+            ]
+        },
+
+        // Finance Category
+        {
+            type: 'category', label: '💰 Finance', items: [
+                { path: '/blink/finance/purchase-approvals', label: 'Purchase Approval Center (PO)', menuCode: 'blink_purchase_approval', menuCodes: ['blink_purchase_order', 'blink_approval'], showBadge: true },
             ]
         },
 
