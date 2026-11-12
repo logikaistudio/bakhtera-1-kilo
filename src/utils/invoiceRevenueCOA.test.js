@@ -46,7 +46,7 @@ test('freight invoice abbreviations resolve to the matching detailed accounts', 
     ];
 
     assert.equal(
-        resolveInvoiceRevenueCOA({ description: 'THC - Invoice INV-001' }, accountsWithMoreDetails, accountsWithMoreDetails[1])?.id,
+        resolveInvoiceRevenueCOA({ description: 'THC - Invoice INV-001', coa_id: 'ocean' }, accountsWithMoreDetails, accountsWithMoreDetails[1])?.id,
         'handling'
     );
     assert.equal(
@@ -66,7 +66,7 @@ test('freight invoice abbreviations resolve to the matching detailed accounts', 
         'admin'
     );
     assert.equal(
-        resolveInvoiceRevenueCOA({ description: 'INWARD MANIFEST FEE - Invoice INV-001' }, accountsWithMoreDetails, accountsWithMoreDetails[1])?.id,
+        resolveInvoiceRevenueCOA({ description: 'INWARD MANIFEST FEE - Invoice INV-001', coa_id: 'sales' }, accountsWithMoreDetails, accountsWithMoreDetails[1])?.id,
         'document'
     );
 });

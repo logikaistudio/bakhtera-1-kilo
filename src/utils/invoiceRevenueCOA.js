@@ -55,9 +55,6 @@ export const resolveInvoiceRevenueCOA = (item, coaList, fallbackAccount) => {
         !isGenericIncomeAccount(account) &&
         !hasChildAccount(account, accounts);
 
-    if (isSpecificRevenueAccount(accountById)) return accountById;
-    if (isSpecificRevenueAccount(accountByCode)) return accountByCode;
-
     const itemHints = [item?.item_name, item?.description, item?.name, item?.service_name]
         .map(normalizeName)
         .filter(hint => hint.length >= 4);
@@ -76,6 +73,8 @@ export const resolveInvoiceRevenueCOA = (item, coaList, fallbackAccount) => {
         if (matches.length === 1) return matches[0];
     }
 
+    if (isSpecificRevenueAccount(accountById)) return accountById;
+    if (isSpecificRevenueAccount(accountByCode)) return accountByCode;
     if (isRevenueAccount(accountById) && !isGenericIncomeAccount(accountById)) return accountById;
     if (isRevenueAccount(accountByCode) && !isGenericIncomeAccount(accountByCode)) return accountByCode;
 
