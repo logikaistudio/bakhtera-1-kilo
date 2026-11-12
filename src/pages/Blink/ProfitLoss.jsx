@@ -208,7 +208,7 @@ const ProfitLoss = () => {
                 .from('blink_invoices')
                 .select('id, invoice_date, status, subtotal, total_amount, invoice_items, currency, exchange_rate')
                 .eq('division', activeDivision)
-                .in('status', ['unpaid', 'paid', 'partially_paid', 'overdue'])
+                .in('status', ['approved', 'unpaid', 'paid', 'partially_paid', 'overdue'])
                 .gte('invoice_date', queryStart)
                 .lte('invoice_date', queryEnd)
                 .order('invoice_date', { ascending: true })

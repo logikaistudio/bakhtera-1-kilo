@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { getActiveDivision } from '../../utils/divisionContext';
-import { fetchBlinkJournalEntries, filterActiveBlinkJournalEntries } from '../../utils/blinkJournalIntegrity';
+import { fetchAllBlinkRows, fetchBlinkJournalEntries, filterActiveBlinkJournalEntries } from '../../utils/blinkJournalIntegrity';
 import { useLanguage } from '../../i18n/LanguageContext';
 
 const ProfitLossDetail = () => {
@@ -96,7 +96,7 @@ const ProfitLossDetail = () => {
             const currentMonthCol = selectedMonth;
             const prevMonthCol = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
 
-            const queryEnd = new Date(targetYear, targetMonth, 0).toISOString().split('T')[0];
+            const queryEnd = new Date(Date.UTC(targetYear, targetMonth, 0)).toISOString().split('T')[0];
             const fetchStart = prevYear < targetYear ? `${prevYear}-12-01` : `${targetYear}-01-01`;
 
             const journalEntries = await fetchBlinkJournalEntries({
@@ -126,6 +126,7 @@ const ProfitLossDetail = () => {
                 return cur && cur !== 'IDR' && numRate > 0 ? v * numRate : v;
             };
 
+            const postedRevenueInvoiceIds = new Set();
             entries.forEach(e => {
                 let code = null;
                 if (e.coa_id && idToCode[e.coa_id]) {
@@ -144,12 +145,79 @@ const ProfitLossDetail = () => {
                 const debit = toIDR(e.debit, e.currency, e.exchange_rate);
                 const credit = toIDR(e.credit, e.currency, e.exchange_rate);
                 let val = 0;
-                if (['REVENUE', 'OTHER_INCOME'].includes(acc.type)) val = (credit - debit);
+                if (['REVENUE', 'OTHER_INCOME'].includes(acc.type)) {
+                    val = (credit - debit);
+                    if (acc.type === 'REVENUE'
+                        && e.entry_type === 'invoice'
+                        && ['ar', 'blink_invoice', 'invoice'].includes(e.reference_type)
+                        && e.reference_id) {
+                        postedRevenueInvoiceIds.add(String(e.reference_id));
+                    }
+                }
                 else if (['EXPENSE', 'COGS', 'COST', 'DIRECT_COST', 'OTHER_EXPENSE'].includes(acc.type)) val = (debit - credit);
                 const mKey = e.entry_date?.substring(0, 7);
                 if (mKey === currentMonthCol) acc.currentMonthAmount += val;
                 if (mKey === prevMonthCol) acc.prevMonthAmount += val;
                 if (mKey.startsWith(String(targetYear)) && mKey <= currentMonthCol) acc.ytdAmount += val;
+            });
+
+            const defaultRevenueAccount = Object.values(coaMapByCode).find(acc => acc.type === 'REVENUE');
+            const resolveRevenueAccountForItem = (item = {}) => {
+                if (item.coa_id && idToCode[item.coa_id]) {
+                    const account = coaMapByCode[idToCode[item.coa_id]];
+                    if (account?.type === 'REVENUE') return account;
+                }
+                const code = String(item.coa_code || item.itemCode || '').trim();
+                const account = code ? coaMapByCode[code] : null;
+                return account?.type === 'REVENUE' ? account : defaultRevenueAccount;
+            };
+            const invoiceRows = await fetchAllBlinkRows(() => supabase
+                .from('blink_invoices')
+                .select('id, invoice_date, status, subtotal, total_amount, invoice_items, currency, exchange_rate')
+                .eq('division', activeDivision)
+                .in('status', ['approved', 'unpaid', 'paid', 'partially_paid', 'overdue'])
+                .gte('invoice_date', fetchStart)
+                .lte('invoice_date', queryEnd)
+                .order('invoice_date', { ascending: true })
+                .order('id', { ascending: true }));
+
+            invoiceRows.forEach(invoice => {
+                if (postedRevenueInvoiceIds.has(String(invoice.id))) return;
+
+                const invoiceItems = Array.isArray(invoice.invoice_items) ? invoice.invoice_items : [];
+                const exchangeRate = invoice.currency !== 'IDR' ? (Number(invoice.exchange_rate) || 1) : 1;
+                if (invoiceItems.length > 0) {
+                    invoiceItems.forEach(item => {
+                        const account = resolveRevenueAccountForItem(item);
+                        const amount = toIDR(
+                            Number(item.amount) || 0,
+                            item.currency || invoice.currency || 'IDR',
+                            exchangeRate
+                        );
+                        if (!account || !amount) return;
+
+                        account.amount += amount;
+                        if (invoice.invoice_date?.startsWith(currentMonthCol)) account.currentMonthAmount += amount;
+                        if (invoice.invoice_date?.startsWith(prevMonthCol)) account.prevMonthAmount += amount;
+                        if (invoice.invoice_date?.startsWith(String(targetYear))
+                            && invoice.invoice_date.substring(0, 7) <= currentMonthCol) {
+                            account.ytdAmount += amount;
+                        }
+                    });
+                    return;
+                }
+
+                const fallbackAmount = Number(invoice.subtotal ?? invoice.total_amount) || 0;
+                const amount = toIDR(fallbackAmount, invoice.currency || 'IDR', exchangeRate);
+                if (!defaultRevenueAccount || !amount) return;
+
+                defaultRevenueAccount.amount += amount;
+                if (invoice.invoice_date?.startsWith(currentMonthCol)) defaultRevenueAccount.currentMonthAmount += amount;
+                if (invoice.invoice_date?.startsWith(prevMonthCol)) defaultRevenueAccount.prevMonthAmount += amount;
+                if (invoice.invoice_date?.startsWith(String(targetYear))
+                    && invoice.invoice_date.substring(0, 7) <= currentMonthCol) {
+                    defaultRevenueAccount.ytdAmount += amount;
+                }
             });
 
             const all = Object.values(coaMapByCode);
