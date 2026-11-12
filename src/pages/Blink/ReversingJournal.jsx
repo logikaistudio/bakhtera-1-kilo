@@ -122,7 +122,8 @@ const ReversingJournal = () => {
                 .eq('journal_type', 'reversal')
                 .eq('division', activeDivision)
                 .order('entry_date', { ascending: false })
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false });
 
             if (dateRange.start) q = q.gte('entry_date', dateRange.start);
             if (dateRange.end) q = q.lte('entry_date', dateRange.end);

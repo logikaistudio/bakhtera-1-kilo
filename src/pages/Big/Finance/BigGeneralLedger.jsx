@@ -227,7 +227,8 @@ const BigGeneralLedger = () => {
                 .eq('coa_id', account.id)
                 .gte('big_journal_entries.entry_date', dateRange.start)
                 .lte('big_journal_entries.entry_date', dateRange.end)
-                .order('big_journal_entries.entry_date', { ascending: false });
+                .order('big_journal_entries.entry_date', { ascending: false })
+                .order('id', { ascending: false });
 
             if (error) throw error;
 

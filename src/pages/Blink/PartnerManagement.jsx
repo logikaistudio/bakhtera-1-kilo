@@ -130,7 +130,8 @@ const PartnerManagement = () => {
                 .from('blink_business_partners')
                 .select('*')
                 .or(`owner_division.eq.${activeDivision},is_shared.eq.true`)
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false });
 
             if (error) throw error;
             setPartners(data || []);

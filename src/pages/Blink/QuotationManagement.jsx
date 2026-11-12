@@ -49,6 +49,11 @@ const normalizeServiceType = (value) => {
     return 'sea';
 };
 
+const normalizeTradeDirection = (value) => {
+    const direction = String(value || '').trim().toLowerCase();
+    return direction === 'export' || direction === 'import' ? direction : 'unspecified';
+};
+
 const QuotationManagement = () => {
     const { t } = useLanguage();
     const { user, canCreate, canEdit, canDelete, canView, canApprove, isAdmin, isSuperAdmin } = useAuth();
@@ -78,6 +83,7 @@ const QuotationManagement = () => {
         salesPerson: user?.full_name || user?.username || 'Unknown User',
         quotationType: 'RG', // Regular by default
         quotationDate: new Date().toISOString().split('T')[0], // Today's date
+        tradeDirection: '',
         origin: '',
         destination: '',
         serviceType: 'sea',
@@ -135,7 +141,8 @@ const QuotationManagement = () => {
             const { data, error } = await supabase
                 .from('blink_quotations')
                 .select('*')
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false });
 
             if (error) throw error;
 
@@ -151,6 +158,7 @@ const QuotationManagement = () => {
                 salesPerson: q.sales_person || q.salesPerson || '',
                 quotationType: q.quotation_type || q.quotationType || 'RG',
                 quotationDate: q.quotation_date || q.quotationDate,
+                tradeDirection: normalizeTradeDirection(q.trade_direction),
                 validUntil: q.valid_until || q.validUntil,
                 serviceType: q.service_type || q.serviceType,
                 cargoType: q.cargo_type || q.cargoType,
@@ -236,6 +244,7 @@ const QuotationManagement = () => {
             sales_person: formData.salesPerson,
             quotation_type: formData.quotationType,
             quotation_date: formData.quotationDate,
+            trade_direction: formData.tradeDirection,
             valid_until: validUntil.toISOString().split('T')[0],
             origin: formData.origin,
             destination: formData.destination,
@@ -367,6 +376,9 @@ const QuotationManagement = () => {
                     origin: editedQuotation.origin,
                     destination: editedQuotation.destination,
                     service_type: editedQuotation.serviceType,
+                    trade_direction: normalizeTradeDirection(editedQuotation.tradeDirection) === 'unspecified'
+                        ? null
+                        : normalizeTradeDirection(editedQuotation.tradeDirection),
                     cargo_type: editedQuotation.cargoType,
                     commodity: editedQuotation.commodity,
 
@@ -421,6 +433,7 @@ const QuotationManagement = () => {
             salesPerson: user?.full_name || user?.username || '',
             quotationType: 'RG',
             quotationDate: new Date().toISOString().split('T')[0],
+            tradeDirection: '',
             origin: '',
             destination: '',
             serviceType: 'sea',
@@ -630,6 +643,9 @@ const QuotationManagement = () => {
                 sales_person: parentQuotation.salesPerson,
                 quotation_type: parentQuotation.quotationType,
                 quotation_date: new Date().toISOString().split('T')[0],
+                trade_direction: normalizeTradeDirection(parentQuotation.tradeDirection) === 'unspecified'
+                    ? null
+                    : normalizeTradeDirection(parentQuotation.tradeDirection),
                 origin: parentQuotation.origin,
                 destination: parentQuotation.destination,
                 service_type: parentQuotation.serviceType,
@@ -878,6 +894,7 @@ const QuotationManagement = () => {
             salesPerson: quotation.salesPerson, // Already mapped
             quotationType: quotation.quotationType || 'RG',
             quotationDate: quotation.quotationDate,
+            tradeDirection: normalizeTradeDirection(quotation.tradeDirection),
             origin: quotation.origin,
             destination: quotation.destination,
             serviceType,
@@ -912,6 +929,7 @@ const QuotationManagement = () => {
                     sales_person: newShipment.salesPerson,
                     quotation_type: newShipment.quotationType,
                     quotation_date: newShipment.quotationDate,
+                    trade_direction: newShipment.tradeDirection === 'unspecified' ? null : newShipment.tradeDirection,
                     // Route & service
                     origin: newShipment.origin,
                     destination: newShipment.destination,
@@ -1002,6 +1020,14 @@ const QuotationManagement = () => {
             q.destination?.toLowerCase().includes(search)
         );
     });
+    const quotationGroups = [
+        { direction: 'export', label: t("Export") },
+        { direction: 'import', label: t("Import") },
+        { direction: 'unspecified', label: t("Belum Ditentukan") }
+    ].map(group => ({
+        ...group,
+        quotations: filteredQuotations.filter(quote => normalizeTradeDirection(quote.tradeDirection) === group.direction)
+    }));
 
     // Only show active customers
     const activeCustomers = customers.filter(c => c.status === 'active');
@@ -1125,157 +1151,139 @@ const QuotationManagement = () => {
                 </div>
             </div>
 
-            {/* Quotations Table */}
-            <div className="glass-card rounded-lg overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full">
-                        <thead className="bg-accent-orange">
-                            <tr>
-                                {isAdmin() && (
-                                    <th className="px-4 py-3 text-left w-10">
-                                        <input 
-                                            type="checkbox" 
-                                            checked={filteredQuotations.length > 0 && selectedIds.length === filteredQuotations.length}
-                                            onChange={(e) => {
-                                                if (e.target.checked) setSelectedIds(filteredQuotations.map(q => q.id));
-                                                else setSelectedIds([]);
-                                            }}
-                                            className="rounded border-white/30 bg-transparent text-white cursor-pointer"
-                                        />
-                                    </th>
-                                )}
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">{t("Job Number")}</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">{t("Customer")}</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">{t("Route")}</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">{t("Service")}</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">{t("Amount")}</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">{t("Valid Until")}</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">{t("Status")}</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-dark-border">
-                            {filteredQuotations.length === 0 ? (
-                                <tr>
-                                    <td colSpan={isAdmin() ? "8" : "7"} className="px-4 py-12 text-center">
-                                        <FileText className="w-12 h-12 text-silver-dark mx-auto mb-3" />
-                                        <p className="text-silver-dark">
-                                            {searchTerm
-                                                ? `No quotation matches the search for "${searchTerm}"`
-                                                : 'No quotation yet. Click "New Quotation" to start.'
-                                            }
-                                        </p>
-                                    </td>
-                                </tr>
-                            ) : (
-                                filteredQuotations.map((quote) => {
-                                    const StatusIcon = statusConfig[quote.status]?.icon || FileText;
-                                    const ServiceIcon = serviceTypeIcons[quote.serviceType] || Ship;
-                                    return (
-                                        <tr
-                                            key={quote.id}
-                                            onClick={() => handleViewQuotation(quote)}
-                                            className={`hover:bg-dark-surface smooth-transition cursor-pointer ${selectedIds.includes(quote.id) ? 'bg-blue-500/10' : ''}`}
-                                        >
-                                            {isAdmin() && (
-                                                <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                                                    <input 
-                                                        type="checkbox"
-                                                        checked={selectedIds.includes(quote.id)}
-                                                        onChange={(e) => {
-                                                            if (e.target.checked) setSelectedIds([...selectedIds, quote.id]);
-                                                            else setSelectedIds(selectedIds.filter(id => id !== quote.id));
-                                                        }}
-                                                        className="rounded border-dark-border cursor-pointer bg-dark-card"
-                                                    />
-                                                </td>
-                                            )}
-                                            <td className="px-4 py-3">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-medium text-accent-orange">{quote.jobNumber}</span>
-                                                    {quote.revision_number > 1 && (
-                                                        <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded">
-                                                            {t("Rev")} {quote.revision_number}
-                                                        </span>
-                                                    )}
-                                                    {quote.is_superseded && (
-                                                        <span className="px-2 py-0.5 bg-gray-500/20 text-gray-400 text-xs rounded">
-                                                            {t("Superseded")}
-                                                        </span>
-                                                    )}
-                                                </div>
+            {/* Quotations grouped by trade direction */}
+            {quotationGroups.map(group => (
+                <section key={group.direction} className="space-y-2">
+                    <h2 className="text-lg font-semibold text-silver-light">
+                        {t("Quotation")} — {group.label} ({group.quotations.length})
+                    </h2>
+                    <div className="glass-card rounded-lg overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead className="bg-accent-orange">
+                                    <tr>
+                                        {isAdmin() && (
+                                            <th className="px-4 py-3 text-left w-10">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={group.quotations.length > 0 && group.quotations.every(quote => selectedIds.includes(quote.id))}
+                                                    onChange={(e) => setSelectedIds(previous => {
+                                                        const groupIds = new Set(group.quotations.map(quote => quote.id));
+                                                        return e.target.checked
+                                                            ? [...new Set([...previous, ...groupIds])]
+                                                            : previous.filter(id => !groupIds.has(id));
+                                                    })}
+                                                    className="rounded border-white/30 bg-transparent text-white cursor-pointer"
+                                                />
+                                            </th>
+                                        )}
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">{t("Job Number")}</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">{t("Customer")}</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">{t("Route")}</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">{t("Service")}</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">{t("Amount")}</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">{t("Valid Until")}</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase">{t("Status")}</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-dark-border">
+                                    {group.quotations.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={isAdmin() ? 8 : 7} className="px-4 py-8 text-center text-silver-dark">
+                                                {searchTerm
+                                                    ? t("No quotation matches the search.")
+                                                    : t("No quotations in this group.")
+                                                }
                                             </td>
-                                            <td className="px-4 py-3">
-                                                <div className="flex items-center gap-2">
-                                                    <User className="w-4 h-4 text-silver-dark" />
-                                                    <div>
-                                                        <div className="text-silver-light font-medium">{quote.customer}</div>
-                                                        {quote.customerCompany && (
-                                                            <div className="text-xs text-silver-dark">{quote.customerCompany}</div>
+                                        </tr>
+                                    ) : group.quotations.map(quote => {
+                                        const ServiceIcon = serviceTypeIcons[quote.serviceType] || Ship;
+                                        const config = statusConfig[quote.status];
+                                        const StatusIcon = config?.icon || Circle;
+                                        return (
+                                            <tr
+                                                key={quote.id}
+                                                onClick={() => handleViewQuotation(quote)}
+                                                className={`hover:bg-dark-surface smooth-transition cursor-pointer ${selectedIds.includes(quote.id) ? 'bg-blue-500/10' : ''}`}
+                                            >
+                                                {isAdmin() && (
+                                                    <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedIds.includes(quote.id)}
+                                                            onChange={e => setSelectedIds(previous => e.target.checked
+                                                                ? [...new Set([...previous, quote.id])]
+                                                                : previous.filter(id => id !== quote.id))}
+                                                            className="rounded border-dark-border cursor-pointer bg-dark-card"
+                                                        />
+                                                    </td>
+                                                )}
+                                                <td className="px-4 py-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-medium text-accent-orange">{quote.jobNumber}</span>
+                                                        {quote.revision_number > 1 && (
+                                                            <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded">
+                                                                {t("Rev")} {quote.revision_number}
+                                                            </span>
+                                                        )}
+                                                        {quote.is_superseded && (
+                                                            <span className="px-2 py-0.5 bg-gray-500/20 text-gray-400 text-xs rounded">
+                                                                {t("Superseded")}
+                                                            </span>
                                                         )}
                                                     </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <div className="flex items-center gap-2">
-                                                    <MapPin className="w-4 h-4 text-silver-dark" />
-                                                    <span className="text-silver-light text-sm">
-                                                        {quote.origin} → {quote.destination}
-                                                    </span>
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <div className="flex items-center gap-2">
-                                                    <ServiceIcon className="w-4 h-4 text-silver-dark" />
-                                                    <span className="text-silver-light capitalize">{quote.serviceType}</span>
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <div className="font-semibold text-silver-light">
-                                                    {(() => {
-                                                        const rate = quote.exchange_rate || quote.exchangeRate || 16000;
-                                                        const idr = quote.total_idr ?? (quote.totalAmount ? ((quote.currency === 'IDR') ? quote.totalAmount : quote.totalAmount * rate) : (quote.total_amount ? (quote.currency === 'IDR' ? quote.total_amount : quote.total_amount * rate) : 0));
-                                                        const usd = quote.total_usd ?? (quote.totalAmount ? ((quote.currency === 'USD') ? quote.totalAmount : (rate ? quote.totalAmount / rate : 0)) : (quote.total_amount ? ((quote.currency === 'USD') ? quote.total_amount : (rate ? quote.total_amount / rate : 0)) : 0));
-                                                        return quote.currency === 'USD' ? `$${usd.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `Rp ${idr.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                                                    })()}
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <span className="text-silver-dark text-sm">{quote.validUntil || '-'}</span>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                {(() => {
-                                                    const config = statusConfig[quote.status];
-                                                    const StatusIcon = config?.icon || Circle;
-                                                    const isPending = quote.status === 'pending_approval';
-
-                                                    return (
-                                                        <div className="relative inline-flex">
-                                                            <div className={`
-                                                                flex items-center gap-1.5 px-3 py-1.5 rounded-lg
-                                                                ${config?.color}
-                                                                border border-current/30
-                                                                smooth-transition
-                                                                hover:scale-105 hover:shadow-md hover:border-current/50
-                                                                cursor-pointer
-                                                            `}>
-                                                                <StatusIcon className="w-3.5 h-3.5" />
-                                                                <span className="text-xs font-semibold">
-                                                                    {config?.label}
-                                                                </span>
-                                                            </div>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <User className="w-4 h-4 text-silver-dark" />
+                                                        <div>
+                                                            <div className="text-silver-light font-medium">{quote.customerName}</div>
+                                                            {quote.customerCompany && <div className="text-xs text-silver-dark">{quote.customerCompany}</div>}
                                                         </div>
-                                                    );
-                                                })()}
-                                            </td>
-
-                                        </tr>
-                                    );
-                                })
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <MapPin className="w-4 h-4 text-silver-dark" />
+                                                        <span className="text-silver-light text-sm">{quote.origin} → {quote.destination}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <ServiceIcon className="w-4 h-4 text-silver-dark" />
+                                                        <span className="text-silver-light capitalize">{quote.serviceType}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <div className="font-semibold text-silver-light">
+                                                        {(() => {
+                                                            const rate = quote.exchange_rate || quote.exchangeRate || 16000;
+                                                            const idr = quote.total_idr ?? (quote.totalAmount ? (quote.currency === 'IDR' ? quote.totalAmount : quote.totalAmount * rate) : (quote.total_amount ? (quote.currency === 'IDR' ? quote.total_amount : quote.total_amount * rate) : 0));
+                                                            const usd = quote.total_usd ?? (quote.totalAmount ? (quote.currency === 'USD' ? quote.totalAmount : (rate ? quote.totalAmount / rate : 0)) : (quote.total_amount ? (quote.currency === 'USD' ? quote.total_amount : (rate ? quote.total_amount / rate : 0)) : 0));
+                                                            return quote.currency === 'USD'
+                                                                ? `$${usd.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                                                : `Rp ${idr.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                                                        })()}
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3"><span className="text-silver-dark text-sm">{quote.validUntil || '-'}</span></td>
+                                                <td className="px-4 py-3">
+                                                    <div className="relative inline-flex">
+                                                        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${config?.color} border border-current/30`}>
+                                                            <StatusIcon className="w-3.5 h-3.5" />
+                                                            <span className="text-xs font-semibold">{config?.label}</span>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+            ))}
 
             {/* Modal for New Quotation */}
             <Modal
@@ -1322,7 +1330,7 @@ const QuotationManagement = () => {
                     </div>
 
                     {/* Quotation Type & Date */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                 {t("Quotation Type")} <span className="text-red-400">*</span>
@@ -1352,6 +1360,21 @@ const QuotationManagement = () => {
                                 onChange={(e) => setFormData({ ...formData, quotationDate: e.target.value })}
                                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
                             />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                {t("Trade Direction")} <span className="text-red-400">*</span>
+                            </label>
+                            <select
+                                required
+                                value={formData.tradeDirection}
+                                onChange={(e) => setFormData({ ...formData, tradeDirection: e.target.value })}
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-black"
+                            >
+                                <option value="">{t("Select...")}</option>
+                                <option value="export">{t("Export")}</option>
+                                <option value="import">{t("Import")}</option>
+                            </select>
                         </div>
                     </div>
 
@@ -1872,6 +1895,26 @@ const QuotationManagement = () => {
                             <div>
                                 <p className="text-xs text-gray-500 font-medium mb-1">{t("Quotation Date")}</p>
                                 <p className="text-gray-900 font-medium">{viewingQuotation.quotationDate || viewingQuotation.createdAt}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-gray-500 font-medium mb-1">{t("Trade Direction")}</p>
+                                {isEditingQuotation ? (
+                                    <select
+                                        value={editedQuotation?.tradeDirection || 'unspecified'}
+                                        onChange={(e) => setEditedQuotation({ ...editedQuotation, tradeDirection: e.target.value })}
+                                        className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-sm"
+                                    >
+                                        <option value="unspecified">{t("Belum Ditentukan")}</option>
+                                        <option value="export">{t("Export")}</option>
+                                        <option value="import">{t("Import")}</option>
+                                    </select>
+                                ) : (
+                                    <p className="text-gray-900 font-medium capitalize">
+                                        {normalizeTradeDirection(viewingQuotation.tradeDirection) === 'unspecified'
+                                            ? t("Belum Ditentukan")
+                                            : normalizeTradeDirection(viewingQuotation.tradeDirection)}
+                                    </p>
+                                )}
                             </div>
                             {/* New Fields Edit Section */}
                             {isEditingQuotation && (

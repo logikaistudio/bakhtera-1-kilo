@@ -230,7 +230,9 @@ const BigAccountsReceivable = () => {
             const { data: arRows, error } = await supabase
                 .from('big_ar_transactions')
                 .select('*')
-                .order('transaction_date', { ascending: false });
+                .order('transaction_date', { ascending: false })
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false });
 
             let rows = [];
             if (!error && arRows?.length > 0) {
@@ -241,7 +243,9 @@ const BigAccountsReceivable = () => {
                     .select('*')
                     .neq('status', 'draft')
                     .neq('status', 'cancelled')
-                    .order('invoice_date', { ascending: false });
+                    .order('invoice_date', { ascending: false })
+                    .order('created_at', { ascending: false })
+                    .order('id', { ascending: false });
 
                 rows = (invRows || []).map(inv => ({
                     id: inv.id,
@@ -263,7 +267,10 @@ const BigAccountsReceivable = () => {
                 ...ar,
                 aging_bucket: calcAging(ar.due_date),
                 status: ar.status || deriveStatus(ar.paid_amount || 0, ar.original_amount || 0, ar.due_date),
-            })));
+            })).sort((a, b) =>
+                new Date(b.transaction_date || b.invoice_date || b.created_at || 0) -
+                new Date(a.transaction_date || a.invoice_date || a.created_at || 0)
+            ));
         } catch (err) { console.error(err); }
         finally { setLoading(false); }
     };

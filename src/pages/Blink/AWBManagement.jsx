@@ -200,7 +200,8 @@ const AWBManagement = () => {
                 .from('blink_shipments')
                 .select('*')
                 // .eq('service_type', 'Air') // Uncomment if strict filtering needed
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false });
 
             if (error) throw error;
 

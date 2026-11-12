@@ -293,7 +293,8 @@ const InvoiceManagement = () => {
                 .from('blink_invoices')
                 .select(`*`)
                 .eq('division', activeDivision)
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false });
 
             if (invoicesError) throw invoicesError;
 
@@ -343,7 +344,8 @@ const InvoiceManagement = () => {
                 // Include more statuses - user wants to invoice from approved AND converted quotations
                 .in('status', ['approved', 'sent', 'approved_internal', 'converted'])
                 .eq('division', activeDivision)
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false });
 
             if (error) {
                 console.warn('Could not fetch quotations:', error.message);
@@ -383,7 +385,8 @@ const InvoiceManagement = () => {
                 .select('*')
                 .eq('status', 'approved')
                 .eq('division', activeDivision)
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false });
 
             if (error) {
                 console.warn('Could not fetch shipments:', error.message);
@@ -3996,14 +3999,16 @@ const InvoiceViewModal = ({ invoice, formatCurrency, onClose, onPayment, onPrint
                 .select('*')
                 .or(`reference_type.eq.invoice,reference_type.eq.ar_payment,payment_type.eq.incoming`)
                 .eq('reference_id', invoice.id)
-                .order('payment_date', { ascending: false });
+                .order('payment_date', { ascending: false })
+                .order('id', { ascending: false });
 
             // Strategy 2: match by invoice_number stored as reference_number
             const { data: d2 } = await supabase
                 .from('blink_payments')
                 .select('*')
                 .eq('reference_number', invoice.invoice_number)
-                .order('payment_date', { ascending: false });
+                .order('payment_date', { ascending: false })
+                .order('id', { ascending: false });
 
             // Merge and deduplicate by id
             const merged = [...(d1 || []), ...(d2 || [])];
@@ -5205,7 +5210,8 @@ const ExistingInvoicesIndicator = ({ jobNumber, isAdditional = false, selectedCu
                     .eq('job_number', jobNumber)
                     .neq('status', 'cancelled')
                     .not('invoice_number', 'ilike', '%-RB')
-                    .order('created_at', { ascending: false });
+                    .order('created_at', { ascending: false })
+                    .order('id', { ascending: false });
 
                 if (error) throw error;
                 setExistingInvoices(data || []);

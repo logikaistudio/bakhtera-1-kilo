@@ -124,7 +124,8 @@ const SalesBlinkApproval = () => {
                 .from('blink_sales_quotations')
                 .select('*')
                 .eq('status', 'manager_approval')
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false });
 
             if (sqErr) throw sqErr;
 
@@ -164,7 +165,8 @@ const SalesBlinkApproval = () => {
                 .from('blink_approval_history')
                 .select('*')
                 .eq('module', 'blink_sales')
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false });
                 
             if (histErr && !isMissingTableError(histErr)) {
                 console.error('Error fetching history:', histErr);

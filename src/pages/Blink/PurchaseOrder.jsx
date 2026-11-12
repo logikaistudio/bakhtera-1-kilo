@@ -152,7 +152,8 @@ const PurchaseOrder = () => {
                 .from('blink_purchase_orders')
                 .select('*')
                 .eq('division', activeDivision)
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false });
 
             if (error) throw error;
             setPOs(data || []);
@@ -201,7 +202,8 @@ const PurchaseOrder = () => {
                 .select('id, customer, customer_id, origin, destination, job_number, so_number, cogs, cogs_currency, buying_items, service_type, status')
                 .eq('status', 'approved')
                 .eq('division', activeDivision)
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false });
             if (error) throw error;
             // Normalize field keys
             const mapped = (data || []).map(s => ({
@@ -224,7 +226,8 @@ const PurchaseOrder = () => {
                 .select('*')
                 .in('status', ['approved', 'sent', 'approved_internal', 'converted'])
                 .eq('division', activeDivision)
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false });
             if (error) throw error;
             setQuotations(data || []);
         } catch (error) {

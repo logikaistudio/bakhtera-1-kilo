@@ -266,7 +266,8 @@ const BlinkApproval = ({ scope = 'operations' }) => {
                     .from('blink_sales_quotations')
                     .select('*')
                     .eq('status', 'manager_approval')
-                    .order('created_at', { ascending: false });
+                    .order('created_at', { ascending: false })
+                    .order('id', { ascending: false });
                 if (error) console.error('Error fetching sales quotations:', error);
                 else salesQuotations = data || [];
             }
@@ -278,7 +279,8 @@ const BlinkApproval = ({ scope = 'operations' }) => {
                     .from('blink_quotations')
                     .select('*')
                     .eq('status', 'manager_approval')
-                    .order('created_at', { ascending: false });
+                    .order('created_at', { ascending: false })
+                    .order('id', { ascending: false });
                 if (error) console.error('Error fetching quotations:', error);
                 else quotations = data || [];
             }
@@ -291,7 +293,8 @@ const BlinkApproval = ({ scope = 'operations' }) => {
                     .select('*')
                     .in('status', ['submitted', 'manager_approval', 'pending', 'pending_approval'])
                     .eq('division', division)
-                    .order('created_at', { ascending: false });
+                    .order('created_at', { ascending: false })
+                    .order('id', { ascending: false });
                 if (error) console.error('Error fetching POs:', error);
                 else purchaseOrders = data || [];
             }
@@ -303,7 +306,8 @@ const BlinkApproval = ({ scope = 'operations' }) => {
                     .from('blink_shipments')
                     .select('*')
                     .or('bl_status.in.(submitted,manager_approval,pending,pending_approval),status.in.(submitted,manager_approval,pending,pending_approval)')
-                    .order('created_at', { ascending: false });
+                    .order('created_at', { ascending: false })
+                    .order('id', { ascending: false });
                 if (error) console.error('Error fetching shipments:', error);
                 else shipments = data || [];
             }
@@ -316,7 +320,8 @@ const BlinkApproval = ({ scope = 'operations' }) => {
                     .select('*')
                     .in('status', ['submitted', 'manager_approval', 'pending', 'pending_approval'])
                     .eq('division', division)
-                    .order('created_at', { ascending: false });
+                    .order('created_at', { ascending: false })
+                    .order('id', { ascending: false });
             if (invErr) console.error('Error fetching invoices:', invErr);
 
             const mappedSalesQuotations = salesQuotations.map(sq => ({
@@ -459,7 +464,8 @@ const BlinkApproval = ({ scope = 'operations' }) => {
                 .from('blink_approval_history')
                 .select('*')
                 .eq('module', historyModule)
-                .order('approved_at', { ascending: false });
+                .order('approved_at', { ascending: false })
+                .order('id', { ascending: false });
 
             if (histRes.error && histRes.error.message?.includes("Could not find the 'module' column")) {
                 // Fallback: fetch all without module filter (column not yet migrated)
@@ -467,7 +473,8 @@ const BlinkApproval = ({ scope = 'operations' }) => {
                 const fallbackRes = await supabase
                     .from('blink_approval_history')
                     .select('*')
-                    .order('approved_at', { ascending: false });
+                    .order('approved_at', { ascending: false })
+                    .order('id', { ascending: false });
                 histErr = fallbackRes.error;
                 historyData = fallbackRes.data || [];
             } else {

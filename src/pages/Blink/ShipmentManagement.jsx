@@ -18,6 +18,11 @@ const normalizeServiceType = (value) => {
     return 'sea';
 };
 
+const normalizeTradeDirection = (value) => {
+    const direction = String(value || '').trim().toLowerCase();
+    return direction === 'export' || direction === 'import' ? direction : 'unspecified';
+};
+
 const ShipmentManagement = () => {
     const { t } = useLanguage();
     const { canCreate, canEdit, canDelete, canView, canApprove, canAccess, isSuperAdmin } = useAuth();
@@ -131,7 +136,8 @@ const ShipmentManagement = () => {
                 .from('blink_shipments')
                 .select('*')
                 .eq('division', activeDivision)
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false });
 
             if (error) {
                 console.error('❌ Fetch error:', error);
@@ -162,6 +168,7 @@ const ShipmentManagement = () => {
                 return ({
                 ...s,
                 service_type: normalizeServiceType(sourceServiceType),
+                tradeDirection: normalizeTradeDirection(s.trade_direction || quote.trade_direction),
                 jobNumber: s.job_number || s.jobNumber,
                 soNumber: s.so_number || s.soNumber,
                 quotationId: s.quotation_id || s.quotationId,
@@ -322,8 +329,6 @@ const ShipmentManagement = () => {
         return true;
     });
 
-    const isAllFilteredSelected = filteredShipments.length > 0 && filteredShipments.every(s => selectedShipmentIds.includes(s.id));
-
     const toggleSelectShipment = (shipmentId) => {
         setSelectedShipmentIds(prev => (
             prev.includes(shipmentId)
@@ -332,17 +337,20 @@ const ShipmentManagement = () => {
         ));
     };
 
-    const toggleSelectAllFiltered = () => {
-        if (isAllFilteredSelected) {
-            setSelectedShipmentIds(prev => prev.filter(id => !filteredShipments.some(s => s.id === id)));
-            return;
-        }
+    const shipmentGroups = [
+        { direction: 'export', label: t("Export") },
+        { direction: 'import', label: t("Import") },
+        { direction: 'unspecified', label: t("Belum Ditentukan") }
+    ].map(group => ({
+        ...group,
+        shipments: filteredShipments.filter(shipment => normalizeTradeDirection(shipment.tradeDirection) === group.direction)
+    }));
 
-        setSelectedShipmentIds(prev => {
-            const merged = new Set(prev);
-            filteredShipments.forEach(s => merged.add(s.id));
-            return Array.from(merged);
-        });
+    const toggleSelectShipmentGroup = (groupShipments, shouldSelect) => {
+        const groupIds = new Set(groupShipments.map(shipment => shipment.id));
+        setSelectedShipmentIds(previous => shouldSelect
+            ? [...new Set([...previous, ...groupIds])]
+            : previous.filter(id => !groupIds.has(id)));
     };
 
 
@@ -930,80 +938,87 @@ const ShipmentManagement = () => {
                     </p>
                 </div>
             ) : (
-                <div className="glass-card rounded-lg overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="bg-accent-orange">
-                                <tr>
-                                    <th className="px-4 py-3 text-center text-xs font-semibold text-white">
-                                        <input
-                                            type="checkbox"
-                                            checked={isAllFilteredSelected}
-                                            onChange={toggleSelectAllFiltered}
-                                            onClick={(e) => e.stopPropagation()}
-                                            className="w-4 h-4"
-                                        />
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-white">{t("Job Number")}</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-white">{t("Customer")}</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-white">{t("Route")}</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-white">{t("Type")}</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-white">{t("Service")}</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-white">{t("Status")}</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-dark-border">
-                                {filteredShipments.map((ship) => (
-                                    <tr
-                                        key={ship.id}
-                                        onClick={() => handleViewShipment(ship)}
-                                        className="hover:bg-dark-surface smooth-transition cursor-pointer"
-                                    >
-                                        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedShipmentIds.includes(ship.id)}
-                                                onChange={() => toggleSelectShipment(ship.id)}
-                                                className="w-4 h-4"
-                                            />
-                                        </td>
-                                        <td className="px-4 py-3 font-medium text-accent-orange">
-                                            {ship.jobNumber}
-                                        </td>
-                                        <td className="px-4 py-3 text-silver-light">{ship.customer}</td>
-                                        <td className="px-4 py-3">
-                                            <div className="flex items-center gap-1 text-sm">
-                                                <MapPin className="w-3 h-3" />
-                                                <span>{ship.origin} → {ship.destination}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            {(() => {
-                                                const b = getShipmentBadge(ship);
-                                                if (!b.colorClass) {
-                                                    // Render as plain text when colorClass is empty
-                                                    return <span className="text-sm text-silver-dark">{b.label}</span>;
-                                                }
-                                                return (
-                                                    <span className={`px-2 py-1 rounded text-xs ${b.colorClass}`}>
-                                                        {b.label}
-                                                    </span>
-                                                );
-                                            })()}
-                                        </td>
-                                        <td className="px-4 py-3 capitalize text-silver-light">
-                                            {ship.serviceType}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <span className={`px-3 py-1 rounded-full text-xs ${statusConfig[ship.status]?.color}`}>
-                                                {statusConfig[ship.status]?.label}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                <div className="space-y-6">
+                    {shipmentGroups.map(group => (
+                        <section key={group.direction} className="space-y-2">
+                            <h2 className="text-lg font-semibold text-silver-light">
+                                {t("Sales Order")} — {group.label} ({group.shipments.length})
+                            </h2>
+                            <div className="glass-card rounded-lg overflow-hidden">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                        <thead className="bg-accent-orange">
+                                            <tr>
+                                                <th className="px-4 py-3 text-center text-xs font-semibold text-white">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={group.shipments.length > 0 && group.shipments.every(shipment => selectedShipmentIds.includes(shipment.id))}
+                                                        onChange={event => toggleSelectShipmentGroup(group.shipments, event.target.checked)}
+                                                        onClick={event => event.stopPropagation()}
+                                                        className="w-4 h-4"
+                                                    />
+                                                </th>
+                                                <th className="px-4 py-3 text-left text-xs font-semibold text-white">{t("Job Number")}</th>
+                                                <th className="px-4 py-3 text-left text-xs font-semibold text-white">{t("Customer")}</th>
+                                                <th className="px-4 py-3 text-left text-xs font-semibold text-white">{t("Route")}</th>
+                                                <th className="px-4 py-3 text-left text-xs font-semibold text-white">{t("Type")}</th>
+                                                <th className="px-4 py-3 text-left text-xs font-semibold text-white">{t("Service")}</th>
+                                                <th className="px-4 py-3 text-left text-xs font-semibold text-white">{t("Status")}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-dark-border">
+                                            {group.shipments.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan="7" className="px-4 py-8 text-center text-silver-dark">
+                                                        {t("No sales orders in this group.")}
+                                                    </td>
+                                                </tr>
+                                            ) : group.shipments.map(ship => (
+                                                <tr
+                                                    key={ship.id}
+                                                    onClick={() => handleViewShipment(ship)}
+                                                    className="hover:bg-dark-surface smooth-transition cursor-pointer"
+                                                >
+                                                    <td className="px-4 py-3" onClick={event => event.stopPropagation()}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedShipmentIds.includes(ship.id)}
+                                                            onChange={() => toggleSelectShipment(ship.id)}
+                                                            className="w-4 h-4"
+                                                        />
+                                                    </td>
+                                                    <td className="px-4 py-3 font-medium text-accent-orange">{ship.jobNumber}</td>
+                                                    <td className="px-4 py-3 text-silver-light">{ship.customer}</td>
+                                                    <td className="px-4 py-3">
+                                                        <div className="flex items-center gap-1 text-sm">
+                                                            <MapPin className="w-3 h-3" />
+                                                            <span>{ship.origin} → {ship.destination}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        {(() => {
+                                                            const badge = getShipmentBadge(ship);
+                                                            return (
+                                                                <span className={`px-2 py-1 rounded text-xs ${badge.colorClass}`}>
+                                                                    {badge.label}
+                                                                </span>
+                                                            );
+                                                        })()}
+                                                    </td>
+                                                    <td className="px-4 py-3 capitalize text-silver-light">{ship.serviceType}</td>
+                                                    <td className="px-4 py-3">
+                                                        <span className={`px-3 py-1 rounded-full text-xs ${statusConfig[ship.status]?.color}`}>
+                                                            {statusConfig[ship.status]?.label}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </section>
+                    ))}
                 </div>
             )}
 

@@ -185,7 +185,10 @@ const BigGeneralJournal = () => {
         setLoading(true);
         try {
             const [{ data: ent }, { data: coa }] = await Promise.all([
-                supabase.from('big_journal_entries').select(`*, big_journal_line_items(*, big_coa(code, name))`).order('entry_date', { ascending: false }),
+                supabase.from('big_journal_entries').select(`*, big_journal_line_items(*, big_coa(code, name))`)
+                    .order('entry_date', { ascending: false })
+                    .order('created_at', { ascending: false })
+                    .order('id', { ascending: false }),
                 supabase.from('big_coa').select('id,code,name,type').eq('is_active', true).order('code'),
             ]);
             setEntries(ent || []);

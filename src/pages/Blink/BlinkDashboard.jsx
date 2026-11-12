@@ -470,12 +470,16 @@ const BlinkDashboard = () => {
                     supabase.from('blink_invoices')
                         .select('id, invoice_number, customer_name, invoice_date, due_date, outstanding_amount, total_amount, paid_amount, status, currency')
                         .in('status', ['unpaid', 'overdue', 'partially_paid', 'submitted', 'manager_approval', 'sent'])
-                        .order('invoice_date', { ascending: false }).limit(20),
+                        .order('invoice_date', { ascending: false })
+                        .order('id', { ascending: false })
+                        .limit(20),
                     // AP: query blink_ap_transactions (populated when PO is approved)
                     supabase.from('blink_ap_transactions')
                         .select('id, ap_number, po_number, vendor_name, bill_date, due_date, outstanding_amount, original_amount, paid_amount, status, currency, exchange_rate')
                         .in('status', ['outstanding', 'overdue', 'partial'])
-                        .order('bill_date', { ascending: false }).limit(20),
+                        .order('bill_date', { ascending: false })
+                        .order('id', { ascending: false })
+                        .limit(20),
                     // Shipments for import/export breakdown
                     supabase.from('blink_shipments')
                         .select('trade_direction, service_type, quoted_amount, currency')
@@ -499,7 +503,9 @@ const BlinkDashboard = () => {
                         .from('blink_purchase_orders')
                         .select('id, po_number, vendor_name, po_date, payment_terms, total_amount, paid_amount, currency, exchange_rate, status')
                         .in('status', ['approved', 'received'])
-                        .order('po_date', { ascending: false }).limit(20);
+                        .order('po_date', { ascending: false })
+                        .order('id', { ascending: false })
+                        .limit(20);
                     unpaidPOs = (poFallback || []).map(po => {
                         let daysToAdd = 30;
                         const m = String(po.payment_terms || 'NET 30').match(/\d+/);

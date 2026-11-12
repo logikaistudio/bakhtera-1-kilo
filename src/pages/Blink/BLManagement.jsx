@@ -216,7 +216,8 @@ const BLManagement = () => {
             const { data: shipmentsData, error } = await supabase
                 .from('blink_shipments')
                 .select('*')
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false });
 
             if (error) throw error;
 
@@ -327,7 +328,8 @@ const BLManagement = () => {
             const { data, error } = await supabase
                 .from('blink_quotations')
                 .select('*')
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false });
 
             if (error) throw error;
             setQuotations(data || []);
@@ -342,7 +344,8 @@ const BLManagement = () => {
             const { data, error } = await supabase
                 .from('blink_shipments')
                 .select('*')
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false });
 
             if (error) throw error;
             setShipments(data || []);

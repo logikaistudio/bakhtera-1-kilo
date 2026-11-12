@@ -64,7 +64,9 @@ const AccountsReceivable = () => {
                 .from('blink_ar_transactions')
                 .select('*')
                 .eq('division', activeDivision)
-                .order('transaction_date', { ascending: false });
+                .order('transaction_date', { ascending: false })
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false });
 
             let finalRows = [];
 
@@ -85,7 +87,9 @@ const AccountsReceivable = () => {
                     .eq('division', activeDivision)
                     .neq('status', 'draft')
                     .neq('status', 'cancelled')
-                    .order('invoice_date', { ascending: false });
+                    .order('invoice_date', { ascending: false })
+                    .order('created_at', { ascending: false })
+                    .order('id', { ascending: false });
 
                 if (invoiceError) throw invoiceError;
 
@@ -132,6 +136,11 @@ const AccountsReceivable = () => {
                 };
             });
 
+            arData.sort((a, b) => {
+                const dateDifference = new Date(b.transaction_date || 0) - new Date(a.transaction_date || 0);
+                if (dateDifference !== 0) return dateDifference;
+                return String(b.created_at || b.id || '').localeCompare(String(a.created_at || a.id || ''));
+            });
             setARTransactions(arData);
         } catch (error) {
             console.error('Error fetching AR:', error);
@@ -652,7 +661,9 @@ const ARDetailModal = ({ ar, onClose, onRecordPayment, formatCurrency, canEditAR
                 query.eq('reference_id', ar.id);
             }
 
-            query.order('payment_date', { ascending: false });
+            query
+                .order('payment_date', { ascending: false })
+                .order('id', { ascending: false });
             const { data, error } = await query;
             if (error) throw error;
             setPaymentHistory(data || []);

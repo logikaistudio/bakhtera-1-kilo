@@ -537,7 +537,8 @@ const APDetailModal = ({ ap, formatCurrency, onClose, onRecordPayment, canEditAP
                 .select('*')
                 .eq('reference_id', ap.id)
                 .eq('division', ap.division || getActiveDivision())
-                .order('payment_date', { ascending: false });
+                .order('payment_date', { ascending: false })
+                .order('id', { ascending: false });
 
             if (error) throw error;
             setPaymentHistory(data || []);
@@ -877,7 +878,8 @@ const AccountsPayable = () => {
                     .select('*')
                 )
                     .order('bill_date', { ascending: false })
-                    .order('id', { ascending: true })
+                    .order('created_at', { ascending: false })
+                    .order('id', { ascending: false })
                 ).then(data => ({ data, error: null }))
                     .catch(error => ({ data: [], error })),
                 fetchAllBlinkRows(() => scopeByDivision(supabase
@@ -886,7 +888,8 @@ const AccountsPayable = () => {
                 )
                     .in('status', ['approved', 'received', 'paid'])
                     .order('po_date', { ascending: false })
-                    .order('id', { ascending: true })
+                    .order('created_at', { ascending: false })
+                    .order('id', { ascending: false })
                 ).then(data => ({ data, error: null }))
                     .catch(error => ({ data: [], error }))
             ]);
@@ -944,7 +947,12 @@ const AccountsPayable = () => {
                 };
             });
 
-            const finalRows = [...apRows, ...fallbackRows];
+            const finalRows = [...apRows, ...fallbackRows].sort((a, b) => {
+                const dateDifference = new Date(b.bill_date || b.po_date || b.transaction_date || b.created_at || 0) -
+                    new Date(a.bill_date || a.po_date || a.transaction_date || a.created_at || 0);
+                if (dateDifference !== 0) return dateDifference;
+                return String(b.created_at || b.id || '').localeCompare(String(a.created_at || a.id || ''));
+            });
 
             // Update aging bucket and metadata dynamically
             const updatedData = (finalRows || []).map(ap => {

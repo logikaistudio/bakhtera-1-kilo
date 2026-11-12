@@ -46,7 +46,8 @@ const ExchangeRates = () => {
             const { data, error } = await supabase
                 .from('blink_exchange_rates')
                 .select('*')
-                .order('effective_date', { ascending: false });
+                .order('effective_date', { ascending: false })
+                .order('id', { ascending: false });
 
             if (error) throw error;
             setRates(data || []);

@@ -456,7 +456,9 @@ const BigInvoiceManagement = () => {
         setLoading(true);
         try {
             const [{ data: inv }, { data: coa }, { data: q }] = await Promise.all([
-                supabase.from('big_invoices').select('*').order('created_at', { ascending: false }),
+                supabase.from('big_invoices').select('*')
+                    .order('created_at', { ascending: false })
+                    .order('id', { ascending: false }),
                 supabase.from('big_coa').select('id,code,name,type').eq('is_active', true).order('code'),
                 supabase
                     .from('big_quotations')

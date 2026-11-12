@@ -449,7 +449,8 @@ const SalesQuotation = () => {
             const { data, error } = await supabase
                 .from('blink_sales_quotations')
                 .select('*')
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false });
 
             if (error) throw error;
 

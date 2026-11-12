@@ -40,7 +40,8 @@ const SellingVsBuying = () => {
             const { data, error } = await supabase
                 .from('blink_shipments')
                 .select('*')
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false });
 
             if (error) throw error;
 

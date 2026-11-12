@@ -231,7 +231,9 @@ const BigAccountsPayable = () => {
             const { data: apRows, error } = await supabase
                 .from('big_ap_transactions')
                 .select('*')
-                .order('transaction_date', { ascending: false });
+                .order('transaction_date', { ascending: false })
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false });
 
             let rows = [];
             if (!error && apRows?.length > 0) {
@@ -241,7 +243,9 @@ const BigAccountsPayable = () => {
                     .from('big_pos')
                     .select('*')
                     .in('status', ['approved', 'paid'])
-                    .order('po_date', { ascending: false });
+                    .order('po_date', { ascending: false })
+                    .order('created_at', { ascending: false })
+                    .order('id', { ascending: false });
 
                 rows = (poRows || []).map(po => ({
                     id: po.id,
@@ -264,7 +268,10 @@ const BigAccountsPayable = () => {
                 ...ap,
                 aging_bucket: calcAging(ap.due_date),
                 status: ap.status || deriveStatus(ap.paid_amount || 0, ap.original_amount || 0, ap.due_date),
-            })));
+            })).sort((a, b) =>
+                new Date(b.transaction_date || b.bill_date || b.po_date || b.created_at || 0) -
+                new Date(a.transaction_date || a.bill_date || a.po_date || a.created_at || 0)
+            ));
         } catch (err) { console.error(err); }
         finally { setLoading(false); }
     };

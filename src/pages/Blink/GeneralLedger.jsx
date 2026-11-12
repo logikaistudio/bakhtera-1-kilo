@@ -132,6 +132,7 @@ const exportToPDF = (selectedAccount, accountInfo, dateRange, openingBalance, to
         if (currency === 'USD') return `$${Math.abs(value).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         return `Rp ${Math.abs(value).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
+    const displayRows = [...rows].reverse();
 
     const bodyHTML = `
             <div class="summary-grid">
@@ -171,14 +172,15 @@ const exportToPDF = (selectedAccount, accountInfo, dateRange, openingBalance, to
                     </tr>
                 </thead>
                 <tbody>
-                    <tr class="row-opening">
-                        <td colspan="6" class="yellow-label">↑ Opening Balance
-                            <span style="font-weight:normal;color:#92400e;font-size:8px"> (before ${fmtDatePrint(dateRange.start)})</span>
+                    <tr class="row-closing">
+                        <td colspan="6" class="purple">↓ Closing Balance
+                            <span style="font-weight:normal;color:#7c3aed;font-size:8px"> (${fmtDatePrint(dateRange.end)})</span>
                         </td>
-                        <td></td><td></td>
-                        <td class="text-right mono yellow-label">${fmtP(openingBalance)}</td>
+                        <td class="text-right mono green bold">${fmtP(totalDebit)}</td>
+                        <td class="text-right mono bold" style="color:#1d4ed8">${fmtP(totalCredit)}</td>
+                        <td class="text-right mono ${closingBalance < 0 ? 'red' : 'purple'} bold">${fmtP(closingBalance)}</td>
                     </tr>
-                    ${rows.map(entry => `
+                    ${displayRows.map(entry => `
                     <tr>
                         <td class="muted">${fmtDatePrint(entry.entry_date)}</td>
                         <td class="code">${entry.entry_number || '-'}</td>
@@ -190,13 +192,12 @@ const exportToPDF = (selectedAccount, accountInfo, dateRange, openingBalance, to
                         <td class="text-right mono" style="color:#1d4ed8">${entry.credit > 0 ? fmtAmt(entry.credit, entry.currency, entry.exchange_rate) : ''}</td>
                         <td class="text-right mono ${entry.runningBalance < 0 ? 'red' : ''}">${fmtP(entry.runningBalance)}</td>
                     </tr>`).join('')}
-                    <tr class="row-closing">
-                        <td colspan="6" class="purple">↓ Closing Balance
-                            <span style="font-weight:normal;color:#7c3aed;font-size:8px"> (${fmtDatePrint(dateRange.end)})</span>
+                    <tr class="row-opening">
+                        <td colspan="6" class="yellow-label">↑ Opening Balance
+                            <span style="font-weight:normal;color:#92400e;font-size:8px"> (before ${fmtDatePrint(dateRange.start)})</span>
                         </td>
-                        <td class="text-right mono green bold">${fmtP(totalDebit)}</td>
-                        <td class="text-right mono bold" style="color:#1d4ed8">${fmtP(totalCredit)}</td>
-                        <td class="text-right mono ${closingBalance < 0 ? 'red' : 'purple'} bold">${fmtP(closingBalance)}</td>
+                        <td></td><td></td>
+                        <td class="text-right mono yellow-label">${fmtP(openingBalance)}</td>
                     </tr>
                 </tbody>
             </table>`;
@@ -399,7 +400,8 @@ const GeneralLedger = () => {
                     .gte('entry_date', dateRange.start)
                     .lte('entry_date', dateRange.end)
                     .order('entry_date', { ascending: true })
-                    .order('created_at', { ascending: true }),
+                    .order('created_at', { ascending: true })
+                    .order('id', { ascending: true }),
                 (acc?.code || isUnclassified) ? supabase.from('blink_journal_entries')
                     .select('*')
                     .eq('division', activeDivision)
@@ -408,7 +410,8 @@ const GeneralLedger = () => {
                     .gte('entry_date', dateRange.start)
                     .lte('entry_date', dateRange.end)
                     .order('entry_date', { ascending: true })
-                    .order('created_at', { ascending: true }) : Promise.resolve({ data: [] }),
+                    .order('created_at', { ascending: true })
+                    .order('id', { ascending: true }) : Promise.resolve({ data: [] }),
                 acc?.name ? supabase.from('blink_journal_entries')
                     .select('*')
                     .eq('division', activeDivision)
@@ -416,7 +419,8 @@ const GeneralLedger = () => {
                     .gte('entry_date', dateRange.start)
                     .lte('entry_date', dateRange.end)
                     .order('entry_date', { ascending: true })
-                    .order('created_at', { ascending: true }) : Promise.resolve({ data: [] })
+                    .order('created_at', { ascending: true })
+                    .order('id', { ascending: true }) : Promise.resolve({ data: [] })
             ]);
 
             if (r1.error) throw r1.error;
@@ -587,6 +591,7 @@ const GeneralLedger = () => {
             return { ...e, runningBalance: running };
         });
     }, [filteredEntries, openingBalance, isNormalCredit]);
+    const displayRows = useMemo(() => [...rows].reverse(), [rows]);
 
     // Sparkline data for closing balance trend (last 7 rows)
     const sparkData = rows.slice(-Math.min(rows.length, 12)).map(r => r.runningBalance);
@@ -613,8 +618,8 @@ const GeneralLedger = () => {
         if (!selectedAccount) return;
         const headers = ['Date', 'Entry No.', 'Description', 'Ref. No.', 'Party', 'Debit (IDR)', 'Credit (IDR)', 'Balance (IDR)', 'Currency', 'Source'];
         const csvRows = [
-            ['Opening Balance', '', '', '', '', '', '', openingBalance, '', ''],
-            ...rows.map(r => [
+            ['Closing Balance', '', '', '', '', totalDebit, totalCredit, closingBalance, '', ''],
+            ...displayRows.map(r => [
                 r.entry_date, r.entry_number, r.description || '',
                 getDisplayReferenceNumber(r), r.party_name || '',
                 toIDR(r.debit, r.currency, r.exchange_rate) ?? 0,
@@ -622,7 +627,7 @@ const GeneralLedger = () => {
                 r.runningBalance, r.currency || 'IDR',
                 r.reference_type || r.source || ''
             ]),
-            ['Closing Balance', '', '', '', '', totalDebit, totalCredit, closingBalance, '', '']
+            ['Opening Balance', '', '', '', '', '', '', openingBalance, '', '']
         ];
         const esc = f => { const s = String(f ?? ''); return s.includes(',') ? `"${s}"` : s; };
         const csv = [headers.join(','), ...csvRows.map(r => r.map(esc).join(','))].join('\n');
@@ -885,18 +890,21 @@ const GeneralLedger = () => {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-dark-border/40">
-                                                <tr className="bg-yellow-500/5 border-l-2 border-yellow-500">
+                                                <tr className="bg-purple-500/5 border-l-2 border-purple-500">
                                                     <td className="px-3 py-1.5" colSpan={6}>
-                                                        <span className="font-semibold text-yellow-400">{t("↑ Opening Balance")}</span>
-                                                        <span className="ml-2 text-silver-dark text-[10px]">{t("(before")} {new Date(dateRange.start + 'T00:00:00').toLocaleDateString('en-GB', { dateStyle: 'medium' })})</span>
+                                                        <span className="font-semibold text-purple-400">{t("↓ Closing Balance")}</span>
+                                                        <span className="ml-2 text-silver-dark text-[10px]">({new Date(dateRange.end + 'T00:00:00').toLocaleDateString('en-GB', { dateStyle: 'medium' })})</span>
                                                     </td>
-                                                    <td className="px-3 py-1.5" />
-                                                    <td className="px-3 py-1.5" />
-                                                    <td className="px-3 py-1.5 text-right font-bold text-yellow-400 font-mono">{fmtIDR(openingBalance)}</td>
+                                                    <td className="px-3 py-1.5 text-right font-bold text-green-400 font-mono">{fmtIDR(totalDebit)}</td>
+                                                    <td className="px-3 py-1.5 text-right font-bold text-blue-400 font-mono">{fmtIDR(totalCredit)}</td>
+                                                    <td className="px-3 py-1.5 text-right font-mono">
+                                                        <span className={`font-bold ${closingBalance >= 0 ? 'text-purple-400' : 'text-red-400'}`}>{fmtIDR(closingBalance)}</span>
+                                                        <div className="flex justify-end mt-0.5"><BalanceTag bal={closingBalance} /></div>
+                                                    </td>
                                                 </tr>
                                                 {rows.length === 0 ? (
                                                     <tr><td colSpan={9} className="px-4 py-10 text-center text-silver-dark">{t("Tidak ada transactions pada periode dan akun ini.")}</td></tr>
-                                                ) : rows.map((entry, idx) => {
+                                                ) : displayRows.map((entry, idx) => {
                                                     const srcCfg = getSourceConfig(entry);
                                                     const referenceNumber = getDisplayReferenceNumber(entry);
                                                     const isLinked = entry.reference_type && entry.reference_type !== 'adjustment' && referenceNumber;
@@ -932,17 +940,14 @@ const GeneralLedger = () => {
                                                     );
                                                 })}
                                                 {rows.length > 0 && (
-                                                    <tr className="bg-purple-500/5 border-l-2 border-purple-500">
+                                                    <tr className="bg-yellow-500/5 border-l-2 border-yellow-500">
                                                         <td className="px-3 py-1.5" colSpan={6}>
-                                                            <span className="font-semibold text-purple-400">{t("↓ Closing Balance")}</span>
-                                                            <span className="ml-2 text-silver-dark text-[10px]">({new Date(dateRange.end + 'T00:00:00').toLocaleDateString('en-GB', { dateStyle: 'medium' })})</span>
+                                                            <span className="font-semibold text-yellow-400">{t("↑ Opening Balance")}</span>
+                                                            <span className="ml-2 text-silver-dark text-[10px]">{t("(before")} {new Date(dateRange.start + 'T00:00:00').toLocaleDateString('en-GB', { dateStyle: 'medium' })})</span>
                                                         </td>
-                                                        <td className="px-3 py-1.5 text-right font-bold text-green-400 font-mono">{fmtIDR(totalDebit)}</td>
-                                                        <td className="px-3 py-1.5 text-right font-bold text-blue-400 font-mono">{fmtIDR(totalCredit)}</td>
-                                                        <td className="px-3 py-1.5 text-right font-mono">
-                                                            <span className={`font-bold ${closingBalance >= 0 ? 'text-purple-400' : 'text-red-400'}`}>{fmtIDR(closingBalance)}</span>
-                                                            <div className="flex justify-end mt-0.5"><BalanceTag bal={closingBalance} /></div>
-                                                        </td>
+                                                        <td className="px-3 py-1.5" />
+                                                        <td className="px-3 py-1.5" />
+                                                        <td className="px-3 py-1.5 text-right font-bold text-yellow-400 font-mono">{fmtIDR(openingBalance)}</td>
                                                     </tr>
                                                 )}
                                             </tbody>
