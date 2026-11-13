@@ -999,6 +999,8 @@ const AccountsPayable = () => {
             ? `$${formatted}`
             : `Rp ${formatted}`;
     };
+    const formatAgingAmount = (value) => Number(value || 0)
+        .toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     // Calculate metrics with currency breakdown
     const apSummary = getCurrencySummary(apTransactions, 'original_amount');
@@ -1207,46 +1209,52 @@ const AccountsPayable = () => {
                 <h2 className="text-sm font-bold text-silver-light mb-3">{t("Aging Analysis (Outstanding by Currency)")}</h2>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {/* IDR Aging */}
-                    <div className="space-y-3">
-                        <p className="text-xs font-semibold text-blue-400">{t("IDR Outstanding")}</p>
+                    <div className="space-y-4">
+                        <p className="text-sm font-bold text-slate-800 dark:text-silver-light">{t("IDR Outstanding")}</p>
                         {Object.entries(agingByCurrency).map(([bucket, data]) => (
                             <div key={`idr-${bucket}`}>
-                                <div className="flex justify-between mb-1">
-                                    <span className="text-xs text-silver-dark">{bucket} {t("Days")}</span>
-                                    <span className="text-sm font-semibold text-blue-300">Rp {formatCurrency(data.IDR)}</span>
+                                <div className="flex justify-between mb-1.5">
+                                    <span className="text-sm font-medium text-slate-700 dark:text-silver-light">{bucket} {t("Days")}</span>
+                                    <span className="text-sm font-bold text-slate-900 dark:text-silver-light">{formatAgingAmount(data.IDR)}</span>
                                 </div>
-                                <div className="h-1.5 bg-dark-card rounded-full overflow-hidden">
+                                <div className="h-7 rounded-lg border border-slate-300 bg-slate-200/90 p-0.5 shadow-inner dark:border-slate-700 dark:bg-slate-900/80">
                                     <div
-                                        className={`h-full ${
-                                            bucket === '0-30' ? 'bg-green-400' :
-                                            bucket === '31-60' ? 'bg-yellow-400' :
-                                            bucket === '61-90' ? 'bg-orange-400' : 'bg-red-400'
+                                        className={`relative h-full overflow-hidden rounded-md border-t border-white/60 border-b border-black/20 bg-gradient-to-b shadow-[0_2px_0_rgba(15,23,42,0.4)] transition-[width] duration-500 ${
+                                            bucket === '0-30' ? 'from-emerald-300 via-green-400 to-emerald-600' :
+                                            bucket === '31-60' ? 'from-amber-300 via-yellow-400 to-amber-600' :
+                                            bucket === '61-90' ? 'from-orange-300 via-orange-400 to-orange-600' :
+                                            'from-rose-300 via-red-400 to-rose-600'
                                         }`}
                                         style={{ width: `${outstandingSummary.IDR.amount > 0 ? (data.IDR / outstandingSummary.IDR.amount) * 100 : 0}%` }}
-                                    />
+                                    >
+                                        <span className="absolute inset-x-1 top-[2px] h-1/3 rounded-full bg-gradient-to-b from-white/55 to-white/10" />
+                                    </div>
                                 </div>
                             </div>
                         ))}
                     </div>
 
                     {/* USD Aging */}
-                    <div className="space-y-3">
-                        <p className="text-xs font-semibold text-yellow-400">{t("USD Outstanding")}</p>
+                    <div className="space-y-4">
+                        <p className="text-sm font-bold text-slate-800 dark:text-silver-light">{t("USD Outstanding")}</p>
                         {Object.entries(agingByCurrency).map(([bucket, data]) => (
                             <div key={`usd-${bucket}`}>
-                                <div className="flex justify-between mb-1">
-                                    <span className="text-xs text-silver-dark">{bucket} {t("Days")}</span>
-                                    <span className="text-sm font-semibold text-yellow-300">$ {formatCurrency(data.USD)}</span>
+                                <div className="flex justify-between mb-1.5">
+                                    <span className="text-sm font-medium text-slate-700 dark:text-silver-light">{bucket} {t("Days")}</span>
+                                    <span className="text-sm font-bold text-slate-900 dark:text-silver-light">{formatAgingAmount(data.USD)}</span>
                                 </div>
-                                <div className="h-1.5 bg-dark-card rounded-full overflow-hidden">
+                                <div className="h-7 rounded-lg border border-slate-300 bg-slate-200/90 p-0.5 shadow-inner dark:border-slate-700 dark:bg-slate-900/80">
                                     <div
-                                        className={`h-full ${
-                                            bucket === '0-30' ? 'bg-green-400' :
-                                            bucket === '31-60' ? 'bg-yellow-400' :
-                                            bucket === '61-90' ? 'bg-orange-400' : 'bg-red-400'
+                                        className={`relative h-full overflow-hidden rounded-md border-t border-white/60 border-b border-black/20 bg-gradient-to-b shadow-[0_2px_0_rgba(15,23,42,0.4)] transition-[width] duration-500 ${
+                                            bucket === '0-30' ? 'from-emerald-300 via-green-400 to-emerald-600' :
+                                            bucket === '31-60' ? 'from-amber-300 via-yellow-400 to-amber-600' :
+                                            bucket === '61-90' ? 'from-orange-300 via-orange-400 to-orange-600' :
+                                            'from-rose-300 via-red-400 to-rose-600'
                                         }`}
                                         style={{ width: `${outstandingSummary.USD.amount > 0 ? (data.USD / outstandingSummary.USD.amount) * 100 : 0}%` }}
-                                    />
+                                    >
+                                        <span className="absolute inset-x-1 top-[2px] h-1/3 rounded-full bg-gradient-to-b from-white/55 to-white/10" />
+                                    </div>
                                 </div>
                             </div>
                         ))}
