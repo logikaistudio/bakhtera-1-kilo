@@ -374,7 +374,7 @@ const ProfitLoss = () => {
             // Code 6 → Administrasi & General Expenses
             const expenses = all.filter(a => {
                 const prefix = getCodePrefix(a.code);
-                return prefix === '6' && a.amount !== 0;
+                return prefix === '6';
             }).sort((a, b) => a.code.localeCompare(b.code));
 
             // Code 7 & 8 → Other Income (ALL 7xx and 8xx accounts go here)

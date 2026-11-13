@@ -234,7 +234,9 @@ const ProfitLossDetail = () => {
             const valid = a => a.currentMonthAmount !== 0 || a.prevMonthAmount !== 0 || a.ytdAmount !== 0;
             const revenue = all.filter(a => a.type === 'REVENUE' && valid(a)).sort((a, b) => a.code.localeCompare(b.code));
             const cogs = all.filter(a => ['COGS', 'COST', 'DIRECT_COST'].includes(a.type) && valid(a)).sort((a, b) => a.code.localeCompare(b.code));
-            const expenses = all.filter(a => a.type === 'EXPENSE' && valid(a)).sort((a, b) => a.code.localeCompare(b.code));
+            const expenses = all.filter(a =>
+                (a.type === 'EXPENSE' && valid(a)) || String(a.code || '').trim().startsWith('6')
+            ).sort((a, b) => a.code.localeCompare(b.code));
             const other_income = all.filter(a => a.type === 'OTHER_INCOME' && valid(a)).sort((a, b) => a.code.localeCompare(b.code));
             const other_expense = all.filter(a => a.type === 'OTHER_EXPENSE' && valid(a)).sort((a, b) => a.code.localeCompare(b.code));
 
