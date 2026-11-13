@@ -974,7 +974,6 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
         notes: ''
     });
     const [bankAccounts, setBankAccounts] = useState([]);
-    const [arAccountsList, setArAccountsList] = useState([]);
     const [loading, setLoading] = useState(false);
     // Success state
     const [paymentSuccess, setPaymentSuccess] = useState(false);
@@ -999,7 +998,6 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
             const { data, error } = await supabase.from('finance_coa').select('*').eq('type', 'ASSET').order('code');
             if (error) throw error;
             if (data && data.length > 0) {
-                setArAccountsList(data);
                 const invoiceARCOAId = invoiceRow?.ar_coa_id || ar.ar_coa_id;
                 if (invoiceARCOAId) {
                     setFormData(prev => ({ ...prev, ar_coa_id: invoiceARCOAId }));
@@ -1430,39 +1428,6 @@ const PaymentRecordModal = ({ ar, formatCurrency, onClose, onSuccess }) => {
                                 {t("No bank accounts configured. Go to Company Settings to add accounts.")}
                             </p>
                         )}
-                    </div>
-
-                    {/* Piutang Account Override */}
-                    <div>
-                        <label className="block text-sm font-medium text-silver-dark mb-2">
-                            {t("Akun Piutang (AR Account)")}
-                        </label>
-                        {formData.ar_coa_id ? (
-                            <p className="w-full rounded-lg border border-dark-border bg-dark-surface px-3 py-2 text-sm text-silver-light">
-                                {(() => {
-                                    const account = arAccountsList.find(c => c.id === formData.ar_coa_id);
-                                    return account ? `${account.code} - ${account.name}` : t("COA piutang tersimpan pada invoice");
-                                })()}
-                            </p>
-                        ) : (
-                            <select
-                                value={formData.ar_coa_id}
-                                onChange={(e) => setFormData(prev => ({ ...prev, ar_coa_id: e.target.value }))}
-                                className="w-full"
-                            >
-                                <option value="">{t("-- Pilih Akun Piutang --")}</option>
-                                {arAccountsList.map(c => (
-                                    <option key={c.id} value={c.id}>
-                                        {c.code} - {c.name}
-                                    </option>
-                                ))}
-                            </select>
-                        )}
-                        <p className="text-xs text-silver-dark mt-1">
-                            {formData.ar_coa_id
-                                ? t("COA ini diambil dari invoice dan digunakan otomatis pada jurnal settlement.")
-                                : t("Invoice lama belum memiliki COA tersimpan; pilih akun untuk mempertahankan alur settlement lama.")}
-                        </p>
                     </div>
 
                     <div>

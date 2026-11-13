@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import {
     DollarSign, Calendar, RefreshCw, ChevronDown, ChevronRight,
-    FileSpreadsheet, Printer
+    FileSpreadsheet, Printer, X
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { getActiveDivision } from '../../utils/divisionContext';
@@ -44,6 +44,8 @@ const ProfitLoss = () => {
     const [expandedSections, setExpandedSections] = useState({
         revenue: true, cogs: true, expenses: true, other_income: true, other_expense: true
     });
+    const [incomeSourcesByCode, setIncomeSourcesByCode] = useState({});
+    const [incomeDrilldownAccount, setIncomeDrilldownAccount] = useState(null);
     const fetchReportDataRef = useRef(null);
 
     useEffect(() => { fetchReportData(); }, [selectedMonth]);
@@ -159,6 +161,23 @@ const ProfitLoss = () => {
             const getCodePrefix = (code) => code ? String(code).trim().charAt(0) : null;
             const postedRevenueInvoiceIds = new Set();
             const postedRevenueByInvoice = new Map();
+            const incomeSourcesByCode = new Map();
+            const addIncomeSource = (account, source) => {
+                const code = String(account?.code || '').trim();
+                if (!code || !source.amount) return null;
+                const sources = incomeSourcesByCode.get(code) || [];
+                sources.push(source);
+                incomeSourcesByCode.set(code, sources);
+                return source;
+            };
+            const removeIncomeSource = (account, source) => {
+                const code = String(account?.code || '').trim();
+                if (!code || !source) return;
+                incomeSourcesByCode.set(
+                    code,
+                    (incomeSourcesByCode.get(code) || []).filter(item => item !== source)
+                );
+            };
             const resolvedDefaultRevenueAccount = resolveDefaultInvoiceRevenueCOA(coaData || []);
             const defaultRevenueAccount = resolvedDefaultRevenueAccount
                 ? coaMapByCode[String(resolvedDefaultRevenueAccount.code || '').trim()] || null
@@ -212,13 +231,29 @@ const ProfitLoss = () => {
                 }
 
                 let val = 0;
+                let sourceDetail = null;
                 if (prefix === '4' || prefix === '7' || prefix === '8') {
                     val = (credit - debit);
+                    if (prefix === '4') {
+                        sourceDetail = addIncomeSource(acc, {
+                            sourceType: 'Jurnal aktual',
+                            date: e.entry_date,
+                            reference: e.reference_number || e.entry_number || e.reference_id || e.id,
+                            description: e.description || '-',
+                            amount: val
+                        });
+                    }
                     if (prefix === '4' && isInvoiceRevenueEntry(e) && e.reference_id) {
                         const invoiceId = String(e.reference_id);
                         postedRevenueInvoiceIds.add(invoiceId);
                         const postedRows = postedRevenueByInvoice.get(invoiceId) || [];
-                        postedRows.push({ account: acc, amount: val, date: e.entry_date, description: e.description });
+                        postedRows.push({
+                            account: acc,
+                            amount: val,
+                            date: e.entry_date,
+                            description: e.description,
+                            sourceDetail
+                        });
                         postedRevenueByInvoice.set(invoiceId, postedRows);
                     }
                 } else {
@@ -227,7 +262,7 @@ const ProfitLoss = () => {
                 applyAmountToAccount(acc, val, e.entry_date);
             });
 
-            const invoiceColumns = 'id, invoice_date, status, subtotal, total_amount, invoice_items, currency, exchange_rate';
+            const invoiceColumns = 'id, invoice_number, invoice_date, status, subtotal, total_amount, invoice_items, currency, exchange_rate';
             const invoiceRows = await fetchAllBlinkRows(() => supabase
                 .from('blink_invoices')
                 .select(invoiceColumns)
@@ -255,7 +290,14 @@ const ProfitLoss = () => {
                     if (!accountCode || accountCode === sourceCode || accountCode === defaultCode) return;
 
                     applyAmountToAccount(row.account, -row.amount, row.date);
-                    applyAmountToAccount(coaMapByCode[accountCode], row.amount, row.date);
+                    const targetAccount = coaMapByCode[accountCode];
+                    applyAmountToAccount(targetAccount, row.amount, row.date);
+                    removeIncomeSource(row.account, row.sourceDetail);
+                    row.sourceDetail = addIncomeSource(targetAccount, {
+                        ...row.sourceDetail,
+                        sourceType: 'Jurnal direklasifikasi di P&L'
+                    });
+                    row.account = targetAccount;
                 });
             };
 
@@ -284,11 +326,25 @@ const ProfitLoss = () => {
                     const itemTotal = allocations.reduce((sum, allocation) => sum + allocation.amount, 0);
                     const postedTotal = postedRows.reduce((sum, row) => sum + row.amount, 0);
                     if (itemTotal > 0 && postedTotal !== 0) {
-                        postedRows.forEach(row => applyAmountToAccount(row.account, -row.amount, row.date));
+                        postedRows.forEach(row => {
+                            applyAmountToAccount(row.account, -row.amount, row.date);
+                            removeIncomeSource(row.account, row.sourceDetail);
+                        });
                         allocations.forEach(allocation => {
                             const amount = allocation.amount * (postedTotal / itemTotal);
                             const account = coaMapByCode[String(allocation.account.code || '').trim()];
                             applyAmountToAccount(account, amount, invoice.invoice_date);
+                            addIncomeSource(account, {
+                                sourceType: 'Alokasi P&L dari jurnal',
+                                date: invoice.invoice_date,
+                                reference: invoice.invoice_number || invoice.id,
+                                description: 'Alokasi pendapatan invoice',
+                                relatedJournal: postedRows
+                                    .map(row => row.sourceDetail?.reference)
+                                    .filter(Boolean)
+                                    .join(', '),
+                                amount
+                            });
                         });
                     } else {
                         reclassifyPostedRowsByDescription(postedRows);
@@ -302,13 +358,28 @@ const ProfitLoss = () => {
                     allocations.forEach(({ account, amount }) => {
                         const targetAccount = coaMapByCode[String(account.code || '').trim()];
                         applyAmountToAccount(targetAccount, amount, invoice.invoice_date);
+                        addIncomeSource(targetAccount, {
+                            sourceType: 'Alokasi invoice (belum ada jurnal)',
+                            date: invoice.invoice_date,
+                            reference: invoice.invoice_number || invoice.id,
+                            description: 'Alokasi pendapatan invoice',
+                            amount
+                        });
                     });
                     return;
                 }
 
                 const fallbackAmount = Number(invoice.subtotal ?? invoice.total_amount) || 0;
                 const exchangeRate = invoice.currency !== 'IDR' ? (Number(invoice.exchange_rate) || 1) : 1;
-                applyAmountToAccount(defaultRevenueAccount, toIDR(fallbackAmount, invoice.currency || 'IDR', exchangeRate), invoice.invoice_date);
+                const amount = toIDR(fallbackAmount, invoice.currency || 'IDR', exchangeRate);
+                applyAmountToAccount(defaultRevenueAccount, amount, invoice.invoice_date);
+                addIncomeSource(defaultRevenueAccount, {
+                    sourceType: 'Invoice fallback P&L (belum ada jurnal)',
+                    date: invoice.invoice_date,
+                    reference: invoice.invoice_number || invoice.id,
+                    description: 'Pendapatan invoice',
+                    amount
+                });
             });
 
             postedRevenueByInvoice.forEach((postedRows, invoiceId) => {
@@ -416,6 +487,12 @@ const ProfitLoss = () => {
                 other_income: groupedOtherIncome,
                 other_expense: groupedOtherExpense,
             });
+            setIncomeSourcesByCode(Object.fromEntries(
+                [...incomeSourcesByCode.entries()].map(([code, sources]) => [
+                    code,
+                    sources.sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')))
+                ])
+            ));
             setTotals({ totalRevenue, totalCOGS, grossProfit, totalExpenses, operatingProfit, totalOtherIncome, totalOtherExpense, otherNet, netIncomeBeforeTax, taxAmount, netIncomeAfterTax });
         } catch (error) {
             console.error('Error fetching P&L data:', error);
@@ -440,6 +517,14 @@ const ProfitLoss = () => {
     const lastDate = new Date(parseInt(selY, 10), parseInt(selM, 10), 0);
     const formatDate = (d) => d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
     const period = `Periode: ${formatDate(firstDate)} - ${formatDate(lastDate)}`;
+    const incomeDrilldownSources = incomeDrilldownAccount
+        ? incomeSourcesByCode[String(incomeDrilldownAccount.code || '').trim()] || []
+        : [];
+    const incomeDrilldownTotal = incomeDrilldownSources.reduce((sum, source) => sum + source.amount, 0);
+    const formatIncomeContribution = (amount) => {
+        const value = Math.abs(amount).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return amount < 0 ? `(${value})` : value;
+    };
 
     // ── Export Excel ─────────────────────────────────────────────────
     const handleExportExcel = () => {
@@ -688,9 +773,11 @@ const ProfitLoss = () => {
     const colW = 'w-[120px] min-w-[120px]';
     const totalW = 'w-[120px] min-w-[120px]';
 
-    const ItemRow = ({ item }) => (
+    const ItemRow = ({ item, sectionKey }) => (
         <div
-            onClick={() => navigate('/blink/finance/general-ledger', { state: { preSelectedAccount: item.id } })}
+            onClick={() => sectionKey === 'revenue'
+                ? setIncomeDrilldownAccount(item)
+                : navigate('/blink/finance/general-ledger', { state: { preSelectedAccount: item.id } })}
             className="flex items-center border-b border-gray-100 dark:border-dark-border/20 hover:bg-gray-50 dark:hover:bg-dark-surface/40 cursor-pointer group"
         >
             <div className={`w-[140px] flex-shrink-0 pl-4 pr-2 py-2 flex items-center`}>
@@ -716,7 +803,7 @@ const ProfitLoss = () => {
     const renderSection = (groupedData, sectionKey) => {
         if (!groupedData || groupedData.length === 0) return <div className="px-6 py-2 text-[11px] text-silver-dark italic">{t("No data")}</div>;
         
-        return groupedData.map((group, idx) => {
+        return groupedData.map(group => {
             if (group.isParent) {
                 return (
                     <div key={`parent-${group.parent.code}`}>
@@ -739,11 +826,11 @@ const ProfitLoss = () => {
                                 <div className={`flex items-center justify-end text-[12px] font-mono text-slate-700 dark:text-silver-light font-bold ${getAmountColor(group.parent.amount)} ${totalW} px-1`} title={fmt(group.parent.amount)}>{fmt(group.parent.amount)}</div>
                             </div>
                         </div>
-                        {group.items.map(item => <ItemRow key={item.id} item={item} />)}
+                        {group.items.map(item => <ItemRow key={item.id} item={item} sectionKey={sectionKey} />)}
                     </div>
                 );
             }
-            return <ItemRow key={group.item.id} item={group.item} />;
+            return <ItemRow key={group.item.id} item={group.item} sectionKey={sectionKey} />;
         });
     };
 
@@ -975,8 +1062,92 @@ const ProfitLoss = () => {
                 </div>
             </div>
 
+            {incomeDrilldownAccount && (
+                <div
+                    className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4"
+                    onClick={() => setIncomeDrilldownAccount(null)}
+                >
+                    <div
+                        className="bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-xl shadow-2xl w-full max-w-5xl max-h-[85vh] flex flex-col"
+                        onClick={event => event.stopPropagation()}
+                    >
+                        <div className="flex items-start justify-between gap-4 p-5 border-b border-gray-200 dark:border-dark-border">
+                            <div>
+                                <h2 className="text-base font-bold text-slate-800 dark:text-silver-light">
+                                    {t("Income P&L Detail")}
+                                </h2>
+                                <p className="text-xs text-slate-500 dark:text-silver-dark mt-1">
+                                    {incomeDrilldownAccount.code} — {incomeDrilldownAccount.name}
+                                </p>
+                                <p className="text-xs text-slate-500 dark:text-silver-dark">{period}</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIncomeDrilldownAccount(null)}
+                                className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 dark:text-silver-light"
+                                aria-label={t("Close")}
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <div className="overflow-auto p-5">
+                            {incomeDrilldownSources.length === 0 ? (
+                                <div className="py-8 text-center text-sm text-slate-500 dark:text-silver-dark">
+                                    {t("No source transactions for this income account in the selected period.")}
+                                </div>
+                            ) : (
+                                <table className="w-full text-xs min-w-[700px]">
+                                    <thead>
+                                        <tr className="text-left text-slate-500 dark:text-silver-dark border-b border-gray-200 dark:border-dark-border">
+                                            <th className="px-3 py-2">{t("Date")}</th>
+                                            <th className="px-3 py-2">{t("Source")}</th>
+                                            <th className="px-3 py-2">{t("Reference")}</th>
+                                            <th className="px-3 py-2">{t("Description")}</th>
+                                            <th className="px-3 py-2 text-right">{t("P&L Contribution (IDR)")}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {incomeDrilldownSources.map((source, index) => (
+                                            <tr key={`${source.reference}-${source.date}-${index}`} className="border-b border-gray-100 dark:border-dark-border/30">
+                                                <td className="px-3 py-2 whitespace-nowrap text-slate-600 dark:text-silver-dark">{source.date || '-'}</td>
+                                                <td className="px-3 py-2 whitespace-nowrap text-slate-700 dark:text-silver-light">{source.sourceType}</td>
+                                                <td className="px-3 py-2 whitespace-nowrap font-mono text-slate-600 dark:text-silver-dark">{source.reference || '-'}</td>
+                                                <td className="px-3 py-2 text-slate-700 dark:text-silver-light">
+                                                    <div>{source.description || '-'}</div>
+                                                    {source.relatedJournal && (
+                                                        <div className="text-[10px] text-slate-500 dark:text-silver-dark mt-0.5">
+                                                            {t("Related journal:")} {source.relatedJournal}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className={`px-3 py-2 text-right font-mono whitespace-nowrap ${source.amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-silver-light'}`}>
+                                                    {formatIncomeContribution(source.amount)}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr className="font-bold border-t-2 border-gray-300 dark:border-dark-border">
+                                            <td colSpan={4} className="px-3 py-2 text-right text-slate-800 dark:text-silver-light">
+                                                {t("Total P&L Contribution")}
+                                            </td>
+                                            <td className="px-3 py-2 text-right font-mono text-slate-800 dark:text-silver-light">
+                                                {formatIncomeContribution(incomeDrilldownTotal)}
+                                            </td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            )}
+                        </div>
+                        <div className="p-4 border-t border-gray-200 dark:border-dark-border text-[11px] text-slate-500 dark:text-silver-dark">
+                            {t("Invoice allocations are shown as P&L sources and are not represented as posted ledger entries unless labeled as a journal.")}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="text-center text-xs text-gray-400 dark:text-silver-dark mt-6 italic">
-                {t("* Klik pada akun untuk melihat detail di General Ledger.")}
+                {t("* Click income accounts to view P&L source details; other accounts open the General Ledger.")}
             </div>
         </div>
     );
