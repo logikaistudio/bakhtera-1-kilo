@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
@@ -84,6 +84,7 @@ const fmtIDR = (value) => {
 const GeneralJournal = () => {
     const { t } = useLanguage();
     const navigate = useNavigate();
+    const location = useLocation();
     const { companySettings } = useData();
     const { canCreate, canDelete } = useAuth();
     const activeDivision = getActiveDivision();
@@ -91,15 +92,15 @@ const GeneralJournal = () => {
     const [entries, setEntries] = useState([]);
     const [accounts, setAccounts] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchTerm, setSearchTerm] = useState(location.state?.searchTerm || '');
     const [sourceFilter, setSourceFilter] = useState('all');
     const [showUnbalancedOnly, setShowUnbalancedOnly] = useState(false);
     const [showFxAuditReport, setShowFxAuditReport] = useState(false);
     const [expandedGroups, setExpandedGroups] = useState(new Set());
-    const [dateRange, setDateRange] = useState({
+    const [dateRange, setDateRange] = useState(() => location.state?.dateRange || ({
         start: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
         end: new Date().toISOString().split('T')[0]
-    });
+    }));
 
     // Modal states
     const [showNewEntryModal, setShowNewEntryModal] = useState(false);
@@ -183,6 +184,8 @@ const GeneralJournal = () => {
                 e.account_name?.toLowerCase().includes(t) ||
                 e.account_code?.toLowerCase().includes(t) ||
                 e.reference_number?.toLowerCase().includes(t) ||
+                String(e.reference_id || '').toLowerCase().includes(t) ||
+                String(e.id || '').toLowerCase().includes(t) ||
                 e.party_name?.toLowerCase().includes(t)
             );
         }

@@ -239,6 +239,7 @@ const ProfitLoss = () => {
                             sourceType: 'Jurnal aktual',
                             date: e.entry_date,
                             reference: e.reference_number || e.entry_number || e.reference_id || e.id,
+                            referenceTarget: isInvoiceRevenueEntry(e) ? 'invoice' : 'journal',
                             description: e.description || '-',
                             amount: val
                         });
@@ -338,6 +339,7 @@ const ProfitLoss = () => {
                                 sourceType: 'Alokasi P&L dari jurnal',
                                 date: invoice.invoice_date,
                                 reference: invoice.invoice_number || invoice.id,
+                                referenceTarget: 'invoice',
                                 description: 'Alokasi pendapatan invoice',
                                 relatedJournal: postedRows
                                     .map(row => row.sourceDetail?.reference)
@@ -362,6 +364,7 @@ const ProfitLoss = () => {
                             sourceType: 'Alokasi invoice (belum ada jurnal)',
                             date: invoice.invoice_date,
                             reference: invoice.invoice_number || invoice.id,
+                            referenceTarget: 'invoice',
                             description: 'Alokasi pendapatan invoice',
                             amount
                         });
@@ -377,6 +380,7 @@ const ProfitLoss = () => {
                     sourceType: 'Invoice fallback P&L (belum ada jurnal)',
                     date: invoice.invoice_date,
                     reference: invoice.invoice_number || invoice.id,
+                    referenceTarget: 'invoice',
                     description: 'Pendapatan invoice',
                     amount
                 });
@@ -525,6 +529,20 @@ const ProfitLoss = () => {
     const formatIncomeContribution = (amount) => {
         const value = Math.abs(amount).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         return amount < 0 ? `(${value})` : value;
+    };
+    const navigateToIncomeReference = (source) => {
+        if (source.referenceTarget === 'invoice') {
+            navigate('/blink/finance/invoices', { state: { searchTerm: source.reference } });
+            return;
+        }
+        if (source.referenceTarget === 'journal') {
+            navigate('/blink/finance/general-journal', {
+                state: {
+                    searchTerm: source.reference,
+                    dateRange: source.date ? { start: source.date, end: source.date } : undefined
+                }
+            });
+        }
     };
 
     // ── Export Excel ─────────────────────────────────────────────────
@@ -1112,7 +1130,18 @@ const ProfitLoss = () => {
                                             <tr key={`${source.reference}-${source.date}-${index}`} className="border-b border-gray-100 dark:border-dark-border/30">
                                                 <td className="px-3 py-2 whitespace-nowrap text-slate-600 dark:text-silver-dark">{source.date || '-'}</td>
                                                 <td className="px-3 py-2 whitespace-nowrap text-slate-700 dark:text-silver-light">{source.sourceType}</td>
-                                                <td className="px-3 py-2 whitespace-nowrap font-mono text-slate-600 dark:text-silver-dark">{source.reference || '-'}</td>
+                                                <td className="px-3 py-2 whitespace-nowrap font-mono text-slate-600 dark:text-silver-dark">
+                                                    {source.referenceTarget && source.reference ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => navigateToIncomeReference(source)}
+                                                            className="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                                                            title={t("Open reference")}
+                                                        >
+                                                            {source.reference || '-'}
+                                                        </button>
+                                                    ) : source.reference || '-'}
+                                                </td>
                                                 <td className="px-3 py-2 text-slate-700 dark:text-silver-light">
                                                     <div>{source.description || '-'}</div>
                                                     {source.relatedJournal && (

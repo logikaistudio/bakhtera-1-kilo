@@ -2299,6 +2299,7 @@ const InvoiceManagement = () => {
         const matchesSearch = !searchTerm ||
             inv.invoice_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             inv.job_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            String(inv.id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
             inv.customer_name?.toLowerCase().includes(searchTerm.toLowerCase());
 
         if (!matchesSearch) return false;
