@@ -518,7 +518,8 @@ const ProfitLoss = () => {
     const formatDate = (d) => d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
     const period = `Periode: ${formatDate(firstDate)} - ${formatDate(lastDate)}`;
     const incomeDrilldownSources = incomeDrilldownAccount
-        ? incomeSourcesByCode[String(incomeDrilldownAccount.code || '').trim()] || []
+        ? (incomeSourcesByCode[String(incomeDrilldownAccount.code || '').trim()] || [])
+            .filter(source => source.date?.substring(0, 7) === selectedMonth)
         : [];
     const incomeDrilldownTotal = incomeDrilldownSources.reduce((sum, source) => sum + source.amount, 0);
     const formatIncomeContribution = (amount) => {
