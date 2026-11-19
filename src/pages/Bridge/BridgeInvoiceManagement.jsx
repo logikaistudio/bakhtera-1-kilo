@@ -1306,8 +1306,8 @@ const BridgeInvoiceManagement = () => {
 
                         /* Invoice Title Bar */
                         .invoice-title-bar { 
-                            background-color: #FF9B00;
-                            color: #000000;
+                            background-color: #9A3412;
+                            color: #FFFFFF;
                             padding: 6px 10px; margin-bottom: 20px; font-weight: bold; font-size: 16px; 
                             display: flex; justify-content: space-between; align-items: center;
                             border: none;
@@ -1325,7 +1325,7 @@ const BridgeInvoiceManagement = () => {
 
                         /* Shipment Details Box */
                         .shipment-box { border: 1px solid #000; margin-bottom: 20px; }
-                        .shipment-header { background: #FF9B00; color: #000000; font-weight: bold; padding: 4px 8px; text-transform: uppercase; font-size: 11px; border-bottom: none; }
+                        .shipment-header { background: #9A3412; color: #FFFFFF; font-weight: bold; padding: 4px 8px; text-transform: uppercase; font-size: 11px; border-bottom: none; }
                         
                         .shipment-grid { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid #ccc; }
                         .shipment-cell { padding: 3px 6px; border-right: 1px solid #ccc; font-size: 11px; }
@@ -1348,7 +1348,7 @@ const BridgeInvoiceManagement = () => {
                         .totals-box { width: 320px; border: 1px solid #000; border-top: none; }
                         .totals-row { display: flex; justify-content: space-between; padding: 6px 10px; font-weight: bold; font-size: 11px; }
                         .border-bottom { border-bottom: 1px solid #ccc; }
-                        .grand-total { background: #FF9B00; color: #000000; padding: 10px; font-size: 13px; text-transform: uppercase; font-weight: bold; }
+                        .grand-total { background: #9A3412; color: #FFFFFF; padding: 10px; font-size: 13px; text-transform: uppercase; font-weight: bold; }
 
                         /* Footer */
                         .footer-section { display: flex; margin-top: auto; border-top: 2px solid #000; padding-top: 20px; page-break-inside: avoid; }
@@ -1367,12 +1367,12 @@ const BridgeInvoiceManagement = () => {
                         }
                         .btn { 
                             padding: 10px 24px; cursor: pointer; 
-                            background: #FF9B00; color: white; 
+                            background: #9A3412; color: white;
                             border: none; border-radius: 6px; 
                             font-weight: bold; font-size: 14px; 
                             box-shadow: 0 2px 4px rgba(0,0,0,0.2);
                         }
-                        .btn:hover { background: #EF6C00; }
+                        .btn:hover { background: #7C2D12; }
                         
                         @media print { 
                             .print-actions { display: none !important; } 
@@ -1414,7 +1414,7 @@ const BridgeInvoiceManagement = () => {
                         <!-- Title -->
                         <div class="invoice-title-bar">
                             <span>VAT INVOICE ${invoice.invoice_number}</span>
-                             <span style="font-size: 10px; font-weight: normal; color: rgba(0,0,0,0.6);">Page 1 of 1</span>
+                             <span style="font-size: 10px; font-weight: normal; color: #FFFFFF;">Page 1 of 1</span>
                         </div>
 
                         <!-- Top Info -->
@@ -4647,11 +4647,11 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
 
                         {/* Invoice Title Bar */}
                         <div style={{
-                            backgroundColor: '#FF9B00', color: '#000000', padding: '8px 10px', marginBottom: '15px',
+                            backgroundColor: '#9A3412', color: '#FFFFFF', padding: '8px 10px', marginBottom: '15px',
                             fontWeight: 'bold', fontSize: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
                         }}>
                             <span>{t("VAT INVOICE")} {invoice.invoice_number}</span>
-                            <span style={{ fontSize: '10px', fontWeight: 'normal', color: 'rgba(0,0,0,0.6)' }}>{t("Page 1 of 1")}</span>
+                            <span style={{ fontSize: '10px', fontWeight: 'normal', color: '#FFFFFF' }}>{t("Page 1 of 1")}</span>
                         </div>
 
                         {/* Top Info */}
@@ -4684,7 +4684,7 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
 
                         {/* Shipment Details Box */}
                         <div style={{ border: '1px solid #000', marginBottom: '20px' }}>
-                            <div style={{ background: '#FF9B00', color: '#000000', fontWeight: 'bold', padding: '4px 8px', textTransform: 'uppercase', fontSize: '11px', borderBottom: 'none' }}>
+                            <div style={{ background: '#9A3412', color: '#FFFFFF', fontWeight: 'bold', padding: '4px 8px', textTransform: 'uppercase', fontSize: '11px', borderBottom: 'none' }}>
                                 {t("SHIPMENT DETAILS")}
                             </div>
 
@@ -4822,7 +4822,7 @@ const PrintPreviewModal = ({ invoice, formatCurrency, onClose, onPrint, companyS
                                     <span>{t("VAT Total")}</span>
                                     <span>{formatCurrency(splitTax, printCurrency)}</span>
                                 </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', fontWeight: 'bold', fontSize: '13px', background: '#FF9B00', color: 'black' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', fontWeight: 'bold', fontSize: '13px', background: '#9A3412', color: '#FFFFFF' }}>
                                     <span>{t("TOTAL AMOUNT")}</span>
                                     <span>{formatCurrency(splitTotal, printCurrency)}</span>
                                 </div>
