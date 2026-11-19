@@ -2194,51 +2194,93 @@ export const DataProvider = ({ children }) => {
     };
 
     // Warehouse Inventory helper function
-    const updateInventoryStock = async (assetId, assetName, quantity, unit, type, transactionId, value) => {
-        const { data: existingInventory, error } = await supabase
+    const updateInventoryStock = async (assetId, assetName, quantity, unit, type, transactionId, value, inventoryScope = null) => {
+        let inventoryQuery = supabase
             .from('freight_warehouse')
             .select('*')
-            .eq('item_code', assetId)
-            .limit(1)
-            .maybeSingle();
+            .eq('item_code', assetId);
+
+        if (inventoryScope?.id) {
+            inventoryQuery = inventoryQuery.eq('id', inventoryScope.id);
+        } else if (inventoryScope) {
+            if (inventoryScope.pengajuanId) inventoryQuery = inventoryQuery.eq('pengajuan_id', inventoryScope.pengajuanId);
+            else if (inventoryScope.pengajuanNumber) inventoryQuery = inventoryQuery.eq('pengajuan_number', inventoryScope.pengajuanNumber);
+            if (inventoryScope.packageNumber) inventoryQuery = inventoryQuery.eq('package_number', inventoryScope.packageNumber);
+        } else {
+            inventoryQuery = inventoryQuery.limit(1);
+        }
+
+        const { data: matchingInventory, error } = await inventoryQuery;
 
         if (error) {
             console.error('Error reading warehouse stock:', error);
             throw error;
         }
 
-        const inventory = existingInventory || warehouseInventory.find(i => i.assetId === assetId);
+        const fallbackInventory = !inventoryScope ? warehouseInventory.find(i => i.assetId === assetId) : null;
+        const inventoryRows = matchingInventory?.length ? matchingInventory : (fallbackInventory ? [fallbackInventory] : []);
+        const inventory = inventoryRows[0] || null;
         const stockChange = Number(quantity) || 0;
         if (stockChange === 0) return true;
 
-        const existingStock = inventory ? Number(inventory.quantity ?? inventory.current_stock ?? inventory.currentStock ?? 0) : 0;
-        const existsId = inventory ? inventory.id : null;
+        if (inventoryRows.length > 0) {
+            const rowsToUpdate = inventoryScope ? inventoryRows : [inventory];
+            const stockByRow = rowsToUpdate.map(row => ({
+                row,
+                quantity: Number(row.quantity ?? row.current_stock ?? row.currentStock ?? 0)
+            }));
+            const availableStock = stockByRow.reduce((total, item) => total + item.quantity, 0);
+            if (stockChange < 0 && availableStock < Math.abs(stockChange)) {
+                throw new Error(`Stok gudang ${assetName || assetId} tidak mencukupi.`);
+            }
 
-        if (existsId) {
-            const newStock = existingStock + stockChange;
-            if (newStock < 0) throw new Error(`Stok gudang ${assetName || assetId} tidak mencukupi.`);
             const movement = {
                 type,
                 transactionId,
                 quantity: Math.abs(stockChange),
                 date: new Date().toISOString(),
             };
+            let remainingChange = stockChange;
+            const updatedQuantities = new Map();
 
-            const updatedDataPayload = {
-                quantity: newStock,
-                value: value || inventory.value,
-                updated_at: new Date().toISOString()
-            };
+            for (const item of stockByRow) {
+                if (remainingChange === 0) break;
+                const rowChange = remainingChange < 0
+                    ? -Math.min(item.quantity, Math.abs(remainingChange))
+                    : remainingChange;
+                const newStock = item.quantity + rowChange;
+                const updatedDataPayload = {
+                    quantity: newStock,
+                    value: value || item.row.value,
+                    updated_at: new Date().toISOString()
+                };
+                const { error: updateError } = await supabase
+                    .from('freight_warehouse')
+                    .update(updatedDataPayload)
+                    .eq('id', item.row.id);
 
-            const { error: updateError } = await supabase.from('freight_warehouse').update(updatedDataPayload).eq('id', existsId);
+                if (updateError) {
+                    console.error("Error updating warehouse stock:", updateError);
+                    throw updateError;
+                }
 
-            if (updateError) {
-                console.error("Error updating warehouse stock:", updateError);
-                throw updateError;
+                updatedQuantities.set(item.row.id, { newStock, movement });
+                remainingChange -= rowChange;
             }
 
-            setWarehouseInventory(prev => prev.map(i => i.id === existsId ? { ...i, quantity: newStock, currentStock: newStock, lastUpdated: new Date().toISOString(), movements: [...(i.movements || []), movement] } : i));
+            setWarehouseInventory(prev => prev.map(item => {
+                const update = updatedQuantities.get(item.id);
+                return update ? {
+                    ...item,
+                    quantity: update.newStock,
+                    currentStock: update.newStock,
+                    lastUpdated: new Date().toISOString(),
+                    movements: [...(item.movements || []), update.movement]
+                } : item;
+            }));
             return true;
+        } else if (inventoryScope) {
+            throw new Error(`Data stok gudang ${assetName || assetId} untuk pengajuan/paket ini tidak ditemukan.`);
         } else if (stockChange > 0) {
             // Create new inventory item
             const newInventoryState = {

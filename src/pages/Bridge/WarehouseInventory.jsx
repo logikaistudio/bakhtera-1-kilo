@@ -387,7 +387,6 @@ const WarehouseInventory = () => {
                 console.log('📊 Processing', mutations.length, 'mutation(s)...');
                 for (const mutation of mutations) {
                     console.log('💾 Saving mutation:', mutation.itemName, mutation._type, 'qty:', mutation.mutatedQty);
-                    await addMutationLog(mutation);
 
                     // Update inventory stock
                     const qtyChange = mutation._type === 'outbound' ? -Math.abs(mutation.mutatedQty) : Math.abs(mutation.mutatedQty);
@@ -399,9 +398,40 @@ const WarehouseInventory = () => {
                             'pcs',
                             mutation._type === 'outbound' ? 'Mutation Out' : 'Mutation In',
                             mutation.pengajuanNumber,
-                            0
+                            0,
+                            {
+                                pengajuanId: mutation.pengajuanId,
+                                pengajuanNumber: mutation.pengajuanNumber,
+                                packageNumber: mutation.packageNumber
+                            }
                         );
                         console.log('📉 Inventory updated:', mutation.itemCode, qtyChange);
+                    }
+                    try {
+                        await addMutationLog(mutation);
+                    } catch (logError) {
+                        if (updateInventoryStock) {
+                            try {
+                                await updateInventoryStock(
+                                    mutation.itemCode,
+                                    mutation.itemName,
+                                    -qtyChange,
+                                    'pcs',
+                                    'Mutation Rollback',
+                                    mutation.pengajuanNumber,
+                                    0,
+                                    {
+                                        pengajuanId: mutation.pengajuanId,
+                                        pengajuanNumber: mutation.pengajuanNumber,
+                                        packageNumber: mutation.packageNumber
+                                    }
+                                );
+                            } catch (rollbackError) {
+                                console.error('Failed to restore warehouse stock after mutation log error:', rollbackError);
+                                throw new Error(`Mutasi gagal dicatat dan stok gagal dipulihkan: ${rollbackError.message}`);
+                            }
+                        }
+                        throw logError;
                     }
                 }
                 alert(`Data berhasil disimpan! ${mutations.length} mutasi diproses.`);
@@ -1041,12 +1071,6 @@ const WarehouseInventory = () => {
                 // Save each mutation AND Update Inventory
                 for (const mutation of mutations) {
                     console.log('💾 Saving mutation:', mutation.itemName, 'qty:', mutation.mutatedQty);
-                    await addMutationLog({
-                        ...mutation,
-                        pengajuanId: selectedPengajuan.isWarehouseFallback && !selectedPengajuan.warehouseQuotationExists
-                            ? null
-                            : mutation.pengajuanId
-                    });
 
                     // Update Warehouse Inventory Stock (RESTORED LOGIC)
                     // Outbound (Mutasi) = Decrease Stock
@@ -1068,9 +1092,52 @@ const WarehouseInventory = () => {
                             'pcs',
                             mutation._type === 'outbound' ? 'Mutation Out' : 'Mutation In',
                             mutation.pengajuanNumber,
-                            0
+                            0,
+                            {
+                                pengajuanId: mutation.pengajuanId,
+                                pengajuanNumber: mutation.pengajuanNumber,
+                                packageNumber: mutation.packageNumber
+                            }
                         );
                         console.log('📉 Inventory updated:', mutation.itemCode, qtyChange);
+                    }
+                    const logData = {
+                        ...mutation,
+                        pengajuanId: selectedPengajuan.isWarehouseFallback && !selectedPengajuan.warehouseQuotationExists
+                            ? null
+                            : mutation.pengajuanId
+                    };
+                    try {
+                        await addMutationLog(logData);
+                    } catch (logError) {
+                        try {
+                            if (selectedPengajuan.isWarehouseFallback) {
+                                const inventoryId = mutation.warehouseInventoryId;
+                                const previousStock = fallbackStocks.get(inventoryId) - qtyChange;
+                                const restored = await updateWarehouseInventory(inventoryId, { quantity: previousStock });
+                                if (!restored) throw new Error('Gagal memperbarui stok warehouse.');
+                                fallbackStocks.set(inventoryId, previousStock);
+                            } else if (updateInventoryStock) {
+                                await updateInventoryStock(
+                                    mutation.itemCode,
+                                    mutation.itemName,
+                                    -qtyChange,
+                                    'pcs',
+                                    'Mutation Rollback',
+                                    mutation.pengajuanNumber,
+                                    0,
+                                    {
+                                        pengajuanId: mutation.pengajuanId,
+                                        pengajuanNumber: mutation.pengajuanNumber,
+                                        packageNumber: mutation.packageNumber
+                                    }
+                                );
+                            }
+                        } catch (rollbackError) {
+                            console.error('Failed to restore warehouse stock after mutation log error:', rollbackError);
+                            throw new Error(`Mutasi gagal dicatat dan stok gagal dipulihkan: ${rollbackError.message}`);
+                        }
+                        throw logError;
                     }
                 }
 

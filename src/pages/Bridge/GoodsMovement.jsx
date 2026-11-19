@@ -222,7 +222,12 @@ const GoodsMovement = () => {
                     selectedLog.uom || 'pcs',
                     isReturningToWarehouse ? 'remutation' : 'remutation-correction',
                     transactionId,
-                    0
+                    0,
+                    {
+                        pengajuanId: selectedLog.pengajuanId,
+                        pengajuanNumber: selectedLog.pengajuanNumber,
+                        packageNumber: selectedLog.packageNumber
+                    }
                 );
                 adjustedStock = true;
                 await addMutationLog(newMutation);
@@ -242,7 +247,12 @@ const GoodsMovement = () => {
                         selectedLog.uom || 'pcs',
                         'remutation-rollback',
                         transactionId,
-                        0
+                        0,
+                        {
+                            pengajuanId: selectedLog.pengajuanId,
+                            pengajuanNumber: selectedLog.pengajuanNumber,
+                            packageNumber: selectedLog.packageNumber
+                        }
                     );
                 } catch (rollbackError) {
                     console.error('Failed to roll back warehouse stock after remutation error:', rollbackError);
