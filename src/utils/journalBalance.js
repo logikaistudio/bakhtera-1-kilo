@@ -50,3 +50,41 @@ export const buildBalancingLine = (difference, account, description) => {
         description: description.trim()
     };
 };
+
+export const buildManualBatchBalancingEntry = (lines, account, description, division) => {
+    if (!Array.isArray(lines) || lines.length === 0 || !lines.every(line => line.source === 'manual')) return null;
+
+    const batchId = lines[0].batch_id;
+    if (!batchId || !lines.every(line => line.batch_id === batchId)) return null;
+
+    const status = getJournalLinesStatus(lines);
+    if (!status.canBalance) return null;
+
+    const baseEntryNumber = lines[0].reference_number ||
+        lines[0].entry_number?.replace(/-L\d+$/i, '') ||
+        lines[0].entry_number;
+    const nextLineNumber = Math.max(0, ...lines.map(line => {
+        const match = line.entry_number?.match(/-L(\d+)$/i);
+        return match ? Number(match[1]) : 0;
+    })) + 1;
+    const balancingLine = buildBalancingLine(status.difference, account, description);
+    if (!baseEntryNumber || !balancingLine) return null;
+
+    return {
+        entry_number: `${baseEntryNumber}-L${String(nextLineNumber).padStart(2, '0')}`,
+        entry_date: lines[0].entry_date,
+        entry_type: 'adjustment',
+        account_code: balancingLine.account_code,
+        account_name: balancingLine.account_name,
+        coa_id: balancingLine.coa_id,
+        debit: balancingLine.debit,
+        credit: balancingLine.credit,
+        description: balancingLine.description,
+        batch_id: batchId,
+        source: 'manual',
+        division: division || lines[0].division,
+        currency: 'IDR',
+        journal_type: lines[0].journal_type || 'general',
+        reference_number: baseEntryNumber
+    };
+};

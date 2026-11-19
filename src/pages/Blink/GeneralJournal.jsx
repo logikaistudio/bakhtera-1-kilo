@@ -15,7 +15,12 @@ import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { getActiveDivision } from '../../utils/divisionContext';
 import { filterActiveBlinkJournalEntries } from '../../utils/blinkJournalIntegrity';
-import { buildBalancingLine, getJournalLinesStatus, getUnbalancedJournalBatchKeys } from '../../utils/journalBalance';
+import {
+    buildBalancingLine,
+    buildManualBatchBalancingEntry,
+    getJournalLinesStatus,
+    getUnbalancedJournalBatchKeys
+} from '../../utils/journalBalance';
 import JournalFxAuditReport from '../../components/Common/JournalFxAuditReport';
 import { useLanguage } from '../../i18n/LanguageContext';
 
@@ -106,6 +111,9 @@ const GeneralJournal = () => {
     const [showNewEntryModal, setShowNewEntryModal] = useState(false);
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [selectedGroup, setSelectedGroup] = useState(null);
+    const [balancingAccountId, setBalancingAccountId] = useState('');
+    const [balancingDescription, setBalancingDescription] = useState('');
+    const [savingBalanceCorrection, setSavingBalanceCorrection] = useState(false);
 
     // New entry form
     const [newEntry, setNewEntry] = useState({
@@ -402,6 +410,48 @@ const GeneralJournal = () => {
             fetchEntries();
         } catch (e) {
             alert('Failed to delete: ' + e.message);
+        }
+    };
+
+    const addBalancingLineToSelectedGroup = async () => {
+        if (!canCreate('blink_journal') || !selectedGroup || savingBalanceCorrection) return;
+        if (selectedGroup.source !== 'manual') {
+            alert(t('Auto-generated journal entries must be corrected at their source.'));
+            return;
+        }
+
+        const account = accounts.find(item => item.id === balancingAccountId);
+        const correction = buildManualBatchBalancingEntry(
+            selectedGroup.lines,
+            account,
+            balancingDescription,
+            activeDivision
+        );
+        if (!correction) {
+            alert(t('This journal cannot be balanced. Check its lines, account, and batch.'));
+            return;
+        }
+
+        try {
+            setSavingBalanceCorrection(true);
+            const { data, error } = await supabase
+                .from('blink_journal_entries')
+                .insert([correction])
+                .select()
+                .single();
+            if (error) throw error;
+
+            setEntries(current => [...current, data]);
+            setShowDetailModal(false);
+            setSelectedGroup(null);
+            setBalancingAccountId('');
+            setBalancingDescription('');
+            alert(t('Balancing line added to the existing journal batch.'));
+        } catch (error) {
+            console.error('Error adding journal balancing line:', error);
+            alert(`${t('Failed to balance journal')}: ${error.message}`);
+        } finally {
+            setSavingBalanceCorrection(false);
         }
     };
 
@@ -893,6 +943,53 @@ const GeneralJournal = () => {
                                 </tfoot>
                             </table>
                         </div>
+
+                        {selectedGroup.source === 'manual' && getJournalLinesStatus(selectedGroup.lines).canBalance && (
+                            <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 mb-5">
+                                <h3 className="font-semibold text-amber-300 mb-3">{t('Balance this journal batch')}</h3>
+                                {selectedGroup.batch_id ? (
+                                    <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-end gap-3">
+                                        <div>
+                                            <label className="block text-xs font-medium text-silver-light mb-1">{t('Balancing account')}</label>
+                                            <select
+                                                value={balancingAccountId}
+                                                onChange={event => setBalancingAccountId(event.target.value)}
+                                                className="w-full"
+                                            >
+                                                <option value="">{t('-- Select account --')}</option>
+                                                {accounts.filter(account => account.is_active !== false).map(account => (
+                                                    <option key={account.id} value={account.id}>{account.code} - {account.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-silver-light mb-1">{t('Adjustment reason')}</label>
+                                            <input
+                                                type="text"
+                                                value={balancingDescription}
+                                                onChange={event => setBalancingDescription(event.target.value)}
+                                                placeholder={t('Bank fee, tax withheld, etc.')}
+                                                className="w-full"
+                                            />
+                                        </div>
+                                        <Button
+                                            onClick={addBalancingLineToSelectedGroup}
+                                            disabled={!canCreate('blink_journal') || !balancingAccountId || !balancingDescription.trim() || savingBalanceCorrection}
+                                        >
+                                            {savingBalanceCorrection ? t('Saving...') : `${t('Add balancing line')} (${getJournalLinesStatus(selectedGroup.lines).difference < 0 ? t('Debit') : t('Credit')} ${fmt(Math.abs(getJournalLinesStatus(selectedGroup.lines).difference))})`}
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-amber-200">{t('This journal batch cannot be corrected because its batch ID is missing.')}</p>
+                                )}
+                                <p className="text-xs text-amber-200 mt-3">{t('The correction will be added to this same batch, not as a separate journal.')}</p>
+                            </div>
+                        )}
+                        {selectedGroup.source !== 'manual' && getJournalLinesStatus(selectedGroup.lines).canBalance && (
+                            <p className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 mb-5 text-sm text-amber-200">
+                                {t('Auto-generated journal entries must be corrected at their source.')}
+                            </p>
+                        )}
 
                         <div className="flex justify-end">
                             <Button variant="secondary" onClick={() => setShowDetailModal(false)}>{t("Close")}</Button>
