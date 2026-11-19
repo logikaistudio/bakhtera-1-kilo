@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useData } from '../../context/DataContext';
-import { generatePONumber, generateAPNumber } from '../../utils/documentNumbers';
+import { generateBlinkPONumber, generateAPNumber } from '../../utils/documentNumbers';
 import { createPOApprovalJournal, getAllCOA } from '../../utils/journalHelper';
 import Button from '../../components/Common/Button';
 import Modal from '../../components/Common/Modal';
@@ -344,7 +344,7 @@ const PurchaseOrder = () => {
                     vendor_email: vendor.email || '',
                     vendor_phone: vendor.phone || '',
                     vendor_address: vendor.address_line1 || vendor.address || '',
-                    po_number: await generatePONumber(), // Using centralized PO Number Generation
+                    po_number: await generateBlinkPONumber(),
                     po_date: formData.po_date || new Date(),
                     delivery_date: formData.delivery_date || null,
                     payment_terms: formData.payment_terms,

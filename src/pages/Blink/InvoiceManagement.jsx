@@ -831,7 +831,7 @@ const InvoiceManagement = () => {
         const days = parseInt(String(terms).replace('NET ', '')) || 30;
         dueDate.setDate(dueDate.getDate() + days);
 
-        // Precompute expected additional invoice number (e.g. INV-BLK2607-0001-v1)
+        // Precompute expected additional invoice number (e.g. INV-BFW2607-0001-v1)
         const nextInvNumber = await generateAdditionalInvoiceNumber(sourceInvoice.invoice_number, 'blink_invoices');
 
         // Find reference shipment or quotation if available

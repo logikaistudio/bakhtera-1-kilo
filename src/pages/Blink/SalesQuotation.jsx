@@ -630,7 +630,7 @@ const SalesQuotation = () => {
                 result = await safeDatabaseUpdateById('blink_sales_quotations', editingDraftId, quotationPayload);
                 jobNumber = existingDraft.jobNumber || existingDraft.job_number || '-';
             } else {
-                // Generate Job Number using centralized generator - Format: SQT-BLKYYMM-XXXX
+                // Generate Job Number using centralized generator - Format: SQT-BFWYYMM-XXXX
                 jobNumber = await generateSalesQuotationNumber();
                 result = await safeDatabaseInsert('blink_sales_quotations', {
                     ...quotationPayload,
@@ -1476,7 +1476,7 @@ const handlePrintQuotation = (quotation, creatorName = '', approverName = '', op
             return;
         }
         console.log('🔵 Create SO clicked for quotation:', quotation.id);
-        // Generate SO Number using centralized generator - Format: BLKYYMM-SO-XXXX
+        // Generate SO Number using centralized generator - Format: BFWYYMM-SO-XXXX
         const { generateSONumber } = await import('../../utils/documentNumbers');
         const soNumber = generateSONumber(quotation.jobNumber || quotation.quotationNumber);
         console.log('📝 Generated SO Number:', soNumber);

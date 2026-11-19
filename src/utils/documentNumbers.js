@@ -3,13 +3,14 @@
  * Standardized numbering format for all Blink documents
  * 
  * Format:
- * - Quotation: BLKYYMM-XXXX
- * - SO: BLKYYMM-SO-XXXX (follows quotation number)
- * - Invoice: INV-BLKYYMM-XXXX (follows quotation number)
- * - PO: PO-BLKYYMM-XXXX
+ * - Quotation: BFWYYMM-XXXX
+ * - SO: BFWYYMM-SO-XXXX (follows quotation number)
+ * - Invoice: INV-BFWYYMM-XXXX (follows quotation number)
+ * - PO: PO-BFWYYMM-XXXX
  */
 
 import { supabase } from '../lib/supabase';
+import { normalizeBlinkNumberPrefix } from './blinkNumberPrefix';
 
 /**
  * Get current YYMM format
@@ -24,12 +25,12 @@ export const getYYMM = () => {
 
 /**
  * Generate Quotation Number
- * Format: BLKYYMM-XXXX
+ * Format: BFWYYMM-XXXX
  * @returns {Promise<string>} Generated quotation number
  */
 export const generateQuotationNumber = async () => {
     const yymm = getYYMM();
-    const prefix = `BLK${yymm}`;
+    const prefix = `BFW${yymm}`;
 
     try {
         // Get the latest quotation number for this month
@@ -62,12 +63,12 @@ export const generateQuotationNumber = async () => {
 
 /**
  * Generate Sales Quotation Number
- * Format: SQT-BLKYYMM-XXXX
+ * Format: SQT-BFWYYMM-XXXX
  * @returns {Promise<string>} Generated sales quotation number
  */
 export const generateSalesQuotationNumber = async () => {
     const yymm = getYYMM();
-    const prefix = `SQT-BLK${yymm}`;
+    const prefix = `SQT-BFW${yymm}`;
 
     try {
         // Get the latest sales quotation number for this month
@@ -100,35 +101,36 @@ export const generateSalesQuotationNumber = async () => {
 
 /**
  * Generate SO Number from Quotation Number
- * Format: BLKYYMM-SO-XXXX (based on quotation number)
+ * Format: BFWYYMM-SO-XXXX (based on quotation number)
  * @param {string} quotationNumber - The base quotation number
  * @returns {string} SO number
  */
 export const generateSONumber = (quotationNumber) => {
     if (!quotationNumber) {
         const yymm = getYYMM();
-        return `BLK${yymm}-SO-0001`;
+        return `BFW${yymm}-SO-0001`;
     }
 
     // Insert -SO- before the sequence number
-    // BLK2601-0001 -> BLK2601-SO-0001
-    const parts = quotationNumber.split('-');
+    // BFW2601-0001 -> BFW2601-SO-0001
+    const normalizedNumber = normalizeBlinkNumberPrefix(quotationNumber);
+    const parts = normalizedNumber.split('-');
     if (parts.length >= 2) {
         return `${parts[0]}-SO-${parts[1]}`;
     }
 
-    return `${quotationNumber}-SO`;
+    return `${normalizedNumber}-SO`;
 };
 
 /**
  * Generate Invoice Number from Quotation Number
- * Format: INV-BLKYYMM-XXXX (based on quotation number)
+ * Format: INV-BFWYYMM-XXXX (based on quotation number)
  * @param {string} quotationNumber - The base quotation number
  * @returns {string} Invoice number
  */
 /**
  * Generate Invoice Number from Quotation Number (Async & Unique)
- * Format: INV-BLKYYMM-XXXX[-N]
+ * Format: INV-BFWYYMM-XXXX[-N]
  * Checks DB for existing invoice numbers to avoid duplicates
  * @param {string} quotationNumber - The base quotation number
  * @returns {Promise<string>} Invoice number
@@ -137,9 +139,9 @@ export const generateInvoiceNumber = async (quotationNumber) => {
     let baseNumber;
     if (!quotationNumber) {
         const yymm = getYYMM();
-        baseNumber = `INV-BLK${yymm}-0001`;
+        baseNumber = `INV-BFW${yymm}-0001`;
     } else {
-        baseNumber = `INV-${quotationNumber}`;
+        baseNumber = `INV-${normalizeBlinkNumberPrefix(quotationNumber)}`;
     }
 
     try {
@@ -238,13 +240,16 @@ export const generateBridgeInvoiceNumber = async (quotationNumber) => {
  * Generate Additional (Versioned) Invoice Number
  * @param {string} sourceInvoiceNumber - Base invoice number
  * @param {string} tableName - DB table name ('blink_invoices' or 'bridge_invoices')
- * @returns {Promise<string>} e.g. "INV-BLK2607-0001-v1", "INV-BLK2607-0001-v2"
+ * @returns {Promise<string>} e.g. "INV-BFW2607-0001-v1", "INV-BFW2607-0001-v2"
  */
 export const generateAdditionalInvoiceNumber = async (sourceInvoiceNumber, tableName = 'blink_invoices') => {
     if (!sourceInvoiceNumber) return '';
 
     // Strip existing version suffix if any (e.g., -v1, -v2, v1, etc.)
-    const rootBase = sourceInvoiceNumber.replace(/[-_]?v\d+$/i, '');
+    const sourceNumber = tableName === 'blink_invoices'
+        ? normalizeBlinkNumberPrefix(sourceInvoiceNumber)
+        : sourceInvoiceNumber;
+    const rootBase = sourceNumber.replace(/[-_]?v\d+$/i, '');
 
     try {
         const { data, error } = await supabase
@@ -278,14 +283,9 @@ export const generateAdditionalInvoiceNumber = async (sourceInvoiceNumber, table
 };
 
 
-/**
- * Generate PO Number
- * Format: PO-BLKYYMM-XXXX
- * @returns {Promise<string>} Generated PO number
- */
-export const generatePONumber = async () => {
+const generatePONumberWithCode = async (code) => {
     const yymm = getYYMM();
-    const prefix = `PO-BLK${yymm}`;
+    const prefix = `PO-${code}${yymm}`;
 
     try {
         // Get the latest PO number for this month
@@ -315,6 +315,11 @@ export const generatePONumber = async () => {
         return `${prefix}-${String(Date.now()).slice(-4)}`;
     }
 };
+
+// Keep the legacy prefix for Bridge purchase orders.
+export const generatePONumber = () => generatePONumberWithCode('BLK');
+/** Generate a Blink PO number in the PO-BFWYYMM-XXXX format. */
+export const generateBlinkPONumber = () => generatePONumberWithCode('BFW');
 
 /**
  * Generate AP Number

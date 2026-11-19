@@ -793,8 +793,8 @@ const ShipmentDetailModalEnhanced = ({ isOpen, onClose, shipment, onUpdate, onCa
                 vendorGroups[vid].push(item);
             });
 
-            const { generatePONumber } = await import('../../utils/documentNumbers');
-            const basePONumber = await generatePONumber();
+            const { generateBlinkPONumber } = await import('../../utils/documentNumbers');
+            const basePONumber = await generateBlinkPONumber();
             const vendorIds = Object.keys(vendorGroups);
             const suffixes = vendorIds.length === 1 ? [''] : vendorIds.map((_, i) => String.fromCharCode(65 + i)); // A, B, C...
 

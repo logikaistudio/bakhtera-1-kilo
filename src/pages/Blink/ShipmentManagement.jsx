@@ -505,8 +505,8 @@ const ShipmentManagement = () => {
                 return;
             }
             const vendor = listPOVendors.find(v => v.id === listPOSelectedVendor);
-            const { generatePONumber } = await import('../../utils/documentNumbers');
-            const poNumber = await generatePONumber();
+            const { generateBlinkPONumber } = await import('../../utils/documentNumbers');
+            const poNumber = await generateBlinkPONumber();
             const items = listPOShipment.pending_po_items;
             const totalAmount = items.reduce((sum, i) => sum + i.amount, 0);
 

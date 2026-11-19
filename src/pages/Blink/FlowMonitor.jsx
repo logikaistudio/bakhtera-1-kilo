@@ -43,7 +43,7 @@ const FlowMonitor = () => {
                 // Customer approved
                 customer_approved_at: q.status === 'approved' || q.status === 'converted' ? q.updated_at : null,
                 customer_approved_by: q.customer_name,
-                // SO created (when converted) - Format: BLKYYMM-SO-XXXX
+                // SO created (when converted) - Format: BFWYYMM-SO-XXXX
                 so_created_at: q.status === 'converted' ? q.updated_at : null,
                 so_number: q.status === 'converted' ? generateSONumber(q.job_number || q.quotation_number) : null,
                 // Current status
