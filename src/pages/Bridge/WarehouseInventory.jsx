@@ -911,20 +911,25 @@ const WarehouseInventory = () => {
                 const submissionId = mutationData?.id || selectedPengajuan?.id;
                 const submissionNumber = mutationData?.quotationNumber || mutationData?.quotation_number ||
                     selectedPengajuan?.quotationNumber || selectedPengajuan?.quotation_number;
-                const outboundApproved = quotations.some(q =>
-                    String(q.type || '').trim().toLowerCase() === 'outbound' &&
-                    String(q.documentStatus || q.document_status || '').trim().toLowerCase() === 'approved' &&
-                    (
-                        (submissionId && (
-                            String(q.id || '') === String(submissionId) ||
-                            String(q.sourcePengajuanId || q.source_pengajuan_id || '') === String(submissionId)
-                        )) ||
-                        (submissionNumber && (
-                            String(q.quotationNumber || q.quotation_number || '').trim().toLowerCase() === String(submissionNumber).trim().toLowerCase() ||
-                            String(q.sourcePengajuanNumber || q.source_pengajuan_number || '').trim().toLowerCase() === String(submissionNumber).trim().toLowerCase()
-                        ))
-                    )
-                ) || outboundTransactions?.some(o =>
+                const outboundApproved = quotations.some(q => {
+                    const sourceId = q.sourcePengajuanId || q.source_pengajuan_id ||
+                        q.documents?.sourcePengajuanId || q.documents?.source_pengajuan_id;
+                    const sourceNumber = q.sourcePengajuanNumber || q.source_pengajuan_number ||
+                        q.documents?.sourcePengajuanNumber || q.documents?.source_pengajuan_number;
+
+                    return String(q.type || '').trim().toLowerCase() === 'outbound' &&
+                        String(q.documentStatus || q.document_status || '').trim().toLowerCase() === 'approved' &&
+                        (
+                            (submissionId && (
+                                String(q.id || '') === String(submissionId) ||
+                                String(sourceId || '') === String(submissionId)
+                            )) ||
+                            (submissionNumber && (
+                                String(q.quotationNumber || q.quotation_number || '').trim().toLowerCase() === String(submissionNumber).trim().toLowerCase() ||
+                                String(sourceNumber || '').trim().toLowerCase() === String(submissionNumber).trim().toLowerCase()
+                            ))
+                        );
+                }) || outboundTransactions?.some(o =>
                     (String(o.quotation_id || o.pengajuanId || o.pengajuan_id || '') === String(submissionId || '') ||
                         (submissionNumber && String(o.quotationNumber || o.quotation_number || o.pengajuanNumber || o.pengajuan_number || '').trim().toLowerCase() === String(submissionNumber).trim().toLowerCase())) &&
                     (String(o.status || '').trim().toLowerCase() === 'approved' ||
