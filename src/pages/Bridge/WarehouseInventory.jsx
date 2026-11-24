@@ -915,8 +915,14 @@ const WarehouseInventory = () => {
                     String(q.type || '').trim().toLowerCase() === 'outbound' &&
                     String(q.documentStatus || q.document_status || '').trim().toLowerCase() === 'approved' &&
                     (
-                        (submissionId && String(q.id) === String(submissionId)) ||
-                        (submissionNumber && String(q.quotationNumber || q.quotation_number || '').trim().toLowerCase() === String(submissionNumber).trim().toLowerCase())
+                        (submissionId && (
+                            String(q.id || '') === String(submissionId) ||
+                            String(q.sourcePengajuanId || q.source_pengajuan_id || '') === String(submissionId)
+                        )) ||
+                        (submissionNumber && (
+                            String(q.quotationNumber || q.quotation_number || '').trim().toLowerCase() === String(submissionNumber).trim().toLowerCase() ||
+                            String(q.sourcePengajuanNumber || q.source_pengajuan_number || '').trim().toLowerCase() === String(submissionNumber).trim().toLowerCase()
+                        ))
                     )
                 ) || outboundTransactions?.some(o =>
                     (String(o.quotation_id || o.pengajuanId || o.pengajuan_id || '') === String(submissionId || '') ||
