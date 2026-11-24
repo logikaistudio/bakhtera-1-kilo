@@ -10,6 +10,7 @@ import { exportToCSV } from '../../utils/exportCSV';
 import { calculateDaysDifference, getAgingStatus } from '../../utils/agingCalculator';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { hasApprovedOutboundForSource } from './outboundApproval';
+import { getWarehouseStock } from './warehouseStock';
 
 const WarehouseInventory = () => {
     const { t } = useLanguage();
@@ -319,9 +320,10 @@ const WarehouseInventory = () => {
 
                     // Get item status for validation
                     const itemName = item.name || item.itemName;
-                    const itemStatus = getIndividualItemStatus(item.itemCode, pkg.packageNumber, itemName);
+                    const itemStatus = getIndividualItemStatus(item.itemCode, pkg.packageNumber, itemName, item.warehouseInventoryId);
                     // Use totalDeducted to account for official outbound as well
-                    const inWarehouse = (item.quantity || 0) - (itemStatus.totalDeducted || itemStatus.atPameran);
+                    const inWarehouse = itemStatus.warehouseAvailable ??
+                        (item.quantity || 0) - (itemStatus.totalDeducted || itemStatus.atPameran);
 
                     // Process outbound mutation (Gudang -> Pameran)
                     if (outQty > 0 && outQty <= inWarehouse) {
@@ -633,9 +635,15 @@ const WarehouseInventory = () => {
                 // Expand items into multiple rows: one warehouse row + one row per outstanding destination
                 items: (pkg.items || []).flatMap((item, originalItemIdx) => {
                     const rows = [];
-                    const status = getIndividualItemStatus(item.itemCode, pkg.packageNumber);
-                    // inWarehouse = max allowed for OUTBOUND (Mutasi) - includes official outbound deduction
-                    const inWarehouse = (item.quantity || 0) - (status.totalDeducted || status.atPameran);
+                    const status = getIndividualItemStatus(
+                        item.itemCode,
+                        pkg.packageNumber,
+                        item.name || item.itemName,
+                        item.warehouseInventoryId,
+                        pengajuanToProcess
+                    );
+                    const inWarehouse = status.warehouseAvailable ??
+                        (item.quantity || 0) - (status.totalDeducted || status.atPameran);
 
                     const pengajuanNumberLocal = pengajuanToProcess.quotationNumber || pengajuanToProcess.quotation_number;
                     const relatedMutations = (mutationLogs || []).filter(m =>
@@ -1404,11 +1412,18 @@ const WarehouseInventory = () => {
     };
 
     // Helper to calculate item location status (per individual item)
-    const getIndividualItemStatus = (itemCode, packageNumber, itemName) => {
-        if (!selectedPengajuan) return { atPameran: 0, totalOutbound: 0, totalReturned: 0, officialOutbound: 0, totalDeducted: 0 };
+    const getIndividualItemStatus = (itemCode, packageNumber, itemName, warehouseInventoryId, pengajuan = selectedPengajuan) => {
+        if (!pengajuan) return { atPameran: 0, totalOutbound: 0, totalReturned: 0, officialOutbound: 0, totalDeducted: 0 };
 
-        const pengajuanNumber = selectedPengajuan.quotationNumber || selectedPengajuan.quotation_number;
-        const pengajuanId = selectedPengajuan.id;
+        const pengajuanNumber = pengajuan.quotationNumber || pengajuan.quotation_number;
+        const pengajuanId = pengajuan.id;
+        const warehouseAvailable = getWarehouseStock(warehouseInventory, {
+            submissionId: pengajuanId,
+            submissionNumber: pengajuanNumber,
+            packageNumber,
+            itemCode,
+            warehouseInventoryId
+        });
 
         // Helper: is this destination "outside" (non-warehouse, non-gudang)?
         const isOutsideDestination = (dest) => {
@@ -1466,7 +1481,8 @@ const WarehouseInventory = () => {
             totalOfficialOut: totalOfficialOut,   // untuk display saja
             totalReturned,
             // Untuk deduction stok: hanya pakai net dari mutation logs (tidak double-count outbound transactions)
-            totalDeducted: netAtPameran
+            totalDeducted: netAtPameran,
+            warehouseAvailable
         };
     };
 
@@ -1990,9 +2006,10 @@ const WarehouseInventory = () => {
                                                     {(pkg.items || []).map((item, itemIdx) => {
                                                         const itemName = item.name || item.itemName;
                                                         const mutationInfo = getItemMutationInfo(item.itemCode, pkg.packageNumber, itemName);
-                                                        const itemStatus = getIndividualItemStatus(item.itemCode, pkg.packageNumber, itemName);
+                                                        const itemStatus = getIndividualItemStatus(item.itemCode, pkg.packageNumber, itemName, item.warehouseInventoryId);
                                                         // Use totalDeducted to account for official outbound
-                                                        const inWarehouse = (item.quantity || 0) - (itemStatus.totalDeducted || itemStatus.atPameran);
+                                                        const inWarehouse = itemStatus.warehouseAvailable ??
+                                                            (item.quantity || 0) - (itemStatus.totalDeducted || itemStatus.atPameran);
                                                         const isCheckedOut = item.checkedOut || item.checked_out;
                                                         const checkoutBcNumber = item.checkoutBcNumber || item.checkout_bc_number;
 
