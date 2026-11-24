@@ -9,6 +9,7 @@ import Button from '../../components/Common/Button';
 import { exportToCSV } from '../../utils/exportCSV';
 import { calculateDaysDifference, getAgingStatus } from '../../utils/agingCalculator';
 import { useLanguage } from '../../i18n/LanguageContext';
+import { hasApprovedOutboundForSource } from './outboundApproval';
 
 const WarehouseInventory = () => {
     const { t } = useLanguage();
@@ -911,30 +912,40 @@ const WarehouseInventory = () => {
                 const submissionId = mutationData?.id || selectedPengajuan?.id;
                 const submissionNumber = mutationData?.quotationNumber || mutationData?.quotation_number ||
                     selectedPengajuan?.quotationNumber || selectedPengajuan?.quotation_number;
-                const outboundApproved = quotations.some(q => {
-                    const sourceId = q.sourcePengajuanId || q.source_pengajuan_id ||
-                        q.documents?.sourcePengajuanId || q.documents?.source_pengajuan_id;
-                    const sourceNumber = q.sourcePengajuanNumber || q.source_pengajuan_number ||
-                        q.documents?.sourcePengajuanNumber || q.documents?.source_pengajuan_number;
-
-                    return String(q.type || '').trim().toLowerCase() === 'outbound' &&
-                        String(q.documentStatus || q.document_status || '').trim().toLowerCase() === 'approved' &&
-                        (
-                            (submissionId && (
-                                String(q.id || '') === String(submissionId) ||
-                                String(sourceId || '') === String(submissionId)
-                            )) ||
-                            (submissionNumber && (
-                                String(q.quotationNumber || q.quotation_number || '').trim().toLowerCase() === String(submissionNumber).trim().toLowerCase() ||
-                                String(sourceNumber || '').trim().toLowerCase() === String(submissionNumber).trim().toLowerCase()
-                            ))
-                        );
+                let outboundApproved = hasApprovedOutboundForSource({
+                    quotations,
+                    submissionId,
+                    submissionNumber
                 }) || outboundTransactions?.some(o =>
                     (String(o.quotation_id || o.pengajuanId || o.pengajuan_id || '') === String(submissionId || '') ||
                         (submissionNumber && String(o.quotationNumber || o.quotation_number || o.pengajuanNumber || o.pengajuan_number || '').trim().toLowerCase() === String(submissionNumber).trim().toLowerCase())) &&
                     (String(o.status || '').trim().toLowerCase() === 'approved' ||
                         String(o.document_status || '').trim().toLowerCase() === 'approved')
                 );
+
+                if (!outboundApproved) {
+                    const hasApprovedRecord = async (column, value) => {
+                        if (!value) return false;
+
+                        const { data, error } = await supabase
+                            .from('freight_quotations')
+                            .select('id')
+                            .eq('type', 'outbound')
+                            .eq('document_status', 'approved')
+                            .eq(column, value)
+                            .limit(1)
+                            .maybeSingle();
+
+                        if (error) throw error;
+                        return Boolean(data);
+                    };
+
+                    outboundApproved =
+                        await hasApprovedRecord('id', submissionId) ||
+                        await hasApprovedRecord('source_pengajuan_id', submissionId) ||
+                        await hasApprovedRecord('quotation_number', submissionNumber) ||
+                        await hasApprovedRecord('source_pengajuan_number', submissionNumber);
+                }
                 
                 if (!outboundApproved) {
                     alert(t("❌ Tidak bisa melakukan outbound. Pengajuan Barang Keluar belum disetujui.\n\nSilakan buat dan setujui pengajuan barang keluar terlebih dahulu."));
