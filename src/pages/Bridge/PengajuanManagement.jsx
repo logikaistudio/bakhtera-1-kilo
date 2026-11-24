@@ -496,9 +496,16 @@ const PengajuanManagement = () => {
                 }
             }
 
-            updateQuotation(editModal.pengajuan.id, updatedData);
-            alert(t("✅ Status pengajuan berhasil diupdate!"));
-            setEditModal({ show: false, pengajuan: null });
+            try {
+                const updateResult = await updateQuotation(editModal.pengajuan.id, updatedData);
+                if (updateResult === false) return;
+
+                alert(t("✅ Status pengajuan berhasil diupdate!"));
+                setEditModal({ show: false, pengajuan: null });
+            } catch (error) {
+                console.error('❌ Gagal menyimpan status pengajuan:', error);
+                alert(`❌ Gagal menyimpan status pengajuan: ${error.message}`);
+            }
         } else {
             alert(t("❌ updateQuotation function not found"));
         }

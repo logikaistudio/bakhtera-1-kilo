@@ -3174,7 +3174,8 @@ export const DataProvider = ({ children }) => {
         const quotation = quotations.find(q => q.id === quotationId);
         if (!quotation) {
             console.log('🔴 Quotation not found!');
-            return;
+            alert('Pengajuan tidak ditemukan. Silakan muat ulang halaman dan coba lagi.');
+            return false;
         }
 
         const previousStatus = quotation.document_status || quotation.documentStatus;
@@ -3243,13 +3244,13 @@ export const DataProvider = ({ children }) => {
                 if (updateError2) {
                     console.error('❌ Retry update without item_date failed:', updateError2);
                     alert(`Failed to update quotation: ${updateError2.message}`);
-                    return;
+                    return false;
                 }
-                return;
+                return true;
             }
 
             alert(`Failed to update quotation: ${updateError.message}`);
-            return;
+            return false;
         }
 
         console.log('✅ Quotation updated successfully');
@@ -3464,6 +3465,8 @@ export const DataProvider = ({ children }) => {
             // We will skip auto-sync to DB for now to avoid errors, assuming approval is the main event.
             console.log('📝 Inventory sync for BC update skipped for DB performance (Todo)');
         }
+
+        return true;
     };
 
     const approveBC = (bcDocId, approvedBy) => {
