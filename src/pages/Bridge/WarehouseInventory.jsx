@@ -680,7 +680,7 @@ const WarehouseInventory = () => {
         return prevMutations.reduce((sum, m) => sum + (m.mutatedQty || 0), 0);
     };
 
-    const handleStartMutation = (data) => {
+    const handleStartMutation = async (data) => {
         if (!hasEdit) return;
         // Fix: If 'data' is an event object (from button click) or undefined, use selectedPengajuan
         const pengajuanToProcess = (data && !data.packages && !data.quotationNumber && !data.quotation_number)
@@ -689,6 +689,48 @@ const WarehouseInventory = () => {
 
         if (!pengajuanToProcess) {
             console.warn('⚠️ No pengajuan data available for mutation.');
+            return;
+        }
+
+        const submissionNumber = pengajuanToProcess.quotationNumber || pengajuanToProcess.quotation_number;
+        const logColumns = 'id,pengajuan_id,pengajuan_number,item_code,item_name,mutated_qty,origin,destination,date,time,pic,created_at,meta_package:documents->>packageNumber';
+        const logQueries = [];
+        if (submissionNumber) {
+            logQueries.push(
+                supabase.from('freight_mutation_logs').select(logColumns).eq('pengajuan_number', submissionNumber)
+            );
+        }
+        if (pengajuanToProcess.id) {
+            logQueries.push(
+                supabase.from('freight_mutation_logs').select(logColumns).eq('pengajuan_id', pengajuanToProcess.id)
+            );
+        }
+
+        let freshMutationLogs;
+        try {
+            const results = await Promise.all(logQueries);
+            const logsById = new Map();
+            results.forEach(({ data, error }) => {
+                if (error) throw error;
+                (data || []).forEach(log => logsById.set(String(log.id), log));
+            });
+            freshMutationLogs = Array.from(logsById.values()).map(log => ({
+                id: String(log.id),
+                pengajuanId: log.pengajuan_id,
+                pengajuanNumber: log.pengajuan_number,
+                packageNumber: log.meta_package,
+                itemCode: log.item_code,
+                itemName: log.item_name,
+                mutatedQty: Number(log.mutated_qty) || 0,
+                origin: log.origin,
+                destination: log.destination,
+                date: log.date,
+                time: log.time,
+                pic: log.pic
+            }));
+        } catch (error) {
+            console.error('Gagal memuat riwayat mutasi sebelum membuka modal:', error);
+            alert(`Gagal memuat riwayat mutasi: ${error.message || 'Muat ulang halaman dan coba lagi.'}`);
             return;
         }
 
@@ -716,7 +758,7 @@ const WarehouseInventory = () => {
                         (item.quantity || 0) - (status.totalDeducted || status.atPameran);
 
                     const pengajuanNumberLocal = pengajuanToProcess.quotationNumber || pengajuanToProcess.quotation_number;
-                    const relatedMutations = (mutationLogs || []).filter(m =>
+                    const relatedMutations = freshMutationLogs.filter(m =>
                         (m.pengajuanId === pengajuanToProcess.id || normalize(m.pengajuanNumber) === normalize(pengajuanNumberLocal)) &&
                         normalize(m.itemCode) === normalize(item.itemCode) &&
                         (pkg.packageNumber ? normalize(m.packageNumber) === normalize(pkg.packageNumber) : true)
