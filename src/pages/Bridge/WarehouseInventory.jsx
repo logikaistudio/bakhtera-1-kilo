@@ -112,6 +112,20 @@ const WarehouseInventory = () => {
         q.type === 'outbound'
     );
 
+    const getSubmissionTime = (q) => {
+        const time = Date.parse(q.submissionDate || q.submission_date || q.created_at || q.createdAt || '');
+        return Number.isNaN(time) ? 0 : time;
+    };
+    const getCreatedTime = (q) => {
+        const time = Date.parse(q.created_at || q.createdAt || '');
+        return Number.isNaN(time) ? 0 : time;
+    };
+    const sortNewestFirst = (a, b) =>
+        getSubmissionTime(b) - getSubmissionTime(a) ||
+        getCreatedTime(b) - getCreatedTime(a) ||
+        String(b.quotationNumber || b.quotation_number || '').localeCompare(
+            String(a.quotationNumber || a.quotation_number || ''), undefined, { numeric: true });
+
     // Filter inbound based on search
     const filteredInboundPengajuan = visibleInboundPengajuan.filter(q => {
         const searchLower = searchTerm.toLowerCase();
@@ -122,7 +136,7 @@ const WarehouseInventory = () => {
         return pengajuanNo.toLowerCase().includes(searchLower) ||
             bcNo.toLowerCase().includes(searchLower) ||
             customer.toLowerCase().includes(searchLower);
-    });
+    }).sort(sortNewestFirst);
 
     // Filter outbound based on search
     const filteredOutboundPengajuan = approvedOutboundPengajuan.filter(q => {
@@ -134,7 +148,7 @@ const WarehouseInventory = () => {
         return pengajuanNo.toLowerCase().includes(searchLower) ||
             bcNo.toLowerCase().includes(searchLower) ||
             customer.toLowerCase().includes(searchLower);
-    });
+    }).sort(sortNewestFirst);
 
     // Helper function to count packages and items
     const countPackagesAndItems = (pengajuan) => {
