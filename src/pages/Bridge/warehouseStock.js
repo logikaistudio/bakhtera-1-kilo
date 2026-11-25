@@ -5,9 +5,10 @@ export const getWarehouseStock = (warehouseInventory, {
     submissionNumber,
     packageNumber,
     itemCode,
-    warehouseInventoryId
+    warehouseInventoryId,
+    preferInventoryId = false
 }) => {
-    if (warehouseInventoryId) {
+    if (warehouseInventoryId && (preferInventoryId || (!submissionId && !submissionNumber))) {
         const row = warehouseInventory.find(item => String(item.id) === String(warehouseInventoryId));
         return row ? Number(row.currentStock ?? row.quantity ?? row.current_stock ?? 0) : null;
     }

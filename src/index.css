@@ -355,6 +355,17 @@ tbody tr:last-child td {
   border-bottom: none !important;
 }
 
+/* Keep warehouse inventory detail columns readable without affecting other tables. */
+.warehouse-detail-table thead th {
+  padding: 0.5rem 0.625rem !important;
+  white-space: nowrap;
+}
+
+.warehouse-detail-table tbody td {
+  padding: 0.5rem 0.625rem !important;
+  vertical-align: middle;
+}
+
 /* Alternating Row Colors */
 tbody tr:nth-child(even) {
   background-color: #FAFBFC !important;

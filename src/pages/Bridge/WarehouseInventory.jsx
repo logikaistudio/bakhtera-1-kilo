@@ -1165,6 +1165,13 @@ const WarehouseInventory = () => {
                 });
             });
 
+            if (mutations.length === 0) {
+                const hasAvailableStock = mutationRequests.some(request => Number(request.availableStock) > 0);
+                throw new Error(hasAvailableStock
+                    ? 'Belum ada jumlah mutasi yang diisi. Masukkan jumlah minimal 1 pada baris dengan stok tersedia.'
+                    : 'Stok tersedia untuk semua item adalah 0. Pastikan stok sudah tercatat di inventaris warehouse, lalu muat ulang halaman.');
+            }
+
             console.log('📊 Total mutations to save:', mutations.length);
 
             if (mutations.length > 0 && !addMutationLog) {
@@ -1501,7 +1508,8 @@ const WarehouseInventory = () => {
             submissionNumber: pengajuanNumber,
             packageNumber,
             itemCode,
-            warehouseInventoryId
+            warehouseInventoryId,
+            preferInventoryId: pengajuan.isWarehouseFallback
         });
 
         // Helper: is this destination "outside" (non-warehouse, non-gudang)?
@@ -1782,8 +1790,8 @@ const WarehouseInventory = () => {
             {/* Detail Inventory Modal */}
             {
                 selectedPengajuan && displayData && !showMutationModal && (
-                    <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
-                        <div className="bg-white dark:bg-dark-card rounded-xl w-full max-w-6xl max-h-[90vh] overflow-hidden shadow-xl flex flex-col">
+                    <div className="fixed inset-0 flex items-center justify-center z-50 p-2" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+                        <div className="bg-white dark:bg-dark-card rounded-xl w-full max-w-[98vw] h-[94vh] max-h-[94vh] overflow-hidden shadow-xl flex flex-col">
                             <div className="flex-shrink-0 flex justify-between items-center p-4 border-b border-gray-200 dark:border-dark-border">
                                 <div>
                                     <h2 className="text-xl font-bold text-gray-900 dark:text-white">{t("Detail Inventaris")}</h2>
@@ -1876,7 +1884,7 @@ const WarehouseInventory = () => {
                             </div>
 
                             {/* Monitoring Durasi & Timeline Section */}
-                            <div className="flex-shrink-0 px-4 pt-4 pb-4 border-b border-gray-200 dark:border-dark-border">
+                            <div className={isEditing ? 'hidden' : 'flex-shrink-0 px-4 pt-4 pb-4 border-b border-gray-200 dark:border-dark-border'}>
                                 <h3 className="text-base font-bold text-gray-800 dark:text-silver-light mb-3">{t("⏱️ Monitoring Durasi & Timeline")}</h3>
 
                                 {(() => {
@@ -2035,19 +2043,24 @@ const WarehouseInventory = () => {
                             </div>
 
                             {/* Detail Item Section Title */}
-                            <div className="flex-shrink-0 px-4 pt-4 pb-3">
+                            <div className="flex-shrink-0 px-4 pt-3 pb-2">
                                 <h3 className="text-base font-bold text-gray-800 dark:text-silver-light">{t("📝 Detail Item")}</h3>
                             </div>
 
                             {/* Detail Items */}
-                            <div className="flex-1 min-h-0 p-4 overflow-y-auto space-y-4">
+                            <div className="flex-1 min-h-0 px-3 pb-3 overflow-y-auto space-y-3">
+                                {isEditing && selectedPengajuan.type !== 'outbound' && !selectedPengajuan.isWarehouseFallback && (
+                                    <p className="text-xs text-gray-600 dark:text-silver-dark">
+                                        {t("Geser tabel ke kanan untuk melihat seluruh kolom mutasi.")}
+                                    </p>
+                                )}
                                 {(displayData.packages || []).map((pkg, pkgIndex) => (
                                     <div key={pkgIndex} className="border border-gray-200 dark:border-dark-border rounded-lg overflow-hidden">
                                         <div className="bg-gray-100 dark:bg-dark-surface px-3 py-2 border-b border-gray-200 dark:border-dark-border">
                                             <span className="text-sm font-semibold text-gray-700 dark:text-silver-light">{t("Kode Packing:")} {pkg.packageNumber || `PKG-${pkgIndex + 1}`}</span>
                                         </div>
-                                        <div className="overflow-x-auto">
-                                            <table className="w-full">
+                                        <div className="max-w-full overflow-x-auto overscroll-x-contain">
+                                            <table className={`warehouse-detail-table w-full ${isEditing && selectedPengajuan.type !== 'outbound' && !selectedPengajuan.isWarehouseFallback ? 'min-w-[1500px]' : 'min-w-[920px]'}`}>
                                                 <thead className={selectedPengajuan.type === 'outbound' ? 'bg-accent-purple' : 'bg-accent-blue'}>
                                                     <tr>
                                                         <th className="px-1 py-0.5 text-left text-xs font-bold whitespace-nowrap text-white w-8" style={{ fontWeight: 'bold' }}>No.</th>
@@ -2179,26 +2192,26 @@ const WarehouseInventory = () => {
                                                                                     if (val > maxKeluar) val = maxKeluar;
                                                                                     handleItemChange(pkgIndex, itemIdx, 'mutationOutQty', val);
                                                                                 }}
-                                                                                className={`w-14 px-1 py-0 text-xs border rounded text-center ${maxKeluar > 0 ? 'border-red-300 bg-white' : 'border-gray-300 bg-gray-200 cursor-not-allowed'}`}
+                                                                                className={`w-16 px-2 py-1 text-sm border rounded text-center ${maxKeluar > 0 ? 'border-red-300 bg-white' : 'border-gray-300 bg-gray-200 cursor-not-allowed'}`}
                                                                                 disabled={maxKeluar === 0}
                                                                             />
                                                                         </td>
                                                                         <td className="px-1 py-0 text-xs text-center bg-red-50">
-                                                                            <input type="date" className="w-[85px] px-0.5 py-0 text-[10px] border border-red-200 rounded"
+                                                                            <input type="date" className="w-[130px] px-2 py-1 text-xs border border-red-200 rounded"
                                                                                 value={item.mutationDateOut || ''}
                                                                                 onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'mutationDateOut', e.target.value)}
                                                                                 disabled={keluarQty === 0}
                                                                             />
                                                                         </td>
                                                                         <td className="px-1 py-0 text-xs text-center bg-red-50">
-                                                                            <input type="time" className="w-[60px] px-0.5 py-0 text-[10px] border border-red-200 rounded"
+                                                                            <input type="time" className="w-[95px] px-2 py-1 text-xs border border-red-200 rounded"
                                                                                 value={item.mutationTimeOut || ''}
                                                                                 onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'mutationTimeOut', e.target.value)}
                                                                                 disabled={keluarQty === 0}
                                                                             />
                                                                         </td>
                                                                         <td className="px-1 py-0 text-xs text-center bg-red-50">
-                                                                            <input type="text" className="w-[70px] px-0.5 py-0 text-[10px] border border-red-200 rounded" placeholder="PIC"
+                                                                            <input type="text" className="w-[110px] px-2 py-1 text-xs border border-red-200 rounded" placeholder="PIC"
                                                                                 value={item.mutationPicOut || ''}
                                                                                 onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'mutationPicOut', e.target.value)}
                                                                                 disabled={keluarQty === 0}
@@ -2218,26 +2231,26 @@ const WarehouseInventory = () => {
                                                                                     if (val > maxKembali) val = maxKembali;
                                                                                     handleItemChange(pkgIndex, itemIdx, 'mutationInQty', val);
                                                                                 }}
-                                                                                className={`w-14 px-1 py-0 text-xs border rounded text-center ${maxKembali > 0 ? 'border-blue-300 bg-white' : 'border-gray-300 bg-gray-200 cursor-not-allowed'}`}
+                                                                                className={`w-16 px-2 py-1 text-sm border rounded text-center ${maxKembali > 0 ? 'border-blue-300 bg-white' : 'border-gray-300 bg-gray-200 cursor-not-allowed'}`}
                                                                                 disabled={maxKembali === 0}
                                                                             />
                                                                         </td>
                                                                         <td className="px-1 py-0 text-xs text-center bg-blue-50">
-                                                                            <input type="date" className="w-[85px] px-0.5 py-0 text-[10px] border border-blue-200 rounded"
+                                                                            <input type="date" className="w-[130px] px-2 py-1 text-xs border border-blue-200 rounded"
                                                                                 value={item.mutationDateIn || ''}
                                                                                 onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'mutationDateIn', e.target.value)}
                                                                                 disabled={kembaliQty === 0}
                                                                             />
                                                                         </td>
                                                                         <td className="px-1 py-0 text-xs text-center bg-blue-50">
-                                                                            <input type="time" className="w-[60px] px-0.5 py-0 text-[10px] border border-blue-200 rounded"
+                                                                            <input type="time" className="w-[95px] px-2 py-1 text-xs border border-blue-200 rounded"
                                                                                 value={item.mutationTimeIn || ''}
                                                                                 onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'mutationTimeIn', e.target.value)}
                                                                                 disabled={kembaliQty === 0}
                                                                             />
                                                                         </td>
                                                                         <td className="px-1 py-0 text-xs text-center bg-blue-50">
-                                                                            <input type="text" className="w-[70px] px-0.5 py-0 text-[10px] border border-blue-200 rounded" placeholder="PIC"
+                                                                            <input type="text" className="w-[110px] px-2 py-1 text-xs border border-blue-200 rounded" placeholder="PIC"
                                                                                 value={item.mutationPicIn || ''}
                                                                                 onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'mutationPicIn', e.target.value)}
                                                                                 disabled={kembaliQty === 0}
@@ -2249,7 +2262,7 @@ const WarehouseInventory = () => {
                                                                 <td className={`px-1 py-0 text-xs ${isCheckedOut ? 'text-amber-800 dark:text-amber-400' : 'text-gray-700 dark:text-silver'}`}>
                                                                     {isEditing ? (
                                                                         <div className="flex items-center gap-1">
-                                                                            <input type="text" value={item.notes || ''} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'notes', e.target.value)} className="w-24 px-1 py-0 text-xs border rounded" placeholder={t("Catatan...")} />
+                                                                            <input type="text" value={item.notes || ''} onChange={(e) => handleItemChange(pkgIndex, itemIdx, 'notes', e.target.value)} className="w-36 px-2 py-1 text-xs border rounded" placeholder={t("Catatan...")} />
                                                                             {item.checkedOut && (
                                                                                 <input
                                                                                     type="text"

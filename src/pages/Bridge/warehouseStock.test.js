@@ -37,3 +37,33 @@ test('uses the exact fallback warehouse row when an inventory ID is available', 
 
     assert.equal(stock, 0);
 });
+
+test('prefers the exact row for fallback inventory even when scoped rows are present', () => {
+    const stock = getWarehouseStock([
+        { id: 'warehouse-1', pengajuan_id: 'source-1', package_number: 'PKG-A', item_code: 'ITEM-1', quantity: 0 },
+        { id: 'warehouse-2', pengajuan_id: 'source-1', package_number: 'PKG-A', item_code: 'ITEM-1', quantity: 4 }
+    ], {
+        submissionId: 'source-1',
+        packageNumber: 'PKG-A',
+        itemCode: 'ITEM-1',
+        warehouseInventoryId: 'warehouse-1',
+        preferInventoryId: true
+    });
+
+    assert.equal(stock, 0);
+});
+
+test('uses scoped stock when a source row ID is present for a quotation', () => {
+    const stock = getWarehouseStock([
+        { id: 'warehouse-1', pengajuan_id: 'source-1', package_number: 'PKG-A', item_code: 'ITEM-1', quantity: 0 },
+        { id: 'warehouse-2', pengajuan_id: 'source-1', package_number: 'PKG-A', item_code: 'ITEM-1', quantity: 4 },
+        { id: 'warehouse-3', pengajuan_id: 'source-2', package_number: 'PKG-A', item_code: 'ITEM-1', quantity: 9 }
+    ], {
+        submissionId: 'source-1',
+        packageNumber: 'PKG-A',
+        itemCode: 'ITEM-1',
+        warehouseInventoryId: 'warehouse-1'
+    });
+
+    assert.equal(stock, 4);
+});
