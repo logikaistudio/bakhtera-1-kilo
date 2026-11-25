@@ -150,6 +150,16 @@ const WarehouseInventory = () => {
             customer.toLowerCase().includes(searchLower);
     }).sort(sortNewestFirst);
 
+    // Same stock source as the Goods Movement modal (freight_warehouse balance)
+    const getCurrentWarehouseStock = (pengajuan) => (pengajuan.packages || []).reduce((total, pkg) =>
+        total + (pkg.items || []).reduce((sum, item) => {
+            const status = getIndividualItemStatus(
+                item.itemCode, pkg.packageNumber, item.name || item.itemName, item.warehouseInventoryId, pengajuan
+            );
+            const stock = status.warehouseAvailable ?? (Number(item.quantity || 0) - (status.totalDeducted || 0));
+            return sum + Math.max(0, Number(stock) || 0);
+        }, 0), 0);
+
     // Helper function to count packages and items
     const countPackagesAndItems = (pengajuan) => {
         const packages = pengajuan.packages || [];
@@ -1761,6 +1771,7 @@ const WarehouseInventory = () => {
                                 <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">{t("Durasi")}</th>
                                 <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">{t("Jml Package")}</th>
                                 <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">{t("Jml Item")}</th>
+                                <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">{t("Stok Gudang")}</th>
                                 <th className="px-2 py-1 text-center text-xs font-semibold text-white whitespace-nowrap">{t("PIC Penerima")}</th>
                             </tr>
                         </thead>
@@ -1785,6 +1796,7 @@ const WarehouseInventory = () => {
                                         })()}
                                         <td className="px-2 py-0.5 text-xs text-accent-blue font-bold text-center">{packageCount}</td>
                                         <td className="px-2 py-0.5 text-xs text-accent-blue font-bold text-center">{itemCount}</td>
+                                        <td className={`px-2 py-0.5 text-xs font-bold text-center ${getCurrentWarehouseStock(pengajuan) === 0 ? 'text-red-400' : 'text-green-400'}`}>{getCurrentWarehouseStock(pengajuan)}</td>
                                         <td className="px-2 py-0.5 text-xs text-silver text-center whitespace-nowrap">{pengajuan.pic || pengajuan.receivedBy || '-'}</td>
                                     </tr>
                                 );
