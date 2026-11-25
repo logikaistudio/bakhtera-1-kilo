@@ -1,5 +1,8 @@
 const normalize = value => String(value ?? '').trim().toLowerCase();
 
+export const shouldShowWarehouseMutationRow = (warehouseStock, hasOutstandingExternalStock) =>
+    Number(warehouseStock ?? 0) > 0 || !hasOutstandingExternalStock;
+
 export const getWarehouseStock = (warehouseInventory, {
     submissionId,
     submissionNumber,

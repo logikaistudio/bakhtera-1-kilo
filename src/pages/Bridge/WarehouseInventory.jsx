@@ -10,7 +10,7 @@ import { exportToCSV } from '../../utils/exportCSV';
 import { calculateDaysDifference, getAgingStatus } from '../../utils/agingCalculator';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { hasApprovedOutboundForSource } from './outboundApproval';
-import { getWarehouseStock } from './warehouseStock';
+import { getWarehouseStock, shouldShowWarehouseMutationRow } from './warehouseStock';
 import { validateMutationRequests } from './mutationValidation';
 
 const WarehouseInventory = () => {
@@ -744,7 +744,7 @@ const WarehouseInventory = () => {
             mutationLocation: DEFAULT_LOCATION, // Default location (header fallback)
             packages: (pengajuanToProcess.packages || []).map(pkg => ({
                 ...pkg,
-                // Expand items into multiple rows: one warehouse row + one row per outstanding destination
+                // Show actionable warehouse stock and each outstanding external location.
                 items: (pkg.items || []).flatMap((item, originalItemIdx) => {
                     const rows = [];
                     const status = getIndividualItemStatus(
@@ -796,29 +796,12 @@ const WarehouseInventory = () => {
                         return nonGudang ? nonGudang.value : 'Hall 1';
                     })();
 
-                    rows.push({
-                        ...item,
-                        _originalItem: item.itemCode,
-                        _originalItemIdx: originalItemIdx,
-                        _replicaIndex: 'warehouse',
-                        mutationLocation: safeExhibitionLoc,
-                        inWarehouse: Math.max(0, inWarehouse),
-                        atPameran: 0,
-                        maxMutationQty: Math.max(0, inWarehouse),
-                        maxRemutationQty: 0,
-                        mutationQty: 0,
-                        remutationQty: 0,
-                        mutationCondition: 'Baik',
-                        mutationDate: new Date().toISOString().split('T')[0],
-                        mutationTime: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
-                        mutationPic: '',
-                        mutationDocuments: []
-                    });
-
                     // 2) For each destination with outstanding qty, create a remutation row
+                    let hasOutstandingExternalStock = false;
                     Object.values(destGroups).forEach(g => {
                         const qtyAtDest = Math.max(0, (g.sent || 0) - (g.returned || 0));
                         if (qtyAtDest <= 0) return;
+                        hasOutstandingExternalStock = true;
                         rows.push({
                             ...item,
                             _originalItem: item.itemCode,
@@ -839,6 +822,27 @@ const WarehouseInventory = () => {
                             mutationDocuments: []
                         });
                     });
+
+                    if (shouldShowWarehouseMutationRow(inWarehouse, hasOutstandingExternalStock)) {
+                        rows.unshift({
+                            ...item,
+                            _originalItem: item.itemCode,
+                            _originalItemIdx: originalItemIdx,
+                            _replicaIndex: 'warehouse',
+                            mutationLocation: safeExhibitionLoc,
+                            inWarehouse: Math.max(0, inWarehouse),
+                            atPameran: 0,
+                            maxMutationQty: Math.max(0, inWarehouse),
+                            maxRemutationQty: 0,
+                            mutationQty: 0,
+                            remutationQty: 0,
+                            mutationCondition: 'Baik',
+                            mutationDate: new Date().toISOString().split('T')[0],
+                            mutationTime: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+                            mutationPic: '',
+                            mutationDocuments: []
+                        });
+                    }
 
                     return rows;
                 })

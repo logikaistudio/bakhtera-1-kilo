@@ -1,6 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { getWarehouseStock, planWarehouseStockDeductions } from './warehouseStock.js';
+import {
+    getWarehouseStock,
+    planWarehouseStockDeductions,
+    shouldShowWarehouseMutationRow
+} from './warehouseStock.js';
+
+test('hides an empty warehouse row when the item is available at an external location', () => {
+    assert.equal(shouldShowWarehouseMutationRow(0, true), false);
+    assert.equal(shouldShowWarehouseMutationRow(1, true), true);
+    assert.equal(shouldShowWarehouseMutationRow(0, false), true);
+});
 
 test('uses only stock for the matching submission, package, and item', () => {
     const stock = getWarehouseStock([
