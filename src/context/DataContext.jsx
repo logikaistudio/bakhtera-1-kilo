@@ -2254,14 +2254,19 @@ export const DataProvider = ({ children }) => {
                     value: value || item.row.value,
                     updated_at: new Date().toISOString()
                 };
-                const { error: updateError } = await supabase
+                const { data: updatedRow, error: updateError } = await supabase
                     .from('freight_warehouse')
                     .update(updatedDataPayload)
-                    .eq('id', item.row.id);
+                    .eq('id', item.row.id)
+                    .select('id')
+                    .maybeSingle();
 
                 if (updateError) {
                     console.error("Error updating warehouse stock:", updateError);
                     throw updateError;
+                }
+                if (!updatedRow) {
+                    throw new Error(`Stok warehouse ${assetName || assetId} tidak tersimpan. Muat ulang data dan coba lagi.`);
                 }
 
                 updatedQuantities.set(item.row.id, { newStock, movement });
@@ -2608,14 +2613,22 @@ export const DataProvider = ({ children }) => {
     };
 
     const updateWarehouseInventory = async (id, updatedInventory) => {
-        const { error } = await supabase
+        const { data, error } = await supabase
             .from('freight_warehouse')
             .update(updatedInventory)
-            .eq('id', id);
+            .eq('id', id)
+            .select('id')
+            .maybeSingle();
 
         if (error) {
             console.error('Error updating inventory:', error);
             alert(`Gagal memperbarui inventaris: ${error.message}`);
+            return false;
+        }
+        if (!data) {
+            const message = 'Baris inventaris tidak ditemukan atau tidak dapat diperbarui. Muat ulang halaman dan coba lagi.';
+            console.error(message, { id });
+            alert(message);
             return false;
         }
         setWarehouseInventory(prev => prev.map(i => i.id === id ? {

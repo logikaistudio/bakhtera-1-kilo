@@ -11,6 +11,7 @@ import { calculateDaysDifference, getAgingStatus } from '../../utils/agingCalcul
 import { useLanguage } from '../../i18n/LanguageContext';
 import { hasApprovedOutboundForSource } from './outboundApproval';
 import { getWarehouseStock } from './warehouseStock';
+import { validateMutationRequests } from './mutationValidation';
 
 const WarehouseInventory = () => {
     const { t } = useLanguage();
@@ -262,6 +263,48 @@ const WarehouseInventory = () => {
                 }))
             };
 
+            if (!selectedPengajuan.isWarehouseFallback) {
+                const mutationRequests = (editData.packages || []).flatMap(pkg =>
+                    (pkg.items || []).flatMap(item => {
+                        const itemStatus = getIndividualItemStatus(
+                            item.itemCode,
+                            pkg.packageNumber,
+                            item.name || item.itemName,
+                            item.warehouseInventoryId
+                        );
+                        const availableInWarehouse = itemStatus.warehouseAvailable ??
+                            (Number(item.quantity) || 0) - (itemStatus.totalDeducted || itemStatus.atPameran);
+                        const scope = (direction) => JSON.stringify([
+                            selectedPengajuan.id,
+                            pkg.packageNumber || '',
+                            item.itemCode || '',
+                            direction
+                        ]);
+
+                        return [
+                            {
+                                scope: scope('outbound'),
+                                quantity: item.mutationOutQty,
+                                availableStock: availableInWarehouse,
+                                itemName: item.name || item.itemName
+                            },
+                            {
+                                scope: scope('inbound'),
+                                quantity: item.mutationInQty,
+                                availableStock: itemStatus.atPameran,
+                                itemName: item.name || item.itemName
+                            }
+                        ];
+                    })
+                );
+                validateMutationRequests(mutationRequests);
+
+                if (mutationRequests.some(request => Number(request.quantity || 0) > 0) &&
+                    (!addMutationLog || !updateInventoryStock)) {
+                    throw new Error('Fungsi penyimpanan mutasi tidak tersedia. Muat ulang halaman dan coba lagi.');
+                }
+            }
+
             if (selectedPengajuan.isWarehouseFallback) {
                 const warehouseUpdates = (cleanedData.packages || []).flatMap(pkg =>
                     (pkg.items || []).map(item => {
@@ -299,7 +342,10 @@ const WarehouseInventory = () => {
             }
 
             // 1. Save quotation data (without mutation fields)
-            await updateQuotation(selectedPengajuan.id, cleanedData);
+            const quotationSaved = await updateQuotation(selectedPengajuan.id, cleanedData);
+            if (!quotationSaved) {
+                throw new Error('Data pengajuan gagal disimpan. Mutasi belum diproses.');
+            }
             console.log('✅ Data inventaris berhasil disimpan');
 
             // 2. Process mutations if any
@@ -326,7 +372,7 @@ const WarehouseInventory = () => {
                         (item.quantity || 0) - (itemStatus.totalDeducted || itemStatus.atPameran);
 
                     // Process outbound mutation (Gudang -> Pameran)
-                    if (outQty > 0 && outQty <= inWarehouse) {
+                    if (outQty > 0) {
                         // Per-item location if specified, else header fallback
                         const destinationLocation = item.mutationLocation || editData.mutationLocation || DEFAULT_LOCATION;
                         mutations.push({
@@ -354,7 +400,7 @@ const WarehouseInventory = () => {
                     }
 
                     // Process inbound mutation (Pameran -> Gudang)
-                    if (inQty > 0 && inQty <= itemStatus.atPameran) {
+                    if (inQty > 0) {
                         mutations.push({
                             pengajuanId: qId,
                             pengajuanNumber: qNumber,
@@ -386,7 +432,7 @@ const WarehouseInventory = () => {
             });
 
             // Save mutations
-            if (addMutationLog && mutations.length > 0) {
+            if (mutations.length > 0) {
                 console.log('📊 Processing', mutations.length, 'mutation(s)...');
                 for (const mutation of mutations) {
                     console.log('💾 Saving mutation:', mutation.itemName, mutation._type, 'qty:', mutation.mutatedQty);
@@ -1009,6 +1055,28 @@ const WarehouseInventory = () => {
                 return;
             }
 
+            const mutationRequests = (mutationData?.packages || []).flatMap(pkg =>
+                (pkg.items || []).map(item => {
+                    const isToGudang = String(item.mutationLocation || 'Gudang').toLowerCase() === 'gudang';
+                    const direction = isToGudang ? 'inbound' : 'outbound';
+                    const origin = item._replicaIndex !== 'warehouse' ? item._replicaIndex : 'Pameran';
+
+                    return {
+                        scope: JSON.stringify([
+                            qId,
+                            pkg.packageNumber || '',
+                            item.itemCode || '',
+                            direction,
+                            isToGudang ? origin : ''
+                        ]),
+                        quantity: item.mutationQty,
+                        availableStock: isToGudang ? item.atPameran : item.inWarehouse,
+                        itemName: item.name || item.itemName
+                    };
+                })
+            );
+            validateMutationRequests(mutationRequests);
+
             // Extract sender/shipper info from pengajuan data
             // Note: shipper field can be a direct string (from PengajuanManagement) or an object
             const senderName = (typeof mutationData?.shipper === 'string' ? mutationData.shipper : null) ||
@@ -1028,7 +1096,7 @@ const WarehouseInventory = () => {
                 console.log(`📦 Package ${pkgIdx + 1}:`, pkg.packageNumber, '- Items:', (pkg.items || []).length);
 
                 (pkg.items || []).forEach((item, itemIdx) => {
-                    const mutationQty = item.mutationQty || 0;
+                    const mutationQty = item.mutationQty ?? 0;
                     if (mutationQty <= 0) return;
 
                     const bcNum = selectedPengajuan?.bcDocumentNumber || selectedPengajuan?.bc_document_number ||
@@ -1099,7 +1167,18 @@ const WarehouseInventory = () => {
 
             console.log('📊 Total mutations to save:', mutations.length);
 
-            if (addMutationLog && mutations.length > 0) {
+            if (mutations.length > 0 && !addMutationLog) {
+                throw new Error('Fungsi penyimpanan log mutasi tidak tersedia. Muat ulang halaman dan coba lagi.');
+            }
+            if (mutations.length > 0 && (
+                selectedPengajuan.isWarehouseFallback
+                    ? !updateWarehouseInventory
+                    : !updateInventoryStock
+            )) {
+                throw new Error('Fungsi pembaruan stok warehouse tidak tersedia. Muat ulang halaman dan coba lagi.');
+            }
+
+            if (mutations.length > 0) {
                 const fallbackStocks = new Map();
                 if (selectedPengajuan.isWarehouseFallback) {
                     mutations.forEach(mutation => {
