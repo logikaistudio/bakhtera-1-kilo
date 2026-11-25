@@ -1916,8 +1916,8 @@ const WarehouseInventory = () => {
                             </div>
 
                             {/* Monitoring Durasi & Timeline Section */}
-                            <div className={isEditing ? 'hidden' : 'flex-shrink-0 px-4 pt-4 pb-4 border-b border-gray-200 dark:border-dark-border'}>
-                                <h3 className="text-base font-bold text-gray-800 dark:text-silver-light mb-3">{t("⏱️ Monitoring Durasi & Timeline")}</h3>
+                            <div className={isEditing ? 'hidden' : 'flex-shrink-0 px-3 pt-2 pb-2 border-b border-gray-200 dark:border-dark-border'}>
+                                <h3 className="text-sm font-bold text-gray-800 dark:text-silver-light mb-2">{t("⏱️ Monitoring Durasi & Timeline")}</h3>
 
                                 {(() => {
                                     const entryDate = displayData.submissionDate || displayData.submission_date || displayData.date;
@@ -1934,14 +1934,14 @@ const WarehouseInventory = () => {
                                     ).sort((a, b) => new Date(b.date) - new Date(a.date));
 
                                     return (
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                                             {/* Aging Status Card */}
-                                            <div className="glass-card p-4 rounded-lg border-l-4" style={{ borderLeftColor: status.color.replace('text-', '#') }}>
-                                                <div className="flex items-center justify-between mb-2">
-                                                    <h4 className="text-sm font-semibold text-gray-700 dark:text-silver-light">{t("Status Aging")}</h4>
-                                                    {status.isAlert && <AlertCircle className={`w-5 h-5 ${status.color}`} />}
+                                            <div className="glass-card p-2 rounded-lg border-l-4" style={{ borderLeftColor: status.color.replace('text-', '#') }}>
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <h4 className="text-xs font-semibold text-gray-700 dark:text-silver-light">{t("Status Aging")}</h4>
+                                                    {status.isAlert && <AlertCircle className={`w-4 h-4 ${status.color}`} />}
                                                 </div>
-                                                <div className="space-y-2">
+                                                <div className="space-y-1">
                                                     <div className="flex justify-between items-center">
                                                         <span className="text-xs text-gray-600 dark:text-silver-dark">{t("Tanggal Masuk:")}</span>
                                                         <span className="text-xs font-semibold text-gray-900 dark:text-silver-light">{formatDate(entryDate)}</span>
@@ -1950,17 +1950,17 @@ const WarehouseInventory = () => {
                                                         <span className="text-xs text-gray-600 dark:text-silver-dark">{t("Jam Masuk:")}</span>
                                                         <span className="text-xs font-semibold text-gray-900 dark:text-silver-light">{formatTime(displayData.approvedDate || displayData.approved_date)}</span>
                                                     </div>
-                                                    <div className="flex justify-between items-center pt-2 border-t border-gray-200 dark:border-dark-border">
+                                                    <div className="flex justify-between items-center pt-1 border-t border-gray-200 dark:border-dark-border">
                                                         <span className="text-xs text-gray-600 dark:text-silver-dark">{t("Durasi di Gudang:")}</span>
-                                                        <span className={`text-lg font-bold ${status.color}`}>{days} {t("Hari")}</span>
+                                                        <span className={`text-base font-bold ${status.color}`}>{days} {t("Hari")}</span>
                                                     </div>
                                                 </div>
                                             </div>
 
                                             {/* Location Breakdown Card */}
-                                            <div className="glass-card p-4 rounded-lg">
-                                                <h4 className="text-sm font-semibold text-gray-700 dark:text-silver-light mb-2">{t("Distribusi Lokasi")}</h4>
-                                                <div className="space-y-2">
+                                            <div className="glass-card p-2 rounded-lg">
+                                                <h4 className="text-xs font-semibold text-gray-700 dark:text-silver-light mb-1">{t("Distribusi Lokasi")}</h4>
+                                                <div className="space-y-1">
                                                     <div className="flex justify-between items-center">
                                                         <span className="text-xs text-gray-600 dark:text-silver-dark">{t("Total Item:")}</span>
                                                         <span className="text-xs font-bold text-accent-blue">{locationInfo.totalItems}</span>
@@ -1987,10 +1987,10 @@ const WarehouseInventory = () => {
                                             </div>
 
                                             {/* Activity Timeline Card */}
-                                            <div className="glass-card p-4 rounded-lg">
-                                                <h4 className="text-sm font-semibold text-gray-700 dark:text-silver-light mb-2">{t("Aktivitas & Frekuensi")}</h4>
+                                            <div className="glass-card p-2 rounded-lg">
+                                                <h4 className="text-xs font-semibold text-gray-700 dark:text-silver-light mb-1">{t("Aktivitas & Frekuensi")}</h4>
                                                 {allMutations.length > 0 ? (
-                                                    <div className="space-y-3">
+                                                    <div className="space-y-2">
                                                         {/* Mutation Statistics */}
                                                         {(() => {
                                                             // Calculate mutation frequencies
@@ -2007,28 +2007,28 @@ const WarehouseInventory = () => {
                                                             });
 
                                                             return (
-                                                                <div className="grid grid-cols-3 gap-2 pb-2 border-b border-gray-200 dark:border-dark-border">
+                                                                <div className="grid grid-cols-3 gap-1 pb-1 border-b border-gray-200 dark:border-dark-border">
                                                                     {/* Pameran Counter */}
                                                                     <div className="text-center">
                                                                         <div className="text-[10px] text-orange-600 dark:text-orange-400 font-medium">{DEFAULT_LOCATION}</div>
-                                                                        <div className="text-lg font-bold text-orange-700 dark:text-orange-300">{toPameran.length}x</div>
+                                                                        <div className="text-base font-bold text-orange-700 dark:text-orange-300">{toPameran.length}x</div>
                                                                     </div>
                                                                     {/* Gudang Counter */}
                                                                     <div className="text-center">
                                                                         <div className="text-[10px] text-green-600 dark:text-green-400 font-medium">{t("Kembali")}</div>
-                                                                        <div className="text-lg font-bold text-green-700 dark:text-green-300">{toGudang.length}x</div>
+                                                                        <div className="text-base font-bold text-green-700 dark:text-green-300">{toGudang.length}x</div>
                                                                     </div>
                                                                     {/* Other Counter */}
                                                                     <div className="text-center">
                                                                         <div className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">{t("Lainnya")}</div>
-                                                                        <div className="text-lg font-bold text-purple-700 dark:text-purple-300">{toOther.length}x</div>
+                                                                        <div className="text-base font-bold text-purple-700 dark:text-purple-300">{toOther.length}x</div>
                                                                     </div>
                                                                 </div>
                                                             );
                                                         })()}
 
                                                         {/* Recent Activity Timeline */}
-                                                        <div className="space-y-2 max-h-20 overflow-y-auto">
+                                                        <div className="space-y-1 max-h-14 overflow-y-auto">
                                                             {allMutations.slice(0, 3).map((mutation, idx) => {
                                                                 const dest = (mutation.destination || '').toLowerCase();
                                                                 const isPameran = dest === DEFAULT_LOCATION.toLowerCase();
@@ -2424,7 +2424,7 @@ const WarehouseInventory = () => {
                                                         <th className="px-3 py-3 text-center text-sm font-semibold text-white bg-red-700 w-40">PIC</th>
                                                         <th className="px-3 py-3 text-center text-sm font-semibold text-white bg-red-700 w-36">{t("Dokumen")}</th>
                                                         <th className="px-3 py-3 text-left text-sm font-semibold text-white w-56">{t("Keterangan")}</th>
-                                                        <th className="px-3 py-3 text-center text-sm font-semibold text-white w-20">{t("Aksi")}</th>
+                                                        <th className="sticky right-0 z-10 px-2 py-3 text-center text-sm font-semibold text-white w-20 bg-accent-blue">{t("Aksi")}</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-gray-200 dark:divide-dark-border">
@@ -2492,7 +2492,9 @@ const WarehouseInventory = () => {
                                                                     <select
                                                                         value={mutationLocation}
                                                                         onChange={(e) => handleMutationItemChange(pkgIndex, itemIdx, 'mutationLocation', e.target.value)}
-                                                                        className="w-full min-w-36 min-h-11 px-3 py-2 text-sm border rounded-lg bg-white dark:bg-dark-surface dark:text-silver-light text-center"
+                                                                        aria-label={`${t("Tujuan/Lokasi")} ${item.itemCode || ''}`}
+                                                                        title={t("Pilih tujuan perpindahan")}
+                                                                        className="w-full min-w-36 min-h-11 px-3 py-2 text-sm border rounded-lg bg-white dark:bg-dark-surface dark:text-silver-light text-center cursor-pointer pointer-events-auto"
                                                                     >
                                                                         {LOCATION_OPTIONS.filter(opt => {
                                                                             const location = opt.value.toLowerCase();
@@ -2574,7 +2576,7 @@ const WarehouseInventory = () => {
                                                                 </td>
                                                                 
                                                                 {/* Aksi */}
-                                                                <td className="px-3 py-3 text-sm text-center border-l border-gray-200 dark:border-dark-border">
+                                                                <td className="sticky right-0 z-10 px-2 py-3 text-sm text-center border-l border-gray-200 dark:border-dark-border bg-white dark:bg-dark-card">
                                                                     {!isFullyMutated && (isPrimaryRow || isMultiRow) && (
                                                                         <div className="flex gap-1 justify-center">
                                                                             {isPrimaryRow ? (
