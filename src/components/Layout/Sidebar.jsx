@@ -38,6 +38,17 @@ import { useLanguage } from '../../i18n/LanguageContext';
 import LanguageSwitcher from '../../i18n/LanguageSwitcher';
 
 
+const getSidebarSection = (path) => {
+    if (path.startsWith('/bridge')) return 'bridge';
+    if (path.includes('/finance/') && !path.includes('/selling-buying')) return 'finance';
+    if (path.startsWith('/pabean')) return 'pabean';
+    if (path.startsWith('/big')) return 'big';
+    if (path.startsWith('/cabang')) return 'cabang';
+    if (path.startsWith('/blink')) return 'blink';
+    if (path.startsWith('/bxpo')) return 'bxpo';
+    if (path.startsWith('/finance')) return 'finance';
+    return '';
+};
 
 const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
     const { t } = useLanguage();
@@ -54,13 +65,7 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [expandedSection, setExpandedSection] = useState('');
     const [branches, setBranches] = useState([]);
-    const [expandedCategories, setExpandedCategories] = useState([
-        'blink-marketing', 'blink-operations', 'blink-costing', 'blink-profit', 'blink-data', 'blink-approval',
-        'blink-finance',
-        'bridge-operasional', 'bridge-finance', 'bridge-data', 'bridge-persetujuan',
-        'finance-blinkfinance', 'finance-bridgefinance', 'finance-bigfinance',
-        'central-users'
-    ]); // All expanded by default
+    const [expandedCategories, setExpandedCategories] = useState([]);
     const [showChangePassword, setShowChangePassword] = useState(false);
     const userLevel = String(user?.user_level || '').toLowerCase();
     const isAdminHq = isSuperAdmin() || isAdmin() || userLevel === 'admin_hq';
@@ -141,32 +146,18 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
     }, []);
     const lastPathRef = React.useRef(null);
 
-    // Initial check and Listener for path changes
+    // Initial check and listener for path changes
     React.useEffect(() => {
         const path = location.pathname;
-        const getSection = (p) => {
-            if (p.includes('/finance/') && !p.includes('/selling-buying')) return 'finance';
-            if (p.startsWith('/bridge')) return 'bridge';
-            if (p.startsWith('/pabean')) return 'pabean';
-            if (p.startsWith('/big')) return 'big';
-            if (p.startsWith('/cabang')) return 'cabang';
-            if (p.startsWith('/blink')) return 'blink';
-            if (p.startsWith('/bxpo')) return 'bxpo';
-            if (p.startsWith('/finance')) return 'finance';
-            return '';
-        };
+        const currentSection = getSidebarSection(path);
 
-        const currentSection = getSection(path);
-
-        // Handle initial load
         if (lastPathRef.current === null) {
             if (currentSection) {
                 setExpandedSection(currentSection);
                 scrollToElement('menu-' + currentSection);
             }
         } else {
-            // Handle navigation
-            const prevSection = getSection(lastPathRef.current);
+            const prevSection = getSidebarSection(lastPathRef.current);
             if (currentSection && currentSection !== prevSection) {
                 setExpandedSection(currentSection);
                 scrollToElement('menu-' + currentSection);
@@ -537,6 +528,36 @@ const Sidebar = ({ isSidebarOpen = true, setIsSidebarOpen }) => {
     const financeSubMenuItems = localizeMenu(financeSubMenuItemsRaw);
     const cabangSubMenuItems = localizeMenu(cabangSubMenuItemsRaw);
     const bxpoSubMenuItems = localizeMenu(bxpoSubMenuItemsRaw);
+
+    const activeSection = getSidebarSection(location.pathname);
+    const menuBySection = {
+        bridge: bridgeSubMenuItems,
+        big: bigSubMenuItems,
+        blink: blinkSubMenuItems,
+        cabang: cabangSubMenuItems,
+        bxpo: bxpoSubMenuItems,
+        finance: financeSubMenuItems
+    };
+    const category = (menuBySection[activeSection] || []).find(subItem =>
+            subItem.type === 'category' &&
+            subItem.items.some(menuItem => {
+                if (!menuItem.path) return false;
+                if (location.pathname === menuItem.path ||
+                    location.pathname.startsWith(`${menuItem.path}/`)) return true;
+                return activeSection === 'cabang' &&
+                    location.pathname.endsWith(menuItem.path.slice('/cabang'.length));
+            })
+        );
+
+    const activeCategoryKey = category
+        ? activeSection === 'finance'
+            ? `finance-${category.label.toLowerCase().replace(/[^a-z0-9]/g, '')}`
+            : `${activeSection}-${category.label.toLowerCase().split(' ').pop()}`
+        : '';
+
+    React.useEffect(() => {
+        setExpandedCategories(activeCategoryKey ? [activeCategoryKey] : []);
+    }, [activeCategoryKey]);
 
     const hasBxpoAccess = () => {
         return bxpoSubMenuItems.some(subItem => {
