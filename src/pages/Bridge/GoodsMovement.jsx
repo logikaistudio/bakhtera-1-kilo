@@ -8,6 +8,7 @@ import { exportToCSV } from '../../utils/exportCSV';
 import { exportToXLS } from '../../utils/exportXLS';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { LOCATION_OPTIONS } from '../../constants/locationOptions';
+import { sortMutationLogsBySubmission } from './goodsMovementUtils';
 
 const GoodsMovement = () => {
     const { t } = useLanguage();
@@ -429,8 +430,7 @@ const GoodsMovement = () => {
             };
         });
 
-        // Return newest-first for display
-        return processed.sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date));
+        return sortMutationLogsBySubmission(processed);
     };
 
     // Precompute running balances and opening balances for all mutation logs
@@ -454,14 +454,7 @@ const GoodsMovement = () => {
     })();
 
     const renderTable = (data, title, icon, colorClass, emptyMessage) => {
-        const getLogTimestamp = (log) => {
-            const value = log.createdAt || (log.date ? `${log.date}T${log.time || '00:00:00'}` : null);
-            const timestamp = value ? new Date(value).getTime() : 0;
-            return Number.isNaN(timestamp) ? 0 : timestamp;
-        };
-        const sortedData = [...data].sort((a, b) =>
-            getLogTimestamp(b) - getLogTimestamp(a) || String(b.id).localeCompare(String(a.id))
-        );
+        const sortedData = sortMutationLogsBySubmission(data);
         const isAllInTableSelected = sortedData.length > 0 && sortedData.every(log => selectedIds.includes(log.id));
 
         const toggleSelectAllInTable = () => {

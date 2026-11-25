@@ -16,6 +16,7 @@ import {
     shouldShowWarehouseMutationRow
 } from './warehouseStock';
 import { validateMutationRequests } from './mutationValidation';
+import { applyMutationTracking } from './mutationTracking';
 
 const isWarehouseMutationRow = item => String(item?._replicaIndex || '').startsWith('warehouse');
 const getMutationSourceLocation = item =>
@@ -1190,7 +1191,7 @@ const WarehouseInventory = () => {
                         ),
                         documents: (item.mutationDocuments || []).map(d => ({ title: d.title, name: d.name, type: d.type, data: d.data })),
                         _pkgIndex: pkgIdx,
-                        _itemIndex: itemIdx,
+                        _itemIndex: Number.isInteger(item._originalItemIdx) ? item._originalItemIdx : itemIdx,
                         _type: type
                     });
                 });
@@ -1304,34 +1305,13 @@ const WarehouseInventory = () => {
                     }
                 }
 
-                // Update quotation with mutation tracking labels
-                const updatedPackages = JSON.parse(JSON.stringify(selectedPengajuan.packages || []));
-
-                for (const mutation of mutations) {
-                    const pkg = updatedPackages[mutation._pkgIndex];
-                    if (pkg && pkg.items && pkg.items[mutation._itemIndex]) {
-                        const item = pkg.items[mutation._itemIndex];
-
-                        // Count existing mutations for this item
-                        const existingMutations = mutationLogs.filter(m =>
-                            m.pengajuanNumber === qNumber &&
-                            m.itemCode === item.itemCode &&
-                            m.packageNumber === pkg.packageNumber
-                        ).length;
-
-                        // Set mutation label: mutasi-1, mutasi-2, or re-mutasi for 3+
-                        const mutationNum = existingMutations + 1;
-                        const mutationLabel = mutationNum >= 3 ? 're-mutasi' : `mutasi-${mutationNum}`;
-
-                        // Update item with mutation tracking
-                        item.mutationStatus = mutationLabel;
-                        item.lastMutationDate = mutation.date;
-                        item.lastMutationQty = mutation.mutatedQty;
-                        item.totalMutated = (item.totalMutated || 0) + mutation.mutatedQty;
-
-                        console.log(`📝 Updated ${item.name || item.itemName} → ${mutationLabel}`);
-                    }
-                }
+                // Update the original quotation items, not the expanded source-location rows.
+                const updatedPackages = applyMutationTracking(
+                    selectedPengajuan.packages || [],
+                    mutations,
+                    mutationLogs,
+                    qNumber
+                );
 
                 if (selectedPengajuan.isWarehouseFallback) {
                     console.log('✅ Mutasi tersimpan langsung ke log dan stok inventaris warehouse');

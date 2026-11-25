@@ -2501,21 +2501,22 @@ export const DataProvider = ({ children }) => {
     const updateMutationLog = async (id, updates) => {
         try {
             const documents = updates.documents;
-            const documentsPayload = Array.isArray(documents) ? {
-                files: documents,
-                sender: updates.sender,
-                uom: updates.uom,
-                mutationLocation: updates.destination || updates.mutationLocation,
-                storageLocation: updates.storageLocation,
-                packageNumber: updates.packageNumber,
-                hsCode: updates.hsCode,
-                condition: updates.condition
-            } : documents;
+            const existingMetadata = Array.isArray(documents) ? {} : documents || {};
+            const documentsPayload = documents == null ? undefined : {
+                ...existingMetadata,
+                files: Array.isArray(documents) ? documents : existingMetadata.files || [],
+                sender: updates.sender ?? existingMetadata.sender,
+                uom: updates.uom ?? existingMetadata.uom,
+                mutationLocation: updates.destination || updates.mutationLocation || existingMetadata.mutationLocation,
+                storageLocation: updates.storageLocation ?? existingMetadata.storageLocation,
+                packageNumber: updates.packageNumber ?? existingMetadata.packageNumber,
+                hsCode: updates.hsCode ?? existingMetadata.hsCode,
+                condition: updates.condition ?? existingMetadata.condition
+            };
 
             // Update in Supabase
             const basePayload = {
                 destination: updates.destination,
-                condition: updates.condition,
                 pic: updates.pic,
                 date: updates.date,
                 time: updates.time,
@@ -2528,18 +2529,29 @@ export const DataProvider = ({ children }) => {
                 .update(payload)
                 .eq('id', id)
                 .select();
-            let { data, error } = await updateQuery({
-                ...basePayload,
+            const optionalColumns = {
+                condition: updates.condition,
                 mutation_location: getMutationLocationCategory(updates.destination),
                 storage_location: updates.storageLocation
-            });
+            };
+            const payload = {
+                ...basePayload,
+                ...optionalColumns
+            };
+            let data;
+            let error;
+            while (true) {
+                ({ data, error } = await updateQuery(payload));
+                if (!error) break;
 
-            const errorMessage = `${error?.message || ''} ${error?.details || ''}`.toLowerCase();
-            const missingLocationColumns = error &&
-                ['42703', 'PGRST204'].includes(error.code) &&
-                (errorMessage.includes('mutation_location') || errorMessage.includes('storage_location'));
-            if (missingLocationColumns) {
-                ({ data, error } = await updateQuery(basePayload));
+                const errorMessage = `${error.message || ''} ${error.details || ''}`.toLowerCase();
+                const missingOptionalColumn = ['condition', 'mutation_location', 'storage_location'].find(column =>
+                    errorMessage.includes(column)
+                );
+                if (!['42703', 'PGRST204'].includes(error.code) || !missingOptionalColumn ||
+                    !Object.hasOwn(payload, missingOptionalColumn)) break;
+
+                delete payload[missingOptionalColumn];
             }
 
             if (error) {
