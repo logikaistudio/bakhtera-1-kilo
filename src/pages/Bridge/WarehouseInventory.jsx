@@ -10,8 +10,16 @@ import { exportToCSV } from '../../utils/exportCSV';
 import { calculateDaysDifference, getAgingStatus } from '../../utils/agingCalculator';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { hasApprovedOutboundForSource } from './outboundApproval';
-import { getWarehouseStock, shouldShowWarehouseMutationRow } from './warehouseStock';
+import {
+    getExternalLocationBalances,
+    getWarehouseStock,
+    shouldShowWarehouseMutationRow
+} from './warehouseStock';
 import { validateMutationRequests } from './mutationValidation';
+
+const isWarehouseMutationRow = item => String(item?._replicaIndex || '').startsWith('warehouse');
+const getMutationSourceLocation = item =>
+    isWarehouseMutationRow(item) ? 'warehouse' : item?._sourceLocation || item?._replicaIndex;
 
 const WarehouseInventory = () => {
     const { t } = useLanguage();
@@ -764,27 +772,7 @@ const WarehouseInventory = () => {
                         (pkg.packageNumber ? normalize(m.packageNumber) === normalize(pkg.packageNumber) : true)
                     );
 
-                    // Group by destination (exclude warehouse/gudang)
-                    const destGroups = {};
-                    relatedMutations.forEach(m => {
-                        const dest = (m.destination || '').toString().trim();
-                        if (!dest) return;
-                        if (['warehouse', 'gudang'].includes(dest.toLowerCase())) return;
-                        const key = dest.toLowerCase();
-                        destGroups[key] = destGroups[key] || { destination: dest, sent: 0, returned: 0 };
-                        destGroups[key].sent += parseInt(m.mutatedQty || 0);
-                    });
-
-                    // Count returns from each destination back to warehouse
-                    relatedMutations.forEach(m => {
-                        const origin = (m.origin || '').toString().trim();
-                        const dest = (m.destination || '').toString().trim();
-                        // If this mutation's destination is warehouse and origin matches a tracked dest, count as returned
-                        if ((dest || '').toLowerCase() === 'warehouse' || (dest || '').toLowerCase() === 'gudang') {
-                            const key = (origin || '').toLowerCase();
-                            if (destGroups[key]) destGroups[key].returned += parseInt(m.mutatedQty || 0);
-                        }
-                    });
+                    const externalLocationBalances = getExternalLocationBalances(relatedMutations);
 
                     // Determine a safe non-Gudang default location for outbound warehouse rows
                     const safeExhibitionLoc = (() => {
@@ -796,23 +784,19 @@ const WarehouseInventory = () => {
                         return nonGudang ? nonGudang.value : 'Hall 1';
                     })();
 
-                    // 2) For each destination with outstanding qty, create a remutation row
-                    let hasOutstandingExternalStock = false;
-                    Object.values(destGroups).forEach(g => {
-                        const qtyAtDest = Math.max(0, (g.sent || 0) - (g.returned || 0));
-                        if (qtyAtDest <= 0) return;
-                        hasOutstandingExternalStock = true;
+                    // Add one source row for each external location that currently holds stock.
+                    externalLocationBalances.forEach(({ location, quantity }) => {
                         rows.push({
                             ...item,
                             _originalItem: item.itemCode,
                             _originalItemIdx: originalItemIdx,
-                            _replicaIndex: g.destination,
-                            // Default destination for returning from outside is Gudang
+                            _replicaIndex: location,
+                            _sourceLocation: location,
                             mutationLocation: 'Gudang',
                             inWarehouse: 0,
-                            atPameran: qtyAtDest,
+                            atPameran: quantity,
                             maxMutationQty: 0,
-                            maxRemutationQty: qtyAtDest,
+                            maxRemutationQty: quantity,
                             mutationQty: 0,
                             remutationQty: 0,
                             mutationCondition: 'Baik',
@@ -823,12 +807,14 @@ const WarehouseInventory = () => {
                         });
                     });
 
+                    const hasOutstandingExternalStock = externalLocationBalances.length > 0;
                     if (shouldShowWarehouseMutationRow(inWarehouse, hasOutstandingExternalStock)) {
                         rows.unshift({
                             ...item,
                             _originalItem: item.itemCode,
                             _originalItemIdx: originalItemIdx,
                             _replicaIndex: 'warehouse',
+                            _sourceLocation: 'warehouse',
                             mutationLocation: safeExhibitionLoc,
                             inWarehouse: Math.max(0, inWarehouse),
                             atPameran: 0,
@@ -926,21 +912,10 @@ const WarehouseInventory = () => {
         if (field === 'mutationLocation') {
             const item = newData.packages[pkgIndex].items[itemIndex];
             const newLocation = value;
-            const isToGudang = String(newLocation).toLowerCase() === 'gudang';
-            const isToOutbound = String(newLocation).toLowerCase() === 'outbound';
-            const isToExhibition = isExhibitionLocation ? isExhibitionLocation(newLocation) : String(newLocation).toLowerCase().includes('hall');
-
-            // Recalculate max values based on new location
-            if (isToGudang) {
-                // Going back to Gudang - max is what's at exhibition
-                item.maxMutationQty = 0;
-                item.maxRemutationQty = item.atPameran || 0;
-            } else if (isToOutbound || isToExhibition) {
-                // Going to Outbound or Exhibition - max is what's in warehouse
-                item.maxMutationQty = item.inWarehouse || 0;
-                item.maxRemutationQty = 0;
-            }
-            // Reset qty values when location changes
+            item.maxMutationQty = isWarehouseMutationRow(item)
+                ? item.inWarehouse || 0
+                : item.atPameran || 0;
+            item.maxRemutationQty = isWarehouseMutationRow(item) ? 0 : item.atPameran || 0;
             item.mutationQty = 0;
             item.remutationQty = 0;
         }
@@ -950,23 +925,21 @@ const WarehouseInventory = () => {
             const item = newData.packages[pkgIndex].items[itemIndex];
             
             // Check max based on other identical items
-            const isWarehouseRow = String(item._replicaIndex).startsWith('warehouse');
+            const isWarehouseRow = isWarehouseMutationRow(item);
+            const sourceLocation = normalize(getMutationSourceLocation(item));
             let sumOtherMutations = 0;
-            if (isWarehouseRow) {
-                newData.packages[pkgIndex].items.forEach((otherItem, otherIdx) => {
-                    if (otherIdx !== itemIndex && otherItem._originalItemIdx === item._originalItemIdx && String(otherItem._replicaIndex).startsWith('warehouse')) {
-                        sumOtherMutations += (parseInt(otherItem.mutationQty) || 0);
-                    }
-                });
-            }
+            newData.packages[pkgIndex].items.forEach((otherItem, otherIdx) => {
+                if (
+                    otherIdx !== itemIndex &&
+                    otherItem._originalItemIdx === item._originalItemIdx &&
+                    normalize(getMutationSourceLocation(otherItem)) === sourceLocation
+                ) {
+                    sumOtherMutations += Number(otherItem.mutationQty) || 0;
+                }
+            });
 
-            const isToGudang = String(item.mutationLocation || 'Gudang').toLowerCase() === 'gudang';
-            const maxMutasiBase = item.inWarehouse || 0;
-            const maxRemutasi = item.atPameran || 0;
-
-            const maxMutasi = isWarehouseRow
-                ? Math.max(0, maxMutasiBase - sumOtherMutations)
-                : (isToGudang ? maxRemutasi : Math.max(0, maxMutasiBase - sumOtherMutations));
+            const sourceStock = isWarehouseRow ? item.inWarehouse : item.atPameran;
+            const maxMutasi = Math.max(0, (Number(sourceStock) || 0) - sumOtherMutations);
 
             if (value !== '' && value > maxMutasi) {
                 value = maxMutasi;
@@ -993,6 +966,8 @@ const WarehouseInventory = () => {
         
         const baseItem = pkg.items[itemIndex];
         if (!baseItem) return;
+        const isWarehouseRow = isWarehouseMutationRow(baseItem);
+        const sourceLocation = getMutationSourceLocation(baseItem);
 
         // Find the last index of rows belonging to this original item
         let lastIdx = itemIndex;
@@ -1006,8 +981,14 @@ const WarehouseInventory = () => {
 
         const newRow = {
             ...baseItem,
-            _replicaIndex: `warehouse_multi_${Date.now()}_${Math.random().toString(36).substring(7)}`,
-            mutationLocation: getExhibitionLocation() || LOCATION_OPTIONS.find(opt => opt.value.toLowerCase() !== 'gudang')?.value || 'Hall 1',
+            _replicaIndex: `${isWarehouseRow ? 'warehouse' : 'external'}_multi_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+            _sourceLocation: sourceLocation,
+            mutationLocation: isWarehouseRow
+                ? getExhibitionLocation() || LOCATION_OPTIONS.find(opt => opt.value.toLowerCase() !== 'gudang')?.value || 'Hall 1'
+                : LOCATION_OPTIONS.find(opt =>
+                    !['gudang', 'outbound'].includes(opt.value.toLowerCase()) &&
+                    normalize(opt.value) !== normalize(sourceLocation)
+                )?.value || 'Gudang',
             mutationQty: 0,
             remutationQty: 0,
             mutationCondition: 'Baik',
@@ -1128,19 +1109,18 @@ const WarehouseInventory = () => {
             const mutationRequests = (mutationData?.packages || []).flatMap(pkg =>
                 (pkg.items || []).map(item => {
                     const isToGudang = String(item.mutationLocation || 'Gudang').toLowerCase() === 'gudang';
-                    const direction = isToGudang ? 'inbound' : 'outbound';
-                    const origin = item._replicaIndex !== 'warehouse' ? item._replicaIndex : 'Pameran';
+                    const sourceLocation = getMutationSourceLocation(item);
+                    const availableStock = isWarehouseMutationRow(item) ? item.inWarehouse : item.atPameran;
 
                     return {
                         scope: JSON.stringify([
                             qId,
                             pkg.packageNumber || '',
                             item.itemCode || '',
-                            direction,
-                            isToGudang ? origin : ''
+                            sourceLocation
                         ]),
                         quantity: item.mutationQty,
-                        availableStock: isToGudang ? item.atPameran : item.inWarehouse,
+                        availableStock,
                         itemName: item.name || item.itemName
                     };
                 })
@@ -1173,65 +1153,46 @@ const WarehouseInventory = () => {
                         mutationData?.bcDocumentNumber || mutationData?.bc_document_number;
                     const destinationLocation = item.mutationLocation || mutationData.mutationLocation || DEFAULT_LOCATION;
                     const isToGudang = String(destinationLocation).toLowerCase() === 'gudang';
+                    const isWarehouseSource = isWarehouseMutationRow(item);
+                    const originLocation = getMutationSourceLocation(item);
+                    const type = isWarehouseSource ? 'outbound' : isToGudang ? 'inbound' : 'transfer';
+                    const sourceStock = Number(isWarehouseSource ? item.inWarehouse : item.atPameran) || 0;
+                    const destination = isToGudang ? 'warehouse' : destinationLocation;
 
-                    if (isToGudang) {
-                        // Process Return Mutation (Pameran -> Warehouse)
-                        const originLocation = item._replicaIndex !== 'warehouse' ? item._replicaIndex : 'Pameran';
-                        mutations.push({
-                            pengajuanId: qId,
-                            pengajuanNumber: qNumber,
-                            pengajuan_number: qNumber, // Robust fallback
-                            bcDocumentNumber: bcNum,
-                            packageNumber: pkg.packageNumber,
-                            itemCode: item.itemCode,
-                            itemName: item.name || item.itemName,
-                            warehouseInventoryId: item.warehouseInventoryId,
-                            hsCode: item.hsCode,
-                            sender: senderName, // Added for Pabean Barang Mutasi
-                            totalStock: item.quantity,
-                            mutatedQty: mutationQty,
-                            remainingStock: (item.inWarehouse || 0) + mutationQty, // Logic balik gudang
-                            origin: originLocation,
-                            destination: 'warehouse',
-                            condition: item.mutationCondition,
-                            date: item.mutationDate,
-                            time: item.mutationTime,
-                            pic: item.mutationPic,
-                            remarks: item.notes || `Kembali ke Gudang`,
-                            documents: (item.mutationDocuments || []).map(d => ({ title: d.title, name: d.name, type: d.type, data: d.data })),
-                            _pkgIndex: pkgIdx,
-                            _itemIndex: itemIdx,
-                            _type: 'inbound'
-                        });
-                    } else {
-                        // Process Outbound Mutation (Warehouse -> Selected Location)
-                        mutations.push({
-                            pengajuanId: qId,
-                            pengajuanNumber: qNumber,
-                            pengajuan_number: qNumber, // Robust fallback
-                            bcDocumentNumber: bcNum,
-                            packageNumber: pkg.packageNumber,
-                            itemCode: item.itemCode,
-                            itemName: item.name || item.itemName,
-                            warehouseInventoryId: item.warehouseInventoryId,
-                            hsCode: item.hsCode,
-                            sender: senderName, // Added for Pabean Barang Mutasi
-                            totalStock: item.quantity,
-                            mutatedQty: mutationQty,
-                            remainingStock: item.inWarehouse - mutationQty, // Logic sisa gudang
-                            origin: 'warehouse',
-                            destination: destinationLocation,
-                            condition: item.mutationCondition,
-                            date: item.mutationDate,
-                            time: item.mutationTime,
-                            pic: item.mutationPic,
-                            remarks: item.notes || `Mutasi ke ${destinationLocation}`,
-                            documents: (item.mutationDocuments || []).map(d => ({ title: d.title, name: d.name, type: d.type, data: d.data })),
-                            _pkgIndex: pkgIdx,
-                            _itemIndex: itemIdx,
-                            _type: 'outbound'
-                        });
-                    }
+                    mutations.push({
+                        pengajuanId: qId,
+                        pengajuanNumber: qNumber,
+                        pengajuan_number: qNumber,
+                        bcDocumentNumber: bcNum,
+                        packageNumber: pkg.packageNumber,
+                        itemCode: item.itemCode,
+                        itemName: item.name || item.itemName,
+                        warehouseInventoryId: item.warehouseInventoryId,
+                        hsCode: item.hsCode,
+                        sender: senderName,
+                        totalStock: item.quantity,
+                        mutatedQty: mutationQty,
+                        remainingStock: type === 'inbound'
+                            ? (Number(item.inWarehouse) || 0) + mutationQty
+                            : Math.max(0, sourceStock - mutationQty),
+                        origin: originLocation,
+                        destination,
+                        condition: item.mutationCondition,
+                        date: item.mutationDate,
+                        time: item.mutationTime,
+                        pic: item.mutationPic,
+                        remarks: item.notes || (
+                            type === 'inbound'
+                                ? `Kembali ke Gudang`
+                                : type === 'transfer'
+                                    ? `Pindah dari ${originLocation} ke ${destinationLocation}`
+                                    : `Mutasi ke ${destinationLocation}`
+                        ),
+                        documents: (item.mutationDocuments || []).map(d => ({ title: d.title, name: d.name, type: d.type, data: d.data })),
+                        _pkgIndex: pkgIdx,
+                        _itemIndex: itemIdx,
+                        _type: type
+                    });
                 });
             });
 
@@ -1247,7 +1208,8 @@ const WarehouseInventory = () => {
             if (mutations.length > 0 && !addMutationLog) {
                 throw new Error('Fungsi penyimpanan log mutasi tidak tersedia. Muat ulang halaman dan coba lagi.');
             }
-            if (mutations.length > 0 && (
+            const needsWarehouseStockUpdate = mutations.some(mutation => mutation._type !== 'transfer');
+            if (needsWarehouseStockUpdate && (
                 selectedPengajuan.isWarehouseFallback
                     ? !updateWarehouseInventory
                     : !updateInventoryStock
@@ -1259,6 +1221,7 @@ const WarehouseInventory = () => {
                 const fallbackStocks = new Map();
                 if (selectedPengajuan.isWarehouseFallback) {
                     mutations.forEach(mutation => {
+                        if (mutation._type === 'transfer') return;
                         const inventoryItem = warehouseInventory.find(item => item.id === mutation.warehouseInventoryId);
                         if (!inventoryItem) throw new Error('Baris inventaris untuk mutasi tidak ditemukan. Muat ulang halaman.');
                         fallbackStocks.set(mutation.warehouseInventoryId, Number(inventoryItem.currentStock ?? inventoryItem.quantity ?? 0));
@@ -1269,19 +1232,20 @@ const WarehouseInventory = () => {
                 for (const mutation of mutations) {
                     console.log('💾 Saving mutation:', mutation.itemName, 'qty:', mutation.mutatedQty);
 
-                    // Update Warehouse Inventory Stock (RESTORED LOGIC)
-                    // Outbound (Mutasi) = Decrease Stock
-                    // Inbound (Remutasi) = Increase Stock
-                    const qtyChange = mutation._type === 'outbound' ? -Math.abs(mutation.mutatedQty) : Math.abs(mutation.mutatedQty);
+                    const qtyChange = mutation._type === 'transfer'
+                        ? 0
+                        : mutation._type === 'outbound'
+                            ? -Math.abs(mutation.mutatedQty)
+                            : Math.abs(mutation.mutatedQty);
 
-                    if (selectedPengajuan.isWarehouseFallback) {
+                    if (qtyChange !== 0 && selectedPengajuan.isWarehouseFallback) {
                         const inventoryId = mutation.warehouseInventoryId;
                         const nextStock = fallbackStocks.get(inventoryId) + qtyChange;
                         if (nextStock < 0) throw new Error('Stok warehouse tidak mencukupi untuk mutasi ini.');
                         const saved = await updateWarehouseInventory(inventoryId, { quantity: nextStock });
                         if (!saved) throw new Error(`Gagal memperbarui stok warehouse untuk ${mutation.itemName}.`);
                         fallbackStocks.set(inventoryId, nextStock);
-                    } else if (updateInventoryStock) {
+                    } else if (qtyChange !== 0 && updateInventoryStock) {
                         await updateInventoryStock(
                             mutation.itemCode,
                             mutation.itemName,
@@ -1307,32 +1271,34 @@ const WarehouseInventory = () => {
                     try {
                         await addMutationLog(logData);
                     } catch (logError) {
-                        try {
-                            if (selectedPengajuan.isWarehouseFallback) {
-                                const inventoryId = mutation.warehouseInventoryId;
-                                const previousStock = fallbackStocks.get(inventoryId) - qtyChange;
-                                const restored = await updateWarehouseInventory(inventoryId, { quantity: previousStock });
-                                if (!restored) throw new Error('Gagal memperbarui stok warehouse.');
-                                fallbackStocks.set(inventoryId, previousStock);
-                            } else if (updateInventoryStock) {
-                                await updateInventoryStock(
-                                    mutation.itemCode,
-                                    mutation.itemName,
-                                    -qtyChange,
-                                    'pcs',
-                                    'Mutation Rollback',
-                                    mutation.pengajuanNumber,
-                                    0,
-                                    {
-                                        pengajuanId: mutation.pengajuanId,
-                                        pengajuanNumber: mutation.pengajuanNumber,
-                                        packageNumber: mutation.packageNumber
-                                    }
-                                );
+                        if (qtyChange !== 0) {
+                            try {
+                                if (selectedPengajuan.isWarehouseFallback) {
+                                    const inventoryId = mutation.warehouseInventoryId;
+                                    const previousStock = fallbackStocks.get(inventoryId) - qtyChange;
+                                    const restored = await updateWarehouseInventory(inventoryId, { quantity: previousStock });
+                                    if (!restored) throw new Error('Gagal memperbarui stok warehouse.');
+                                    fallbackStocks.set(inventoryId, previousStock);
+                                } else if (updateInventoryStock) {
+                                    await updateInventoryStock(
+                                        mutation.itemCode,
+                                        mutation.itemName,
+                                        -qtyChange,
+                                        'pcs',
+                                        'Mutation Rollback',
+                                        mutation.pengajuanNumber,
+                                        0,
+                                        {
+                                            pengajuanId: mutation.pengajuanId,
+                                            pengajuanNumber: mutation.pengajuanNumber,
+                                            packageNumber: mutation.packageNumber
+                                        }
+                                    );
+                                }
+                            } catch (rollbackError) {
+                                console.error('Failed to restore warehouse stock after mutation log error:', rollbackError);
+                                throw new Error(`Mutasi gagal dicatat dan stok gagal dipulihkan: ${rollbackError.message}`);
                             }
-                        } catch (rollbackError) {
-                            console.error('Failed to restore warehouse stock after mutation log error:', rollbackError);
-                            throw new Error(`Mutasi gagal dicatat dan stok gagal dipulihkan: ${rollbackError.message}`);
                         }
                         throw logError;
                     }
@@ -1387,7 +1353,9 @@ const WarehouseInventory = () => {
                     ? 'mutation_out' : mutationTypes.includes('inbound') ? 'mutation_in' : 'mutation_out';
 
                 const mutationSummary = mutations.map(m =>
-                    `${m.itemName}: ${m.mutatedQty} ${m.uom || 'pcs'} (${m._type === 'outbound' ? 'Keluar' : 'Masuk'})`
+                    `${m.itemName}: ${m.mutatedQty} ${m.uom || 'pcs'} (${
+                        m._type === 'outbound' ? 'Keluar' : m._type === 'inbound' ? 'Masuk' : 'Pindah'
+                    })`
                 ).join(', ');
 
                 try {
@@ -1589,12 +1557,10 @@ const WarehouseInventory = () => {
             return d !== 'warehouse' && d !== 'gudang';
         };
 
-        // 1. MUTATIONS KELUAR (any destination that is not warehouse/gudang)
-        const outboundMutations = mutationLogs.filter(m =>
+        const itemMutations = mutationLogs.filter(m =>
             (m.pengajuanId === pengajuanId || normalize(m.pengajuanNumber) === normalize(pengajuanNumber)) &&
             normalize(m.itemCode) === normalize(itemCode) &&
-            (packageNumber ? normalize(m.packageNumber) === normalize(packageNumber) : true) &&
-            isOutsideDestination(m.destination)
+            (packageNumber ? normalize(m.packageNumber) === normalize(packageNumber) : true)
         );
 
         // 2. OFFICIAL OUTBOUND (freight_outbound) - used only for display/reporting, NOT for stock deduction
@@ -1616,21 +1582,15 @@ const WarehouseInventory = () => {
             return matchSource && matchPackage;
         });
 
-        // 3. RETURN MUTATIONS (destination = warehouse or gudang)
-        const returnMutations = mutationLogs.filter(m =>
-            (m.pengajuanId === pengajuanId || normalize(m.pengajuanNumber) === normalize(pengajuanNumber)) &&
-            normalize(m.itemCode) === normalize(itemCode) &&
-            (packageNumber ? normalize(m.packageNumber) === normalize(packageNumber) : true) &&
-            ((m.destination || '').toLowerCase() === 'warehouse' || (m.destination || '').toLowerCase() === 'gudang')
-        );
-
-        // Calc totals
-        const totalMutationOut = outboundMutations.reduce((sum, m) => sum + (parseInt(m.mutatedQty) || 0), 0);
+        const totalMutationOut = itemMutations.reduce((sum, m) =>
+            sum + (['warehouse', 'gudang'].includes(normalize(m.origin)) && isOutsideDestination(m.destination)
+                ? (Number(m.mutatedQty) || 0) : 0), 0);
         const totalOfficialOut = officialOutbound.reduce((sum, o) => sum + (parseInt(o.quantity) || 0), 0);
-        const totalReturned = returnMutations.reduce((sum, m) => sum + (parseInt(m.mutatedQty) || 0), 0);
-
-        // Net barang di luar = semua keluar - semua kembali
-        const netAtPameran = Math.max(0, totalMutationOut - totalReturned);
+        const totalReturned = itemMutations.reduce((sum, m) =>
+            sum + (isOutsideDestination(m.origin) && ['warehouse', 'gudang'].includes(normalize(m.destination))
+                ? (Number(m.mutatedQty) || 0) : 0), 0);
+        const netAtPameran = getExternalLocationBalances(itemMutations)
+            .reduce((sum, location) => sum + location.quantity, 0);
 
         return {
             atPameran: netAtPameran,             // barang sedang di luar gudang (semua lokasi)
@@ -2490,32 +2450,30 @@ const WarehouseInventory = () => {
                                                         // Determine which direction is active based on selected location
                                                         const isToGudang = String(mutationLocation).toLowerCase() === 'gudang'; // Remutasi: Exhibition -> Gudang
                                                         const isToOutbound = String(mutationLocation).toLowerCase() === 'outbound';
-                                                        const isToExhibition = isExhibitionLocation ? isExhibitionLocation(mutationLocation) : !isToGudang && !isToOutbound;
 
-                                                        // Calculate max values
-                                                        // For warehouse rows: always use inWarehouse as max (items going OUT)
-                                                        // For remutation rows (from exhibition back): use atPameran
-                                                        const maxMutasiBase = item.inWarehouse || 0;
-                                                        const maxRemutasi = item.atPameran || 0;
-
+                                                        const sourceLocation = normalize(getMutationSourceLocation(item));
                                                         let sumOtherMutations = 0;
-                                                        if (isWarehouseRow) {
-                                                            (pkg.items || []).forEach((otherItem, otherIdx) => {
-                                                                if (otherIdx !== itemIdx && otherItem._originalItemIdx === item._originalItemIdx && String(otherItem._replicaIndex).startsWith('warehouse')) {
-                                                                    sumOtherMutations += (parseInt(otherItem.mutationQty) || 0);
-                                                                }
-                                                            });
-                                                        }
+                                                        (pkg.items || []).forEach((otherItem, otherIdx) => {
+                                                            if (
+                                                                otherIdx !== itemIdx &&
+                                                                otherItem._originalItemIdx === item._originalItemIdx &&
+                                                                normalize(getMutationSourceLocation(otherItem)) === sourceLocation
+                                                            ) {
+                                                                sumOtherMutations += Number(otherItem.mutationQty) || 0;
+                                                            }
+                                                        });
 
-                                                        // KEY FIX: For warehouse rows, maxMutasi is always based on inWarehouse (going OUT)
-                                                        // For non-warehouse rows (remutation/return), maxMutasi is based on atPameran (coming back)
-                                                        const maxMutasi = isWarehouseRow
-                                                            ? Math.max(0, maxMutasiBase - sumOtherMutations)
-                                                            : (isToGudang ? maxRemutasi : Math.max(0, maxMutasiBase - sumOtherMutations));
-
-                                                        const projectedStock = (isToGudang && !isWarehouseRow)
-                                                            ? (item.inWarehouse || 0) + (item.mutationQty || 0)
-                                                            : (item.inWarehouse || 0) - sumOtherMutations - (item.mutationQty || 0);
+                                                        const sourceStock = Number(isWarehouseRow ? item.inWarehouse : item.atPameran) || 0;
+                                                        const maxMutasi = Math.max(0, sourceStock - sumOtherMutations);
+                                                        const projectedStock = isWarehouseRow
+                                                            ? sourceStock - sumOtherMutations - (Number(item.mutationQty) || 0)
+                                                            : isToGudang
+                                                                ? (Number(item.inWarehouse) || 0) + (Number(item.mutationQty) || 0)
+                                                                : sourceStock - sumOtherMutations - (Number(item.mutationQty) || 0);
+                                                        const isPrimaryRow = isWarehouseRow
+                                                            ? item._replicaIndex === 'warehouse'
+                                                            : normalize(item._replicaIndex) === sourceLocation;
+                                                        const isMultiRow = String(item._replicaIndex).includes('_multi_');
 
                                                         return (
                                                             <tr key={itemIdx} className={`hover:bg-gray-50 dark:hover:bg-dark-surface/50 ${isFullyMutated ? 'opacity-75 bg-gray-50' : ''}`}>
@@ -2523,17 +2481,24 @@ const WarehouseInventory = () => {
                                                                 <td className="px-3 py-3 text-sm text-gray-700 dark:text-silver">{item.itemCode || '-'}</td>
                                                                 <td className="px-3 py-3 text-sm text-gray-700 dark:text-silver whitespace-normal">{item.name || item.itemName || '-'}</td>
                                                                 <td className="px-3 py-3 text-sm text-gray-700 dark:text-silver text-center">
-                                                                    {isToGudang ? item.atPameran : item.inWarehouse} {item.uom || 'pcs'}
+                                                                    {sourceStock} {item.uom || 'pcs'}
+                                                                    {!isWarehouseRow && (
+                                                                        <div className="text-xs text-gray-500 dark:text-silver-dark">
+                                                                            {t("Dari:")} {getMutationSourceLocation(item)}
+                                                                        </div>
+                                                                    )}
                                                                 </td>
                                                                 <td className="px-3 py-3 text-sm text-gray-700 dark:text-silver">
                                                                     <select
                                                                         value={mutationLocation}
                                                                         onChange={(e) => handleMutationItemChange(pkgIndex, itemIdx, 'mutationLocation', e.target.value)}
                                                                         className="w-full min-w-36 min-h-11 px-3 py-2 text-sm border rounded-lg bg-white dark:bg-dark-surface dark:text-silver-light text-center"
-                                                                        disabled={!isWarehouseRow}
                                                                     >
-                                                                        {/* For warehouse rows: show non-Gudang options only. For remutation: show Gudang only. */}
-                                                                        {LOCATION_OPTIONS.filter(opt => isWarehouseRow ? opt.value.toLowerCase() !== 'gudang' : opt.value.toLowerCase() === 'gudang').map(opt => (
+                                                                        {LOCATION_OPTIONS.filter(opt => {
+                                                                            const location = opt.value.toLowerCase();
+                                                                            if (isWarehouseRow) return location !== 'gudang';
+                                                                            return location !== 'outbound' && normalize(location) !== sourceLocation;
+                                                                        }).map(opt => (
                                                                             <option key={opt.value} value={opt.value}>{opt.label}</option>
                                                                         ))}
                                                                         {isWarehouseRow && <option value="Outbound">{t("Outbound")}</option>}
@@ -2610,9 +2575,9 @@ const WarehouseInventory = () => {
                                                                 
                                                                 {/* Aksi */}
                                                                 <td className="px-3 py-3 text-sm text-center border-l border-gray-200 dark:border-dark-border">
-                                                                    {String(item._replicaIndex).startsWith('warehouse') && !isFullyMutated && (
+                                                                    {!isFullyMutated && (isPrimaryRow || isMultiRow) && (
                                                                         <div className="flex gap-1 justify-center">
-                                                                            {String(item._replicaIndex) === 'warehouse' ? (
+                                                                            {isPrimaryRow ? (
                                                                                 <Button
                                                                                     onClick={() => handleAddMultiMutation(pkgIndex, itemIdx)}
                                                                                     variant="primary"

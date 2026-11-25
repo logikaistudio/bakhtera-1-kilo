@@ -1,10 +1,22 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+    getExternalLocationBalances,
     getWarehouseStock,
     planWarehouseStockDeductions,
     shouldShowWarehouseMutationRow
 } from './warehouseStock.js';
+
+test('tracks direct transfers between external locations without duplicating quantity', () => {
+    assert.deepEqual(getExternalLocationBalances([
+        { origin: 'warehouse', destination: 'Hall 3', mutatedQty: 5 },
+        { origin: 'Hall 3', destination: 'Parkiran', mutatedQty: 2 },
+        { origin: 'Parkiran', destination: 'Gudang', mutatedQty: 1 }
+    ]), [
+        { location: 'Hall 3', quantity: 3 },
+        { location: 'Parkiran', quantity: 1 }
+    ]);
+});
 
 test('hides an empty warehouse row when the item is available at an external location', () => {
     assert.equal(shouldShowWarehouseMutationRow(0, true), false);

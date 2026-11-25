@@ -3,6 +3,29 @@ const normalize = value => String(value ?? '').trim().toLowerCase();
 export const shouldShowWarehouseMutationRow = (warehouseStock, hasOutstandingExternalStock) =>
     Number(warehouseStock ?? 0) > 0 || !hasOutstandingExternalStock;
 
+export const getExternalLocationBalances = (mutations) => {
+    const balances = new Map();
+    const isWarehouse = location => ['warehouse', 'gudang'].includes(normalize(location));
+    const changeBalance = (location, change) => {
+        const key = normalize(location);
+        if (!key || isWarehouse(key)) return;
+        const current = balances.get(key) || { location: String(location).trim(), quantity: 0 };
+        current.quantity += change;
+        balances.set(key, current);
+    };
+
+    mutations.forEach(mutation => {
+        const quantity = Number(mutation.mutatedQty ?? mutation.mutated_qty) || 0;
+        if (quantity <= 0) return;
+        changeBalance(mutation.origin, -quantity);
+        changeBalance(mutation.destination, quantity);
+    });
+
+    return Array.from(balances.values())
+        .map(balance => ({ ...balance, quantity: Math.max(0, balance.quantity) }))
+        .filter(balance => balance.quantity > 0);
+};
+
 export const getWarehouseStock = (warehouseInventory, {
     submissionId,
     submissionNumber,
