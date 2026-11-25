@@ -34,3 +34,36 @@ export const getWarehouseStock = (warehouseInventory, {
         0
     );
 };
+
+export const planWarehouseStockDeductions = (warehouseRows, requestedQuantity) => {
+    const requested = Number(requestedQuantity);
+    if (!Number.isFinite(requested) || requested <= 0) {
+        throw new Error('Jumlah barang keluar tidak valid.');
+    }
+
+    const stockRows = warehouseRows.map(row => {
+        const quantity = Number(row.quantity ?? 0);
+        if (!row.id || !Number.isFinite(quantity) || quantity < 0) {
+            throw new Error('Data stok warehouse tidak valid.');
+        }
+        return { id: row.id, quantity };
+    });
+
+    const available = stockRows.reduce((total, row) => total + row.quantity, 0);
+    if (requested > available) {
+        throw new Error(`Stok gudang tidak mencukupi (tersedia ${available}, diminta ${requested}).`);
+    }
+
+    let remaining = requested;
+    return stockRows.flatMap(row => {
+        if (remaining === 0 || row.quantity === 0) return [];
+
+        const deducted = Math.min(row.quantity, remaining);
+        remaining -= deducted;
+        return [{
+            id: row.id,
+            previousQuantity: row.quantity,
+            quantity: row.quantity - deducted
+        }];
+    });
+};

@@ -1,5 +1,7 @@
 // Handler untuk memproses outbound ke Pabean
 // Insert ke freight_outbound dan update warehouse inventory
+import { planWarehouseStockDeductions } from '../warehouseStock';
+
 export const createProcessOutboundHandler = (selectedItem, setIsSaving, setShowDetailModal, editedItem = null, isEditing = false, onSuccess = null) => async () => {
     // Use editedItem if in edit mode, otherwise selectedItem
     const itemToProcess = (isEditing && editedItem) ? editedItem : selectedItem;
@@ -85,80 +87,87 @@ export const createProcessOutboundHandler = (selectedItem, setIsSaving, setShowD
                         }
                     };
 
+                    if (!sourcePengajuanId && !sourcePengajuanNumber) {
+                        throw new Error(`Pengajuan sumber untuk ${itemCode} tidak ditemukan.`);
+                    }
+
+                    let warehouseQuery = supabase
+                        .from('freight_warehouse')
+                        .select('id,quantity')
+                        .eq('item_code', itemCode)
+                        .eq('package_number', pkg.packageNumber);
+
+                    if (sourcePengajuanId) {
+                        warehouseQuery = warehouseQuery.eq('pengajuan_id', sourcePengajuanId);
+                    } else {
+                        warehouseQuery = warehouseQuery.eq('pengajuan_number', sourcePengajuanNumber);
+                    }
+
+                    let { data: warehouseItems, error: whQueryError } = await warehouseQuery;
+                    if (whQueryError) throw new Error(`Gagal membaca stok warehouse: ${whQueryError.message}`);
+
+                    if ((!warehouseItems || warehouseItems.length === 0) && sourcePengajuanId && sourcePengajuanNumber) {
+                        const result = await supabase
+                            .from('freight_warehouse')
+                            .select('id,quantity')
+                            .eq('pengajuan_number', sourcePengajuanNumber)
+                            .eq('item_code', itemCode)
+                            .eq('package_number', pkg.packageNumber);
+
+                        if (result.error) throw new Error(`Gagal membaca stok warehouse: ${result.error.message}`);
+                        warehouseItems = result.data;
+                    }
+
+                    if (!warehouseItems?.length) {
+                        throw new Error(`Stok ${itemName || itemCode} untuk pengajuan sumber tidak ditemukan.`);
+                    }
+
+                    const stockDeductions = planWarehouseStockDeductions(warehouseItems, quantity);
+                    const appliedDeductions = [];
+                    try {
+                        for (const deduction of stockDeductions) {
+                            const { data: updatedRow, error: updateError } = await supabase
+                                .from('freight_warehouse')
+                                .update({ quantity: deduction.quantity })
+                                .eq('id', deduction.id)
+                                .eq('quantity', deduction.previousQuantity)
+                                .select('id')
+                                .maybeSingle();
+
+                            if (updateError) throw updateError;
+                            if (!updatedRow) throw new Error('Stok berubah saat diproses. Muat ulang data dan coba lagi.');
+                            appliedDeductions.push(deduction);
+                        }
+                    } catch (updateError) {
+                        for (const deduction of appliedDeductions.reverse()) {
+                            const { error: rollbackError } = await supabase
+                                .from('freight_warehouse')
+                                .update({ quantity: deduction.previousQuantity })
+                                .eq('id', deduction.id)
+                                .eq('quantity', deduction.quantity);
+                            if (rollbackError) {
+                                throw new Error(`Stok gagal diperbarui dan pemulihan stok juga gagal: ${rollbackError.message}`);
+                            }
+                        }
+                        throw updateError;
+                    }
+
                     const { error: outboundError } = await supabase
                         .from('freight_outbound')
                         .insert([outboundPayload]);
 
                     if (outboundError) {
-                        console.error('Error insert freight_outbound:', outboundError);
-                        throw new Error(`Insert freight_outbound: ${outboundError.message}`);
-                    }
-
-                    // 1b. Try to update freight_warehouse (kurangi stok) - with multiple fallback strategies
-                    let warehouseItems = null;
-                    let whQueryError = null;
-
-                    // Strategy 1: Query by sourcePengajuanId
-                    if (sourcePengajuanId) {
-                        const result = await supabase
-                            .from('freight_warehouse')
-                            .select('*')
-                            .eq('pengajuan_id', sourcePengajuanId)
-                            .eq('item_code', itemCode)
-                            .eq('package_number', pkg.packageNumber);
-
-                        warehouseItems = result.data;
-                        whQueryError = result.error;
-                    }
-
-                    // Strategy 2: Query by item_code and package_number only (if Strategy 1 fails)
-                    if ((!warehouseItems || warehouseItems.length === 0) && !whQueryError) {
-                        console.log('🔍 Fallback: searching warehouse by item_code & package_number only');
-                        const result = await supabase
-                            .from('freight_warehouse')
-                            .select('*')
-                            .eq('item_code', itemCode)
-                            .eq('package_number', pkg.packageNumber);
-
-                        warehouseItems = result.data;
-                        whQueryError = result.error;
-                    }
-
-                    // Strategy 3: Query by item_code only (last resort)
-                    if ((!warehouseItems || warehouseItems.length === 0) && !whQueryError) {
-                        console.log('🔍 Fallback 2: searching warehouse by item_code only');
-                        const result = await supabase
-                            .from('freight_warehouse')
-                            .select('*')
-                            .eq('item_code', itemCode);
-
-                        warehouseItems = result.data;
-                        whQueryError = result.error;
-                    }
-
-                    if (whQueryError) {
-                        console.error('Error query warehouse:', whQueryError);
-                        // Don't throw - continue with outbound record even if warehouse update fails
-                        console.warn(`⚠️ Tidak dapat update warehouse untuk ${itemCode}, tetapi data outbound sudah tercatat.`);
-                    } else if (warehouseItems && warehouseItems.length > 0) {
-                        // Update warehouse stock (kurangi quantity)
-                        const warehouseItem = warehouseItems[0];
-                        const currentQty = Number(warehouseItem.quantity) || 0;
-                        const newQty = Math.max(0, currentQty - quantity);
-
-                        console.log(`📦 Warehouse update for ${itemCode}: ${currentQty} → ${newQty} (taking ${quantity})`);
-
-                        const { error: updateError } = await supabase
-                            .from('freight_warehouse')
-                            .update({ quantity: newQty })
-                            .eq('id', warehouseItem.id);
-
-                        if (updateError) {
-                            console.error('Error update warehouse:', updateError);
-                            console.warn(`⚠️ Update warehouse gagal untuk ${itemCode}, tetapi outbound sudah tercatat.`);
+                        for (const deduction of appliedDeductions.reverse()) {
+                            const { error: rollbackError } = await supabase
+                                .from('freight_warehouse')
+                                .update({ quantity: deduction.previousQuantity })
+                                .eq('id', deduction.id)
+                                .eq('quantity', deduction.quantity);
+                            if (rollbackError) {
+                                throw new Error(`Outbound gagal dicatat dan pemulihan stok juga gagal: ${rollbackError.message}`);
+                            }
                         }
-                    } else {
-                        console.warn(`⚠️ Item ${itemCode} tidak ditemukan di warehouse, tetapi data outbound sudah tercatat.`);
+                        throw new Error(`Insert freight_outbound: ${outboundError.message}`);
                     }
 
                     successCount++;

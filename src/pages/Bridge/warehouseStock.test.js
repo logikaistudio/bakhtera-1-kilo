@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { getWarehouseStock } from './warehouseStock.js';
+import { getWarehouseStock, planWarehouseStockDeductions } from './warehouseStock.js';
 
 test('uses only stock for the matching submission, package, and item', () => {
     const stock = getWarehouseStock([
@@ -66,4 +66,21 @@ test('uses scoped stock when a source row ID is present for a quotation', () => 
     });
 
     assert.equal(stock, 4);
+});
+
+test('deducts outbound quantity across matching stock rows', () => {
+    assert.deepEqual(planWarehouseStockDeductions([
+        { id: 'warehouse-1', quantity: 2 },
+        { id: 'warehouse-2', quantity: 3 }
+    ], 4), [
+        { id: 'warehouse-1', previousQuantity: 2, quantity: 0 },
+        { id: 'warehouse-2', previousQuantity: 3, quantity: 1 }
+    ]);
+});
+
+test('rejects outbound quantity above available stock instead of clamping to zero', () => {
+    assert.throws(
+        () => planWarehouseStockDeductions([{ id: 'warehouse-1', quantity: 2 }], 3),
+        /Stok gudang tidak mencukupi/
+    );
 });
