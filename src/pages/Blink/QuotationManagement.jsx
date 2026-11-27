@@ -61,6 +61,10 @@ const QuotationManagement = () => {
     const { deleteBlinkQuotationCascade, customers, companySettings } = useData();
     const [showModal, setShowModal] = useState(false);
     const [showViewModal, setShowViewModal] = useState(false);
+    const [showRevisionModal, setShowRevisionModal] = useState(false);
+    const [revisionRate, setRevisionRate] = useState('');
+    const [revisionReason, setRevisionReason] = useState('');
+    const [isCreatingRevision, setIsCreatingRevision] = useState(false);
     const [viewingQuotation, setViewingQuotation] = useState(null);
     const [isEditingQuotation, setIsEditingQuotation] = useState(false);
     const [editedQuotation, setEditedQuotation] = useState(null);
@@ -318,20 +322,31 @@ const QuotationManagement = () => {
     // Finance approval handlers
 
 
-    const handleManagerReject = async (quotationId, reason) => {
+    const handleManagerReject = async (quotationId) => {
         if (!canApprove('blink_quotations')) {
             alert(t("You do not have permission to reject Quotation."));
             return;
         }
         const rejectionReason = prompt('Reject reason (optional):');
         try {
-            const { error } = await supabase
-                .from('blink_quotations')
-                .update({
-                    status: 'rejected',
-                    rejection_reason: rejectionReason
-                })
-                .eq('id', quotationId);
+            let error;
+            if (
+                viewingQuotation?.id === quotationId
+                && Number(viewingQuotation.revision_number || 1) > 1
+            ) {
+                ({ error } = await supabase.rpc('reject_blink_quotation_revision', {
+                    p_quotation_id: quotationId,
+                    p_rejection_reason: rejectionReason
+                }));
+            } else {
+                ({ error } = await supabase
+                    .from('blink_quotations')
+                    .update({
+                        status: 'rejected',
+                        rejection_reason: rejectionReason
+                    })
+                    .eq('id', quotationId));
+            }
 
             if (error) throw error;
 
@@ -592,6 +607,18 @@ const QuotationManagement = () => {
             alert(t("Anda tidak memiliki hak akses untuk meminta revisi."));
             return;
         }
+        const quotation = viewingQuotation;
+        const requestableStatuses = ['rejected', 'sent', 'approved', 'converted'];
+        if (
+            !quotation
+            || quotation.id !== quotationId
+            || quotation.is_superseded
+            || !requestableStatuses.includes(quotation.status)
+        ) {
+            alert(t("Only an active rejected or issued quotation can be re-quoted."));
+            return;
+        }
+
         const reason = prompt('Revision reason from customer:');
         if (!reason || reason.trim() === '') {
             alert(t("Revision reason is required"));
@@ -599,13 +626,10 @@ const QuotationManagement = () => {
         }
 
         try {
-            const { error } = await supabase
-                .from('blink_quotations')
-                .update({
-                    status: 'revision_requested',
-                    revision_reason: reason.trim()
-                })
-                .eq('id', quotationId);
+            const { error } = await supabase.rpc('request_blink_quotation_revision', {
+                p_source_id: quotationId,
+                p_revision_reason: reason.trim()
+            });
 
             if (error) throw error;
 
@@ -618,79 +642,72 @@ const QuotationManagement = () => {
         }
     };
 
-    // Create revision (new version) of quotation
-    const handleCreateRevision = async (quotationId) => {
+    const openRevisionModal = () => {
+        if (!viewingQuotation) return;
+        const currentRate = viewingQuotation.currency === 'IDR'
+            ? 1
+            : Number(viewingQuotation.exchange_rate || viewingQuotation.exchangeRate || 16000);
+        setRevisionRate(String(currentRate));
+        setRevisionReason(viewingQuotation.revision_reason || '');
+        setShowViewModal(false);
+        setShowRevisionModal(true);
+    };
+
+    // Create a new version while retaining the existing Job Order and quotation number.
+    const handleCreateRevision = async (event) => {
+        event.preventDefault();
         if (!canCreate('blink_quotations')) {
             alert(t("You do not have permission to create Quotation revision."));
             return;
         }
+
+        if (!viewingQuotation || viewingQuotation.is_superseded) {
+            alert(t("Only the active quotation revision can be re-quoted."));
+            return;
+        }
+
+        if (viewingQuotation.status !== 'revision_requested') {
+            alert(t("A customer revision request is required before re-quoting."));
+            return;
+        }
+
+        const isIDR = viewingQuotation.currency === 'IDR';
+        const newRate = isIDR ? 1 : Number(revisionRate);
+        const oldRate = Number(viewingQuotation.exchange_rate || viewingQuotation.exchangeRate || 16000);
+        if (!Number.isFinite(newRate) || newRate <= 0) {
+            alert(t("Enter a valid positive exchange rate."));
+            return;
+        }
+        if (!isIDR && newRate === oldRate) {
+            alert(t("The new exchange rate must differ from the current revision."));
+            return;
+        }
+        if (!revisionReason.trim()) {
+            alert(t("Revision reason is required."));
+            return;
+        }
+
         try {
-            const parentQuotation = quotations.find(q => q.id === quotationId);
-            if (!parentQuotation) {
-                alert(t("Quotation not found"));
-                return;
-            }
+            setIsCreatingRevision(true);
+            const { data, error } = await supabase.rpc('create_blink_quotation_revision', {
+                p_source_id: viewingQuotation.id,
+                p_exchange_rate: newRate,
+                p_revision_reason: revisionReason.trim(),
+                p_revised_by: user?.full_name || user?.username || 'User'
+            });
+            if (error) throw error;
 
-            const nextRevisionNumber = (parentQuotation.revision_number || 1) + 1;
-
-            const revisedQuotation = {
-                job_number: parentQuotation.jobNumber,
-                quotation_number: parentQuotation.quotationNumber,
-
-                customer_name: parentQuotation.customerName,
-                customer_company: parentQuotation.customerCompany,
-                customer_address: parentQuotation.customerAddress,
-                sales_person: parentQuotation.salesPerson,
-                quotation_type: parentQuotation.quotationType,
-                quotation_date: new Date().toISOString().split('T')[0],
-                trade_direction: normalizeTradeDirection(parentQuotation.tradeDirection) === 'unspecified'
-                    ? null
-                    : normalizeTradeDirection(parentQuotation.tradeDirection),
-                origin: parentQuotation.origin,
-                destination: parentQuotation.destination,
-                service_type: parentQuotation.serviceType,
-                cargo_type: parentQuotation.cargoType,
-                weight: parentQuotation.weight,
-                commodity: parentQuotation.commodity,
-                currency: parentQuotation.currency,
-                exchange_rate: parentQuotation.currency === 'IDR' ? 1 : (parentQuotation.exchange_rate || 16000),
-                total_amount: parentQuotation.totalAmount,
-                validity_days: parentQuotation.validityDays || 30,
-                notes: parentQuotation.notes,
-                service_items: parentQuotation.serviceItems,
-                revision_number: nextRevisionNumber,
-                parent_quotation_id: parentQuotation.parent_quotation_id || parentQuotation.id,
-                revision_reason: parentQuotation.revision_reason,
-                revised_at: new Date().toISOString(),
-                revised_by: 'Current User',
-                status: 'manager_approval',
-                is_superseded: false
-            };
-
-            const { data: newRevision, error: createError } = await supabase
-                .from('blink_quotations')
-                .insert([revisedQuotation])
-                .select()
-                .single();
-
-            if (createError) throw createError;
-
-            const { error: updateError } = await supabase
-                .from('blink_quotations')
-                .update({
-                    is_superseded: true,
-                    superseded_by_id: newRevision.id
-                })
-                .eq('id', quotationId);
-
-            if (updateError) throw updateError;
-
+            const newRevision = Array.isArray(data) ? data[0] : data;
             await fetchQuotations();
-            alert(`✅ Revision Rev ${nextRevisionNumber} created!\n\nStatus: Waiting manager approval\nJob Number: ${parentQuotation.jobNumber} Rev ${nextRevisionNumber}`);
-            setShowViewModal(false);
+            setShowRevisionModal(false);
+            setViewingQuotation(null);
+            window.dispatchEvent(new Event('blink_approval_updated'));
+            alert(`✅ Revision Rev ${newRevision?.revision_number || ''} created!\n\nStatus: Waiting manager approval\nJob Order: ${viewingQuotation.jobNumber || viewingQuotation.job_number}`);
         } catch (error) {
-            console.error('❌ Error creating revision:', error);
-            alert('❌ Failed to create revision: ' + error.message);
+            console.error('Error creating operational quotation revision:', error);
+            alert('❌ Failed to create revision: ' + (error.message || error));
+        } finally {
+            setIsCreatingRevision(false);
         }
     };
 
@@ -879,37 +896,66 @@ const QuotationManagement = () => {
             alert(t("You do not have permission (Create Shipment / Edit Quotation) to convert to Sales Order."));
             return;
         }
+        if (quotation.is_superseded || quotation.status !== 'manager_approval') {
+            alert(t("Only the active quotation revision awaiting approval can be converted to a Sales Order."));
+            return;
+        }
         console.log('🔵 Create SO clicked for quotation:', quotation.id);
         // Generate SO Number using centralized generator - Format: BLKYYMM-SO-XXXX
-        const { generateSONumber } = await import('../../utils/documentNumbers');
-        const soNumber = generateSONumber(quotation.jobNumber || quotation.quotationNumber);
-        console.log('📝 Generated SO Number:', soNumber);
-
-        // Auto-create Shipment in Operations
-        const serviceType = normalizeServiceType(quotation.serviceType || quotation.service_type);
-        const newShipment = {
-            jobNumber: quotation.jobNumber, // Already mapped to camelCase
-            soNumber: soNumber,
-            customer: quotation.customerName, // Already mapped
-            salesPerson: quotation.salesPerson, // Already mapped
-            quotationType: quotation.quotationType || 'RG',
-            quotationDate: quotation.quotationDate,
-            tradeDirection: normalizeTradeDirection(quotation.tradeDirection),
-            origin: quotation.origin,
-            destination: quotation.destination,
-            serviceType,
-            cargoType: quotation.cargoType,
-            weight: quotation.weight,
-            volume: quotation.volume,
-            commodity: quotation.commodity,
-            quotedAmount: quotation.totalAmount || 0, // Already mapped
-            status: 'pending',
-            createdAt: new Date().toISOString().split('T')[0],
-            createdFrom: 'sales_order'
-        };
-
-        // Save shipment to Supabase FIRST, then update quotation status on success
         try {
+            const jobNumber = quotation.jobNumber || quotation.job_number;
+            const operationalQuoteIds = quotations
+                .filter(existingQuotation => existingQuotation.job_number === jobNumber)
+                .map(existingQuotation => existingQuotation.id);
+            const { data: existingShipments, error: existingShipmentsError } = operationalQuoteIds.length
+                ? await supabase
+                    .from('blink_shipments')
+                    .select('id, so_number, quotation_id')
+                    .eq('job_number', jobNumber)
+                    .is('sales_quotation_id', null)
+                    .in('quotation_id', operationalQuoteIds)
+                    .neq('status', 'cancelled')
+                    .limit(1)
+                : { data: [], error: null };
+            if (existingShipmentsError) throw existingShipmentsError;
+            const existingOperationalShipment = existingShipments?.[0];
+            if (existingOperationalShipment) {
+                const { error: approvalError } = await supabase.rpc('approve_blink_quotation_revision', {
+                    p_quotation_id: quotation.id
+                });
+                if (approvalError) throw approvalError;
+
+                await fetchQuotations();
+                setShowViewModal(false);
+                alert(`✅ Quotation revision approved. Existing shipment ${existingOperationalShipment.so_number || ''} now uses Rev ${quotation.revision_number || 1} at the revised exchange rate.`);
+                return;
+            }
+
+            const { generateSONumber } = await import('../../utils/documentNumbers');
+            const soNumber = generateSONumber(quotation.jobNumber || quotation.quotationNumber);
+            console.log('📝 Generated SO Number:', soNumber);
+            const serviceType = normalizeServiceType(quotation.serviceType || quotation.service_type);
+            const newShipment = {
+                jobNumber: quotation.jobNumber,
+                soNumber,
+                customer: quotation.customerName,
+                salesPerson: quotation.salesPerson,
+                quotationType: quotation.quotationType || 'RG',
+                quotationDate: quotation.quotationDate,
+                tradeDirection: normalizeTradeDirection(quotation.tradeDirection),
+                origin: quotation.origin,
+                destination: quotation.destination,
+                serviceType,
+                cargoType: quotation.cargoType,
+                weight: quotation.weight,
+                volume: quotation.volume,
+                commodity: quotation.commodity,
+                quotedAmount: quotation.totalAmount || 0,
+                status: 'pending',
+                createdAt: new Date().toISOString().split('T')[0],
+                createdFrom: 'sales_order'
+            };
+
             // Determine BL type based on service type
             const isAirFreight = serviceType === 'air';
             const blType = isAirFreight ? 'AWB' : 'MBL';
@@ -917,7 +963,7 @@ const QuotationManagement = () => {
             const blNumber = `${blPrefix}-${soNumber}`;
             const baseQuotedAmount = parseCurrency(quotation.total_amount ?? quotation.totalAmount ?? 0);
 
-            const { data: shipmentData, error } = await supabase
+            const { error } = await supabase
                 .from('blink_shipments')
                 .insert([{
                     job_number: newShipment.jobNumber,
@@ -983,12 +1029,10 @@ const QuotationManagement = () => {
 
             if (error) throw error;
 
-            // ✅ Only update quotation status AFTER shipment is successfully created
-            const { error: updateError } = await supabase
-                .from('blink_quotations')
-                .update({ status: 'converted', updated_at: new Date().toISOString() })
-                .eq('id', quotation.id);
-            if (updateError) console.error('Warning: status update failed after SO creation:', updateError);
+            const { error: approvalError } = await supabase.rpc('approve_blink_quotation_revision', {
+                p_quotation_id: quotation.id
+            });
+            if (approvalError) throw approvalError;
 
             await fetchQuotations();
             setShowViewModal(false);
@@ -2287,11 +2331,22 @@ const QuotationManagement = () => {
 
 
                                 {/* Customer Decision */}
-
+                                {!viewingQuotation.is_superseded
+                                    && ['rejected', 'sent', 'approved', 'converted'].includes(viewingQuotation.status)
+                                    && canEdit('blink_quotations') && (
+                                    <Button
+                                        variant="secondary"
+                                        onClick={() => handleRequestRevision(viewingQuotation.id)}
+                                    >
+                                        {t("Request Re-quotation")}
+                                    </Button>
+                                )}
 
                                 {/* Create Revision (for revision_requested status) */}
-                                {viewingQuotation.status === 'revision_requested' && canCreate('blink_quotations') && (
-                                    <Button onClick={() => handleCreateRevision(viewingQuotation.id)} className="bg-blue-500/20 hover:bg-blue-500/30 text-blue-400">
+                                {viewingQuotation.status === 'revision_requested'
+                                    && !viewingQuotation.is_superseded
+                                    && canCreate('blink_quotations') && (
+                                    <Button onClick={openRevisionModal} className="bg-blue-500/20 hover:bg-blue-500/30 text-blue-400">
                                         {t("📝 Create Revision")}
                                     </Button>
                                 )}
@@ -2306,6 +2361,73 @@ const QuotationManagement = () => {
                             <Button variant="secondary" onClick={() => setShowViewModal(false)}>{t("Close")}</Button>
                         </div>
                     </div>
+                </Modal>
+            )}
+            {viewingQuotation && (
+                <Modal
+                    isOpen={showRevisionModal}
+                    onClose={() => {
+                        setShowRevisionModal(false);
+                        setShowViewModal(true);
+                    }}
+                    title={t("Create Operational Quotation Revision")}
+                    size="small"
+                >
+                    <form onSubmit={handleCreateRevision} className="space-y-4">
+                        <div className="rounded-lg border border-dark-border bg-dark-surface p-3 text-sm text-silver-light">
+                            <div>{t("Job Order")}: <span className="font-mono font-semibold">{viewingQuotation.jobNumber || viewingQuotation.job_number}</span></div>
+                            <div className="mt-1">{t("Quotation Number")}: <span className="font-mono font-semibold">{viewingQuotation.quotationNumber || viewingQuotation.quotation_number}</span></div>
+                            <div className="mt-1">{t("Current Revision")}: <span className="font-semibold">Rev {viewingQuotation.revision_number || 1}</span></div>
+                        </div>
+                        <div>
+                            <label className="mb-1 block text-sm font-medium text-silver-light">
+                                {t("New Exchange Rate (IDR per unit)")}
+                            </label>
+                            <input
+                                type="number"
+                                value={revisionRate}
+                                onChange={event => setRevisionRate(event.target.value)}
+                                disabled={viewingQuotation.currency === 'IDR' || isCreatingRevision}
+                                min="0.0001"
+                                step="0.01"
+                                required={viewingQuotation.currency !== 'IDR'}
+                                className="w-full rounded-lg border border-dark-border bg-dark-card px-3 py-2 text-silver-light disabled:opacity-60"
+                            />
+                            {viewingQuotation.currency === 'IDR' && (
+                                <p className="mt-1 text-xs text-silver-dark">{t("IDR quotations use a fixed exchange rate of 1.")}</p>
+                            )}
+                        </div>
+                        <div>
+                            <label className="mb-1 block text-sm font-medium text-silver-light">
+                                {t("Revision Reason")}
+                            </label>
+                            <textarea
+                                value={revisionReason}
+                                onChange={event => setRevisionReason(event.target.value)}
+                                rows={3}
+                                required
+                                maxLength={1000}
+                                disabled={isCreatingRevision}
+                                className="w-full rounded-lg border border-dark-border bg-dark-card px-3 py-2 text-silver-light"
+                            />
+                        </div>
+                        <div className="flex justify-end gap-2 border-t border-dark-border pt-4">
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                disabled={isCreatingRevision}
+                                onClick={() => {
+                                    setShowRevisionModal(false);
+                                    setShowViewModal(true);
+                                }}
+                            >
+                                {t("Cancel")}
+                            </Button>
+                            <Button type="submit" disabled={isCreatingRevision}>
+                                {isCreatingRevision ? t("Creating...") : t("Create Revision")}
+                            </Button>
+                        </div>
+                    </form>
                 </Modal>
             )}
             {showPrintPreview && (isEditingQuotation ? editedQuotation : viewingQuotation) && (

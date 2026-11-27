@@ -342,7 +342,7 @@ const AccountsReceivable = () => {
                                     <span className="text-sm font-medium text-slate-700 dark:text-silver-light">{bucket} {t("Days")}</span>
                                     <span className="text-sm font-bold text-slate-900 dark:text-silver-light">{formatAgingAmount(data.IDR)}</span>
                                 </div>
-                                <div className="h-7 rounded-lg border border-slate-300 bg-slate-200/90 p-0.5 shadow-inner dark:border-slate-700 dark:bg-slate-900/80">
+                                <div className="h-7 rounded-lg border border-slate-300 bg-slate-200/90 p-0.5 shadow-inner dark:border-slate-500 dark:bg-slate-600/80">
                                     <div
                                         className={`relative h-full overflow-hidden rounded-md border-t border-white/60 border-b border-black/20 bg-gradient-to-b shadow-[0_2px_0_rgba(15,23,42,0.4)] transition-[width] duration-500 ${
                                             bucket === '0-30' ? 'from-emerald-300 via-green-400 to-emerald-600' :
@@ -368,7 +368,7 @@ const AccountsReceivable = () => {
                                     <span className="text-sm font-medium text-slate-700 dark:text-silver-light">{bucket} {t("Days")}</span>
                                     <span className="text-sm font-bold text-slate-900 dark:text-silver-light">{formatAgingAmount(data.USD)}</span>
                                 </div>
-                                <div className="h-7 rounded-lg border border-slate-300 bg-slate-200/90 p-0.5 shadow-inner dark:border-slate-700 dark:bg-slate-900/80">
+                                <div className="h-7 rounded-lg border border-slate-300 bg-slate-200/90 p-0.5 shadow-inner dark:border-slate-500 dark:bg-slate-600/80">
                                     <div
                                         className={`relative h-full overflow-hidden rounded-md border-t border-white/60 border-b border-black/20 bg-gradient-to-b shadow-[0_2px_0_rgba(15,23,42,0.4)] transition-[width] duration-500 ${
                                             bucket === '0-30' ? 'from-emerald-300 via-green-400 to-emerald-600' :

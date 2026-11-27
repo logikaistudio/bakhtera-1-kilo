@@ -17,6 +17,8 @@ import {
 } from './warehouseStock';
 import { validateMutationRequests } from './mutationValidation';
 import { applyMutationTracking } from './mutationTracking';
+import { useDraftSave, getDraftFromStorage, clearDraftFromStorage, formatDraftTimestamp } from '../../hooks/useDraftSave';
+import DraftRecoveryPrompt from '../../components/Common/DraftRecoveryPrompt';
 
 const isWarehouseMutationRow = item => String(item?._replicaIndex || '').startsWith('warehouse');
 const getMutationSourceLocation = item =>
@@ -37,6 +39,10 @@ const WarehouseInventory = () => {
     const [editData, setEditData] = useState(null);
     // Tambahan: State untuk jam masuk (entryTime) saat edit
     const [entryTime, setEntryTime] = useState('');
+    
+    // Draft recovery states
+    const [showDraftRecovery, setShowDraftRecovery] = useState(false);
+    const [draftData, setDraftData] = useState(null);
 
     // Mutation modal states
     const [showMutationModal, setShowMutationModal] = useState(false);
@@ -370,6 +376,7 @@ const WarehouseInventory = () => {
                 setSelectedPengajuan(cleanedData);
                 setEditData(cleanedData);
                 setIsEditing(false);
+                clearDraftFromStorage(`warehouse_edit_${selectedPengajuan.id}`);
                 alert(t("Data inventaris berhasil disimpan"));
                 return;
             }
@@ -544,6 +551,7 @@ const WarehouseInventory = () => {
             // Update selectedPengajuan dengan data baru (approvedDate sudah update)
             setSelectedPengajuan({ ...editData, approvedDate: approvedDateISO, approved_date: approvedDateISO });
             setIsEditing(false);
+            clearDraftFromStorage(`warehouse_edit_${selectedPengajuan.id}`);
         } catch (error) {
             console.error('❌ Gagal menyimpan data:', error);
             alert('Gagal menyimpan data: ' + error.message);
@@ -895,6 +903,48 @@ const WarehouseInventory = () => {
             }
         }
     }, [searchParams, quotations, mutationLogs, showMutationModal]);
+
+    // Auto-save draft ketika editData berubah
+    useDraftSave(
+        selectedPengajuan?.id ? `warehouse_edit_${selectedPengajuan.id}` : null,
+        editData && isEditing ? { editData, entryTime, selectedPengajuan } : null,
+        30000 // Auto-save setiap 30 detik
+    );
+
+    // Check dan prompt restore draft saat selectedPengajuan berubah
+    useEffect(() => {
+        if (!selectedPengajuan?.id || isEditing) return;
+
+        const draftKey = `warehouse_edit_${selectedPengajuan.id}`;
+        const draft = getDraftFromStorage(draftKey);
+
+        if (draft && draft.data && draft.data.editData) {
+            setDraftData(draft);
+            setShowDraftRecovery(true);
+        } else {
+            setShowDraftRecovery(false);
+            setDraftData(null);
+        }
+    }, [selectedPengajuan?.id, isEditing]);
+
+    const handleRecoverDraft = () => {
+        if (!draftData || !draftData.data) return;
+
+        setEditData(draftData.data.editData);
+        setEntryTime(draftData.data.entryTime || '');
+        setIsEditing(true);
+        setShowDraftRecovery(false);
+        console.log('✅ Draft berhasil di-restore');
+    };
+
+    const handleDiscardDraft = () => {
+        if (!selectedPengajuan?.id) return;
+
+        clearDraftFromStorage(`warehouse_edit_${selectedPengajuan.id}`);
+        setShowDraftRecovery(false);
+        setDraftData(null);
+        console.log('🗑️ Draft berhasil dihapus');
+    };
 
     const handleCloseMutation = () => {
         setShowMutationModal(false);
@@ -1841,6 +1891,18 @@ const WarehouseInventory = () => {
                             <div className="flex-shrink-0 px-4 pt-4 pb-2">
                                 <h3 className="text-base font-bold text-gray-800 dark:text-silver-light">{t("📦 Data Inventaris")}</h3>
                             </div>
+
+                            {/* Draft Recovery Prompt */}
+                            {showDraftRecovery && draftData && (
+                                <div className="flex-shrink-0 px-4 pb-2">
+                                    <DraftRecoveryPrompt
+                                        draftTime={formatDraftTimestamp(draftData.timestamp)}
+                                        pengajuanNumber={selectedPengajuan.quotationNumber || selectedPengajuan.quotation_number}
+                                        onRecover={handleRecoverDraft}
+                                        onDiscard={handleDiscardDraft}
+                                    />
+                                </div>
+                            )}
 
                             {/* Header Table */}
                             <div className="flex-shrink-0 px-4 pb-4 border-b border-gray-200 dark:border-dark-border">
