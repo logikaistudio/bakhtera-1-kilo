@@ -19,6 +19,8 @@ import { validateMutationRequests } from './mutationValidation';
 import { applyMutationTracking } from './mutationTracking';
 import { useDraftSave, getDraftFromStorage, clearDraftFromStorage, formatDraftTimestamp } from '../../hooks/useDraftSave';
 import DraftRecoveryPrompt from '../../components/Common/DraftRecoveryPrompt';
+import { exportWarehouseToExcel, handleImportWarehouseData } from '../../utils/warehouseExportImport';
+import WarehouseImportExportPanel from '../../components/Common/WarehouseImportExportPanel';
 
 const isWarehouseMutationRow = item => String(item?._replicaIndex || '').startsWith('warehouse');
 const getMutationSourceLocation = item =>
@@ -43,6 +45,10 @@ const WarehouseInventory = () => {
     // Draft recovery states
     const [showDraftRecovery, setShowDraftRecovery] = useState(false);
     const [draftData, setDraftData] = useState(null);
+
+    // Export/Import states (Phase 2)
+    const [exportInProgress, setExportInProgress] = useState(false);
+    const [importInProgress, setImportInProgress] = useState(false);
 
     // Mutation modal states
     const [showMutationModal, setShowMutationModal] = useState(false);
@@ -1460,6 +1466,77 @@ const WarehouseInventory = () => {
         exportToCSV(exportData, 'Inventaris_Gudang', columns);
     };
 
+    // Phase 2: Export Warehouse Data as Excel Template
+    const handleExportData = async () => {
+        try {
+            setExportInProgress(true);
+            if (!selectedPengajuan) {
+                alert('Silakan pilih pengajuan untuk diekspor');
+                return;
+            }
+
+            const fileName = `Warehouse_${selectedPengajuan.quotationNumber || 'Export'}_${new Date().toISOString().split('T')[0]}.xlsx`;
+            await exportWarehouseToExcel(selectedPengajuan, fileName);
+            
+            setExportInProgress(false);
+        } catch (error) {
+            console.error('Export error:', error);
+            alert(`Gagal mengekspor data: ${error.message}`);
+            setExportInProgress(false);
+        }
+    };
+
+    // Phase 2: Import Warehouse Data from Excel/JSON
+    const handleImportData = async (file, mergeMode) => {
+        try {
+            setImportInProgress(true);
+            if (!selectedPengajuan) {
+                alert('Silakan pilih pengajuan untuk diimpor');
+                return;
+            }
+
+            const result = await handleImportWarehouseData(
+                file,
+                selectedPengajuan,
+                mergeMode,
+                warehouseInventory
+            );
+
+            if (result.success) {
+                // Update warehouse inventory dengan data yang diimpor
+                const updatedInventory = result.mergedData;
+                await updateWarehouseInventory(selectedPengajuan.id, {
+                    ...selectedPengajuan,
+                    packages: updatedInventory.packages
+                });
+
+                // Update editData jika sedang edit
+                if (isEditing && editData) {
+                    setEditData({
+                        ...editData,
+                        packages: updatedInventory.packages
+                    });
+                }
+
+                // Update selectedPengajuan untuk reflect perubahan
+                setSelectedPengajuan({
+                    ...selectedPengajuan,
+                    packages: updatedInventory.packages
+                });
+
+                alert(`✓ Data berhasil diimpor (Mode: ${mergeMode})\n${result.summary}`);
+                setImportInProgress(false);
+            } else {
+                alert(`⚠ Impor gagal: ${result.message}`);
+                setImportInProgress(false);
+            }
+        } catch (error) {
+            console.error('Import error:', error);
+            alert(`Gagal mengimpor data: ${error.message}`);
+            setImportInProgress(false);
+        }
+    };
+
     const displayData = isEditing ? editData : selectedPengajuan;
 
     // Helper to normalize strings for robust comparison
@@ -1876,9 +1953,23 @@ const WarehouseInventory = () => {
                                             {hasEdit && (
                                                 <Button onClick={handleStartEdit} variant="secondary" icon={Edit2} className="text-sm">{t("Kelola")}</Button>
                                             )}
+                                            {/* Phase 2: Import/Export Panel */}
+                                            <WarehouseImportExportPanel
+                                                onExport={handleExportData}
+                                                onImport={handleImportData}
+                                                isLoading={importInProgress}
+                                                exportInProgress={exportInProgress}
+                                            />
                                         </>
                                     ) : (
                                         <>
+                                            {/* Phase 2: Import/Export Panel (Edit Mode) */}
+                                            <WarehouseImportExportPanel
+                                                onExport={handleExportData}
+                                                onImport={handleImportData}
+                                                isLoading={importInProgress}
+                                                exportInProgress={exportInProgress}
+                                            />
                                             <Button onClick={handleCancelEdit} variant="secondary" icon={XCircle} className="text-sm">{t("Batal")}</Button>
                                             <Button onClick={handleSaveEdit} variant="primary" icon={Save} className="text-sm">{t("Simpan")}</Button>
                                         </>
