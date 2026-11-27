@@ -17,6 +17,9 @@ import UserManagement from './pages/Admin/UserManagement';
 import RolePermissions from './pages/Admin/RolePermissions';
 import UserPermissionAssignment from './pages/Admin/UserPermissionAssignment';
 
+// Backup & Recovery (Phase 3)
+import BackupManagementPanel from './components/Common/BackupManagementPanel';
+
 // Main Dashboard
 import FreightDashboard from './pages/FreightDashboard';
 
@@ -269,6 +272,7 @@ function App() {
                     <Route path="/bridge/code-of-account" element={<ProtectedRoute menuCode="bridge_coa"><CodeOfAccount /></ProtectedRoute>} />
                     <Route path="/bridge/master/partners" element={<ProtectedRoute menuCode="bridge_partners"><BridgePartnerManagement /></ProtectedRoute>} />
                     <Route path="/bridge/master/settings" element={<ProtectedRoute menuCode="bridge_settings"><BridgeCompanySettings /></ProtectedRoute>} />
+                    <Route path="/admin/backup-management" element={<ProtectedRoute requireSuperAdmin={true}><BackupManagementPanel /></ProtectedRoute>} />
 
                     {/* Big Module */}
                     <Route path="/big" element={<ProtectedRoute menuCode="big_dashboard"><BigDashboard /></ProtectedRoute>} />

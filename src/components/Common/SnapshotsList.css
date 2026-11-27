@@ -1,0 +1,223 @@
+.snapshots-list {
+  margin: 2rem 0;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.snapshots-list.loading,
+.snapshots-list.empty {
+  padding: 2rem;
+  text-align: center;
+  color: #666;
+  font-weight: 500;
+}
+
+.list-header {
+  padding: 1.5rem;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.list-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #1a1a1a;
+}
+
+/* Table */
+.table-wrapper {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+thead {
+  background: #f8f9fa;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+th {
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: #333;
+}
+
+tbody tr {
+  border-bottom: 1px solid #e0e0e0;
+  transition: background-color 0.2s;
+}
+
+tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+tbody tr.status-pending {
+  opacity: 0.7;
+}
+
+td {
+  padding: 1rem;
+  color: #555;
+}
+
+td.date {
+  font-size: 0.85rem;
+  color: #666;
+  white-space: nowrap;
+}
+
+td.name {
+  font-family: monospace;
+  font-size: 0.85rem;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+td.records {
+  font-weight: 500;
+  text-align: center;
+}
+
+td.size {
+  font-size: 0.85rem;
+  color: #666;
+  text-align: right;
+}
+
+td.status {
+  text-align: center;
+}
+
+/* Badges */
+.badge {
+  display: inline-block;
+  padding: 0.4rem 0.8rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.badge-green {
+  background: #d4edda;
+  color: #155724;
+}
+
+.badge-red {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.badge-yellow {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.badge-blue {
+  background: #d1ecf1;
+  color: #0c5460;
+}
+
+.badge-purple {
+  background: #e2d9f3;
+  color: #663399;
+}
+
+.badge-gray {
+  background: #e2e3e5;
+  color: #383d41;
+}
+
+/* Actions */
+td.actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.btn-action {
+  display: inline-block;
+  padding: 0.5rem 0.8rem;
+  margin-left: 0.5rem;
+  border: none;
+  border-radius: 4px;
+  background: #f0f0f0;
+  color: #333;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-action:hover:not(:disabled) {
+  background: #e0e0e0;
+  transform: translateY(-1px);
+}
+
+.btn-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-restore {
+  background: #d1ecf1;
+  color: #0c5460;
+}
+
+.btn-restore:hover:not(:disabled) {
+  background: #bee5eb;
+}
+
+.btn-delete {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.btn-delete:hover:not(:disabled) {
+  background: #f5c6cb;
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 1.5rem;
+  border-top: 1px solid #e0e0e0;
+  background: #f8f9fa;
+}
+
+.pagination button {
+  padding: 0.5rem 1rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: white;
+  color: #333;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pagination button:hover:not(:disabled) {
+  background: #f0f0f0;
+  border-color: #999;
+}
+
+.pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pagination span {
+  color: #666;
+  font-size: 0.9rem;
+}

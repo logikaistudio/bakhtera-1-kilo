@@ -10,8 +10,6 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "migrate:journal-schema": "node script/migrate_journal_schema.mjs"
-
-
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.89.0",
@@ -21,6 +19,7 @@
     "jspdf": "^4.2.0",
     "jspdf-autotable": "^5.0.2",
     "lucide-react": "^0.562.0",
+    "pako": "^3.0.3",
     "pg": "^8.16.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
