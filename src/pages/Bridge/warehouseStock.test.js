@@ -3,9 +3,22 @@ import test from 'node:test';
 import {
     getExternalLocationBalances,
     getWarehouseStock,
+    getWarehouseInventoryScopeFilters,
     planWarehouseStockDeductions,
     shouldShowWarehouseMutationRow
 } from './warehouseStock.js';
+
+test('tries a warehouse row ID, submission ID, then submission number', () => {
+    assert.deepEqual(getWarehouseInventoryScopeFilters({
+        id: 'warehouse-1',
+        pengajuanId: 'source-1',
+        pengajuanNumber: 'BRG-1'
+    }), [
+        { column: 'id', value: 'warehouse-1' },
+        { column: 'pengajuan_id', value: 'source-1' },
+        { column: 'pengajuan_number', value: 'BRG-1' }
+    ]);
+});
 
 test('tracks direct transfers between external locations without duplicating quantity', () => {
     assert.deepEqual(getExternalLocationBalances([

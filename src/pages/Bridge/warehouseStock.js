@@ -1,5 +1,11 @@
 const normalize = value => String(value ?? '').trim().toLowerCase();
 
+export const getWarehouseInventoryScopeFilters = (scope) => [
+    ...(scope?.id ? [{ column: 'id', value: scope.id }] : []),
+    ...(scope?.pengajuanId ? [{ column: 'pengajuan_id', value: scope.pengajuanId }] : []),
+    ...(scope?.pengajuanNumber ? [{ column: 'pengajuan_number', value: scope.pengajuanNumber }] : [])
+];
+
 export const shouldShowWarehouseMutationRow = (warehouseStock, hasOutstandingExternalStock) =>
     Number(warehouseStock ?? 0) > 0 || !hasOutstandingExternalStock;
 

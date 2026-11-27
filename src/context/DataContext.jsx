@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { fileToBase64, validateImage } from '../utils/validateImage';
 import { useAuth } from './AuthContext';
 import { getActiveDivision, canViewPartnerInDivision } from '../utils/divisionContext';
+import { getWarehouseInventoryScopeFilters } from '../pages/Bridge/warehouseStock';
 
 const DataContext = createContext();
 
@@ -2195,26 +2196,32 @@ export const DataProvider = ({ children }) => {
 
     // Warehouse Inventory helper function
     const updateInventoryStock = async (assetId, assetName, quantity, unit, type, transactionId, value, inventoryScope = null) => {
-        let inventoryQuery = supabase
-            .from('freight_warehouse')
-            .select('*')
-            .eq('item_code', assetId);
+        const scopeFilters = inventoryScope
+            ? getWarehouseInventoryScopeFilters(inventoryScope)
+            : [null];
+        let matchingInventory = [];
 
-        if (inventoryScope?.id) {
-            inventoryQuery = inventoryQuery.eq('id', inventoryScope.id);
-        } else if (inventoryScope) {
-            if (inventoryScope.pengajuanId) inventoryQuery = inventoryQuery.eq('pengajuan_id', inventoryScope.pengajuanId);
-            else if (inventoryScope.pengajuanNumber) inventoryQuery = inventoryQuery.eq('pengajuan_number', inventoryScope.pengajuanNumber);
-            if (inventoryScope.packageNumber) inventoryQuery = inventoryQuery.eq('package_number', inventoryScope.packageNumber);
-        } else {
-            inventoryQuery = inventoryQuery.limit(1);
-        }
+        for (const scopeFilter of scopeFilters.length ? scopeFilters : [null]) {
+            let inventoryQuery = supabase
+                .from('freight_warehouse')
+                .select('*')
+                .eq('item_code', assetId);
 
-        const { data: matchingInventory, error } = await inventoryQuery;
+            if (scopeFilter) inventoryQuery = inventoryQuery.eq(scopeFilter.column, scopeFilter.value);
+            if (inventoryScope?.packageNumber) {
+                inventoryQuery = inventoryQuery.eq('package_number', inventoryScope.packageNumber);
+            }
+            if (!inventoryScope) inventoryQuery = inventoryQuery.limit(1);
 
-        if (error) {
-            console.error('Error reading warehouse stock:', error);
-            throw error;
+            const { data, error } = await inventoryQuery;
+            if (error) {
+                console.error('Error reading warehouse stock:', error);
+                throw error;
+            }
+            if (data?.length) {
+                matchingInventory = data;
+                break;
+            }
         }
 
         const fallbackInventory = !inventoryScope ? warehouseInventory.find(i => i.assetId === assetId) : null;
