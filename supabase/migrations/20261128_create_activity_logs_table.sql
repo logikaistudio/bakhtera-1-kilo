@@ -30,33 +30,14 @@ CREATE INDEX IF NOT EXISTS idx_activity_logs_created_at ON activity_logs(created
 -- Enable RLS (Row Level Security)
 ALTER TABLE activity_logs ENABLE ROW LEVEL SECURITY;
 
--- Policy: Authenticated users can read all activity logs
--- (Activity logs are audit data that should be visible to authorized users)
-CREATE POLICY "authenticated_users_can_read_activity_logs"
-    ON activity_logs
-    FOR SELECT
-    TO authenticated
-    USING (true);
-
--- Policy: Only authenticated users can insert activity logs
--- (Created by backend/triggers, not directly by users)
-CREATE POLICY "authenticated_users_can_insert_activity_logs"
-    ON activity_logs
-    FOR INSERT
-    TO authenticated
-    WITH CHECK (true);
-
--- Policy: Authenticated users can delete activity logs
--- (Role check is enforced in the app; user_roles table is not part of this schema)
-CREATE POLICY "authenticated_users_can_delete_activity_logs"
-    ON activity_logs
-    FOR DELETE
-    TO authenticated
-    USING (true);
+-- Policies follow the app convention (no Supabase Auth session: login is custom,
+-- so requests run as the anon role). Access control is enforced in the app.
+CREATE POLICY "activity_logs_select" ON activity_logs FOR SELECT USING (true);
+CREATE POLICY "activity_logs_insert" ON activity_logs FOR INSERT WITH CHECK (true);
+CREATE POLICY "activity_logs_delete" ON activity_logs FOR DELETE USING (true);
 
 -- Grant permissions
-GRANT SELECT, INSERT ON activity_logs TO authenticated;
-GRANT DELETE ON activity_logs TO authenticated; -- Will be restricted by policy
+GRANT SELECT, INSERT, DELETE ON activity_logs TO anon, authenticated;
 
 -- Add comments for documentation
 COMMENT ON TABLE activity_logs IS 'Comprehensive audit trail for all data modifications across the Bridge application';
