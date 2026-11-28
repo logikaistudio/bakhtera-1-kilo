@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { createTrackedFetch } from './activityTracker';
 
 // Supabase configuration
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || import.meta.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -35,6 +36,9 @@ const client = createClient(supabaseUrl, supabaseKey, {
     },
     db: {
         schema: 'public'
+    },
+    global: {
+        fetch: createTrackedFetch({ baseUrl: supabaseUrl, apiKey: supabaseKey })
     }
 });
 

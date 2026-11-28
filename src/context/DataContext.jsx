@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { getActivityActor } from '../lib/activityTracker';
 import { fileToBase64, validateImage } from '../utils/validateImage';
 import { useAuth } from './AuthContext';
 import { getActiveDivision, canViewPartnerInDivision } from '../utils/divisionContext';
@@ -94,17 +95,7 @@ export const DataProvider = ({ children }) => {
     const logActivity = async (module, action, entityType, entityId, entityName, details, user = null) => {
         try {
             // Get current user if not provided
-            let currentUser = user;
-            if (!currentUser) {
-                const { data: { user: authUser } } = await supabase.auth.getUser();
-                if (authUser) {
-                    currentUser = {
-                        id: authUser.id,
-                        email: authUser.email,
-                        name: authUser.user_metadata?.name || 'Unknown User'
-                    };
-                }
-            }
+            const currentUser = user || getActivityActor();
 
             // Create log entry
             const newLog = {

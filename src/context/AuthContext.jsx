@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { login as loginService, logout as logoutService, validateSession, getUserPermissions } from '../services/authService';
+import { setActivityActor } from '../lib/activityTracker';
 import { syncRolePermissionsWithMenus } from '../services/rolePermissionSyncService';
 import { getActiveDivision } from '../utils/divisionContext';
 
@@ -15,6 +16,10 @@ export const AuthProvider = ({ children }) => {
     const [permissions, setPermissions] = useState({});
     const [loading, setLoading] = useState(true);
     const [sessionToken, setSessionToken] = useState(null);
+
+    useEffect(() => {
+        setActivityActor(user);
+    }, [user]);
 
     // Load session from localStorage on mount
     useEffect(() => {

@@ -5,6 +5,7 @@
  */
 
 import { supabase } from '../lib/supabase';
+import { getActivityActor } from '../lib/activityTracker';
 
 /**
  * Log an activity to the database
@@ -30,17 +31,7 @@ export const logActivity = async (
 ) => {
     try {
         // Get current user if not provided
-        let currentUser = user;
-        if (!currentUser) {
-            const { data: { user: authUser } } = await supabase.auth.getUser();
-            if (authUser) {
-                currentUser = {
-                    id: authUser.id,
-                    email: authUser.email,
-                    name: authUser.user_metadata?.name || 'Unknown User'
-                };
-            }
-        }
+        const currentUser = user || getActivityActor();
 
         // Create log entry
         const logEntry = {
