@@ -4,6 +4,7 @@ import { fileToBase64, validateImage } from '../utils/validateImage';
 import { useAuth } from './AuthContext';
 import { getActiveDivision, canViewPartnerInDivision } from '../utils/divisionContext';
 import { getWarehouseInventoryScopeFilters } from '../pages/Bridge/warehouseStock';
+import { logActivity as logActivityToService, fetchActivityLogs } from '../services/activityService';
 
 const DataContext = createContext();
 
@@ -89,20 +90,54 @@ export const DataProvider = ({ children }) => {
         return false;
     };
 
-    // Helper function to log activity
-    const logActivity = (module, action, entityType, entityId, entityName, details, user = 'System User') => {
-        const newLog = {
-            id: `log-${Date.now()}`,
-            timestamp: new Date().toISOString(),
-            module,
-            action,
-            entityType,
-            entityId,
-            entityName,
-            user,
-            details
-        };
-        setActivityLogs(prev => [newLog, ...prev]);
+    // Helper function to log activity (now saves to database)
+    const logActivity = async (module, action, entityType, entityId, entityName, details, user = null) => {
+        try {
+            // Get current user if not provided
+            let currentUser = user;
+            if (!currentUser) {
+                const { data: { user: authUser } } = await supabase.auth.getUser();
+                if (authUser) {
+                    currentUser = {
+                        id: authUser.id,
+                        email: authUser.email,
+                        name: authUser.user_metadata?.name || 'Unknown User'
+                    };
+                }
+            }
+
+            // Create log entry
+            const newLog = {
+                id: `log-${Date.now()}`,
+                timestamp: new Date().toISOString(),
+                module,
+                action,
+                entityType,
+                entityId,
+                entityName,
+                user: currentUser?.name || currentUser?.email || 'Unknown User',
+                userId: currentUser?.id,
+                userEmail: currentUser?.email,
+                details
+            };
+
+            // Add to local state immediately for UI response
+            setActivityLogs(prev => [newLog, ...prev]);
+
+            // Log to database asynchronously
+            await logActivityToService(
+                module,
+                action,
+                entityType,
+                entityId,
+                entityName,
+                details,
+                {},
+                currentUser
+            );
+        } catch (error) {
+            console.error('Error logging activity:', error);
+        }
     };
 
     // Pending Approvals (persisted to Supabase)
@@ -654,6 +689,20 @@ export const DataProvider = ({ children }) => {
         return () => {
             isActive = false;
         };
+    }, []);
+
+    // Load activity logs on mount
+    useEffect(() => {
+        const loadActivityLogs = async () => {
+            try {
+                const logs = await fetchActivityLogs({ limit: 1000 });
+                setActivityLogs(logs);
+            } catch (error) {
+                console.error('Error loading activity logs:', error);
+            }
+        };
+
+        loadActivityLogs();
     }, []);
 
     // Realtime Subscriptions
