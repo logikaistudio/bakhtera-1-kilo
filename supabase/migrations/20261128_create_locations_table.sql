@@ -22,40 +22,15 @@ CREATE INDEX IF NOT EXISTS idx_locations_is_default ON locations(is_default);
 -- Enable RLS (Row Level Security)
 ALTER TABLE locations ENABLE ROW LEVEL SECURITY;
 
--- Policy: Authenticated users can read all locations
-CREATE POLICY "authenticated_users_can_read_locations"
-    ON locations
-    FOR SELECT
-    TO authenticated
-    USING (true);
-
--- Policy: Authenticated users can create locations (admin-only in app)
-CREATE POLICY "authenticated_users_can_create_locations"
-    ON locations
-    FOR INSERT
-    TO authenticated
-    WITH CHECK (true);
-
--- Policy: Authenticated users can update locations (admin-only in app)
-CREATE POLICY "authenticated_users_can_update_locations"
-    ON locations
-    FOR UPDATE
-    TO authenticated
-    USING (true)
-    WITH CHECK (true);
-
--- Policy: Super admins can delete locations
-CREATE POLICY "superadmins_can_delete_locations"
-    ON locations
-    FOR DELETE
-    TO authenticated
-    USING (
-        (SELECT role FROM user_roles WHERE user_id = auth.uid() LIMIT 1) = 'admin'
-    );
+-- Policies follow the app convention (no Supabase Auth session: login is custom,
+-- so requests run as the anon role). Access control is enforced in the app.
+CREATE POLICY "locations_select" ON locations FOR SELECT USING (true);
+CREATE POLICY "locations_insert" ON locations FOR INSERT WITH CHECK (true);
+CREATE POLICY "locations_update" ON locations FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "locations_delete" ON locations FOR DELETE USING (true);
 
 -- Grant permissions
-GRANT SELECT, INSERT, UPDATE ON locations TO authenticated;
-GRANT DELETE ON locations TO authenticated; -- Will be restricted by policy
+GRANT SELECT, INSERT, UPDATE, DELETE ON locations TO anon, authenticated;
 
 -- Add comments for documentation
 COMMENT ON TABLE locations IS 'Storage and warehouse location master data for inventory management';
