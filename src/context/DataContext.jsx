@@ -83,7 +83,7 @@ export const DataProvider = ({ children }) => {
     const [activityLogs, setActivityLogs] = useState([]);
 
     // Auth helpers (AuthProvider wraps DataProvider)
-    const { isAdmin, isSuperAdmin } = useAuth();
+    const { isAdmin, isSuperAdmin, user: authUser, loading: authLoading } = useAuth();
     const ensureSuperAdminDelete = () => {
         if (isSuperAdmin()) return true;
         alert('Akses Ditolak: hanya superadmin yang dapat menghapus data.');
@@ -691,19 +691,23 @@ export const DataProvider = ({ children }) => {
         };
     }, []);
 
-    // Load activity logs on mount
+    // Load activity logs once the user session is ready (RLS requires authenticated role)
     useEffect(() => {
+        if (authLoading || !authUser) return;
+        let isActive = true;
+
         const loadActivityLogs = async () => {
             try {
                 const logs = await fetchActivityLogs({ limit: 1000 });
-                setActivityLogs(logs);
+                if (isActive) setActivityLogs(logs);
             } catch (error) {
                 console.error('Error loading activity logs:', error);
             }
         };
 
         loadActivityLogs();
-    }, []);
+        return () => { isActive = false; };
+    }, [authLoading, authUser?.id]);
 
     // Realtime Subscriptions
     useEffect(() => {
